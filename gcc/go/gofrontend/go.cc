@@ -40,6 +40,8 @@ go_create_gogo(const struct go_create_gogo_args* args)
     ::gogo->set_compiling_runtime(args->compiling_runtime);
   if (args->c_header != NULL)
     ::gogo->set_c_header(args->c_header);
+  if (args->importcfg != NULL)
+    ::gogo->read_importcfg(args->importcfg);
   if (args->embedcfg != NULL)
     ::gogo->read_embedcfg(args->embedcfg);
   ::gogo->set_debug_escape_level(args->debug_escape_level);
@@ -145,6 +147,9 @@ go_parse_input_files(const char** filenames, unsigned int filename_count,
 
   if (only_check_syntax)
     return;
+
+  // Record global variable initializer dependencies.
+  ::gogo->record_global_init_refs();
 
   // Do simple deadcode elimination.
   ::gogo->remove_deadcode();

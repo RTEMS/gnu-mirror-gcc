@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 2020-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 2020-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -1197,6 +1197,12 @@ package body Gen_IL.Gen is
          for F in First .. Last loop
             if Field_Table (F).Field_Type in Node_Or_Entity_Type then
                Result (Node_Id) := True;
+
+            --  Subtypes of Uint all use the same Cast for Uint
+
+            elsif Field_Table (F).Field_Type in Uint_Subtype then
+               Result (Uint) := True;
+
             else
                Result (Field_Table (F).Field_Type) := True;
             end if;
@@ -1419,7 +1425,7 @@ package body Gen_IL.Gen is
         (S : in out Sink; T : Type_Enum)
       is
          Pre : constant String :=
-           "function Cast is new Unchecked_Conversion (";
+           "function Cast is new Ada.Unchecked_Conversion (";
          Lo_Type : constant String := "Field_Size_" & Image (Field_Size (T)) & "_Bit";
          Hi_Type : constant String := Get_Set_Id_Image (T);
       begin
@@ -1767,6 +1773,7 @@ package body Gen_IL.Gen is
          end if;
 
          Put_Get_Set_Incr (S, F, "Set");
+
          Decrease_Indent (S, 3);
          Put (S, "end Set_" & Image (F) & ";" & LF & LF);
       end Put_Setter_Body;
@@ -2128,9 +2135,13 @@ package body Gen_IL.Gen is
 
                procedure One_Comp (F : Field_Enum);
 
+               --------------
+               -- One_Comp --
+               --------------
+
                procedure One_Comp (F : Field_Enum) is
                   pragma Annotate (Codepeer, Modified, Field_Table);
-                  Offset : constant Field_Offset :=  Field_Table (F).Offset;
+                  Offset : constant Field_Offset := Field_Table (F).Offset;
                begin
                   if First_Time then
                      First_Time := False;
@@ -2150,7 +2161,8 @@ package body Gen_IL.Gen is
 
                   Put (S, F_Image (F) & " => (" &
                        Image (Field_Table (F).Field_Type) & "_Field, " &
-                       Image (Offset) & ")");
+                       Image (Offset) & ", " &
+                       Image (Field_Table (F).Type_Only) & ")");
 
                   FS := Field_Size (F);
                   FB := First_Bit (F, Offset);
@@ -2245,10 +2257,32 @@ package body Gen_IL.Gen is
          Decrease_Indent (S, 2);
          Put (S, ");" & LF & LF);
 
+         Put (S, "type Type_Only_Enum is" & LF);
+         Increase_Indent (S, 2);
+         Put (S, "(");
+
+         declare
+            First_Time : Boolean := True;
+         begin
+            for TO in Type_Only_Enum loop
+               if First_Time then
+                  First_Time := False;
+               else
+                  Put (S, ", ");
+               end if;
+
+               Put (S, Image (TO));
+            end loop;
+         end;
+
+         Decrease_Indent (S, 2);
+         Put (S, ");" & LF & LF);
+
          Put (S, "type Field_Descriptor is record" & LF);
          Increase_Indent (S, 3);
          Put (S, "Kind : Field_Kind;" & LF);
          Put (S, "Offset : Field_Offset;" & LF);
+         Put (S, "Type_Only : Type_Only_Enum;" & LF);
          Decrease_Indent (S, 3);
          Put (S, "end record;" & LF & LF);
 
@@ -2304,7 +2338,7 @@ package body Gen_IL.Gen is
          Decrease_Indent (S, 3);
          Put (S, LF & "end Sinfo.Nodes;" & LF);
 
-         Put (B, "with Unchecked_Conversion;" & LF);
+         Put (B, "with Ada.Unchecked_Conversion;" & LF);
          Put (B, "with Atree; use Atree; use Atree.Atree_Private_Part;" & LF);
          Put (B, "with Nlists; use Nlists;" & LF);
          Put (B, "pragma Warnings (Off);" & LF);
@@ -2360,7 +2394,7 @@ package body Gen_IL.Gen is
          Decrease_Indent (S, 3);
          Put (S, LF & "end Einfo.Entities;" & LF);
 
-         Put (B, "with Unchecked_Conversion;" & LF);
+         Put (B, "with Ada.Unchecked_Conversion;" & LF);
          Put (B, "with Atree; use Atree; use Atree.Atree_Private_Part;" & LF);
          Put (B, "with Einfo.Utils; use Einfo.Utils;" & LF);
          --  This forms a cycle between packages (via bodies, which is OK)
@@ -2438,7 +2472,8 @@ package body Gen_IL.Gen is
          for T in First_Concrete (Root) .. Last_Concrete (Root) loop
             if T not in N_Unused_At_Start | N_Unused_At_End then
                Put_Make_Spec (S, Root, T);
-               Put (S, ";" & LF & "pragma " & Inline & " (Make_" &
+               Put (S, ";" & LF);
+               Put (S, "pragma " & Inline & " (Make_" &
                     Image_Sans_N (T) & ");" & LF & LF);
             end if;
          end loop;
@@ -2922,9 +2957,9 @@ package body Gen_IL.Gen is
          --  Current Node_Kind'Pos or Entity_Kind'Pos to be printed
 
          procedure Put_Enum_Lit (T : Node_Or_Entity_Type);
-         --  Print out the #define corresponding to the Ada enumeration literal
+         --  Print out the enumerator corresponding to the Ada enumeration literal
          --  for T in Node_Kind and Entity_Kind (i.e. concrete types).
-         --  This looks like "#define Some_Kind <pos>", where Some_Kind
+         --  This looks like "Some_Kind = <pos>", where Some_Kind
          --  is the Node_Kind or Entity_Kind enumeration literal, and
          --  <pos> is Node_Kind'Pos or Entity_Kind'Pos of that literal.
 
@@ -2935,7 +2970,7 @@ package body Gen_IL.Gen is
          procedure Put_Enum_Lit (T : Node_Or_Entity_Type) is
          begin
             if T in Concrete_Type then
-               Put (S, "#define " & Image (T) & " " & Image (Cur_Pos) & LF);
+               Put (S, "  " & Image (T) & " = " & Image (Cur_Pos) & "," & LF);
                Cur_Pos := Cur_Pos + 1;
             end if;
          end Put_Enum_Lit;
@@ -2955,7 +2990,9 @@ package body Gen_IL.Gen is
       begin
          Put_Union_Membership (S, Root, Only_Prototypes => True);
 
+         Put (S, "enum " & Node_Or_Entity (Root) & "_Kind : unsigned int {" & LF);
          Iterate_Types (Root, Pre => Put_Enum_Lit'Access);
+         Put (S, "};" & LF);
 
          Put (S, "#define Number_" & Node_Or_Entity (Root) & "_Kinds " &
               Image (Cur_Pos) & "" & LF & LF);
@@ -3011,7 +3048,8 @@ package body Gen_IL.Gen is
             Put (S, "unsigned int Raw = slot;" & LF);
          end if;
 
-         Put (S, Get_Set_Id_Image (Rec.Field_Type) & " val = ");
+         Put (S, Get_Set_Id_Image (Rec.Field_Type) & " val = (" &
+                Get_Set_Id_Image (Rec.Field_Type) & ") ");
 
          if Field_Has_Special_Default (Rec.Field_Type) then
             Increase_Indent (S, 2);

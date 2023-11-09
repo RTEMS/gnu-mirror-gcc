@@ -1,5 +1,5 @@
 /* Definitions for specs for C++.
-   Copyright (C) 1995-2021 Free Software Foundation, Inc.
+   Copyright (C) 1995-2023 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -17,7 +17,7 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-/* This is the contribution to the `default_compilers' array in gcc.c for
+/* This is the contribution to the `default_compilers' array in gcc.cc for
    g++.  */
 
 #ifndef CPLUSPLUS_CPP_SPEC
@@ -53,9 +53,9 @@ along with GCC; see the file COPYING3.  If not see
       "  %{fmodules-ts:-fmodule-header %{fpreprocessed:-fdirectives-only}}"
       "  %(cc1_options) %2"
       "  %{!fsyntax-only:"
-      "    %{!S:-o %g.s%V}"
+      "    %{!S:-o %g.s}"
       "    %{!fmodule-*:%{!fmodules-*:%{!fdump-ada-spec*:"
-      "	         %{!o*:--output-pch=%i.gch}%W{o*:--output-pch=%*}}}}}"
+      "	         %{!o*:--output-pch %w%i.gch}%W{o*:--output-pch %w%*}}}}%{!S:%V}}"
       "}}}",
      CPLUSPLUS_CPP_SPEC, 0, 0},
   {"@c++-system-header",
@@ -74,9 +74,9 @@ along with GCC; see the file COPYING3.  If not see
       "    %{fpreprocessed:-fdirectives-only}}"
       "  %(cc1_options) %2"
       "  %{!fsyntax-only:"
-      "    %{!S:-o %g.s%V}"
+      "    %{!S:-o %g.s}"
       "    %{!fmodule-*:%{!fmodules-*:%{!fdump-ada-spec*:"
-      "	         %{!o*:--output-pch=%i.gch}%W{o*:--output-pch=%*}}}}}"
+      "	         %{!o*:--output-pch %w%i.gch}%W{o*:--output-pch %w%*}}}}%{!S:%V}}"
       "}}}",
      CPLUSPLUS_CPP_SPEC, 0, 0},
   {"@c++-user-header",
@@ -94,9 +94,9 @@ along with GCC; see the file COPYING3.  If not see
       "  %{fmodules-ts:-fmodule-header=user %{fpreprocessed:-fdirectives-only}}"
       "  %(cc1_options) %2"
       "  %{!fsyntax-only:"
-      "    %{!S:-o %g.s%V}"
+      "    %{!S:-o %g.s}"
       "    %{!fmodule-*:%{!fmodules-*:%{!fdump-ada-spec*:"
-      "	         %{!o*:--output-pch=%i.gch}%W{o*:--output-pch=%*}}}}}"
+      "	         %{!o*:--output-pch %w%i.gch}%W{o*:--output-pch %w%*}}}}%{!S:%V}}"
       "}}}",
      CPLUSPLUS_CPP_SPEC, 0, 0},
   {"@c++",

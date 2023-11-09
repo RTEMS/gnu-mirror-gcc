@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -30,6 +30,7 @@ with Checks;
 with CStand;
 with Debug;          use Debug;
 with Elists;
+with Exp_Ch6;
 with Exp_Dbug;
 with Exp_Unst;
 with Fmap;
@@ -38,7 +39,6 @@ with Ghost;          use Ghost;
 with Inline;         use Inline;
 with Lib;            use Lib;
 with Lib.Load;       use Lib.Load;
-with Lib.Xref;
 with Live;           use Live;
 with Namet;          use Namet;
 with Nlists;         use Nlists;
@@ -69,6 +69,7 @@ with SCIL_LL;
 with Tbuild;         use Tbuild;
 with Types;          use Types;
 with VAST;
+with Warnsw;         use Warnsw;
 
 procedure Frontend is
 begin
@@ -425,24 +426,17 @@ begin
 
             --  Cleanup processing after completing main analysis
 
-            --  In GNATprove_Mode we do not perform most expansions but body
-            --  instantiation is needed.
-
-            pragma Assert
-              (Operating_Mode = Generate_Code
-                or else Operating_Mode = Check_Semantics);
-
-            if Operating_Mode = Generate_Code
-              or else GNATprove_Mode
-            then
-               Instantiate_Bodies;
-            end if;
-
-            --  Analyze all inlined bodies, check access-before-elaboration
-            --  rules, and remove ignored Ghost code when generating code or
-            --  compiling for GNATprove.
+            pragma Assert (Operating_Mode in Check_Semantics | Generate_Code);
 
             if Operating_Mode = Generate_Code or else GNATprove_Mode then
+
+               --  In GNATprove_Mode we do not perform most expansions but body
+               --  instantiation is needed.
+
+               Instantiate_Bodies;
+
+               --  Analyze inlined bodies if required
+
                if Inline_Processing_Required then
                   Analyze_Inlined_Bodies;
                end if;
@@ -453,6 +447,8 @@ begin
                if Debug_Flag_UU then
                   Collect_Garbage_Entities;
                end if;
+
+               --  Check access-before-elaboration rules
 
                if Legacy_Elaboration_Checks then
                   Check_Elab_Calls;
@@ -473,12 +469,6 @@ begin
                Check_Elaboration_Scenarios;
             end if;
 
-            --  At this stage we can unnest subprogram bodies if required
-
-            if Total_Errors_Detected = 0 then
-               Exp_Unst.Unnest_Subprograms (Cunit (Main_Unit));
-            end if;
-
             --  List library units if requested
 
             if List_Units then
@@ -487,19 +477,25 @@ begin
 
             --  Output waiting warning messages
 
-            Lib.Xref.Process_Deferred_References;
             Sem_Warn.Output_Non_Modified_In_Out_Warnings;
             Sem_Warn.Output_Unreferenced_Messages;
             Sem_Warn.Check_Unused_Withs;
             Sem_Warn.Output_Unused_Warnings_Off_Warnings;
 
             --  Remove any ignored Ghost code as it must not appear in the
-            --  executable. This action must be performed last because it
+            --  executable. This action must be performed very late because it
             --  heavily alters the tree.
 
             if Operating_Mode = Generate_Code or else GNATprove_Mode then
                Remove_Ignored_Ghost_Code;
             end if;
+
+            --  At this stage we can unnest subprogram bodies if required
+
+            if Total_Errors_Detected = 0 then
+               Exp_Unst.Unnest_Subprograms (Cunit (Main_Unit));
+            end if;
+
          end if;
       end if;
    end;
@@ -524,6 +520,16 @@ begin
       VAST.Check_Tree (Cunit (Main_Unit));
    end if;
 
+   --  Validate all the subprogram calls; this work will be done by VAST; in
+   --  the meantime it is done to check extra formals and it can be disabled
+   --  using -gnatd_X (which also disables all the other assertions on extra
+   --  formals). It is invoked using pragma Debug to avoid adding any cost
+   --  when the compiler is built with assertions disabled.
+
+   if not Debug_Flag_Underscore_XX then
+      pragma Debug (Exp_Ch6.Validate_Subprogram_Calls (Cunit (Main_Unit)));
+   end if;
+
    --  Dump the source now. Note that we do this as soon as the analysis
    --  of the tree is complete, because it is not just a dump in the case
    --  of -gnatD, where it rewrites all source locations in the tree.
@@ -538,7 +544,7 @@ begin
    --  Initialize_Scalars, but others should be checked: as well???
 
    declare
-      Item  : Node_Id;
+      Item : Node_Id;
 
    begin
       Item := First (Context_Items (Cunit (Main_Unit)));
@@ -559,6 +565,4 @@ begin
    if Mapping_File_Name /= null then
       Fmap.Update_Mapping_File (Mapping_File_Name.all);
    end if;
-
-   return;
 end Frontend;

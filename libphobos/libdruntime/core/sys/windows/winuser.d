@@ -4,11 +4,10 @@
  * Translated from MinGW Windows headers
  *
  * License: $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
- * Source: $(DRUNTIMESRC src/core/sys/windows/_winuser.d)
+ * Source: $(DRUNTIMESRC core/sys/windows/_winuser.d)
  */
 module core.sys.windows.winuser;
 version (Windows):
-@system:
 
 version (ANSI) {} else version = Unicode;
 pragma(lib, "user32");
@@ -3422,7 +3421,7 @@ align(4) LUID  luid;
     }
     alias BSMINFO* PBSMINFO;
 
-    alias TypeDef!(HANDLE) HRAWINPUT;
+    alias HANDLE HRAWINPUT;
 
     struct RAWINPUTHEADER {
         DWORD dwType;
@@ -4156,7 +4155,7 @@ extern (C) {
 
 
 // These shouldn't be necessary for D.
-alias TypeDef!(char*) va_list_;
+alias char* va_list_;
 int wvsprintfA(LPSTR, LPCSTR, va_list_ arglist);
 int wvsprintfW(LPWSTR, LPCWSTR, va_list_ arglist);
 

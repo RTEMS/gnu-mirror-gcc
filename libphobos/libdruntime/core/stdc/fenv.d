@@ -24,7 +24,6 @@ else version (WatchOS)
     version = Darwin;
 
 extern (C):
-@system:
 nothrow:
 @nogc:
 
@@ -151,6 +150,8 @@ version (GNUFP)
     // https://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/sparc/fpu/bits/fenv.h
     else version (SPARC_Any)
     {
+        import core.stdc.config : c_ulong;
+
         alias fenv_t = c_ulong;
         alias fexcept_t = c_ulong;
     }
@@ -161,6 +162,15 @@ version (GNUFP)
         {
             fexcept_t __fpc;
             void*     __unused;
+        }
+
+        alias fexcept_t = uint;
+    }
+    else version (LoongArch64)
+    {
+        struct fenv_t
+        {
+            uint   __fp_control_register;
         }
 
         alias fexcept_t = uint;
@@ -481,7 +491,7 @@ else version (CRuntime_UClibc)
 
         alias fexcept_t = ushort;
     }
-    else version (MIPS32)
+    else version (MIPS_Any)
     {
         struct fenv_t
         {
@@ -783,6 +793,28 @@ else
             FE_DOWNWARD     = 0x3, ///
             FE_UPWARD       = 0x2, ///
             FE_TOWARDZERO   = 0x1, ///
+        }
+    }
+    else version (LoongArch64)
+    {
+        // Define bits representing exceptions in the FPSR status word.
+        enum
+        {
+            FE_INEXACT      = 0x010000, ///
+            FE_UNDERFLOW    = 0x020000, ///
+            FE_OVERFLOW     = 0x040000, ///
+            FE_DIVBYZERO    = 0x080000, ///
+            FE_INVALID      = 0x100000, ///
+            FE_ALL_EXCEPT   = 0x1f0000, ///
+        }
+
+        // Define bits representing rounding modes in the FPCR Rmode field.
+        enum
+        {
+            FE_TONEAREST    = 0x000, ///
+            FE_TOWARDZERO   = 0x100, ///
+            FE_DOWNWARD     = 0x200, ///
+            FE_UPWARD       = 0x300, ///
         }
     }
     else

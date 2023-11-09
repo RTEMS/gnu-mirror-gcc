@@ -625,6 +625,8 @@ ac_includes_default="\
 ac_subst_vars='LTLIBOBJS
 CET_HOST_FLAGS
 PICFLAG
+enable_host_pie
+enable_host_shared
 MAINT
 USED_CATALOGS
 PACKAGE
@@ -652,6 +654,7 @@ noexception_flags
 WARN_PEDANTIC
 c_warn
 warn
+ETAGS
 AUTOHEADER
 AUTOCONF
 ACLOCAL
@@ -737,6 +740,7 @@ enable_maintainer_mode
 enable_checking
 enable_canonical_system_headers
 enable_host_shared
+enable_host_pie
 enable_cet
 enable_valgrind_annotations
 '
@@ -1378,6 +1382,7 @@ Optional Features:
   --enable-canonical-system-headers
                           enable or disable system headers canonicalization
   --enable-host-shared    build host code as shared libraries
+  --enable-host-pie       build host code as PIE
   --enable-cet            enable Intel CET in host libraries [default=auto]
   --enable-valgrind-annotations
                           enable valgrind runtime interaction
@@ -4896,6 +4901,11 @@ done
 test -n "$AUTOHEADER" || AUTOHEADER="$MISSING autoheader"
 
 
+if test -z "$ETAGS"; then
+  ETAGS=etags
+fi
+
+
 # Figure out what compiler warnings we can enable.
 # See config/warnings.m4 for details.
 
@@ -6638,6 +6648,73 @@ $as_echo "#define HAVE_UCHAR 1" >>confdefs.h
 
 fi
 
+# The cast to long int works around a bug in the HP C Compiler
+# version HP92453-01 B.11.11.23709.GP, which incorrectly rejects
+# declarations like `int a3[[(sizeof (unsigned char)) >= 0]];'.
+# This bug is HP SR number 8606223364.
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking size of ino_t" >&5
+$as_echo_n "checking size of ino_t... " >&6; }
+if ${ac_cv_sizeof_ino_t+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if ac_fn_c_compute_int "$LINENO" "(long int) (sizeof (ino_t))" "ac_cv_sizeof_ino_t"        "$ac_includes_default"; then :
+
+else
+  if test "$ac_cv_type_ino_t" = yes; then
+     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error 77 "cannot compute sizeof (ino_t)
+See \`config.log' for more details" "$LINENO" 5; }
+   else
+     ac_cv_sizeof_ino_t=0
+   fi
+fi
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_sizeof_ino_t" >&5
+$as_echo "$ac_cv_sizeof_ino_t" >&6; }
+
+
+
+cat >>confdefs.h <<_ACEOF
+#define SIZEOF_INO_T $ac_cv_sizeof_ino_t
+_ACEOF
+
+
+# The cast to long int works around a bug in the HP C Compiler
+# version HP92453-01 B.11.11.23709.GP, which incorrectly rejects
+# declarations like `int a3[[(sizeof (unsigned char)) >= 0]];'.
+# This bug is HP SR number 8606223364.
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking size of dev_t" >&5
+$as_echo_n "checking size of dev_t... " >&6; }
+if ${ac_cv_sizeof_dev_t+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if ac_fn_c_compute_int "$LINENO" "(long int) (sizeof (dev_t))" "ac_cv_sizeof_dev_t"        "$ac_includes_default"; then :
+
+else
+  if test "$ac_cv_type_dev_t" = yes; then
+     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error 77 "cannot compute sizeof (dev_t)
+See \`config.log' for more details" "$LINENO" 5; }
+   else
+     ac_cv_sizeof_dev_t=0
+   fi
+fi
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_sizeof_dev_t" >&5
+$as_echo "$ac_cv_sizeof_dev_t" >&6; }
+
+
+
+cat >>confdefs.h <<_ACEOF
+#define SIZEOF_DEV_T $ac_cv_sizeof_dev_t
+_ACEOF
+
+
+
 # g++ on Solaris 10+ defines _XOPEN_SOURCE=600, which exposes a different
 # iconv() prototype.
 ac_ext=cpp
@@ -6734,7 +6811,7 @@ else
       # Check to see if the program is GNU ld.  I'd rather use --version,
       # but apparently some GNU ld's only accept -v.
       # Break only if it was the GNU/non-GNU ld that we prefer.
-      if "$acl_cv_path_LD" -v 2>&1 < /dev/null | egrep '(GNU|with BFD)' > /dev/null; then
+      if "$acl_cv_path_LD" -v 2>&1 < /dev/null | $EGREP '(GNU|with BFD)' > /dev/null; then
 	test "$with_gnu_ld" != no && break
       else
 	test "$with_gnu_ld" != yes && break
@@ -6762,7 +6839,7 @@ if ${acl_cv_prog_gnu_ld+:} false; then :
   $as_echo_n "(cached) " >&6
 else
   # I'd rather use --version here, but apparently some GNU ld's only accept -v.
-if $LD -v 2>&1 </dev/null | egrep '(GNU|with BFD)' 1>&5; then
+if $LD -v 2>&1 </dev/null | $EGREP '(GNU|with BFD)' 1>&5; then
   acl_cv_prog_gnu_ld=yes
 else
   acl_cv_prog_gnu_ld=no
@@ -7532,7 +7609,23 @@ esac
 # Enable --enable-host-shared.
 # Check whether --enable-host-shared was given.
 if test "${enable_host_shared+set}" = set; then :
-  enableval=$enable_host_shared; PICFLAG=-fPIC
+  enableval=$enable_host_shared;
+fi
+
+
+
+# Enable --enable-host-pie.
+# Check whether --enable-host-pie was given.
+if test "${enable_host_pie+set}" = set; then :
+  enableval=$enable_host_pie;
+fi
+
+
+
+if test x$enable_host_shared = xyes; then
+  PICFLAG=-fPIC
+elif test x$enable_host_pie = xyes; then
+  PICFLAG=-fPIE
 else
   PICFLAG=
 fi
@@ -7762,6 +7855,62 @@ case x$enable_languages in
 esac
 
 
+ac_fn_c_check_header_mongrel "$LINENO" "valgrind.h" "ac_cv_header_valgrind_h" "$ac_includes_default"
+if test "x$ac_cv_header_valgrind_h" = xyes; then :
+  have_valgrind_h=yes
+else
+  have_valgrind_h=no
+fi
+
+
+
+# It is certainly possible that there's valgrind but no valgrind.h.
+# GCC relies on making annotations so we must have both.
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for VALGRIND_DISCARD in <valgrind/memcheck.h>" >&5
+$as_echo_n "checking for VALGRIND_DISCARD in <valgrind/memcheck.h>... " >&6; }
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <valgrind/memcheck.h>
+#ifndef VALGRIND_DISCARD
+#error VALGRIND_DISCARD not defined
+#endif
+_ACEOF
+if ac_fn_c_try_cpp "$LINENO"; then :
+  gcc_cv_header_valgrind_memcheck_h=yes
+else
+  gcc_cv_header_valgrind_memcheck_h=no
+fi
+rm -f conftest.err conftest.i conftest.$ac_ext
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_header_valgrind_memcheck_h" >&5
+$as_echo "$gcc_cv_header_valgrind_memcheck_h" >&6; }
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for VALGRIND_DISCARD in <memcheck.h>" >&5
+$as_echo_n "checking for VALGRIND_DISCARD in <memcheck.h>... " >&6; }
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <memcheck.h>
+#ifndef VALGRIND_DISCARD
+#error VALGRIND_DISCARD not defined
+#endif
+_ACEOF
+if ac_fn_c_try_cpp "$LINENO"; then :
+  gcc_cv_header_memcheck_h=yes
+else
+  gcc_cv_header_memcheck_h=no
+fi
+rm -f conftest.err conftest.i conftest.$ac_ext
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_header_memcheck_h" >&5
+$as_echo "$gcc_cv_header_memcheck_h" >&6; }
+if test $gcc_cv_header_valgrind_memcheck_h = yes; then
+
+$as_echo "#define HAVE_VALGRIND_MEMCHECK_H 1" >>confdefs.h
+
+fi
+if test $gcc_cv_header_memcheck_h = yes; then
+
+$as_echo "#define HAVE_MEMCHECK_H 1" >>confdefs.h
+
+fi
+
 # Check whether --enable-valgrind-annotations was given.
 if test "${enable_valgrind_annotations+set}" = set; then :
   enableval=$enable_valgrind_annotations;
@@ -7774,6 +7923,7 @@ if test x$enable_valgrind_annotations != xno \
   if (test $have_valgrind_h = no \
       && test $gcc_cv_header_memcheck_h = no \
       && test $gcc_cv_header_valgrind_memcheck_h = no); then
+    as_fn_error $? "*** valgrind annotations requested, but" "$LINENO" 5
     as_fn_error $? "*** Can't find valgrind/memcheck.h, memcheck.h or valgrind.h" "$LINENO" 5
   fi
 

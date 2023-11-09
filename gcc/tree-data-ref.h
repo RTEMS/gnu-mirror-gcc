@@ -1,5 +1,5 @@
 /* Data references and dependences detectors.
-   Copyright (C) 2003-2021 Free Software Foundation, Inc.
+   Copyright (C) 2003-2023 Free Software Foundation, Inc.
    Contributed by Sebastian Pop <pop@cri.ensmp.fr>
 
 This file is part of GCC.
@@ -592,7 +592,7 @@ extern bool dr_known_forward_stride_p (struct data_reference *);
 /* Return true when the base objects of data references A and B are
    the same memory object.  */
 
-static inline bool
+inline bool
 same_data_refs_base_objects (data_reference_p a, data_reference_p b)
 {
   return DR_NUM_DIMENSIONS (a) == DR_NUM_DIMENSIONS (b)
@@ -600,10 +600,11 @@ same_data_refs_base_objects (data_reference_p a, data_reference_p b)
 }
 
 /* Return true when the data references A and B are accessing the same
-   memory object with the same access functions.  */
+   memory object with the same access functions.  Optionally skip the
+   last OFFSET dimensions in the data reference.  */
 
-static inline bool
-same_data_refs (data_reference_p a, data_reference_p b)
+inline bool
+same_data_refs (data_reference_p a, data_reference_p b, int offset = 0)
 {
   unsigned int i;
 
@@ -614,7 +615,7 @@ same_data_refs (data_reference_p a, data_reference_p b)
   if (!same_data_refs_base_objects (a, b))
     return false;
 
-  for (i = 0; i < DR_NUM_DIMENSIONS (a); i++)
+  for (i = offset; i < DR_NUM_DIMENSIONS (a); i++)
     if (!eq_evolutions_p (DR_ACCESS_FN (a, i), DR_ACCESS_FN (b, i)))
       return false;
 
@@ -640,7 +641,7 @@ known_dependences_p (vec<ddr_p> dependence_relations)
    LEVEL = 0 means a lexicographic dependence, i.e. a dependence due
    to the sequence of statements, not carried by any loop.  */
 
-static inline unsigned
+inline unsigned
 dependence_level (lambda_vector dist_vect, int length)
 {
   int i;
@@ -654,7 +655,7 @@ dependence_level (lambda_vector dist_vect, int length)
 
 /* Return the dependence level for the DDR relation.  */
 
-static inline unsigned
+inline unsigned
 ddr_dependence_level (ddr_p ddr)
 {
   unsigned vector;
@@ -671,7 +672,7 @@ ddr_dependence_level (ddr_p ddr)
 
 /* Return the index of the variable VAR in the LOOP_NEST array.  */
 
-static inline int
+inline int
 index_in_loop_nest (int var, const vec<loop_p> &loop_nest)
 {
   class loop *loopi;
@@ -687,7 +688,7 @@ index_in_loop_nest (int var, const vec<loop_p> &loop_nest)
 /* Returns true when the data reference DR the form "A[i] = ..."
    with a stride equal to its unit type size.  */
 
-static inline bool
+inline bool
 adjacent_dr_p (struct data_reference *dr)
 {
   /* If this is a bitfield store bail out.  */
@@ -708,7 +709,7 @@ void split_constant_offset (tree , tree *, tree *);
 
 /* Compute the greatest common divisor of a VECTOR of SIZE numbers.  */
 
-static inline lambda_int
+inline lambda_int
 lambda_vector_gcd (lambda_vector vector, int size)
 {
   int i;
@@ -725,7 +726,7 @@ lambda_vector_gcd (lambda_vector vector, int size)
 
 /* Allocate a new vector of given SIZE.  */
 
-static inline lambda_vector
+inline lambda_vector
 lambda_vector_new (int size)
 {
   /* ???  We shouldn't abuse the GC allocator here.  */
@@ -734,7 +735,7 @@ lambda_vector_new (int size)
 
 /* Clear out vector VEC1 of length SIZE.  */
 
-static inline void
+inline void
 lambda_vector_clear (lambda_vector vec1, int size)
 {
   memset (vec1, 0, size * sizeof (*vec1));
@@ -743,7 +744,7 @@ lambda_vector_clear (lambda_vector vec1, int size)
 /* Returns true when the vector V is lexicographically positive, in
    other words, when the first nonzero element is positive.  */
 
-static inline bool
+inline bool
 lambda_vector_lexico_pos (lambda_vector v,
 			  unsigned n)
 {
@@ -762,7 +763,7 @@ lambda_vector_lexico_pos (lambda_vector v,
 
 /* Return true if vector VEC1 of length SIZE is the zero vector.  */
 
-static inline bool
+inline bool
 lambda_vector_zerop (lambda_vector vec1, int size)
 {
   int i;
@@ -774,7 +775,7 @@ lambda_vector_zerop (lambda_vector vec1, int size)
 
 /* Allocate a matrix of M rows x  N cols.  */
 
-static inline lambda_matrix
+inline lambda_matrix
 lambda_matrix_new (int m, int n, struct obstack *lambda_obstack)
 {
   lambda_matrix mat;

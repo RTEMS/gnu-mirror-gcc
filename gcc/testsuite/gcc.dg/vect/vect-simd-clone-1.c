@@ -46,13 +46,17 @@ main ()
   int i;
   check_vect ();
   bar ();
+#pragma GCC novector
   for (i = 0; i < N; i++)
     if (array[i] != (i < 30 ? 5 : i * 4 + 123))
       abort ();
   baz ();
+#pragma GCC novector
   for (i = 0; i < N; i++)
     if (array[i] != (i < 30 ? 5 : i * 8 + 123))
       abort ();
   return 0;
 }
 
+/* { dg-warning {unsupported simdlen 8 \(amdgcn\)} "" { target amdgcn*-*-* } 18 } */
+/* { dg-warning {unsupported simdlen 4 \(amdgcn\)} "" { target amdgcn*-*-* } 18 } */

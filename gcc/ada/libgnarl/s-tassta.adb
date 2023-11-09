@@ -6,7 +6,7 @@
 --                                                                          --
 --                                  B o d y                                 --
 --                                                                          --
---         Copyright (C) 1992-2021, Free Software Foundation, Inc.          --
+--         Copyright (C) 1992-2023, Free Software Foundation, Inc.          --
 --                                                                          --
 -- GNARL is free software; you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -1307,10 +1307,8 @@ package body System.Tasking.Stages is
       if TH /= null then
          begin
             TH.all (Cause, Self_ID, EO);
-
          exception
-
-            --  RM-C.7.3 requires all exceptions raised here to be ignored
+            --  RM-C.7.3(16) requires all exceptions raised here to be ignored
 
             when others =>
                null;
@@ -1462,7 +1460,7 @@ package body System.Tasking.Stages is
 
       To_Stderr (System.Address_Image (To_Address (Self_Id)));
       To_Stderr (" terminated by unhandled exception");
-      To_Stderr ((1 => ASCII.LF));
+      To_Stderr ([ASCII.LF]);
       To_Stderr (Exception_Information (Excep.all));
       Initialization.Task_Unlock (Self_Id);
    end Trace_Unhandled_Exception_In_Task;
@@ -1617,8 +1615,8 @@ package body System.Tasking.Stages is
 
             --  Usually, C.Common.Activator = Self_ID implies C.Master_Of_Task
             --  = CM. The only case where C is pending activation by this
-            --  task, but the master of C is not CM is in Ada 2005, when C is
-            --  part of a return object of a build-in-place function.
+            --  task, but the master of C is not CM is when C is part of a
+            --  return object of a build-in-place function.
 
             pragma Assert (C.Common.State = Unactivated);
 

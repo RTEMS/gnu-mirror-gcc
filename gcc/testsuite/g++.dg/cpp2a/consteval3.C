@@ -18,8 +18,7 @@ consteval int f6 (int x) { return x; }
 int d = 6;		// { dg-message "'int d' is not const" }
 int e = f6 (d);		// { dg-error "the value of 'd' is not usable in a constant expression" }
 constexpr int f7 (int x) { return f6 (x); }	// { dg-error "'x' is not a constant expression" }
-constexpr int f = f7 (5);	// { dg-error "" }
-				// { dg-message "in 'constexpr' expansion of" "" { target *-*-* } .-1 }
+constexpr int f = f7 (5);
 using fnptr = int (int);
 fnptr *g = f6;		// { dg-error "taking address of an immediate function 'consteval int f6\\(int\\)'" }
 int f8 (fnptr *);
@@ -56,8 +55,7 @@ template consteval float f12 (float x); // { dg-error "explicit instantiation sh
 consteval int
 f13 (int x)
 {
-  static int a = 5;		// { dg-error "'a' declared 'static' in 'consteval' function only available with" "" { target c++20_only } }
-				// { dg-error "'a' declared 'static' in 'constexpr' context" "" { target c++23 } .-1 }
-  thread_local int b = 6;	// { dg-error "'b' declared 'thread_local' in 'consteval' function only available with" "" { target c++20_only } }
+  static int a = 5;		// { dg-error "'a' defined 'static' in 'consteval' function only available with" "" { target c++20_only } }
+  thread_local int b = 6;	// { dg-error "'b' defined 'thread_local' in 'consteval' function only available with" "" { target c++20_only } }
   return x;
 }

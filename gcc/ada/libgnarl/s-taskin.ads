@@ -6,7 +6,7 @@
 --                                                                          --
 --                                  S p e c                                 --
 --                                                                          --
---          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNARL is free software; you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -773,7 +773,10 @@ package System.Tasking is
    -- Priority info --
    -------------------
 
-   Unspecified_Priority : constant Integer := System.Priority'First - 1;
+   Unspecified_Priority : constant Integer := -1;
+   --  Indicates that a task has an unspecified priority. This is hardcoded as
+   --  -1 rather than System.Priority'First - 1 as the value needs to be used
+   --  in init.c to specify that the main task has no specified priority.
 
    Priority_Not_Boosted : constant Integer := System.Priority'First - 1;
    --  Definition of Priority actually has to come from the RTS configuration
@@ -955,11 +958,10 @@ package System.Tasking is
    type Entry_Call_Array is array (ATC_Level_Index) of
      aliased Entry_Call_Record;
 
-   type Atomic_Address is mod Memory_Size;
-   pragma Atomic (Atomic_Address);
    type Attribute_Array is
-     array (1 .. Parameters.Max_Attribute_Count) of Atomic_Address;
-   --  Array of task attributes. The value (Atomic_Address) will either be
+     array (1 .. Parameters.Max_Attribute_Count) of System.Address;
+   pragma Atomic_Components (Attribute_Array);
+   --  Array of task attributes. The value (System.Address) will either be
    --  converted to a task attribute if it fits, or to a pointer to a record
    --  by Ada.Task_Attributes.
 
@@ -1154,7 +1156,7 @@ package System.Tasking is
       --  non-terminated task so that the associated storage is automatically
       --  reclaimed when the task terminates.
 
-      Attributes : Attribute_Array := (others => 0);
+      Attributes : Attribute_Array := [others => Null_Address];
       --  Task attributes
 
       --  IMPORTANT Note: the Entry_Queues field is last for efficiency of
@@ -1165,7 +1167,7 @@ package System.Tasking is
       --
       --  Protection: Self.L. Once a task has set Self.Stage to Completing, it
       --  has exclusive access to this field.
-   end record;
+   end record; -- Ada_Task_Control_Block
 
    --------------------
    -- Initialization --

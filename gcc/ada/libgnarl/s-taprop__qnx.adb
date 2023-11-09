@@ -6,7 +6,7 @@
 --                                                                          --
 --                                  B o d y                                 --
 --                                                                          --
---          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNARL is free software; you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -49,6 +49,7 @@ with System.Interrupt_Management;
 with System.OS_Constants;
 with System.OS_Primitives;
 with System.Task_Info;
+with System.Multiprocessors;
 
 with System.Soft_Links;
 --  We use System.Soft_Links instead of System.Tasking.Initialization
@@ -83,7 +84,7 @@ package body System.Task_Primitives.Operations is
    Environment_Task_Id : Task_Id;
    --  A variable to hold Task_Id for the environment task
 
-   Locking_Policy : Character;
+   Locking_Policy : constant Character;
    pragma Import (C, Locking_Policy, "__gl_locking_policy");
    --  Value of the pragma Locking_Policy:
    --    'C' for Ceiling_Locking
@@ -99,10 +100,10 @@ package body System.Task_Primitives.Operations is
    --  We start at 100, to reserve some special values for
    --  using in error checking.
 
-   Time_Slice_Val : Integer;
+   Time_Slice_Val : constant Integer;
    pragma Import (C, Time_Slice_Val, "__gl_time_slice_val");
 
-   Dispatching_Policy : Character;
+   Dispatching_Policy : constant Character;
    pragma Import (C, Dispatching_Policy, "__gl_task_dispatching_policy");
 
    Foreign_Task_Elaborated : aliased Boolean := True;
@@ -1317,12 +1318,46 @@ package body System.Task_Primitives.Operations is
    -----------------------
 
    procedure Set_Task_Affinity (T : ST.Task_Id) is
-      pragma Unreferenced (T);
+      use type Multiprocessors.CPU_Range;
 
+      function Thread_Ctl_Ext
+        (Pid     : pid_t;
+         Tid     : Thread_Id;
+         Command : Interfaces.C.unsigned;
+         Runmask : Interfaces.C.size_t) return Interfaces.C.int
+      with
+        Import, Convention => C, External_Name => "ThreadCtlExt";
+      --  Thread_Ctl_Ext is a generic thread control function in QNX.
+      --  It is defined locally because in the C API its second
+      --  argument is a void pointer that takes different actual
+      --  pointer types or values depending on the command. This
+      --  particular instance of this function only accepts the
+      --  NTO_TCTL_RUNMASK command. The void * pointer in the C
+      --  interface is interpreted as bitmask for this command.
+      --  In the binding size_t is used as an integer type that
+      --  always has the same size as a pointer.
+
+      NTO_TCTL_RUNMASK : constant := 4;
+      --  Command for Thread_Ctl. Using this command in Thread_Ctl
+      --  allows the caller to pass a bitmask that describes on
+      --  which CPU the current thread is allowed to run on.
+
+      Pid     : constant pid_t := getpid;
+      Result  : Interfaces.C.int;
+      Runmask : Interfaces.C.size_t;
+      --  Each set bit in runmask represents a processor that the thread
+      --  can run on. If all bits are set to one the thread can run on any CPU.
    begin
-      --  Setting task affinity is not supported by the underlying system
-
-      null;
+      if T.Common.Base_CPU = Multiprocessors.Not_A_Specific_CPU then
+         Runmask := Interfaces.C.size_t'Last;
+      else
+         Runmask :=
+           Interfaces.C.size_t
+             (2 ** Natural (T.Common.Base_CPU - Multiprocessors.CPU'First));
+      end if;
+      Result :=
+         Thread_Ctl_Ext (Pid, Get_Thread_Id (T), NTO_TCTL_RUNMASK, Runmask);
+      pragma Assert (Result = 0);
    end Set_Task_Affinity;
 
 end System.Task_Primitives.Operations;

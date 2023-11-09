@@ -17,7 +17,7 @@ int testinvariant()
     printf("hello\n");
     Foo f = new Foo();
     printf("f = %p\n", f);
-    printf("f.sizeof = x%x\n", Foo.sizeof);
+    printf("f.sizeof = x%zx\n", Foo.sizeof);
     printf("f.classinfo = %p\n", f.classinfo);
     printf("f.classinfo._invariant = %p\n", f.classinfo.base);
     f.test();
@@ -26,7 +26,7 @@ int testinvariant()
 }
 
 /***************************************************/
-// 6453
+// https://issues.dlang.org/show_bug.cgi?id=6453
 
 void test6453()
 {
@@ -107,7 +107,7 @@ void test6453()
 }
 
 /***************************************************/
-// 13113
+// https://issues.dlang.org/show_bug.cgi?id=13113
 
 struct S13113
 {
@@ -140,7 +140,7 @@ void test13113()
 }
 
 /***************************************************/
-// 13147
+// https://issues.dlang.org/show_bug.cgi?id=13147
 
 version (D_InlineAsm_X86)
     enum x86iasm = true;
@@ -176,6 +176,58 @@ void test13147()
     s.test();
 }
 
+/***************************************************/
+// https://issues.dlang.org/show_bug.cgi?id=16384
+
+struct S(T)
+{
+    T x = 5;
+    invariant { assert(x == 6); }
+    invariant { assert(x > 0); }
+
+    void foo() {}
+}
+
+void f(int i) pure { assert( i == 6); }
+
+struct S2(T)
+{
+    T x = 5;
+    invariant { f(x); }
+    invariant { assert(x > 0); }
+
+    void foo() {}
+}
+
+void test16384()
+{
+    string s;
+    S!int y;
+    try
+    {
+        y.foo();
+    }
+    catch(Error)
+    {
+        s = "needs to be thrown";
+    }
+
+    assert(s == "needs to be thrown");
+
+    S2!int y2;
+
+    try
+    {
+        y2.foo();
+    }
+    catch(Error)
+    {
+        s = "needs to be thrown2";
+    }
+
+    assert(s == "needs to be thrown2");
+}
+
 
 /***************************************************/
 
@@ -183,6 +235,7 @@ void main()
 {
     testinvariant();
     test6453();
+    test16384();
     test13113();
     test13147();
 }

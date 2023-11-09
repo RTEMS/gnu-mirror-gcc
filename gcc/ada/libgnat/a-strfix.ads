@@ -46,7 +46,10 @@ pragma Assertion_Policy (Pre            => Ignore,
 with Ada.Strings.Maps; use type Ada.Strings.Maps.Character_Mapping_Function;
 with Ada.Strings.Search;
 
-package Ada.Strings.Fixed with SPARK_Mode is
+package Ada.Strings.Fixed with
+  SPARK_Mode,
+  Always_Terminates
+is
    pragma Preelaborate;
 
    --------------------------------------------------------------
@@ -60,10 +63,9 @@ package Ada.Strings.Fixed with SPARK_Mode is
       Justify : Alignment  := Left;
       Pad     : Character  := Space)
    with
-
-     --  Incomplete contract
-
-     Global => null;
+     Global            => null,
+     Exceptional_Cases =>
+       (Length_Error => Target'Length'Old < Source'Length and Drop = Error);
    --  The Move procedure copies characters from Source to Target. If Source
    --  has the same length as Target, then the effect is to assign Source to
    --  Target. If Source is shorter than Target then:
@@ -709,7 +711,7 @@ package Ada.Strings.Fixed with SPARK_Mode is
                then
                  (Test = Inside)
                  /= Ada.Strings.Maps.Is_In (Source (Last + 1), Set))),
-     Global => null;
+     Global         => null;
    --  Equivalent to Find_Token (Source, Set, Source'First, Test, First, Last)
 
    ------------------------------------
@@ -739,6 +741,9 @@ package Ada.Strings.Fixed with SPARK_Mode is
               Translate'Result (J - Source'First + 1)
               = Mapping (Source (J))),
      Global => null;
+   pragma Annotate (GNATprove, False_Positive,
+                    "call via access-to-subprogram",
+                    "function Mapping must always terminate");
 
    function Translate
      (Source  : String;
@@ -779,6 +784,9 @@ package Ada.Strings.Fixed with SPARK_Mode is
 
        (for all J in Source'Range => Source (J) = Mapping (Source'Old (J))),
      Global => null;
+   pragma Annotate (GNATprove, False_Positive,
+                    "call via access-to-subprogram",
+                    "function Mapping must always terminate");
 
    procedure Translate
      (Source  : in out String;
@@ -904,7 +912,7 @@ package Ada.Strings.Fixed with SPARK_Mode is
       Justify : Alignment  := Left;
       Pad     : Character  := Space)
    with
-     Pre    =>
+     Pre               =>
        Low - 1 <= Source'Last
          and then High >= Source'First - 1
          and then (if High >= Low
@@ -913,10 +921,8 @@ package Ada.Strings.Fixed with SPARK_Mode is
                            - By'Length
                            - Natural'Max (Source'Last - High, 0)
                    else Source'Length <= Natural'Last - By'Length),
-
-   --  Incomplete contract
-
-     Global => null;
+     Global            => null,
+     Exceptional_Cases => (Length_Error => Drop = Error);
    --  Equivalent to:
    --
    --    Move (Replace_Slice (Source, Low, High, By),
@@ -962,7 +968,7 @@ package Ada.Strings.Fixed with SPARK_Mode is
                 (Before - Source'First + New_Item'Length + 1
                  .. Insert'Result'Last)
               = Source (Before .. Source'Last)),
-     Global => null;
+     Global         => null;
    --  Propagates Index_Error if Before is not in
    --  Source'First .. Source'Last + 1; otherwise, returns
    --  Source (Source'First .. Before - 1)
@@ -974,13 +980,11 @@ package Ada.Strings.Fixed with SPARK_Mode is
       New_Item : String;
       Drop     : Truncation := Error)
    with
-     Pre    =>
+     Pre               =>
        Before - 1 in Source'First - 1 .. Source'Last
          and then Source'Length <= Natural'Last - New_Item'Length,
-
-     --  Incomplete contract
-
-     Global => null;
+     Global            => null,
+     Exceptional_Cases => (Length_Error => Drop = Error);
    --  Equivalent to Move (Insert (Source, Before, New_Item), Source, Drop)
 
    function Overwrite
@@ -988,13 +992,13 @@ package Ada.Strings.Fixed with SPARK_Mode is
       Position : Positive;
       New_Item : String) return String
    with
-     Pre    =>
+     Pre      =>
        Position - 1 in Source'First - 1 .. Source'Last
          and then
            (if Position - Source'First >= Source'Length - New_Item'Length
             then Position - Source'First <= Natural'Last - New_Item'Length),
 
-     Post   =>
+     Post     =>
 
        --  Lower bound of the returned string is 1
 
@@ -1029,7 +1033,7 @@ package Ada.Strings.Fixed with SPARK_Mode is
                 (Position - Source'First + New_Item'Length + 1
                  .. Overwrite'Result'Last)
               = Source (Position + New_Item'Length .. Source'Last)),
-     Global => null;
+     Global   => null;
    --  Propagates Index_Error if Position is not in
    --  Source'First .. Source'Last + 1; otherwise, returns the string obtained
    --  from Source by consecutively replacing characters starting at Position
@@ -1043,15 +1047,13 @@ package Ada.Strings.Fixed with SPARK_Mode is
       New_Item : String;
       Drop     : Truncation := Right)
    with
-     Pre    =>
+     Pre               =>
        Position - 1 in Source'First - 1 .. Source'Last
          and then
            (if Position - Source'First >= Source'Length - New_Item'Length
             then Position - Source'First <= Natural'Last - New_Item'Length),
-
-     --  Incomplete contract
-
-     Global => null;
+     Global            => null,
+     Exceptional_Cases => (Length_Error => Drop = Error);
    --  Equivalent to Move(Overwrite(Source, Position, New_Item), Source, Drop)
 
    function Delete
@@ -1112,11 +1114,8 @@ package Ada.Strings.Fixed with SPARK_Mode is
       Pad     : Character := Space)
    with
      Pre    => (if From <= Through
-                then (From in Source'Range
-                        and then Through <= Source'Last)),
-
-     --  Incomplete contract
-
+                  then (From in Source'Range
+                          and then Through <= Source'Last)),
      Global => null;
    --  Equivalent to:
    --
@@ -1168,9 +1167,6 @@ package Ada.Strings.Fixed with SPARK_Mode is
       Justify : Alignment := Left;
       Pad     : Character := Space)
    with
-
-     --  Incomplete contract
-
      Global => null;
    --  Equivalent to:
    --
@@ -1219,9 +1215,6 @@ package Ada.Strings.Fixed with SPARK_Mode is
       Justify : Alignment := Strings.Left;
       Pad     : Character := Space)
    with
-
-     --  Incomplete contract
-
      Global => null;
    --  Equivalent to:
    --
@@ -1258,7 +1251,7 @@ package Ada.Strings.Fixed with SPARK_Mode is
           Head'Result (1 .. Source'Length) = Source
             and then
               Head'Result (Source'Length + 1 .. Count)
-              = (1 .. Count - Source'Length => Pad)),
+              = [1 .. Count - Source'Length => Pad]),
      Global         => null;
    --  Returns a string of length Count. If Count <= Source'Length, the string
    --  comprises the first Count characters of Source. Otherwise, its contents
@@ -1270,10 +1263,8 @@ package Ada.Strings.Fixed with SPARK_Mode is
       Justify : Alignment := Left;
       Pad     : Character := Space)
    with
-
-     --  Incomplete contract
-
-     Global => null;
+     Global            => null,
+     Exceptional_Cases => (Length_Error => Count > Source'Length'Old);
    --  Equivalent to:
    --
    --     Move (Head (Source, Count, Pad),
@@ -1315,14 +1306,14 @@ package Ada.Strings.Fixed with SPARK_Mode is
            --  characters.
 
           (if Source'Length = 0
-           then Tail'Result = (1 .. Count => Pad)
+           then Tail'Result = [1 .. Count => Pad]
            else
              Tail'Result (1 .. Count - Source'Length)
-             = (1 .. Count - Source'Length => Pad)
+             = [1 .. Count - Source'Length => Pad]
                and then
                  Tail'Result (Count - Source'Length + 1 .. Tail'Result'Last)
                  = Source)),
-     Global => null;
+     Global         => null;
    --  Returns a string of length Count. If Count <= Source'Length, the string
    --  comprises the last Count characters of Source. Otherwise, its contents
    --  are Count-Source'Length Pad characters concatenated with Source.
@@ -1333,10 +1324,8 @@ package Ada.Strings.Fixed with SPARK_Mode is
       Justify : Alignment := Left;
       Pad     : Character := Space)
    with
-
-     --  Incomplete contract
-
-     Global => null;
+     Global            => null,
+     Exceptional_Cases => (Length_Error => Count > Source'Length'Old);
    --  Equivalent to:
    --
    --     Move (Tail (Source, Count, Pad),

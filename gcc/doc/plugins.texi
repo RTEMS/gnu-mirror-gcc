@@ -1,4 +1,4 @@
-@c Copyright (C) 2009-2021 Free Software Foundation, Inc.
+@c Copyright (C) 2009-2023 Free Software Foundation, Inc.
 @c Free Software Foundation, Inc.
 @c This is part of the GCC manual.
 @c For copying conditions, see the file gcc.texi.
@@ -44,7 +44,7 @@ Plugins are loaded with
 
 Where @var{name} is the plugin name and @var{ext} is the platform-specific
 dynamic library extension. It should be @code{dll} on Windows/MinGW,
-@code{dylib} on Darwin/Mac OS X, and @code{so} on all other platforms.
+@code{dylib} on Darwin/macOS, and @code{so} on all other platforms.
 The plugin arguments are parsed by GCC and passed to respective
 plugins as key-value pairs. Multiple plugins can be invoked by
 specifying multiple @option{-fplugin} arguments.
@@ -511,7 +511,7 @@ plugin.so: $(PLUGIN_SOURCE_FILES)
 @end smallexample
 
 A single source file plugin may be built with @code{g++ -I`gcc
--print-file-name=plugin`/include -fPIC -shared -fno-rtti -O2 plugin.c -o
+-print-file-name=plugin`/include -fPIC -shared -fno-rtti -O2 plugin.cc -o
 plugin.so}, using backquote shell syntax to query the @file{plugin}
 directory.
 
@@ -554,7 +554,7 @@ compiler:
 
 @smallexample
 g++ -I`gcc -print-file-name=plugin`/include -shared -Wl,--export-all-symbols \
--o plugin.dll plugin.c `gcc -print-file-name=plugin`/cc1plus.exe.a
+-o plugin.dll plugin.cc `gcc -print-file-name=plugin`/cc1plus.exe.a
 @end smallexample
 
 When a plugin needs to use @command{gengtype}, be sure that both

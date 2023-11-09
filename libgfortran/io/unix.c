@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2021 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2023 Free Software Foundation, Inc.
    Contributed by Andy Vaught
    F2003 I/O support contributed by Jerry DeLisle
 
@@ -1028,8 +1028,7 @@ mem_flush (unix_stream *s __attribute__ ((unused)))
 static int
 mem_close (unix_stream *s)
 {
-  if (s)
-    free (s);
+  free (s);
   return 0;
 }
 

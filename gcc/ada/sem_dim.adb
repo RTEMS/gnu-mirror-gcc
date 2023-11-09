@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 2011-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 2011-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -23,7 +23,6 @@
 --                                                                          --
 ------------------------------------------------------------------------------
 
-with Aspects;        use Aspects;
 with Atree;          use Atree;
 with Einfo;          use Einfo;
 with Einfo.Entities; use Einfo.Entities;
@@ -1316,7 +1315,7 @@ package body Sem_Dim is
 
          --  Look at the named components right after the positional components
 
-         if not Present (Next (Comp))
+         if No (Next (Comp))
            and then List_Containing (Comp) = Exps
          then
             Comp := First (Comp_Ass);
@@ -2759,7 +2758,7 @@ package body Sem_Dim is
 
       --  Insert a blank between the literal and the symbol
 
-      Add_Str_To_Name_Buffer (" ");
+      Add_Char_To_Name_Buffer (' ');
       Append (Global_Name_Buffer, Symbol_Of (Typ));
 
       Error_Msg_Name_1 := Name_Find;
@@ -2922,7 +2921,6 @@ package body Sem_Dim is
                Subtype_Indication  => New_Occurrence_Of (Btyp_Of_L, Loc));
 
          Append (New_Aspect, New_Aspects);
-         Set_Parent (New_Aspects, New_Subtyp_Decl_For_L);
          Set_Aspect_Specifications (New_Subtyp_Decl_For_L, New_Aspects);
 
          Analyze (New_Subtyp_Decl_For_L);
@@ -3032,12 +3030,12 @@ package body Sem_Dim is
    --                  symbol is not empty, then the symbol appears as a
    --                  suffix. Otherwise, a new string is created and appears
    --                  as a suffix of Item. This string results in the
-   --                  successive concatanations between each unit symbol
+   --                  successive concatenations between each unit symbol
    --                  raised by its corresponding dimension power from the
    --                  dimensions of Item.
 
    --   * Put_Dim_Of : The output is a new string resulting in the successive
-   --                  concatanations between each dimension symbol raised by
+   --                  concatenations between each dimension symbol raised by
    --                  its corresponding dimension power from the dimensions of
    --                  Item.
 
@@ -3322,13 +3320,13 @@ package body Sem_Dim is
             if Chars (Name_Call) = Name_Image then
                Rewrite (N,
                  Make_Function_Call (Loc,
-                   Name =>                   New_Copy (Name_Call),
+                   Name                   => New_Copy (Name_Call),
                    Parameter_Associations => New_Actuals));
                Analyze_And_Resolve (N);
             else
                Rewrite (N,
                  Make_Procedure_Call_Statement (Loc,
-                   Name =>                   New_Copy (Name_Call),
+                   Name                   => New_Copy (Name_Call),
                    Parameter_Associations => New_Actuals));
                Analyze (N);
             end if;
@@ -3665,7 +3663,7 @@ package body Sem_Dim is
       declare
          G : constant Int := GCD (X.Numerator, X.Denominator);
       begin
-         return Rational'(Numerator =>   Whole (Int (X.Numerator)   / G),
+         return Rational'(Numerator   => Whole (Int (X.Numerator)   / G),
                           Denominator => Whole (Int (X.Denominator) / G));
       end;
    end Reduce;

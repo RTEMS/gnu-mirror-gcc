@@ -15,7 +15,6 @@ toolexeclib_LTLIBRARIES = libtsan.la
 nodist_toolexeclib_HEADERS = libtsan_preinit.o
 
 tsan_files = \
-	tsan_clock.cpp \
 	tsan_debugging.cpp \
 	tsan_external.cpp \
 	tsan_fd.cpp \
@@ -38,6 +37,7 @@ tsan_files = \
 	tsan_platform_windows.cpp \
 	tsan_report.cpp \
 	tsan_rtl.cpp \
+	tsan_rtl_access.cpp \
 	tsan_rtl_mutex.cpp \
 	tsan_rtl_proc.cpp \
 	tsan_rtl_report.cpp \
@@ -57,7 +57,11 @@ libtsan_la_LIBADD += $(top_builddir)/libbacktrace/libsanitizer_libbacktrace.la
 libtsan_la_DEPENDENCIES +=$(top_builddir)/libbacktrace/libsanitizer_libbacktrace.la
 endif
 libtsan_la_LIBADD += $(LIBSTDCXX_RAW_CXX_LDFLAGS)
-libtsan_la_LDFLAGS = -version-info `grep -v '^\#' $(srcdir)/libtool-version` $(link_libtsan)
+if ENABLE_DARWIN_AT_RPATH
+libtsan_darwin_rpath = -nodefaultrpaths -Wl,-rpath,@loader_path/
+endif
+libtsan_la_LDFLAGS = -version-info `grep -v '^\#' $(srcdir)/libtool-version` \
+	$(link_libtsan) $(libtsan_darwin_rpath)
 
 libtsan_preinit.o: tsan_preinit.o
 	cp $< $@

@@ -1,5 +1,5 @@
 /* Target definitions for x86 running Darwin.
-   Copyright (C) 2001-2021 Free Software Foundation, Inc.
+   Copyright (C) 2001-2023 Free Software Foundation, Inc.
    Contributed by Apple Computer Inc.
 
 This file is part of GCC.
@@ -24,37 +24,6 @@ along with GCC; see the file COPYING3.  If not see
 
 #undef DARWIN_X86
 #define DARWIN_X86 1
-
-/* WORKAROUND pr80556:
-   For x86_64 Darwin10 and later, the unwinder is in libunwind (redirected
-   from libSystem).  This doesn't use the keymgr (see keymgr.c) and therefore
-   the calls that libgcc makes to obtain the KEYMGR_GCC3_DW2_OBJ_LIST are not
-   updated to include new images, and might not even be valid for a single
-   image.
-   Therefore, for 64b exes at least, we must use the libunwind implementation,
-   even when static-libgcc is specified.  We put libSystem first so that
-   unwinder symbols are satisfied from there.
-   We default to 64b for single-arch builds, so apply this unconditionally. */
-#ifndef PR80556_WORKAROUND
-#define PR80556_WORKAROUND \
-" %:version-compare(>= 10.6 mmacosx-version-min= -lSystem) "
-#endif
-#undef REAL_LIBGCC_SPEC
-#define REAL_LIBGCC_SPEC						   \
-   "%{static-libgcc|static: "						   \
-       PR80556_WORKAROUND						   \
-      " -lgcc_eh -lgcc;							   \
-      shared-libgcc|fexceptions|fgnu-runtime:				   \
-       %:version-compare(!> 10.5 mmacosx-version-min= -lgcc_s.10.4)	   \
-       %:version-compare(>< 10.5 10.6 mmacosx-version-min= -lgcc_s.10.5)   \
-       %:version-compare(!> 10.5 mmacosx-version-min= -lgcc_ext.10.4)	   \
-       %:version-compare(>= 10.5 mmacosx-version-min= -lgcc_ext.10.5)	   \
-       -lgcc ;								   \
-      :%:version-compare(>< 10.3.9 10.5 mmacosx-version-min= -lgcc_s.10.4) \
-       %:version-compare(>< 10.5 10.6 mmacosx-version-min= -lgcc_s.10.5)   \
-       %:version-compare(!> 10.5 mmacosx-version-min= -lgcc_ext.10.4)	   \
-       %:version-compare(>= 10.5 mmacosx-version-min= -lgcc_ext.10.5)	   \
-       -lgcc }"
 
 /* Size of the Obj-C jump buffer.  */
 #define OBJC_JBLEN ((TARGET_64BIT) ? ((9 * 2) + 3 + 16) : (18))
@@ -128,19 +97,20 @@ along with GCC; see the file COPYING3.  If not see
 /* This is a workaround for a tool bug: see PR100340.  */
 
 #ifdef HAVE_AS_MLLVM_X86_PAD_FOR_ALIGN
-#define EXTRA_ASM_OPTS " -mllvm -x86-pad-for-align=false"
+#define EXTRA_ASM_OPTS " -mllvm -x86-pad-for-align=false "
 #else
 #define EXTRA_ASM_OPTS ""
 #endif
 
 #undef ASM_SPEC
-#define ASM_SPEC "-arch %(darwin_arch) \
-  " ASM_OPTIONS " -force_cpusubtype_ALL \
-  %{static}" ASM_MMACOSX_VERSION_MIN_SPEC EXTRA_ASM_OPTS
+#define ASM_SPEC \
+"%{static} -arch %(darwin_arch) " \
+ ASM_OPTIONS ASM_MMACOSX_VERSION_MIN_SPEC EXTRA_ASM_OPTS \
+"%{!force_cpusubtype_ALL:-force_cpusubtype_ALL} "
 
 #undef ENDFILE_SPEC
 #define ENDFILE_SPEC \
-  "%{Ofast|ffast-math|funsafe-math-optimizations:crtfastmath.o%s} \
+  "%{mdaz-ftz:crtfastmath.o%s;Ofast|ffast-math|funsafe-math-optimizations:%{!shared:%{!mno-daz-ftz:crtfastmath.o%s}}} \
    %{mpc32:crtprec32.o%s} \
    %{mpc64:crtprec64.o%s} \
    %{mpc80:crtprec80.o%s}" TM_DESTRUCTOR
@@ -267,11 +237,11 @@ along with GCC; see the file COPYING3.  If not see
 /* Darwin uses the standard DWARF register numbers but the default
    register numbers for STABS.  Fortunately for 64-bit code the
    default and the standard are the same.  */
-#undef DBX_REGISTER_NUMBER
-#define DBX_REGISTER_NUMBER(n) 					\
-  (TARGET_64BIT ? dbx64_register_map[n]				\
-   : dwarf_debuginfo_p () ? svr4_dbx_register_map[n]		\
-   : dbx_register_map[n])
+#undef DEBUGGER_REGNO
+#define DEBUGGER_REGNO(n) 					\
+  (TARGET_64BIT ? debugger64_register_map[n]				\
+   : dwarf_debuginfo_p () ? svr4_debugger_register_map[n]		\
+   : debugger_register_map[n])
 
 /* Unfortunately, the 32-bit EH information also doesn't use the standard
    DWARF register numbers.  */
@@ -338,3 +308,9 @@ along with GCC; see the file COPYING3.  If not see
 #define CLEAR_INSN_CACHE(beg, end)				\
   extern void sys_icache_invalidate(void *start, size_t len);	\
   sys_icache_invalidate ((beg), (size_t)((end)-(beg)))
+
+/* Disable custom function descriptors for Darwin when we have off-stack
+   trampolines.  */
+#undef X86_CUSTOM_FUNCTION_TEST
+#define X86_CUSTOM_FUNCTION_TEST \
+  (flag_trampolines && flag_trampoline_impl == TRAMPOLINE_IMPL_HEAP) ? 0 : 1

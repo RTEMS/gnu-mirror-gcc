@@ -7,7 +7,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 2000-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 2000-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -236,9 +236,6 @@ int counter = 0;
 
 #define CST(name,comment) C(#name,String,name,comment)
 /* String constant */
-
-#define STR(x) STR1(x)
-#define STR1(x) #x
 
 #ifdef __MINGW32__
 unsigned int _CRT_fmode = _O_BINARY;
@@ -1548,6 +1545,11 @@ CND(SO_KEEPALIVE, "Enable keep-alive msgs")
 #endif
 CND(SO_LINGER, "Defer close to flush data")
 
+#ifndef SO_BINDTODEVICE
+# define SO_BINDTODEVICE -1
+#endif
+CND(SO_BINDTODEVICE, "Bind to a NIC - Network Interface Controller")
+
 #ifndef SO_BROADCAST
 # define SO_BROADCAST -1
 #endif
@@ -1799,11 +1801,6 @@ CND(SIZEOF_struct_hostent, "struct hostent")
 #define SIZEOF_struct_servent (sizeof (struct servent))
 CND(SIZEOF_struct_servent, "struct servent")
 
-#if defined (__linux__) || defined (__ANDROID__) || defined (__QNX__)
-#define SIZEOF_sigset (sizeof (sigset_t))
-CND(SIZEOF_sigset, "sigset")
-#endif
-
 #if defined(_WIN32) || defined(__vxworks)
 #define SIZEOF_nfds_t sizeof (int) * 8
 #define SIZEOF_socklen_t sizeof (size_t)
@@ -1940,6 +1937,11 @@ CST(Inet_Ntop_Linkname, "")
 CST(Poll_Linkname, "")
 
 #endif /* HAVE_SOCKETS */
+
+#if defined (__linux__) || defined (__ANDROID__) || defined (__QNX__)
+#define SIZEOF_sigset (sizeof (sigset_t))
+CND(SIZEOF_sigset, "sigset")
+#endif
 
 /*
 

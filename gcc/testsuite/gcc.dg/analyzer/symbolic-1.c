@@ -1,3 +1,5 @@
+/* { dg-additional-options "-fno-analyzer-suppress-followups" } */
+
 #include "analyzer-decls.h"
 
 /* The example from store.h  */
@@ -5,7 +7,7 @@
 void test_1 (char a, char b, char c, char d, char e, char f,
 	     int i, int j)
 {
-  char arr[1024];
+  char arr[1024]; /* { dg-message "region created on stack here" } */
   arr[2] = a;  /* (1) */
   arr[3] = b;  /* (2) */
 

@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 2012-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 2012-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- This specification is derived from the Ada Reference Manual for use with --
 -- GNAT. The copyright notice above, and the license provisions that follow --
@@ -37,7 +37,8 @@ generic
    type Float_Type is digits <>;
 
 package Ada.Numerics.Generic_Elementary_Functions with
-  SPARK_Mode => On
+  SPARK_Mode => On,
+  Always_Terminates
 is
    pragma Pure;
 

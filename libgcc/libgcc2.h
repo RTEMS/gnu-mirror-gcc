@@ -1,5 +1,5 @@
 /* Header file for libgcc2.c.  */
-/* Copyright (C) 2000-2021 Free Software Foundation, Inc.
+/* Copyright (C) 2000-2023 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -28,6 +28,9 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #ifndef HIDE_EXPORTS
 #pragma GCC visibility push(default)
 #endif
+
+extern void __builtin_nested_func_ptr_created (void *, void *, void **);
+extern void __builtin_nested_func_ptr_deleted (void);
 
 extern int __gcc_bcmp (const unsigned char *, const unsigned char *, size_t);
 extern void __clear_cache (void *, void *);
@@ -156,8 +159,12 @@ typedef		float XFtype	__attribute__ ((mode (XF)));
 typedef _Complex float XCtype	__attribute__ ((mode (XC)));
 #endif
 #if LIBGCC2_HAS_TF_MODE
+#ifndef TFtype
 typedef		float TFtype	__attribute__ ((mode (TF)));
+#endif
+#ifndef TCtype
 typedef _Complex float TCtype	__attribute__ ((mode (TC)));
+#endif
 #endif
 
 typedef int cmp_return_type __attribute__((mode (__libgcc_cmp_return__)));
@@ -176,6 +183,12 @@ typedef int shift_count_type __attribute__((mode (__libgcc_shift_count__)));
 #define unsigned bogus_type
 #define float bogus_type
 #define double bogus_type
+
+#if (defined(__BITINT_MAXWIDTH__) \
+     && (defined(L_mulbitint3) || defined(L_divmodbitint4)))
+#undef LIBGCC2_UNITS_PER_WORD
+#define LIBGCC2_UNITS_PER_WORD (__LIBGCC_BITINT_LIMB_WIDTH__ / __CHAR_BIT__)
+#endif
 
 /* Versions prior to 3.4.4 were not taking into account the word size for
    the 5 trapping arithmetic functions absv, addv, subv, mulv and negv.  As
@@ -384,6 +397,15 @@ extern DWtype __divmoddi4 (DWtype, DWtype, DWtype *);
      !defined (L_umoddi3) && !defined (L_moddi3) && \
      !defined (L_divmoddi4))
 extern UDWtype __udivmoddi4 (UDWtype, UDWtype, UDWtype *);
+#endif
+
+#if (defined(__BITINT_MAXWIDTH__) \
+     && (defined(L_mulbitint3) || defined(L_divmodbitint4)))
+/* _BitInt support.  */
+extern void __mulbitint3 (UWtype *, SItype, const UWtype *, SItype,
+			  const UWtype *, SItype);
+extern void __divmodbitint4 (UWtype *, SItype, UWtype *, SItype,
+			     const UWtype *, SItype, const UWtype *, SItype);
 #endif
 
 /* __negdi2 is static inline when building other libgcc2 portions.  */

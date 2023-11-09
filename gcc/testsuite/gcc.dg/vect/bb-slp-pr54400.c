@@ -1,4 +1,3 @@
-/* { dg-do run } */
 /* { dg-require-effective-target vect_float} */
 /* { dg-additional-options "-w -Wno-psabi -ffast-math" } */
 
@@ -39,5 +38,5 @@ main ()
 }
 
 /* We are lacking an effective target for .REDUC_PLUS support.  */
-/* { dg-final { scan-tree-dump-times "basic block part vectorized" 3 "slp2" { target x86_64-*-* } } } */
-/* { dg-final { scan-tree-dump-not " = VEC_PERM_EXPR" "slp2" { target x86_64-*-* } } } */
+/* { dg-final { scan-tree-dump-times "basic block part vectorized" 3 "slp2" { target x86_64-*-* aarch64*-*-* } } } */
+/* { dg-final { scan-tree-dump-not " = VEC_PERM_EXPR" "slp2" { target x86_64-*-* aarch64*-*-* } } } */

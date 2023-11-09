@@ -1,5 +1,5 @@
 /* Tracking equivalence classes and constraints at a point on an execution path.
-   Copyright (C) 2019-2021 Free Software Foundation, Inc.
+   Copyright (C) 2019-2023 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -25,6 +25,12 @@ namespace ana {
 
 class constraint_manager;
 
+enum bound_kind
+{
+  BK_LOWER,
+  BK_UPPER
+};
+
 /* One of the end-points of a range.  */
 
 struct bound
@@ -33,7 +39,7 @@ struct bound
   bound (tree constant, bool closed)
   : m_constant (constant), m_closed (closed) {}
 
-  void ensure_closed (bool is_upper);
+  void ensure_closed (enum bound_kind bound_kind);
 
   const char * get_relation_as_str () const;
 
@@ -44,8 +50,9 @@ struct bound
 /* A range of values, used for determining if a value has been
    constrained to just one possible constant value.  */
 
-struct range
+class range
 {
+public:
   range () : m_lower_bound (), m_upper_bound () {}
   range (const bound &lower, const bound &upper)
   : m_lower_bound (lower), m_upper_bound (upper) {}
@@ -60,6 +67,10 @@ struct range
   bool below_lower_bound (tree rhs_const) const;
   bool above_upper_bound (tree rhs_const) const;
 
+  bool add_bound (bound b, enum bound_kind bound_kind);
+  bool add_bound (enum tree_code op, tree rhs_const);
+
+private:
   bound m_lower_bound;
   bound m_upper_bound;
 };
@@ -88,6 +99,11 @@ struct bounded_range
   }
 
   static int cmp (const bounded_range &a, const bounded_range &b);
+
+  bool singleton_p () const
+  {
+    return tree_int_cst_equal (m_lower, m_upper);
+  }
 
   tree m_lower;
   tree m_upper;
@@ -126,6 +142,9 @@ public:
   bool empty_p () const { return m_ranges.length () == 0; }
 
   static int cmp (const bounded_ranges *a, const bounded_ranges *b);
+
+  unsigned get_count () const { return m_ranges.length (); }
+  const bounded_range &get_range (unsigned idx) const { return m_ranges[idx]; }
 
 private:
   void canonicalize ();
@@ -247,6 +266,8 @@ public:
   void print (pretty_printer *pp) const;
 
   json::object *to_json () const;
+
+  bool contains_non_constant_p () const;
 
   /* An equivalence class can contain multiple constants (e.g. multiple
      different zeroes, for different types); these are just for the last
@@ -438,6 +459,7 @@ public:
 
   bool get_equiv_class_by_svalue (const svalue *sval,
 				    equiv_class_id *out) const;
+  bool sval_constrained_p (const svalue *sval) const;
   equiv_class_id get_or_add_equiv_class (const svalue *sval);
   tristate eval_condition (equiv_class_id lhs,
 			   enum tree_code op,
@@ -471,6 +493,9 @@ public:
 
   bounded_ranges_manager *get_range_manager () const;
 
+  bool replay_call_summary (call_summary_replay &r,
+			    const constraint_manager &summary);
+
   auto_delete_vec<equiv_class> m_equiv_classes;
   auto_vec<constraint> m_constraints;
   auto_vec<bounded_ranges_constraint> m_bounded_ranges_constraints;
@@ -479,6 +504,8 @@ public:
   void add_constraint_internal (equiv_class_id lhs_id,
 				enum constraint_op c_op,
 				equiv_class_id rhs_id);
+  bool impossible_derived_conditions_p (const svalue *lhs,
+					const svalue *rhs) const;
 
   region_model_manager *m_mgr;
 };

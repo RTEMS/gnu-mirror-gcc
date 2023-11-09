@@ -1,6 +1,6 @@
 // <forward_list.h> -*- C++ -*-
 
-// Copyright (C) 2008-2021 Free Software Foundation, Inc.
+// Copyright (C) 2008-2023 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -40,6 +40,9 @@
 #include <bits/allocator.h>
 #include <ext/alloc_traits.h>
 #include <ext/aligned_buffer.h>
+
+#define __glibcxx_want_list_remove_return_type
+#include <bits/version.h>
 
 namespace std _GLIBCXX_VISIBILITY(default)
 {
@@ -406,6 +409,8 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
    *  and fixed time insertion/deletion at any point in the sequence.
    *
    *  @ingroup sequences
+   *  @headerfile forward_list
+   *  @since C++11
    *
    *  @tparam _Tp  Type of element.
    *  @tparam _Alloc  Allocator type, defaults to allocator<_Tp>.
@@ -1178,8 +1183,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
       /// @}
 
     private:
-#if __cplusplus > 201703L
-# define __cpp_lib_list_remove_return_type 201806L
+#ifdef __cpp_lib_list_remove_return_type // C++20 && HOSTED
       using __remove_return_type = size_type;
 # define _GLIBCXX_FWDLIST_REMOVE_RETURN_TYPE_TAG \
       __attribute__((__abi_tag__("__cxx20")))

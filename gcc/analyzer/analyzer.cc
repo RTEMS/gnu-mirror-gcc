@@ -1,5 +1,5 @@
 /* Utility functions for the analyzer.
-   Copyright (C) 2019-2021 Free Software Foundation, Inc.
+   Copyright (C) 2019-2023 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -19,6 +19,7 @@ along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
 #include "config.h"
+#define INCLUDE_MEMORY
 #include "system.h"
 #include "coretypes.h"
 #include "tree.h"
@@ -27,7 +28,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple.h"
 #include "diagnostic.h"
 #include "intl.h"
-#include "function.h"
 #include "analyzer/analyzer.h"
 
 #if ENABLE_ANALYZER
@@ -41,6 +41,8 @@ namespace ana {
 location_t
 get_stmt_location (const gimple *stmt, function *fun)
 {
+  if (!stmt)
+    return UNKNOWN_LOCATION;
   if (get_pure_location (stmt->location) == UNKNOWN_LOCATION)
     {
       /* Workaround for missing location information for clobber
@@ -109,7 +111,7 @@ get_diagnostic_tree_for_gassign_1 (const gassign *assign_stmt,
 }
 
 /*  Subroutine of fixup_tree_for_diagnostic_1, called on SSA names.
-    Attempt to reconstruct a a tree expression for SSA_NAME
+    Attempt to reconstruct a tree expression for SSA_NAME
     based on its def-stmt.
     SSA_NAME must be non-NULL.
     VISITED must be non-NULL; it is used to ensure termination.
@@ -241,7 +243,7 @@ is_special_named_call_p (const gcall *call, const char *funcname,
 /* Helper function for checkers.  Is FNDECL an extern fndecl at file scope
    that has the given FUNCNAME?
 
-   Compare with special_function_p in calls.c.  */
+   Compare with special_function_p in calls.cc.  */
 
 bool
 is_named_call_p (const_tree fndecl, const char *funcname)
@@ -271,7 +273,7 @@ is_named_call_p (const_tree fndecl, const char *funcname)
 }
 
 /* Return true if FNDECL is within the namespace "std".
-   Compare with cp/typeck.c: decl_in_std_namespace_p, but this doesn't
+   Compare with cp/typeck.cc: decl_in_std_namespace_p, but this doesn't
    rely on being the C++ FE (or handle inline namespaces inside of std).  */
 
 static inline bool
@@ -423,18 +425,45 @@ make_label_text (bool can_colorize, const char *fmt, ...)
   if (!can_colorize)
     pp_show_color (pp) = false;
 
-  text_info ti;
   rich_location rich_loc (line_table, UNKNOWN_LOCATION);
 
   va_list ap;
 
   va_start (ap, fmt);
 
-  ti.format_spec = _(fmt);
-  ti.args_ptr = &ap;
-  ti.err_no = 0;
-  ti.x_data = NULL;
-  ti.m_richloc = &rich_loc;
+  text_info ti (_(fmt), &ap, 0, NULL, &rich_loc);
+  pp_format (pp, &ti);
+  pp_output_formatted_text (pp);
+
+  va_end (ap);
+
+  label_text result = label_text::take (xstrdup (pp_formatted_text (pp)));
+  delete pp;
+  return result;
+}
+
+/* As above, but with singular vs plural.  */
+
+label_text
+make_label_text_n (bool can_colorize, unsigned HOST_WIDE_INT n,
+		   const char *singular_fmt,
+		   const char *plural_fmt, ...)
+{
+  pretty_printer *pp = global_dc->printer->clone ();
+  pp_clear_output_area (pp);
+
+  if (!can_colorize)
+    pp_show_color (pp) = false;
+
+  rich_location rich_loc (line_table, UNKNOWN_LOCATION);
+
+  va_list ap;
+
+  va_start (ap, plural_fmt);
+
+  const char *fmt = ngettext (singular_fmt, plural_fmt, n);
+
+  text_info ti (fmt, &ap, 0, NULL, &rich_loc);
 
   pp_format (pp, &ti);
   pp_output_formatted_text (pp);

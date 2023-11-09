@@ -1,6 +1,6 @@
 // Wrapper of C-language FILE struct -*- C++ -*-
 
-// Copyright (C) 2000-2021 Free Software Foundation, Inc.
+// Copyright (C) 2000-2023 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -26,6 +26,7 @@
 // ISO C++ 14882: 27.8  File-based streams
 //
 
+#include <bits/largefile-config.h>
 #include <bits/basic_file.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -65,6 +66,11 @@
 
 #include <limits> // For <off_t>::max() and min() and <streamsize>::max()
 
+#if _GLIBCXX_USE__GET_OSFHANDLE
+# include <stdint.h> // For intptr_t
+# include <io.h>     // For _get_osfhandle
+#endif
+
 namespace
 {
   // Map ios_base::openmode flags to a string for use in fopen().
@@ -78,32 +84,38 @@ namespace
 	out    = std::ios_base::out,
 	trunc  = std::ios_base::trunc,
 	app    = std::ios_base::app,
-	binary = std::ios_base::binary
+	binary = std::ios_base::binary,
+	noreplace = std::_S_noreplace
       };
 
     // _GLIBCXX_RESOLVE_LIB_DEFECTS
     // 596. 27.8.1.3 Table 112 omits "a+" and "a+b" modes.
-    switch (mode & (in|out|trunc|app|binary))
+    switch (mode & (in|out|trunc|app|binary|noreplace))
       {
-      case (   out                 ): return "w";
-      case (   out      |app       ): return "a";
-      case (             app       ): return "a";
-      case (   out|trunc           ): return "w";
-      case (in                     ): return "r";
-      case (in|out                 ): return "r+";
-      case (in|out|trunc           ): return "w+";
-      case (in|out      |app       ): return "a+";
-      case (in          |app       ): return "a+";
+      case (   out                           ): return "w";
+      case (   out                 |noreplace): return "wx";
+      case (   out|trunc                     ): return "w";
+      case (   out|trunc           |noreplace): return "wx";
+      case (   out      |app                 ): return "a";
+      case (             app                 ): return "a";
+      case (in                               ): return "r";
+      case (in|out                           ): return "r+";
+      case (in|out|trunc                     ): return "w+";
+      case (in|out|trunc           |noreplace): return "w+x";
+      case (in|out      |app                 ): return "a+";
+      case (in          |app                 ): return "a+";
 
-      case (   out          |binary): return "wb";
-      case (   out      |app|binary): return "ab";
-      case (             app|binary): return "ab";
-      case (   out|trunc    |binary): return "wb";
-      case (in              |binary): return "rb";
-      case (in|out          |binary): return "r+b";
-      case (in|out|trunc    |binary): return "w+b";
-      case (in|out      |app|binary): return "a+b";
-      case (in          |app|binary): return "a+b";
+      case (   out          |binary          ): return "wb";
+      case (   out          |binary|noreplace): return "wbx";
+      case (   out      |app|binary          ): return "ab";
+      case (             app|binary          ): return "ab";
+      case (   out|trunc    |binary          ): return "wb";
+      case (in              |binary          ): return "rb";
+      case (in|out          |binary          ): return "r+b";
+      case (in|out|trunc    |binary          ): return "w+b";
+      case (in|out|trunc    |binary|noreplace): return "w+bx";
+      case (in|out      |app|binary          ): return "a+b";
+      case (in          |app|binary          ): return "a+b";
 
       default: return 0; // invalid
       }
@@ -122,15 +134,16 @@ namespace
     for (;;)
       {
 #ifdef _GLIBCXX_USE_STDIO_PURE
-	const std::streamsize __ret = fwrite(__file, 1, __nleft, __file);
+	const std::streamsize __ret = fwrite(__s, 1, __nleft, __file);
+	if (__ret == 0 && ferror(__file))
+	  break;
 #else
 	const std::streamsize __ret = write(__fd, __s, __nleft);
-#endif
 	if (__ret == -1L && errno == EINTR)
 	  continue;
 	if (__ret == -1L)
 	  break;
-
+#endif
 	__nleft -= __ret;
 	if (__nleft == 0)
 	  break;
@@ -244,11 +257,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     const char* __c_mode = fopen_mode(__mode);
     if (__c_mode && !this->is_open())
       {
-#ifdef _GLIBCXX_USE_LFS
-	if ((_M_cfile = fopen64(__name, __c_mode)))
-#else
 	if ((_M_cfile = fopen(__name, __c_mode)))
-#endif
 	  {
 	    _M_cfile_created = true;
 	    __ret = this;
@@ -324,13 +333,15 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   __basic_file<char>::xsgetn(char* __s, streamsize __n)
   {
     streamsize __ret;
-    do
 #ifdef _GLIBCXX_USE_STDIO_PURE
-      __ret = fread(__s, 1, __n, this->file());
+    __ret = fread(__s, 1, __n, this->file());
+    if (__ret == 0 && ferror(this->file()))
+      __ret = -1;
 #else
+    do
       __ret = read(this->fd(), __s, __n);
-#endif
     while (__ret == -1L && errno == EINTR);
+#endif
     return __ret;
   }
 
@@ -369,20 +380,49 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     return __ret;
   }
 
+  namespace
+  {
+    inline streamoff
+    get_file_offset(__basic_file<char>* __f)
+    {
+#ifdef _GLIBCXX_USE_STDIO_PURE
+# ifdef _GLIBCXX_USE_FSEEKO_FTELLO
+      return ftello(__f->file());
+# else
+      return ftell(__f->file());
+# endif
+#else
+      return lseek(__f->fd(), 0, (int)ios_base::cur);
+#endif
+    }
+  }
+
   streamoff
   __basic_file<char>::seekoff(streamoff __off, ios_base::seekdir __way) throw ()
   {
-#ifdef _GLIBCXX_USE_LFS
-    return lseek64(this->fd(), __off, __way);
-#else
-    if (__off > numeric_limits<off_t>::max()
-	|| __off < numeric_limits<off_t>::min())
-      return -1L;
 #ifdef _GLIBCXX_USE_STDIO_PURE
-    return fseek(this->file(), __off, __way);
-#else
-    return lseek(this->fd(), __off, __way);
+#ifdef _GLIBCXX_USE_FSEEKO_FTELLO
+    if _GLIBCXX17_CONSTEXPR (sizeof(off_t) > sizeof(long))
+      {
+	if (fseeko(this->file(), __off, __way))
+	  return -1;
+      }
+    else
 #endif
+      {
+	if (__off > numeric_limits<long>::max()
+	      || __off < numeric_limits<long>::min())
+	  return -1;
+	if (fseek(this->file(), __off, __way))
+	  return -1;
+      }
+    return __way == ios_base::beg ? __off : std::get_file_offset(this);
+#else
+    if _GLIBCXX17_CONSTEXPR (sizeof(streamoff) > sizeof(off_t))
+      if (__off > numeric_limits<off_t>::max()
+	    || __off < numeric_limits<off_t>::min())
+      return -1L;
+    return lseek(this->fd(), __off, __way);
 #endif
   }
 
@@ -414,27 +454,28 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
 #if defined(_GLIBCXX_HAVE_S_ISREG) || defined(_GLIBCXX_HAVE_S_IFREG)
     // Regular files.
-#ifdef _GLIBCXX_USE_LFS
-    struct stat64 __buffer;
-    const int __err = fstat64(this->fd(), &__buffer);
-    if (!__err && _GLIBCXX_ISREG(__buffer.st_mode))
-      {
-	const streamoff __off = __buffer.st_size - lseek64(this->fd(), 0,
-							   ios_base::cur);
-	return std::min(__off, streamoff(numeric_limits<streamsize>::max()));
-      }
-#else
     struct stat __buffer;
     const int __err = fstat(this->fd(), &__buffer);
     if (!__err && _GLIBCXX_ISREG(__buffer.st_mode))
-#ifdef _GLIBCXX_USE_STDIO_PURE
-      return __buffer.st_size - fseek(this->file(), 0, ios_base::cur);
-#else
-      return __buffer.st_size - lseek(this->fd(), 0, ios_base::cur);
-#endif
-#endif
+      {
+	const streamoff __off = __buffer.st_size - std::get_file_offset(this);
+	return std::min(__off, streamoff(numeric_limits<streamsize>::max()));
+      }
 #endif
     return 0;
+  }
+
+  __basic_file<char>::native_handle_type
+  __basic_file<char>::native_handle() const noexcept
+  {
+#ifdef _GLIBCXX_USE_STDIO_PURE
+    return _M_cfile;
+#elif _GLIBCXX_USE__GET_OSFHANDLE
+    const intptr_t handle = _M_cfile ? _get_osfhandle(fileno(_M_cfile)) : -1;
+    return reinterpret_cast<native_handle>(handle);
+#else
+    return fileno(_M_cfile);
+#endif
   }
 
 _GLIBCXX_END_NAMESPACE_VERSION

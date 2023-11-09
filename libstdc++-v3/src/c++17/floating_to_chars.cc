@@ -1,6 +1,6 @@
 // std::to_chars implementation for floating-point types -*- C++ -*-
 
-// Copyright (C) 2020-2021 Free Software Foundation, Inc.
+// Copyright (C) 2020-2023 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -21,9 +21,6 @@
 // a copy of the GCC Runtime Library Exception along with this program;
 // see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 // <http://www.gnu.org/licenses/>.
-
-// Activate __glibcxx_assert within this file to shake out any bugs.
-#define _GLIBCXX_ASSERTIONS 1
 
 #include <charconv>
 
@@ -46,6 +43,14 @@
 #endif
 // sprintf for __ieee128
 extern "C" int __sprintfieee128(char*, const char*, ...);
+#elif __FLT128_MANT_DIG__ == 113 && __LDBL_MANT_DIG__ != 113 \
+      && defined(__GLIBC_PREREQ)
+extern "C" int __strfromf128(char*, size_t, const char*, _Float128)
+  __asm ("strfromf128")
+#ifndef _GLIBCXX_HAVE_FLOAT128_MATH
+  __attribute__((__weak__))
+#endif
+  ;
 #endif
 
 // This implementation crucially assumes float/double have the
@@ -76,21 +81,20 @@ extern "C" int __sprintfieee128(char*, const char*, ...);
 # define LONG_DOUBLE_KIND LDK_UNSUPPORTED
 #endif
 
-#if defined _GLIBCXX_USE_FLOAT128 && __FLT128_MANT_DIG__ == 113
+// For now we only support __float128 when it's the powerpc64 __ieee128 type.
+#if defined _GLIBCXX_LONG_DOUBLE_ALT128_COMPAT && __FLT128_MANT_DIG__ == 113
 // Define overloads of std::to_chars for __float128.
 # define FLOAT128_TO_CHARS 1
-#endif
-
-// For now we only support __float128 when it's the powerpc64 __ieee128 type.
-#ifndef _GLIBCXX_LONG_DOUBLE_ALT128_COMPAT
-# undef FLOAT128_TO_CHARS
-#endif
-
-#ifdef FLOAT128_TO_CHARS
 using F128_type = __float128;
+#elif __FLT128_MANT_DIG__ == 113 && __LDBL_MANT_DIG__ != 113 \
+      && defined(__GLIBC_PREREQ)
+# define FLOAT128_TO_CHARS 1
+using F128_type = _Float128;
 #else
 using F128_type = void;
 #endif
+
+#include <stdint.h>
 
 namespace
 {
@@ -257,7 +261,7 @@ namespace
 
 # ifdef FLOAT128_TO_CHARS
   template<>
-    struct floating_type_traits<__float128> : floating_type_traits_binary128
+    struct floating_type_traits<F128_type> : floating_type_traits_binary128
     { };
 # endif
 #endif
@@ -379,6 +383,44 @@ namespace
     };
 #endif
 
+  // Wrappers around float for std::{,b}float16_t promoted to float.
+  struct floating_type_float16_t
+  {
+    float x;
+    operator float() const { return x; }
+  };
+  struct floating_type_bfloat16_t
+  {
+    float x;
+    operator float() const { return x; }
+  };
+
+  template<>
+    struct floating_type_traits<floating_type_float16_t>
+    {
+      static constexpr int mantissa_bits = 10;
+      static constexpr int exponent_bits = 5;
+      static constexpr bool has_implicit_leading_bit = true;
+      using mantissa_t = uint32_t;
+      using shortest_scientific_t = ryu::floating_decimal_128;
+
+      static constexpr uint64_t pow10_adjustment_tab[]
+	= { 0 };
+    };
+
+  template<>
+    struct floating_type_traits<floating_type_bfloat16_t>
+    {
+      static constexpr int mantissa_bits = 7;
+      static constexpr int exponent_bits = 8;
+      static constexpr bool has_implicit_leading_bit = true;
+      using mantissa_t = uint32_t;
+      using shortest_scientific_t = ryu::floating_decimal_128;
+
+      static constexpr uint64_t pow10_adjustment_tab[]
+	= { 0b0000111001110001101010010110100101010010000000000000000000000000 };
+    };
+
   // An IEEE-style decomposition of a floating-point value of type T.
   template<typename T>
     struct ieee_t
@@ -487,6 +529,79 @@ namespace
     }
 #endif
 
+  template<>
+    ieee_t<floating_type_float16_t>
+    get_ieee_repr(const floating_type_float16_t value)
+    {
+      using mantissa_t = typename floating_type_traits<float>::mantissa_t;
+      constexpr int mantissa_bits = floating_type_traits<float>::mantissa_bits;
+      constexpr int exponent_bits = floating_type_traits<float>::exponent_bits;
+
+      uint32_t value_bits = 0;
+      memcpy(&value_bits, &value.x, sizeof(value));
+
+      ieee_t<floating_type_float16_t> ieee_repr;
+      ieee_repr.mantissa
+	= static_cast<mantissa_t>(value_bits & ((uint32_t{1} << mantissa_bits) - 1u));
+      value_bits >>= mantissa_bits;
+      ieee_repr.biased_exponent
+	= static_cast<uint32_t>(value_bits & ((uint32_t{1} << exponent_bits) - 1u));
+      value_bits >>= exponent_bits;
+      ieee_repr.sign = (value_bits & 1) != 0;
+      // We have mantissa and biased_exponent from the float (originally
+      // float16_t converted to float).
+      // Transform that to float16_t mantissa and biased_exponent.
+      // If biased_exponent is 0, then value is +-0.0.
+      // If biased_exponent is 0x67..0x70, then it is a float16_t denormal.
+      if (ieee_repr.biased_exponent >= 0x67
+	  && ieee_repr.biased_exponent <= 0x70)
+	{
+	  int n = ieee_repr.biased_exponent - 0x67;
+	  ieee_repr.mantissa = ((uint32_t{1} << n)
+				| (ieee_repr.mantissa >> (mantissa_bits - n)));
+	  ieee_repr.biased_exponent = 0;
+	}
+      // If biased_exponent is 0xff, then it is a float16_t inf or NaN.
+      else if (ieee_repr.biased_exponent == 0xff)
+	{
+	  ieee_repr.mantissa >>= 13;
+	  ieee_repr.biased_exponent = 0x1f;
+	}
+      // If biased_exponent is 0x71..0x8e, then it is a float16_t normal number.
+      else if (ieee_repr.biased_exponent > 0x70)
+	{
+	  ieee_repr.mantissa >>= 13;
+	  ieee_repr.biased_exponent -= 0x70;
+	}
+      return ieee_repr;
+    }
+
+  template<>
+    ieee_t<floating_type_bfloat16_t>
+    get_ieee_repr(const floating_type_bfloat16_t value)
+    {
+      using mantissa_t = typename floating_type_traits<float>::mantissa_t;
+      constexpr int mantissa_bits = floating_type_traits<float>::mantissa_bits;
+      constexpr int exponent_bits = floating_type_traits<float>::exponent_bits;
+
+      uint32_t value_bits = 0;
+      memcpy(&value_bits, &value.x, sizeof(value));
+
+      ieee_t<floating_type_bfloat16_t> ieee_repr;
+      ieee_repr.mantissa
+	= static_cast<mantissa_t>(value_bits & ((uint32_t{1} << mantissa_bits) - 1u));
+      value_bits >>= mantissa_bits;
+      ieee_repr.biased_exponent
+	= static_cast<uint32_t>(value_bits & ((uint32_t{1} << exponent_bits) - 1u));
+      value_bits >>= exponent_bits;
+      ieee_repr.sign = (value_bits & 1) != 0;
+      // We have mantissa and biased_exponent from the float (originally
+      // bfloat16_t converted to float).
+      // Transform that to bfloat16_t mantissa and biased_exponent.
+      ieee_repr.mantissa >>= 16;
+      return ieee_repr;
+    }
+
   // Invoke Ryu to obtain the shortest scientific form for the given
   // floating-point number.
   template<typename T>
@@ -498,7 +613,9 @@ namespace
       else if constexpr (std::is_same_v<T, double>)
 	return ryu::floating_to_fd64(value);
       else if constexpr (std::is_same_v<T, long double>
-			 || std::is_same_v<T, F128_type>)
+			 || std::is_same_v<T, F128_type>
+			 || std::is_same_v<T, floating_type_float16_t>
+			 || std::is_same_v<T, floating_type_bfloat16_t>)
 	{
 	  constexpr int mantissa_bits
 	    = floating_type_traits<T>::mantissa_bits;
@@ -683,6 +800,28 @@ template<typename T>
     return {{first, errc{}}};
   }
 
+template<>
+  optional<to_chars_result>
+  __handle_special_value<floating_type_float16_t>(char* first,
+						  char* const last,
+						  const floating_type_float16_t value,
+						  const chars_format fmt,
+						  const int precision)
+  {
+    return __handle_special_value(first, last, value.x, fmt, precision);
+  }
+
+template<>
+  optional<to_chars_result>
+  __handle_special_value<floating_type_bfloat16_t>(char* first,
+						   char* const last,
+						   const floating_type_bfloat16_t value,
+						   const chars_format fmt,
+						   const int precision)
+  {
+    return __handle_special_value(first, last, value.x, fmt, precision);
+  }
+
 // This subroutine of the floating-point to_chars overloads performs
 // hexadecimal formatting.
 template<typename T>
@@ -714,9 +853,9 @@ template<typename T>
     const bool is_normal_number = (biased_exponent != 0);
 
     // Calculate the unbiased exponent.
-    const int32_t unbiased_exponent = (is_normal_number
-				       ? biased_exponent - exponent_bias
-				       : 1 - exponent_bias);
+    int32_t unbiased_exponent = (is_normal_number
+				 ? biased_exponent - exponent_bias
+				 : 1 - exponent_bias);
 
     // Shift the mantissa so that its bitwidth is a multiple of 4.
     constexpr unsigned rounded_mantissa_bits = (mantissa_bits + 3) / 4 * 4;
@@ -733,6 +872,16 @@ template<typename T>
 	  __glibcxx_assert(effective_mantissa & (mantissa_t{1} << (mantissa_bits
 								   - 1u)));
       }
+    else if (!precision.has_value() && effective_mantissa)
+      {
+	// 1.8p-23 is shorter than 0.00cp-14, so if precision is
+	// omitted, try to canonicalize denormals such that they
+	// have the leading bit set.
+	int width = __bit_width(effective_mantissa);
+	int shift = rounded_mantissa_bits - width + has_implicit_leading_bit;
+	unbiased_exponent -= shift;
+	effective_mantissa <<= shift;
+      }
 
     // Compute the shortest precision needed to print this value exactly,
     // disregarding trailing zeros.
@@ -747,7 +896,8 @@ template<typename T>
     __glibcxx_assert(shortest_full_precision >= 0);
 
     int written_exponent = unbiased_exponent;
-    const int effective_precision = precision.value_or(shortest_full_precision);
+    int effective_precision = precision.value_or(shortest_full_precision);
+    int excess_precision = 0;
     if (effective_precision < shortest_full_precision)
       {
 	// When limiting the precision, we need to determine how to round the
@@ -794,19 +944,24 @@ template<typename T>
 	      }
 	  }
       }
+    else
+      {
+	excess_precision = effective_precision - shortest_full_precision;
+	effective_precision = shortest_full_precision;
+      }
 
     // Compute the leading hexit and mask it out from the mantissa.
     char leading_hexit;
     if constexpr (has_implicit_leading_bit)
       {
-	const unsigned nibble = effective_mantissa >> rounded_mantissa_bits;
+	const auto nibble = unsigned(effective_mantissa >> rounded_mantissa_bits);
 	__glibcxx_assert(nibble <= 2);
 	leading_hexit = '0' + nibble;
 	effective_mantissa &= ~(mantissa_t{0b11} << rounded_mantissa_bits);
       }
     else
       {
-	const unsigned nibble = effective_mantissa >> (rounded_mantissa_bits-4);
+	const auto nibble = unsigned(effective_mantissa >> (rounded_mantissa_bits-4));
 	__glibcxx_assert(nibble < 16);
 	leading_hexit = "0123456789abcdef"[nibble];
 	effective_mantissa &= ~(mantissa_t{0b1111} << (rounded_mantissa_bits-4));
@@ -816,26 +971,30 @@ template<typename T>
     // Now before we start writing the string, determine the total length of
     // the output string and perform a single bounds check.
     int expected_output_length = sign + 1;
-    if (effective_precision != 0)
-      expected_output_length += strlen(".") + effective_precision;
+    if (effective_precision + excess_precision > 0)
+      expected_output_length += strlen(".");
+    expected_output_length += effective_precision;
     const int abs_written_exponent = abs(written_exponent);
     expected_output_length += (abs_written_exponent >= 10000 ? strlen("p+ddddd")
 			       : abs_written_exponent >= 1000 ? strlen("p+dddd")
 			       : abs_written_exponent >= 100 ? strlen("p+ddd")
 			       : abs_written_exponent >= 10 ? strlen("p+dd")
 			       : strlen("p+d"));
-    if (last - first < expected_output_length)
+    if (last - first < expected_output_length
+	|| last - first - expected_output_length < excess_precision)
       return {last, errc::value_too_large};
+    char* const expected_output_end = first + expected_output_length + excess_precision;
 
-    const auto saved_first = first;
     // Write the negative sign and the leading hexit.
     if (sign)
       *first++ = '-';
     *first++ = leading_hexit;
 
+    if (effective_precision + excess_precision > 0)
+      *first++ = '.';
+
     if (effective_precision > 0)
       {
-	*first++ = '.';
 	int written_hexits = 0;
 	// Extract and mask out the leading nibble after the decimal point,
 	// write its corresponding hexit, and repeat until the mantissa is
@@ -847,7 +1006,7 @@ template<typename T>
 	while (effective_mantissa != 0)
 	  {
 	    nibble_offset -= 4;
-	    const unsigned nibble = effective_mantissa >> nibble_offset;
+	    const auto nibble = unsigned(effective_mantissa >> nibble_offset);
 	    __glibcxx_assert(nibble < 16);
 	    *first++ = "0123456789abcdef"[nibble];
 	    ++written_hexits;
@@ -863,13 +1022,18 @@ template<typename T>
 	  }
       }
 
+    if (excess_precision > 0)
+      {
+	memset(first, '0', excess_precision);
+	first += excess_precision;
+      }
+
     // Finally, write the exponent.
     *first++ = 'p';
     if (written_exponent >= 0)
       *first++ = '+';
     const to_chars_result result = to_chars(first, last, written_exponent);
-    __glibcxx_assert(result.ec == errc{}
-		     && result.ptr == saved_first + expected_output_length);
+    __glibcxx_assert(result.ec == errc{} && result.ptr == expected_output_end);
     return result;
   }
 
@@ -879,7 +1043,8 @@ namespace
 #pragma GCC diagnostic ignored "-Wabi"
   template<typename T, typename... Extra>
   inline int
-  sprintf_ld(char* buffer, const char* format_string, T value, Extra... args)
+  sprintf_ld(char* buffer, size_t length __attribute__((unused)),
+	     const char* format_string, T value, Extra... args)
   {
     int len;
 
@@ -889,10 +1054,31 @@ namespace
       fesetround(FE_TONEAREST); // We want round-to-nearest behavior.
 #endif
 
+#ifdef FLOAT128_TO_CHARS
 #ifdef _GLIBCXX_LONG_DOUBLE_ALT128_COMPAT
     if constexpr (is_same_v<T, __ieee128>)
       len = __sprintfieee128(buffer, format_string, args..., value);
     else
+#else
+    if constexpr (is_same_v<T, _Float128>)
+      {
+#ifndef _GLIBCXX_HAVE_FLOAT128_MATH
+	if (&__strfromf128 == nullptr)
+	  len = sprintf(buffer, format_string, args..., (long double)value);
+	else
+#endif
+	if constexpr (sizeof...(args) == 0)
+	  len = __strfromf128(buffer, length, "%.0f", value);
+	else
+	  {
+	    // strfromf128 unfortunately doesn't allow .*
+	    char fmt[3 * sizeof(int) + 6];
+	    sprintf(fmt, "%%.%d%c", args..., int(format_string[4]));
+	    len = __strfromf128(buffer, length, fmt, value);
+	  }
+      }
+    else
+#endif
 #endif
     len = sprintf(buffer, format_string, args..., value);
 
@@ -912,7 +1098,18 @@ template<typename T>
 			       chars_format fmt)
   {
     if (fmt == chars_format::hex)
-      return __floating_to_chars_hex(first, last, value, nullopt);
+      {
+	// std::bfloat16_t has the same exponent range as std::float32_t
+	// and so we can avoid instantiation of __floating_to_chars_hex
+	// for bfloat16_t.  Shortest hex will be the same as for float.
+	// When we print shortest form even for denormals, we can do it
+	// for std::float16_t as well.
+	if constexpr (is_same_v<T, floating_type_float16_t>
+		      || is_same_v<T, floating_type_bfloat16_t>)
+	  return __floating_to_chars_hex(first, last, value.x, nullopt);
+	else
+	  return __floating_to_chars_hex(first, last, value, nullopt);
+      }
 
     __glibcxx_assert(fmt == chars_format::fixed
 		     || fmt == chars_format::scientific
@@ -1039,8 +1236,10 @@ template<typename T>
 	    // can avoid this if we use sprintf to write all but the last
 	    // digit, and carefully compute and write the last digit
 	    // ourselves.
-	    char buffer[expected_output_length+1];
-	    const int output_length = sprintf_ld(buffer, "%.0Lf", value);
+	    char buffer[expected_output_length + 1];
+	    const int output_length = sprintf_ld(buffer,
+						 expected_output_length + 1,
+						 "%.0Lf", value);
 	    __glibcxx_assert(output_length == expected_output_length);
 	    memcpy(first, buffer, output_length);
 	    return {first + output_length, errc{}};
@@ -1103,6 +1302,7 @@ template<typename T>
       }
 
     __glibcxx_assert(false);
+    __builtin_unreachable();
   }
 
 template<typename T>
@@ -1191,6 +1391,8 @@ template<typename T>
 	    effective_precision = min(precision, max_eff_scientific_precision);
 	    output_specifier = "%.*Lg";
 	  }
+	else
+	  __builtin_unreachable();
 	const int excess_precision = (fmt != chars_format::general
 				      ? precision - effective_precision : 0);
 
@@ -1223,11 +1425,14 @@ template<typename T>
 	      output_length_upper_bound = sign + strlen("0");
 	    output_length_upper_bound += sizeof(radix) + effective_precision;
 	  }
+	else
+	  __builtin_unreachable();
 
 	// Do the sprintf into the local buffer.
-	char buffer[output_length_upper_bound+1];
+	char buffer[output_length_upper_bound + 1];
 	int output_length
-	  = sprintf_ld(buffer, output_specifier, value, effective_precision);
+	  = sprintf_ld(buffer, output_length_upper_bound + 1, output_specifier,
+		       value, effective_precision);
 	__glibcxx_assert(output_length <= output_length_upper_bound);
 
 	if (effective_precision > 0)
@@ -1250,7 +1455,8 @@ template<typename T>
 	    }
 
 	// Copy the string from the buffer over to the output range.
-	if (last - first < output_length + excess_precision)
+	if (last - first < output_length
+	    || last - first - output_length < excess_precision)
 	  return {last, errc::value_too_large};
 	memcpy(first, buffer, output_length);
 	first += output_length;
@@ -1304,7 +1510,8 @@ template<typename T>
 	  output_length_upper_bound += strlen("e+dd");
 
 	int output_length;
-	if (last - first >= output_length_upper_bound + excess_precision)
+	if (last - first >= output_length_upper_bound
+	    && last - first - output_length_upper_bound >= excess_precision)
 	  {
 	    // The result will definitely fit into the output range, so we can
 	    // write directly into it.
@@ -1325,7 +1532,8 @@ template<typename T>
 						  buffer, nullptr);
 	    __glibcxx_assert(output_length == output_length_upper_bound - 1
 			     || output_length == output_length_upper_bound);
-	    if (last - first < output_length + excess_precision)
+	    if (last - first < output_length
+		|| last - first - output_length < excess_precision)
 	      return {last, errc::value_too_large};
 	    memcpy(first, buffer, output_length);
 	  }
@@ -1365,7 +1573,8 @@ template<typename T>
 	  output_length_upper_bound += strlen(".") + effective_precision;
 
 	int output_length;
-	if (last - first >= output_length_upper_bound + excess_precision)
+	if (last - first >= output_length_upper_bound
+	    && last - first - output_length_upper_bound >= excess_precision)
 	  {
 	    // The result will definitely fit into the output range, so we can
 	    // write directly into it.
@@ -1382,7 +1591,8 @@ template<typename T>
 	    output_length = ryu::d2fixed_buffered_n(value, effective_precision,
 						    buffer);
 	    __glibcxx_assert(output_length <= output_length_upper_bound);
-	    if (last - first < output_length + excess_precision)
+	    if (last - first < output_length
+		|| last - first - output_length < excess_precision)
 	      return {last, errc::value_too_large};
 	    memcpy(first, buffer, output_length);
 	  }
@@ -1554,6 +1764,7 @@ template<typename T>
       }
 
     __glibcxx_assert(false);
+    __builtin_unreachable();
   }
 
 // Define the overloads for float.
@@ -1621,6 +1832,7 @@ to_chars(char* first, char* last, long double value, chars_format fmt,
 }
 
 #ifdef FLOAT128_TO_CHARS
+#ifdef _GLIBCXX_LONG_DOUBLE_ALT128_COMPAT
 to_chars_result
 to_chars(char* first, char* last, __float128 value) noexcept
 {
@@ -1639,7 +1851,61 @@ to_chars(char* first, char* last, __float128 value, chars_format fmt,
 {
   return __floating_to_chars_precision(first, last, value, fmt, precision);
 }
+
+extern "C" to_chars_result
+_ZSt8to_charsPcS_DF128_(char* first, char* last, __float128 value) noexcept
+  __attribute__((alias ("_ZSt8to_charsPcS_u9__ieee128")));
+
+extern "C" to_chars_result
+_ZSt8to_charsPcS_DF128_St12chars_format(char* first, char* last,
+					__float128 value,
+					chars_format fmt) noexcept
+  __attribute__((alias ("_ZSt8to_charsPcS_u9__ieee128St12chars_format")));
+
+extern "C" to_chars_result
+_ZSt8to_charsPcS_DF128_St12chars_formati(char* first, char* last,
+					 __float128 value,
+					 chars_format fmt,
+					 int precision) noexcept
+  __attribute__((alias ("_ZSt8to_charsPcS_u9__ieee128St12chars_formati")));
+#else
+to_chars_result
+to_chars(char* first, char* last, _Float128 value) noexcept
+{
+  return __floating_to_chars_shortest(first, last, value, chars_format{});
+}
+
+to_chars_result
+to_chars(char* first, char* last, _Float128 value, chars_format fmt) noexcept
+{
+  return __floating_to_chars_shortest(first, last, value, fmt);
+}
+
+to_chars_result
+to_chars(char* first, char* last, _Float128 value, chars_format fmt,
+	 int precision) noexcept
+{
+  return __floating_to_chars_precision(first, last, value, fmt, precision);
+}
 #endif
+#endif
+
+// Entrypoints for 16-bit floats.
+[[gnu::cold]] to_chars_result
+__to_chars_float16_t(char* first, char* last, float value,
+		     chars_format fmt) noexcept
+{
+  return __floating_to_chars_shortest(first, last,
+				      floating_type_float16_t{ value }, fmt);
+}
+
+[[gnu::cold]] to_chars_result
+__to_chars_bfloat16_t(char* first, char* last, float value,
+		      chars_format fmt) noexcept
+{
+  return __floating_to_chars_shortest(first, last,
+				      floating_type_bfloat16_t{ value }, fmt);
+}
 
 #ifdef _GLIBCXX_LONG_DOUBLE_COMPAT
 // Map the -mlong-double-64 long double overloads to the double overloads.

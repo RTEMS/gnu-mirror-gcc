@@ -1,6 +1,6 @@
 /* Verify zero initialization for integer and pointer type automatic variables.  */
 /* { dg-do compile { target { ilp32 || lp64 } } } */
-/* { dg-options "-ftrivial-auto-var-init=zero -fdump-tree-gimple" } */
+/* { dg-options "-ftrivial-auto-var-init=zero -fno-short-enums -fdump-tree-gimple" } */
 
 #ifndef __cplusplus
 # define bool _Bool
@@ -29,13 +29,13 @@ void foo()
   return;
 }
 
-/* { dg-final { scan-tree-dump "temp1 = .DEFERRED_INIT \\(1, 2, 0\\)" "gimple" } } */
-/* { dg-final { scan-tree-dump "temp2 = .DEFERRED_INIT \\(2, 2, 0\\)" "gimple" } } */
-/* { dg-final { scan-tree-dump "temp3 = .DEFERRED_INIT \\(4, 2, 0\\)" "gimple" } } */
-/* { dg-final { scan-tree-dump "temp4 = .DEFERRED_INIT \\(4, 2, 0\\)" "gimple" } } */
-/* { dg-final { scan-tree-dump "temp5 = .DEFERRED_INIT \\(4, 2, 0\\)" "gimple" { target ilp32 } } } */
-/* { dg-final { scan-tree-dump "temp5 = .DEFERRED_INIT \\(8, 2, 0\\)" "gimple" { target lp64 } } } */
-/* { dg-final { scan-tree-dump "temp6 = .DEFERRED_INIT \\(8, 2, 0\\)" "gimple" } } */
-/* { dg-final { scan-tree-dump "temp7 = .DEFERRED_INIT \\(4, 2, 0\\)" "gimple" { target ilp32 } } } */
-/* { dg-final { scan-tree-dump "temp7 = .DEFERRED_INIT \\(8, 2, 0\\)" "gimple" { target lp64 } } } */
-/* { dg-final { scan-tree-dump "temp8 = .DEFERRED_INIT \\(1, 2, 0\\)" "gimple" } } */
+/* { dg-final { scan-tree-dump "temp1 = .DEFERRED_INIT \\(1, 2, \&\"temp1\"" "gimple" } } */
+/* { dg-final { scan-tree-dump "temp2 = .DEFERRED_INIT \\(2, 2, \&\"temp2\"" "gimple" } } */
+/* { dg-final { scan-tree-dump "temp3 = .DEFERRED_INIT \\(4, 2, \&\"temp3\"" "gimple" } } */
+/* { dg-final { scan-tree-dump "temp4 = .DEFERRED_INIT \\(4, 2, \&\"temp4\"" "gimple" } } */
+/* { dg-final { scan-tree-dump "temp5 = .DEFERRED_INIT \\(4, 2, \&\"temp5\"" "gimple" { target ilp32 } } } */
+/* { dg-final { scan-tree-dump "temp5 = .DEFERRED_INIT \\(8, 2, \&\"temp5\"" "gimple" { target lp64 } } } */
+/* { dg-final { scan-tree-dump "temp6 = .DEFERRED_INIT \\(8, 2, \&\"temp6\"" "gimple" } } */
+/* { dg-final { scan-tree-dump "temp7 = .DEFERRED_INIT \\(4, 2, \&\"temp7\"" "gimple" { target ilp32 } } } */
+/* { dg-final { scan-tree-dump "temp7 = .DEFERRED_INIT \\(8, 2, \&\"temp7\"" "gimple" { target lp64 } } } */
+/* { dg-final { scan-tree-dump "temp8 = .DEFERRED_INIT \\(1, 2, \&\"temp8\"" "gimple" } } */

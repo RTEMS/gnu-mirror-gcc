@@ -1,5 +1,5 @@
 /* Declarations for rtx-reader support for gen* routines.
-   Copyright (C) 2000-2021 Free Software Foundation, Inc.
+   Copyright (C) 2000-2023 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -20,6 +20,7 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_GENSUPPORT_H
 #define GCC_GENSUPPORT_H
 
+#include "hash-set.h"
 #include "read-md.h"
 
 struct obstack;
@@ -121,7 +122,7 @@ struct optab_pattern
   unsigned int m1, m2;
 
   /* An index that provides a lexicographical sort of (OP, M2, M1).
-     Used by genopinit.c.  */
+     Used by genopinit.cc.  */
   unsigned int sort_num;
 };
 
@@ -129,11 +130,12 @@ extern rtx add_implicit_parallel (rtvec);
 extern rtx_reader *init_rtx_reader_args_cb (int, const char **,
 					    bool (*)(const char *));
 extern rtx_reader *init_rtx_reader_args (int, const char **);
+extern int count_patterns ();
 extern bool read_md_rtx (md_rtx_info *);
 extern unsigned int get_num_insn_codes ();
 
 /* Set this to 0 to disable automatic elision of insn patterns which
-   can never be used in this configuration.  See genconditions.c.
+   can never be used in this configuration.  See genconditions.cc.
    Must be set before calling init_md_reader.  */
 extern int insn_elision;
 
@@ -148,10 +150,10 @@ extern const char *get_c_test (rtx);
 extern int maybe_eval_c_test (const char *);
 
 /* Add an entry to the table of conditions.  Used by genconditions and
-   by read-rtl.c.  */
+   by read-rtl.cc.  */
 extern void add_c_test (const char *, int);
 
-/* This structure is used internally by gensupport.c and genconditions.c.  */
+/* This structure is used internally by gensupport.cc and genconditions.cc.  */
 struct c_test
 {
   const char *expr;
@@ -172,11 +174,11 @@ struct pred_data
   const char *name;		/* predicate name */
   bool special;			/* special handling of modes? */
 
-  /* data used primarily by genpreds.c */
+  /* data used primarily by genpreds.cc */
   const char *c_block;		/* C test block */
   rtx exp;			/* RTL test expression */
 
-  /* data used primarily by genrecog.c */
+  /* data used primarily by genrecog.cc */
   enum rtx_code singleton;	/* if pred takes only one code, that code */
   int num_codes;		/* number of codes accepted */
   bool allows_non_lvalue;	/* if pred allows non-lvalue expressions */
@@ -217,6 +219,8 @@ struct pattern_stats
   /* The number of operand variables that are needed.  */
   int num_operand_vars;
 };
+
+extern hash_set<rtx> compact_syntax;
 
 extern void get_pattern_stats (struct pattern_stats *ranges, rtvec vec);
 extern void compute_test_codes (rtx, file_location, char *);

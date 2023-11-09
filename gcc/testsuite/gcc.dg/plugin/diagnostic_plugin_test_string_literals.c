@@ -17,12 +17,12 @@
 #include "basic-block.h"
 #include "tree-ssa-alias.h"
 #include "internal-fn.h"
+#include "gimple.h"
+#include "gimple-iterator.h"
 #include "gimple-fold.h"
 #include "tree-eh.h"
 #include "gimple-expr.h"
 #include "is-a.h"
-#include "gimple.h"
-#include "gimple-iterator.h"
 #include "tree.h"
 #include "tree-pass.h"
 #include "intl.h"
@@ -208,7 +208,7 @@ plugin_init (struct plugin_name_args *plugin_info,
   if (!plugin_default_version_check (version, &gcc_version))
     return 1;
 
-  global_dc->caret_max_width = 80;
+  global_dc->m_source_printing.max_width = 80;
 
   pass_info.pass = new pass_test_string_literals (g);
   pass_info.reference_pass_name = "ssa";

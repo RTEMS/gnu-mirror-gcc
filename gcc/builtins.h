@@ -1,5 +1,5 @@
 /* Expand builtin functions.
-   Copyright (C) 1988-2021 Free Software Foundation, Inc.
+   Copyright (C) 1988-2023 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -52,6 +52,8 @@ extern bool force_folding_builtin_constant_p;
 extern bool called_as_built_in (tree);
 extern bool get_object_alignment_1 (tree, unsigned int *,
 				    unsigned HOST_WIDE_INT *);
+extern bool get_object_alignment_2 (tree, unsigned int *,
+				    unsigned HOST_WIDE_INT *, bool);
 extern unsigned int get_object_alignment (tree);
 extern bool get_pointer_alignment_1 (tree, unsigned int *,
 				     unsigned HOST_WIDE_INT *);
@@ -103,7 +105,7 @@ struct c_strlen_data
 };
 
 extern tree c_strlen (tree, int, c_strlen_data * = NULL, unsigned = 1);
-extern rtx c_readstr (const char *, scalar_int_mode, bool = true);
+extern rtx c_readstr (const char *, fixed_size_mode, bool = true);
 extern void expand_builtin_setjmp_setup (rtx, rtx);
 extern void expand_builtin_setjmp_receiver (rtx);
 extern void expand_builtin_update_setjmp_buf (rtx);
@@ -123,6 +125,7 @@ extern void std_expand_builtin_va_start (tree, rtx);
 extern void expand_builtin_trap (void);
 extern void expand_ifn_atomic_bit_test_and (gcall *);
 extern void expand_ifn_atomic_compare_exchange (gcall *);
+extern void expand_ifn_atomic_op_fetch_cmp_0 (gcall *);
 extern rtx expand_builtin (tree, rtx, rtx, machine_mode, int);
 extern enum built_in_function builtin_mathfn_code (const_tree);
 extern tree fold_builtin_expect (location_t, tree, tree, tree, tree);
@@ -146,10 +149,13 @@ extern char target_percent_s[3];
 extern char target_percent_c[3];
 extern char target_percent_s_newline[4];
 extern bool target_char_cst_p (tree t, char *p);
+extern rtx get_memory_rtx (tree exp, tree len);
 
+extern internal_fn associated_internal_fn (combined_fn, tree);
 extern internal_fn associated_internal_fn (tree);
 extern internal_fn replacement_internal_fn (gcall *);
 
 extern bool builtin_with_linkage_p (tree);
+extern int type_to_class (tree);
 
 #endif /* GCC_BUILTINS_H */

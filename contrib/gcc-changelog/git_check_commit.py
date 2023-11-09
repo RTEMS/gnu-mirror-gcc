@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+
+# Copyright (C) 2020-2023 Free Software Foundation, Inc.
 #
 # This file is part of GCC.
 #
@@ -29,6 +31,8 @@ parser.add_argument('-g', '--git-path', default='.',
                     help='Path to git repository')
 parser.add_argument('-p', '--print-changelog', action='store_true',
                     help='Print final changelog entires')
+parser.add_argument('-v', '--verbose', action='store_true',
+                    help='Print verbose information')
 args = parser.parse_args()
 
 retval = 0
@@ -38,9 +42,17 @@ for git_commit in parse_git_revisions(args.git_path, args.revisions):
     if git_commit.success:
         if args.print_changelog:
             git_commit.print_output()
+        if args.verbose and git_commit.warnings:
+            for warning in git_commit.warnings:
+                print('WARN: %s' % warning)
     else:
+        if args.verbose and git_commit.warnings:
+            for warning in git_commit.warnings:
+                print('WARN: %s' % warning)
         for error in git_commit.errors:
             print('ERR: %s' % error)
+            if args.verbose and error.details:
+                print(error.details)
         retval = 1
 
 exit(retval)

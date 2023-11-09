@@ -1,4 +1,4 @@
-@c Copyright (C) 2006-2021 Free Software Foundation, Inc.
+@c Copyright (C) 2006-2023 Free Software Foundation, Inc.
 @c Free Software Foundation, Inc.
 @c This is part of the GCC manual.
 @c For copying conditions, see the file gcc.texi.
@@ -210,7 +210,7 @@ loop in depth-first search order in reversed CFG, ordered by dominance
 relation, and breath-first search order, respectively.
 @item @code{single_exit}: Returns the single exit edge of the loop, or
 @code{NULL} if the loop has more than one exit.  You can only use this
-function if LOOPS_HAVE_MARKED_SINGLE_EXITS property is used.
+function if @code{LOOPS_HAVE_RECORDED_EXITS} is used.
 @item @code{get_loop_exit_edges}: Enumerates the exit edges of a loop.
 @item @code{just_once_each_iteration_p}: Returns true if the basic block
 is executed exactly once during each iteration of a loop (that is, it
@@ -249,8 +249,8 @@ are only reliable for the innermost loops:
 @item @code{create_iv}: Creates a new induction variable.  Only works on
 GIMPLE@.  @code{standard_iv_increment_position} can be used to find a
 suitable place for the iv increment.
-@item @code{duplicate_loop_to_header_edge},
-@code{tree_duplicate_loop_to_header_edge}: These functions (on RTL and
+@item @code{duplicate_loop_body_to_header_edge},
+@code{tree_duplicate_loop_body_to_header_edge}: These functions (on RTL and
 on GIMPLE) duplicate the body of the loop prescribed number of times on
 one of the edges entering loop header, thus performing either loop
 unrolling or loop peeling.  @code{can_duplicate_loop_p}
@@ -504,7 +504,7 @@ false unconditionally.
 @cindex Data Dependency Analysis
 
 The code for the data dependence analysis can be found in
-@file{tree-data-ref.c} and its interface and data structures are
+@file{tree-data-ref.cc} and its interface and data structures are
 described in @file{tree-data-ref.h}.  The function that computes the
 data dependences for all the array and pointer references for a given
 loop is @code{compute_data_dependences_for_loop}.  This function is

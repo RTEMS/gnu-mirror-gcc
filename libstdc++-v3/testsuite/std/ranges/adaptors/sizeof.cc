@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2021 Free Software Foundation, Inc.
+// Copyright (C) 2020-2023 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -15,8 +15,7 @@
 // with this library; see the file COPYING3.  If not see
 // <http://www.gnu.org/licenses/>.
 
-// { dg-options "-std=gnu++2a" }
-// { dg-do compile { target c++2a } }
+// { dg-do compile { target c++20 } }
 
 #include <ranges>
 #include <string_view>
@@ -42,11 +41,11 @@ static_assert(sizeof(ranges::drop_while_view<V, decltype(&pred_f)>) == 4*ptr);
 static_assert(sizeof(ranges::transform_view<V, decltype(&func_f)>) == 3*ptr);
 
 static_assert(sizeof(ranges::filter_view<V, decltype(pred_l)>) == 3*ptr);
-static_assert(sizeof(ranges::take_while_view<V, decltype(pred_l)>) == 3*ptr);
+static_assert(sizeof(ranges::take_while_view<V, decltype(pred_l)>) == 2*ptr);
 static_assert(sizeof(ranges::drop_while_view<V, decltype(pred_l)>) == 3*ptr);
-static_assert(sizeof(ranges::transform_view<V, decltype(func_l)>) == 3*ptr);
+static_assert(sizeof(ranges::transform_view<V, decltype(func_l)>) == 2*ptr);
 
 static_assert(sizeof(ranges::lazy_split_view<V, std::string_view>) == 4*ptr);
 
 static_assert
- (sizeof(ranges::reverse_view<ranges::filter_view<V, decltype(pred_l)>>) == 4*ptr);
+ (sizeof(ranges::reverse_view<ranges::filter_view<V, decltype(pred_l)>>) == 3*ptr);

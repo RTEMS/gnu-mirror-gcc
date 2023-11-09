@@ -1,6 +1,6 @@
 // Utilities used throughout the library -*- C++ -*-
 
-// Copyright (C) 2004-2021 Free Software Foundation, Inc.
+// Copyright (C) 2004-2023 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -34,6 +34,11 @@
 #define _GLIBCXX_UTILITY_H 1
 
 #pragma GCC system_header
+
+#define __glibcxx_want_tuple_element_t
+#define __glibcxx_want_integer_sequence
+#define __glibcxx_want_ranges_zip
+#include <bits/version.h>
 
 #if __cplusplus >= 201103L
 
@@ -70,6 +75,11 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     struct tuple_size<const volatile __enable_if_has_tuple_size<_Tp>>
     : public tuple_size<_Tp> { };
 
+#if __cplusplus >= 201703L
+  template<typename _Tp>
+    inline constexpr size_t tuple_size_v = tuple_size<_Tp>::value;
+#endif
+
   /// Gives the type of the ith element of a given tuple type.
   template<size_t __i, typename _Tp>
     struct tuple_element;
@@ -81,29 +91,54 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   template<size_t __i, typename _Tp>
     struct tuple_element<__i, const _Tp>
     {
-      typedef typename add_const<__tuple_element_t<__i, _Tp>>::type type;
+      using type = const __tuple_element_t<__i, _Tp>;
     };
 
   template<size_t __i, typename _Tp>
     struct tuple_element<__i, volatile _Tp>
     {
-      typedef typename add_volatile<__tuple_element_t<__i, _Tp>>::type type;
+      using type = volatile __tuple_element_t<__i, _Tp>;
     };
 
   template<size_t __i, typename _Tp>
     struct tuple_element<__i, const volatile _Tp>
     {
-      typedef typename add_cv<__tuple_element_t<__i, _Tp>>::type type;
+      using type = const volatile __tuple_element_t<__i, _Tp>;
     };
 
 #if __cplusplus >= 201402L
-// The standard says this macro and alias template should be in <tuple>
-// but we define them here, to be available in <utility> and <array> too.
-#define __cpp_lib_tuple_element_t 201402L
 
+  // Return the index of _Tp in _Types, if it occurs exactly once.
+  // Otherwise, return sizeof...(_Types).
+  template<typename _Tp, typename... _Types>
+    constexpr size_t
+    __find_uniq_type_in_pack()
+    {
+      constexpr size_t __sz = sizeof...(_Types);
+      constexpr bool __found[__sz] = { __is_same(_Tp, _Types) ... };
+      size_t __n = __sz;
+      for (size_t __i = 0; __i < __sz; ++__i)
+	{
+	  if (__found[__i])
+	    {
+	      if (__n < __sz) // more than one _Tp found
+		return __sz;
+	      __n = __i;
+	    }
+	}
+      return __n;
+    }
+#endif // C++14
+
+// The standard says this macro and alias template should be in <tuple> but we
+// define them here, to be available in <array>, <utility> and <ranges> too.
+// _GLIBCXX_RESOLVE_LIB_DEFECTS
+// 3378. tuple_size_v/tuple_element_t should be available when
+//       tuple_size/tuple_element are
+#ifdef __cpp_lib_tuple_element_t // C++ >= 14
   template<size_t __i, typename _Tp>
     using tuple_element_t = typename tuple_element<__i, _Tp>::type;
-#endif // C++14
+#endif
 
   // Stores a tuple of indices.  Used by tuple and pair, and by bind() to
   // extract the elements in a tuple.
@@ -125,9 +160,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 #endif
     };
 
-#if __cplusplus >= 201402L
-
-#define __cpp_lib_integer_sequence 201304L
+#ifdef __cpp_lib_integer_sequence // C++ >= 14
 
   /// Class template integer_sequence
   template<typename _Tp, _Tp... _Idx>
@@ -157,10 +190,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   /// Alias template index_sequence_for
   template<typename... _Types>
     using index_sequence_for = make_index_sequence<sizeof...(_Types)>;
+#endif // __cpp_lib_integer_sequence
 
 #if __cplusplus >= 201703L
 
-  //
   struct in_place_t {
     explicit in_place_t() = default;
   };
@@ -193,7 +226,47 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     using __is_in_place_type = bool_constant<__is_in_place_type_v<_Tp>>;
 
 #endif // C++17
-#endif // C++14
+
+#if __has_builtin(__type_pack_element)
+  template<size_t _Np, typename... _Types>
+    struct _Nth_type
+    { using type = __type_pack_element<_Np, _Types...>; };
+#else
+  template<size_t _Np, typename... _Types>
+    struct _Nth_type
+    { };
+
+  template<typename _Tp0, typename... _Rest>
+    struct _Nth_type<0, _Tp0, _Rest...>
+    { using type = _Tp0; };
+
+  template<typename _Tp0, typename _Tp1, typename... _Rest>
+    struct _Nth_type<1, _Tp0, _Tp1, _Rest...>
+    { using type = _Tp1; };
+
+  template<typename _Tp0, typename _Tp1, typename _Tp2, typename... _Rest>
+    struct _Nth_type<2, _Tp0, _Tp1, _Tp2, _Rest...>
+    { using type = _Tp2; };
+
+  template<size_t _Np, typename _Tp0, typename _Tp1, typename _Tp2,
+	   typename... _Rest>
+#if __cpp_concepts
+    requires (_Np >= 3)
+#endif
+    struct _Nth_type<_Np, _Tp0, _Tp1, _Tp2, _Rest...>
+    : _Nth_type<_Np - 3, _Rest...>
+    { };
+
+#if ! __cpp_concepts // Need additional specializations to avoid ambiguities.
+  template<typename _Tp0, typename _Tp1, typename _Tp2, typename... _Rest>
+    struct _Nth_type<0, _Tp0, _Tp1, _Tp2, _Rest...>
+    { using type = _Tp0; };
+
+  template<typename _Tp0, typename _Tp1, typename _Tp2, typename... _Rest>
+    struct _Nth_type<1, _Tp0, _Tp1, _Tp2, _Rest...>
+    { using type = _Tp1; };
+#endif
+#endif
 
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace

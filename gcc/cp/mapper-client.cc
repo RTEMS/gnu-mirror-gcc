@@ -1,5 +1,5 @@
 /* C++ modules.  Experimental!
-   Copyright (C) 2017-2021 Free Software Foundation, Inc.
+   Copyright (C) 2017-2023 Free Software Foundation, Inc.
    Written by Nathan Sidwell <nathan@acm.org> while at FaceBook
 
    This file is part of GCC.
@@ -27,12 +27,14 @@ along with GCC; see the file COPYING3.  If not see
 #define INCLUDE_STRING
 #define INCLUDE_VECTOR
 #define INCLUDE_MAP
+#define INCLUDE_MEMORY
 #include "system.h"
 
 #include "line-map.h"
 #include "diagnostic-core.h"
 #include "mapper-client.h"
 #include "intl.h"
+#include "mkdeps.h"
 
 #include "../../c++tools/resolver.h"
 
@@ -131,6 +133,7 @@ spawn_mapper_program (char const **errmsg, std::string &name,
 
 module_client *
 module_client::open_module_client (location_t loc, const char *o,
+				   class mkdeps *deps,
 				   void (*set_repo) (const char *),
 				   char const *full_program_name)
 {
@@ -226,6 +229,8 @@ module_client::open_module_client (location_t loc, const char *o,
 		int fd = -1;
 #if CODY_NETWORKING
 		fd = Cody::OpenLocal (&errmsg, name.c_str () + 1);
+#else
+		errmsg = "disabled";
 #endif
 		if (fd >= 0)
 		  c = new module_client (fd, fd);
@@ -253,6 +258,8 @@ module_client::open_module_client (location_t loc, const char *o,
 			int fd = -1;
 #if CODY_NETWORKING
 			fd = Cody::OpenInet6 (&errmsg, name.c_str (), port);
+#else
+			errmsg = "disabled";
 #endif
 			name[colon] = ':';
 
@@ -280,6 +287,9 @@ module_client::open_module_client (location_t loc, const char *o,
 	  errmsg = "opening";
 	else
 	  {
+	    /* Add the mapper file to the dependency tracking. */
+	    if (deps)
+	      deps_add_dep (deps, name.c_str ());
 	    if (int l = r->read_tuple_file (fd, ident, false))
 	      {
 		if (l > 0)

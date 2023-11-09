@@ -14,9 +14,11 @@
 // sanitizer_common/sanitizer_common_interceptors.h
 //===----------------------------------------------------------------------===//
 
-#include "interception/interception.h"
 #include "hwasan.h"
+#include "hwasan_checks.h"
 #include "hwasan_thread.h"
+#include "interception/interception.h"
+#include "sanitizer_common/sanitizer_linux.h"
 #include "sanitizer_common/sanitizer_stackdepot.h"
 
 #if !SANITIZER_FUCHSIA
@@ -28,24 +30,54 @@ using namespace __hwasan;
 struct ThreadStartArg {
   thread_callback_t callback;
   void *param;
+  __sanitizer_sigset_t starting_sigset_;
 };
 
 static void *HwasanThreadStartFunc(void *arg) {
   __hwasan_thread_enter();
   ThreadStartArg A = *reinterpret_cast<ThreadStartArg*>(arg);
+  SetSigProcMask(&A.starting_sigset_, nullptr);
   UnmapOrDie(arg, GetPageSizeCached());
   return A.callback(A.param);
 }
 
+#    define COMMON_SYSCALL_PRE_READ_RANGE(p, s) __hwasan_loadN((uptr)p, (uptr)s)
+#    define COMMON_SYSCALL_PRE_WRITE_RANGE(p, s) \
+      __hwasan_storeN((uptr)p, (uptr)s)
+#    define COMMON_SYSCALL_POST_READ_RANGE(p, s) \
+      do {                                       \
+        (void)(p);                               \
+        (void)(s);                               \
+      } while (false)
+#    define COMMON_SYSCALL_POST_WRITE_RANGE(p, s) \
+      do {                                        \
+        (void)(p);                                \
+        (void)(s);                                \
+      } while (false)
+#    include "sanitizer_common/sanitizer_common_syscalls.inc"
+#    include "sanitizer_common/sanitizer_syscalls_netbsd.inc"
+
 INTERCEPTOR(int, pthread_create, void *th, void *attr, void *(*callback)(void*),
             void * param) {
-  ScopedTaggingDisabler disabler;
+  EnsureMainThreadIDIsCorrect();
+  ScopedTaggingDisabler tagging_disabler;
   ThreadStartArg *A = reinterpret_cast<ThreadStartArg *> (MmapOrDie(
       GetPageSizeCached(), "pthread_create"));
-  *A = {callback, param};
-  int res = REAL(pthread_create)(th, attr, &HwasanThreadStartFunc, A);
-  return res;
+  A->callback = callback;
+  A->param = param;
+  ScopedBlockSignals block(&A->starting_sigset_);
+  // ASAN uses the same approach to disable leaks from pthread_create.
+#    if CAN_SANITIZE_LEAKS
+  __lsan::ScopedInterceptorDisabler lsan_disabler;
+#    endif
+  return REAL(pthread_create)(th, attr, &HwasanThreadStartFunc, A);
 }
+
+INTERCEPTOR(int, pthread_join, void *t, void **arg) {
+  return REAL(pthread_join)(t, arg);
+}
+
+DEFINE_REAL_PTHREAD_FUNCTIONS
 
 DEFINE_REAL(int, vfork)
 DECLARE_EXTERN_INTERCEPTOR_AND_WRAPPER(int, vfork)
@@ -69,6 +101,8 @@ InternalLongjmp(__hw_register_buf env, int retval) {
   constexpr size_t kSpIndex = 13;
 #    elif defined(__x86_64__)
   constexpr size_t kSpIndex = 6;
+#    elif SANITIZER_RISCV64
+  constexpr size_t kSpIndex = 13;
 #    endif
 
   // Clear all memory tags on the stack between here and where we're going.
@@ -125,6 +159,49 @@ InternalLongjmp(__hw_register_buf env, int retval) {
       "cmovnz %1,%%rax;"
       "jmp *%%rdx;" ::"r"(env_address),
       "r"(retval_tmp));
+#    elif SANITIZER_RISCV64
+  register long int retval_tmp asm("x11") = retval;
+  register void *env_address asm("x10") = &env[0];
+  asm volatile(
+      "ld     ra,   0<<3(%0);"
+      "ld     s0,   1<<3(%0);"
+      "ld     s1,   2<<3(%0);"
+      "ld     s2,   3<<3(%0);"
+      "ld     s3,   4<<3(%0);"
+      "ld     s4,   5<<3(%0);"
+      "ld     s5,   6<<3(%0);"
+      "ld     s6,   7<<3(%0);"
+      "ld     s7,   8<<3(%0);"
+      "ld     s8,   9<<3(%0);"
+      "ld     s9,   10<<3(%0);"
+      "ld     s10,  11<<3(%0);"
+      "ld     s11,  12<<3(%0);"
+#      if __riscv_float_abi_double
+      "fld    fs0,  14<<3(%0);"
+      "fld    fs1,  15<<3(%0);"
+      "fld    fs2,  16<<3(%0);"
+      "fld    fs3,  17<<3(%0);"
+      "fld    fs4,  18<<3(%0);"
+      "fld    fs5,  19<<3(%0);"
+      "fld    fs6,  20<<3(%0);"
+      "fld    fs7,  21<<3(%0);"
+      "fld    fs8,  22<<3(%0);"
+      "fld    fs9,  23<<3(%0);"
+      "fld    fs10, 24<<3(%0);"
+      "fld    fs11, 25<<3(%0);"
+#      elif __riscv_float_abi_soft
+#      else
+#        error "Unsupported case"
+#      endif
+      "ld     a4, 13<<3(%0);"
+      "mv     sp, a4;"
+      // Return the value requested to return through arguments.
+      // This should be in x11 given what we requested above.
+      "seqz   a0, %1;"
+      "add    a0, a0, %1;"
+      "ret;"
+      : "+r"(env_address)
+      : "r"(retval_tmp));
 #    endif
 }
 
@@ -169,6 +246,10 @@ INTERCEPTOR(void, longjmp, __hw_jmp_buf env, int val) {
 namespace __hwasan {
 
 int OnExit() {
+  if (CAN_SANITIZE_LEAKS && common_flags()->detect_leaks &&
+      __lsan::HasReportedLeaks()) {
+    return common_flags()->exitcode;
+  }
   // FIXME: ask frontend whether we need to return failure.
   return 0;
 }
@@ -189,7 +270,8 @@ void InitializeInterceptors() {
   INTERCEPT_FUNCTION(vfork);
 #endif  // __linux__
   INTERCEPT_FUNCTION(pthread_create);
-#endif
+  INTERCEPT_FUNCTION(pthread_join);
+#  endif
 
   inited = 1;
 }

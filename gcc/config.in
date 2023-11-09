@@ -49,6 +49,19 @@
 #endif
 
 
+/* Specify a runpath directory, additional to those provided by the compiler
+   */
+#ifndef USED_FOR_TARGET
+#undef DARWIN_ADD_RPATH
+#endif
+
+
+/* Should add an extra runpath directory */
+#ifndef USED_FOR_TARGET
+#undef DARWIN_DO_EXTRA_RPATH
+#endif
+
+
 /* Define to enable the use of a default assembler. */
 #ifndef USED_FOR_TARGET
 #undef DEFAULT_ASSEMBLER
@@ -208,6 +221,12 @@
 /* Define to enable LTO support. */
 #ifndef USED_FOR_TARGET
 #undef ENABLE_LTO
+#endif
+
+
+/* If --with-multiarch option is used */
+#ifndef USED_FOR_TARGET
+#undef ENABLE_MULTIARCH
 #endif
 
 
@@ -404,13 +423,19 @@
 #endif
 
 
+/* Define if your assembler supports eh_frame pcrel encoding. */
+#ifndef USED_FOR_TARGET
+#undef HAVE_AS_EH_FRAME_PCREL_ENCODING_SUPPORT
+#endif
+
+
 /* Define if your assembler supports the R_PPC64_ENTRY relocation. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_ENTRY_MARKERS
 #endif
 
 
-/* Define if your assembler supports explicit relocations. */
+/* Define if your assembler supports explicit relocation. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_EXPLICIT_RELOCS
 #endif
@@ -443,12 +468,6 @@
 /* Define true if the assembler supports '.long foo@GOTOFF'. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_GOTOFF_IN_DATA
-#endif
-
-
-/* Define if your assembler supports the --gstabs option. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_GSTABS_DEBUG_FLAG
 #endif
 
 
@@ -598,6 +617,12 @@
 #endif
 
 
+/* Define if your macOS assembler supports .build_version directives */
+#ifndef USED_FOR_TARGET
+#undef HAVE_AS_MACOS_BUILD_VERSION
+#endif
+
+
 /* Define if the assembler understands -march=rv*_zifencei. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_MARCH_ZIFENCEI
@@ -616,17 +641,21 @@
 #endif
 
 
-/* Define if your Mac OS X assembler supports -mllvm -x86-pad-for-align=false.
-   */
+/* Define if your macOS assembler supports -mllvm -x86-pad-for-align=false. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_MLLVM_X86_PAD_FOR_ALIGN
 #endif
 
 
-/* Define if your Mac OS X assembler supports the -mmacos-version-min option.
-   */
+/* Define if your macOS assembler supports the -mmacos-version-min option. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_MMACOSX_VERSION_MIN_OPTION
+#endif
+
+
+/* Define if your assembler supports -mrelax option. */
+#ifndef USED_FOR_TARGET
+#undef HAVE_AS_MRELAX_OPTION
 #endif
 
 
@@ -669,6 +698,12 @@
 /* Define if your assembler supports R_PPC*_PLTSEQ relocations. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_PLTSEQ
+#endif
+
+
+/* Define if your assembler supports htm insns on power10. */
+#ifndef USED_FOR_TARGET
+#undef HAVE_AS_POWER10_HTM
 #endif
 
 
@@ -737,12 +772,6 @@
    against hidden symbols. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_AS_SPARC_UA_PCREL_HIDDEN
-#endif
-
-
-/* Define if your assembler supports .stabs. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_AS_STABS_DIRECTIVE
 #endif
 
 
@@ -1457,69 +1486,9 @@
 #endif
 
 
-/* Define if your assembler has fixed global_load functions. */
+/* Define to 1 if you have the `getauxval' function. */
 #ifndef USED_FOR_TARGET
-#undef HAVE_GCN_ASM_GLOBAL_LOAD_FIXED
-#endif
-
-
-/* Define if your assembler expects amdgcn_target gfx908+xnack syntax. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GCN_ASM_V3_SYNTAX
-#endif
-
-
-/* Define if your assembler expects amdgcn_target gfx908:xnack+ syntax. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GCN_ASM_V4_SYNTAX
-#endif
-
-
-/* Define if your assembler allows -mattr=+sramecc for fiji. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GCN_SRAM_ECC_FIJI
-#endif
-
-
-/* Define if your assembler allows -mattr=+sramecc for gfx900. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GCN_SRAM_ECC_GFX900
-#endif
-
-
-/* Define if your assembler allows -mattr=+sramecc for gfx906. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GCN_SRAM_ECC_GFX906
-#endif
-
-
-/* Define if your assembler allows -mattr=+sramecc for gfx908. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GCN_SRAM_ECC_GFX908
-#endif
-
-
-/* Define if your assembler allows -mattr=+xnack for fiji. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GCN_XNACK_FIJI
-#endif
-
-
-/* Define if your assembler allows -mattr=+xnack for gfx900. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GCN_XNACK_GFX900
-#endif
-
-
-/* Define if your assembler allows -mattr=+xnack for gfx906. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GCN_XNACK_GFX906
-#endif
-
-
-/* Define if your assembler allows -mattr=+xnack for gfx908. */
-#ifndef USED_FOR_TARGET
-#undef HAVE_GCN_XNACK_GFX908
+#undef HAVE_GETAUXVAL
 #endif
 
 
@@ -2011,6 +1980,12 @@
 #endif
 
 
+/* Define to 1 if you have the <sys/auxv.h> header file. */
+#ifndef USED_FOR_TARGET
+#undef HAVE_SYS_AUXV_H
+#endif
+
+
 /* Define to 1 if you have the <sys/file.h> header file. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_SYS_FILE_H
@@ -2208,6 +2183,18 @@
 #endif
 
 
+/* Define if O_NONBLOCK supported by fcntl. */
+#ifndef USED_FOR_TARGET
+#undef HOST_HAS_O_NONBLOCK
+#endif
+
+
+/* Define which stat syscall is able to handle 64bit indodes. */
+#ifndef USED_FOR_TARGET
+#undef HOST_STAT_FOR_64BIT_INODES
+#endif
+
+
 /* Define as const if the declaration of iconv() needs const. */
 #ifndef USED_FOR_TARGET
 #undef ICONV_CONST
@@ -2220,9 +2207,21 @@
 #endif
 
 
+/* Define to 1 if ld64 supports '-demangle'. */
+#ifndef USED_FOR_TARGET
+#undef LD64_HAS_DEMANGLE
+#endif
+
+
 /* Define to 1 if ld64 supports '-export_dynamic'. */
 #ifndef USED_FOR_TARGET
 #undef LD64_HAS_EXPORT_DYNAMIC
+#endif
+
+
+/* Define to 1 if ld64 supports '-platform_version'. */
+#ifndef USED_FOR_TARGET
+#undef LD64_HAS_PLATFORM_VERSION
 #endif
 
 
@@ -2363,6 +2362,18 @@
 /* Define to PREFIX/include if cpp should also search that directory. */
 #ifndef USED_FOR_TARGET
 #undef PREFIX_INCLUDE_DIR
+#endif
+
+
+/* The size of `dev_t', as computed by sizeof. */
+#ifndef USED_FOR_TARGET
+#undef SIZEOF_DEV_T
+#endif
+
+
+/* The size of `ino_t', as computed by sizeof. */
+#ifndef USED_FOR_TARGET
+#undef SIZEOF_INO_T
 #endif
 
 

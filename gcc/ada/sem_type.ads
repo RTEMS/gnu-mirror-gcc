@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -103,9 +103,12 @@ package Sem_Type is
    --  in N. If the name is an expanded name, the homonyms are only those that
    --  belong to the same scope.
 
-   function Is_Invisible_Operator (N : Node_Id; T : Entity_Id) return Boolean;
-   --  Check whether a predefined operation with universal operands appears in
-   --  a context in which the operators of the expected type are not visible.
+   function Is_Visible_Operator (N : Node_Id; Typ : Entity_Id) return Boolean;
+   --  Determine whether a predefined operation is performed in a context where
+   --  the predefined operators of base type Typ are visible. The existence of
+   --  this routine is an implementation artifact. A more straightforward but
+   --  more space-consuming choice would be to make all inherited operators
+   --  explicit in the symbol table. See also Sem_ch8.Has_Implicit_Operator.
 
    procedure List_Interps (Nam : Node_Id; Err : Node_Id);
    --  List candidate interpretations of an overloaded name. Used for various
@@ -181,10 +184,9 @@ package Sem_Type is
    --  opposed to an operator, type and mode conformance are required.
 
    function Find_Unique_Type (L : Node_Id; R : Node_Id) return Entity_Id;
-   --  Used in second pass of resolution, for equality and comparison nodes. L
-   --  is the left operand, whose type is known to be correct, and R is the
-   --  right operand, which has one interpretation compatible with that of L.
-   --  Return the type intersection of the two.
+   --  Used in type resolution for equality and comparison nodes. L and R are
+   --  the operands, whose type is known to be correct or Any_Type in case of
+   --  ambiguity. Return the type intersection of the two.
 
    function Has_Compatible_Type (N : Node_Id; Typ : Entity_Id) return Boolean;
    --  Verify that some interpretation of the node N has a type compatible with
@@ -220,10 +222,9 @@ package Sem_Type is
      (T1            : Entity_Id;
       T2            : Entity_Id;
       Use_Full_View : Boolean := False) return Boolean;
-   --  T1 is a tagged type (not class-wide). Verify that it is one of the
-   --  ancestors of type T2 (which may or not be class-wide). If Use_Full_View
-   --  is True then the full-view of private parents is used when climbing
-   --  through the parents of T2.
+   --  T1 is a type (not class-wide). Verify that it is one of the ancestors of
+   --  type T2 (which may or not be class-wide). If Use_Full_View is True, then
+   --  the full view of private parents is used when climbing T2's parents.
    --
    --  Note: For analysis purposes the flag Use_Full_View must be set to False
    --  (otherwise we break the privacy contract since this routine returns true
@@ -253,13 +254,22 @@ package Sem_Type is
    procedure Set_Abstract_Op (I : Interp_Index; V : Entity_Id);
    --  Set the abstract operation field of an interpretation
 
-   function Valid_Comparison_Arg (T : Entity_Id) return Boolean;
-   --  A valid argument to an ordering operator must be a discrete type, a
-   --  real type, or a one dimensional array with a discrete component type.
+   function Specific_Type (Typ_1, Typ_2 : Entity_Id) return Entity_Id;
+   --  If Typ_1 and Typ_2 are compatible, return the one that is not universal
+   --  or is not a "class" type (any_character, etc).
 
    function Valid_Boolean_Arg (T : Entity_Id) return Boolean;
-   --  A valid argument of a boolean operator is either some boolean type, or a
-   --  one-dimensional array of boolean type.
+   --  A valid argument of a predefined boolean operator must be a boolean type
+   --  or a 1-dimensional array of boolean type.
+
+   function Valid_Comparison_Arg (T : Entity_Id) return Boolean;
+   --  A valid argument of a predefined comparison operator must be a discrete
+   --  type, real type or a 1-dimensional array with a discrete component type.
+
+   function Valid_Equality_Arg (T : Entity_Id) return Boolean;
+   --  A valid argument of a predefined equality operator must be a nonlimited
+   --  type or an array with a limited private component whose full view is not
+   --  limited.
 
    procedure Write_Interp (It : Interp);
    --  Debugging procedure to display an Interp

@@ -1,5 +1,5 @@
 /* Simple bitmaps.
-   Copyright (C) 1999-2021 Free Software Foundation, Inc.
+   Copyright (C) 1999-2023 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -98,7 +98,7 @@ struct simple_bitmap_def
 
 /* Verify that access at INDEX in bitmap MAP is valid.  */ 
 
-static inline void
+inline void
 bitmap_check_index (const_sbitmap map, int index)
 {
   gcc_checking_assert (index >= 0);
@@ -107,14 +107,14 @@ bitmap_check_index (const_sbitmap map, int index)
 
 /* Verify that bitmaps A and B have same size.  */ 
 
-static inline void
+inline void
 bitmap_check_sizes (const_sbitmap a, const_sbitmap b)
 {
   gcc_checking_assert (a->n_bits == b->n_bits);
 }
 
 /* Test if bit number bitno in the bitmap is set.  */
-static inline SBITMAP_ELT_TYPE
+inline bool
 bitmap_bit_p (const_sbitmap map, int bitno)
 {
   bitmap_check_index (map, bitno);
@@ -124,26 +124,36 @@ bitmap_bit_p (const_sbitmap map, int bitno)
   return (map->elms[i] >> s) & (SBITMAP_ELT_TYPE) 1;
 }
 
-/* Set bit number BITNO in the sbitmap MAP.  */
+/* Set bit number BITNO in the sbitmap MAP.
+   Return true if the bit changed.  */
 
-static inline void
+inline bool
 bitmap_set_bit (sbitmap map, int bitno)
 {
   bitmap_check_index (map, bitno);
 
-  map->elms[bitno / SBITMAP_ELT_BITS]
-    |= (SBITMAP_ELT_TYPE) 1 << (bitno) % SBITMAP_ELT_BITS;
+  size_t i = bitno / SBITMAP_ELT_BITS;
+  unsigned int s = bitno % SBITMAP_ELT_BITS;
+  if (map->elms[i] & ((SBITMAP_ELT_TYPE) 1 << s))
+    return false;
+  map->elms[i] |= (SBITMAP_ELT_TYPE) 1 << s;
+  return true;
 }
 
-/* Reset bit number BITNO in the sbitmap MAP.  */
+/* Reset bit number BITNO in the sbitmap MAP.
+   Return true if the bit changed.  */
 
-static inline void
+inline bool
 bitmap_clear_bit (sbitmap map, int bitno)
 {
   bitmap_check_index (map, bitno);
 
-  map->elms[bitno / SBITMAP_ELT_BITS]
-    &= ~((SBITMAP_ELT_TYPE) 1 << (bitno) % SBITMAP_ELT_BITS);
+  size_t i = bitno / SBITMAP_ELT_BITS;
+  unsigned int s = bitno % SBITMAP_ELT_BITS;
+  if (!(map->elms[i] & ((SBITMAP_ELT_TYPE) 1 << s)))
+    return false;
+  map->elms[i] &= ~((SBITMAP_ELT_TYPE) 1 << s);
+  return true;
 }
 
 /* The iterator for sbitmap.  */
@@ -167,7 +177,7 @@ struct sbitmap_iterator {
 /* Initialize the iterator I with sbitmap BMP and the initial index
    MIN.  */
 
-static inline void
+inline void
 bmp_iter_set_init (sbitmap_iterator *i, const_sbitmap bmp,
 		   unsigned int min, unsigned *bit_no ATTRIBUTE_UNUSED)
 {
@@ -187,7 +197,7 @@ bmp_iter_set_init (sbitmap_iterator *i, const_sbitmap bmp,
    to the index of the bit to be visited.  Otherwise, return
    false.  */
 
-static inline bool
+inline bool
 bmp_iter_set (sbitmap_iterator *i, unsigned int *n)
 {
   /* Skip words that are zeros.  */
@@ -213,7 +223,7 @@ bmp_iter_set (sbitmap_iterator *i, unsigned int *n)
 
 /* Advance to the next bit.  */
 
-static inline void
+inline void
 bmp_iter_next (sbitmap_iterator *i, unsigned *bit_no ATTRIBUTE_UNUSED)
 {
   i->word >>= 1;
@@ -254,7 +264,7 @@ extern sbitmap sbitmap_alloc (unsigned int);
 extern sbitmap *sbitmap_vector_alloc (unsigned int, unsigned int);
 extern sbitmap sbitmap_resize (sbitmap, unsigned int, int);
 extern void bitmap_copy (sbitmap, const_sbitmap);
-extern int bitmap_equal_p (const_sbitmap, const_sbitmap);
+extern bool bitmap_equal_p (const_sbitmap, const_sbitmap);
 extern unsigned int bitmap_count_bits (const_sbitmap);
 extern bool bitmap_empty_p (const_sbitmap);
 extern void bitmap_clear (sbitmap);

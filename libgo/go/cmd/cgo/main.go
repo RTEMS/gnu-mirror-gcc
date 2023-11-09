@@ -21,7 +21,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -154,7 +153,6 @@ type Type struct {
 	EnumValues map[string]int64
 	Typedef    string
 	BadPointer bool // this pointer type should be represented as a uintptr (deprecated)
-	NotInHeap  bool // this type should have a go:notinheap annotation
 }
 
 // A FuncType collects information about a function type in both the C and Go worlds.
@@ -252,6 +250,7 @@ var importSyscall = flag.Bool("import_syscall", true, "import syscall in generat
 var trimpath = flag.String("trimpath", "", "applies supplied rewrites or trims prefixes to recorded source file paths")
 
 var goarch, goos, gomips, gomips64 string
+var gccBaseCmd []string
 
 func main() {
 	objabi.AddVersionFlag() // -V
@@ -309,10 +308,10 @@ func main() {
 	p := newPackage(args[:i])
 
 	// We need a C compiler to be available. Check this.
-	gccName := p.gccBaseCmd()[0]
-	_, err := exec.LookPath(gccName)
+	var err error
+	gccBaseCmd, err = checkGCCBaseCmd()
 	if err != nil {
-		fatalf("C compiler %q not found: %v", gccName, err)
+		fatalf("%v", err)
 		os.Exit(2)
 	}
 

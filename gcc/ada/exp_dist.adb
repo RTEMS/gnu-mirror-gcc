@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -300,12 +300,9 @@ package body Exp_Dist is
       NVList      : Entity_Id;
       Parameter   : Entity_Id;
       Constrained : Boolean;
-      RACW_Ctrl   : Boolean := False;
       Any         : Entity_Id) return Node_Id;
    --  Return a call to Add_Item to add the Any corresponding to the designated
    --  formal Parameter (with the indicated Constrained status) to NVList.
-   --  RACW_Ctrl must be set to True for controlling formals of distributed
-   --  object primitive operations.
 
    --------------------
    -- Stub_Structure --
@@ -1089,7 +1086,6 @@ package body Exp_Dist is
       NVList      : Entity_Id;
       Parameter   : Entity_Id;
       Constrained : Boolean;
-      RACW_Ctrl   : Boolean := False;
       Any         : Entity_Id) return Node_Id
    is
       Parameter_Name_String : String_Id;
@@ -1146,7 +1142,7 @@ package body Exp_Dist is
 
       Parameter_Name_String := String_From_Name_Buffer;
 
-      if RACW_Ctrl or else Nkind (Parameter) = N_Defining_Identifier then
+      if Nkind (Parameter) = N_Defining_Identifier then
 
          --  When the parameter passed to Add_Parameter_To_NVList is an
          --  Extra_Constrained parameter, Parameter is an N_Defining_
@@ -2912,7 +2908,7 @@ package body Exp_Dist is
    ---------------------------------
 
    procedure Expand_Calling_Stubs_Bodies (Unit_Node : Node_Id) is
-      Spec  : constant Node_Id := Specification (Unit_Node);
+      Spec : constant Node_Id := Specification (Unit_Node);
    begin
       Add_Calling_Stubs_To_Declarations (Spec);
    end Expand_Calling_Stubs_Bodies;
@@ -3122,8 +3118,8 @@ package body Exp_Dist is
       --  Start of processing for Add_RACW_Read_Attribute
 
       begin
-         Build_Stream_Procedure (Loc,
-           RACW_Type, Body_Node, Pnam, Statements, Outp => True);
+         Build_Stream_Procedure
+           (RACW_Type, Body_Node, Pnam, Statements, Outp => True);
          Proc_Decl := Make_Subprogram_Declaration (Loc,
            Copy_Specification (Loc, Specification (Body_Node)));
 
@@ -3358,7 +3354,7 @@ package body Exp_Dist is
 
       begin
          Build_Stream_Procedure
-           (Loc, RACW_Type, Body_Node, Pnam, Statements, Outp => False);
+           (RACW_Type, Body_Node, Pnam, Statements, Outp => False);
 
          Proc_Decl := Make_Subprogram_Declaration (Loc,
            Copy_Specification (Loc, Specification (Body_Node)));
@@ -5804,7 +5800,7 @@ package body Exp_Dist is
 
       begin
          Build_Stream_Procedure
-           (Loc, RACW_Type, Body_Node, Pnam, Statements, Outp => True);
+           (RACW_Type, Body_Node, Pnam, Statements, Outp => True);
 
          Proc_Decl := Make_Subprogram_Declaration (Loc,
            Copy_Specification (Loc, Specification (Body_Node)));
@@ -6107,7 +6103,7 @@ package body Exp_Dist is
 
       begin
          Build_Stream_Procedure
-           (Loc, RACW_Type, Body_Node, Pnam, Statements, Outp => False);
+           (RACW_Type, Body_Node, Pnam, Statements, Outp => False);
 
          Proc_Decl :=
            Make_Subprogram_Declaration (Loc,
@@ -8308,7 +8304,7 @@ package body Exp_Dist is
             CI := Component_Items (Clist);
             VP := Variant_Part (Clist);
 
-            Item := First (CI);
+            Item := First_Non_Pragma (CI);
             while Present (Item) loop
                Def := Defining_Identifier (Item);
 
@@ -8317,7 +8313,7 @@ package body Exp_Dist is
                     (Stmts, Container, Counter, Rec, Def);
                end if;
 
-               Next (Item);
+               Next_Non_Pragma (Item);
             end loop;
 
             if Present (VP) then
@@ -8604,6 +8600,8 @@ package body Exp_Dist is
 
             Use_Opaque_Representation : Boolean;
 
+            Real_Rep : Node_Id;
+
          begin
             --  For a derived type, we can't go past the base type (to the
             --  parent type) here, because that would cause the attribute's
@@ -8638,10 +8636,10 @@ package body Exp_Dist is
             Use_Opaque_Representation := False;
 
             if Has_Stream_Attribute_Definition
-                 (Typ, TSS_Stream_Output, At_Any_Place => True)
+                 (Typ, TSS_Stream_Output, Real_Rep, At_Any_Place => True)
               or else
                Has_Stream_Attribute_Definition
-                 (Typ, TSS_Stream_Write, At_Any_Place => True)
+                 (Typ, TSS_Stream_Write, Real_Rep, At_Any_Place => True)
             then
                --  If user-defined stream attributes are specified for this
                --  type, use them and transmit data as an opaque sequence of
@@ -9442,6 +9440,8 @@ package body Exp_Dist is
             --  When True, use stream attributes and represent type as an
             --  opaque sequence of bytes.
 
+            Real_Rep : Node_Id;
+
          begin
             --  For a derived type, we can't go past the base type (to the
             --  parent type) here, because that would cause the attribute's
@@ -9496,10 +9496,10 @@ package body Exp_Dist is
             Use_Opaque_Representation := False;
 
             if Has_Stream_Attribute_Definition
-                 (Typ, TSS_Stream_Output, At_Any_Place => True)
+                 (Typ, TSS_Stream_Output, Real_Rep, At_Any_Place => True)
               or else
                Has_Stream_Attribute_Definition
-                 (Typ, TSS_Stream_Write,  At_Any_Place => True)
+                 (Typ, TSS_Stream_Write, Real_Rep, At_Any_Place => True)
             then
                --  If user-defined stream attributes are specified for this
                --  type, use them and transmit data as an opaque sequence of
@@ -10628,6 +10628,8 @@ package body Exp_Dist is
             Type_Name_Str    : String_Id;
             Type_Repo_Id_Str : String_Id;
 
+            Real_Rep : Node_Id;
+
          --  Start of processing for Build_TypeCode_Function
 
          begin
@@ -10661,10 +10663,10 @@ package body Exp_Dist is
               (Type_Name_Str, Type_Repo_Id_Str, Parameters);
 
             if Has_Stream_Attribute_Definition
-                 (Typ, TSS_Stream_Output, At_Any_Place => True)
+                 (Typ, TSS_Stream_Output, Real_Rep, At_Any_Place => True)
               or else
                Has_Stream_Attribute_Definition
-                 (Typ, TSS_Stream_Write, At_Any_Place => True)
+                 (Typ, TSS_Stream_Write, Real_Rep, At_Any_Place => True)
             then
                --  If user-defined stream attributes are specified for this
                --  type, use them and transmit data as an opaque sequence of

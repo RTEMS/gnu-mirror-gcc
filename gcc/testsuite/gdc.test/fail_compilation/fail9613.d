@@ -1,8 +1,8 @@
-// PREMUTE_ARGS:
+// PERMUTE_ARGS:
 /*
 TEST_OUTPUT:
 ---
-fail_compilation/fail9613.d(12): Error: `(arguments)` expected following `const(byte)`
+fail_compilation/fail9613.d(12): Error: `(arguments)` expected following `const(byte)`, not `.`
 fail_compilation/fail9613.d(12): Error: semicolon expected following auto declaration, not `.`
 ---
 */

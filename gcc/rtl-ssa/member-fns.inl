@@ -1,5 +1,5 @@
 // Implementation of public inline member functions for RTL SSA     -*- C++ -*-
-// Copyright (C) 2020-2021 Free Software Foundation, Inc.
+// Copyright (C) 2020-2023 Free Software Foundation, Inc.
 //
 // This file is part of GCC.
 //
@@ -215,7 +215,7 @@ set_info::last_nondebug_insn_use () const
 inline use_info *
 set_info::first_any_insn_use () const
 {
-  if (m_first_use->is_in_any_insn ())
+  if (m_first_use && m_first_use->is_in_any_insn ())
     return m_first_use;
   return nullptr;
 }
@@ -401,7 +401,7 @@ def_mux::set () const
 }
 
 inline def_info *
-def_lookup::prev_def () const
+def_lookup::last_def_of_prev_group () const
 {
   if (!mux)
     return nullptr;
@@ -413,7 +413,7 @@ def_lookup::prev_def () const
 }
 
 inline def_info *
-def_lookup::next_def () const
+def_lookup::first_def_of_next_group () const
 {
   if (!mux)
     return nullptr;
@@ -433,19 +433,19 @@ def_lookup::matching_set () const
 }
 
 inline def_info *
-def_lookup::matching_or_prev_def () const
+def_lookup::matching_set_or_last_def_of_prev_group () const
 {
   if (set_info *set = matching_set ())
     return set;
-  return prev_def ();
+  return last_def_of_prev_group ();
 }
 
 inline def_info *
-def_lookup::matching_or_next_def () const
+def_lookup::matching_set_or_first_def_of_next_group () const
 {
   if (set_info *set = matching_set ())
     return set;
-  return next_def ();
+  return first_def_of_next_group ();
 }
 
 inline insn_note::insn_note (insn_note_kind kind)
@@ -484,7 +484,7 @@ insn_info::operator< (const insn_info &other) const
   if (this == &other)
     return false;
 
-  if (__builtin_expect (m_point != other.m_point, 1))
+  if (LIKELY (m_point != other.m_point))
     return m_point < other.m_point;
 
   return slow_compare_with (other) < 0;
@@ -514,7 +514,7 @@ insn_info::compare_with (const insn_info *other) const
   if (this == other)
     return 0;
 
-  if (__builtin_expect (m_point != other->m_point, 1))
+  if (LIKELY (m_point != other->m_point))
     // Assume that points remain in [0, INT_MAX].
     return m_point - other->m_point;
 
@@ -914,6 +914,15 @@ inline iterator_range<def_iterator>
 function_info::reg_defs (unsigned int regno) const
 {
   return { m_defs[regno + 1], nullptr };
+}
+
+inline bool
+function_info::is_single_dominating_def (const set_info *set) const
+{
+  return (set->is_first_def ()
+	  && set->is_last_def ()
+	  && (!HARD_REGISTER_NUM_P (set->regno ())
+	      || !TEST_HARD_REG_BIT (m_clobbered_by_calls, set->regno ())));
 }
 
 inline set_info *

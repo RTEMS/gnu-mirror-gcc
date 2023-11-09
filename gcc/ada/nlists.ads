@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -42,9 +42,6 @@ package Nlists is
    --  header is allocated in the lists table, and a List_Id value references
    --  this header, which may be used to access the nodes in the list using
    --  the set of routines that define this interface.
-
-   --  Note: node lists can contain either nodes or entities (extended nodes)
-   --  or a mixture of nodes and extended nodes.
 
    function In_Same_List (N1, N2 : Node_Or_Entity_Id) return Boolean;
    pragma Inline (In_Same_List);
@@ -348,13 +345,21 @@ package Nlists is
    --  Called to unlock list contents when assertions are enabled; if
    --  assertions are not enabled calling this subprogram has no effect.
 
-   function Parent (List : List_Id) return Node_Or_Entity_Id;
+   function List_Parent (List : List_Id) return Node_Or_Entity_Id;
+   pragma Inline (List_Parent);
+   function Parent (List : List_Id) return Node_Or_Entity_Id
+     renames List_Parent;
    pragma Inline (Parent);
    --  Node lists may have a parent in the same way as a node. The function
    --  accesses the Parent value, which is either Empty when a list header
    --  is first created, or the value that has been set by Set_Parent.
+   --  Parent has the same name as the one in Atree; List_Parent can be used
+   --  more easily in the debugger.
 
-   procedure Set_Parent (List : List_Id; Node : Node_Or_Entity_Id);
+   procedure Set_List_Parent (List : List_Id; Node : Node_Or_Entity_Id);
+   pragma Inline (Set_List_Parent);
+   procedure Set_Parent (List : List_Id; Node : Node_Or_Entity_Id)
+     renames Set_List_Parent;
    pragma Inline (Set_Parent);
    --  Sets the parent field of the given list to reference the given node
 

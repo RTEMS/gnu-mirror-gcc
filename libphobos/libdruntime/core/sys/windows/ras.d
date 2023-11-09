@@ -4,11 +4,10 @@
  * Translated from MinGW Windows headers
  *
  * License: $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
- * Source: $(DRUNTIMESRC src/core/sys/windows/_ras.d)
+ * Source: $(DRUNTIMESRC core/sys/windows/_ras.d)
  */
 module core.sys.windows.ras;
 version (Windows):
-@system:
 
 version (ANSI) {} else version = Unicode;
 pragma(lib, "rasapi32");
@@ -224,7 +223,7 @@ enum RASPROJECTION {
 }
 alias RASPROJECTION* LPRASPROJECTION;
 
-alias TypeDef!(HANDLE) HRASCONN;
+alias HANDLE HRASCONN;
 alias HRASCONN* LPHRASCONN;
 
 struct RASCONNW {

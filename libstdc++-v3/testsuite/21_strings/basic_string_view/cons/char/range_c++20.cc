@@ -1,4 +1,4 @@
-// Copyright (C) 2021 Free Software Foundation, Inc.
+// Copyright (C) 2021-2023 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -15,7 +15,6 @@
 // with this library; see the file COPYING3.  If not see
 // <http://www.gnu.org/licenses/>.
 
-// { dg-options "-std=gnu++23" }
 // { dg-do run { target c++23 } }
 
 #include <string_view>
@@ -36,7 +35,7 @@ test01()
   };
 
   R r;
-  std::string_view s = r;
+  std::string_view s{r};
   VERIFY( s == r.str );
   VERIFY( s.data() == std::ranges::data(r) );
   VERIFY( s.size() == std::ranges::size(r) );
@@ -50,9 +49,14 @@ test01()
   static_assert( std::ranges::contiguous_range<R2> );
   static_assert( std::ranges::sized_range<R2> );
   R2 r2;
-  std::string_view s2 = r2; // uses conversion to string_view
+  std::string_view s2(r2); // uses conversion to string_view
   VERIFY( s2 == "Out of range" );
   VERIFY( std::string_view(const_cast<const R2&>(r2)) == s2 );
+
+  // And again using copy-initialization instead of direct-initialization.
+  std::string_view s2_implicit = r2; // uses conversion to string_view
+  VERIFY( s2_implicit == "Out of range" );
+  VERIFY( std::string_view(const_cast<const R2&>(r2)) == s2_implicit );
 
   struct R3 : R
   {
@@ -91,7 +95,7 @@ test01()
   static_assert( std::ranges::contiguous_range<R5> );
   static_assert( std::ranges::sized_range<R5> );
   R5 r5;
-  std::string_view s5 = r5; // Uses range constructor
+  std::string_view s5(r5); // Uses range constructor
   VERIFY( s5 == r5.str );
   s5 = std::string_view(std::move(r5)); // In C++20 this used conversion op.
   VERIFY( s5 == r5.str );	        // In C++23 it uses range constructor.
@@ -156,9 +160,23 @@ test04()
   };
 
   R r;
-  std::basic_string_view s = r; // Use deduction guide.
+  std::basic_string_view s(r); // Use deduction guide.
 
   static_assert( std::is_same_v<decltype(s), std::string_view> );
+}
+
+void
+test05()
+{
+  struct R
+  {
+    const char* begin() const { return nullptr; }
+    const char* end() const { return nullptr; }
+  };
+
+  // P2499R0 string_view range constructor should be explicit
+  // P2516R0 string_view is implicitly convertible from what?
+  static_assert( ! std::is_convertible_v<R, std::string_view> );
 }
 
 int main()
@@ -167,4 +185,5 @@ int main()
   test02();
   test03();
   test04();
+  test05();
 }

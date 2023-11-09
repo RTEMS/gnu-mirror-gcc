@@ -1,5 +1,5 @@
 /* Integrated Register Allocator (IRA) intercommunication header file.
-   Copyright (C) 2006-2021 Free Software Foundation, Inc.
+   Copyright (C) 2006-2023 Free Software Foundation, Inc.
    Contributed by Vladimir Makarov <vmakarov@redhat.com>.
 
 This file is part of GCC.
@@ -281,13 +281,20 @@ struct ira_allocno
   int regno;
   /* Mode of the allocno which is the mode of the corresponding
      pseudo-register.  */
-  ENUM_BITFIELD (machine_mode) mode : 8;
+  ENUM_BITFIELD (machine_mode) mode : MACHINE_MODE_BITSIZE;
   /* Widest mode of the allocno which in at least one case could be
      for paradoxical subregs where wmode > mode.  */
-  ENUM_BITFIELD (machine_mode) wmode : 8;
+  ENUM_BITFIELD (machine_mode) wmode : MACHINE_MODE_BITSIZE;
   /* Register class which should be used for allocation for given
      allocno.  NO_REGS means that we should use memory.  */
   ENUM_BITFIELD (reg_class) aclass : 16;
+  /* Hard register assigned to given allocno.  Negative value means
+     that memory was allocated to the allocno.  During the reload,
+     spilled allocno has value equal to the corresponding stack slot
+     number (0, ...) - 2.  Value -1 is used for allocnos spilled by the
+     reload (at this point pseudo-register has only one allocno) which
+     did not get stack slot yet.  */
+  signed int hard_regno : 16;
   /* A bitmask of the ABIs used by calls that occur while the allocno
      is live.  */
   unsigned int crossed_calls_abis : NUM_ABI_IDS;
@@ -314,22 +321,13 @@ struct ira_allocno
      vector where a bit with given index represents allocno with the
      same number.  */
   unsigned int conflict_vec_p : 1;
-  /* Hard register assigned to given allocno.  Negative value means
-     that memory was allocated to the allocno.  During the reload,
-     spilled allocno has value equal to the corresponding stack slot
-     number (0, ...) - 2.  Value -1 is used for allocnos spilled by the
-     reload (at this point pseudo-register has only one allocno) which
-     did not get stack slot yet.  */
-  signed int hard_regno : 16;
-  /* Allocnos with the same regno are linked by the following member.
-     Allocnos corresponding to inner loops are first in the list (it
-     corresponds to depth-first traverse of the loops).  */
-  ira_allocno_t next_regno_allocno;
-  /* There may be different allocnos with the same regno in different
-     regions.  Allocnos are bound to the corresponding loop tree node.
-     Pseudo-register may have only one regular allocno with given loop
-     tree node but more than one cap (see comments above).  */
-  ira_loop_tree_node_t loop_tree_node;
+  /* True if the parent loop has an allocno for the same register and
+     if the parent allocno's assignment might not be valid in this loop.
+     This means that we cannot merge this allocno and the parent allocno
+     together.
+
+     This is only ever true for non-cap allocnos.  */
+  unsigned int might_conflict_with_parent_p : 1;
   /* Accumulated usage references of the allocno.  Here and below,
      word 'accumulated' means info for given region and all nested
      subregions.  In this case, 'accumulated' means sum of references
@@ -355,6 +353,25 @@ struct ira_allocno
      register class living at the point than number of hard-registers
      of the class available for the allocation.  */
   int excess_pressure_points_num;
+  /* The number of objects tracked in the following array.  */
+  int num_objects;
+  /* Accumulated frequency of calls which given allocno
+     intersects.  */
+  int call_freq;
+  /* Accumulated number of the intersected calls.  */
+  int calls_crossed_num;
+  /* The number of calls across which it is live, but which should not
+     affect register preferences.  */
+  int cheap_calls_crossed_num;
+  /* Allocnos with the same regno are linked by the following member.
+     Allocnos corresponding to inner loops are first in the list (it
+     corresponds to depth-first traverse of the loops).  */
+  ira_allocno_t next_regno_allocno;
+  /* There may be different allocnos with the same regno in different
+     regions.  Allocnos are bound to the corresponding loop tree node.
+     Pseudo-register may have only one regular allocno with given loop
+     tree node but more than one cap (see comments above).  */
+  ira_loop_tree_node_t loop_tree_node;
   /* Allocno hard reg preferences.  */
   ira_pref_t allocno_prefs;
   /* Copies to other non-conflicting allocnos.  The copies can
@@ -367,21 +384,11 @@ struct ira_allocno
   /* It is a link to allocno (cap) on lower loop level represented by
      given cap.  Null if given allocno is not a cap.  */
   ira_allocno_t cap_member;
-  /* The number of objects tracked in the following array.  */
-  int num_objects;
   /* An array of structures describing conflict information and live
      ranges for each object associated with the allocno.  There may be
      more than one such object in cases where the allocno represents a
      multi-word register.  */
   ira_object_t objects[2];
-  /* Accumulated frequency of calls which given allocno
-     intersects.  */
-  int call_freq;
-  /* Accumulated number of the intersected calls.  */
-  int calls_crossed_num;
-  /* The number of calls across which it is live, but which should not
-     affect register preferences.  */
-  int cheap_calls_crossed_num;
   /* Registers clobbered by intersected calls.  */
    HARD_REG_SET crossed_calls_clobbered_regs;
   /* Array of usage costs (accumulated and the one updated during
@@ -423,6 +430,8 @@ struct ira_allocno
 #define ALLOCNO_CAP_MEMBER(A) ((A)->cap_member)
 #define ALLOCNO_NREFS(A) ((A)->nrefs)
 #define ALLOCNO_FREQ(A) ((A)->freq)
+#define ALLOCNO_MIGHT_CONFLICT_WITH_PARENT_P(A) \
+  ((A)->might_conflict_with_parent_p)
 #define ALLOCNO_HARD_REGNO(A) ((A)->hard_regno)
 #define ALLOCNO_CALL_FREQ(A) ((A)->call_freq)
 #define ALLOCNO_CALLS_CROSSED_NUM(A) ((A)->calls_crossed_num)
@@ -470,7 +479,7 @@ typedef struct ira_emit_data *ira_emit_data_t;
 struct ira_emit_data
 {
   /* TRUE if the allocno assigned to memory was a destination of
-     removed move (see ira-emit.c) at loop exit because the value of
+     removed move (see ira-emit.cc) at loop exit because the value of
      the corresponding pseudo-register is not changed inside the
      loop.  */
   unsigned int mem_optimized_dest_p : 1;
@@ -484,7 +493,7 @@ struct ira_emit_data
   /* Final rtx representation of the allocno.  */
   rtx reg;
   /* Non NULL if we remove restoring value from given allocno to
-     MEM_OPTIMIZED_DEST at loop exit (see ira-emit.c) because the
+     MEM_OPTIMIZED_DEST at loop exit (see ira-emit.cc) because the
      allocno value is not changed inside the loop.  */
   ira_allocno_t mem_optimized_dest;
 };
@@ -495,7 +504,7 @@ struct ira_emit_data
 extern ira_emit_data_t ira_allocno_emit_data;
 
 /* Abbreviation for frequent emit data access.  */
-static inline rtx
+inline rtx
 allocno_emit_reg (ira_allocno_t a)
 {
   return ALLOCNO_EMIT_DATA (a)->reg;
@@ -610,7 +619,7 @@ public:
   /* RTL representation of the stack slot.  */
   rtx mem;
   /* Size of the stack slot.  */
-  poly_uint64_pod width;
+  poly_uint64 width;
 };
 
 /* The number of elements in the following array.  */
@@ -623,7 +632,7 @@ extern class ira_spilled_reg_stack_slot *ira_spilled_reg_stack_slots;
 /* Correspondingly overall cost of the allocation, cost of the
    allocnos assigned to hard-registers, cost of the allocnos assigned
    to memory, cost of loads, stores and register move insns generated
-   for pseudo-register live range splitting (see ira-emit.c).  */
+   for pseudo-register live range splitting (see ira-emit.cc).  */
 extern int64_t ira_overall_cost;
 extern int64_t ira_reg_cost, ira_mem_cost;
 extern int64_t ira_load_cost, ira_store_cost, ira_shuffle_cost;
@@ -725,7 +734,7 @@ struct minmax_set_iterator {
 
 /* Initialize the iterator I for bit vector VEC containing minimal and
    maximal values MIN and MAX.  */
-static inline void
+inline void
 minmax_set_iter_init (minmax_set_iterator *i, IRA_INT_TYPE *vec, int min,
 		      int max)
 {
@@ -740,7 +749,7 @@ minmax_set_iter_init (minmax_set_iterator *i, IRA_INT_TYPE *vec, int min,
 /* Return TRUE if we have more allocnos to visit, in which case *N is
    set to the number of the element to be visited.  Otherwise, return
    FALSE.  */
-static inline bool
+inline bool
 minmax_set_iter_cond (minmax_set_iterator *i, int *n)
 {
   /* Skip words that are zeros.  */
@@ -755,8 +764,9 @@ minmax_set_iter_cond (minmax_set_iterator *i, int *n)
     }
 
   /* Skip bits that are zero.  */
-  for (; (i->word & 1) == 0; i->word >>= 1)
-    i->bit_num++;
+  int off = ctz_hwi (i->word);
+  i->bit_num += off;
+  i->word >>= off;
 
   *n = (int) i->bit_num + i->start_val;
 
@@ -764,7 +774,7 @@ minmax_set_iter_cond (minmax_set_iterator *i, int *n)
 }
 
 /* Advance to the next element in the set.  */
-static inline void
+inline void
 minmax_set_iter_next (minmax_set_iterator *i)
 {
   i->word >>= 1;
@@ -960,7 +970,7 @@ extern class target_ira_int *this_target_ira_int;
 #define ira_prohibited_mode_move_regs \
   (this_target_ira_int->x_ira_prohibited_mode_move_regs)
 
-/* ira.c: */
+/* ira.cc: */
 
 extern void *ira_allocate (size_t);
 extern void ira_free (void *addr);
@@ -973,7 +983,7 @@ extern void ira_init_register_move_cost (machine_mode);
 extern alternative_mask ira_setup_alts (rtx_insn *);
 extern int ira_get_dup_out_num (int, alternative_mask, bool &);
 
-/* ira-build.c */
+/* ira-build.cc */
 
 /* The current loop tree node and its regno allocno map.  */
 extern ira_loop_tree_node_t ira_curr_loop_tree_node;
@@ -1032,13 +1042,13 @@ extern void ira_flattening (int, int);
 extern bool ira_build (void);
 extern void ira_destroy (void);
 
-/* ira-costs.c */
+/* ira-costs.cc */
 extern void ira_init_costs_once (void);
 extern void ira_init_costs (void);
 extern void ira_costs (void);
 extern void ira_tune_allocno_costs (void);
 
-/* ira-lives.c */
+/* ira-lives.cc */
 
 extern void ira_rebuild_start_finish_chains (void);
 extern void ira_print_live_range_list (FILE *, live_range_t);
@@ -1053,11 +1063,12 @@ extern void ira_finish_allocno_live_ranges (void);
 extern void ira_implicitly_set_insn_hard_regs (HARD_REG_SET *,
 					       alternative_mask);
 
-/* ira-conflicts.c */
+/* ira-conflicts.cc */
 extern void ira_debug_conflicts (bool);
 extern void ira_build_conflicts (void);
 
-/* ira-color.c */
+/* ira-color.cc */
+extern ira_allocno_t ira_soft_conflict (ira_allocno_t, ira_allocno_t);
 extern void ira_debug_hard_regs_forest (void);
 extern int ira_loop_edge_freq (ira_loop_tree_node_t, int, bool);
 extern void ira_reassign_conflict_allocnos (int);
@@ -1065,7 +1076,7 @@ extern void ira_initiate_assign (void);
 extern void ira_finish_assign (void);
 extern void ira_color (void);
 
-/* ira-emit.c */
+/* ira-emit.cc */
 extern void ira_initiate_emit_data (void);
 extern void ira_finish_emit_data (void);
 extern void ira_emit (bool);
@@ -1073,7 +1084,7 @@ extern void ira_emit (bool);
 
 
 /* Return true if equivalence of pseudo REGNO is not a lvalue.  */
-static inline bool
+inline bool
 ira_equiv_no_lvalue_p (int regno)
 {
   if (regno >= ira_reg_equiv_len)
@@ -1087,7 +1098,7 @@ ira_equiv_no_lvalue_p (int regno)
 
 
 /* Initialize register costs for MODE if necessary.  */
-static inline void
+inline void
 ira_init_register_move_cost_if_necessary (machine_mode mode)
 {
   if (ira_register_move_cost[mode] == NULL)
@@ -1103,7 +1114,7 @@ struct ira_allocno_iterator {
 };
 
 /* Initialize the iterator I.  */
-static inline void
+inline void
 ira_allocno_iter_init (ira_allocno_iterator *i)
 {
   i->n = 0;
@@ -1111,7 +1122,7 @@ ira_allocno_iter_init (ira_allocno_iterator *i)
 
 /* Return TRUE if we have more allocnos to visit, in which case *A is
    set to the allocno to be visited.  Otherwise, return FALSE.  */
-static inline bool
+inline bool
 ira_allocno_iter_cond (ira_allocno_iterator *i, ira_allocno_t *a)
 {
   int n;
@@ -1140,7 +1151,7 @@ struct ira_object_iterator {
 };
 
 /* Initialize the iterator I.  */
-static inline void
+inline void
 ira_object_iter_init (ira_object_iterator *i)
 {
   i->n = 0;
@@ -1148,7 +1159,7 @@ ira_object_iter_init (ira_object_iterator *i)
 
 /* Return TRUE if we have more objects to visit, in which case *OBJ is
    set to the object to be visited.  Otherwise, return FALSE.  */
-static inline bool
+inline bool
 ira_object_iter_cond (ira_object_iterator *i, ira_object_t *obj)
 {
   int n;
@@ -1177,7 +1188,7 @@ struct ira_allocno_object_iterator {
 };
 
 /* Initialize the iterator I.  */
-static inline void
+inline void
 ira_allocno_object_iter_init (ira_allocno_object_iterator *i)
 {
   i->n = 0;
@@ -1186,7 +1197,7 @@ ira_allocno_object_iter_init (ira_allocno_object_iterator *i)
 /* Return TRUE if we have more objects to visit in allocno A, in which
    case *O is set to the object to be visited.  Otherwise, return
    FALSE.  */
-static inline bool
+inline bool
 ira_allocno_object_iter_cond (ira_allocno_object_iterator *i, ira_allocno_t a,
 			      ira_object_t *o)
 {
@@ -1214,7 +1225,7 @@ struct ira_pref_iterator {
 };
 
 /* Initialize the iterator I.  */
-static inline void
+inline void
 ira_pref_iter_init (ira_pref_iterator *i)
 {
   i->n = 0;
@@ -1222,7 +1233,7 @@ ira_pref_iter_init (ira_pref_iterator *i)
 
 /* Return TRUE if we have more prefs to visit, in which case *PREF is
    set to the pref to be visited.  Otherwise, return FALSE.  */
-static inline bool
+inline bool
 ira_pref_iter_cond (ira_pref_iterator *i, ira_pref_t *pref)
 {
   int n;
@@ -1252,7 +1263,7 @@ struct ira_copy_iterator {
 };
 
 /* Initialize the iterator I.  */
-static inline void
+inline void
 ira_copy_iter_init (ira_copy_iterator *i)
 {
   i->n = 0;
@@ -1260,7 +1271,7 @@ ira_copy_iter_init (ira_copy_iterator *i)
 
 /* Return TRUE if we have more copies to visit, in which case *CP is
    set to the copy to be visited.  Otherwise, return FALSE.  */
-static inline bool
+inline bool
 ira_copy_iter_cond (ira_copy_iterator *i, ira_copy_t *cp)
 {
   int n;
@@ -1313,7 +1324,7 @@ struct ira_object_conflict_iterator {
 };
 
 /* Initialize the iterator I with ALLOCNO conflicts.  */
-static inline void
+inline void
 ira_object_conflict_iter_init (ira_object_conflict_iterator *i,
 			       ira_object_t obj)
 {
@@ -1339,7 +1350,7 @@ ira_object_conflict_iter_init (ira_object_conflict_iterator *i,
 /* Return TRUE if we have more conflicting allocnos to visit, in which
    case *A is set to the allocno to be visited.  Otherwise, return
    FALSE.  */
-static inline bool
+inline bool
 ira_object_conflict_iter_cond (ira_object_conflict_iterator *i,
 			       ira_object_t *pobj)
 {
@@ -1369,8 +1380,9 @@ ira_object_conflict_iter_cond (ira_object_conflict_iterator *i,
 	}
 
       /* Skip bits that are zero.  */
-      for (; (word & 1) == 0; word >>= 1)
-	bit_num++;
+      int off = ctz_hwi (word);
+      bit_num += off;
+      word >>= off;
 
       obj = ira_object_id_map[bit_num + i->base_conflict_id];
       i->bit_num = bit_num + 1;
@@ -1393,7 +1405,7 @@ ira_object_conflict_iter_cond (ira_object_conflict_iterator *i,
 /* The function returns TRUE if at least one hard register from ones
    starting with HARD_REGNO and containing value of MODE are in set
    HARD_REGSET.  */
-static inline bool
+inline bool
 ira_hard_reg_set_intersection_p (int hard_regno, machine_mode mode,
 				 HARD_REG_SET hard_regset)
 {
@@ -1407,7 +1419,7 @@ ira_hard_reg_set_intersection_p (int hard_regno, machine_mode mode,
 }
 
 /* Return number of hard registers in hard register SET.  */
-static inline int
+inline int
 hard_reg_set_size (HARD_REG_SET set)
 {
   int i, size;
@@ -1421,7 +1433,7 @@ hard_reg_set_size (HARD_REG_SET set)
 /* The function returns TRUE if hard registers starting with
    HARD_REGNO and containing value of MODE are fully in set
    HARD_REGSET.  */
-static inline bool
+inline bool
 ira_hard_reg_in_set_p (int hard_regno, machine_mode mode,
 		       HARD_REG_SET hard_regset)
 {
@@ -1442,7 +1454,7 @@ ira_hard_reg_in_set_p (int hard_regno, machine_mode mode,
 
 /* Allocate cost vector *VEC for hard registers of ACLASS and
    initialize the elements by VAL if it is necessary */
-static inline void
+inline void
 ira_allocate_and_set_costs (int **vec, reg_class_t aclass, int val)
 {
   int i, *reg_costs;
@@ -1458,7 +1470,7 @@ ira_allocate_and_set_costs (int **vec, reg_class_t aclass, int val)
 
 /* Allocate cost vector *VEC for hard registers of ACLASS and copy
    values of vector SRC into the vector if it is necessary */
-static inline void
+inline void
 ira_allocate_and_copy_costs (int **vec, enum reg_class aclass, int *src)
 {
   int len;
@@ -1472,7 +1484,7 @@ ira_allocate_and_copy_costs (int **vec, enum reg_class aclass, int *src)
 
 /* Allocate cost vector *VEC for hard registers of ACLASS and add
    values of vector SRC into the vector if it is necessary */
-static inline void
+inline void
 ira_allocate_and_accumulate_costs (int **vec, enum reg_class aclass, int *src)
 {
   int i, len;
@@ -1492,7 +1504,7 @@ ira_allocate_and_accumulate_costs (int **vec, enum reg_class aclass, int *src)
 /* Allocate cost vector *VEC for hard registers of ACLASS and copy
    values of vector SRC into the vector or initialize it by VAL (if
    SRC is null).  */
-static inline void
+inline void
 ira_allocate_and_set_or_copy_costs (int **vec, enum reg_class aclass,
 				    int val, int *src)
 {
@@ -1537,6 +1549,163 @@ ira_need_caller_save_p (ira_allocno_t a, unsigned int regno)
   return call_clobbered_in_region_p (ALLOCNO_CROSSED_CALLS_ABIS (a),
 				     ALLOCNO_CROSSED_CALLS_CLOBBERED_REGS (a),
 				     ALLOCNO_MODE (a), regno);
+}
+
+/* Represents the boundary between an allocno in one loop and its parent
+   allocno in the enclosing loop.  It is usually possible to change a
+   register's allocation on this boundary; the class provides routines
+   for calculating the cost of such changes.  */
+class ira_loop_border_costs
+{
+public:
+  ira_loop_border_costs (ira_allocno_t);
+
+  int move_between_loops_cost () const;
+  int spill_outside_loop_cost () const;
+  int spill_inside_loop_cost () const;
+
+private:
+  /* The mode and class of the child allocno.  */
+  machine_mode m_mode;
+  reg_class m_class;
+
+  /* Sums the frequencies of the entry edges and the exit edges.  */
+  int m_entry_freq, m_exit_freq;
+};
+
+/* Return the cost of storing the register on entry to the loop and
+   loading it back on exit from the loop.  This is the cost to use if
+   the register is spilled within the loop but is successfully allocated
+   in the parent loop.  */
+inline int
+ira_loop_border_costs::spill_inside_loop_cost () const
+{
+  return (m_entry_freq * ira_memory_move_cost[m_mode][m_class][0]
+	  + m_exit_freq * ira_memory_move_cost[m_mode][m_class][1]);
+}
+
+/* Return the cost of loading the register on entry to the loop and
+   storing it back on exit from the loop.  This is the cost to use if
+   the register is successfully allocated within the loop but is spilled
+   in the parent loop.  */
+inline int
+ira_loop_border_costs::spill_outside_loop_cost () const
+{
+  return (m_entry_freq * ira_memory_move_cost[m_mode][m_class][1]
+	  + m_exit_freq * ira_memory_move_cost[m_mode][m_class][0]);
+}
+
+/* Return the cost of moving the pseudo register between different hard
+   registers on entry and exit from the loop.  This is the cost to use
+   if the register is successfully allocated within both this loop and
+   the parent loop, but the allocations for the loops differ.  */
+inline int
+ira_loop_border_costs::move_between_loops_cost () const
+{
+  ira_init_register_move_cost_if_necessary (m_mode);
+  auto move_cost = ira_register_move_cost[m_mode][m_class][m_class];
+  return move_cost * (m_entry_freq + m_exit_freq);
+}
+
+/* Return true if subloops that contain allocnos for A's register can
+   use a different assignment from A.  ALLOCATED_P is true for the case
+   in which allocation succeeded for A.  EXCLUDE_OLD_RELOAD is true if
+   we should always return false for non-LRA targets.  (This is a hack
+   and should be removed along with old reload.)  */
+inline bool
+ira_subloop_allocnos_can_differ_p (ira_allocno_t a, bool allocated_p = true,
+				   bool exclude_old_reload = true)
+{
+  if (exclude_old_reload && !ira_use_lra_p)
+    return false;
+
+  auto regno = ALLOCNO_REGNO (a);
+
+  if (pic_offset_table_rtx != NULL
+      && regno == (int) REGNO (pic_offset_table_rtx))
+    return false;
+
+  ira_assert (regno < ira_reg_equiv_len);
+  if (ira_equiv_no_lvalue_p (regno))
+    return false;
+
+  /* Avoid overlapping multi-registers.  Moves between them might result
+     in wrong code generation.  */
+  if (allocated_p)
+    {
+      auto pclass = ira_pressure_class_translate[ALLOCNO_CLASS (a)];
+      if (ira_reg_class_max_nregs[pclass][ALLOCNO_MODE (a)] > 1)
+	return false;
+    }
+
+  return true;
+}
+
+/* Return true if we should treat A and SUBLOOP_A as belonging to a
+   single region.  */
+inline bool
+ira_single_region_allocno_p (ira_allocno_t a, ira_allocno_t subloop_a)
+{
+  if (flag_ira_region != IRA_REGION_MIXED)
+    return false;
+
+  if (ALLOCNO_MIGHT_CONFLICT_WITH_PARENT_P (subloop_a))
+    return false;
+
+  auto rclass = ALLOCNO_CLASS (a);
+  auto pclass = ira_pressure_class_translate[rclass];
+  auto loop_used_regs = ALLOCNO_LOOP_TREE_NODE (a)->reg_pressure[pclass];
+  return loop_used_regs <= ira_class_hard_regs_num[pclass];
+}
+
+/* Return the set of all hard registers that conflict with A.  */
+inline HARD_REG_SET
+ira_total_conflict_hard_regs (ira_allocno_t a)
+{
+  auto obj_0 = ALLOCNO_OBJECT (a, 0);
+  HARD_REG_SET conflicts = OBJECT_TOTAL_CONFLICT_HARD_REGS (obj_0);
+  for (int i = 1; i < ALLOCNO_NUM_OBJECTS (a); i++)
+    conflicts |= OBJECT_TOTAL_CONFLICT_HARD_REGS (ALLOCNO_OBJECT (a, i));
+  return conflicts;
+}
+
+/* Return the cost of saving a caller-saved register before each call
+   in A's live range and restoring the same register after each call.  */
+inline int
+ira_caller_save_cost (ira_allocno_t a)
+{
+  auto mode = ALLOCNO_MODE (a);
+  auto rclass = ALLOCNO_CLASS (a);
+  return (ALLOCNO_CALL_FREQ (a)
+	  * (ira_memory_move_cost[mode][rclass][0]
+	     + ira_memory_move_cost[mode][rclass][1]));
+}
+
+/* A and SUBLOOP_A are allocnos for the same pseudo register, with A's
+   loop immediately enclosing SUBLOOP_A's loop.  If we allocate to A a
+   hard register R that is clobbered by a call in SUBLOOP_A, decide
+   which of the following approaches should be used for handling the
+   conflict:
+
+   (1) Spill R on entry to SUBLOOP_A's loop, assign memory to SUBLOOP_A,
+       and restore R on exit from SUBLOOP_A's loop.
+
+   (2) Spill R before each necessary call in SUBLOOP_A's live range and
+       restore R after each such call.
+
+   Return true if (1) is better than (2).  SPILL_COST is the cost of
+   doing (1).  */
+inline bool
+ira_caller_save_loop_spill_p (ira_allocno_t a, ira_allocno_t subloop_a,
+			      int spill_cost)
+{
+  if (!ira_subloop_allocnos_can_differ_p (a))
+    return false;
+
+  /* Calculate the cost of saving a call-clobbered register
+     before each call and restoring it afterwards.  */
+  int call_cost = ira_caller_save_cost (subloop_a);
+  return call_cost && call_cost >= spill_cost;
 }
 
 #endif /* GCC_IRA_INT_H */

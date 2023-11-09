@@ -45,7 +45,7 @@ if test "$build" != "$host"; then
       *-*-darwin*,*-*-darwin*)
 	hostos=`echo $host | sed 's/.*-darwin/darwin/'`
 	targetos=`echo $target | sed 's/.*-darwin/darwin/'`
-	if test $hostos = $targetos -o $targetos = darwin ; then
+	if test $hostos = $targetos || test $targetos = darwin ; then
 	  GLIBCXX_IS_NATIVE=true
 	fi
 	;;
@@ -57,6 +57,15 @@ if test "$build" != "$host"; then
 else
   GLIBCXX_IS_NATIVE=true
 fi
+
+# In the case that we're building without headers, we won't have <stdio.h>
+# available. In these cases, we have to instruct autotools to never include
+# <stdio.h> as a part of default headers.
+m4_version_prereq([2.70], [], [
+if test "x$with_headers" = "xno"; then
+  ac_includes_default=`echo "$ac_includes_default" | sed '/^#include <stdio.h>$/d'`
+fi
+])
 
 # Sets up automake.  Must come after AC_CANONICAL_SYSTEM.  Each of the
 # following is magically included in AUTOMAKE_OPTIONS in each Makefile.am.
@@ -90,13 +99,16 @@ AC_SYS_LARGEFILE
 GLIBCXX_CONFIGURE
 
 # Libtool setup.
-if test "x${with_newlib}" != "xyes" && test "x${with_avrlibc}" != "xyes"; then
+if test "x${with_newlib}" != "xyes" &&
+    test "x${with_avrlibc}" != "xyes" &&
+    test "x$with_headers" != "xno"; then
   AC_LIBTOOL_DLOPEN
 fi
 AM_PROG_LIBTOOL
 ACX_LT_HOST_FLAGS
 AC_SUBST(enable_shared)
 AC_SUBST(enable_static)
+AM_CONDITIONAL([ENABLE_DARWIN_AT_RPATH], [test x$enable_darwin_at_rpath = xyes])
 
 if test "$enable_vtable_verify" = yes; then
   predep_objects_CXX="${predep_objects_CXX} ${glibcxx_builddir}/../libgcc/vtv_start.o"
@@ -170,7 +182,7 @@ GLIBCXX_ENABLE_LONG_LONG([yes])
 GLIBCXX_ENABLE_WCHAR_T([yes])
 GLIBCXX_ENABLE_C99([yes])
 GLIBCXX_ENABLE_CONCEPT_CHECKS([no])
-GLIBCXX_ENABLE_DEBUG_FLAGS(["-gdwarf-4 -g3 -O0 -D_GLIBCXX_ASSERTIONS"])
+GLIBCXX_ENABLE_DEBUG_FLAGS(["-g3 -O0 -D_GLIBCXX_ASSERTIONS"])
 GLIBCXX_ENABLE_DEBUG([no])
 GLIBCXX_ENABLE_PARALLEL([yes])
 GLIBCXX_ENABLE_CXX_FLAGS
@@ -338,6 +350,7 @@ else
     AC_DEFINE(HAVE_FLOORF)
     AC_DEFINE(HAVE_FMODF)
     AC_DEFINE(HAVE_FREXPF)
+    AC_DEFINE(HAVE_HYPOTF)
     AC_DEFINE(HAVE_LDEXPF)
     AC_DEFINE(HAVE_LOG10F)
     AC_DEFINE(HAVE_LOGF)
@@ -349,9 +362,41 @@ else
     AC_DEFINE(HAVE_TANF)
     AC_DEFINE(HAVE_TANHF)
 
+dnl # Support for the long version of some math libraries depends on
+dnl # architecture and newlib version.  So test for their availability
+dnl # rather than hardcoding that information.
+    GLIBCXX_CHECK_MATH_DECLS([
+      acosl asinl atan2l atanl ceill coshl cosl expl fabsl floorl fmodl
+      frexpl hypotl ldexpl log10l logl modfl powl sinhl sinl sqrtl
+      tanhl tanl])
+
     AC_DEFINE(HAVE_ICONV)
     AC_DEFINE(HAVE_MEMALIGN)
-  else
+
+    case "${target}" in
+      *-rtems*)
+        case "${target}" in
+          bfin* | lm32* | mips* | moxie* | or1k* | v850*)
+            ;;
+          *)
+            AC_DEFINE(HAVE_TLS)
+            ;;
+        esac
+        AC_DEFINE(HAVE_ALIGNED_ALLOC)
+        AC_DEFINE(HAVE_AT_QUICK_EXIT)
+        AC_DEFINE(HAVE_LINK)
+        AC_DEFINE(HAVE_QUICK_EXIT)
+        AC_DEFINE(HAVE_READLINK)
+        AC_DEFINE(HAVE_SETENV)
+        AC_DEFINE(HAVE_SLEEP)
+        AC_DEFINE(HAVE_SOCKATMARK)
+        AC_DEFINE(HAVE_STRERROR_L)
+        AC_DEFINE(HAVE_SYMLINK)
+        AC_DEFINE(HAVE_TRUNCATE)
+        AC_DEFINE(HAVE_USLEEP)
+        ;;
+    esac
+  elif test "x$with_headers" != "xno"; then
     GLIBCXX_CROSSCONFIG
   fi
 
@@ -389,8 +434,6 @@ fi
 GCC_CHECK_UNWIND_GETIPINFO
 
 GCC_LINUX_FUTEX([AC_DEFINE(HAVE_LINUX_FUTEX, 1, [Define if futex syscall is available.])])
-
-GCC_HEADER_STDINT(include/gstdint.h)
 
 GLIBCXX_ENABLE_SYMVERS([yes])
 AC_SUBST(libtool_VERSION)
@@ -468,6 +511,10 @@ GLIBCXX_CHECK_X86_RDRAND
 # Check if assembler supports rdseed opcode.
 GLIBCXX_CHECK_X86_RDSEED
 
+# Check for other random number APIs
+GLIBCXX_CHECK_GETENTROPY
+GLIBCXX_CHECK_ARC4RANDOM
+
 # This depends on GLIBCXX_ENABLE_SYMVERS and GLIBCXX_IS_NATIVE.
 GLIBCXX_CONFIGURE_TESTSUITE
 
@@ -478,6 +525,8 @@ GLIBCXX_CHECK_GTHREADS
 AC_CHECK_HEADERS([fcntl.h dirent.h sys/statvfs.h utime.h])
 GLIBCXX_ENABLE_FILESYSTEM_TS
 GLIBCXX_CHECK_FILESYSTEM_DEPS
+
+GLIBCXX_ENABLE_BACKTRACE
 
 # For Networking TS.
 AC_CHECK_HEADERS([fcntl.h sys/ioctl.h sys/socket.h sys/uio.h poll.h netdb.h arpa/inet.h netinet/in.h netinet/tcp.h])
@@ -492,6 +541,21 @@ GLIBCXX_CHECK_SIZE_T_MANGLING
 
 # Check which release added std::exception_ptr for the target
 GLIBCXX_CHECK_EXCEPTION_PTR_SYMVER
+
+# For libsupc++/eh_alloc.cc defaults.
+GLIBCXX_EMERGENCY_EH_ALLOC
+
+# For src/c++20/tzdb.cc defaults.
+GLIBCXX_ZONEINFO_DIR
+
+# For src/c++11/shared_ptr.cc alignment.
+GLIBCXX_CHECK_ALIGNAS_CACHELINE
+
+# For using init_priority in ios_init.cc
+GLIBCXX_CHECK_INIT_PRIORITY
+
+# For __basic_file::native_handle()
+GLIBCXX_CHECK_FILEBUF_NATIVE_HANDLES
 
 # Define documentation rules conditionally.
 
@@ -619,6 +683,7 @@ AC_CONFIG_FILES(Makefile)
 AC_CONFIG_FILES([scripts/testsuite_flags],[chmod +x scripts/testsuite_flags])
 AC_CONFIG_FILES([scripts/extract_symvers],[chmod +x scripts/extract_symvers])
 AC_CONFIG_FILES([doc/xsl/customization.xsl])
+AC_CONFIG_FILES([src/libbacktrace/backtrace-supported.h])
 
 # Multilibs need MULTISUBDIR defined correctly in certain makefiles so
 # that multilib installs will end up installed in the correct place.

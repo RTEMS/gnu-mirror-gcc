@@ -62,6 +62,7 @@ go_cmd_gofmt_files = \
 
 go_cmd_cgo_files = \
 	$(cmdsrcdir)/cgo/ast.go \
+	$(cmdsrcdir)/cgo/ast_go118.go \
 	$(cmdsrcdir)/cgo/doc.go \
 	$(cmdsrcdir)/cgo/gcc.go \
 	$(cmdsrcdir)/cgo/godefs.go \
@@ -224,6 +225,7 @@ check-go-tool: go$(EXEEXT) $(noinst_PROGRAMS) check-head check-gccgo check-gcc
 	cp -r $(libgosrcdir)/golang.org/x/mod check-go-dir/src/cmd/vendor/golang.org/x/
 	cp -r $(libgosrcdir)/golang.org/x/crypto check-go-dir/src/cmd/vendor/golang.org/x/
 	cp -r $(libgosrcdir)/golang.org/x/xerrors check-go-dir/src/cmd/vendor/golang.org/x/
+	cp -r $(libgosrcdir)/golang.org/x/tools check-go-dir/src/cmd/vendor/golang.org/x/
 	cp $(libgodir)/objabi.go check-go-dir/src/cmd/internal/objabi/
 	@abs_libgodir=`cd $(libgodir) && $(PWD_COMMAND)`; \
 	abs_checkdir=`cd check-go-dir && $(PWD_COMMAND)`; \
@@ -330,8 +332,8 @@ check: check-head check-go-tool check-runtime check-cgo-test check-carchive-test
 	@cp gotools.sum gotools.log
 	@for file in cmd_go-testlog runtime-testlog cgo-testlog carchive-testlog cmd_vet-testlog embed-testlog; do \
 	  testname=`echo $${file} | sed -e 's/-testlog//' -e 's|_|/|'`; \
-	  echo "Running $${testname}" >> gotools.sum; \
-	  echo "Running $${testname}" >> gotools.log; \
+	  echo "Running $${testname} ..." >> gotools.sum; \
+	  echo "Running $${testname} ..." >> gotools.log; \
 	  sed -e 's/^--- \(.*\) ([^)]*)$$/\1/' < $${file} >> gotools.log; \
 	  grep '^--- ' $${file} | sed -e 's/^--- \(.*\) ([^)]*)$$/\1/' -e 's/SKIP/UNTESTED/' | sort -k 2 >> gotools.sum; \
 	done

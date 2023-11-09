@@ -27,11 +27,11 @@ extern "C" void *memset(void *ptr, int value, uptr num);
 
 namespace __lsan {
 #if defined(__i386__) || defined(__arm__)
-static const uptr kMaxAllowedMallocSize = 1UL << 30;
+static const uptr kMaxAllowedMallocSize = 1ULL << 30;
 #elif defined(__mips64) || defined(__aarch64__)
-static const uptr kMaxAllowedMallocSize = 4UL << 30;
+static const uptr kMaxAllowedMallocSize = 4ULL << 30;
 #else
-static const uptr kMaxAllowedMallocSize = 8UL << 30;
+static const uptr kMaxAllowedMallocSize = 8ULL << 30;
 #endif
 
 static Allocator allocator;
@@ -88,6 +88,11 @@ void *Allocate(const StackTrace &stack, uptr size, uptr alignment,
     size = 1;
   if (size > max_malloc_size)
     return ReportAllocationSizeTooBig(size, stack);
+  if (UNLIKELY(IsRssLimitExceeded())) {
+    if (AllocatorMayReturnNull())
+      return nullptr;
+    ReportRssLimitExceeded(&stack);
+  }
   void *p = allocator.Allocate(GetAllocatorCache(), size, alignment);
   if (UNLIKELY(!p)) {
     SetAllocatorOutOfMemory();
@@ -99,7 +104,6 @@ void *Allocate(const StackTrace &stack, uptr size, uptr alignment,
   if (cleared && allocator.FromPrimary(p))
     memset(p, 0, size);
   RegisterAllocation(stack, p, size);
-  if (&__sanitizer_malloc_hook) __sanitizer_malloc_hook(p, size);
   RunMallocHooks(p, size);
   return p;
 }
@@ -115,7 +119,6 @@ static void *Calloc(uptr nmemb, uptr size, const StackTrace &stack) {
 }
 
 void Deallocate(void *p) {
-  if (&__sanitizer_free_hook) __sanitizer_free_hook(p);
   RunFreeHooks(p);
   RegisterDeallocation(p);
   allocator.Deallocate(GetAllocatorCache(), p);
@@ -142,7 +145,25 @@ void GetAllocatorCacheRange(uptr *begin, uptr *end) {
   *end = *begin + sizeof(AllocatorCache);
 }
 
+static const void *GetMallocBegin(const void *p) {
+  if (!p)
+    return nullptr;
+  void *beg = allocator.GetBlockBegin(p);
+  if (!beg)
+    return nullptr;
+  ChunkMetadata *m = Metadata(beg);
+  if (!m)
+    return nullptr;
+  if (!m->allocated)
+    return nullptr;
+  if (m->requested_size == 0)
+    return nullptr;
+  return (const void *)beg;
+}
+
 uptr GetMallocUsableSize(const void *p) {
+  if (!p)
+    return 0;
   ChunkMetadata *m = Metadata(p);
   if (!m) return 0;
   return m->requested_size;
@@ -270,6 +291,10 @@ uptr GetUserBegin(uptr chunk) {
   return chunk;
 }
 
+uptr GetUserAddr(uptr chunk) {
+  return chunk;
+}
+
 LsanMetadata::LsanMetadata(uptr chunk) {
   metadata_ = Metadata(reinterpret_cast<void *>(chunk));
   CHECK(metadata_);
@@ -299,7 +324,7 @@ void ForEachChunk(ForEachChunkCallback callback, void *arg) {
   allocator.ForEachChunk(callback, arg);
 }
 
-IgnoreObjectResult IgnoreObjectLocked(const void *p) {
+IgnoreObjectResult IgnoreObject(const void *p) {
   void *chunk = allocator.GetBlockBegin(p);
   if (!chunk || p < chunk) return kIgnoreObjectInvalid;
   ChunkMetadata *m = Metadata(chunk);
@@ -314,7 +339,7 @@ IgnoreObjectResult IgnoreObjectLocked(const void *p) {
   }
 }
 
-void GetAdditionalThreadContextPtrs(ThreadContextBase *tctx, void *ptrs) {
+void GetAdditionalThreadContextPtrsLocked(InternalMmapVector<uptr> *ptrs) {
   // This function can be used to treat memory reachable from `tctx` as live.
   // This is useful for threads that have been created but not yet started.
 
@@ -355,20 +380,13 @@ SANITIZER_INTERFACE_ATTRIBUTE
 int __sanitizer_get_ownership(const void *p) { return Metadata(p) != nullptr; }
 
 SANITIZER_INTERFACE_ATTRIBUTE
+const void * __sanitizer_get_allocated_begin(const void *p) {
+  return GetMallocBegin(p);
+}
+
+SANITIZER_INTERFACE_ATTRIBUTE
 uptr __sanitizer_get_allocated_size(const void *p) {
   return GetMallocUsableSize(p);
 }
 
-#if !SANITIZER_SUPPORTS_WEAK_HOOKS
-// Provide default (no-op) implementation of malloc hooks.
-SANITIZER_INTERFACE_ATTRIBUTE SANITIZER_WEAK_ATTRIBUTE
-void __sanitizer_malloc_hook(void *ptr, uptr size) {
-  (void)ptr;
-  (void)size;
-}
-SANITIZER_INTERFACE_ATTRIBUTE SANITIZER_WEAK_ATTRIBUTE
-void __sanitizer_free_hook(void *ptr) {
-  (void)ptr;
-}
-#endif
 } // extern "C"

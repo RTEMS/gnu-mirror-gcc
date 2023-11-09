@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -242,7 +242,7 @@ package body Endh is
             --  FOR or WHILE allowed (signalling error) to substitute for LOOP
             --  if on the same line as the END.
 
-            elsif (Token = Tok_For or else Token = Tok_While)
+            elsif Token in Tok_For | Tok_While
               and then not Token_Is_At_Start_Of_Line
             then
                Scan; -- past FOR or WHILE
@@ -445,8 +445,7 @@ package body Endh is
                --  incorrect. Same thing for a period in place of a semicolon.
 
                elsif Token_Is_At_Start_Of_Line
-                 or else Token = Tok_Colon
-                 or else Token = Tok_Dot
+                 or else Token in Tok_Colon | Tok_Dot
                then
                   T_Semicolon;
 
@@ -480,10 +479,8 @@ package body Endh is
             --  on the same line as the END
 
             while not Token_Is_At_Start_Of_Line
-              and then Prev_Token /= Tok_Record
-              and then Prev_Token /= Tok_Semicolon
-              and then Token /= Tok_End
-              and then Token /= Tok_EOF
+              and then Prev_Token not in Tok_Record | Tok_Semicolon
+              and then Token not in Tok_End | Tok_EOF
             loop
                Scan; -- past junk
             end loop;
@@ -625,9 +622,8 @@ package body Endh is
             return;
          end if;
 
-         if Token /= Tok_Identifier
-           and then Token /= Tok_Operator_Symbol
-           and then Token /= Tok_String_Literal
+         if Token not in
+           Tok_Identifier | Tok_Operator_Symbol | Tok_String_Literal
          then
             exit;
          end if;
@@ -655,9 +651,7 @@ package body Endh is
       --  if there is no line end at the end of the last line of the file)
 
       else
-         while Token /= Tok_End
-           and then Token /= Tok_EOF
-           and then Token /= Tok_Semicolon
+         while Token not in Tok_End | Tok_EOF | Tok_Semicolon
            and then not Token_Is_At_Start_Of_Line
          loop
             Scan; -- past junk token on same line
@@ -732,7 +726,7 @@ package body Endh is
       --       ...
       --    end My_Label;
 
-      --  This is the case where we want to use the entry in the suspicous
+      --  This is the case where we want to use the entry in the suspicious
       --  label table to flag the semicolon saying it should be a colon.
 
       --  Label_OK will be false because the label does not match (we have
@@ -826,9 +820,9 @@ package body Endh is
       --  Cases where a label is definitely allowed on the END line
 
       elsif End_Type = E_Name then
-         Syntax_OK := (not Explicit_Start_Label (SS_Index))
+         Syntax_OK := not Explicit_Start_Label (SS_Index)
                          or else
-                      (not Scopes (SS_Index).Lreq);
+                      not Scopes (SS_Index).Lreq;
 
       --  Otherwise we have cases which don't allow labels anyway, so we
       --  certainly accept an END which does not have a label.
@@ -1137,7 +1131,7 @@ package body Endh is
                then
                   Error_Msg_Col := Scopes (Scope.Last).Ecol;
                   Error_Msg
-                    ("(style) END in wrong column, should be@", End_Sloc);
+                    ("(style) END in wrong column, should be@?l?", End_Sloc);
                end if;
             end if;
 
@@ -1157,9 +1151,7 @@ package body Endh is
 
                   Scan; -- past END
 
-                  if Token = Tok_Identifier
-                    or else Token = Tok_Operator_Symbol
-                  then
+                  if Token in Tok_Identifier | Tok_Operator_Symbol then
                      Nxt_Labl := P_Designator;
 
                      --  We only consider it an error if the label is a match
@@ -1172,11 +1164,11 @@ package body Endh is
                        and then
                          (Scope.Last = 1
                             or else
-                              (not Explicit_Start_Label (Scope.Last - 1))
+                              not Explicit_Start_Label (Scope.Last - 1)
                                  or else
-                              (not Same_Label
-                                     (End_Labl,
-                                      Scopes (Scope.Last - 1).Labl)))
+                              not Same_Label
+                                    (End_Labl,
+                                     Scopes (Scope.Last - 1).Labl))
                      then
                         T_Semicolon;
                         Error_Msg ("duplicate end line ignored", End_Loc);

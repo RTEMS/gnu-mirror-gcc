@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 2009-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 2009-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -398,7 +398,8 @@ package body Par_SCO is
       function Check_Node (N : Node_Id) return Traverse_Result;
       --  Determine if Nkind (N) indicates the presence of a decision (i.e. N
       --  is a logical operator, which is a decision in itself, or an
-      --  IF-expression whose Condition attribute is a decision).
+      --  IF-expression whose Condition attribute is a decision, or a
+      --  quantified expression, whose predicate is a decision).
 
       ----------------
       -- Check_Node --
@@ -409,10 +410,11 @@ package body Par_SCO is
          --  If we are not sure this is a logical operator (AND and OR may be
          --  turned into logical operators with the Short_Circuit_And_Or
          --  pragma), assume it is. Putative decisions will be discarded if
-         --  needed in the secord pass.
+         --  needed in the second pass.
 
          if Is_Logical_Operator (N) /= False
            or else Nkind (N) = N_If_Expression
+           or else Nkind (N) = N_Quantified_Expression
          then
             return Abandon;
          else
@@ -480,13 +482,11 @@ package body Par_SCO is
       N : Node_Id;
 
    begin
-      if L /= No_List then
-         N := First (L);
-         while Present (N) loop
-            Process_Decisions (N, T, Pragma_Sloc);
-            Next (N);
-         end loop;
-      end if;
+      N := First (L);
+      while Present (N) loop
+         Process_Decisions (N, T, Pragma_Sloc);
+         Next (N);
+      end loop;
    end Process_Decisions;
 
    --  Version taking a node
@@ -829,8 +829,15 @@ package body Par_SCO is
 
             when N_Quantified_Expression =>
                declare
-                  Cond : constant Node_Id := Condition (N);
+                  Cond   : constant Node_Id := Condition (N);
+                  I_Spec : Node_Id := Empty;
                begin
+                  if Present (Iterator_Specification (N)) then
+                     I_Spec := Iterator_Specification (N);
+                  else
+                     I_Spec := Loop_Parameter_Specification (N);
+                  end if;
+                  Process_Decisions (I_Spec, 'X', Pragma_Sloc);
                   Process_Decisions (Cond, 'W', Pragma_Sloc);
                   return Skip;
                end;
@@ -922,8 +929,8 @@ package body Par_SCO is
    ---------------------
 
    procedure Record_Instance (Id : Instance_Id; Inst_Sloc : Source_Ptr) is
-      Inst_Src  : constant Source_File_Index :=
-                    Get_Source_File_Index (Inst_Sloc);
+      Inst_Src : constant Source_File_Index :=
+                   Get_Source_File_Index (Inst_Sloc);
    begin
       SCO_Instance_Table.Append
         ((Inst_Dep_Num       => Dependency_Num (Unit (Inst_Src)),
@@ -1682,6 +1689,10 @@ package body Par_SCO is
          C1 : Character;
 
       begin
+         if not Has_Aspects (N) then
+            return;
+         end if;
+
          AN := First (Aspect_Specifications (N));
          while Present (AN) loop
             AE := Expression (AN);
@@ -2401,8 +2412,6 @@ package body Par_SCO is
                end if;
          end case;
 
-         --  Process aspects if present
-
          Traverse_Aspects (N);
       end Traverse_One;
 
@@ -2417,21 +2426,18 @@ package body Par_SCO is
 
       --  Loop through statements or declarations
 
-      if Is_Non_Empty_List (L) then
-         N := First (L);
-         while Present (N) loop
+      N := First (L);
+      while Present (N) loop
 
-            --  Note: For separate bodies, we see the tree after Par.Labl has
-            --  introduced implicit labels, so we need to ignore those nodes.
+         --  Note: For separate bodies, we see the tree after Par.Labl has
+         --  introduced implicit labels, so we need to ignore those nodes.
 
-            if Nkind (N) /= N_Implicit_Label_Declaration then
-               Traverse_One (N);
-            end if;
+         if Nkind (N) /= N_Implicit_Label_Declaration then
+            Traverse_One (N);
+         end if;
 
-            Next (N);
-         end loop;
-
-      end if;
+         Next (N);
+      end loop;
 
       --  End sequence of statements and flush deferred decisions
 

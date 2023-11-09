@@ -1,5 +1,5 @@
 /* Definitions for option handling for IA-32.
-   Copyright (C) 1988-2021 Free Software Foundation, Inc.
+   Copyright (C) 1988-2023 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -119,6 +119,27 @@ enum instrument_return {
   instrument_return_none = 0,
   instrument_return_call,
   instrument_return_nop5
+};
+
+enum harden_sls {
+  harden_sls_none = 0,
+  harden_sls_return = 1 << 0,
+  harden_sls_indirect_jmp = 1 << 1,
+  harden_sls_all = harden_sls_return | harden_sls_indirect_jmp
+};
+
+enum lam_type {
+  lam_none = 0,
+  lam_u48 = 1,
+  lam_u57
+};
+
+enum apx_features {
+  apx_none = 0,
+  apx_egpr = 1 << 0,
+  apx_push2pop2 = 1 << 1,
+  apx_ndd = 1 << 2,
+  apx_all = apx_egpr | apx_push2pop2 | apx_ndd,
 };
 
 #endif

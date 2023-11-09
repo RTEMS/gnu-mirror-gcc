@@ -1,6 +1,6 @@
 // Core algorithmic facilities -*- C++ -*-
 
-// Copyright (C) 2020-2021 Free Software Foundation, Inc.
+// Copyright (C) 2020-2023 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -33,7 +33,6 @@
 #if __cplusplus > 201703L
 
 #include <compare>
-#include <bits/stl_iterator_base_types.h>
 #include <bits/stl_iterator_base_funcs.h>
 #include <bits/stl_iterator.h>
 #include <bits/ranges_base.h> // ranges::begin, ranges::range etc.
@@ -240,7 +239,7 @@ namespace ranges
 	{
 	  auto [__in,__out]
 	    = ranges::__copy_or_move<_IsMove>(__first.base(), __last.base(),
-					      __result);
+					      std::move(__result));
 	  return {decltype(__first){__in}, std::move(__out)};
 	}
       else if constexpr (__is_normal_iterator<_Out>)
@@ -251,9 +250,7 @@ namespace ranges
 	}
       else if constexpr (sized_sentinel_for<_Sent, _Iter>)
 	{
-#ifdef __cpp_lib_is_constant_evaluated
-	  if (!std::is_constant_evaluated())
-#endif
+	  if (!std::__is_constant_evaluated())
 	    {
 	      if constexpr (__memcpyable<_Iter, _Out>::__value)
 		{
@@ -388,9 +385,7 @@ namespace ranges
 	}
       else if constexpr (sized_sentinel_for<_Sent, _Iter>)
 	{
-#ifdef __cpp_lib_is_constant_evaluated
-	  if (!std::is_constant_evaluated())
-#endif
+	  if (!std::__is_constant_evaluated())
 	    {
 	      if constexpr (__memcpyable<_Out, _Iter>::__value)
 		{
@@ -527,17 +522,23 @@ namespace ranges
 	if (__n <= 0)
 	  return __first;
 
-	// TODO: Generalize this optimization to contiguous iterators.
-	if constexpr (is_pointer_v<_Out>
-		      // Note that __is_byte already implies !is_volatile.
-		      && __is_byte<remove_pointer_t<_Out>>::__value
-		      && integral<_Tp>)
+	if constexpr (is_scalar_v<_Tp>)
 	  {
-	    __builtin_memset(__first, static_cast<unsigned char>(__value), __n);
-	    return __first + __n;
-	  }
-	else if constexpr (is_scalar_v<_Tp>)
-	  {
+	    // TODO: Generalize this optimization to contiguous iterators.
+	    if constexpr (is_pointer_v<_Out>
+			  // Note that __is_byte already implies !is_volatile.
+			  && __is_byte<remove_pointer_t<_Out>>::__value
+			  && integral<_Tp>)
+	      {
+		if (!std::__is_constant_evaluated())
+		  {
+		    __builtin_memset(__first,
+				     static_cast<unsigned char>(__value),
+				     __n);
+		    return __first + __n;
+		  }
+	      }
+
 	    const auto __tmp = __value;
 	    for (; __n > 0; --__n, (void)++__first)
 	      *__first = __tmp;

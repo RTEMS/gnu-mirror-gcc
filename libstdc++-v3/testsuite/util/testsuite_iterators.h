@@ -1,7 +1,7 @@
 // -*- C++ -*-
 // Iterator Wrappers for the C++ library testsuite.
 //
-// Copyright (C) 2004-2021 Free Software Foundation, Inc.
+// Copyright (C) 2004-2023 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -122,13 +122,18 @@ namespace __gnu_test
    */
   template<class T>
   struct output_iterator_wrapper
-  : public std::iterator<std::output_iterator_tag, void, std::ptrdiff_t, void, void>
   {
   protected:
     output_iterator_wrapper() : ptr(0), SharedInfo(0)
     { }
 
   public:
+    typedef std::output_iterator_tag iterator_category;
+    typedef T value_type;
+    typedef std::ptrdiff_t difference_type;
+    typedef T* pointer;
+    typedef T& reference;
+
     typedef OutputContainer<T> ContainerType;
     T* ptr;
     ContainerType* SharedInfo;
@@ -209,8 +214,6 @@ namespace __gnu_test
    */
   template<class T>
   class input_iterator_wrapper
-  : public std::iterator<std::input_iterator_tag, typename remove_cv<T>::type,
-			 std::ptrdiff_t, T*, T&>
   {
     struct post_inc_proxy
     {
@@ -228,6 +231,12 @@ namespace __gnu_test
     { }
 
   public:
+    typedef std::input_iterator_tag iterator_category;
+    typedef typename remove_cv<T>::type value_type;
+    typedef std::ptrdiff_t difference_type;
+    typedef T* pointer;
+    typedef T& reference;
+
     typedef BoundsContainer<T> ContainerType;
     T* ptr;
     ContainerType* SharedInfo;
@@ -907,7 +916,7 @@ namespace __gnu_test
   // Test for basic properties of C++20 16.3.3.6 [customization.point.object].
   template<typename T>
     constexpr bool
-    is_customization_point_object(T& obj) noexcept
+    is_customization_point_object(T&) noexcept
     {
       // A [CPO] is a function object with a literal class type.
       static_assert( std::is_class_v<T> || std::is_union_v<T> );

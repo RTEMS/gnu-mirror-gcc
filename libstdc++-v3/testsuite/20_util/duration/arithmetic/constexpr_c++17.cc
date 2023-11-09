@@ -1,6 +1,6 @@
 // { dg-do compile { target c++17 } }
 
-// Copyright (C) 2011-2021 Free Software Foundation, Inc.
+// Copyright (C) 2011-2023 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -22,7 +22,7 @@
 
 #ifndef __cpp_lib_chrono
 # error "Feature-test macro for constexpr <chrono> missing"
-#elif __cpp_lib_chrono != 201611
+#elif __cpp_lib_chrono < 201611
 # error "Feature-test macro for constexpr <chrono> has wrong value"
 #endif
 

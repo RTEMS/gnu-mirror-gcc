@@ -1,3 +1,4 @@
+#include <omp.h>
 #include <gomp-constants.h>
 
 /* static */ int
@@ -7,13 +8,13 @@ device_arch_nvptx (void)
 }
 
 /* static */ int
-device_arch_intel_mic (void)
+device_arch_gcn (void)
 {
-  return GOMP_DEVICE_INTEL_MIC;
+  return GOMP_DEVICE_GCN;
 }
 
 #pragma omp declare variant (device_arch_nvptx) match(construct={target},device={arch(nvptx)})
-#pragma omp declare variant (device_arch_intel_mic) match(construct={target},device={arch(intel_mic)})
+#pragma omp declare variant (device_arch_gcn) match(construct={target},device={arch(gcn)})
 /* static */ int
 device_arch (void)
 {
@@ -37,7 +38,7 @@ on_device_arch_nvptx ()
 }
 
 int
-on_device_arch_intel_mic ()
+on_device_arch_gcn ()
 {
-  return on_device_arch (GOMP_DEVICE_INTEL_MIC);
+  return on_device_arch (GOMP_DEVICE_GCN);
 }

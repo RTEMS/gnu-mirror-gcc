@@ -3,7 +3,6 @@
 // license that can be found in the LICENSE file.
 
 //go:build aix || darwin || dragonfly || freebsd || (js && wasm) || linux || netbsd || openbsd || solaris
-// +build aix darwin dragonfly freebsd js,wasm linux netbsd openbsd solaris
 
 package mime
 
@@ -12,6 +11,7 @@ import (
 )
 
 func initMimeUnixTest(t *testing.T) {
+	once.Do(initMime)
 	err := loadMimeGlobsFile("testdata/test.types.globs2")
 	if err != nil {
 		t.Fatal(err)

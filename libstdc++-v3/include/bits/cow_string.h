@@ -1,6 +1,6 @@
 // Definition of gcc4-compatible Copy-on-Write basic_string -*- C++ -*-
 
-// Copyright (C) 1997-2021 Free Software Foundation, Inc.
+// Copyright (C) 1997-2023 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -26,7 +26,7 @@
  *  This is an internal header file, included by other library headers.
  *  Do not attempt to use it directly. @headername{string}
  *
- *  Defines the reference-counted COW string implentation.
+ *  Defines the reference-counted COW string implementation.
  */
 
 #ifndef _COW_STRING_H
@@ -34,13 +34,10 @@
 
 #if ! _GLIBCXX_USE_CXX11_ABI
 
-#ifdef __cpp_lib_is_constant_evaluated
-// Support P1032R1 in C++20 (but not P0980R1 yet).
-# define __cpp_lib_constexpr_string 201811L
-#elif __cplusplus >= 201703L && _GLIBCXX_HAVE_BUILTIN_IS_CONSTANT_EVALUATED
-// Support P0426R1 changes to char_traits in C++17.
-# define __cpp_lib_constexpr_string 201611L
-#endif
+#include <ext/atomicity.h> // _Atomic_word, __is_single_threaded
+
+#define __glibcxx_want_constexpr_string
+#include <bits/version.h>
 
 namespace std _GLIBCXX_VISIBILITY(default)
 {
@@ -52,6 +49,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
    *
    *  @ingroup strings
    *  @ingroup sequences
+   *  @headerfile string
+   *  @since C++98
    *
    *  @tparam _CharT  Type of character
    *  @tparam _Traits  Traits for character type, defaults to
@@ -105,7 +104,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
    *  destroy the empty-string _Rep object.
    *
    *  All but the last paragraph is considered pretty conventional
-   *  for a C++ string implementation.
+   *  for a Copy-On-Write C++ string implementation.
   */
   // 21.3  Template class basic_string
   template<typename _CharT, typename _Traits, typename _Alloc>
@@ -222,10 +221,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	  // but one reference concurrently with this check, so we need this
 	  // load to be acquire to synchronize with release fetch_and_add in
 	  // _M_dispose.
-	  return __atomic_load_n(&this->_M_refcount, __ATOMIC_ACQUIRE) > 0;
-#else
-	  return this->_M_refcount > 0;
+	  if (!__gnu_cxx::__is_single_threaded())
+	    return __atomic_load_n(&this->_M_refcount, __ATOMIC_ACQUIRE) > 0;
 #endif
+	  return this->_M_refcount > 0;
 	}
 
 	void
@@ -621,24 +620,22 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  @a __str is a valid, but unspecified string.
        */
       basic_string(basic_string&& __str) noexcept
-#if _GLIBCXX_FULLY_DYNAMIC_STRING == 0
       : _M_dataplus(std::move(__str._M_dataplus))
       {
+#if _GLIBCXX_FULLY_DYNAMIC_STRING == 0
+	// Make __str use the shared empty string rep.
 	__str._M_data(_S_empty_rep()._M_refdata());
-      }
 #else
-      : _M_dataplus(__str._M_rep())
-      {
 	// Rather than allocate an empty string for the rvalue string,
 	// just share ownership with it by incrementing the reference count.
-	// If the rvalue string was "leaked" then it was the unique owner,
-	// so need an extra increment to indicate shared ownership.
-	if (_M_rep()->_M_is_leaked())
-	  __gnu_cxx::__atomic_add_dispatch(&_M_rep()->_M_refcount, 2);
-	else
+	// If the rvalue string was the unique owner then there are exactly
+	// two owners now.
+	if (_M_rep()->_M_is_shared())
 	  __gnu_cxx::__atomic_add_dispatch(&_M_rep()->_M_refcount, 1);
-      }
+	else
+	  _M_rep()->_M_refcount = 1;
 #endif
+      }
 
       /**
        *  @brief  Construct string from an initializer %list.
@@ -667,10 +664,12 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	else
 	  _M_dataplus._M_p = _S_construct(__str.begin(), __str.end(), __a);
       }
+#endif // C++11
 
+#if __cplusplus >= 202100L
       basic_string(nullptr_t) = delete;
       basic_string& operator=(nullptr_t) = delete;
-#endif // C++11
+#endif // C++23
 
       /**
        *  @brief  Construct string as copy of a range.
@@ -692,7 +691,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  @param  __n   The number of characters to copy from __t.
        *  @param  __a   Allocator to use.
        */
-      template<typename _Tp, typename = _If_sv<_Tp, void>>
+      template<typename _Tp,
+	       typename = enable_if_t<is_convertible_v<const _Tp&, __sv_type>>>
 	basic_string(const _Tp& __t, size_type __pos, size_type __n,
 		     const _Alloc& __a = _Alloc())
 	: basic_string(_S_to_string_view(__t).substr(__pos, __n), __a) { }
@@ -904,17 +904,24 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
     public:
       // Capacity:
+
       ///  Returns the number of characters in the string, not including any
       ///  null-termination.
       size_type
       size() const _GLIBCXX_NOEXCEPT
-      { return _M_rep()->_M_length; }
+      {
+#if _GLIBCXX_FULLY_DYNAMIC_STRING == 0 && __OPTIMIZE__
+	if (_S_empty_rep()._M_length != 0)
+	  __builtin_unreachable();
+#endif
+	return _M_rep()->_M_length;
+      }
 
       ///  Returns the number of characters in the string, not including any
       ///  null-termination.
       size_type
       length() const _GLIBCXX_NOEXCEPT
-      { return _M_rep()->_M_length; }
+      { return size(); }
 
       ///  Returns the size() of the largest possible %string.
       size_type
@@ -956,6 +963,48 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       shrink_to_fit() noexcept
       { reserve(); }
 #pragma GCC diagnostic pop
+#endif
+
+#ifdef __cpp_lib_string_resize_and_overwrite // C++ >= 23
+      /** Resize the string and call a function to fill it.
+       *
+       * @param __n   The maximum size requested.
+       * @param __op  A callable object that writes characters to the string.
+       *
+       * This is a low-level function that is easy to misuse, be careful.
+       *
+       * Calling `str.resize_and_overwrite(n, op)` will reserve at least `n`
+       * characters in `str`, evaluate `n2 = std::move(op)(str.data(), n)`,
+       * and finally set the string length to `n2` (adding a null terminator
+       * at the end). The function object `op` is allowed to write to the
+       * extra capacity added by the initial reserve operation, which is not
+       * allowed if you just call `str.reserve(n)` yourself.
+       *
+       * This can be used to efficiently fill a `string` buffer without the
+       * overhead of zero-initializing characters that will be overwritten
+       * anyway.
+       *
+       * The callable `op` must not access the string directly (only through
+       * the pointer passed as its first argument), must not write more than
+       * `n` characters to the string, must return a value no greater than `n`,
+       * and must ensure that all characters up to the returned length are
+       * valid after it returns (i.e. there must be no uninitialized values
+       * left in the string after the call, because accessing them would
+       * have undefined behaviour). If `op` exits by throwing an exception
+       * the behaviour is undefined.
+       *
+       * @since C++23
+       */
+      template<typename _Operation>
+	void
+	resize_and_overwrite(size_type __n, _Operation __op);
+#endif // __cpp_lib_string_resize_and_overwrite
+
+#if __cplusplus >= 201103L
+      /// Non-standard version of resize_and_overwrite for C++11 and above.
+      template<typename _Operation>
+	void
+	__resize_and_overwrite(size_type __n, _Operation __op);
 #endif
 
       /**
@@ -2849,7 +2898,17 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  the shorter one is ordered first.
       */
       int
-      compare(size_type __pos, size_type __n, const basic_string& __str) const;
+      compare(size_type __pos, size_type __n, const basic_string& __str) const
+      {
+	_M_check(__pos, "basic_string::compare");
+	__n = _M_limit(__pos, __n);
+	const size_type __osize = __str.size();
+	const size_type __len = std::min(__n, __osize);
+	int __r = traits_type::compare(_M_data() + __pos, __str.data(), __len);
+	if (!__r)
+	  __r = _S_compare(__n, __osize);
+	return __r;
+      }
 
       /**
        *  @brief  Compare substring to a substring.
@@ -2876,7 +2935,19 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       */
       int
       compare(size_type __pos1, size_type __n1, const basic_string& __str,
-	      size_type __pos2, size_type __n2 = npos) const;
+	      size_type __pos2, size_type __n2 = npos) const
+      {
+	_M_check(__pos1, "basic_string::compare");
+	__str._M_check(__pos2, "basic_string::compare");
+	__n1 = _M_limit(__pos1, __n1);
+	__n2 = __str._M_limit(__pos2, __n2);
+	const size_type __len = std::min(__n1, __n2);
+	int __r = traits_type::compare(_M_data() + __pos1,
+				       __str.data() + __pos2, __len);
+	if (!__r)
+	  __r = _S_compare(__n1, __n2);
+	return __r;
+      }
 
       /**
        *  @brief  Compare to a C string.
@@ -2893,7 +2964,17 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  ordered first.
       */
       int
-      compare(const _CharT* __s) const _GLIBCXX_NOEXCEPT;
+      compare(const _CharT* __s) const _GLIBCXX_NOEXCEPT
+      {
+	__glibcxx_requires_string(__s);
+	const size_type __size = this->size();
+	const size_type __osize = traits_type::length(__s);
+	const size_type __len = std::min(__size, __osize);
+	int __r = traits_type::compare(_M_data(), __s, __len);
+	if (!__r)
+	  __r = _S_compare(__size, __osize);
+	return __r;
+      }
 
       // _GLIBCXX_RESOLVE_LIB_DEFECTS
       // 5 String::compare specification questionable
@@ -2917,7 +2998,18 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  one is ordered first.
       */
       int
-      compare(size_type __pos, size_type __n1, const _CharT* __s) const;
+      compare(size_type __pos, size_type __n1, const _CharT* __s) const
+      {
+	__glibcxx_requires_string(__s);
+	_M_check(__pos, "basic_string::compare");
+	__n1 = _M_limit(__pos, __n1);
+	const size_type __osize = traits_type::length(__s);
+	const size_type __len = std::min(__n1, __osize);
+	int __r = traits_type::compare(_M_data() + __pos, __s, __len);
+	if (!__r)
+	  __r = _S_compare(__n1, __osize);
+	return __r;
+      }
 
       /**
        *  @brief  Compare substring against a character %array.
@@ -2945,7 +3037,17 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       */
       int
       compare(size_type __pos, size_type __n1, const _CharT* __s,
-	      size_type __n2) const;
+	      size_type __n2) const
+      {
+	__glibcxx_requires_string_len(__s, __n2);
+	_M_check(__pos, "basic_string::compare");
+	__n1 = _M_limit(__pos, __n1);
+	const size_type __len = std::min(__n1, __n2);
+	int __r = traits_type::compare(_M_data() + __pos, __s, __len);
+	if (!__r)
+	  __r = _S_compare(__n1, __n2);
+	return __r;
+      }
 
 #if __cplusplus > 201703L
       bool
@@ -2956,6 +3058,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       starts_with(_CharT __x) const noexcept
       { return __sv_type(this->data(), this->size()).starts_with(__x); }
 
+      [[__gnu__::__nonnull__]]
       bool
       starts_with(const _CharT* __x) const noexcept
       { return __sv_type(this->data(), this->size()).starts_with(__x); }
@@ -2968,6 +3071,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       ends_with(_CharT __x) const noexcept
       { return __sv_type(this->data(), this->size()).ends_with(__x); }
 
+      [[__gnu__::__nonnull__]]
       bool
       ends_with(const _CharT* __x) const noexcept
       { return __sv_type(this->data(), this->size()).ends_with(__x); }
@@ -2982,6 +3086,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       contains(_CharT __x) const noexcept
       { return __sv_type(this->data(), this->size()).contains(__x); }
 
+      [[__gnu__::__nonnull__]]
       bool
       contains(const _CharT* __x) const noexcept
       { return __sv_type(this->data(), this->size()).contains(__x); }
@@ -3347,7 +3452,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	 }
        else
 	 {
-	   // Todo: overlapping case.
+	   // TODO: overlapping case.
 	   const basic_string __tmp(__s, __n2);
 	   return _M_replace_safe(__pos, __n1, __tmp._M_data(), __n2);
 	 }
@@ -3368,10 +3473,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     basic_string<_CharT, _Traits, _Alloc>::
     _M_leak_hard()
     {
-#if _GLIBCXX_FULLY_DYNAMIC_STRING == 0
-      if (_M_rep() == &_S_empty_rep())
+      // No need to create a new copy of an empty string when a non-const
+      // reference/pointer/iterator into it is obtained. Modifying the
+      // trailing null character is undefined, so the ref/pointer/iterator
+      // is effectively const anyway.
+      if (this->empty())
 	return;
-#endif
+
       if (_M_rep()->_M_is_shared())
 	_M_mutate(0, 0, 0);
       _M_rep()->_M_set_leaked();
@@ -3645,6 +3753,54 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       // 21.3.5.7 par 3: do not append null.  (good.)
       return __n;
     }
+
+#ifdef __cpp_lib_string_resize_and_overwrite // C++ >= 23
+  template<typename _CharT, typename _Traits, typename _Alloc>
+  template<typename _Operation>
+    [[__gnu__::__always_inline__]]
+    void
+    basic_string<_CharT, _Traits, _Alloc>::
+    __resize_and_overwrite(const size_type __n, _Operation __op)
+    { resize_and_overwrite<_Operation&>(__n, __op); }
+#endif
+
+#if __cplusplus >= 201103L
+  template<typename _CharT, typename _Traits, typename _Alloc>
+  template<typename _Operation>
+    void
+    basic_string<_CharT, _Traits, _Alloc>::
+#ifdef __cpp_lib_string_resize_and_overwrite // C++ >= 23
+    resize_and_overwrite(const size_type __n, _Operation __op)
+#else
+    __resize_and_overwrite(const size_type __n, _Operation __op)
+#endif
+    {
+      const size_type __capacity = capacity();
+      _CharT* __p;
+      if (__n > __capacity || _M_rep()->_M_is_shared())
+	this->reserve(__n);
+      __p = _M_data();
+      struct _Terminator {
+	~_Terminator() { _M_this->_M_rep()->_M_set_length_and_sharable(_M_r); }
+	basic_string* _M_this;
+	size_type _M_r;
+      };
+      _Terminator __term{this, 0};
+      auto __r = std::move(__op)(__p + 0, __n + 0);
+#ifdef __cpp_lib_concepts
+      static_assert(ranges::__detail::__is_integer_like<decltype(__r)>);
+#else
+      static_assert(__gnu_cxx::__is_integer_nonstrict<decltype(__r)>::__value,
+		    "resize_and_overwrite operation must return an integer");
+#endif
+      _GLIBCXX_DEBUG_ASSERT(__r >= 0 && __r <= __n);
+      __term._M_r = size_type(__r);
+      if (__term._M_r > __n)
+	__builtin_unreachable();
+    }
+#endif // C++11
+
+
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
 #endif  // ! _GLIBCXX_USE_CXX11_ABI

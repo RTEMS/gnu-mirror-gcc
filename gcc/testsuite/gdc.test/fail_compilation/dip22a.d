@@ -1,12 +1,14 @@
 /*
-REQUIRED_ARGS:
+EXTRA_FILES: imports/dip22a.d
 TEST_OUTPUT:
 ---
-fail_compilation/dip22a.d(16): Error: no property `bar` for type `imports.dip22a.Klass`, did you mean `imports.dip22a.Klass.bar`?
-fail_compilation/dip22a.d(17): Error: no property `bar` for type `Struct`, did you mean `imports.dip22a.Struct.bar`?
-fail_compilation/dip22a.d(18): Error: undefined identifier `bar` in module `imports.dip22a`, did you mean function `bar`?
-fail_compilation/dip22a.d(19): Error: no property `bar` for type `void`
-fail_compilation/dip22a.d(20): Error: no property `bar` for type `int`
+fail_compilation/dip22a.d(18): Error: no property `bar` for `new Klass` of type `imports.dip22a.Klass`
+fail_compilation/imports/dip22a.d(3):        class `Klass` defined here
+fail_compilation/dip22a.d(19): Error: no property `bar` for `Struct()` of type `imports.dip22a.Struct`
+fail_compilation/imports/dip22a.d(8):        struct `Struct` defined here
+fail_compilation/dip22a.d(20): Error: undefined identifier `bar` in module `imports.dip22a`
+fail_compilation/dip22a.d(21): Error: no property `bar` for `Template!int` of type `void`
+fail_compilation/dip22a.d(22): Error: no property `bar` for `12` of type `int`
 ---
 */
 import imports.dip22a;

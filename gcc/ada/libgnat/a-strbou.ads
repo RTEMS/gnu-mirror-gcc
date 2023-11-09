@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- This specification is derived from the Ada Reference Manual for use with --
 -- GNAT. The copyright notice above, and the license provisions that follow --
@@ -47,7 +47,10 @@ with Ada.Strings.Maps; use type Ada.Strings.Maps.Character_Mapping_Function;
 with Ada.Strings.Superbounded;
 with Ada.Strings.Search;
 
-package Ada.Strings.Bounded with SPARK_Mode is
+package Ada.Strings.Bounded with
+  SPARK_Mode,
+  Always_Terminates
+is
    pragma Preelaborate;
 
    generic
@@ -56,7 +59,8 @@ package Ada.Strings.Bounded with SPARK_Mode is
 
    package Generic_Bounded_Length with SPARK_Mode,
      Initial_Condition => Length (Null_Bounded_String) = 0,
-     Abstract_State    => null
+     Abstract_State    => null,
+     Always_Terminates
    is
       --  Preconditions in this unit are meant for analysis only, not for
       --  run-time checking, so that the expected exceptions are raised. This
@@ -1339,6 +1343,9 @@ package Ada.Strings.Bounded with SPARK_Mode is
             (for all K in 1 .. Length (Source) =>
                Element (Translate'Result, K) = Mapping (Element (Source, K))),
         Global => null;
+      pragma Annotate (GNATprove, False_Positive,
+                       "call via access-to-subprogram",
+                       "function Mapping must always terminate");
 
       procedure Translate
         (Source  : in out Bounded_String;
@@ -1350,6 +1357,9 @@ package Ada.Strings.Bounded with SPARK_Mode is
             (for all K in 1 .. Length (Source) =>
                Element (Source, K) = Mapping (Element (Source'Old, K))),
         Global => null;
+      pragma Annotate (GNATprove, False_Positive,
+                       "call via access-to-subprogram",
+                       "function Mapping must always terminate");
 
       ---------------------------------------
       -- String Transformation Subprograms --
@@ -1898,7 +1908,7 @@ package Ada.Strings.Bounded with SPARK_Mode is
                --  some characters of Source are remaining at the left.
 
                and then
-                 (if New_Item'Length > Max_Length then
+                 (if New_Item'Length >= Max_Length then
 
                     --  New_Item covers all Max_Length characters
 
@@ -1984,7 +1994,7 @@ package Ada.Strings.Bounded with SPARK_Mode is
                --  some characters of Source are remaining at the left.
 
                and then
-                 (if New_Item'Length > Max_Length then
+                 (if New_Item'Length >= Max_Length then
 
                     --  New_Item covers all Max_Length characters
 
@@ -2202,7 +2212,7 @@ package Ada.Strings.Bounded with SPARK_Mode is
                  Slice (Head'Result, 1, Length (Source)) = To_String (Source)
                and then
                  Slice (Head'Result, Length (Source) + 1, Count) =
-                   (1 .. Count - Length (Source) => Pad),
+                   [1 .. Count - Length (Source) => Pad],
 
            Count > Max_Length and then Drop = Right
            =>
@@ -2213,13 +2223,13 @@ package Ada.Strings.Bounded with SPARK_Mode is
                  Slice (Head'Result, 1, Length (Source)) = To_String (Source)
                and then
                  Slice (Head'Result, Length (Source) + 1, Max_Length) =
-                   (1 .. Max_Length - Length (Source) => Pad),
+                   [1 .. Max_Length - Length (Source) => Pad],
 
            Count - Length (Source) > Max_Length and then Drop = Left
            =>
              --  Source is fully dropped at the left
 
-             To_String (Head'Result) = (1 .. Max_Length => Pad),
+             To_String (Head'Result) = [1 .. Max_Length => Pad],
 
            others
            =>
@@ -2232,7 +2242,7 @@ package Ada.Strings.Bounded with SPARK_Mode is
                and then
                  Slice (Head'Result,
                    Max_Length - Count + Length (Source) + 1, Max_Length) =
-                     (1 .. Count - Length (Source) => Pad));
+                     [1 .. Count - Length (Source) => Pad]);
 
       procedure Head
         (Source : in out Bounded_String;
@@ -2258,7 +2268,7 @@ package Ada.Strings.Bounded with SPARK_Mode is
                    To_String (Source'Old)
                and then
                  Slice (Source, Length (Source'Old) + 1, Count) =
-                   (1 .. Count - Length (Source'Old) => Pad),
+                   [1 .. Count - Length (Source'Old) => Pad],
 
            Count > Max_Length and then Drop = Right
            =>
@@ -2270,13 +2280,13 @@ package Ada.Strings.Bounded with SPARK_Mode is
                    To_String (Source'Old)
                and then
                  Slice (Source, Length (Source'Old) + 1, Max_Length) =
-                   (1 .. Max_Length - Length (Source'Old) => Pad),
+                   [1 .. Max_Length - Length (Source'Old) => Pad],
 
            Count - Length (Source) > Max_Length and then Drop = Left
            =>
              --  Source is fully dropped on the left
 
-             To_String (Source) = (1 .. Max_Length => Pad),
+             To_String (Source) = [1 .. Max_Length => Pad],
 
            others
            =>
@@ -2290,7 +2300,7 @@ package Ada.Strings.Bounded with SPARK_Mode is
                and then
                  Slice (Source,
                    Max_Length - Count + Length (Source'Old) + 1, Max_Length) =
-                     (1 .. Count - Length (Source'Old) => Pad));
+                     [1 .. Count - Length (Source'Old) => Pad]);
 
       function Tail
         (Source : Bounded_String;
@@ -2316,7 +2326,7 @@ package Ada.Strings.Bounded with SPARK_Mode is
              Length (Tail'Result) = Count
                and then
                  Slice (Tail'Result, 1, Count - Length (Source)) =
-                   (1 .. Count - Length (Source) => Pad)
+                   [1 .. Count - Length (Source) => Pad]
                and then
                  Slice (Tail'Result, Count - Length (Source) + 1, Count) =
                    To_String (Source),
@@ -2328,7 +2338,7 @@ package Ada.Strings.Bounded with SPARK_Mode is
              Length (Tail'Result) = Max_Length
                and then
                  Slice (Tail'Result, 1, Max_Length - Length (Source)) =
-                   (1 .. Max_Length - Length (Source) => Pad)
+                   [1 .. Max_Length - Length (Source) => Pad]
                and then
                  (if Length (Source) > 0 then
                     Slice (Tail'Result,
@@ -2339,7 +2349,7 @@ package Ada.Strings.Bounded with SPARK_Mode is
            =>
              --  Source is fully dropped on the right
 
-             To_String (Tail'Result) = (1 .. Max_Length => Pad),
+             To_String (Tail'Result) = [1 .. Max_Length => Pad],
 
            others
            =>
@@ -2348,7 +2358,7 @@ package Ada.Strings.Bounded with SPARK_Mode is
              Length (Tail'Result) = Max_Length
                and then
                  Slice (Tail'Result, 1, Count - Length (Source)) =
-                   (1 .. Count - Length (Source) => Pad)
+                   [1 .. Count - Length (Source) => Pad]
                and then
                  Slice (Tail'Result, Count - Length (Source) + 1, Max_Length) =
                    Slice (Source, 1, Max_Length - Count + Length (Source)));
@@ -2378,7 +2388,7 @@ package Ada.Strings.Bounded with SPARK_Mode is
              Length (Source) = Count
                and then
                  Slice (Source, 1, Count - Length (Source'Old)) =
-                   (1 .. Count - Length (Source'Old) => Pad)
+                   [1 .. Count - Length (Source'Old) => Pad]
                and then
                  Slice (Source, Count - Length (Source'Old) + 1, Count) =
                    To_String (Source'Old),
@@ -2390,7 +2400,7 @@ package Ada.Strings.Bounded with SPARK_Mode is
              Length (Source) = Max_Length
                and then
                  Slice (Source, 1, Max_Length - Length (Source'Old)) =
-                   (1 .. Max_Length - Length (Source'Old) => Pad)
+                   [1 .. Max_Length - Length (Source'Old) => Pad]
                and then
                  (if Length (Source'Old) > 0 then
                     Slice (Source,
@@ -2401,7 +2411,7 @@ package Ada.Strings.Bounded with SPARK_Mode is
            =>
              --  Source is fully dropped at the right
 
-             To_String (Source) = (1 .. Max_Length => Pad),
+             To_String (Source) = [1 .. Max_Length => Pad],
 
            others
            =>
@@ -2410,7 +2420,7 @@ package Ada.Strings.Bounded with SPARK_Mode is
              Length (Source) = Max_Length
                and then
                  Slice (Source, 1, Count - Length (Source'Old)) =
-                   (1 .. Count - Length (Source'Old) => Pad)
+                   [1 .. Count - Length (Source'Old) => Pad]
                and then
                  Slice (Source, Count - Length (Source'Old) + 1, Max_Length) =
                    Slice (Source'Old,
@@ -2425,7 +2435,7 @@ package Ada.Strings.Bounded with SPARK_Mode is
          Right : Character) return Bounded_String
       with
         Pre  => Left <= Max_Length,
-        Post => To_String ("*"'Result) = (1 .. Left => Right);
+        Post => To_String ("*"'Result) = [1 .. Left => Right];
 
       function "*"
         (Left  : Natural;
@@ -2461,7 +2471,7 @@ package Ada.Strings.Bounded with SPARK_Mode is
         Pre  => (if Count > Max_Length then Drop /= Error),
         Post =>
           To_String (Replicate'Result) =
-            (1 .. Natural'Min (Max_Length, Count) => Item);
+            [1 .. Natural'Min (Max_Length, Count) => Item];
 
       function Replicate
         (Count : Natural;
@@ -2565,7 +2575,7 @@ package Ada.Strings.Bounded with SPARK_Mode is
                               (Max_Length     => Max_Length,
                                Current_Length => 0,
                                Data           =>
-                                 (1 .. Max_Length => ASCII.NUL));
+                                 [1 .. Max_Length => ASCII.NUL]);
 
       pragma Inline (To_Bounded_String);
 

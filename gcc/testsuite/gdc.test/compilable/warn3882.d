@@ -10,9 +10,9 @@ void test3882()
 }
 
 /******************************************/
-// 12619
+// https://issues.dlang.org/show_bug.cgi?id=12619
 
-extern (C) @system nothrow pure void* memcpy(void* s1, in void* s2, size_t n);
+extern (C) @system nothrow pure void* memcpy(void* s1, const void* s2, size_t n);
 // -> weakly pure
 
 void test12619() pure
@@ -22,7 +22,7 @@ void test12619() pure
 }
 
 /******************************************/
-// 12760
+// https://issues.dlang.org/show_bug.cgi?id=12760
 
 struct S12760(T)
 {
@@ -41,11 +41,11 @@ struct K12760
 }
 
 /******************************************/
-// 12909
+// https://issues.dlang.org/show_bug.cgi?id=12909
 
 int f12909(immutable(int[])[int] aa) pure nothrow
 {
-    //aa[0] = [];   // fix for issue 13701
+    //aa[0] = [];   // fix for https://issues.dlang.org/show_bug.cgi?id=13701
     return 0;
 }
 
@@ -60,11 +60,11 @@ void test12909()
 }
 
 /******************************************/
-// 13899
+// https://issues.dlang.org/show_bug.cgi?id=13899
 
 const struct Foo13899
 {
-    int opApply(immutable int delegate(in ref int) pure nothrow dg) pure nothrow
+    int opApply(immutable int delegate(const ref int) pure nothrow dg) pure nothrow
     {
         return 1;
     }

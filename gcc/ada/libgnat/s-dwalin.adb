@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 2009-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 2009-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -35,7 +35,6 @@ with Ada.Unchecked_Deallocation;
 
 with Interfaces; use Interfaces;
 
-with System;                   use System;
 with System.Address_Image;
 with System.Bounded_Strings;   use System.Bounded_Strings;
 with System.IO;                use System.IO;
@@ -45,7 +44,11 @@ with System.Storage_Elements;  use System.Storage_Elements;
 
 package body System.Dwarf_Lines is
 
-   SSU : constant := System.Storage_Unit;
+   subtype Offset is Object_Reader.Offset;
+
+   function "-" (Left, Right : Address) return uint32;
+   pragma Import (Intrinsic, "-");
+   --  Return the difference between two addresses as an unsigned offset
 
    function Get_Load_Displacement (C : Dwarf_Context) return Storage_Offset;
    --  Return the displacement between the load address present in the binary
@@ -77,14 +80,16 @@ package body System.Dwarf_Lines is
    --  Read an entry format array, as specified by 6.2.4.1
 
    procedure Read_Aranges_Entry
-     (C     : in out Dwarf_Context;
-      Start :    out Address;
-      Len   :    out Storage_Count);
+     (C         : in out Dwarf_Context;
+      Addr_Size :        Natural;
+      Start     :    out Address;
+      Len       :    out Storage_Count);
    --  Read a single .debug_aranges pair
 
    procedure Read_Aranges_Header
      (C           : in out Dwarf_Context;
       Info_Offset :    out Offset;
+      Addr_Size   :    out Natural;
       Success     :    out Boolean);
    --  Read .debug_aranges header
 
@@ -1070,12 +1075,13 @@ package body System.Dwarf_Lines is
       Info_Offset :    out Offset;
       Success     :    out Boolean)
    is
+      Addr_Size : Natural;
    begin
       Info_Offset := 0;
       Seek (C.Aranges, 0);
 
       while Tell (C.Aranges) < Length (C.Aranges) loop
-         Read_Aranges_Header (C, Info_Offset, Success);
+         Read_Aranges_Header (C, Info_Offset, Addr_Size, Success);
          exit when not Success;
 
          loop
@@ -1083,7 +1089,7 @@ package body System.Dwarf_Lines is
                Start : Address;
                Len   : Storage_Count;
             begin
-               Read_Aranges_Entry (C, Start, Len);
+               Read_Aranges_Entry (C, Addr_Size, Start, Len);
                exit when Start = 0 and Len = 0;
                if Addr >= Start
                  and then Addr < Start + Len
@@ -1281,9 +1287,6 @@ package body System.Dwarf_Lines is
          Unit_Type := Read (C.Info);
 
          Addr_Sz := Read (C.Info);
-         if Addr_Sz /= (Address'Size / SSU) then
-            return;
-         end if;
 
          Read_Section_Offset (C.Info, Abbrev_Offset, Is64);
 
@@ -1291,9 +1294,6 @@ package body System.Dwarf_Lines is
          Read_Section_Offset (C.Info, Abbrev_Offset, Is64);
 
          Addr_Sz := Read (C.Info);
-         if Addr_Sz /= (Address'Size / SSU) then
-            return;
-         end if;
 
       else
          return;
@@ -1355,6 +1355,7 @@ package body System.Dwarf_Lines is
    procedure Read_Aranges_Header
      (C           : in out Dwarf_Context;
       Info_Offset :    out Offset;
+      Addr_Size   :    out Natural;
       Success     :    out Boolean)
    is
       Unit_Length : Offset;
@@ -1365,6 +1366,7 @@ package body System.Dwarf_Lines is
    begin
       Success     := False;
       Info_Offset := 0;
+      Addr_Size   := 0;
 
       Read_Initial_Length (C.Aranges, Unit_Length, Is64);
 
@@ -1377,10 +1379,7 @@ package body System.Dwarf_Lines is
 
       --  Read address_size (ubyte)
 
-      Sz := Read (C.Aranges);
-      if Sz /= (Address'Size / SSU) then
-         return;
-      end if;
+      Addr_Size := Natural (uint8'(Read (C.Aranges)));
 
       --  Read segment_size (ubyte)
 
@@ -1393,7 +1392,7 @@ package body System.Dwarf_Lines is
 
       declare
          Cur_Off : constant Offset := Tell (C.Aranges);
-         Align   : constant Offset := 2 * Address'Size / SSU;
+         Align   : constant Offset := 2 * Offset (Addr_Size);
          Space   : constant Offset := Cur_Off mod Align;
       begin
          if Space /= 0 then
@@ -1409,14 +1408,15 @@ package body System.Dwarf_Lines is
    ------------------------
 
    procedure Read_Aranges_Entry
-     (C     : in out Dwarf_Context;
-      Start :    out Address;
-      Len   :    out Storage_Count)
+     (C         : in out Dwarf_Context;
+      Addr_Size :        Natural;
+      Start     :    out Address;
+      Len       :    out Storage_Count)
    is
    begin
       --  Read table
 
-      if Address'Size = 32 then
+      if Addr_Size = 4 then
          declare
             S, L : uint32;
          begin
@@ -1426,7 +1426,7 @@ package body System.Dwarf_Lines is
             Len   := Storage_Count (L);
          end;
 
-      elsif Address'Size = 64 then
+      elsif Addr_Size = 8 then
          declare
             S, L : uint64;
          begin
@@ -1521,6 +1521,7 @@ package body System.Dwarf_Lines is
       declare
          Info_Offset : Offset;
          Line_Offset : Offset;
+         Addr_Size   : Natural;
          Success     : Boolean;
          Ar_Start    : Address;
          Ar_Len      : Storage_Count;
@@ -1532,7 +1533,7 @@ package body System.Dwarf_Lines is
          Seek (C.Aranges, 0);
 
          while Tell (C.Aranges) < Length (C.Aranges) loop
-            Read_Aranges_Header (C, Info_Offset, Success);
+            Read_Aranges_Header (C, Info_Offset, Addr_Size, Success);
             exit when not Success;
 
             Debug_Info_Lookup (C, Info_Offset, Line_Offset, Success);
@@ -1541,11 +1542,11 @@ package body System.Dwarf_Lines is
             --  Read table
 
             loop
-               Read_Aranges_Entry (C, Ar_Start, Ar_Len);
+               Read_Aranges_Entry (C, Addr_Size, Ar_Start, Ar_Len);
                exit when Ar_Start = Null_Address and Ar_Len = 0;
 
                Len   := uint32 (Ar_Len);
-               Start := uint32 (Ar_Start - C.Low);
+               Start := uint32'(Ar_Start - C.Low);
 
                --  Search START in the array
 
@@ -1765,7 +1766,8 @@ package body System.Dwarf_Lines is
 
       if C.Cache /= null then
          declare
-            Addr_Off         : constant uint32 := uint32 (Addr - C.Low);
+            Off : constant uint32 := uint32'(Addr - C.Low);
+
             First, Last, Mid : Natural;
          begin
             First := C.Cache'First;
@@ -1774,17 +1776,17 @@ package body System.Dwarf_Lines is
 
             while First <= Last loop
                Mid := First + (Last - First) / 2;
-               if Addr_Off < C.Cache (Mid).First then
+               if Off < C.Cache (Mid).First then
                   Last := Mid - 1;
-               elsif Addr_Off >= C.Cache (Mid).First + C.Cache (Mid).Size then
+               elsif Off >= C.Cache (Mid).First + C.Cache (Mid).Size then
                   First := Mid + 1;
                else
                   exit;
                end if;
             end loop;
 
-            if Addr_Off >= C.Cache (Mid).First
-              and then Addr_Off < C.Cache (Mid).First + C.Cache (Mid).Size
+            if Off >= C.Cache (Mid).First
+              and then Off < C.Cache (Mid).First + C.Cache (Mid).Size
             then
                Line_Offset := Offset (C.Cache (Mid).Line);
                S := Read_Symbol (C.Obj.all, Offset (C.Cache (Mid).Sym));

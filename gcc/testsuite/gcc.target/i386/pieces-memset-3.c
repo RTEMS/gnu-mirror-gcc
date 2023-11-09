@@ -15,4 +15,4 @@ foo (int x)
 /* No need to dynamically realign the stack here.  */
 /* { dg-final { scan-assembler-not "and\[^\n\r]*%\[re\]sp" } } */
 /* Nor use a frame pointer.  */
-/* { dg-final { scan-assembler-not "%\[re\]bp" { target { ! ia32 } } } } */
+/* { dg-final { scan-assembler-not "%\[re\]bp" { xfail ia32 } } } */

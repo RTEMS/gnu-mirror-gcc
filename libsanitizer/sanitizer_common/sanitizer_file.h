@@ -15,7 +15,7 @@
 #ifndef SANITIZER_FILE_H
 #define SANITIZER_FILE_H
 
-#include "sanitizer_interface_internal.h"
+#include "sanitizer_common.h"
 #include "sanitizer_internal_defs.h"
 #include "sanitizer_libc.h"
 #include "sanitizer_mutex.h"
@@ -78,6 +78,7 @@ bool SupportsColoredOutput(fd_t fd);
 // OS
 const char *GetPwd();
 bool FileExists(const char *filename);
+bool DirExists(const char *path);
 char *FindPathToBinary(const char *name);
 bool IsPathSeparator(const char c);
 bool IsAbsolutePath(const char *path);

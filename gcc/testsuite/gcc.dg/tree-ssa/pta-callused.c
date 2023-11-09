@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-options "-O2 --param max-fields-for-field-sensitive=2 -fdump-tree-alias" } */
+/* { dg-options "-O2 --param max-fields-for-field-sensitive=2 -fdump-tree-alias-details" } */
 
 struct Foo {
   int *p, *q;
@@ -22,5 +22,5 @@ int bar (int b)
   return *foo (&q);
 }
 
-/* { dg-final { scan-tree-dump "CALLUSED\\(\[0-9\]+\\) = { f.* i q }" "alias" } } */
+/* { dg-final { scan-tree-dump "CALLUSED\\(\[0-9\]+\\) = { ESCAPED NONLOCAL f.* i q }" "alias" } } */
 

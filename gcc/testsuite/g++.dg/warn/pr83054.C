@@ -2,8 +2,15 @@
 // { dg-options "-O3 -Wsuggest-final-types" }
 // { dg-do compile }
 
+// A throwing dtor in C++98 mode changes the warning.
+#if __cplusplus < 201100L
+#define NOTHROW throw()
+#else
+#define NOTHROW noexcept
+#endif
+
 extern "C" int printf (const char *, ...);
-struct foo // { dg-warning "final would enable devirtualization of 5 calls" }
+struct foo
 {
   static int count;
   void print (int i, int j) { printf ("foo[%d][%d] = %d\n", i, j, x); }
@@ -12,7 +19,7 @@ struct foo // { dg-warning "final would enable devirtualization of 5 calls" }
     x = count++;
     printf("this %d = %x\n", x, (void *)this);
   }
-  virtual ~foo () {
+  virtual ~foo () NOTHROW {
     printf("this %d = %x\n", x, (void *)this);
     --count;
   }

@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -370,7 +370,7 @@ package body Ada.Strings.Fixed with SPARK_Mode is
       Before   : Positive;
       New_Item : String) return String
    is
-      Front  : constant Integer := Before - Source'First;
+      Front : constant Integer := Before - Source'First;
 
    begin
       if Before - 1 not in Source'First - 1 .. Source'Last then
@@ -384,6 +384,10 @@ package body Ada.Strings.Fixed with SPARK_Mode is
            Source (Source'First .. Before - 1);
          Result (Front + 1 .. Front + New_Item'Length) :=
            New_Item;
+
+         pragma Assert
+           (Result (1 .. Before - Source'First)
+            = Source (Source'First .. Before - 1));
          pragma Assert
            (Result
               (Before - Source'First + 1
@@ -558,15 +562,21 @@ package body Ada.Strings.Fixed with SPARK_Mode is
             if Position <= Source'Last - New_Item'Length then
                Result (Front + New_Item'Length + 1 .. Result'Last) :=
                  Source (Position + New_Item'Length .. Source'Last);
+
+               pragma Assert
+                 (Result
+                    (Position - Source'First + New_Item'Length + 1
+                     .. Result'Last)
+                  = Source (Position + New_Item'Length .. Source'Last));
             end if;
 
             pragma Assert
               (if Position <= Source'Last - New_Item'Length
                then
                   Result
-                 (Position - Source'First + New_Item'Length + 1
-                  .. Result'Last)
-               = Source (Position + New_Item'Length .. Source'Last));
+                    (Position - Source'First + New_Item'Length + 1
+                     .. Result'Last)
+                  = Source (Position + New_Item'Length .. Source'Last));
          end return;
       end;
    end Overwrite;
@@ -618,6 +628,11 @@ package body Ada.Strings.Fixed with SPARK_Mode is
                  (Result (1 .. Integer'Max (0, Low - Source'First))
                   = Source (Source'First .. Low - 1));
                Result (Front_Len + 1 .. Front_Len + By'Length) := By;
+               pragma Assert
+                 (Result
+                    (Integer'Max (0, Low - Source'First) + 1
+                     .. Integer'Max (0, Low - Source'First) + By'Length)
+                  = By);
 
                if High < Source'Last then
                   Result (Front_Len + By'Length + 1 .. Result'Last) :=
@@ -758,12 +773,18 @@ package body Ada.Strings.Fixed with SPARK_Mode is
       do
          for J in Source'Range loop
             Result (J - (Source'First - 1)) := Mapping.all (Source (J));
+            pragma Annotate (GNATprove, False_Positive,
+                             "call via access-to-subprogram",
+                             "function Mapping must always terminate");
             pragma Loop_Invariant
               (for all K in Source'First .. J =>
                  Result (K - (Source'First - 1))'Initialized);
             pragma Loop_Invariant
               (for all K in Source'First .. J =>
                  Result (K - (Source'First - 1)) = Mapping (Source (K)));
+            pragma Annotate (GNATprove, False_Positive,
+                             "call via access-to-subprogram",
+                             "function Mapping must always terminate");
          end loop;
       end return;
    end Translate;
@@ -776,9 +797,15 @@ package body Ada.Strings.Fixed with SPARK_Mode is
    begin
       for J in Source'Range loop
          Source (J) := Mapping.all (Source (J));
+         pragma Annotate (GNATprove, False_Positive,
+                          "call via access-to-subprogram",
+                          "function Mapping must always terminate");
          pragma Loop_Invariant
            (for all K in Source'First .. J =>
               Source (K) = Mapping (Source'Loop_Entry (K)));
+         pragma Annotate (GNATprove, False_Positive,
+                          "call via access-to-subprogram",
+                          "function Mapping must always terminate");
       end loop;
    end Translate;
 

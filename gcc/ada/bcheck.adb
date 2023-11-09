@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -94,9 +94,7 @@ package body Bcheck is
          Check_Consistent_SSO_Default;
       end if;
 
-      if Zero_Cost_Exceptions_Specified
-        or else Frontend_Exceptions_Specified
-      then
+      if Zero_Cost_Exceptions_Specified then
          Check_Consistent_Exception_Handling;
       end if;
 
@@ -225,7 +223,7 @@ package body Bcheck is
                   end if;
                end if;
 
-               if (not Tolerate_Consistency_Errors) and Verbose_Mode then
+               if not Tolerate_Consistency_Errors and Verbose_Mode then
                   Error_Msg_File_1 := Source.Table (Src).Stamp_File;
 
                   if Source.Table (Src).Source_Found then
@@ -1245,11 +1243,8 @@ package body Bcheck is
    procedure Check_Consistent_Exception_Handling is
    begin
       Check_Mechanism : for A1 in ALIs.First + 1 .. ALIs.Last loop
-         if (ALIs.Table (A1).Zero_Cost_Exceptions /=
-              ALIs.Table (ALIs.First).Zero_Cost_Exceptions)
-           or else
-            (ALIs.Table (A1).Frontend_Exceptions /=
-              ALIs.Table (ALIs.First).Frontend_Exceptions)
+         if ALIs.Table (A1).Zero_Cost_Exceptions /=
+             ALIs.Table (ALIs.First).Zero_Cost_Exceptions
          then
             Error_Msg_File_1 := ALIs.Table (A1).Sfile;
             Error_Msg_File_2 := ALIs.Table (ALIs.First).Sfile;
@@ -1407,7 +1402,7 @@ package body Bcheck is
                            Secondary := 0;
                         end if;
 
-                        if (Primary /= -1) and (Secondary /= -1) then
+                        if Primary /= -1 and Secondary /= -1 then
                            return (Primary   => Primary,
                                    Secondary => Secondary);
                         end if;
@@ -1426,7 +1421,7 @@ package body Bcheck is
                V2      : constant ALI_Version := Extract_Version (V2_Text);
 
                Include_Version_Numbers_In_Message : constant Boolean :=
-                 (V1 /= V2) and (V1 /= No_Version) and (V2 /= No_Version);
+                 V1 /= V2 and V1 /= No_Version and V2 /= No_Version;
             begin
                Error_Msg_File_1 := ALIs.Table (A).Sfile;
                Error_Msg_File_2 := ALIs.Table (ALIs.First).Sfile;

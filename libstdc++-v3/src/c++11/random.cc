@@ -1,6 +1,6 @@
 // random -*- C++ -*-
 
-// Copyright (C) 2012-2021 Free Software Foundation, Inc.
+// Copyright (C) 2012-2023 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -26,8 +26,7 @@
 #define _CRT_RAND_S // define this before including <stdlib.h> to get rand_s
 
 #include <random>
-
-#ifdef  _GLIBCXX_USE_C99_STDINT_TR1
+#include <system_error>
 
 #if defined __i386__ || defined __x86_64__
 # include <cpuid.h>
@@ -37,6 +36,8 @@
 # ifdef _GLIBCXX_X86_RDSEED
 #  define USE_RDSEED 1
 # endif
+#elif defined __powerpc64__ && defined __BUILTIN_CPU_SUPPORTS__
+# define USE_DARN 1
 #endif
 
 #include <cerrno>
@@ -66,10 +67,15 @@
 # include <stdlib.h>
 #endif
 
-#if defined _GLIBCXX_USE_CRT_RAND_S || defined _GLIBCXX_USE_DEV_RANDOM
+#ifdef _GLIBCXX_HAVE_GETENTROPY
+# include <unistd.h>
+#endif
+
+#if defined _GLIBCXX_USE_CRT_RAND_S || defined _GLIBCXX_USE_DEV_RANDOM \
+  || _GLIBCXX_HAVE_GETENTROPY
 // The OS provides a source of randomness we can use.
 # pragma GCC poison _M_mt
-#elif defined USE_RDRAND || defined USE_RDSEED
+#elif defined USE_RDRAND || defined USE_RDSEED || defined USE_DARN
 // Hardware instructions might be available, but use cpuid checks at runtime.
 # pragma GCC poison _M_mt
 // If the runtime cpuid checks fail we'll use a linear congruential engine.
@@ -87,6 +93,11 @@ namespace std _GLIBCXX_VISIBILITY(default)
 {
   namespace
   {
+    [[noreturn]]
+    inline void
+    __throw_syserr([[maybe_unused]] int e, [[maybe_unused]] const char* msg)
+    { _GLIBCXX_THROW_OR_ABORT(system_error(e, std::generic_category(), msg)); }
+
 #if USE_RDRAND
     unsigned int
     __attribute__ ((target("rdrnd")))
@@ -95,7 +106,7 @@ namespace std _GLIBCXX_VISIBILITY(default)
       unsigned int retries = 100;
       unsigned int val;
 
-      while (__builtin_ia32_rdrand32_step(&val) == 0)
+      while (__builtin_ia32_rdrand32_step(&val) == 0) [[__unlikely__]]
 	if (--retries == 0)
 	  std::__throw_runtime_error(__N("random_device: rdrand failed"));
 
@@ -111,7 +122,7 @@ namespace std _GLIBCXX_VISIBILITY(default)
       unsigned int retries = 100;
       unsigned int val;
 
-      while (__builtin_ia32_rdseed_si_step(&val) == 0)
+      while (__builtin_ia32_rdseed_si_step(&val) == 0) [[__unlikely__]]
 	{
 	  if (--retries == 0)
 	    {
@@ -135,6 +146,24 @@ namespace std _GLIBCXX_VISIBILITY(default)
 #endif
 #endif
 
+#ifdef USE_DARN
+    unsigned int
+    __attribute__((target("cpu=power9")))
+    __ppc_darn(void*)
+    {
+      const uint64_t failed = -1;
+      unsigned int retries = 10;
+      uint64_t val = __builtin_darn();
+      while (val == failed) [[__unlikely__]]
+	{
+	  if (--retries == 0)
+	    std::__throw_runtime_error(__N("random_device: darn failed"));
+	  val = __builtin_darn();
+	}
+      return (uint32_t)val;
+    }
+#endif
+
 #ifdef _GLIBCXX_USE_CRT_RAND_S
     unsigned int
     __winxp_rand_s(void*)
@@ -143,6 +172,25 @@ namespace std _GLIBCXX_VISIBILITY(default)
       if (::rand_s(&val) != 0)
 	std::__throw_runtime_error(__N("random_device: rand_s failed"));
       return val;
+    }
+#endif
+
+#ifdef _GLIBCXX_HAVE_GETENTROPY
+    unsigned int
+    __libc_getentropy(void*)
+    {
+      unsigned int val;
+      if (::getentropy(&val, sizeof(val)) != 0)
+	std::__throw_runtime_error(__N("random_device: getentropy failed"));
+      return val;
+    }
+#endif
+
+#ifdef _GLIBCXX_HAVE_ARC4RANDOM
+    unsigned int
+    __libc_arc4random(void*)
+    {
+      return ::arc4random();
     }
 #endif
 
@@ -192,6 +240,71 @@ namespace std _GLIBCXX_VISIBILITY(default)
       return lcg();
     }
 #endif
+
+    enum Which : unsigned {
+      device_file = 1, prng = 2, rand_s = 4, getentropy = 8, arc4random = 16,
+      rdseed = 64, rdrand = 128, darn = 256,
+      any = 0xffff
+    };
+
+    constexpr Which
+    operator|(Which l, Which r) noexcept
+    { return Which(unsigned(l) | unsigned(r)); }
+
+    inline Which
+    which_source(random_device::result_type (*func [[maybe_unused]])(void*),
+		 void* file [[maybe_unused]])
+    {
+#ifdef _GLIBCXX_USE_CRT_RAND_S
+      if (func == &__winxp_rand_s)
+	return rand_s;
+#endif
+
+#ifdef USE_RDSEED
+#ifdef USE_RDRAND
+      if (func == &__x86_rdseed_rdrand)
+	return rdseed;
+#endif
+      if (func == &__x86_rdseed)
+	return rdseed;
+#endif
+
+#ifdef USE_RDRAND
+      if (func == &__x86_rdrand)
+	return rdrand;
+#endif
+
+#ifdef USE_DARN
+      if (func == &__ppc_darn)
+	return darn;
+#endif
+
+#ifdef _GLIBCXX_USE_DEV_RANDOM
+      if (file != nullptr)
+	return device_file;
+#endif
+
+#ifdef _GLIBCXX_HAVE_ARC4RANDOM
+      if (func == __libc_arc4random)
+	return arc4random;
+#endif
+
+#ifdef _GLIBCXX_HAVE_GETENTROPY
+      if (func == __libc_getentropy)
+	return getentropy;
+#endif
+
+#ifdef USE_LCG
+      if (func == &__lcg)
+	return prng;
+#endif
+
+#ifdef USE_MT19937
+      return prng;
+#endif
+
+      return any; // should be unreachable
+    }
   }
 
   void
@@ -209,10 +322,7 @@ namespace std _GLIBCXX_VISIBILITY(default)
 
     const char* fname [[gnu::unused]] = nullptr;
 
-    enum {
-	rand_s = 1, rdseed = 2, rdrand = 4, device_file = 8, prng = 16,
-	any = 0xffff
-    } which;
+    Which which;
 
     if (token == "default")
       {
@@ -227,10 +337,26 @@ namespace std _GLIBCXX_VISIBILITY(default)
     else if (token == "rdrand" || token == "rdrnd")
       which = rdrand;
 #endif // USE_RDRAND
+#ifdef USE_DARN
+    else if (token == "darn")
+      which = darn;
+#endif
+#if defined USE_RDRAND || defined USE_RDSEED || defined USE_DARN
+    else if (token == "hw" || token == "hardware")
+      which = rdrand | rdseed | darn;
+#endif
 #ifdef _GLIBCXX_USE_CRT_RAND_S
     else if (token == "rand_s")
       which = rand_s;
 #endif // _GLIBCXX_USE_CRT_RAND_S
+#ifdef _GLIBCXX_HAVE_GETENTROPY
+    else if (token == "getentropy")
+      which = getentropy;
+#endif // _GLIBCXX_HAVE_GETENTROPY
+#ifdef _GLIBCXX_HAVE_ARC4RANDOM
+    else if (token == "arc4random")
+      which = arc4random;
+#endif // _GLIBCXX_HAVE_ARC4RANDOM
 #ifdef _GLIBCXX_USE_DEV_RANDOM
     else if (token == "/dev/urandom" || token == "/dev/random")
       {
@@ -243,9 +369,18 @@ namespace std _GLIBCXX_VISIBILITY(default)
       which = prng;
 #endif
     else
-      std::__throw_runtime_error(
-	  __N("random_device::random_device(const std::string&):"
-	      " unsupported token"));
+      std::__throw_syserr(EINVAL, __N("random_device::random_device"
+				      "(const std::string&):"
+				      " unsupported token"));
+
+#if defined ENOSYS
+    [[maybe_unused]] const int unsupported = ENOSYS;
+#elif defined ENOTSUP
+    [[maybe_unused]] const int unsupported = ENOTSUP;
+#else
+    [[maybe_unused]] const int unsupported = 0;
+#endif
+    int err = 0;
 
 #ifdef _GLIBCXX_USE_CRT_RAND_S
     if (which & rand_s)
@@ -281,6 +416,7 @@ namespace std _GLIBCXX_VISIBILITY(default)
 	      return;
 	    }
 	}
+      err = unsupported;
     }
 #endif // USE_RDSEED
 
@@ -301,8 +437,42 @@ namespace std _GLIBCXX_VISIBILITY(default)
 	      return;
 	    }
 	}
+      err = unsupported;
     }
 #endif // USE_RDRAND
+
+#ifdef USE_DARN
+    if (which & darn)
+      {
+	if (__builtin_cpu_supports("darn"))
+	  {
+	    _M_func = &__ppc_darn;
+	    return;
+	  }
+	err = unsupported;
+      }
+#endif // USE_DARN
+
+#ifdef _GLIBCXX_HAVE_ARC4RANDOM
+    if (which & arc4random)
+      {
+	_M_func = &__libc_arc4random;
+	return;
+      }
+#endif // _GLIBCXX_HAVE_ARC4RANDOM
+
+#ifdef _GLIBCXX_HAVE_GETENTROPY
+    if (which & getentropy)
+      {
+	unsigned int i;
+	if (::getentropy(&i, sizeof(i)) == 0) // On linux the syscall can fail.
+	  {
+	    _M_func = &__libc_getentropy;
+	    return;
+	  }
+	err = unsupported;
+      }
+#endif // _GLIBCXX_HAVE_GETENTROPY
 
 #ifdef _GLIBCXX_USE_DEV_RANDOM
     if (which & device_file)
@@ -320,6 +490,7 @@ namespace std _GLIBCXX_VISIBILITY(default)
       if (_M_file)
 	return;
 #endif // USE_POSIX_FILE_IO
+      err = errno;
     }
 #endif // _GLIBCXX_USE_DEV_RANDOM
 
@@ -336,9 +507,12 @@ namespace std _GLIBCXX_VISIBILITY(default)
     }
 #endif
 
-    std::__throw_runtime_error(
-	__N("random_device::random_device(const std::string&):"
-	    " device not available"));
+    auto msg = __N("random_device::random_device(const std::string&):"
+		   " device not available");
+    if (err)
+      std::__throw_syserr(err, msg);
+    else
+      std::__throw_runtime_error(msg);
 #endif // USE_MT19937
   }
 
@@ -355,8 +529,8 @@ namespace std _GLIBCXX_VISIBILITY(default)
 	char* endptr;
 	seed = std::strtoul(nptr, &endptr, 0);
 	if (*nptr == '\0' || *endptr != '\0')
-	  std::__throw_runtime_error(__N("random_device::_M_init_pretr1"
-					 "(const std::string&)"));
+	  std::__throw_syserr(EINVAL, __N("random_device::_M_init_pretr1"
+					  "(const std::string&)"));
       }
     _M_mt.seed(seed);
 #else
@@ -395,6 +569,7 @@ namespace std _GLIBCXX_VISIBILITY(default)
       }
 #endif
 
+#ifdef _GLIBCXX_USE_DEV_RANDOM
 #ifdef USE_POSIX_FILE_IO
     ::close(_M_fd);
     _M_fd = -1;
@@ -402,6 +577,7 @@ namespace std _GLIBCXX_VISIBILITY(default)
     std::fclose(static_cast<FILE*>(_M_file));
 #endif
     _M_file = nullptr;
+#endif
   }
 
   random_device::result_type
@@ -427,7 +603,7 @@ namespace std _GLIBCXX_VISIBILITY(default)
 	    p = static_cast<char*>(p) + e;
 	  }
 	else if (e != -1 || errno != EINTR)
-	  __throw_runtime_error(__N("random_device could not be read"));
+	  __throw_syserr(errno, __N("random_device could not be read"));
       }
     while (n > 0);
 #else // USE_POSIX_FILE_IO
@@ -449,10 +625,29 @@ namespace std _GLIBCXX_VISIBILITY(default)
   double
   random_device::_M_getentropy() const noexcept
   {
+    const int max = sizeof(result_type) * __CHAR_BIT__;
+
+    switch(which_source(_M_func, _M_file))
+    {
+    case rdrand:
+    case rdseed:
+    case darn:
+      return (double) max;
+    case arc4random:
+    case getentropy:
+      return (double) max;
+    case rand_s:
+    case prng:
+      return 0.0;
+    case device_file:
+      // handled below
+      break;
+    default:
+      return 0.0;
+    }
+
 #if defined _GLIBCXX_USE_DEV_RANDOM \
     && defined _GLIBCXX_HAVE_SYS_IOCTL_H && defined RNDGETENTCNT
-    if (!_M_file)
-      return 0.0;
 
 #ifdef USE_POSIX_FILE_IO
     const int fd = _M_fd;
@@ -469,7 +664,6 @@ namespace std _GLIBCXX_VISIBILITY(default)
     if (ent < 0)
       return 0.0;
 
-    const int max = sizeof(result_type) * __CHAR_BIT__;
     if (ent > max)
       ent = max;
 
@@ -495,4 +689,3 @@ namespace std _GLIBCXX_VISIBILITY(default)
   template struct __detail::_Mod<unsigned, 2147483647UL, 16807UL, 0UL>;
 #endif
 }
-#endif // _GLIBCXX_USE_C99_STDINT_TR1

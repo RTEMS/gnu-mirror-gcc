@@ -1,8 +1,8 @@
 /* Verify the return instruction is mret.  */
 /* { dg-do compile } */
-/* { dg-options "-O" } */
+/* { dg-options "" } */
 void __attribute__ ((interrupt ("supervisor")))
 foo (void)
 {
 }
-/* { dg-final { scan-assembler "sret" } } */
+/* { dg-final { scan-assembler {\msret} } } */

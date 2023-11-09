@@ -9,24 +9,24 @@ fail_compilation/lexer1.d(34): Error: declaration expected, not `0.1L`
 fail_compilation/lexer1.d(35): Error: declaration expected, not `0.1i`
 fail_compilation/lexer1.d(36): Error: declaration expected, not `0.1fi`
 fail_compilation/lexer1.d(37): Error: declaration expected, not `0.1Li`
-fail_compilation/lexer1.d(38): Error: declaration expected, not `32U`
-fail_compilation/lexer1.d(39): Error: declaration expected, not `55295U`
-fail_compilation/lexer1.d(40): Error: declaration expected, not `65536U`
-fail_compilation/lexer1.d(41): Error: declaration expected, not `"ab\\c\"\u1234a\U00011100a"d`
+fail_compilation/lexer1.d(38): Error: declaration expected, not `' '`
+fail_compilation/lexer1.d(39): Error: declaration expected, not `'\ud7ff'`
+fail_compilation/lexer1.d(40): Error: declaration expected, not `'\U00010000'`
+fail_compilation/lexer1.d(41): Error: declaration expected, not `"ab\\c\"\u1234a\U00011100a\0ab"d`
 fail_compilation/lexer1.d(43): Error: declaration expected, not `module`
 fail_compilation/lexer1.d(45): Error: escape hex sequence has 1 hex digits instead of 2
-fail_compilation/lexer1.d(46): Error: undefined escape hex sequence \G
+fail_compilation/lexer1.d(46): Error: undefined escape hex sequence \xG
 fail_compilation/lexer1.d(47): Error: unnamed character entity &unnamedentity;
 fail_compilation/lexer1.d(48): Error: unterminated named entity &1;
 fail_compilation/lexer1.d(49): Error: unterminated named entity &*;
 fail_compilation/lexer1.d(50): Error: unterminated named entity &s1";
 fail_compilation/lexer1.d(51): Error: unterminated named entity &2;
 fail_compilation/lexer1.d(52): Error: escape octal sequence \400 is larger than \377
+fail_compilation/lexer1.d(53): Error: html entity requires 2 code units, use a string instead of a character
 ---
 */
 
 // https://dlang.dawg.eu/coverage/src/lexer.c.gcov.html
-
 x"01 02 03"w;
 0x80000001;
 0.1;
@@ -50,3 +50,4 @@ static s5 = "\&*";
 static s6 = "\&s1";
 static s7 = "\&2;";
 static s7 = "\400;";
+dchar s8 = '\&acE;';

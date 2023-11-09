@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2021 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2023 Free Software Foundation, Inc.
    Contributed by Andy Vaught
    F2003 I/O support contributed by Jerry DeLisle
 
@@ -29,7 +29,6 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 #include "io.h"
 #include "format.h"
-#include <ctype.h>
 #include <string.h>
 
 
@@ -193,7 +192,7 @@ next_char (format_data *fmt, int literal)
 	return -1;
 
       fmt->format_string_len--;
-      c = toupper (*fmt->format_string++);
+      c = safe_toupper (*fmt->format_string++);
       fmt->error_element = c;
     }
   while ((c == ' ' || c == '\t') && !literal);
@@ -270,8 +269,7 @@ free_format_data (format_data *fmt)
        fnp->format != FMT_NONE; fnp++)
     if (fnp->format == FMT_DT)
 	{
-	  if (GFC_DESCRIPTOR_DATA(fnp->u.udf.vlist))
-	    free (GFC_DESCRIPTOR_DATA(fnp->u.udf.vlist));
+	  free (GFC_DESCRIPTOR_DATA(fnp->u.udf.vlist));
 	  free (fnp->u.udf.vlist);
 	}
 
@@ -328,7 +326,7 @@ format_lex (format_data *fmt)
 
     case '+':
       c = next_char (fmt, 0);
-      if (!isdigit (c))
+      if (!safe_isdigit (c))
 	{
 	  token = FMT_UNKNOWN;
 	  break;
@@ -339,7 +337,7 @@ format_lex (format_data *fmt)
       for (;;)
 	{
 	  c = next_char (fmt, 0);
-	  if (!isdigit (c))
+	  if (!safe_isdigit (c))
 	    break;
 
 	  fmt->value = 10 * fmt->value + c - '0';
@@ -367,7 +365,7 @@ format_lex (format_data *fmt)
       for (;;)
 	{
 	  c = next_char (fmt, 0);
-	  if (!isdigit (c))
+	  if (!safe_isdigit (c))
 	    break;
 
 	  fmt->value = 10 * fmt->value + c - '0';

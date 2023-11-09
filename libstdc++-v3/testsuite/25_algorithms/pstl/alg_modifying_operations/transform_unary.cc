@@ -2,7 +2,7 @@
 // { dg-options "-ltbb" }
 // { dg-do run { target c++17 } }
 // { dg-timeout-factor 3 }
-// { dg-require-effective-target tbb-backend }
+// { dg-require-effective-target tbb_backend }
 
 //===-- transform_unary.pass.cpp ------------------------------------------===//
 //
@@ -83,7 +83,7 @@ struct test_non_const
     }
 };
 
-int32_t
+int
 main()
 {
     test<int32_t, int32_t>();

@@ -1,5 +1,5 @@
 /* Rich optional information on why an optimization wasn't possible.
-   Copyright (C) 2018-2021 Free Software Foundation, Inc.
+   Copyright (C) 2018-2023 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -62,10 +62,8 @@ opt_problem::opt_problem (const dump_location_t &loc,
   {
     dump_pretty_printer pp (&dump_context::get (), MSG_MISSED_OPTIMIZATION);
 
-    text_info text;
-    text.err_no = errno;
-    text.args_ptr = ap;
-    text.format_spec = fmt; /* No i18n is performed.  */
+    text_info text (fmt, /* No i18n is performed.  */
+		    ap, errno);
 
     /* Phases 1 and 2, using pp_format.  */
     pp_format (&pp, &text);
@@ -324,7 +322,7 @@ test_opt_result_failure_at (const line_table_case &case_)
 /* Run all of the selftests within this file.  */
 
 void
-opt_problem_cc_tests ()
+c_opt_problem_cc_tests ()
 {
   test_opt_result_success ();
   for_each_line_table_case (test_opt_result_failure_at);

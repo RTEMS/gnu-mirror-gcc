@@ -4,11 +4,10 @@
  * Translated from MinGW Windows headers
  *
  * License: $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
- * Source: $(DRUNTIMESRC src/core/sys/windows/_rpcndr.d)
+ * Source: $(DRUNTIMESRC core/sys/windows/_rpcndr.d)
  */
 module core.sys.windows.rpcndr;
 version (Windows):
-@system:
 pragma(lib, "rpcrt4");
 
 /* Translation notes:
@@ -388,7 +387,7 @@ enum PROXY_PHASE {
     PROXY_UNMARSHAL
 }
 
-alias TypeDef!(void *) RPC_SS_THREAD_HANDLE;
+alias void * RPC_SS_THREAD_HANDLE;
 
 extern (Windows) {
 alias void function (void*) NDR_RUNDOWN;

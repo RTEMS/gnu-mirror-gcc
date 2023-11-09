@@ -1,5 +1,5 @@
 /* Print RTL for GCC.
-   Copyright (C) 1987-2021 Free Software Foundation, Inc.
+   Copyright (C) 1987-2023 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -36,7 +36,7 @@ class rtx_writer
 
   void print_rtx (const_rtx in_rtx);
   void print_rtl (const_rtx rtx_first);
-  int print_rtl_single_with_indent (const_rtx x, int ind);
+  void print_rtl_single_with_indent (const_rtx x, int ind);
 
   void finish_directive ();
 
@@ -52,8 +52,8 @@ class rtx_writer
 
  private:
   FILE *m_outfile;
-  int m_sawclose;
   int m_indent;
+  bool m_sawclose;
   bool m_in_call_function_usage;
 
   /* True means use simplified format without flags, modes, etc.  */
@@ -68,8 +68,10 @@ class rtx_writer
      - insn names are prefixed with "c" (e.g. "cinsn", "cnote", etc).  */
   bool m_compact;
 
+#ifndef GENERATOR_FILE
   /* An optional instance of rtx_reuse_manager.  */
   rtx_reuse_manager *m_rtx_reuse_manager;
+#endif
 };
 
 #ifdef BUFSIZ

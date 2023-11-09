@@ -37,9 +37,11 @@ main ()
   int i;
   check_vect ();
   bar ();
+#pragma GCC novector
   for (i = 0; i < N; i++)
     if (d[i] != (i < 30 ? 5 : i * 4 + 123) || e[i] != i)
       abort ();
   return 0;
 }
 
+/* { dg-warning {unsupported simdlen 4 \(amdgcn\)} "" { target amdgcn*-*-* } 15 } */

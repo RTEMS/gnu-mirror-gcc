@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021 Free Software Foundation, Inc.
+// Copyright (C) 2019-2023 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -15,8 +15,7 @@
 // with this library; see the file COPYING3.  If not see
 // <http://www.gnu.org/licenses/>.
 
-// { dg-options "-std=gnu++2a" }
-// { dg-do compile { target c++2a } }
+// { dg-do compile { target c++20 } }
 
 #include <concepts>
 
@@ -39,9 +38,7 @@ static_assert( std::unsigned_integral<bool> );
 static_assert( std::is_signed_v<char> ? true : std::unsigned_integral<char> );
 static_assert( std::unsigned_integral<char16_t> );
 static_assert( std::unsigned_integral<char32_t> );
-#ifdef _GLIBCXX_USE_WCHAR_T
 static_assert( std::is_signed_v<wchar_t> ? true : std::unsigned_integral<wchar_t> );
-#endif
 #ifdef _GLIBCXX_USE_CHAR8_T
 static_assert( std::unsigned_integral<char8_t> );
 #endif

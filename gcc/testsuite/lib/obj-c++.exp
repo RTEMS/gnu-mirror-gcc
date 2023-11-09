@@ -1,4 +1,4 @@
-# Copyright (C) 2004-2021 Free Software Foundation, Inc.
+# Copyright (C) 2004-2023 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -276,10 +276,6 @@ proc obj-c++_init { args } {
 
     set gcc_warning_prefix "warning:"
     set gcc_error_prefix "(fatal )?error:"
-
-    if { [istarget *-*-darwin*] } {
-	lappend ALWAYS_OBJCXXFLAGS "ldflags=-multiply_defined suppress"
-    }
 
     verbose -log "ALWAYS_OBJCXXFLAGS set to $ALWAYS_OBJCXXFLAGS"
 

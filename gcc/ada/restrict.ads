@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -109,49 +109,45 @@ package Restrict is
    --  is why this restriction itself is excluded from the list).
 
    Implementation_Restriction : constant array (All_Restrictions) of Boolean :=
-     (Simple_Barriers                    => True,
-      No_Calendar                        => True,
-      No_Default_Initialization          => True,
-      No_Direct_Boolean_Operators        => True,
-      No_Dispatching_Calls               => True,
-      No_Dynamic_Accessibility_Checks    => True,
-      No_Dynamic_Attachment              => True,
-      No_Elaboration_Code                => True,
-      No_Enumeration_Maps                => True,
-      No_Entry_Calls_In_Elaboration_Code => True,
-      No_Entry_Queue                     => True,
-      No_Exception_Handlers              => True,
-      No_Exception_Propagation           => True,
-      No_Exception_Registration          => True,
-      No_Finalization                    => True,
-      No_Fixed_IO                        => True,
-      No_Implementation_Attributes       => True,
-      No_Implementation_Pragmas          => True,
-      No_Implicit_Conditionals           => True,
-      No_Implicit_Aliasing               => True,
-      No_Implicit_Dynamic_Code           => True,
-      No_Implicit_Loops                  => True,
-      No_Initialize_Scalars              => True,
-      No_Local_Protected_Objects         => True,
-      No_Long_Long_Integers              => True,
-      No_Multiple_Elaboration            => True,
-      No_Protected_Type_Allocators       => True,
-      No_Relative_Delay                  => True,
-      No_Requeue_Statements              => True,
-      No_Secondary_Stack                 => True,
-      No_Select_Statements               => True,
-      No_Standard_Storage_Pools          => True,
-      No_Stream_Optimizations            => True,
-      No_Streams                         => True,
-      No_Task_Attributes_Package         => True,
-      No_Task_Termination                => True,
-      No_Tasking                         => True,
-      No_Wide_Characters                 => True,
-      Static_Priorities                  => True,
-      Static_Storage_Size                => True,
-      Pure_Barriers                      => True,
-      SPARK_05                           => True,
-      others                             => False);
+     (No_Calendar                              => True,
+      No_Default_Initialization                => True,
+      No_Direct_Boolean_Operators              => True,
+      No_Dispatching_Calls                     => True,
+      No_Dynamic_Accessibility_Checks          => True,
+      No_Dynamic_Sized_Objects                 => True,
+      No_Elaboration_Code                      => True,
+      No_Entry_Calls_In_Elaboration_Code       => True,
+      No_Entry_Queue                           => True,
+      No_Enumeration_Maps                      => True,
+      No_Exception_Handlers                    => True,
+      No_Exception_Propagation                 => True,
+      No_Exception_Registration                => True,
+      No_Finalization                          => True,
+      No_Fixed_IO                              => True,
+      No_Implicit_Aliasing                     => True,
+      No_Implicit_Conditionals                 => True,
+      No_Implicit_Dynamic_Code                 => True,
+      No_Implicit_Loops                        => True,
+      No_Implicit_Protected_Object_Allocations => True,
+      No_Implicit_Task_Allocations             => True,
+      No_Initialize_Scalars                    => True,
+      No_Local_Tagged_Types                    => True,
+      No_Long_Long_Integers                    => True,
+      No_Multiple_Elaboration                  => True,
+      No_Secondary_Stack                       => True,
+      No_Standard_Storage_Pools                => True,
+      No_Stream_Optimizations                  => True,
+      No_Streams                               => True,
+      No_Tagged_Type_Registration              => True,
+      No_Task_At_Interrupt_Priority            => True,
+      No_Task_Attributes_Package               => True,
+      No_Tasking                               => True,
+      No_Wide_Characters                       => True,
+      Static_Dispatch_Tables                   => True,
+      Static_Priorities                        => True,
+      Static_Storage_Size                      => True,
+      SPARK_05                                 => True,
+      others                                   => False);
 
    --------------------------
    -- No_Dependences Table --
@@ -171,6 +167,9 @@ package Restrict is
    type ND_Entry is record
       Unit : Node_Id;
       --  The unit parameter from the No_Dependence pragma
+
+      System_Child : Name_Id;
+      --  The name if the unit is a child of System, or else No_Name
 
       Warn : Boolean;
       --  True if from Restriction_Warnings, False if from Restrictions
@@ -240,16 +239,6 @@ package Restrict is
    --  For abort to be allowed, either No_Abort_Statements must be False,
    --  or Max_Asynchronous_Select_Nesting must be non-zero.
 
-   procedure Check_Compiler_Unit (Feature : String; N : Node_Id);
-   --  If unit N is in a unit that has a pragma Compiler_Unit_Warning, then
-   --  a message is posted on node N noting use of the given feature is not
-   --  permitted in the compiler (bootstrap considerations).
-
-   procedure Check_Compiler_Unit (Feature : String; Loc : Source_Ptr);
-   --  If unit N is in a unit that has a pragma Compiler_Unit_Warning, then a
-   --  message is posted at location Loc noting use of the given feature is not
-   --  permitted in the compiler (bootstrap considerations).
-
    procedure Check_Restricted_Unit (U : Unit_Name_Type; N : Node_Id);
    --  Checks if loading of unit U is prohibited by the setting of some
    --  restriction (e.g. No_IO restricts the loading of unit Ada.Text_IO).
@@ -282,6 +271,13 @@ package Restrict is
    --  Called when a dependence on a unit is created (either implicitly, or by
    --  an explicit WITH clause). U is a node for the unit involved, and Err is
    --  the node to which an error will be attached if necessary.
+
+   procedure Check_Restriction_No_Dependence_On_System
+     (U   : Name_Id;
+      Err : Node_Id);
+   --  Likewise, but for the child units of System referenced by their name
+
+   --  WARNING: There is a matching C declaration of this subprogram in fe.h
 
    procedure Check_Restriction_No_Specification_Of_Aspect (N : Node_Id);
    --  N is the node id for an N_Aspect_Specification, an N_Pragma, or an
@@ -401,6 +397,8 @@ package Restrict is
    function No_Exception_Propagation_Active return Boolean;
    --  Test to see if current restrictions settings specify that no
    --  exception propagation is activated.
+
+   --  WARNING: There is a matching C declaration of this subprogram in fe.h
 
    function Process_Restriction_Synonyms (N : Node_Id) return Name_Id;
    --  Id is a node whose Chars field contains the name of a restriction.
@@ -602,6 +600,20 @@ package Restrict is
    procedure Add_To_Config_Boolean_Restrictions (R : Restriction_Id);
    --  Add specified restriction to stored configuration boolean restrictions.
    --  This is used for handling the special case of No_Elaboration_Code.
+
+   package Local_Restrictions is
+      --  In the body of package Restrict, we want to call a subprogram
+      --  declared in package Local_Restrict. Doing this in the obvious
+      --  way introduces problems (by pulling the bulk of semantics into
+      --  the closure of package Restrict). So we declare an access-to-subp
+      --  object here and call through it later if it happens to be non-null;
+      --  it is initialized in the body of package Local_Restrict.
+
+      type Local_Restriction_Checking_Proc_Ref is access
+        procedure (R : All_Restrictions; N : Node_Id);
+
+      Local_Restriction_Checking_Hook : Local_Restriction_Checking_Proc_Ref;
+   end Local_Restrictions;
 
 private
    type Save_Cunit_Boolean_Restrictions is

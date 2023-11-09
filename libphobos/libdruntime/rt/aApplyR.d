@@ -1,34 +1,40 @@
 /**
- * This code handles decoding UTF strings for foreach_reverse loops.  There are
- * 6 combinations of conversions between char, wchar, and dchar, and 2 of each
- * of those.
+ * This code handles decoding UTF strings for `foreach_reverse` loops.
  *
  * Copyright: Copyright Digital Mars 2004 - 2010.
- * License:   $(WEB www.boost.org/LICENSE_1_0.txt, Boost License 1.0).
+ * License:   $(HTTP www.boost.org/LICENSE_1_0.txt, Boost License 1.0).
  * Authors:   Walter Bright, Sean Kelly
- */
-
-/*          Copyright Digital Mars 2004 - 2010.
- * Distributed under the Boost Software License, Version 1.0.
- *    (See accompanying file LICENSE or copy at
- *          http://www.boost.org/LICENSE_1_0.txt)
+ * Source: $(DRUNTIMESRC rt/_aApplyR.d)
  */
 module rt.aApplyR;
 
-/* This code handles decoding UTF strings for foreach_reverse loops.
- * There are 6 combinations of conversions between char, wchar,
- * and dchar, and 2 of each of those.
- */
-
-private import rt.util.utf;
+import core.internal.utf;
 
 /**********************************************/
 /* 1 argument versions */
 
-// dg is D, but _aApplyRcd() is C
-extern (D) alias int delegate(void *) dg_t;
+// Note: dg is extern(D), but _aApplyRcd() is extern(C)
 
-extern (C) int _aApplyRcd1(in char[] aa, dg_t dg)
+/**
+Delegate type corresponding to transformed loop body
+
+The parameter is a pointer to the current `char`, `wchar` or `dchar`
+
+Returns: non-zero when a `break` statement is hit
+*/
+extern (D) alias dg_t = int delegate(void* c);
+
+/**
+Same as `_aApplyXXX` functions, but for `foreach_reverse`
+
+Params:
+    aa = input string
+    dg = foreach body transformed into a delegate, similar to `opApply`
+
+Returns:
+    non-zero when the loop was exited through a `break`
+*/
+extern (C) int _aApplyRcd1(scope const(char)[] aa, dg_t dg)
 {   int result;
 
     debug(apply) printf("_aApplyRcd1(), len = %d\n", aa.length);
@@ -100,9 +106,8 @@ unittest
     assert(i == 4);
 }
 
-/*****************************/
-
-extern (C) int _aApplyRwd1(in wchar[] aa, dg_t dg)
+/// ditto
+extern (C) int _aApplyRwd1(scope const(wchar)[] aa, dg_t dg)
 {   int result;
 
     debug(apply) printf("_aApplyRwd1(), len = %d\n", aa.length);
@@ -164,9 +169,8 @@ unittest
     assert(i == 4);
 }
 
-/*****************************/
-
-extern (C) int _aApplyRcw1(in char[] aa, dg_t dg)
+/// ditto
+extern (C) int _aApplyRcw1(scope const(char)[] aa, dg_t dg)
 {   int result;
 
     debug(apply) printf("_aApplyRcw1(), len = %d\n", aa.length);
@@ -251,9 +255,8 @@ unittest
     assert(i == 5);
 }
 
-/*****************************/
-
-extern (C) int _aApplyRwc1(in wchar[] aa, dg_t dg)
+/// ditto
+extern (C) int _aApplyRwc1(scope const(wchar)[] aa, dg_t dg)
 {   int result;
 
     debug(apply) printf("_aApplyRwc1(), len = %d\n", aa.length);
@@ -336,9 +339,8 @@ unittest
     assert(i == 9);
 }
 
-/*****************************/
-
-extern (C) int _aApplyRdc1(in dchar[] aa, dg_t dg)
+/// ditto
+extern (C) int _aApplyRdc1(scope const(dchar)[] aa, dg_t dg)
 {   int result;
 
     debug(apply) printf("_aApplyRdc1(), len = %d\n", aa.length);
@@ -415,9 +417,8 @@ unittest
     assert(i == 9);
 }
 
-/*****************************/
-
-extern (C) int _aApplyRdw1(in dchar[] aa, dg_t dg)
+/// ditto
+extern (C) int _aApplyRdw1(scope const(dchar)[] aa, dg_t dg)
 {   int result;
 
     debug(apply) printf("_aApplyRdw1(), len = %d\n", aa.length);
@@ -487,10 +488,21 @@ unittest
 /****************************************************************************/
 /* 2 argument versions */
 
-// dg is D, but _aApplyRcd2() is C
-extern (D) alias int delegate(void *, void *) dg2_t;
+/**
+Delegate type corresponding to transformed loop body
 
-extern (C) int _aApplyRcd2(in char[] aa, dg2_t dg)
+Parameters are pointers to a `size_t` loop index, and the current `char`, `wchar` or `dchar`.
+
+Returns: non-zero when a `break` statement is hit
+*/
+extern (D) alias dg2_t = int delegate(void* i, void* c);
+
+// Note: dg is extern(D), but _aApplyRcd2() is extern(C)
+
+/**
+Variants of _aApplyRXXX that include a loop index.
+*/
+extern (C) int _aApplyRcd2(scope const(char)[] aa, dg2_t dg)
 {   int result;
     size_t i;
     size_t len = aa.length;
@@ -565,9 +577,8 @@ unittest
     assert(i == 4);
 }
 
-/*****************************/
-
-extern (C) int _aApplyRwd2(in wchar[] aa, dg2_t dg)
+/// ditto
+extern (C) int _aApplyRwd2(scope const(wchar)[] aa, dg2_t dg)
 {   int result;
 
     debug(apply) printf("_aApplyRwd2(), len = %d\n", aa.length);
@@ -631,9 +642,8 @@ unittest
     assert(i == 4);
 }
 
-/*****************************/
-
-extern (C) int _aApplyRcw2(in char[] aa, dg2_t dg)
+/// ditto
+extern (C) int _aApplyRcw2(scope const(char)[] aa, dg2_t dg)
 {   int result;
 
     debug(apply) printf("_aApplyRcw2(), len = %d\n", aa.length);
@@ -720,9 +730,8 @@ unittest
     assert(i == 5);
 }
 
-/*****************************/
-
-extern (C) int _aApplyRwc2(in wchar[] aa, dg2_t dg)
+/// ditto
+extern (C) int _aApplyRwc2(scope const(wchar)[] aa, dg2_t dg)
 {   int result;
 
     debug(apply) printf("_aApplyRwc2(), len = %d\n", aa.length);
@@ -807,9 +816,8 @@ unittest
     assert(i == 9);
 }
 
-/*****************************/
-
-extern (C) int _aApplyRdc2(in dchar[] aa, dg2_t dg)
+/// ditto
+extern (C) int _aApplyRdc2(scope const(dchar)[] aa, dg2_t dg)
 {   int result;
 
     debug(apply) printf("_aApplyRdc2(), len = %d\n", aa.length);
@@ -887,9 +895,8 @@ unittest
     assert(i == 9);
 }
 
-/*****************************/
-
-extern (C) int _aApplyRdw2(in dchar[] aa, dg2_t dg)
+/// ditto
+extern (C) int _aApplyRdw2(scope const(dchar)[] aa, dg2_t dg)
 {   int result;
 
     debug(apply) printf("_aApplyRdw2(), len = %d\n", aa.length);

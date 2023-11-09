@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2001-2021, AdaCore                     --
+--                     Copyright (C) 2001-2023, AdaCore                     --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -71,31 +71,31 @@ package body GNAT.Sockets is
    --  Correspondence tables
 
    Levels : constant array (Level_Type) of C.int :=
-              (Socket_Level               => SOSC.SOL_SOCKET,
+              [Socket_Level               => SOSC.SOL_SOCKET,
                IP_Protocol_For_IP_Level   => SOSC.IPPROTO_IP,
                IP_Protocol_For_IPv6_Level => SOSC.IPPROTO_IPV6,
                IP_Protocol_For_UDP_Level  => SOSC.IPPROTO_UDP,
                IP_Protocol_For_TCP_Level  => SOSC.IPPROTO_TCP,
                IP_Protocol_For_ICMP_Level => SOSC.IPPROTO_ICMP,
                IP_Protocol_For_IGMP_Level => SOSC.IPPROTO_IGMP,
-               IP_Protocol_For_RAW_Level  => SOSC.IPPROTO_RAW);
+               IP_Protocol_For_RAW_Level  => SOSC.IPPROTO_RAW];
 
    Modes : constant array (Mode_Type) of C.int :=
-             (Socket_Stream   => SOSC.SOCK_STREAM,
+             [Socket_Stream   => SOSC.SOCK_STREAM,
               Socket_Datagram => SOSC.SOCK_DGRAM,
-              Socket_Raw      => SOSC.SOCK_RAW);
+              Socket_Raw      => SOSC.SOCK_RAW];
 
    Shutmodes : constant array (Shutmode_Type) of C.int :=
-                 (Shut_Read       => SOSC.SHUT_RD,
+                 [Shut_Read       => SOSC.SHUT_RD,
                   Shut_Write      => SOSC.SHUT_WR,
-                  Shut_Read_Write => SOSC.SHUT_RDWR);
+                  Shut_Read_Write => SOSC.SHUT_RDWR];
 
    Requests : constant array (Request_Name) of SOSC.IOCTL_Req_T :=
-                (Non_Blocking_IO => SOSC.FIONBIO,
-                 N_Bytes_To_Read => SOSC.FIONREAD);
+                [Non_Blocking_IO => SOSC.FIONBIO,
+                 N_Bytes_To_Read => SOSC.FIONREAD];
 
    Options : constant array (Specific_Option_Name) of C.int :=
-               (Keep_Alive          => SOSC.SO_KEEPALIVE,
+               [Keep_Alive          => SOSC.SO_KEEPALIVE,
                 Keep_Alive_Count    => SOSC.TCP_KEEPCNT,
                 Keep_Alive_Idle     => SOSC.TCP_KEEPIDLE,
                 Keep_Alive_Interval => SOSC.TCP_KEEPINTVL,
@@ -120,15 +120,16 @@ package body GNAT.Sockets is
                 IPv6_Only           => SOSC.IPV6_V6ONLY,
                 Send_Timeout        => SOSC.SO_SNDTIMEO,
                 Receive_Timeout     => SOSC.SO_RCVTIMEO,
-                Busy_Polling        => SOSC.SO_BUSY_POLL);
+                Busy_Polling        => SOSC.SO_BUSY_POLL,
+                Bind_To_Device      => SOSC.SO_BINDTODEVICE];
    --  ??? Note: for OpenSolaris, Receive_Packet_Info should be IP_RECVPKTINFO,
    --  but for Linux compatibility this constant is the same as IP_PKTINFO.
 
    Flags : constant array (0 .. 3) of C.int :=
-             (0 => SOSC.MSG_OOB,     --  Process_Out_Of_Band_Data
+             [0 => SOSC.MSG_OOB,     --  Process_Out_Of_Band_Data
               1 => SOSC.MSG_PEEK,    --  Peek_At_Incoming_Data
               2 => SOSC.MSG_WAITALL, --  Wait_For_A_Full_Reception
-              3 => SOSC.MSG_EOR);    --  Send_End_Of_Record
+              3 => SOSC.MSG_EOR];    --  Send_End_Of_Record
 
    Socket_Error_Id : constant Exception_Id := Socket_Error'Identity;
    Host_Error_Id   : constant Exception_Id := Host_Error'Identity;
@@ -191,12 +192,14 @@ package body GNAT.Sockets is
        else Value);
    --  Removes dot at the end of error message
 
-   procedure Raise_Host_Error (H_Error : Integer; Name : String);
+   procedure Raise_Host_Error (H_Error : Integer; Name : String)
+   with No_Return;
    --  Raise Host_Error exception with message describing error code (note
    --  hstrerror seems to be obsolete) from h_errno. Name is the name
    --  or address that was being looked up.
 
-   procedure Raise_GAI_Error (RC : C.int; Name : String);
+   procedure Raise_GAI_Error (RC : C.int; Name : String)
+   with No_Return;
    --  Raise Host_Error with exception message in case of errors in
    --  getaddrinfo and getnameinfo.
 
@@ -1034,7 +1037,6 @@ package body GNAT.Sockets is
 
       R     : C.int;
       Iter  : Addrinfo_Access;
-      Found : Boolean;
 
       function To_Array return Address_Info_Array;
       --  Convert taken from OS addrinfo list A into Address_Info_Array
@@ -1044,8 +1046,6 @@ package body GNAT.Sockets is
       --------------
 
       function To_Array return Address_Info_Array is
-         Result : Address_Info_Array (1 .. 8);
-
          procedure Unsupported;
          --  Calls Unknown callback if defiend
 
@@ -1063,6 +1063,9 @@ package body GNAT.Sockets is
                   Integer (Iter.ai_addrlen));
             end if;
          end Unsupported;
+
+         Found  : Boolean;
+         Result : Address_Info_Array (1 .. 8);
 
       --  Start of processing for To_Array
 
@@ -1085,8 +1088,8 @@ package body GNAT.Sockets is
                if Result (J).Addr.Family = Family_Unspec then
                   Unsupported;
                else
+                  Found := False;
                   for M in Modes'Range loop
-                     Found := False;
                      if Modes (M) = Iter.ai_socktype then
                         Result (J).Mode := M;
                         Found := True;
@@ -1184,8 +1187,8 @@ package body GNAT.Sockets is
       Numeric_Serv : Boolean := False) return Host_Service
    is
       SA  : aliased Sockaddr;
-      H   : aliased C.char_array := (1 .. SOSC.NI_MAXHOST => C.nul);
-      S   : aliased C.char_array := (1 .. SOSC.NI_MAXSERV => C.nul);
+      H   : aliased C.char_array := [1 .. SOSC.NI_MAXHOST => C.nul];
+      S   : aliased C.char_array := [1 .. SOSC.NI_MAXSERV => C.nul];
       RC  : C.int;
       Len : C.int;
    begin
@@ -1411,17 +1414,21 @@ package body GNAT.Sockets is
       use type C.unsigned;
       use type C.unsigned_char;
 
+      --  SOSC.IF_NAMESIZE may be not defined, ensure that we have at least
+      --  a valid range for VS declared below.
+      NS  : constant Interfaces.C.size_t :=
+              (if SOSC.IF_NAMESIZE = -1 then 256 else SOSC.IF_NAMESIZE);
       V8  : aliased Two_Ints;
       V4  : aliased C.int;
       U4  : aliased C.unsigned;
       V1  : aliased C.unsigned_char;
+      VS  : aliased C.char_array (1 .. NS); -- for devices name
       VT  : aliased Timeval;
       Len : aliased C.int;
       Add : System.Address;
       Res : C.int;
       Opt : Option_Type (Name);
       Onm : Interfaces.C.int;
-
    begin
       if Name in Specific_Option_Name then
          Onm := Options (Name);
@@ -1489,6 +1496,11 @@ package body GNAT.Sockets is
          =>
             Len := V8'Size / 8;
             Add := V8'Address;
+
+         when Bind_To_Device
+         =>
+            Len := VS'Length;
+            Add := VS'Address;
       end case;
 
       Res :=
@@ -1587,6 +1599,9 @@ package body GNAT.Sockets is
             else
                Opt.Timeout := To_Duration (VT);
             end if;
+
+         when Bind_To_Device =>
+            Opt.Device := ASU.To_Unbounded_String (C.To_Ada (VS));
       end case;
 
       return Opt;
@@ -1621,7 +1636,7 @@ package body GNAT.Sockets is
             when Family_Inet   => 4 * Value.Sin_V4'Length,
             when Family_Inet6  => 6 * 5 + 4 * 4);
             --  1234:1234:1234:1234:1234:1234:123.123.123.123
-      Dst : aliased C.char_array := (1 .. C.size_t (Size) => C.nul);
+      Dst : aliased C.char_array := [1 .. C.size_t (Size) => C.nul];
       Ia  : aliased In_Addr_Union (Value.Family);
    begin
       case Value.Family is
@@ -2614,6 +2629,10 @@ package body GNAT.Sockets is
       V4  : aliased C.int;
       U4  : aliased C.unsigned;
       V1  : aliased C.unsigned_char;
+      VS  : aliased C.char_array
+              (1 .. (if Option.Name = Bind_To_Device
+                     then C.size_t (ASU.Length (Option.Device) + 1)
+                     else 0));
       VT  : aliased Timeval;
       Len : C.int;
       Add : System.Address := Null_Address;
@@ -2752,6 +2771,11 @@ package body GNAT.Sockets is
                Len := VT'Size / 8;
                Add := VT'Address;
             end if;
+
+         when Bind_To_Device =>
+            VS := C.To_C (ASU.To_String (Option.Device));
+            Len := C.int (VS'Length);
+            Add := VS'Address;
       end case;
 
       if Option.Name in Specific_Option_Name then

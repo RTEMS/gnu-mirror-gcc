@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2021 Free Software Foundation, Inc.
+// Copyright (C) 2020-2023 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -15,11 +15,11 @@
 // with this library; see the file COPYING3.  If not see
 // <http://www.gnu.org/licenses/>.
 
-// { dg-options "-std=gnu++2a" }
-// { dg-do run { target c++2a } }
+// { dg-do run { target c++20 } }
 
 #include <algorithm>
 #include <string>
+#include <utility>
 #include <vector>
 #include <testsuite_hooks.h>
 #include <testsuite_iterators.h>
@@ -129,6 +129,34 @@ test05()
   VERIFY( result.min == "a"s && result.max == "c"s );
 }
 
+struct A {
+  A() = delete;
+  A(int i) : i(i) { }
+  A(const A&) = default;
+  A(A&& other) : A(std::as_const(other)) { ++move_count; }
+  A& operator=(const A&) = default;
+  A& operator=(A&& other) {
+    ++move_count;
+    return *this = std::as_const(other);
+  };
+  friend auto operator<=>(const A&, const A&) = default;
+  static inline int move_count = 0;
+  int i;
+};
+
+void
+test06()
+{
+  // PR libstdc++/104858
+  // Verify ranges::minmax doesn't dereference the iterator for the first
+  // element in the range twice.
+  A a(42);
+  ranges::subrange r = {std::move_iterator(&a), std::move_sentinel(&a + 1)};
+  auto result = ranges::minmax(r);
+  VERIFY( A::move_count == 1 );
+  VERIFY( result.min.i == 42 && result.max.i == 42 );
+}
+
 int
 main()
 {
@@ -137,4 +165,5 @@ main()
   test03();
   test04();
   test05();
+  test06();
 }

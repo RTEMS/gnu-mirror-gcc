@@ -2,7 +2,7 @@
 // { dg-options "-ltbb" }
 // { dg-do run { target c++17 } }
 // { dg-timeout-factor 3 }
-// { dg-require-effective-target tbb-backend }
+// { dg-require-effective-target tbb_backend }
 
 //===-- uninitialized_fill_destroy.pass.cpp -------------------------------===//
 //
@@ -87,7 +87,7 @@ test_uninitialized_fill_destroy_by_type()
     }
 }
 
-int32_t
+int
 main()
 {
     // for trivial types

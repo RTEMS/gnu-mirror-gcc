@@ -2,7 +2,7 @@
 // { dg-options "-ltbb" }
 // { dg-do run { target c++17 } }
 // { dg-timeout-factor 3 }
-// { dg-require-effective-target tbb-backend }
+// { dg-require-effective-target tbb_backend }
 
 //===-- uninitialized_construct.pass.cpp ----------------------------------===//
 //
@@ -112,12 +112,12 @@ test_uninit_construct_by_type()
     }
 }
 
-int32_t
+int
 main()
 {
 
     // for user-defined types
-#if !_PSTL_ICC_16_VC14_TEST_PAR_TBB_RT_RELEASE_64_BROKEN
+#if !defined(_PSTL_ICC_16_VC14_TEST_PAR_TBB_RT_RELEASE_64_BROKEN)
     test_uninit_construct_by_type<Wrapper<int32_t>>();
     test_uninit_construct_by_type<Wrapper<std::vector<std::string>>>();
 #endif

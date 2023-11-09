@@ -1,6 +1,6 @@
 // Concepts and traits for use with iterators -*- C++ -*-
 
-// Copyright (C) 2019-2021 Free Software Foundation, Inc.
+// Copyright (C) 2019-2023 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -32,15 +32,35 @@
 
 #pragma GCC system_header
 
+#if __cplusplus >= 202002L
 #include <concepts>
 #include <bits/ptr_traits.h>	// to_address
 #include <bits/ranges_cmp.h>	// identity, ranges::less
 
-#if __cpp_lib_concepts
 namespace std _GLIBCXX_VISIBILITY(default)
 {
 _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
+  /** A sentinel type that can be used to check for the end of a range.
+   *
+   * For some iterator types the past-the-end sentinel value is independent
+   * of the underlying sequence, and a default sentinel can be used with them.
+   * For example, a `std::counted_iterator` keeps a count of how many elements
+   * remain, and so checking for the past-the-end value only requires checking
+   * if that count has reached zero. A past-the-end `std::istream_iterator` is
+   * equal to the default-constructed value, which can be easily checked.
+   *
+   * Comparing iterators of these types to `std::default_sentinel` is a
+   * convenient way to check if the end has been reached.
+   *
+   * @since C++20
+   */
+  struct default_sentinel_t { };
+
+  /// A default sentinel value.
+  inline constexpr default_sentinel_t default_sentinel{};
+
+#if __cpp_lib_concepts
   struct input_iterator_tag;
   struct output_iterator_tag;
   struct forward_iterator_tag;
@@ -77,16 +97,17 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   namespace ranges
   {
-    namespace __cust_imove
+    /// @cond undocumented
+    namespace __imove
     {
-      void iter_move();
+      void iter_move() = delete;
 
       template<typename _Tp>
 	concept __adl_imove
 	  = (std::__detail::__class_or_enum<remove_reference_t<_Tp>>)
 	  && requires(_Tp&& __t) { iter_move(static_cast<_Tp&&>(__t)); };
 
-      struct _IMove
+      struct _IterMove
       {
       private:
 	template<typename _Tp>
@@ -133,19 +154,17 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	      return *__e;
 	  }
       };
-    } // namespace __cust_imove
+    } // namespace __imove
+    /// @endcond
 
-    inline namespace __cust
-    {
-      inline constexpr __cust_imove::_IMove iter_move{};
-    } // inline namespace __cust
+    inline namespace _Cpo {
+      inline constexpr __imove::_IterMove iter_move{};
+    }
   } // namespace ranges
 
   template<__detail::__dereferenceable _Tp>
-    requires __detail::
-      __can_reference<ranges::__cust_imove::_IMove::__type<_Tp&>>
-    using iter_rvalue_reference_t
-      = ranges::__cust_imove::_IMove::__type<_Tp&>;
+    requires __detail::__can_reference<ranges::__imove::_IterMove::__type<_Tp&>>
+    using iter_rvalue_reference_t = ranges::__imove::_IterMove::__type<_Tp&>;
 
   template<typename> struct incrementable_traits { };
 
@@ -751,19 +770,34 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       && invocable<_Fn, iter_reference_t<_Is>...>
     using indirect_result_t = invoke_result_t<_Fn, iter_reference_t<_Is>...>;
 
+  namespace __detail
+  {
+    template<typename _Iter, typename _Proj>
+      struct __projected
+      {
+	struct __type
+	{
+	  using value_type = remove_cvref_t<indirect_result_t<_Proj&, _Iter>>;
+	  indirect_result_t<_Proj&, _Iter> operator*() const; // not defined
+	};
+      };
+
+    template<weakly_incrementable _Iter, typename _Proj>
+      struct __projected<_Iter, _Proj>
+      {
+	struct __type
+	{
+	  using value_type = remove_cvref_t<indirect_result_t<_Proj&, _Iter>>;
+	  using difference_type = iter_difference_t<_Iter>;
+	  indirect_result_t<_Proj&, _Iter> operator*() const; // not defined
+	};
+      };
+  } // namespace __detail
+
   /// [projected], projected
   template<indirectly_readable _Iter,
 	   indirectly_regular_unary_invocable<_Iter> _Proj>
-    struct projected
-    {
-      using value_type = remove_cvref_t<indirect_result_t<_Proj&, _Iter>>;
-
-      indirect_result_t<_Proj&, _Iter> operator*() const; // not defined
-    };
-
-  template<weakly_incrementable _Iter, typename _Proj>
-    struct incrementable_traits<projected<_Iter, _Proj>>
-    { using difference_type = iter_difference_t<_Iter>; };
+    using projected = typename __detail::__projected<_Iter, _Proj>::__type;
 
   // [alg.req], common algorithm requirements
 
@@ -797,7 +831,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
 namespace ranges
 {
-  namespace __cust_iswap
+  /// @cond undocumented
+  namespace __iswap
   {
     template<typename _It1, typename _It2>
       void iter_swap(_It1, _It2) = delete;
@@ -838,8 +873,8 @@ namespace ranges
 					 *std::declval<_Up>()));
 	  else
 	    return noexcept(*std::declval<_Tp>()
-		= __iter_exchange_move(std::declval<_Up>(),
-				       std::declval<_Tp>()));
+		= __iswap::__iter_exchange_move(std::declval<_Up>(),
+						    std::declval<_Tp>()));
 	}
 
     public:
@@ -861,15 +896,15 @@ namespace ranges
 	      && swappable_with<iter_reference_t<_Tp>, iter_reference_t<_Up>>)
 	    ranges::swap(*__e1, *__e2);
 	  else
-	    *__e1 = __iter_exchange_move(__e2, __e1);
+	    *__e1 = __iswap::__iter_exchange_move(__e2, __e1);
 	}
     };
-  } // namespace __cust_iswap
+  } // namespace __iswap
+  /// @endcond
 
-  inline namespace __cust
-  {
-    inline constexpr __cust_iswap::_IterSwap iter_swap{};
-  } // inline namespace __cust
+  inline namespace _Cpo {
+    inline constexpr __iswap::_IterSwap iter_swap{};
+  }
 
 } // namespace ranges
 
@@ -924,11 +959,8 @@ namespace ranges
 
   inline constexpr unreachable_sentinel_t unreachable_sentinel{};
 
-  struct default_sentinel_t { };
-  inline constexpr default_sentinel_t default_sentinel{};
-
   // This is the namespace for [range.access] CPOs.
-  namespace ranges::__cust_access
+  namespace ranges::__access
   {
     using std::__detail::__class_or_enum;
 
@@ -947,9 +979,8 @@ namespace ranges
 	  { __decay_copy(__t.begin()) } -> input_or_output_iterator;
 	};
 
-    // Poison pills so that unqualified lookup doesn't find std::begin.
-    void begin(auto&) = delete;
-    void begin(const auto&) = delete;
+    // Poison pill so that unqualified lookup doesn't find std::begin.
+    void begin() = delete;
 
     template<typename _Tp>
       concept __adl_begin = __class_or_enum<remove_reference_t<_Tp>>
@@ -972,18 +1003,19 @@ namespace ranges
 	else
 	  return begin(__t);
       }
-  } // namespace ranges::__cust_access
+  } // namespace ranges::__access
 
   namespace __detail
   {
     // Implementation of std::ranges::iterator_t, without using ranges::begin.
     template<typename _Tp>
       using __range_iter_t
-	= decltype(ranges::__cust_access::__begin(std::declval<_Tp&>()));
+	= decltype(ranges::__access::__begin(std::declval<_Tp&>()));
 
   } // namespace __detail
 
+#endif // C++20 library concepts
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
-#endif // C++20 library concepts
+#endif // C++20
 #endif // _ITERATOR_CONCEPTS_H

@@ -1,4 +1,4 @@
-@c Copyright (C) 2000-2021 Free Software Foundation, Inc.
+@c Copyright (C) 2000-2023 Free Software Foundation, Inc.
 @c This is part of the GCC manual.
 @c For copying conditions, see the file gcc.texi.
 
@@ -38,6 +38,8 @@ with some exceptions, and possibly with some extensions.
 @cindex C1X
 @cindex ISO C17
 @cindex C17
+@cindex ISO C23
+@cindex C23
 @cindex ISO C2X
 @cindex C2X
 @cindex Technical Corrigenda
@@ -92,7 +94,7 @@ A new edition of the ISO C standard was published in 1999 as ISO/IEC
 development, drafts of this standard version were referred to as
 @dfn{C9X}.)  GCC has substantially
 complete support for this standard version; see
-@uref{http://gcc.gnu.org/c99status.html} for details.  To select this
+@uref{https://gcc.gnu.org/c99status.html} for details.  To select this
 standard, use @option{-std=c99} or @option{-std=iso9899:1999}.  
 
 Errors in the 1999 ISO C standard were corrected in three Technical
@@ -111,9 +113,11 @@ known as @dfn{C17} and is supported with @option{-std=c17} or
 @option{-std=c11}, and the only difference between the options is the
 value of @code{__STDC_VERSION__}.
 
-A further version of the C standard, known as @dfn{C2X}, is under
-development; experimental and incomplete support for this is enabled
-with @option{-std=c2x}.
+A further version of the C standard, known as @dfn{C23}, is under
+development and expected to be published in 2024 as ISO/IEC 9899:2024.
+(While in development, drafts of this standard version were referred
+to as @dfn{C2X}.)  Experimental and incomplete support for this is
+enabled with @option{-std=c23} or @option{-std=iso9899:2024}.
 
 By default, GCC provides some extensions to the C language that, on
 rare occasions conflict with the C standard.  @xref{C
@@ -187,7 +191,7 @@ to @code{abort}.
 
 For references to Technical Corrigenda, Rationale documents and
 information concerning the history of C that is available online, see
-@uref{http://gcc.gnu.org/readings.html}
+@uref{https://gcc.gnu.org/readings.html}
 
 @section C++ Language
 
@@ -280,7 +284,7 @@ works with the Apple/NeXT Objective-C runtime library.
 There is no formal written standard for Objective-C or Objective-C++@.
 The authoritative manual on traditional Objective-C (1.0) is
 ``Object-Oriented Programming and the Objective-C Language'':
-@uref{http://www.gnustep.org/@/resources/@/documentation/@/ObjectivCBook.pdf}
+@uref{https://gnustep.github.io/@/resources/@/documentation/@/ObjectivCBook.pdf}
 is the original NeXTstep document.
 
 The Objective-C exception and synchronization syntax (that is, the
@@ -313,12 +317,12 @@ The authoritative manual on Objective-C 2.0 is available from Apple:
 @end itemize
 
 For more information concerning the history of Objective-C that is
-available online, see @uref{http://gcc.gnu.org/readings.html}
+available online, see @uref{https://gcc.gnu.org/readings.html}
 
 @section Go Language
 
 As of the GCC 4.7.1 release, GCC supports the Go 1 language standard,
-described at @uref{https://golang.org/doc/go1}.
+described at @uref{https://go.dev/doc/go1}.
 
 @section D language
 

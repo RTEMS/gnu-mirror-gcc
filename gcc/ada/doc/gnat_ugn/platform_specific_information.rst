@@ -13,8 +13,8 @@ Platform-Specific Information
 *****************************
 
 This appendix contains information relating to the implementation
-of run-time libraries on various platforms and also covers
-topics related to the GNAT implementation on Windows and Mac OS.
+of run-time libraries on various platforms and also covers topics
+related to the GNAT implementation on specific Operating Systems.
 
 .. _`Run_Time_Libraries`:
 
@@ -247,10 +247,72 @@ If using the 32-bit version of GNAT on a 64-bit version of GNU/Linux,
 you'll need the 32-bit version of the following packages:
 
 * RedHat, SUSE: ``glibc.i686``, ``glibc-devel.i686``, ``ncurses-libs.i686``
+* SUSE: ``glibc-locale-base-32bit``
 * Debian, Ubuntu: ``libc6:i386``, ``libc6-dev:i386``, ``lib32ncursesw5``
 
 Other GNU/Linux distributions might be choosing a different name
 for those packages.
+
+
+.. _PIE_Enabled_By_Default_On_Linux:
+
+Position Independent Executable (PIE) Enabled by Default on Linux
+-----------------------------------------------------------------
+
+GNAT generates Position Independent Executable (PIE) code by default.
+PIE binaries are loaded into random memory locations, introducing
+an additional layer of protection against attacks.
+
+Building PIE binaries requires that all of their dependencies also be
+built as Position Independent. If the link of your project fails with
+an error like::
+
+      /[...]/ld: /path/to/object/file: relocation R_X86_64_32S against symbol
+      `symbol name' can not be used when making a PIE object;
+      recompile with -fPIE
+
+it means the identified object file has not been built as Position
+Independent.
+
+If you are not interested in building PIE binaries, you can simply
+turn this feature off by first compiling your code with :samp:`-fno-pie`
+and then by linking with :samp:`-no-pie` (note the subtle but important
+difference in the names of the options -- the linker option does **not**
+have an `f` after the dash!). When using gprbuild, this is
+achieved by updating the *Required_Switches* attribute in package `Compiler`
+and, depending on your type of project, either attribute *Switches*
+or attribute *Library_Options* in package `Linker`.
+
+On the other hand, if you would like to build PIE binaries and you are
+getting the error above, a quick and easy workaround to allow linking
+to succeed again is to disable PIE during the link, thus temporarily
+lifting the requirement that all dependencies also be Position
+Independent code. To do so, you simply need to add :samp:`-no-pie` to
+the list of switches passed to the linker. As part of this workaround,
+there is no need to adjust the compiler switches.
+
+From there, to be able to link your binaries with PIE and therefore
+drop the :samp:`-no-pie` workaround, you'll need to get the identified
+dependencies rebuilt with PIE enabled (compiled with :samp:`-fPIE`
+and linked with :samp:`-pie`).
+
+.. _A_GNU_Linux_debug_quirk:
+
+A GNU/Linux Debug Quirk
+-----------------------
+
+On SuSE 15, some kernels have a defect causing issues when debugging
+programs using threads or Ada tasks. Due to the lack of documentation
+found regarding this kernel issue, we can only provide limited
+information about which kernels are impacted: kernel version 5.3.18 is
+known to be impacted, and kernels in the 5.14 range or newer are
+believed to fix this problem.
+
+The bug affects the debugging of 32-bit processes on a 64-bit system.
+Symptoms can vary: Unexpected ``SIGABRT`` signals being received by
+the program, "The futex facility returned an unexpected error code"
+error message, and inferior programs hanging indefinitely range among
+the symptoms most commonly observed.
 
 .. index:: Windows
 
@@ -1699,7 +1761,7 @@ is
 :switch:`-k`
   Kill :samp:`@{nn}` from exported names
   (:ref:`Windows_Calling_Conventions`
-  for a discussion about ``Stdcall``-style symbols.
+  for a discussion about ``Stdcall``-style symbols).
 
 
 .. index:: --help (dlltool)

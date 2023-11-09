@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -180,12 +180,14 @@ procedure Gnat1drv is
       --  Set all flags required when generating C code
 
       if Generate_C_Code then
+         CCG_Mode := True;
          Modify_Tree_For_C := True;
          Transform_Function_Array := True;
          Unnest_Subprogram_Mode := True;
          Building_Static_Dispatch_Tables := False;
          Minimize_Expression_With_Actions := True;
          Expand_Nonbinary_Modular_Ops := True;
+         Back_End_Return_Slot := False;
 
          --  Set operating mode to Generate_Code to benefit from full front-end
          --  expansion (e.g. generics).
@@ -555,10 +557,15 @@ procedure Gnat1drv is
          Validity_Checks_On := False;
          Check_Validity_Of_Parameters := False;
 
-         --  Turn off style check options since we are not interested in any
-         --  front-end warnings when we are getting SPARK output.
+         --  Turn off style checks and compiler warnings in GNATprove except:
+         --    - elaboration warnings, which turn into errors on SPARK code
+         --    - suspicious contracts, which are useful for SPARK code
 
          Reset_Style_Check_Options;
+         Restore_Warnings
+           ((Warnings_Package.Elab_Warnings => True,
+             Warnings_Package.Warn_On_Suspicious_Contract => True,
+             others => False));
 
          --  Suppress the generation of name tables for enumerations, which are
          --  not needed for formal verification, and fall outside the SPARK
@@ -631,28 +638,11 @@ procedure Gnat1drv is
       --  generating code.
 
       if Operating_Mode = Generate_Code then
-         case Targparm.Frontend_Exceptions_On_Target is
-            when True =>
-               case Targparm.ZCX_By_Default_On_Target is
-                  when True =>
-                     Write_Line
-                       ("Run-time library configured incorrectly");
-                     Write_Line
-                       ("(requesting support for Frontend ZCX exceptions)");
-                     raise Unrecoverable_Error;
-
-                  when False =>
-                     Exception_Mechanism := Front_End_SJLJ;
-               end case;
-
-            when False =>
-               case Targparm.ZCX_By_Default_On_Target is
-                  when True =>
-                     Exception_Mechanism := Back_End_ZCX;
-                  when False =>
-                     Exception_Mechanism := Back_End_SJLJ;
-               end case;
-         end case;
+         if Targparm.ZCX_By_Default_On_Target then
+            Exception_Mechanism := Back_End_ZCX;
+         else
+            Exception_Mechanism := Back_End_SJLJ;
+         end if;
       end if;
 
       --  Set proper status for overflow check mechanism
@@ -722,25 +712,10 @@ procedure Gnat1drv is
          Suppress_Options.Suppress (Alignment_Check) := True;
       end if;
 
-      --  Set switch indicating if back end can handle limited types, and
-      --  guarantee that no incorrect copies are made (e.g. in the context
-      --  of an if or case expression).
+      --  Return slot support is disabled if -gnatd_r is specified
 
-      --  Debug flag -gnatd.L decisively sets usage on
-
-      if Debug_Flag_Dot_LL then
-         Back_End_Handles_Limited_Types := True;
-
-      --  If no debug flag, usage off for SCIL cases
-
-      elsif Generate_SCIL then
-         Back_End_Handles_Limited_Types := False;
-
-      --  Otherwise normal gcc back end, for now still turn flag off by
-      --  default, since there are unresolved problems in the front end.
-
-      else
-         Back_End_Handles_Limited_Types := False;
+      if Debug_Flag_Underscore_R then
+         Back_End_Return_Slot := False;
       end if;
 
       --  If the inlining level has not been set by the user, compute it from
@@ -1273,7 +1248,6 @@ begin
 
       if Compilation_Errors then
          Treepr.Tree_Dump;
-         Post_Compilation_Validation_Checks;
          Errout.Finalize (Last_Call => True);
          Errout.Output_Messages;
          Namet.Finalize;
@@ -1401,6 +1375,17 @@ begin
          Back_End_Mode := Skip;
       end if;
 
+      --  Ensure that we properly register a dependency on system.ads, since
+      --  even if we do not semantically depend on this, Targparm has read
+      --  system parameters from the system.ads file.
+
+      Lib.Writ.Ensure_System_Dependency;
+
+      --  Add dependencies, if any, on preprocessing data file and on
+      --  preprocessing definition file(s).
+
+      Prepcomp.Add_Dependencies;
+
       --  At this stage Back_End_Mode is set to indicate if the backend should
       --  be called to generate code. If it is Skip, then code generation has
       --  been turned off, even though code was requested by the original
@@ -1415,18 +1400,19 @@ begin
 
       if Back_End_Mode = Skip then
 
-         --  An ignored Ghost unit is rewritten into a null statement because
-         --  it must not produce an ALI or object file. Do not emit any errors
-         --  related to code generation because the unit does not exist.
+         --  An ignored Ghost unit is rewritten into a null statement. Do
+         --  not emit any errors related to code generation because the
+         --  unit does not exist.
 
          if Is_Ignored_Ghost_Unit (Main_Unit_Node) then
 
             --  Exit the gnat driver with success, otherwise external builders
             --  such as gnatmake and gprbuild will treat the compilation of an
-            --  ignored Ghost unit as a failure. Note that this will produce
-            --  an empty object file for the unit.
+            --  ignored Ghost unit as a failure. Be sure we produce an empty
+            --  object file for the unit.
 
             Ecode := E_Success;
+            Back_End.Gen_Or_Update_Object_File;
 
          --  Otherwise the unit is missing a crucial piece that prevents code
          --  generation.
@@ -1452,7 +1438,7 @@ begin
 
                --  Do not generate an ALI file in this case, because it would
                --  become obsolete when the parent is compiled, and thus
-               --  confuse tools such as gnatfind.
+               --  confuse some tools.
 
             elsif Main_Unit_Kind = N_Subprogram_Declaration then
                Write_Str (" (subprogram spec)");
@@ -1498,11 +1484,19 @@ begin
          Namet.Finalize;
          Check_Rep_Info;
 
-         --  Exit the driver with an appropriate status indicator. This will
-         --  generate an empty object file for ignored Ghost units, otherwise
-         --  no object file will be generated.
+         if Ecode /= E_Success then
+            --  If we cannot generate code, exit the driver with an appropriate
+            --  status indicator.
 
-         Exit_Program (Ecode);
+            Exit_Program (Ecode);
+
+         else
+            --  Otherwise use a goto so that finalization occurs normally and
+            --  for instance any late processing in the GCC code can be
+            --  performed.
+
+            goto End_Of_Program;
+         end if;
       end if;
 
       --  In -gnatc mode we only do annotation if -gnatR is also set, or if
@@ -1537,17 +1531,6 @@ begin
 
          return;
       end if;
-
-      --  Ensure that we properly register a dependency on system.ads, since
-      --  even if we do not semantically depend on this, Targparm has read
-      --  system parameters from the system.ads file.
-
-      Lib.Writ.Ensure_System_Dependency;
-
-      --  Add dependencies, if any, on preprocessing data file and on
-      --  preprocessing definition file(s).
-
-      Prepcomp.Add_Dependencies;
 
       if GNATprove_Mode then
 

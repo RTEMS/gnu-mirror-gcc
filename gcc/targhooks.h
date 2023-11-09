@@ -1,5 +1,5 @@
 /* Default target hook functions.
-   Copyright (C) 2003-2021 Free Software Foundation, Inc.
+   Copyright (C) 2003-2023 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -20,7 +20,7 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_TARGHOOKS_H
 #define GCC_TARGHOOKS_H
 
-extern bool default_legitimate_address_p (machine_mode, rtx, bool);
+extern bool default_legitimate_address_p (machine_mode, rtx, bool, code_helper);
 
 extern void default_external_libcall (rtx);
 extern rtx default_legitimize_address (rtx, rtx, machine_mode);
@@ -53,6 +53,8 @@ extern scalar_int_mode default_unwind_word_mode (void);
 extern unsigned HOST_WIDE_INT default_shift_truncation_mask
   (machine_mode);
 extern unsigned int default_min_divisions_for_recip_mul (machine_mode);
+extern bool default_preferred_div_as_shifts_over_mult
+  (const_tree);
 extern int default_mode_rep_extended (scalar_int_mode, scalar_int_mode);
 
 extern tree default_stack_protect_guard (void);
@@ -98,6 +100,8 @@ extern int default_builtin_vectorization_cost (enum vect_cost_for_stmt, tree, in
 
 extern tree default_builtin_reciprocal (tree);
 
+extern void default_emit_support_tinfos (emit_support_tinfos_callback);
+
 extern HOST_WIDE_INT default_static_rtx_alignment (machine_mode);
 extern HOST_WIDE_INT default_constant_alignment (const_tree, HOST_WIDE_INT);
 extern HOST_WIDE_INT constant_alignment_word_strings (const_tree,
@@ -118,13 +122,7 @@ extern opt_machine_mode default_vectorize_related_mode (machine_mode,
 							poly_uint64);
 extern opt_machine_mode default_get_mask_mode (machine_mode);
 extern bool default_empty_mask_is_expensive (unsigned);
-extern void *default_init_cost (class loop *, bool);
-extern unsigned default_add_stmt_cost (class vec_info *, void *, int,
-				       enum vect_cost_for_stmt,
-				       class _stmt_vec_info *, tree, int,
-				       enum vect_cost_model_location);
-extern void default_finish_cost (void *, unsigned *, unsigned *, unsigned *);
-extern void default_destroy_cost_data (void *);
+extern vector_costs *default_vectorize_create_costs (vec_info *, bool);
 
 /* OpenACC hooks.  */
 extern bool default_goacc_validate_dims (tree, int [], int, unsigned);
@@ -184,6 +182,8 @@ extern void default_target_option_override (void);
 extern void hook_void_bitmap (bitmap);
 extern int default_reloc_rw_mask (void);
 extern bool default_generate_pic_addr_diff_vec (void);
+extern void default_asm_out_constructor (rtx, int);
+extern void default_asm_out_destructor (rtx, int);
 extern tree default_mangle_decl_assembler_name (tree, tree);
 extern tree default_emutls_var_fields (tree, tree *);
 extern tree default_emutls_var_init (tree, tree, tree);
@@ -194,14 +194,16 @@ extern bool default_new_address_profitable_p (rtx, rtx_insn *, rtx);
 extern bool default_target_option_valid_attribute_p (tree, tree, tree, int);
 extern bool default_target_option_pragma_parse (tree, tree);
 extern bool default_target_can_inline_p (tree, tree);
+extern bool default_update_ipa_fn_target_info (unsigned int &, const gimple *);
+extern bool default_need_ipa_fn_target_info (const_tree, unsigned int &);
 extern bool default_valid_pointer_mode (scalar_int_mode);
 extern bool default_ref_may_alias_errno (class ao_ref *);
 extern scalar_int_mode default_addr_space_pointer_mode (addr_space_t);
 extern scalar_int_mode default_addr_space_address_mode (addr_space_t);
 extern bool default_addr_space_valid_pointer_mode (scalar_int_mode,
 						   addr_space_t);
-extern bool default_addr_space_legitimate_address_p (machine_mode, rtx,
-						     bool, addr_space_t);
+extern bool default_addr_space_legitimate_address_p (machine_mode, rtx, bool,
+						     addr_space_t, code_helper);
 extern rtx default_addr_space_legitimize_address (rtx, rtx, machine_mode,
 						  addr_space_t);
 extern bool default_addr_space_subset_p (addr_space_t, addr_space_t);
@@ -216,6 +218,10 @@ extern bool default_libc_has_function (enum function_class, tree);
 extern bool default_libc_has_fast_function (int fcode);
 extern bool no_c99_libc_has_function (enum function_class, tree);
 extern bool gnu_libc_has_function (enum function_class, tree);
+extern bool bsd_libc_has_function (enum function_class, tree);
+extern unsigned default_libm_function_max_error (unsigned, machine_mode, bool);
+extern unsigned glibc_linux_libm_function_max_error (unsigned, machine_mode,
+						     bool);
 
 extern tree default_builtin_tm_load_store (tree);
 
@@ -232,9 +238,6 @@ extern bool default_use_by_pieces_infrastructure_p (unsigned HOST_WIDE_INT,
 						    bool);
 extern int default_compare_by_pieces_branch_ratio (machine_mode);
 
-extern void default_print_patchable_function_entry_1 (FILE *,
-						      unsigned HOST_WIDE_INT,
-						      bool, unsigned int);
 extern void default_print_patchable_function_entry (FILE *,
 						    unsigned HOST_WIDE_INT,
 						    bool);
@@ -272,10 +275,6 @@ extern bool can_use_doloop_if_innermost (const widest_int &,
 					 const widest_int &,
 					 unsigned int, bool);
 
-extern rtx default_load_bounds_for_arg (rtx, rtx, rtx);
-extern void default_store_bounds_for_arg (rtx, rtx, rtx, rtx);
-extern rtx default_load_returned_bounds (rtx);
-extern void default_store_returned_bounds (rtx,rtx);
 extern bool default_optab_supported_p (int, machine_mode, machine_mode,
 				       optimization_type);
 extern unsigned int default_max_noce_ifcvt_seq_cost (edge);
@@ -285,6 +284,7 @@ extern unsigned int default_min_arithmetic_precision (void);
 
 extern enum flt_eval_method
 default_excess_precision (enum excess_precision_type ATTRIBUTE_UNUSED);
+extern bool default_bitint_type_info (int, struct bitint_info *);
 extern HOST_WIDE_INT default_stack_clash_protection_alloca_probe_range (void);
 extern void default_select_early_remat_modes (sbitmap);
 extern tree default_preferred_else_value (unsigned, tree, unsigned, tree *);

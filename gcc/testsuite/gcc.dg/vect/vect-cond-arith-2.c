@@ -1,5 +1,6 @@
 /* { dg-do compile } */
 /* { dg-additional-options "-fgimple -fdump-tree-optimized -ffast-math" } */
+/* { dg-additional-options "-fno-vect-cost-model" { target { riscv_v } } } */
 
 double __GIMPLE (ssa, startwith("loop"))
 neg_xi (double *x)
@@ -41,5 +42,5 @@ neg_xi (double *x)
   return res_3;
 }
 
-/* { dg-final { scan-tree-dump { = \.COND_ADD} "vect" { target { vect_double_cond_arith && vect_fully_masked } } } } */
-/* { dg-final { scan-tree-dump { = \.COND_SUB} "optimized" { target { vect_double_cond_arith && vect_fully_masked } } } } */
+/* { dg-final { scan-tree-dump { = \.COND_(LEN_)?ADD} "vect" { target { vect_double_cond_arith && vect_fully_masked } } } } */
+/* { dg-final { scan-tree-dump { = \.COND_(LEN_)?SUB} "optimized" { target { vect_double_cond_arith && vect_fully_masked } } } } */

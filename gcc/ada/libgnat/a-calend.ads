@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- This specification is derived from the Ada Reference Manual for use with --
 -- GNAT. The copyright notice above, and the license provisions that follow --
@@ -102,16 +102,16 @@ is
 
    function "+" (Left : Time;     Right : Duration) return Time
    with
-     Global => null;
+     SPARK_Mode => Off;
    function "+" (Left : Duration; Right : Time)     return Time
    with
-     Global => null;
+     SPARK_Mode => Off;
    function "-" (Left : Time;     Right : Duration) return Time
    with
-     Global => null;
+     SPARK_Mode => Off;
    function "-" (Left : Time;     Right : Time)     return Duration
    with
-     Global => null;
+     SPARK_Mode => Off;
    --  The first three functions will raise Time_Error if the resulting time
    --  value is less than the start of Ada time in UTC or greater than the
    --  end of Ada time in UTC. The last function will raise Time_Error if the
@@ -242,7 +242,7 @@ private
    --  epoch) expressed in nanoseconds. Note that year 2100 is non-leap.
 
    Days_In_Month : constant array (Month_Number) of Day_Number :=
-                     (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31);
+                     [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
    --  Days in month for non-leap year, leap year case is adjusted in code
 
    Invalid_Time_Zone_Offset : Long_Integer;

@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -187,6 +187,13 @@ package Tbuild is
    --  A convenient form of Make_String_Literal, where the string value is
    --  given as a normal string instead of a String_Id value.
 
+   function Make_Suppress_Block
+     (Loc   : Source_Ptr;
+      Check : Name_Id;
+      Stmts : List_Id) return Node_Id;
+   --  Build a block with a pragma Suppress on Check. Stmts is the statements
+   --  list that needs protection against the check activation.
+
    function Make_Temporary
      (Loc          : Source_Ptr;
       Id           : Character;
@@ -207,8 +214,8 @@ package Tbuild is
      (Loc   : Source_Ptr;
       Check : Name_Id;
       Stmts : List_Id) return Node_Id;
-   --  Build a block with a pragma Suppress on 'Check'. Stmts is the statements
-   --  list that needs protection against the check
+   --  Build a block with a pragma Unsuppress on Check. Stmts is the statements
+   --  list that needs protection against the check suppression.
 
    function New_Constraint_Error (Loc : Source_Ptr) return Node_Id;
    --  This function builds a tree corresponding to the Ada statement
@@ -312,11 +319,10 @@ package Tbuild is
      (Def_Id : Entity_Id;
       Loc    : Source_Ptr) return Node_Id;
    --  New_Occurrence_Of creates an N_Identifier node that is an occurrence of
-   --  the defining identifier Def_Id. The Entity and Etype of the result are
-   --  set from the given defining identifier as follows: Entity is a copy of
-   --  Def_Id. Etype is a copy of Def_Id for types, and a copy of the Etype of
-   --  Def_Id for other entities. Note that Is_Static_Expression is set if this
-   --  call creates an occurrence of an enumeration literal.
+   --  the defining identifier Def_Id. The Entity of the result is Def_Id. The
+   --  Etype of the result is Def_Id for types, and Etype (Def_Id) otherwise.
+   --  Is_Static_Expression is set if this call creates an occurrence of an
+   --  enumeration literal.
 
    function New_Suffixed_Name
      (Related_Id : Name_Id;

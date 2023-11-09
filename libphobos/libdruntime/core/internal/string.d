@@ -2,9 +2,9 @@
  * String manipulation and comparison utilities.
  *
  * Copyright: Copyright Sean Kelly 2005 - 2009.
- * License:   $(WEB www.boost.org/LICENSE_1_0.txt, Boost License 1.0).
+ * License:   $(HTTP www.boost.org/LICENSE_1_0.txt, Boost License 1.0).
  * Authors:   Sean Kelly, Walter Bright
- * Source: $(DRUNTIMESRC src/rt/util/_string.d)
+ * Source: $(DRUNTIMESRC rt/util/_string.d)
  */
 
 module core.internal.string;
@@ -12,85 +12,159 @@ module core.internal.string;
 pure:
 nothrow:
 @nogc:
+@safe:
 
-alias UnsignedStringBuf = char[20];
+alias UnsignedStringBuf = char[64];
 
-char[] unsignedToTempString(ulong value, return char[] buf, uint radix = 10) @safe
+/**
+Converts an unsigned integer value to a string of characters.
+
+Can be used when compiling with -betterC. Does not allocate memory.
+
+Params:
+    T = char, wchar or dchar
+    value = the unsigned integer value to convert
+    buf   = the pre-allocated buffer used to store the result
+    radix = the numeric base to use in the conversion 2 through 36 (defaults to 10)
+    upperCase = use upper case letters for radices 11 - 36
+
+Returns:
+    The unsigned integer value as a string of characters
+*/
+T[] unsignedToTempString(uint radix = 10, bool upperCase = false, T)(ulong value, return scope T[] buf)
+if (radix >= 2 && radix <= 36 &&
+    (is(T == char) || is(T == wchar) || is(T == dchar)))
 {
+    enum baseChar = upperCase ? 'A' : 'a';
     size_t i = buf.length;
+
+    static if (size_t.sizeof == 4) // 32 bit CPU
+    {
+        if (value <= uint.max)
+        {
+            // use faster 32 bit arithmetic
+            uint val = cast(uint) value;
+            do
+            {
+                uint x = void;
+                if (val < radix)
+                {
+                    x = cast(uint)val;
+                    val = 0;
+                }
+                else
+                {
+                    x = cast(uint)(val % radix);
+                    val /= radix;
+                }
+                buf[--i] = cast(char)((radix <= 10 || x < 10) ? x + '0' : x - 10 + baseChar);
+            } while (val);
+            return buf[i .. $];
+        }
+    }
+
     do
     {
-        ubyte x = cast(ubyte)(value % radix);
-        value = value / radix;
-        buf[--i] = cast(char)((x < 10) ? x + '0' : x - 10 + 'a');
+        uint x = void;
+        if (value < radix)
+        {
+            x = cast(uint)value;
+            value = 0;
+        }
+        else
+        {
+            x = cast(uint)(value % radix);
+            value /= radix;
+        }
+        buf[--i] = cast(char)((radix <= 10 || x < 10) ? x + '0' : x - 10 + baseChar);
     } while (value);
     return buf[i .. $];
 }
 
-private struct TempStringNoAlloc
+private struct TempStringNoAlloc(ubyte N)
 {
-    // need to handle 65 bytes for radix of 2 with negative sign.
-    private char[65] _buf;
+    private char[N] _buf = void;
     private ubyte _len;
-    auto get() return
+    inout(char)[] get() inout return
     {
         return _buf[$-_len..$];
     }
     alias get this;
 }
 
-auto unsignedToTempString(ulong value, uint radix) @safe
+/**
+Converts an unsigned integer value to a string of characters.
+
+This implementation is a template so it can be used when compiling with -betterC.
+
+Params:
+    value = the unsigned integer value to convert
+    radix = the numeric base to use in the conversion (defaults to 10)
+
+Returns:
+    The unsigned integer value as a string of characters
+*/
+auto unsignedToTempString(uint radix = 10)(ulong value)
 {
-    TempStringNoAlloc result = void;
-    result._len = unsignedToTempString(value, result._buf, radix).length & 0xff;
+    // Need a buffer of 65 bytes for radix of 2 with room for
+    // signedToTempString to possibly add a negative sign.
+    enum bufferSize = radix >= 10 ? 20 : 65;
+    TempStringNoAlloc!bufferSize result = void;
+    result._len = unsignedToTempString!radix(value, result._buf).length & 0xff;
     return result;
 }
 
 unittest
 {
-    UnsignedStringBuf buf;
-    assert(0.unsignedToTempString(buf, 10) == "0");
-    assert(1.unsignedToTempString(buf, 10) == "1");
-    assert(12.unsignedToTempString(buf, 10) == "12");
-    assert(0x12ABCF .unsignedToTempString(buf, 16) == "12abcf");
-    assert(long.sizeof.unsignedToTempString(buf, 10) == "8");
-    assert(uint.max.unsignedToTempString(buf, 10) == "4294967295");
-    assert(ulong.max.unsignedToTempString(buf, 10) == "18446744073709551615");
+    UnsignedStringBuf buf = void;
+    assert(0.unsignedToTempString(buf) == "0");
+    assert(1.unsignedToTempString(buf) == "1");
+    assert(12.unsignedToTempString(buf) == "12");
+    assert(0x12ABCF .unsignedToTempString!16(buf) == "12abcf");
+    assert(0x12ABCF .unsignedToTempString!(16, true)(buf) == "12ABCF");
+    assert(long.sizeof.unsignedToTempString(buf) == "8");
+    assert(uint.max.unsignedToTempString(buf) == "4294967295");
+    assert(ulong.max.unsignedToTempString(buf) == "18446744073709551615");
 
     // use stack allocated struct version
-    assert(0.unsignedToTempString(10) == "0");
-    assert(1.unsignedToTempString(10) == "1");
-    assert(12.unsignedToTempString(10) == "12");
-    assert(0x12ABCF .unsignedToTempString(16) == "12abcf");
-    assert(long.sizeof.unsignedToTempString(10) == "8");
-    assert(uint.max.unsignedToTempString(10) == "4294967295");
-    assert(ulong.max.unsignedToTempString(10) == "18446744073709551615");
+    assert(0.unsignedToTempString == "0");
+    assert(1.unsignedToTempString == "1");
+    assert(12.unsignedToTempString == "12");
+    assert(0x12ABCF .unsignedToTempString!16 == "12abcf");
+    assert(long.sizeof.unsignedToTempString == "8");
+    assert(uint.max.unsignedToTempString == "4294967295");
+    assert(ulong.max.unsignedToTempString == "18446744073709551615");
+
+    // test bad radices
+    assert(!is(typeof(100.unsignedToTempString!1(buf))));
+    assert(!is(typeof(100.unsignedToTempString!0(buf) == "")));
+    assert(!is(typeof(100.unsignedToTempString!37(buf) == "")));
 }
 
-alias SignedStringBuf = char[20];
+alias SignedStringBuf = char[65];
 
-char[] signedToTempString(long value, return char[] buf, uint radix) @safe
+T[] signedToTempString(uint radix = 10, bool upperCase = false, T)(long value, return scope T[] buf)
 {
     bool neg = value < 0;
     if (neg)
         value = cast(ulong)-value;
-    auto r = unsignedToTempString(value, buf, radix);
+    auto r = unsignedToTempString!(radix, upperCase)(value, buf);
     if (neg)
     {
         // about to do a slice without a bounds check
-        auto trustedSlice(return char[] r) @trusted { assert(r.ptr > buf.ptr); return (r.ptr-1)[0..r.length+1]; }
+        auto trustedSlice(return scope T[] r) @trusted { assert(r.ptr > buf.ptr); return (r.ptr-1)[0..r.length+1]; }
         r = trustedSlice(r);
         r[0] = '-';
     }
     return r;
 }
 
-auto signedToTempString(long value, uint radix) @safe
+auto signedToTempString(uint radix = 10)(long value)
 {
     bool neg = value < 0;
     if (neg)
         value = cast(ulong)-value;
-    auto r = unsignedToTempString(value, radix);
+    auto r = unsignedToTempString!radix(value);
     if (neg)
     {
         r._len++;
@@ -101,35 +175,42 @@ auto signedToTempString(long value, uint radix) @safe
 
 unittest
 {
-    SignedStringBuf buf;
-    assert(0.signedToTempString(buf, 10) == "0");
-    assert(1.signedToTempString(buf, 10) == "1");
-    assert((-1).signedToTempString(buf, 10) == "-1");
-    assert(12.signedToTempString(buf, 10) == "12");
-    assert((-12).signedToTempString(buf, 10) == "-12");
-    assert(0x12ABCF .signedToTempString(buf, 16) == "12abcf");
-    assert((-0x12ABCF) .signedToTempString(buf, 16) == "-12abcf");
-    assert(long.sizeof.signedToTempString(buf, 10) == "8");
-    assert(int.max.signedToTempString(buf, 10) == "2147483647");
-    assert(int.min.signedToTempString(buf, 10) == "-2147483648");
-    assert(long.max.signedToTempString(buf, 10) == "9223372036854775807");
-    assert(long.min.signedToTempString(buf, 10) == "-9223372036854775808");
+    SignedStringBuf buf = void;
+    assert(0.signedToTempString(buf) == "0");
+    assert(1.signedToTempString(buf) == "1");
+    assert((-1).signedToTempString(buf) == "-1");
+    assert(12.signedToTempString(buf) == "12");
+    assert((-12).signedToTempString(buf) == "-12");
+    assert(0x12ABCF .signedToTempString!16(buf) == "12abcf");
+    assert((-0x12ABCF) .signedToTempString!16(buf) == "-12abcf");
+    assert((-0x12ABCF) .signedToTempString!(16, true)(buf) == "-12ABCF");
+    assert(long.sizeof.signedToTempString(buf) == "8");
+    assert(int.max.signedToTempString(buf) == "2147483647");
+    assert(int.min.signedToTempString(buf) == "-2147483648");
+    assert(long.max.signedToTempString(buf) == "9223372036854775807");
+    assert(long.min.signedToTempString(buf) == "-9223372036854775808");
+
+    wchar[65] wbuf = void;
+    assert(1.signedToTempString(wbuf) == "1"w);
+
+    dchar[65] dbuf = void;
+    assert(1.signedToTempString(dbuf) == "1"d);
 
     // use stack allocated struct version
-    assert(0.signedToTempString(10) == "0");
-    assert(1.signedToTempString(10) == "1");
-    assert((-1).signedToTempString(10) == "-1");
-    assert(12.signedToTempString(10) == "12");
-    assert((-12).signedToTempString(10) == "-12");
-    assert(0x12ABCF .signedToTempString(16) == "12abcf");
-    assert((-0x12ABCF) .signedToTempString(16) == "-12abcf");
-    assert(long.sizeof.signedToTempString(10) == "8");
-    assert(int.max.signedToTempString(10) == "2147483647");
-    assert(int.min.signedToTempString(10) == "-2147483648");
-    assert(long.max.signedToTempString(10) == "9223372036854775807");
-    assert(long.min.signedToTempString(10) == "-9223372036854775808");
-    assert(long.max.signedToTempString(2) == "111111111111111111111111111111111111111111111111111111111111111");
-    assert(long.min.signedToTempString(2) == "-1000000000000000000000000000000000000000000000000000000000000000");
+    assert(0.signedToTempString() == "0");
+    assert(1.signedToTempString == "1");
+    assert((-1).signedToTempString == "-1");
+    assert(12.signedToTempString == "12");
+    assert((-12).signedToTempString == "-12");
+    assert(0x12ABCF .signedToTempString!16 == "12abcf");
+    assert((-0x12ABCF) .signedToTempString!16 == "-12abcf");
+    assert(long.sizeof.signedToTempString == "8");
+    assert(int.max.signedToTempString == "2147483647");
+    assert(int.min.signedToTempString == "-2147483648");
+    assert(long.max.signedToTempString == "9223372036854775807");
+    assert(long.min.signedToTempString == "-9223372036854775808");
+    assert(long.max.signedToTempString!2 == "111111111111111111111111111111111111111111111111111111111111111");
+    assert(long.min.signedToTempString!2 == "-1000000000000000000000000000000000000000000000000000000000000000");
 }
 
 
@@ -142,7 +223,7 @@ unittest
  * Returns:
  *      number of digits
  */
-int numDigits(uint radix = 10)(ulong value) @safe
+int numDigits(uint radix = 10)(ulong value) if (radix >= 2 && radix <= 36)
 {
      int n = 1;
      while (1)
@@ -188,9 +269,14 @@ unittest
     assert(1.numDigits!2 == 1);
     assert(2.numDigits!2 == 2);
     assert(3.numDigits!2 == 2);
+
+    // test bad radices
+    static assert(!__traits(compiles, 100.numDigits!1()));
+    static assert(!__traits(compiles, 100.numDigits!0()));
+    static assert(!__traits(compiles, 100.numDigits!37()));
 }
 
-int dstrcmp( scope const char[] s1, scope const char[] s2 ) @trusted
+int dstrcmp()( scope const char[] s1, scope const char[] s2 ) @trusted
 {
     immutable len = s1.length <= s2.length ? s1.length : s2.length;
     if (__ctfe)
@@ -209,5 +295,5 @@ int dstrcmp( scope const char[] s1, scope const char[] s2 ) @trusted
         if ( ret )
             return ret;
     }
-    return s1.length < s2.length ? -1 : (s1.length > s2.length);
+    return (s1.length > s2.length) - (s1.length < s2.length);
 }

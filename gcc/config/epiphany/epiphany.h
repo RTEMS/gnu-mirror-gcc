@@ -1,5 +1,5 @@
 /* Definitions of target machine for GNU compiler, Argonaut EPIPHANY cpu.
-   Copyright (C) 1994-2021 Free Software Foundation, Inc.
+   Copyright (C) 1994-2023 Free Software Foundation, Inc.
    Contributed by Embecosm on behalf of Adapteva, Inc.
 
 This file is part of GCC.
@@ -170,12 +170,10 @@ along with GCC; see the file COPYING3.  If not see
 /* layout_type overrides our ADJUST_ALIGNMENT settings from epiphany-modes.def
    for vector modes, so we have to override it back.  */
 #define ROUND_TYPE_ALIGN(TYPE, MANGLED_ALIGN, SPECIFIED_ALIGN) \
- (TREE_CODE (TYPE) == VECTOR_TYPE && !TYPE_USER_ALIGN (TYPE) \
+ (VECTOR_TYPE_P (TYPE) && !TYPE_USER_ALIGN (TYPE) \
   && SPECIFIED_ALIGN <= GET_MODE_ALIGNMENT (TYPE_MODE (TYPE)) \
   ? GET_MODE_ALIGNMENT (TYPE_MODE (TYPE)) \
-  : ((TREE_CODE (TYPE) == RECORD_TYPE \
-      || TREE_CODE (TYPE) == UNION_TYPE \
-      || TREE_CODE (TYPE) == QUAL_UNION_TYPE) \
+  : (RECORD_OR_UNION_TYPE_P (TYPE) \
      && !TYPE_PACKED (TYPE)) \
   ? epiphany_special_round_type_align ((TYPE), (MANGLED_ALIGN), \
 				       (SPECIFIED_ALIGN)) \
@@ -378,7 +376,7 @@ extern enum reg_class epiphany_regno_reg_class[FIRST_PSEUDO_REGISTER];
    They give nonzero only if REGNO is a hard reg of the suitable class
    or a pseudo reg currently allocated to a suitable hard reg.
    Since they use reg_renumber, they are safe only once reg_renumber
-   has been allocated, which happens in reginfo.c during register
+   has been allocated, which happens in reginfo.cc during register
    allocation.  */
 #define REGNO_OK_FOR_BASE_P(REGNO) \
 ((REGNO) < FIRST_PSEUDO_REGISTER || (unsigned) reg_renumber[REGNO] < FIRST_PSEUDO_REGISTER)
@@ -551,7 +549,7 @@ typedef struct GTY (()) machine_function
     && epiphany_is_interrupt_p (current_function_decl)) \
    ? IRET_REGNUM : GPR_LR)
 /* This is not only for dwarf unwind info, but also for the benefit of
-   df-scan.c to tell it that LR is live at the function start.  */
+   df-scan.cc to tell it that LR is live at the function start.  */
 #define INCOMING_RETURN_ADDR_RTX gen_rtx_REG (Pmode, EPIPHANY_RETURN_REGNO)
 
 /* However, we haven't implemented the rest needed for dwarf2 unwind info.  */
@@ -662,7 +660,7 @@ typedef struct GTY (()) machine_function
 #define NO_FUNCTION_CSE 1
 
 /* Section selection.  */
-/* WARNING: These section names also appear in dwarf2out.c.  */
+/* WARNING: These section names also appear in dwarf2out.cc.  */
 
 #define TEXT_SECTION_ASM_OP	"\t.section .text"
 #define DATA_SECTION_ASM_OP	"\t.section .data"
@@ -795,14 +793,9 @@ do \
 
 /* Debugging information.  */
 
-/* Generate DBX and DWARF debugging information.  */
-#define DBX_DEBUGGING_INFO 1
-
+/* Generate DWARF debugging information.  */
 #undef PREFERRED_DEBUGGING_TYPE
 #define PREFERRED_DEBUGGING_TYPE DWARF2_DEBUG
-
-/* Turn off splitting of long stabs.  */
-#define DBX_CONTIN_LENGTH 0
 
 /* Miscellaneous.  */
 

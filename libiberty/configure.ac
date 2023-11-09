@@ -2,6 +2,7 @@ dnl Process this file with autoconf to produce a configure script
 
 AC_INIT
 AC_CONFIG_SRCDIR([xmalloc.c])
+AC_CONFIG_MACRO_DIRS([../config])
 
 # This works around the fact that libtool configuration may change LD
 # for this particular configuration, but some shells, instead of
@@ -61,6 +62,11 @@ fi
 AC_SUBST(MAINT)dnl
 AC_SUBST(NOTMAINT)dnl
 
+if test -z "$ETAGS"; then
+  ETAGS=etags
+fi
+AC_SUBST([ETAGS])
+
 # Do we have a single-tree copy of texinfo?  Even if we do, we can't
 # rely on it - libiberty is built before texinfo.
 AC_CHECK_PROG(MAKEINFO, makeinfo, makeinfo, )
@@ -107,6 +113,18 @@ dnl These must be called before AM_PROG_LIBTOOL, because it may want
 dnl to call AC_CHECK_PROG.
 AC_CHECK_TOOL(AR, ar)
 AC_CHECK_TOOL(RANLIB, ranlib, :)
+
+GCC_PLUGIN_OPTION(PLUGIN_OPTION)
+if test -n "$PLUGIN_OPTION"; then
+  if $AR --help 2>&1 | grep -q "\--plugin"; then
+    AR_PLUGIN_OPTION="$PLUGIN_OPTION"
+    AC_SUBST(AR_PLUGIN_OPTION)
+  fi
+  if $RANLIB --help 2>&1 | grep -q "\--plugin"; then
+    RANLIB_PLUGIN_OPTION="$PLUGIN_OPTION"
+    AC_SUBST(RANLIB_PLUGIN_OPTION)
+  fi
+fi
 
 dnl When switching to automake, replace the following with AM_ENABLE_MULTILIB.
 # Add --enable-multilib to configure.
@@ -227,8 +245,8 @@ case "${enable_shared}" in
   *) shared=yes ;;
 esac
 
-# ...unless --enable-host-shared was passed from top-level config:
-if [[ "${enable_host_shared}" = "yes" ]]; then
+# ...unless --enable-host-{shared,pie} was passed from top-level config:
+if [[ "${enable_host_shared}" = "yes" ]] || [[ "${enable_host_pie}" = "yes" ]]; then
   shared=yes
 fi
 

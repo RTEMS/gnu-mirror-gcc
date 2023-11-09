@@ -1,6 +1,6 @@
 // Allocator traits -*- C++ -*-
 
-// Copyright (C) 2011-2021 Free Software Foundation, Inc.
+// Copyright (C) 2011-2023 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -33,27 +33,45 @@
 #include <bits/stl_construct.h>
 #include <bits/memoryfwd.h>
 #if __cplusplus >= 201103L
-# include <bits/allocator.h>
 # include <bits/ptr_traits.h>
 # include <ext/numeric_traits.h>
+# if _GLIBCXX_HOSTED
+#  include <bits/allocator.h>
+# endif
 #endif
+
+#define __glibcxx_want_constexpr_dynamic_alloc
+#define __glibcxx_want_allocator_traits_is_always_equal
+#include <bits/version.h>
 
 namespace std _GLIBCXX_VISIBILITY(default)
 {
 _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
 #if __cplusplus >= 201103L
-#define __cpp_lib_allocator_traits_is_always_equal 201411
-
+  /// @cond undocumented
   struct __allocator_traits_base
   {
     template<typename _Tp, typename _Up, typename = void>
-      struct __rebind : __replace_first_arg<_Tp, _Up> { };
+      struct __rebind : __replace_first_arg<_Tp, _Up>
+      {
+	static_assert(is_same<
+	  typename __replace_first_arg<_Tp, typename _Tp::value_type>::type,
+			_Tp>::value,
+	  "allocator_traits<A>::rebind_alloc<A::value_type> must be A");
+      };
 
     template<typename _Tp, typename _Up>
       struct __rebind<_Tp, _Up,
 		      __void_t<typename _Tp::template rebind<_Up>::other>>
-      { using type = typename _Tp::template rebind<_Up>::other; };
+      {
+	using type = typename _Tp::template rebind<_Up>::other;
+
+	static_assert(is_same<
+	  typename _Tp::template rebind<typename _Tp::value_type>::other,
+			_Tp>::value,
+	  "allocator_traits<A>::rebind_alloc<A::value_type> must be A");
+      };
 
   protected:
     template<typename _Tp>
@@ -71,16 +89,19 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     template<typename _Tp>
       using __pocs = typename _Tp::propagate_on_container_swap;
     template<typename _Tp>
-      using __equal = typename _Tp::is_always_equal;
+      using __equal = __type_identity<typename _Tp::is_always_equal>;
   };
 
   template<typename _Alloc, typename _Up>
     using __alloc_rebind
       = typename __allocator_traits_base::template __rebind<_Alloc, _Up>::type;
+  /// @endcond
 
   /**
    * @brief  Uniform interface to all allocator types.
+   * @headerfile memory
    * @ingroup allocators
+   * @since C++11
   */
   template<typename _Alloc>
     struct allocator_traits : __allocator_traits_base
@@ -203,7 +224,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        * otherwise @c is_empty<Alloc>::type
       */
       using is_always_equal
-	= __detected_or_t<typename is_empty<_Alloc>::type, __equal, _Alloc>;
+	= typename __detected_or_t<is_empty<_Alloc>, __equal, _Alloc>::type;
 
       template<typename _Tp>
 	using rebind_alloc = __alloc_rebind<_Alloc, _Tp>;
@@ -398,10 +419,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       { return _S_select(__rhs, 0); }
     };
 
-#if __cplusplus > 201703L
-# define __cpp_lib_constexpr_dynamic_alloc 201907L
-#endif
-
+#if _GLIBCXX_HOSTED
   /// Partial specialization for std::allocator.
   template<typename _Tp>
     struct allocator_traits<allocator<_Tp>>
@@ -455,7 +473,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *
        *  Calls @c a.allocate(n)
       */
-      _GLIBCXX_NODISCARD static _GLIBCXX20_CONSTEXPR pointer
+      [[__nodiscard__,__gnu__::__always_inline__]]
+      static _GLIBCXX20_CONSTEXPR pointer
       allocate(allocator_type& __a, size_type __n)
       { return __a.allocate(__n); }
 
@@ -469,8 +488,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *
        *  Returns <tt> a.allocate(n, hint) </tt>
       */
-      _GLIBCXX_NODISCARD static _GLIBCXX20_CONSTEXPR pointer
-      allocate(allocator_type& __a, size_type __n, const_void_pointer __hint)
+      [[__nodiscard__,__gnu__::__always_inline__]]
+      static _GLIBCXX20_CONSTEXPR pointer
+      allocate(allocator_type& __a, size_type __n,
+	       [[maybe_unused]] const_void_pointer __hint)
       {
 #if __cplusplus <= 201703L
 	return __a.allocate(__n, __hint);
@@ -487,6 +508,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *
        *  Calls <tt> a.deallocate(p, n) </tt>
       */
+      [[__gnu__::__always_inline__]]
       static _GLIBCXX20_CONSTEXPR void
       deallocate(allocator_type& __a, pointer __p, size_type __n)
       { __a.deallocate(__p, __n); }
@@ -503,6 +525,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  `std::construct_at(__p, std::forward<_Args>(__args)...)` instead.
       */
       template<typename _Up, typename... _Args>
+	[[__gnu__::__always_inline__]]
 	static _GLIBCXX20_CONSTEXPR void
 	construct(allocator_type& __a __attribute__((__unused__)), _Up* __p,
 		  _Args&&... __args)
@@ -523,6 +546,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  Calls @c __a.destroy(__p).
       */
       template<typename _Up>
+	[[__gnu__::__always_inline__]]
 	static _GLIBCXX20_CONSTEXPR void
 	destroy(allocator_type& __a __attribute__((__unused__)), _Up* __p)
 	noexcept(is_nothrow_destructible<_Up>::value)
@@ -539,6 +563,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  @param  __a  An allocator.
        *  @return @c __a.max_size()
       */
+      [[__gnu__::__always_inline__]]
       static _GLIBCXX20_CONSTEXPR size_type
       max_size(const allocator_type& __a __attribute__((__unused__))) noexcept
       {
@@ -554,6 +579,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  @param  __rhs  An allocator.
        *  @return @c __rhs
       */
+      [[__gnu__::__always_inline__]]
       static _GLIBCXX20_CONSTEXPR allocator_type
       select_on_container_copy_construction(const allocator_type& __rhs)
       { return __rhs; }
@@ -625,16 +651,11 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  `std::construct_at(__p, std::forward<_Args>(__args)...)` instead.
       */
       template<typename _Up, typename... _Args>
+	[[__gnu__::__always_inline__]]
 	static _GLIBCXX20_CONSTEXPR void
 	construct(allocator_type&, _Up* __p, _Args&&... __args)
 	noexcept(std::is_nothrow_constructible<_Up, _Args...>::value)
-	{
-#if __cplusplus <= 201703L
-	  ::new((void *)__p) _Up(std::forward<_Args>(__args)...);
-#else
-	  std::construct_at(__p, std::forward<_Args>(__args)...);
-#endif
-	}
+	{ std::_Construct(__p, std::forward<_Args>(__args)...); }
 
       /**
        *  @brief  Destroy an object of type `_Up`
@@ -644,6 +665,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  Invokes the destructor for `*__p`.
       */
       template<typename _Up>
+	[[__gnu__::__always_inline__]]
 	static _GLIBCXX20_CONSTEXPR void
 	destroy(allocator_type&, _Up* __p)
 	noexcept(is_nothrow_destructible<_Up>::value)
@@ -658,29 +680,36 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
        *  @param  __rhs  An allocator.
        *  @return `__rhs`
       */
+      [[__gnu__::__always_inline__]]
       static _GLIBCXX20_CONSTEXPR allocator_type
       select_on_container_copy_construction(const allocator_type& __rhs)
       { return __rhs; }
     };
+#endif
 
+  /// @cond undocumented
 #if __cplusplus < 201703L
   template<typename _Alloc>
+    [[__gnu__::__always_inline__]]
     inline void
     __do_alloc_on_copy(_Alloc& __one, const _Alloc& __two, true_type)
     { __one = __two; }
 
   template<typename _Alloc>
+    [[__gnu__::__always_inline__]]
     inline void
     __do_alloc_on_copy(_Alloc&, const _Alloc&, false_type)
     { }
 #endif
 
   template<typename _Alloc>
+    [[__gnu__::__always_inline__]]
     _GLIBCXX14_CONSTEXPR inline void
     __alloc_on_copy(_Alloc& __one, const _Alloc& __two)
     {
-      typedef allocator_traits<_Alloc> __traits;
-      typedef typename __traits::propagate_on_container_copy_assignment __pocca;
+      using __traits = allocator_traits<_Alloc>;
+      using __pocca =
+	typename __traits::propagate_on_container_copy_assignment::type;
 #if __cplusplus >= 201703L
       if constexpr (__pocca::value)
 	__one = __two;
@@ -690,6 +719,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     }
 
   template<typename _Alloc>
+    [[__gnu__::__always_inline__]]
     constexpr _Alloc
     __alloc_on_copy(const _Alloc& __a)
     {
@@ -699,20 +729,24 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
 #if __cplusplus < 201703L
   template<typename _Alloc>
+    [[__gnu__::__always_inline__]]
     inline void __do_alloc_on_move(_Alloc& __one, _Alloc& __two, true_type)
     { __one = std::move(__two); }
 
   template<typename _Alloc>
+    [[__gnu__::__always_inline__]]
     inline void __do_alloc_on_move(_Alloc&, _Alloc&, false_type)
     { }
 #endif
 
   template<typename _Alloc>
+    [[__gnu__::__always_inline__]]
     _GLIBCXX14_CONSTEXPR inline void
     __alloc_on_move(_Alloc& __one, _Alloc& __two)
     {
-      typedef allocator_traits<_Alloc> __traits;
-      typedef typename __traits::propagate_on_container_move_assignment __pocma;
+      using __traits = allocator_traits<_Alloc>;
+      using __pocma
+	= typename __traits::propagate_on_container_move_assignment::type;
 #if __cplusplus >= 201703L
       if constexpr (__pocma::value)
 	__one = std::move(__two);
@@ -723,6 +757,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
 #if __cplusplus < 201703L
   template<typename _Alloc>
+    [[__gnu__::__always_inline__]]
     inline void __do_alloc_on_swap(_Alloc& __one, _Alloc& __two, true_type)
     {
       using std::swap;
@@ -730,16 +765,18 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     }
 
   template<typename _Alloc>
+    [[__gnu__::__always_inline__]]
     inline void __do_alloc_on_swap(_Alloc&, _Alloc&, false_type)
     { }
 #endif
 
   template<typename _Alloc>
+    [[__gnu__::__always_inline__]]
     _GLIBCXX14_CONSTEXPR inline void
     __alloc_on_swap(_Alloc& __one, _Alloc& __two)
     {
-      typedef allocator_traits<_Alloc> __traits;
-      typedef typename __traits::propagate_on_container_swap __pocs;
+      using __traits = allocator_traits<_Alloc>;
+      using __pocs = typename __traits::propagate_on_container_swap::type;
 #if __cplusplus >= 201703L
       if constexpr (__pocs::value)
 	{
@@ -775,11 +812,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 				 typename _Alloc::value_type const&>::type
     { };
 
+#if _GLIBCXX_HOSTED
   // std::allocator<_Tp> just requires CopyConstructible
   template<typename _Tp>
     struct __is_copy_insertable<allocator<_Tp>>
     : is_copy_constructible<_Tp>
     { };
+#endif
 
   // true if _Alloc::value_type is MoveInsertable into containers using _Alloc
   // (might be wrong if _Alloc::construct exists but is not constrained,
@@ -789,11 +828,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     : __is_alloc_insertable_impl<_Alloc, typename _Alloc::value_type>::type
     { };
 
+#if _GLIBCXX_HOSTED
   // std::allocator<_Tp> just requires MoveConstructible
   template<typename _Tp>
     struct __is_move_insertable<allocator<_Tp>>
     : is_move_constructible<_Tp>
     { };
+#endif
 
   // Trait to detect Allocator-like types.
   template<typename _Alloc, typename = void>
@@ -820,7 +861,58 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       __a.deallocate(__a.allocate(1u), 1u);
     };
 #endif
+  /// @endcond
 #endif // C++11
+
+  /// @cond undocumented
+
+  // To implement Option 3 of DR 431.
+  template<typename _Alloc, bool = __is_empty(_Alloc)>
+    struct __alloc_swap
+    { static void _S_do_it(_Alloc&, _Alloc&) _GLIBCXX_NOEXCEPT { } };
+
+  template<typename _Alloc>
+    struct __alloc_swap<_Alloc, false>
+    {
+      static void
+      _S_do_it(_Alloc& __one, _Alloc& __two) _GLIBCXX_NOEXCEPT
+      {
+	// Precondition: swappable allocators.
+	if (__one != __two)
+	  swap(__one, __two);
+      }
+    };
+
+#if __cplusplus >= 201103L
+  template<typename _Tp, bool
+    = __or_<is_copy_constructible<typename _Tp::value_type>,
+            is_nothrow_move_constructible<typename _Tp::value_type>>::value>
+    struct __shrink_to_fit_aux
+    { static bool _S_do_it(_Tp&) noexcept { return false; } };
+
+  template<typename _Tp>
+    struct __shrink_to_fit_aux<_Tp, true>
+    {
+      _GLIBCXX20_CONSTEXPR
+      static bool
+      _S_do_it(_Tp& __c) noexcept
+      {
+#if __cpp_exceptions
+	try
+	  {
+	    _Tp(__make_move_if_noexcept_iterator(__c.begin()),
+		__make_move_if_noexcept_iterator(__c.end()),
+		__c.get_allocator()).swap(__c);
+	    return true;
+	  }
+	catch(...)
+	  { return false; }
+#else
+	return false;
+#endif
+      }
+    };
+#endif
 
   /**
    * Destroy a range of objects using the supplied allocator.  For
@@ -829,6 +921,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
    */
 
   template<typename _ForwardIterator, typename _Allocator>
+    _GLIBCXX20_CONSTEXPR
     void
     _Destroy(_ForwardIterator __first, _ForwardIterator __last,
 	     _Allocator& __alloc)
@@ -842,13 +935,17 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 #endif
     }
 
+#if _GLIBCXX_HOSTED
   template<typename _ForwardIterator, typename _Tp>
+    __attribute__((__always_inline__)) _GLIBCXX20_CONSTEXPR
     inline void
     _Destroy(_ForwardIterator __first, _ForwardIterator __last,
 	     allocator<_Tp>&)
     {
-      _Destroy(__first, __last);
+      std::_Destroy(__first, __last);
     }
+#endif
+  /// @endcond
 
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std

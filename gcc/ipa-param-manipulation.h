@@ -1,6 +1,6 @@
 /* Manipulation of formal and actual parameters of functions and function
    calls.
-   Copyright (C) 2017-2021 Free Software Foundation, Inc.
+   Copyright (C) 2017-2023 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -254,6 +254,7 @@ public:
   /* If true, make the function not return any value.  */
   bool m_skip_return;
 
+  static bool type_attribute_allowed_p (tree);
 private:
   ipa_param_adjustments () {}
 
@@ -313,8 +314,14 @@ public:
 
   /* Change the PARM_DECLs.  */
   void modify_formal_parameters ();
+  /* Register a REPLACEMENT for accesses to BASE at UNIT_OFFSET.  */
+  void register_replacement (tree base, unsigned unit_offset, tree replacement);
   /* Register a replacement decl for the transformation done in APM.  */
   void register_replacement (ipa_adjusted_param *apm, tree replacement);
+  /* Sort m_replacements and set m_sorted_replacements_p to true.  Users that
+     call register_replacement themselves must call the method before any
+     lookup and thus also any statement or expression modification.  */
+  void sort_replacements ();
   /* Lookup a replacement for a given offset within a given parameter.  */
   tree lookup_replacement (tree base, unsigned unit_offset);
   /* Lookup a replacement for an expression, if there is one.  */
@@ -328,6 +335,13 @@ public:
 			   gimple *orig_stmt);
   /* Return the new chain of parameters.  */
   tree get_new_param_chain ();
+  /* Replace all occurances of SSAs in m_dead_ssa_debug_equiv in t with what
+     they are mapped to.  */
+  void remap_with_debug_expressions (tree *t);
+
+  /* If there are any initialization statements that need to be emitted into
+     the basic block BB right at ther start of the new function, do so.  */
+  void append_init_stmts (basic_block bb);
 
   /* Pointers to data structures defining how the function should be
      modified.  */
@@ -339,14 +353,16 @@ public:
 
   auto_vec<tree, 16> m_reset_debug_decls;
 
-  /* Set to true if there are any IPA_PARAM_OP_SPLIT adjustments among stored
-     adjustments.  */
-  bool m_split_modifications_p;
-
   /* Sets of statements and SSA_NAMEs that only manipulate data from parameters
      removed because they are not necessary.  */
   hash_set<gimple *> m_dead_stmts;
   hash_set<tree> m_dead_ssas;
+
+  /* Mapping from DCEd SSAs to what their potential debug_binds should be.  */
+  hash_map<tree, tree> m_dead_ssa_debug_equiv;
+  /* Mapping from DCEd statements to debug expressions that will be placed on
+     the RHS of debug statement that will replace this one.  */
+  hash_map<gimple *, tree> m_dead_stmt_debug_equiv;
 
 private:
   void common_initialization (tree old_fndecl, tree *vars,
@@ -355,13 +371,17 @@ private:
   unsigned get_base_index (ipa_adjusted_param *apm);
   ipa_param_body_replacement *lookup_replacement_1 (tree base,
 						    unsigned unit_offset);
+  ipa_param_body_replacement *lookup_first_base_replacement (tree base);
   tree replace_removed_params_ssa_names (tree old_name, gimple *stmt);
-  bool modify_expression (tree *expr_p, bool convert);
+  bool modify_expression (tree *expr_p, bool convert, gimple_seq * = nullptr);
   bool modify_assignment (gimple *stmt, gimple_seq *extra_stmts);
   bool modify_call_stmt (gcall **stmt_p, gimple *orig_stmt);
   bool modify_cfun_body ();
   void reset_debug_stmts ();
-  void mark_dead_statements (tree dead_param);
+  tree get_ddef_if_exists_and_is_used (tree decl);
+  void mark_dead_statements (tree dead_param, vec<tree> *debugstack);
+  void mark_clobbers_dead (tree dead_param);
+  bool prepare_debug_expressions (tree dead_ssa);
 
   /* Declaration of the function that is being transformed.  */
 
@@ -391,6 +411,12 @@ private:
 
   auto_vec<ipa_param_body_replacement, 16> m_replacements;
 
+  /* List of initialization assignments to be put at the beginning of the
+     cloned function to deal with split aggregates which however have known
+     constant value and so their PARM_DECL disappears.  */
+
+  auto_vec<gimple *, 8> m_split_agg_csts_inits;
+
   /* Vector for remapping SSA_BASES from old parameter declarations that are
      being removed as a part of the transformation.  Before a new VAR_DECL is
      created, it holds the old PARM_DECL, once the variable is built it is
@@ -406,6 +432,10 @@ private:
      its this pointer and must be converted to a normal function.  */
 
   bool m_method2func;
+
+  /* True if m_replacements have ben sorted since the last insertion.  */
+
+  bool m_sorted_replacements_p;
 };
 
 void push_function_arg_decls (vec<tree> *args, tree fndecl);

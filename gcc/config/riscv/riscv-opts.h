@@ -1,5 +1,5 @@
 /* Definition of RISC-V target for GNU compiler.
-   Copyright (C) 2016-2021 Free Software Foundation, Inc.
+   Copyright (C) 2016-2023 Free Software Foundation, Inc.
    Contributed by Andrew Waterman (andrew@sifive.com).
 
 This file is part of GCC.
@@ -52,7 +52,8 @@ extern enum riscv_isa_spec_class riscv_isa_spec;
 /* Keep this list in sync with define_attr "tune" in riscv.md.  */
 enum riscv_microarchitecture_type {
   generic,
-  sifive_7
+  sifive_7,
+  generic_ooo
 };
 extern enum riscv_microarchitecture_type riscv_microarchitecture;
 
@@ -67,10 +68,61 @@ enum stack_protector_guard {
   SSP_GLOBAL			/* global canary */
 };
 
-#define MASK_ZICSR    (1 << 0)
-#define MASK_ZIFENCEI (1 << 1)
+/* RISC-V auto-vectorization preference.  */
+enum riscv_autovec_preference_enum {
+  NO_AUTOVEC,
+  RVV_SCALABLE,
+  RVV_FIXED_VLMAX
+};
 
-#define TARGET_ZICSR    ((riscv_zi_subext & MASK_ZICSR) != 0)
-#define TARGET_ZIFENCEI ((riscv_zi_subext & MASK_ZIFENCEI) != 0)
+/* RISC-V auto-vectorization RVV LMUL.  */
+enum riscv_autovec_lmul_enum {
+  RVV_M1 = 1,
+  RVV_M2 = 2,
+  RVV_M4 = 4,
+  RVV_M8 = 8,
+  /* For dynamic LMUL, we compare COST start with LMUL8.  */
+  RVV_DYNAMIC = 9
+};
+
+enum riscv_multilib_select_kind {
+  /* Select multilib by builtin way.  */
+  select_by_builtin,
+  /* Select multilib by ABI, arch and code model.  */
+  select_by_abi_arch_cmodel,
+  /* Select multilib by ABI only.  */
+  select_by_abi,
+};
+
+/* ENTITIES in mode switching.  */
+enum riscv_entity
+{
+  RISCV_VXRM = 0,
+  RISCV_FRM,
+  MAX_RISCV_ENTITIES
+};
+
+#define TARGET_ZICOND_LIKE (TARGET_ZICOND || (TARGET_XVENTANACONDOPS && TARGET_64BIT))
+
+/* Bit of riscv_zvl_flags will set contintuly, N-1 bit will set if N-bit is
+   set, e.g. MASK_ZVL64B has set then MASK_ZVL32B is set, so we can use
+   popcount to caclulate the minimal VLEN.  */
+#define TARGET_MIN_VLEN \
+  ((riscv_zvl_flags == 0) \
+   ? 0 \
+   : 32 << (__builtin_popcount (riscv_zvl_flags) - 1))
+
+/* Same as TARGET_MIN_VLEN, but take an OPTS as gcc_options.  */
+#define TARGET_MIN_VLEN_OPTS(opts)                                             \
+  ((opts->x_riscv_zvl_flags == 0)                                              \
+     ? 0                                                                       \
+     : 32 << (__builtin_popcount (opts->x_riscv_zvl_flags) - 1))
+
+/* TODO: Enable RVV movmisalign by default for now.  */
+#define TARGET_VECTOR_MISALIGN_SUPPORTED 1
+
+/* The maximmum LMUL according to user configuration.  */
+#define TARGET_MAX_LMUL                                                        \
+  (int) (riscv_autovec_lmul == RVV_DYNAMIC ? RVV_M8 : riscv_autovec_lmul)
 
 #endif /* ! GCC_RISCV_OPTS_H */

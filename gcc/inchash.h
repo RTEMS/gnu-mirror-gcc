@@ -1,5 +1,5 @@
 /* An incremental hash abstract data type.
-   Copyright (C) 2014-2021 Free Software Foundation, Inc.
+   Copyright (C) 2014-2023 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -26,7 +26,7 @@ along with GCC; see the file COPYING3.  If not see
    (not in a single memory block) into a single value. The goal
    is to make it easy to plug in efficient hash algorithms.
    Currently it just implements the plain old jhash based
-   incremental hash from gcc's tree.c.  */
+   incremental hash from gcc's tree.cc.  */
 
 hashval_t iterative_hash_host_wide_int (HOST_WIDE_INT, hashval_t);
 hashval_t iterative_hash_hashval_t (hashval_t, hashval_t);
@@ -59,7 +59,7 @@ class hash
 
   /* Add polynomial value V, treating each element as an unsigned int.  */
   template<unsigned int N, typename T>
-  void add_poly_int (const poly_int_pod<N, T> &v)
+  void add_poly_int (const poly_int<N, T> &v)
   {
     for (unsigned int i = 0; i < N; ++i)
       add_int (v.coeffs[i]);
@@ -73,7 +73,7 @@ class hash
 
   /* Add polynomial value V, treating each element as a HOST_WIDE_INT.  */
   template<unsigned int N, typename T>
-  void add_poly_hwi (const poly_int_pod<N, T> &v)
+  void add_poly_hwi (const poly_int<N, T> &v)
   {
     for (unsigned int i = 0; i < N; ++i)
       add_hwi (v.coeffs[i]);
@@ -87,6 +87,8 @@ class hash
     for (unsigned i = 0; i < x.get_len (); i++)
       add_hwi (x.sext_elt (i));
   }
+
+  void add_real_value (const class real_value &v);
 
   /* Hash in pointer PTR.  */
   void add_ptr (const void *ptr)

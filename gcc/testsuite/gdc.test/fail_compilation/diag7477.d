@@ -1,8 +1,8 @@
 /*
 TEST_OUTPUT:
 ---
-fail_compilation/diag7477.d(13): Error: cannot implicitly convert expression `0` of type `int` to `Foo`
-fail_compilation/diag7477.d(20): Error: cannot implicitly convert expression `0` of type `int` to `string`
+fail_compilation/diag7477.d(13): Error: cannot generate 0 value of type `Foo` for `a`
+fail_compilation/diag7477.d(20): Error: cannot generate 0 value of type `string` for `a`
 ---
 */
 

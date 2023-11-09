@@ -1,5 +1,5 @@
 /* Timing variables for measuring compiler performance.
-   Copyright (C) 2000-2021 Free Software Foundation, Inc.
+   Copyright (C) 2000-2023 Free Software Foundation, Inc.
    Contributed by Alex Samuel <samuel@codesourcery.com>
 
    This file is part of GCC.
@@ -20,6 +20,8 @@
 
 #ifndef GCC_TIMEVAR_H
 #define GCC_TIMEVAR_H
+
+namespace json { class value; }
 
 /* Timing variables are used to measure elapsed time in various
    portions of the compiler.  Each measures elapsed user, system, and
@@ -44,7 +46,7 @@
 */
 
 /* This structure stores the various varieties of time that can be
-   measured.  Times are stored in seconds.  The time may be an
+   measured.  Times are stored in nanoseconds.  The time may be an
    absolute time or a time difference; in the former case, the time
    base is undefined, except that the difference between two times
    produces a valid time difference.  */
@@ -52,14 +54,13 @@
 struct timevar_time_def
 {
   /* User time in this process.  */
-  double user;
+  uint64_t user;
 
-  /* System time (if applicable for this host platform) in this
-     process.  */
-  double sys;
+  /* System time (if applicable for this host platform) in this process.  */
+  uint64_t sys;
 
   /* Wall clock time.  */
-  double wall;
+  uint64_t wall;
 
   /* Garbage collector memory.  */
   size_t ggc_mem;
@@ -119,6 +120,7 @@ class timer
   void pop_client_item ();
 
   void print (FILE *fp);
+  json::value *make_json () const;
 
   const char *get_topmost_item_name () const;
 
@@ -140,6 +142,8 @@ class timer
   /* Private type: a timing variable.  */
   struct timevar_def
   {
+    json::value *make_json () const;
+
     /* Elapsed time for this variable.  */
     struct timevar_time_def elapsed;
 
@@ -175,7 +179,7 @@ class timer
 
   /* A class for managing a collection of named timing items, for use
      e.g. by libgccjit for timing client code.  This class is declared
-     inside timevar.c to avoid everything using timevar.h
+     inside timevar.cc to avoid everything using timevar.h
      from needing vec and hash_map.  */
   class named_items;
 
@@ -206,14 +210,14 @@ class timer
 };
 
 /* Provided for backward compatibility.  */
-static inline void
+inline void
 timevar_push (timevar_id_t tv)
 {
   if (g_timer)
     g_timer->push (tv);
 }
 
-static inline void
+inline void
 timevar_pop (timevar_id_t tv)
 {
   if (g_timer)
@@ -247,13 +251,53 @@ class auto_timevar
       m_timer->pop (m_tv);
   }
 
- private:
+  // Disallow copies.
+  auto_timevar (const auto_timevar &) = delete;
 
-  // Private to disallow copies.
-  auto_timevar (const auto_timevar &);
+ private:
+  timer *m_timer;
+  timevar_id_t m_tv;
+};
+
+// As above, but use cond_start/stop.
+class auto_cond_timevar
+{
+ public:
+  auto_cond_timevar (timer *t, timevar_id_t tv)
+    : m_timer (t),
+      m_tv (tv)
+  {
+    start ();
+  }
+
+  explicit auto_cond_timevar (timevar_id_t tv)
+    : m_timer (g_timer)
+    , m_tv (tv)
+  {
+    start ();
+  }
+
+  ~auto_cond_timevar ()
+  {
+    if (m_timer && !already_running)
+      m_timer->cond_stop (m_tv);
+  }
+
+  // Disallow copies.
+  auto_cond_timevar (const auto_cond_timevar &) = delete;
+
+ private:
+  void start()
+  {
+    if (m_timer)
+      already_running = m_timer->cond_start (m_tv);
+    else
+      already_running = false;
+  }
 
   timer *m_timer;
   timevar_id_t m_tv;
+  bool already_running;
 };
 
 extern void print_time (const char *, long);

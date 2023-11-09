@@ -7,7 +7,7 @@
 --                                 B o d y                                  --
 --                                                                          --
 --               Copyright (C) 1986 by University of Toronto.               --
---                      Copyright (C) 1999-2021, AdaCore                    --
+--                      Copyright (C) 1999-2023, AdaCore                    --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -199,7 +199,7 @@ package body System.Regpat is
 
    type Bit_Conversion_Array is array (Class_Byte range 0 .. 7) of Class_Byte;
    Bit_Conversion : constant Bit_Conversion_Array :=
-                      (1, 2, 4, 8, 16, 32, 64, 128);
+                      [1, 2, 4, 8, 16, 32, 64, 128];
 
    type Std_Class is (ANYOF_NONE,
                       ANYOF_ALNUM,   --  Alphanumeric class [a-zA-Z0-9]
@@ -359,10 +359,11 @@ package body System.Regpat is
    -------------
 
    procedure Compile
-     (Matcher         : out Pattern_Matcher;
-      Expression      : String;
-      Final_Code_Size : out Program_Size;
-      Flags           : Regexp_Flags := No_Flags)
+     (Matcher              : out Pattern_Matcher;
+      Expression           : String;
+      Final_Code_Size      : out Program_Size;
+      Flags                : Regexp_Flags := No_Flags;
+      Error_When_Too_Small : Boolean := True)
    is
       --  We can't allocate space until we know how big the compiled form
       --  will be, but we can't compile it (and thus know how big it is)
@@ -664,7 +665,7 @@ package body System.Regpat is
          Operand : Pointer;
          Greedy  : Boolean := True)
       is
-         Old    : Pointer;
+         Old : Pointer;
       begin
          Old := Insert_Operator_Before (Op, Operand, Greedy, Opsize => 7);
          Emit_Natural (Old + Next_Pointer_Bytes, Min);
@@ -894,7 +895,7 @@ package body System.Regpat is
          Flags.SP_Start := Flags.SP_Start or else New_Flags.SP_Start;
 
          while Parse_Pos <= Parse_End
-           and then (E (Parse_Pos) = '|')
+           and then E (Parse_Pos) = '|'
          loop
             Parse_Pos := Parse_Pos + 1;
             Parse_Branch (New_Flags, False, Br);
@@ -919,17 +920,15 @@ package body System.Regpat is
             if Capturing then
                Ender := Emit_Node (CLOSE);
                Emit (Character'Val (Par_No));
-               Link_Tail (IP, Ender);
-
             else
-               --  Need to keep looking after the closing parenthesis
-               Ender := Emit_Ptr;
+               Ender := Emit_Node (NOTHING);
             end if;
 
          else
             Ender := Emit_Node (EOP);
-            Link_Tail (IP, Ender);
          end if;
+
+         Link_Tail (IP, Ender);
 
          if Have_Branch and then Emit_Ptr <= PM.Size + 1 then
 
@@ -980,7 +979,7 @@ package body System.Regpat is
          C := Expression (Parse_Pos);
          Parse_Pos := Parse_Pos + 1;
 
-         case (C) is
+         case C is
             when '^' =>
                IP :=
                  Emit_Node
@@ -1974,7 +1973,6 @@ package body System.Regpat is
       Result : Pointer;
 
       Expr_Flags : Expression_Flags;
-      pragma Unreferenced (Expr_Flags);
 
    --  Start of processing for Compile
 
@@ -1995,6 +1993,12 @@ package body System.Regpat is
       end if;
 
       PM.Flags := Flags;
+
+      --  Raise the appropriate error when Matcher does not have enough space
+
+      if Error_When_Too_Small and then Matcher.Size < Final_Code_Size then
+         raise Expression_Error with "Pattern_Matcher is too small";
+      end if;
    end Compile;
 
    function Compile
@@ -2010,7 +2014,7 @@ package body System.Regpat is
       Size  : Program_Size;
 
    begin
-      Compile (Dummy, Expression, Size, Flags);
+      Compile (Dummy, Expression, Size, Flags, Error_When_Too_Small => False);
 
       if Size <= Dummy.Size then
          return Pattern_Matcher'
@@ -2024,17 +2028,13 @@ package body System.Regpat is
             Program          =>
               Dummy.Program
                 (Dummy.Program'First .. Dummy.Program'First + Size - 1));
-      else
-         --  We have to recompile now that we know the size
-         --  ??? Can we use Ada 2005's return construct ?
-
-         declare
-            Result : Pattern_Matcher (Size);
-         begin
-            Compile (Result, Expression, Size, Flags);
-            return Result;
-         end;
       end if;
+
+      return
+         Result : Pattern_Matcher (Size)
+      do
+         Compile (Result, Expression, Size, Flags);
+      end return;
    end Compile;
 
    procedure Compile
@@ -2109,11 +2109,11 @@ package body System.Regpat is
 
          if Do_Print then
             declare
-               Point   : constant String := Pointer'Image (Index);
+               Point : constant String := Pointer'Image (Index);
             begin
-               Put ((1 .. 4 - Point'Length => ' ')
+               Put ([1 .. 4 - Point'Length => ' ']
                     & Point & ":"
-                    & (1 .. Local_Indent * 2 => ' ') & Opcode'Image (Op));
+                    & [1 .. Local_Indent * 2 => ' '] & Opcode'Image (Op));
             end;
 
             --  Print the parenthesis number
@@ -2506,11 +2506,11 @@ package body System.Regpat is
 
       begin
          if Prefix then
-            Put ((1 .. 5 - Pos'Length => ' '));
+            Put ([1 .. 5 - Pos'Length => ' ']);
             Put (Pos & " <"
                  & Data (Input_Pos
                      .. Integer'Min (Last_In_Data, Input_Pos + Length - 1)));
-            Put ((1 .. Length - 1 - Last_In_Data + Input_Pos => ' '));
+            Put ([1 .. Length - 1 - Last_In_Data + Input_Pos => ' ']);
             Put ("> |");
 
          else
@@ -2527,7 +2527,7 @@ package body System.Regpat is
       procedure Dump_Error (Msg : String) is
       begin
          Put ("                   |     ");
-         Put ((1 .. Dump_Indent * 2 => ' '));
+         Put ([1 .. Dump_Indent * 2 => ' ']);
          Put_Line (Msg);
       end Dump_Error;
 
@@ -3381,7 +3381,7 @@ package body System.Regpat is
       begin
          Input_Pos  := Pos;
          Last_Paren := 0;
-         Matches_Full := (others => No_Match);
+         Matches_Full := [others => No_Match];
 
          if Match (Program_First) then
             Matches_Full (0) := (Pos, Input_Pos - 1);
@@ -3397,7 +3397,7 @@ package body System.Regpat is
       --  Do we have the regexp Never_Match?
 
       if Self.Size = 0 then
-         Matches := (others => No_Match);
+         Matches := [others => No_Match];
          return;
       end if;
 
@@ -3420,7 +3420,7 @@ package body System.Regpat is
             end loop;
 
             if Next_Try = 0 then
-               Matches := (others => No_Match);
+               Matches := [others => No_Match];
                return;                  -- Not present
             end if;
          end;
@@ -3582,7 +3582,6 @@ package body System.Regpat is
    is
       PM            : Pattern_Matcher (Size);
       Finalize_Size : Program_Size;
-      pragma Unreferenced (Finalize_Size);
    begin
       if Size = 0 then
          Match (Compile (Expression), Data, Matches, Data_First, Data_Last);
@@ -3605,7 +3604,6 @@ package body System.Regpat is
    is
       PM         : Pattern_Matcher (Size);
       Final_Size : Program_Size;
-      pragma Unreferenced (Final_Size);
    begin
       if Size = 0 then
          return Match (Compile (Expression), Data, Data_First, Data_Last);
@@ -3629,7 +3627,6 @@ package body System.Regpat is
       Matches    : Match_Array (0 .. 0);
       PM         : Pattern_Matcher (Size);
       Final_Size : Program_Size;
-      pragma Unreferenced (Final_Size);
    begin
       if Size = 0 then
          Match (Compile (Expression), Data, Matches, Data_First, Data_Last);
@@ -3740,7 +3737,7 @@ package body System.Regpat is
 
    procedure Reset_Class (Bitmap : out Character_Class) is
    begin
-      Bitmap := (others => 0);
+      Bitmap := [others => 0];
    end Reset_Class;
 
    ------------------

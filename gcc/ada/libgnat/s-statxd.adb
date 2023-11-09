@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---         Copyright (C) 1996-2021, Free Software Foundation, Inc.          --
+--         Copyright (C) 1996-2023, Free Software Foundation, Inc.          --
 --                                                                          --
 -- GARLIC is free software;  you can redistribute it and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -72,7 +72,7 @@ package body System.Stream_Attributes.XDR is
 
    type Precision is (Single, Double, Quadruple);
 
-   Fields : constant array (Precision) of Field_Type := (
+   Fields : constant array (Precision) of Field_Type := [
 
                --  Single precision
 
@@ -105,7 +105,7 @@ package body System.Stream_Attributes.XDR is
                F_Mask  => 16#FF#,                  --  2 ** 8 - 1,
                E_Bytes => 2,
                F_Bytes => 14,
-               F_Bits  => 112 mod US));
+               F_Bits  => 112 mod US)];
 
    --  The representation of all items requires a multiple of four bytes
    --  (or 32 bits) of data. The bytes are numbered 0 through n-1. The bytes
@@ -295,8 +295,8 @@ package body System.Stream_Attributes.XDR is
       FP : Fat_Pointer;
 
    begin
-      FP.P1 := I_AS (Stream).P1;
-      FP.P2 := I_AS (Stream).P1;
+      FP.P1 := I_AS (Stream);
+      FP.P2 := I_AS (Stream);
 
       return FP;
    end I_AD;
@@ -321,7 +321,7 @@ package body System.Stream_Attributes.XDR is
             U := U * BB + XDR_TM (S (N));
          end loop;
 
-         return (P1 => To_XDR_SA (XDR_SA (U)));
+         return To_XDR_SA (XDR_SA (U));
       end if;
    end I_AS;
 
@@ -1181,7 +1181,7 @@ package body System.Stream_Attributes.XDR is
 
    procedure W_AS (Stream : not null access RST; Item : Thin_Pointer) is
       S : XDR_S_TM;
-      U : XDR_TM := XDR_TM (To_XDR_SA (Item.P1));
+      U : XDR_TM := XDR_TM (To_XDR_SA (Item));
 
    begin
       for N in reverse S'Range loop
@@ -1244,7 +1244,7 @@ package body System.Stream_Attributes.XDR is
       Is_Positive : Boolean;
       E           : Integer;
       F           : Float;
-      S           : SEA (1 .. F_L) := (others => 0);
+      S           : SEA (1 .. F_L) := [others => 0];
 
    begin
       if not Item'Valid then
@@ -1390,7 +1390,7 @@ package body System.Stream_Attributes.XDR is
       Is_Positive : Boolean;
       E           : Integer;
       F           : Long_Float;
-      S           : SEA (1 .. LF_L) := (others => 0);
+      S           : SEA (1 .. LF_L) := [others => 0];
 
    begin
       if not Item'Valid then
@@ -1519,7 +1519,7 @@ package body System.Stream_Attributes.XDR is
       Is_Positive : Boolean;
       E           : Integer;
       F           : Long_Long_Float := Item;
-      S           : SEA (1 .. LLF_L) := (others => 0);
+      S           : SEA (1 .. LLF_L) := [others => 0];
 
    begin
       if not Item'Valid then
@@ -1737,7 +1737,7 @@ package body System.Stream_Attributes.XDR is
       Is_Positive : Boolean;
       E           : Integer;
       F           : Short_Float;
-      S           : SEA (1 .. SF_L) := (others => 0);
+      S           : SEA (1 .. SF_L) := [others => 0];
 
    begin
       if not Item'Valid then

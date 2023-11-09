@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -111,8 +111,9 @@ package Styleg is
    --  is that the starting column is appropriate to the indentation rules if
    --  Token_Ptr is the first token on the line.
 
-   procedure Check_Left_Paren;
-   --  Called after scanning out a left parenthesis to check spacing
+   procedure Check_Left_Paren_Square_Bracket;
+   --  Called after scanning out a left parenthesis to check spacing. If
+   --  Ada_Version >= Ada_2022 then called similarly for a left square bracket.
 
    procedure Check_Line_Max_Length (Len : Nat);
    --  Called with Scan_Ptr pointing to the first line terminator character
@@ -159,9 +160,13 @@ package Styleg is
    procedure Check_Vertical_Bar;
    --  Called after scanning a vertical bar to check spacing
 
-   procedure Check_Xtra_Parens (Loc : Source_Ptr);
-   --  Called after scanning an if, case, or quantified expression that has at
-   --  least one level of parentheses around the entire expression.
+   procedure Check_Xtra_Parens (N : Node_Id);
+   --  Called after scanning an entire expression (N) that does not require an
+   --  extra level of parentheses.
+
+   procedure Check_Xtra_Parens_Precedence (N : Node_Id);
+   --  Called after scanning a subexpression (N) that does not require an
+   --  extra level of parentheses according to operator precedence rules.
 
    function Mode_In_Check return Boolean;
    pragma Inline (Mode_In_Check);

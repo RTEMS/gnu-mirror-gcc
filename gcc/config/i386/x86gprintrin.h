@@ -1,4 +1,4 @@
-/* Copyright (C) 2020-2021 Free Software Foundation, Inc.
+/* Copyright (C) 2020-2023 Free Software Foundation, Inc.
 
    This file is part of GCC.
 
@@ -24,7 +24,7 @@
 #ifndef _X86GPRINTRIN_H_INCLUDED
 #define _X86GPRINTRIN_H_INCLUDED
 
-#if defined __MMX__ || defined __SSE__
+#if !defined _SOFT_FLOAT || defined __MMX__ || defined __SSE__
 #pragma GCC push_options
 #pragma GCC target("general-regs-only")
 #define __DISABLE_GENERAL_REGS_ONLY__
@@ -52,6 +52,8 @@
 
 #include <clzerointrin.h>
 
+#include <cmpccxaddintrin.h>
+
 #include <enqcmdintrin.h>
 
 #include <fxsrintrin.h>
@@ -71,6 +73,10 @@
 #include <popcntintrin.h>
 
 #include <pkuintrin.h>
+
+#include <prfchiintrin.h>
+
+#include <raointintrin.h>
 
 #include <rdseedintrin.h>
 
@@ -101,6 +107,8 @@
 #include <xtestintrin.h>
 
 #include <hresetintrin.h>
+
+#include <usermsrintrin.h>
 
 extern __inline void
 __attribute__((__gnu_inline__, __always_inline__, __artificial__))

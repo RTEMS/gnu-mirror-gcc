@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2021 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2023 Free Software Foundation, Inc.
    Contributed by Andy Vaught
    F2003 I/O support contributed by Jerry DeLisle
 
@@ -504,6 +504,7 @@ set_internal_unit (st_parameter_dt *dtp, gfc_unit *iunit, int kind)
   iunit->current_record=0;
   iunit->read_bad = 0;
   iunit->endfile = NO_ENDFILE;
+  iunit->last_char = 0;
 
   /* Set flags for the internal unit.  */
 

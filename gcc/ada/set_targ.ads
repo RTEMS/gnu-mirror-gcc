@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 2013-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 2013-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -25,7 +25,7 @@
 
 --  This package handles setting target dependent parameters. If the -gnatet
 --  switch is not set, then these values are taken from the back end (via the
---  routines in Get_Targ, and the enumerate_modes routine in misc.c). If the
+--  routines in Get_Targ, and the enumerate_modes routine in misc.cc). If the
 --  switch is set, then the values are read from the target.atp file in the
 --  current directory (usually written with the Write_Target_Dependent_Values
 --  procedure defined in this package).
@@ -74,7 +74,7 @@ package Set_Targ is
    Long_Long_Size             : Pos; -- Standard.Long_Long_Integer'Size
    Long_Size                  : Pos; -- Standard.Long_Integer'Size
    Maximum_Alignment          : Pos; -- Maximum permitted alignment
-   Max_Unaligned_Field        : Pos; -- Maximum size for unaligned bit field
+   Max_Unaligned_Field        : Pos; -- Kept only for backward compatibility
    Pointer_Size               : Pos; -- System.Address'Size
    Short_Enums                : Nat; -- Foreign enums use short size?
    Short_Size                 : Pos; -- Standard.Short_Integer'Size
@@ -88,7 +88,7 @@ package Set_Targ is
    -------------------------------------
 
    --  This table contains the list of modes supported by the back-end as
-   --  provided by the back end routine enumerate_modes in misc.c. Note that
+   --  provided by the back end routine enumerate_modes in misc.cc. Note that
    --  we only store floating-point modes (see Register_Float_Type).
 
    type FPT_Mode_Entry is record

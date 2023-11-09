@@ -26,10 +26,12 @@ int main (void)
 
   for (i=0; i<N; i++) {
     x[i] = i;
+    __asm__ volatile ("" : : : "memory");
   }
 
   foo (N,z+2);
 
+#pragma GCC novector
   for (i=0; i<N; i++) {
     if (z[i+2] != x[i])
       abort ();
@@ -38,7 +40,4 @@ int main (void)
   return 0;
 }
 
-/* bleah */
-/* { dg-final { scan-tree-dump-times "vectorized 1 loops" 2 "vect" { target vect_unpack } } } */
-/* { dg-final { scan-tree-dump-times "vectorized 1 loops" 1 "vect" { target { ! vect_unpack } } } } */
-
+/* { dg-final { scan-tree-dump-times "vectorized 1 loops" 1 "vect" { target vect_unpack } } } */

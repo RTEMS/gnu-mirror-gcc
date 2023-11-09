@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-options "-O2" } */
+/* { dg-options "" } */
 
 /* Test for do_tablejump patch.  */
 extern void asdf(int);
@@ -12,4 +12,4 @@ void foo(int x) {
   case 4: asdf(14); break;
   }
 }
-/* { dg-final { scan-assembler-not "srli" } } */
+/* { dg-final { scan-assembler-not {\msrli} } } */

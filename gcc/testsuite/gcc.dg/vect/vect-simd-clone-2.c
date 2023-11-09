@@ -44,9 +44,12 @@ main ()
   check_vect ();
   baz ();
   bar ();
+#pragma GCC novector
   for (i = 0; i < N; i++)
     if (array[i] != 5 * (i & 7) * i)
       abort ();
   return 0;
 }
 
+/* { dg-warning {unsupported simdlen 8 \(amdgcn\)} "" { target amdgcn*-*-* } 18 } */
+/* { dg-warning {unsupported simdlen 4 \(amdgcn\)} "" { target amdgcn*-*-* } 18 } */

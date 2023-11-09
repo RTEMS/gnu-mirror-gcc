@@ -66,7 +66,8 @@ extern "C" void *__libc_stack_end;
 void *__libc_stack_end = 0;
 #endif
 
-#if SANITIZER_LINUX && defined(__aarch64__) && !SANITIZER_GO
+#if SANITIZER_LINUX && (defined(__aarch64__) || defined(__loongarch_lp64)) && \
+    !SANITIZER_GO
 # define INIT_LONGJMP_XOR_KEY 1
 #else
 # define INIT_LONGJMP_XOR_KEY 0
@@ -94,14 +95,12 @@ enum {
   MemMeta,
   MemFile,
   MemMmap,
-  MemTrace,
   MemHeap,
   MemOther,
   MemCount,
 };
 
-void FillProfileCallback(uptr p, uptr rss, bool file,
-                         uptr *mem, uptr stats_size) {
+void FillProfileCallback(uptr p, uptr rss, bool file, uptr *mem) {
   mem[MemTotal] += rss;
   if (p >= ShadowBeg() && p < ShadowEnd())
     mem[MemShadow] += rss;
@@ -113,8 +112,6 @@ void FillProfileCallback(uptr p, uptr rss, bool file,
     mem[file ? MemFile : MemMmap] += rss;
   else if (p >= HeapMemBeg() && p < HeapMemEnd())
     mem[MemHeap] += rss;
-  else if (p >= TraceMemBeg() && p < TraceMemEnd())
-    mem[MemTrace] += rss;
   else
     mem[MemOther] += rss;
 }
@@ -122,47 +119,38 @@ void FillProfileCallback(uptr p, uptr rss, bool file,
 void WriteMemoryProfile(char *buf, uptr buf_size, u64 uptime_ns) {
   uptr mem[MemCount];
   internal_memset(mem, 0, sizeof(mem));
-  GetMemoryProfile(FillProfileCallback, mem, MemCount);
+  GetMemoryProfile(FillProfileCallback, mem);
   auto meta = ctx->metamap.GetMemoryStats();
   StackDepotStats stacks = StackDepotGetStats();
   uptr nthread, nlive;
   ctx->thread_registry.GetNumberOfThreads(&nthread, &nlive);
+  uptr trace_mem;
+  {
+    Lock l(&ctx->slot_mtx);
+    trace_mem = ctx->trace_part_total_allocated * sizeof(TracePart);
+  }
   uptr internal_stats[AllocatorStatCount];
   internal_allocator()->GetStats(internal_stats);
   // All these are allocated from the common mmap region.
-  mem[MemMmap] -= meta.mem_block + meta.sync_obj + stacks.allocated +
-                  internal_stats[AllocatorStatMapped];
+  mem[MemMmap] -= meta.mem_block + meta.sync_obj + trace_mem +
+                  stacks.allocated + internal_stats[AllocatorStatMapped];
   if (s64(mem[MemMmap]) < 0)
     mem[MemMmap] = 0;
   internal_snprintf(
       buf, buf_size,
-      "%llus: RSS %zd MB: shadow:%zd meta:%zd file:%zd mmap:%zd"
-      " trace:%zd heap:%zd other:%zd intalloc:%zd memblocks:%zd syncobj:%zu"
-      " stacks=%zd[%zd] nthr=%zd/%zd\n",
-      uptime_ns / (1000 * 1000 * 1000), mem[MemTotal] >> 20,
-      mem[MemShadow] >> 20, mem[MemMeta] >> 20, mem[MemFile] >> 20,
-      mem[MemMmap] >> 20, mem[MemTrace] >> 20, mem[MemHeap] >> 20,
+      "==%zu== %llus [%zu]: RSS %zd MB: shadow:%zd meta:%zd file:%zd"
+      " mmap:%zd heap:%zd other:%zd intalloc:%zd memblocks:%zd syncobj:%zu"
+      " trace:%zu stacks=%zd threads=%zu/%zu\n",
+      internal_getpid(), uptime_ns / (1000 * 1000 * 1000), ctx->global_epoch,
+      mem[MemTotal] >> 20, mem[MemShadow] >> 20, mem[MemMeta] >> 20,
+      mem[MemFile] >> 20, mem[MemMmap] >> 20, mem[MemHeap] >> 20,
       mem[MemOther] >> 20, internal_stats[AllocatorStatMapped] >> 20,
-      meta.mem_block >> 20, meta.sync_obj >> 20, stacks.allocated >> 20,
-      stacks.n_uniq_ids, nlive, nthread);
-}
-
-#  if SANITIZER_LINUX
-void FlushShadowMemoryCallback(
-    const SuspendedThreadsList &suspended_threads_list,
-    void *argument) {
-  ReleaseMemoryPagesToOS(ShadowBeg(), ShadowEnd());
-}
-#endif
-
-void FlushShadowMemory() {
-#if SANITIZER_LINUX
-  StopTheWorld(FlushShadowMemoryCallback, 0);
-#endif
+      meta.mem_block >> 20, meta.sync_obj >> 20, trace_mem >> 20,
+      stacks.allocated >> 20, nlive, nthread);
 }
 
 #if !SANITIZER_GO
-// Mark shadow for .rodata sections with the special kShadowRodata marker.
+// Mark shadow for .rodata sections with the special Shadow::kRodata marker.
 // Accesses to .rodata can't race, so this saves time, memory and trace space.
 static void MapRodata() {
   // First create temp file.
@@ -183,13 +171,13 @@ static void MapRodata() {
     return;
   internal_unlink(name);  // Unlink it now, so that we can reuse the buffer.
   fd_t fd = openrv;
-  // Fill the file with kShadowRodata.
+  // Fill the file with Shadow::kRodata.
   const uptr kMarkerSize = 512 * 1024 / sizeof(RawShadow);
   InternalMmapVector<RawShadow> marker(kMarkerSize);
   // volatile to prevent insertion of memset
   for (volatile RawShadow *p = marker.data(); p < marker.data() + kMarkerSize;
        p++)
-    *p = kShadowRodata;
+    *p = Shadow::kRodata;
   internal_write(fd, marker.data(), marker.size() * sizeof(RawShadow));
   // Map the file into memory.
   uptr page = internal_mmap(0, GetPageSizeCached(), PROT_READ | PROT_WRITE,
@@ -243,6 +231,14 @@ void InitializePlatformEarly() {
     Die();
   }
 #endif
+#elif SANITIZER_LOONGARCH64
+# if !SANITIZER_GO
+  if (vmaSize != 47) {
+    Printf("FATAL: ThreadSanitizer: unsupported VMA range\n");
+    Printf("FATAL: Found %zd - Supported 47\n", vmaSize);
+    Die();
+  }
+# endif
 #elif defined(__powerpc64__)
 # if !SANITIZER_GO
   if (vmaSize != 44 && vmaSize != 46 && vmaSize != 47) {
@@ -303,11 +299,12 @@ void InitializePlatform() {
       SetAddressSpaceUnlimited();
       reexec = true;
     }
-#if SANITIZER_LINUX && defined(__aarch64__)
+#if SANITIZER_ANDROID && (defined(__aarch64__) || defined(__x86_64__))
     // After patch "arm64: mm: support ARCH_MMAP_RND_BITS." is introduced in
     // linux kernel, the random gap between stack and mapped area is increased
     // from 128M to 36G on 39-bit aarch64. As it is almost impossible to cover
     // this big range, we should disable randomized virtual space on aarch64.
+    // ASLR personality check.
     int old_personality = personality(0xffffffff);
     if (old_personality != -1 && (old_personality & ADDR_NO_RANDOMIZE) == 0) {
       VReport(1, "WARNING: Program is run with randomized virtual address "
@@ -316,6 +313,9 @@ void InitializePlatform() {
       CHECK_NE(personality(old_personality | ADDR_NO_RANDOMIZE), -1);
       reexec = true;
     }
+
+#endif
+#if SANITIZER_LINUX && (defined(__aarch64__) || defined(__loongarch_lp64))
     // Initialize the xor key used in {sig}{set,long}jump.
     InitializeLongjmpXorKey();
 #endif
@@ -388,6 +388,8 @@ static uptr UnmangleLongJmpSp(uptr mangled_sp) {
 # else
   return mangled_sp;
 # endif
+#elif defined(__loongarch_lp64)
+  return mangled_sp ^ longjmp_xor_key;
 #elif defined(__powerpc64__)
   // Reverse of:
   //   ld   r4, -28696(r13)
@@ -415,10 +417,16 @@ static uptr UnmangleLongJmpSp(uptr mangled_sp) {
 #elif defined(__powerpc__)
 # define LONG_JMP_SP_ENV_SLOT 0
 #elif SANITIZER_FREEBSD
-# define LONG_JMP_SP_ENV_SLOT 2
+# ifdef __aarch64__
+#  define LONG_JMP_SP_ENV_SLOT 1
+# else
+#  define LONG_JMP_SP_ENV_SLOT 2
+# endif
 #elif SANITIZER_LINUX
 # ifdef __aarch64__
 #  define LONG_JMP_SP_ENV_SLOT 13
+# elif defined(__loongarch__)
+#  define LONG_JMP_SP_ENV_SLOT 1
 # elif defined(__mips64)
 #  define LONG_JMP_SP_ENV_SLOT 1
 # elif defined(__s390x__)
@@ -445,7 +453,11 @@ static void InitializeLongjmpXorKey() {
 
   // 2. Retrieve vanilla/mangled SP.
   uptr sp;
+#ifdef __loongarch__
+  asm("move  %0, $sp" : "=r" (sp));
+#else
   asm("mov  %0, sp" : "=r" (sp));
+#endif
   uptr mangled_sp = ((uptr *)&env)[LONG_JMP_SP_ENV_SLOT];
 
   // 3. xor SPs to obtain key.

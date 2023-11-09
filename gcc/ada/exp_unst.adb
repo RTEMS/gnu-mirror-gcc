@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 2014-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 2014-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -270,7 +270,9 @@ package body Exp_Unst is
    begin
       pragma Assert (Is_Subprogram (E));
 
-      if Subps_Index (E) = Uint_0 then
+      if Field_Is_Initial_Zero (E, F_Subps_Index)
+        or else Subps_Index (E) = Uint_0
+      then
          E := Ultimate_Alias (E);
 
          --  The body of a protected operation has a different name and
@@ -854,7 +856,7 @@ package body Exp_Unst is
                      S : Entity_Id := E;
 
                   begin
-                     for J in reverse 1 .. L  - 1 loop
+                     for J in reverse 1 .. L - 1 loop
                         S := Enclosing_Subprogram (S);
                         Subps.Table (Subp_Index (S)).Reachable := True;
                      end loop;
@@ -886,6 +888,7 @@ package body Exp_Unst is
                      if Is_Subprogram (Ent)
                        and then not Is_Generic_Subprogram (Ent)
                        and then not Is_Imported (Ent)
+                       and then not Is_Intrinsic_Subprogram (Ent)
                        and then Scope_Within (Ultimate_Alias (Ent), Subp)
                      then
                         Append_Unique_Call ((N, Current_Subprogram, Ent));
@@ -935,7 +938,7 @@ package body Exp_Unst is
                --  subprogram. As above, the called entity must be local and
                --  not imported.
 
-               when N_Handled_Sequence_Of_Statements =>
+               when N_Handled_Sequence_Of_Statements | N_Block_Statement =>
                   if Present (At_End_Proc (N))
                     and then Scope_Within (Entity (At_End_Proc (N)), Subp)
                     and then not Is_Imported (Entity (At_End_Proc (N)))
@@ -1181,6 +1184,15 @@ package body Exp_Unst is
 
                   Register_Subprogram (Ent, N);
 
+                  --  Record a call from an At_End_Proc
+
+                  if Present (At_End_Proc (N))
+                    and then Scope_Within (Entity (At_End_Proc (N)), Subp)
+                    and then not Is_Imported (Entity (At_End_Proc (N)))
+                  then
+                     Append_Unique_Call ((N, Ent, Entity (At_End_Proc (N))));
+                  end if;
+
                   --  We make a recursive call to scan the subprogram body, so
                   --  that we can save and restore Current_Subprogram.
 
@@ -1243,11 +1255,12 @@ package body Exp_Unst is
                      return Skip;
                   end if;
 
-               --  Pragmas and component declarations are ignored. Quantified
-               --  expressions are expanded into explicit loops and the
-               --  original epression must be ignored.
+               --  Aspects, pragmas and component declarations are ignored.
+               --  Quantified expressions are expanded into explicit loops
+               --  and the original epression must be ignored.
 
-               when N_Component_Declaration
+               when N_Aspect_Specification
+                  | N_Component_Declaration
                   | N_Pragma
                   | N_Quantified_Expression
                =>
@@ -1752,7 +1765,7 @@ package body Exp_Unst is
 
                      procedure Add_Form_To_Spec (F : Entity_Id; S : Node_Id);
                      --  S is an N_Function/Procedure_Specification node, and F
-                     --  is the new entity to add to this subprogramn spec as
+                     --  is the new entity to add to this subprogram spec as
                      --  the last Extra_Formal.
 
                      ----------------------
@@ -2090,7 +2103,8 @@ package body Exp_Unst is
 
                                  --  Build and insert the assignment:
                                  --    ARECn.nam := nam'Address
-                                 --  or else 'Access for unconstrained array
+                                 --  or else 'Unchecked_Access for
+                                 --  unconstrained array.
 
                                  if Needs_Fat_Pointer (Ent) then
                                     Attr := Name_Unchecked_Access;
@@ -2203,7 +2217,7 @@ package body Exp_Unst is
 
          begin
             --  Ignore type references, these are implicit references that do
-            --  not need rewriting (e.g. the appearence in a conversion).
+            --  not need rewriting (e.g. the appearance in a conversion).
             --  Also ignore if no reference was specified or if the rewriting
             --  has already been done (this can happen if the N_Identifier
             --  occurs more than one time in the tree). Also ignore references
@@ -2212,7 +2226,7 @@ package body Exp_Unst is
 
             if No (UPJ.Ref)
               or else not Is_Entity_Name (UPJ.Ref)
-              or else not Present (Entity (UPJ.Ref))
+              or else No (Entity (UPJ.Ref))
               or else not Opt.Generate_C_Code
             then
                goto Continue;
@@ -2579,6 +2593,8 @@ package body Exp_Unst is
                  and then Is_Library_Level_Entity (Spec_Id)
                then
                   Unnest_Subprogram (Spec_Id, N);
+               else
+                  return Skip;
                end if;
             end;
 

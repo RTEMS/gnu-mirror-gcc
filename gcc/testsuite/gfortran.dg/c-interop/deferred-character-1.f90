@@ -1,9 +1,9 @@
 ! PR92482
-! { dg-do compile}
+! { dg-do compile }
 !
 ! TS 29113
 ! 8.7 Interoperability of procedures and procedure interfaces
-! 
+!
 ! If a dummy argument in an interoperable interface is of type
 ! CHARACTER and is allocatable or a pointer, its character length shall
 ! be deferred.
@@ -16,12 +16,12 @@ module m
   interface
 
     ! These are supposed to be OK
-    subroutine good1 (x, n) bind (c)  ! { dg-bogus "Sorry" "pr92482" { xfail *-*-* } }
+    subroutine good1 (x, n) bind (c)
       use iso_c_binding
       character (kind=C_CHAR, len=:), allocatable :: x
       integer(C_INT), value :: n
     end subroutine
-    subroutine good2 (x, n) bind (c)  ! { dg-bogus "Sorry" "pr92482" { xfail *-*-* } }
+    subroutine good2 (x, n) bind (c)
       use iso_c_binding
       character (kind=C_CHAR, len=:), pointer :: x
       integer(C_INT), value :: n

@@ -1,3 +1,83 @@
+2023-10-22  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* configure: Regenerate.
+
+2023-08-11  Joseph Myers  <joseph@codesourcery.com>
+
+	* configure: Regenerate.
+
+2023-08-07  Nick Alcock  <nick.alcock@oracle.com>
+
+	* configure: Regenerate.
+
+2023-08-07  Alexander von Gluck IV  <kallisti5@unixzen.com>
+
+	* configure: Regenerate.
+
+2023-08-07  Nick Alcock  <nick.alcock@oracle.com>
+
+	* configure: Regenerate.
+
+2023-08-07  Nick Alcock  <nick.alcock@oracle.com>
+
+	* configure: Regenerate.
+
+2023-08-07  H.J. Lu  <hjl.tools@gmail.com>
+
+	* configure: Regenerate.
+
+2023-08-07  H.J. Lu  <hjl.tools@gmail.com>
+
+	* configure: Regenerate.
+
+2023-05-18  Bernhard Reutner-Fischer  <aldot@gcc.gnu.org>
+
+	* libcc1plugin.cc (plugin_float_type): Ditto.
+	* libcp1plugin.cc (plugin_reactivate_decl): Ditto.
+	(plugin_get_float_type): Ditto.
+
+2022-11-01  Nathan Sidwell  <nathan@acm.org>
+
+	* libcp1plugin.cc (plugin_start_lambda_closure_class_type):
+	Initialize the per-scope, per-signature discriminator.
+
+2022-11-01  Nathan Sidwell  <nathan@acm.org>
+
+	* libcp1plugin.cc (plugin_start_closure): Adjust.
+
+2022-10-12  Martin Liska  <mliska@suse.cz>
+
+	* configure: Regenerate.
+
+2022-10-11  Olivier Hainque  <hainque@adacore.com>
+	    Olivier Hainque  <hainque@adacore.com>
+
+	* configure: Regenerate.
+
+2022-06-27  Sergei Trofimovich  <siarheit@google.com>
+
+	PR c++/106102
+	* libcc1plugin.cc: Include <memory> via "system.h".
+	* libcp1plugin.cc: Ditto.
+
+2022-06-01  David Seifert  <soap@gentoo.org>
+
+	PR plugins/95648
+	* configure: Regenerate.
+
+2021-12-16  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/51577
+	PR c++/83035
+	PR c++/100465
+	* libcp1plugin.cc (plugin_build_unary_expr): Adjust call to
+	build_x_unary_op.
+	(plugin_build_binary_expr): Adjust call to build_x_binary_op.
+
+2021-12-15  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* configure: Regenerate.
+
 2021-08-17  Iain Sandoe  <iain@sandoe.co.uk>
 
 	* Makefile.am: Switch mdynamic-no-pic to fPIC.

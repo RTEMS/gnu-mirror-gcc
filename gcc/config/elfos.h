@@ -1,6 +1,6 @@
 /* elfos.h  --  operating system specific defines to be used when
    targeting GCC for some generic ELF system
-   Copyright (C) 1991-2021 Free Software Foundation, Inc.
+   Copyright (C) 1991-2023 Free Software Foundation, Inc.
    Based on svr4.h contributed by Ron Guilmette (rfg@netcom.com).
 
 This file is part of GCC.
@@ -466,7 +466,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
   default_elf_asm_output_ascii ((FILE), (STR), (LENGTH))
 
 /* Allow the use of the -frecord-gcc-switches switch via the
-   elf_record_gcc_switches function defined in varasm.c.  */
+   elf_record_gcc_switches function defined in varasm.cc.  */
 #undef  TARGET_ASM_RECORD_GCC_SWITCHES
 #define TARGET_ASM_RECORD_GCC_SWITCHES elf_record_gcc_switches
 
@@ -482,9 +482,3 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 #undef TARGET_LIBC_HAS_FUNCTION
 #define TARGET_LIBC_HAS_FUNCTION no_c99_libc_has_function
-
-/* ELF support needed only by D front-end.  */
-
-#define TARGET_D_MINFO_SECTION "minfo"
-#define TARGET_D_MINFO_START_NAME "__start_minfo"
-#define TARGET_D_MINFO_END_NAME "__stop_minfo"

@@ -1,5 +1,5 @@
 /* Definitions of target machine for GNU compiler.  MIPS version.
-   Copyright (C) 1989-2021 Free Software Foundation, Inc.
+   Copyright (C) 1989-2023 Free Software Foundation, Inc.
    Contributed by A. Lichnewsky (lich@inria.inria.fr).
    Changed by Michael Meissner	(meissner@osf.org).
    64-bit r4000 support by Ian Lance Taylor (ian@cygnus.com) and
@@ -30,7 +30,7 @@ along with GCC; see the file COPYING3.  If not see
 extern int target_flags_explicit;
 #endif
 
-/* MIPS external variables defined in mips.c.  */
+/* MIPS external variables defined in mips.cc.  */
 
 /* Which ABI to use.  ABI_32 (original 32, or o32), ABI_N32 (n32),
    ABI_64 (n64) are all defined by SGI.  ABI_O64 is o32 extended
@@ -120,11 +120,9 @@ struct mips_cpu_info {
 #define TARGET_RTP_PIC (TARGET_VXWORKS_RTP && flag_pic)
 
 /* Compact branches must not be used if the user either selects the
-   'never' policy or the 'optimal' policy on a core that lacks
+   'never' policy or the 'optimal' / 'always' policy on a core that lacks
    compact branch instructions.  */
-#define TARGET_CB_NEVER (mips_cb == MIPS_CB_NEVER	\
-			 || (mips_cb == MIPS_CB_OPTIMAL \
-			     && !ISA_HAS_COMPACT_BRANCHES))
+#define TARGET_CB_NEVER (mips_cb == MIPS_CB_NEVER || !ISA_HAS_COMPACT_BRANCHES)
 
 /* Compact branches may be used if the user either selects the
    'always' policy or the 'optimal' policy on a core that supports
@@ -134,10 +132,11 @@ struct mips_cpu_info {
 			     && ISA_HAS_COMPACT_BRANCHES))
 
 /* Compact branches must always be generated if the user selects
-   the 'always' policy or the 'optimal' policy om a core that
-   lacks delay slot branch instructions.  */
-#define TARGET_CB_ALWAYS (mips_cb == MIPS_CB_ALWAYS	\
-			 || (mips_cb == MIPS_CB_OPTIMAL \
+   the 'always' policy on a core support compact branches,
+   or the 'optimal' policy on a core that lacks delay slot branch instructions.  */
+#define TARGET_CB_ALWAYS ((mips_cb == MIPS_CB_ALWAYS	  \
+			     && ISA_HAS_COMPACT_BRANCHES) \
+			 || (mips_cb == MIPS_CB_OPTIMAL   \
 			     && !ISA_HAS_DELAY_SLOTS))
 
 /* Special handling for JRC that exists in microMIPSR3 as well as R6
@@ -242,6 +241,10 @@ struct mips_cpu_info {
 #define ISA_HAS_DLSA		(TARGET_64BIT \
 				 && (mips_isa_rev >= 6 \
 				     || ISA_HAS_MSA))
+
+/* ISA load/store instructions can handle unaligned address */
+#define ISA_HAS_UNALIGNED_ACCESS (TARGET_UNALIGNED_ACCESS \
+				 && (mips_isa_rev >= 6))
 
 /* The ISA compression flags that are currently in effect.  */
 #define TARGET_COMPRESSION (target_flags & (MASK_MIPS16 | MASK_MICROMIPS))
@@ -472,6 +475,9 @@ struct mips_cpu_info {
       if (mips_base_compression_flags & MASK_MIPS16)			\
 	builtin_define ("__mips16");					\
 									\
+      if (TARGET_MIPS16E2)						\
+	builtin_define ("__mips_mips16e2");				\
+									\
       if (TARGET_MIPS3D)						\
 	builtin_define ("__mips3d");					\
 									\
@@ -673,12 +679,15 @@ struct mips_cpu_info {
 	builtin_define ("__mips_no_lxc1_sxc1");				\
       if (!ISA_HAS_UNFUSED_MADD4 && !ISA_HAS_FUSED_MADD4)		\
 	builtin_define ("__mips_no_madd4");				\
+									\
+      if (TARGET_CB_NEVER)						\
+	builtin_define ("__mips_compact_branches_never");		\
+      else if (TARGET_CB_ALWAYS)					\
+	builtin_define ("__mips_compact_branches_always");		\
+      else 								\
+	builtin_define ("__mips_compact_branches_optimal");		\
     }									\
   while (0)
-
-/* Target hooks for D language.  */
-#define TARGET_D_CPU_VERSIONS mips_d_target_versions
-#define TARGET_D_REGISTER_CPU_TARGET_INFO mips_d_register_target_info
 
 /* Default target_flags if no switches are specified  */
 
@@ -909,7 +918,9 @@ struct mips_cpu_info {
   {"mips-plt", "%{!mplt:%{!mno-plt:-m%(VALUE)}}" }, \
   {"synci", "%{!msynci:%{!mno-synci:-m%(VALUE)}}" },			\
   {"lxc1-sxc1", "%{!mlxc1-sxc1:%{!mno-lxc1-sxc1:-m%(VALUE)}}" }, \
-  {"madd4", "%{!mmadd4:%{!mno-madd4:-m%(VALUE)}}" } \
+  {"madd4", "%{!mmadd4:%{!mno-madd4:-m%(VALUE)}}" }, \
+  {"compact-branches", "%{!mcompact-branches=*:-mcompact-branches=%(VALUE)}" }, \
+  {"msa", "%{!mmsa:%{!mno-msa:-m%(VALUE)}}" } \
 
 /* A spec that infers the:
    -mnan=2008 setting from a -mips argument,
@@ -1070,6 +1081,7 @@ struct mips_cpu_info {
    ST Loongson 2E/2F.  */
 #define ISA_HAS_CONDMOVE        (ISA_HAS_FP_CONDMOVE			\
 				 || TARGET_MIPS5900			\
+				 || ISA_HAS_MIPS16E2			\
 				 || TARGET_LOONGSON_2EF)
 
 /* ISA has LDC1 and SDC1.  */
@@ -1168,7 +1180,8 @@ struct mips_cpu_info {
 				      && (MODE) == V2SFmode))		\
 				 && !TARGET_MIPS16)
 
-#define ISA_HAS_LWL_LWR		(mips_isa_rev <= 5 && !TARGET_MIPS16)
+#define ISA_HAS_LWL_LWR		(mips_isa_rev <= 5 \
+				 && (!TARGET_MIPS16 || ISA_HAS_MIPS16E2))
 
 #define ISA_HAS_IEEE_754_LEGACY	(mips_isa_rev <= 5)
 
@@ -1235,7 +1248,8 @@ struct mips_cpu_info {
 				 && !TARGET_MIPS16)
 
 /* ISA has data prefetch, LL and SC with limited 9-bit displacement.  */
-#define ISA_HAS_9BIT_DISPLACEMENT	(mips_isa_rev >= 6)
+#define ISA_HAS_9BIT_DISPLACEMENT	(mips_isa_rev >= 6		\
+					 || ISA_HAS_MIPS16E2)
 
 /* ISA has data indexed prefetch instructions.  This controls use of
    'prefx', along with TARGET_HARD_FLOAT and TARGET_DOUBLE_FLOAT.
@@ -1254,7 +1268,8 @@ struct mips_cpu_info {
 #define ISA_HAS_SEB_SEH		(mips_isa_rev >= 2 && !TARGET_MIPS16)
 
 /* ISA includes the MIPS32/64 rev 2 ext and ins instructions.  */
-#define ISA_HAS_EXT_INS		(mips_isa_rev >= 2 && !TARGET_MIPS16)
+#define ISA_HAS_EXT_INS		((mips_isa_rev >= 2 && !TARGET_MIPS16)	\
+				 || ISA_HAS_MIPS16E2)
 
 /* ISA has instructions for accessing top part of 64-bit fp regs.  */
 #define ISA_HAS_MXHC1		(!TARGET_FLOAT32	\
@@ -1282,6 +1297,10 @@ struct mips_cpu_info {
 
 /* The MSA ASE is available.  */
 #define ISA_HAS_MSA		(TARGET_MSA && !TARGET_MIPS16)
+
+/* The MIPS16e V2 instructions are available.  */
+#define ISA_HAS_MIPS16E2       (TARGET_MIPS16 && TARGET_MIPS16E2 \
+				&& !TARGET_64BIT)
 
 /* True if the result of a load is not available to the next instruction.
    A nop will then be needed between instructions like "lw $4,..."
@@ -1323,7 +1342,8 @@ struct mips_cpu_info {
 #define ISA_HAS_SYNCI (mips_isa_rev >= 2 && !TARGET_MIPS16)
 
 /* ISA includes sync.  */
-#define ISA_HAS_SYNC ((mips_isa >= MIPS_ISA_MIPS2 || TARGET_MIPS3900) && !TARGET_MIPS16)
+#define ISA_HAS_SYNC ((mips_isa >= MIPS_ISA_MIPS2 || TARGET_MIPS3900)	\
+		      && (!TARGET_MIPS16 || ISA_HAS_MIPS16E2))
 #define GENERATE_SYNC			\
   (target_flags_explicit & MASK_LLSC	\
    ? TARGET_LLSC && !TARGET_MIPS16	\
@@ -1332,7 +1352,8 @@ struct mips_cpu_info {
 /* ISA includes ll and sc.  Note that this implies ISA_HAS_SYNC
    because the expanders use both ISA_HAS_SYNC and ISA_HAS_LL_SC
    instructions.  */
-#define ISA_HAS_LL_SC (mips_isa >= MIPS_ISA_MIPS2 && !TARGET_MIPS5900 && !TARGET_MIPS16)
+#define ISA_HAS_LL_SC (mips_isa >= MIPS_ISA_MIPS2 && !TARGET_MIPS5900	\
+		       && (!TARGET_MIPS16 || ISA_HAS_MIPS16E2))
 #define GENERATE_LL_SC			\
   (target_flags_explicit & MASK_LLSC	\
    ? TARGET_LLSC && !TARGET_MIPS16	\
@@ -1359,11 +1380,14 @@ struct mips_cpu_info {
 /* ISA includes the pop instruction.  */
 #define ISA_HAS_POP		(TARGET_OCTEON && !TARGET_MIPS16)
 
+#define MIPS16_GP_LOADS	(ISA_HAS_MIPS16E2 && !TARGET_64BIT)
+
 /* The CACHE instruction is available in non-MIPS16 code.  */
 #define TARGET_CACHE_BUILTIN (mips_isa >= MIPS_ISA_MIPS3)
 
 /* The CACHE instruction is available.  */
-#define ISA_HAS_CACHE (TARGET_CACHE_BUILTIN && !TARGET_MIPS16)
+#define ISA_HAS_CACHE (TARGET_CACHE_BUILTIN && (!TARGET_MIPS16	\
+						|| TARGET_MIPS16E2))
 
 /* Tell collect what flags to pass to nm.  */
 #ifndef NM_FLAGS
@@ -1380,9 +1404,7 @@ struct mips_cpu_info {
 #ifndef SUBTARGET_ASM_DEBUGGING_SPEC
 #define SUBTARGET_ASM_DEBUGGING_SPEC "\
 %{g} %{g0} %{g1} %{g2} %{g3} \
-%{ggdb:-g} %{ggdb0:-g0} %{ggdb1:-g1} %{ggdb2:-g2} %{ggdb3:-g3} \
-%{gstabs:-g} %{gstabs0:-g0} %{gstabs1:-g1} %{gstabs2:-g2} %{gstabs3:-g3} \
-%{gstabs+:-g} %{gstabs+0:-g0} %{gstabs+1:-g1} %{gstabs+2:-g2} %{gstabs+3:-g3}"
+%{ggdb:-g} %{ggdb0:-g0} %{ggdb1:-g1} %{ggdb2:-g2} %{ggdb3:-g3}"
 #endif
 
 /* FP_ASM_SPEC represents the floating-point options that must be passed
@@ -1444,6 +1466,7 @@ struct mips_cpu_info {
 %{msym32} %{mno-sym32} \
 %{mtune=*}" \
 FP_ASM_SPEC "\
+%{mmips16e2} \
 %(subtarget_asm_spec)"
 
 /* Extra switches sometimes passed to the linker.  */
@@ -1504,7 +1527,6 @@ FP_ASM_SPEC "\
 #define SUBTARGET_EXTRA_SPECS
 #endif
 
-#define DBX_DEBUGGING_INFO 1		/* generate stabs (OSF/rose) */
 #define DWARF2_DEBUGGING_INFO 1         /* dwarf2 debugging info */
 
 #ifndef PREFERRED_DEBUGGING_TYPE
@@ -1543,14 +1565,6 @@ FP_ASM_SPEC "\
 #ifndef USER_LABEL_PREFIX
 #define USER_LABEL_PREFIX	""
 #endif
-
-/* On Sun 4, this limit is 2048.  We use 1500 to be safe,
-   since the length can run past this up to a continuation point.  */
-#undef DBX_CONTIN_LENGTH
-#define DBX_CONTIN_LENGTH 1500
-
-/* How to renumber registers for dbx and gdb.  */
-#define DBX_REGISTER_NUMBER(REGNO) mips_dbx_regno[REGNO]
 
 /* The mapping from gcc register number to DWARF 2 CFA column number.  */
 #define DWARF_FRAME_REGNUM(REGNO) mips_dwarf_regno[REGNO]
@@ -1684,7 +1698,7 @@ FP_ASM_SPEC "\
   (ISA_HAS_MSA ? BITS_PER_MSA_REG : LONG_DOUBLE_TYPE_SIZE)
 
 /* All accesses must be aligned.  */
-#define STRICT_ALIGNMENT 1
+#define STRICT_ALIGNMENT (!ISA_HAS_UNALIGNED_ACCESS)
 
 /* Define this if you wish to imitate the way many other C compilers
    handle alignment of bitfields and the structures that contain
@@ -1865,7 +1879,6 @@ FP_ASM_SPEC "\
 #define GP_REG_FIRST 0
 #define GP_REG_LAST  31
 #define GP_REG_NUM   (GP_REG_LAST - GP_REG_FIRST + 1)
-#define GP_DBX_FIRST 0
 #define K0_REG_NUM   (GP_REG_FIRST + 26)
 #define K1_REG_NUM   (GP_REG_FIRST + 27)
 #define KERNEL_REG_P(REGNO)	(IN_RANGE (REGNO, K0_REG_NUM, K1_REG_NUM))
@@ -1873,12 +1886,10 @@ FP_ASM_SPEC "\
 #define FP_REG_FIRST 32
 #define FP_REG_LAST  63
 #define FP_REG_NUM   (FP_REG_LAST - FP_REG_FIRST + 1)
-#define FP_DBX_FIRST ((write_symbols == DBX_DEBUG) ? 38 : 32)
 
 #define MD_REG_FIRST 64
 #define MD_REG_LAST  65
 #define MD_REG_NUM   (MD_REG_LAST - MD_REG_FIRST + 1)
-#define MD_DBX_FIRST (FP_DBX_FIRST + FP_REG_NUM)
 
 #define MSA_REG_FIRST FP_REG_FIRST
 #define MSA_REG_LAST  FP_REG_LAST
@@ -2063,10 +2074,6 @@ FP_ASM_SPEC "\
 /* Define this macro if it is as good or better to call a constant
    function address than to call an address kept in a register.  */
 #define NO_FUNCTION_CSE 1
-
-/* The ABI-defined global pointer.  Sometimes we use a different
-   register in leaf functions: see PIC_OFFSET_TABLE_REGNUM.  */
-#define GLOBAL_POINTER_REGNUM (GP_REG_FIRST + 28)
 
 /* We normally use $28 as the global pointer.  However, when generating
    n32/64 PIC, it is better for leaf functions to use a call-clobbered
@@ -2305,7 +2312,7 @@ enum reg_class
 
 #define LUI_OPERAND(VALUE)					\
   (((VALUE) | 0x7fff0000) == 0x7fff0000				\
-   || ((VALUE) | 0x7fff0000) + 0x10000 == 0)
+   || ((unsigned HOST_WIDE_INT) (VALUE) | 0x7fff0000) + 0x10000 == 0)
 
 /* Return a value X with the low 16 bits clear, and such that
    VALUE - X is a signed 16-bit value.  */
@@ -3217,7 +3224,6 @@ extern int num_source_filenames;	/* current .file # */
 extern struct mips_asm_switch mips_noreorder;
 extern struct mips_asm_switch mips_nomacro;
 extern struct mips_asm_switch mips_noat;
-extern int mips_dbx_regno[];
 extern int mips_dwarf_regno[];
 extern bool mips_split_p[];
 extern bool mips_split_hi_p[];
@@ -3394,6 +3400,9 @@ struct GTY(())  machine_function {
 
   /* True if GCC stored callee saved registers in the frame header.  */
   bool use_frame_header_for_callee_saved_regs;
+
+  /* True if the function should generate hazard barrier return.  */
+  bool use_hazard_barrier_return_p;
 };
 #endif
 
@@ -3442,12 +3451,14 @@ struct GTY(())  machine_function {
 
 /* If we are *not* using multilibs and the default ABI is not ABI_32 we
    need to change these from /lib and /usr/lib.  */
+#ifndef ENABLE_MULTIARCH
 #if MIPS_ABI_DEFAULT == ABI_N32
 #define STANDARD_STARTFILE_PREFIX_1 "/lib32/"
 #define STANDARD_STARTFILE_PREFIX_2 "/usr/lib32/"
 #elif MIPS_ABI_DEFAULT == ABI_64
 #define STANDARD_STARTFILE_PREFIX_1 "/lib64/"
 #define STANDARD_STARTFILE_PREFIX_2 "/usr/lib64/"
+#endif
 #endif
 
 /* Load store bonding is not supported by micromips and fix_24k.  The

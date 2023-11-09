@@ -1,5 +1,5 @@
 // RTL SSA utilities relating to instruction movement               -*- C++ -*-
-// Copyright (C) 2020-2021 Free Software Foundation, Inc.
+// Copyright (C) 2020-2023 Free Software Foundation, Inc.
 //
 // This file is part of GCC.
 //
@@ -18,6 +18,10 @@
 // <http://www.gnu.org/licenses/>.
 
 namespace rtl_ssa {
+
+// Return true if INSN can in principle be moved around, and if RTL-SSA
+// has enough information to do that.
+bool can_move_insn_p (insn_info *);
 
 // Restrict movement range RANGE so that the instruction is placed later
 // than INSN.  (The movement range is the range of instructions after which
@@ -61,7 +65,8 @@ move_earlier_than (insn_range_info range, insn_info *insn)
 inline bool
 can_insert_after (insn_info *insn)
 {
-  return insn->is_bb_head () || (insn->is_real () && !insn->is_jump ());
+  return (insn->is_bb_head ()
+	  || (insn->is_real () && !control_flow_insn_p (insn->rtl ())));
 }
 
 // Try to restrict move range MOVE_RANGE so that it is possible to
@@ -103,7 +108,7 @@ restrict_movement_for_dead_range (insn_range_info &move_range,
   resource_info resource = full_register (regno);
   def_lookup dl = crtl->ssa->find_def (resource, insn);
 
-  def_info *prev = dl.prev_def ();
+  def_info *prev = dl.last_def_of_prev_group ();
   ebb_info *ebb = insn->ebb ();
   if (!prev || prev->ebb () != ebb)
     {
@@ -143,8 +148,8 @@ restrict_movement_for_dead_range (insn_range_info &move_range,
     }
 
   // Stop the instruction moving beyond the next relevant definition of REGNO.
-  def_info *next = first_def_ignoring (dl.matching_or_next_def (),
-				       ignore_clobbers::YES, ignore);
+  def_info *next = dl.matching_set_or_first_def_of_next_group ();
+  next = first_def_ignoring (next, ignore_clobbers::YES, ignore);
   if (next)
     move_range = move_earlier_than (move_range, next->insn ());
 

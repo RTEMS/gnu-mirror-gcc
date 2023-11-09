@@ -1,6 +1,6 @@
 /* Definitions of target machine for GNU compiler.
    Renesas H8/300 version
-   Copyright (C) 2000-2021 Free Software Foundation, Inc.
+   Copyright (C) 2000-2023 Free Software Foundation, Inc.
    Contributed by Steve Chamberlain (sac@cygnus.com),
    Jim Wilson (wilson@cygnus.com), and Doug Evans (dje@cygnus.com).
 
@@ -23,7 +23,7 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_H8300_PROTOS_H
 #define GCC_H8300_PROTOS_H
 
-/* Declarations for functions used in insn-output.c.  */
+/* Declarations for functions used in insn-output.cc.  */
 #ifdef RTX_CODE
 extern unsigned int compute_mov_length (rtx *);
 extern const char *output_plussi (rtx *, bool);
@@ -59,7 +59,7 @@ extern int byte_accesses_mergeable_p (rtx, rtx);
 extern int same_cmp_preceding_p (rtx_insn *);
 extern int same_cmp_following_p (rtx_insn *);
 
-/* Used in builtins.c */
+/* Used in builtins.cc */
 extern rtx h8300_return_addr_rtx (int, rtx);
 
 /* Classifies an h8sx shift operation.
@@ -100,6 +100,7 @@ extern int h8300_initial_elimination_offset (int, int);
 extern int h8300_regs_ok_for_stm (int, rtx[]);
 extern int h8300_hard_regno_rename_ok (unsigned int, unsigned int);
 extern bool h8300_move_ok (rtx, rtx);
+extern bool pre_incdec_with_reg (rtx, unsigned int);
 
 struct cpp_reader;
 extern void h8300_pr_interrupt (struct cpp_reader *);

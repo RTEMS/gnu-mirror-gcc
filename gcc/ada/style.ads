@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -147,9 +147,10 @@ package Style is
    --  is that the starting column is appropriate to the indentation rules if
    --  Token_Ptr is the first token on the line.
 
-   procedure Check_Left_Paren
-     renames Style_Inst.Check_Left_Paren;
-   --  Called after scanning out a left parenthesis to check spacing
+   procedure Check_Left_Paren_Square_Bracket
+     renames Style_Inst.Check_Left_Paren_Square_Bracket;
+   --  Called after scanning out a left parenthesis to check spacing. If
+   --  Ada_Version >= Ada_2022 then called similarly for a left square bracket.
 
    procedure Check_Line_Terminator (Len : Int)
      renames Style_Inst.Check_Line_Terminator;
@@ -191,10 +192,15 @@ package Style is
      renames Style_Inst.Check_Vertical_Bar;
    --  Called after scanning a vertical bar to check spacing
 
-   procedure Check_Xtra_Parens (Loc : Source_Ptr)
+   procedure Check_Xtra_Parens (N : Node_Id)
      renames Style_Inst.Check_Xtra_Parens;
-   --  Called after scanning an if, case or quantified expression that has at
-   --  least one level of parentheses around the entire expression.
+   --  Called after scanning an entire expression (N) that does not require an
+   --  extra level of parentheses.
+
+   procedure Check_Xtra_Parens_Precedence (N : Node_Id)
+     renames Style_Inst.Check_Xtra_Parens_Precedence;
+   --  Called after scanning a subexpression (N) that does not require an
+   --  extra level of parentheses according to operator precedence rules.
 
    function Mode_In_Check return Boolean
      renames Style_Inst.Mode_In_Check;

@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-options "-O2 -Werror-implicit-function-declaration -march=k8 -m3dnow -mavx -mavx2 -maes -mpclmul -mgfni -mavx512bw -mavx512fp16 -mavx512vl" } */
+/* { dg-options "-O2 -Werror-implicit-function-declaration -march=k8 -m3dnow -mavx -mavx2 -maes -mpclmul -mgfni -mavx512bw -mavx512fp16 -mavx512vl -mprefetchi" } */
 /* { dg-add-options bind_pic_locally } */
 
 #include <mm_malloc.h>
@@ -153,7 +153,7 @@
 #define __builtin_ia32_shufpd(A, B, N) __builtin_ia32_shufpd(A, B, 0)
 
 /* xmmintrin.h */
-#define __builtin_prefetch(P, A, I) __builtin_prefetch(P, 0, _MM_HINT_NTA)
+#define __builtin_ia32_prefetch(A, B, C, D) __builtin_ia32_prefetch(A, 0, 3, 0)
 #define __builtin_ia32_pshufw(A, N) __builtin_ia32_pshufw(A, 0)
 #define __builtin_ia32_vec_set_v4hi(A, D, N) \
   __builtin_ia32_vec_set_v4hi(A, D, 0)
@@ -789,9 +789,11 @@
 #define __builtin_ia32_vfnmsubsh3_maskz(A, B, C, D, E) __builtin_ia32_vfnmsubsh3_maskz(A, B, C, D, 8)
 #define __builtin_ia32_vfcmaddcph512_round(A, B, C, D) __builtin_ia32_vfcmaddcph512_round(A, B, C, 8)
 #define __builtin_ia32_vfcmaddcph512_mask_round(A, C, D, B, E) __builtin_ia32_vfcmaddcph512_mask_round(A, C, D, B, 8)
+#define __builtin_ia32_vfcmaddcph512_mask3_round(A, C, D, B, E) __builtin_ia32_vfcmaddcph512_mask3_round(A, C, D, B, 8)
 #define __builtin_ia32_vfcmaddcph512_maskz_round(B, C, D, A, E) __builtin_ia32_vfcmaddcph512_maskz_round(B, C, D, A, 8)
 #define __builtin_ia32_vfmaddcph512_round(A, B, C, D) __builtin_ia32_vfmaddcph512_round(A, B, C, 8)
 #define __builtin_ia32_vfmaddcph512_mask_round(A, C, D, B, E) __builtin_ia32_vfmaddcph512_mask_round(A, C, D, B, 8)
+#define __builtin_ia32_vfmaddcph512_mask3_round(A, C, D, B, E) __builtin_ia32_vfmaddcph512_mask3_round(A, C, D, B, 8)
 #define __builtin_ia32_vfmaddcph512_maskz_round(B, C, D, A, E) __builtin_ia32_vfmaddcph512_maskz_round(B, C, D, A, 8)
 #define __builtin_ia32_vfmulcph512_round(A, B, C) __builtin_ia32_vfmulcph512_round(A, B, 8)
 #define __builtin_ia32_vfmulcph512_mask_round(A, C, D, B, E) __builtin_ia32_vfmulcph512_mask_round(A, C, D, B, 8)
@@ -799,9 +801,11 @@
 #define __builtin_ia32_vfcmulcph512_mask_round(A, C, D, B, E) __builtin_ia32_vfcmulcph512_mask_round(A, C, D, B, 8)
 #define __builtin_ia32_vfmaddcsh_round(A, B, C, D) __builtin_ia32_vfmaddcsh_round(A, B, C, 8)
 #define __builtin_ia32_vfmaddcsh_mask_round(A, C, D, B, E) __builtin_ia32_vfmaddcsh_mask_round(A, C, D, B, 8)
+#define __builtin_ia32_vfmaddcsh_mask3_round(A, C, D, B, E) __builtin_ia32_vfmaddcsh_mask3_round(A, C, D, B, 8)
 #define __builtin_ia32_vfmaddcsh_maskz_round(B, C, D, A, E) __builtin_ia32_vfmaddcsh_maskz_round(B, C, D, A, 8)
 #define __builtin_ia32_vfcmaddcsh_round(A, B, C, D) __builtin_ia32_vfcmaddcsh_round(A, B, C, 8)
 #define __builtin_ia32_vfcmaddcsh_mask_round(A, C, D, B, E) __builtin_ia32_vfcmaddcsh_mask_round(A, C, D, B, 8)
+#define __builtin_ia32_vfcmaddcsh_mask3_round(A, C, D, B, E) __builtin_ia32_vfcmaddcsh_mask3_round(A, C, D, B, 8)
 #define __builtin_ia32_vfcmaddcsh_maskz_round(B, C, D, A, E) __builtin_ia32_vfcmaddcsh_maskz_round(B, C, D, A, 8)
 #define __builtin_ia32_vfmulcsh_round(A, B, C) __builtin_ia32_vfmulcsh_round(A, B, 8)
 #define __builtin_ia32_vfmulcsh_mask_round(A, C, D, B, E) __builtin_ia32_vfmulcsh_mask_round(A, C, D, B, 8)
@@ -830,6 +834,13 @@
 /* tbmintrin.h */
 #define __builtin_ia32_bextri_u32(X, Y) __builtin_ia32_bextri_u32 (X, 1)
 #define __builtin_ia32_bextri_u64(X, Y) __builtin_ia32_bextri_u64 (X, 1)
+
+/* cmpccxadd.h */
+#define __builtin_ia32_cmpccxadd(A, B, C, D) __builtin_ia32_cmpccxadd(A, B, C, 1)
+#define __builtin_ia32_cmpccxadd64(A, B, C, D) __builtin_ia32_cmpccxadd64(A, B, C, 1)
+
+/* sm3intrin.h */
+#define __builtin_ia32_vsm3rnds2(A, B, C, D) __builtin_ia32_vsm3rnds2 (A, B, C, 1)
 
 #include <wmmintrin.h>
 #include <immintrin.h>

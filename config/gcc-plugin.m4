@@ -45,11 +45,11 @@ AC_DEFUN([GCC_ENABLE_PLUGINS],
      ;;
      *)
        if test x$build = x$host; then
-	 export_sym_check="objdump${exeext} -T"
+	 export_sym_check="$ac_cv_prog_OBJDUMP -T"
        elif test x$host = x$target; then
 	 export_sym_check="$gcc_cv_objdump -T"
        else
-	 export_sym_check=
+	 export_sym_check="$ac_cv_prog_OBJDUMP -T"
        fi
      ;;
    esac
@@ -91,14 +91,18 @@ AC_DEFUN([GCC_ENABLE_PLUGINS],
      # Check that we can build shared objects with -fPIC -shared
      saved_LDFLAGS="$LDFLAGS"
      saved_CFLAGS="$CFLAGS"
+     saved_CXXFLAGS="$CXXFLAGS"
      case "${host}" in
        *-*-darwin*)
 	 CFLAGS=`echo $CFLAGS | sed s/-mdynamic-no-pic//g`
 	 CFLAGS="$CFLAGS -fPIC"
+	 CXXFLAGS=`echo $CXXFLAGS | sed s/-mdynamic-no-pic//g`
+	 CXXFLAGS="$CXXFLAGS -fPIC"
 	 LDFLAGS="$LDFLAGS -shared -undefined dynamic_lookup"
        ;;
        *)
 	 CFLAGS="$CFLAGS -fPIC"
+	 CXXFLAGS="$CXXFLAGS -fPIC"
 	 LDFLAGS="$LDFLAGS -fPIC -shared"
        ;;
      esac
@@ -113,6 +117,7 @@ AC_DEFUN([GCC_ENABLE_PLUGINS],
      fi
      LDFLAGS="$saved_LDFLAGS"
      CFLAGS="$saved_CFLAGS"
+     CXXFLAGS="$saved_CXXFLAGS"
 
      # If plugin support had been requested but not available, fail.
      if test x"$enable_plugin" = x"no" ; then
@@ -123,4 +128,44 @@ AC_DEFUN([GCC_ENABLE_PLUGINS],
        fi
      fi
    fi
+])
+
+dnl
+dnl
+dnl GCC_PLUGIN_OPTION
+dnl    (SHELL-CODE_HANDLER)
+dnl
+AC_DEFUN([GCC_PLUGIN_OPTION],[dnl
+AC_MSG_CHECKING([for -plugin option])
+
+plugin_names="liblto_plugin.so liblto_plugin-0.dll cyglto_plugin-0.dll"
+plugin_option=
+for plugin in $plugin_names; do
+  plugin_so=`${CC} ${CFLAGS} --print-prog-name $plugin`
+  if test x$plugin_so = x$plugin; then
+    plugin_so=`${CC} ${CFLAGS} --print-file-name $plugin`
+  fi
+  if test x$plugin_so != x$plugin; then
+    plugin_option="--plugin $plugin_so"
+    break
+  fi
+done
+dnl Check if ${AR} $plugin_option rc works.
+AC_CHECK_TOOL(AR, ar)
+if test "${AR}" = "" ; then
+  AC_MSG_ERROR([Required archive tool 'ar' not found on PATH.])
+fi
+touch conftest.c
+${AR} $plugin_option rc conftest.a conftest.c
+if test "$?" != 0; then
+  AC_MSG_WARN([Failed: $AR $plugin_option rc])
+  plugin_option=
+fi
+rm -f conftest.*
+if test -n "$plugin_option"; then
+  $1="$plugin_option"
+  AC_MSG_RESULT($plugin_option)
+else
+  AC_MSG_RESULT([no])
+fi
 ])

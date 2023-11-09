@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -60,6 +60,12 @@ package Rtsfind is
    --  the compilation except in the presence of use clauses, which might
    --  result in unexpected ambiguities.
 
+   --  IMPORTANT NOTE: the specs of packages and procedures with'ed using
+   --  this mechanism must not contain private with clauses. This is because
+   --  the special context installation/removal for private with clauses
+   --  only works in a clean environment for compilation, and could lead
+   --  here to removing visibility over lib units in the calling context.
+
    --  NOTE: If RTU_Id is modified, the subtypes of RTU_Id in the package body
    --  might need to be modified. See Get_Unit_Name.
 
@@ -109,7 +115,13 @@ package Rtsfind is
 
       --  Children of Ada.Numerics
 
+      Ada_Numerics_Big_Numbers,
       Ada_Numerics_Generic_Elementary_Functions,
+
+      --  Children of Ada.Numerics.Big_Numbers
+
+      Ada_Numerics_Big_Numbers_Big_Integers,
+      Ada_Numerics_Big_Numbers_Big_Integers_Ghost,
 
       --  Children of Ada.Real_Time
 
@@ -167,7 +179,6 @@ package Rtsfind is
 
       CUDA_Driver_Types,
       CUDA_Internal,
-      CUDA_Runtime_Api,
       CUDA_Vector_Types,
 
       --  Interfaces
@@ -177,7 +188,6 @@ package Rtsfind is
       --  Children of Interfaces
 
       Interfaces_C,
-      Interfaces_Packed_Decimal,
 
       --  Children of Interfaces.C
 
@@ -193,7 +203,6 @@ package Rtsfind is
       System_Address_To_Access_Conversions,
       System_Arith_64,
       System_Arith_128,
-      System_AST_Handling,
       System_Assertions,
       System_Atomic_Operations,
       System_Atomic_Primitives,
@@ -245,9 +254,6 @@ package Rtsfind is
       System_Fat_LFlt,
       System_Fat_LLF,
       System_Fat_SFlt,
-      System_Fat_VAX_D_Float,
-      System_Fat_VAX_F_Float,
-      System_Fat_VAX_G_Float,
       System_Finalization_Masters,
       System_Finalization_Root,
       System_Fore_Decimal_32,
@@ -276,14 +282,12 @@ package Rtsfind is
       System_Img_LLLI,
       System_Img_LLU,
       System_Img_LLLU,
-      System_Img_Name,
       System_Img_Uns,
       System_Img_WChar,
       System_Interrupts,
       System_Long_Long_Float_Expon,
       System_Machine_Code,
       System_Mantissa,
-      System_Memcop,
       System_Memory,
       System_Multiprocessors,
       System_Pack_03,
@@ -408,14 +412,12 @@ package Rtsfind is
       System_Pack_127,
       System_Parameters,
       System_Partition_Interface,
-      System_Pool_32_Global,
       System_Pool_Global,
-      System_Pool_Empty,
-      System_Pool_Local,
       System_Pool_Size,
       System_Put_Images,
       System_Put_Task_Images,
       System_Relative_Delays,
+      System_Return_Stack,
       System_RPC,
       System_Scalar_Values,
       System_Secondary_Stack,
@@ -427,7 +429,6 @@ package Rtsfind is
       System_Stream_Attributes,
       System_Task_Info,
       System_Tasking,
-      System_Threads,
       System_Unsigned_Types,
       System_Val_Bool,
       System_Val_Char,
@@ -448,7 +449,6 @@ package Rtsfind is
       System_Val_LLLI,
       System_Val_LLU,
       System_Val_LLLU,
-      System_Val_Name,
       System_Val_Uns,
       System_Val_WChar,
       System_Version_Control,
@@ -462,7 +462,6 @@ package Rtsfind is
       System_Wid_LLLI,
       System_Wid_LLU,
       System_Wid_LLLU,
-      System_Wid_Name,
       System_Wid_Uns,
       System_Wid_WChar,
       System_WWd_Char,
@@ -471,7 +470,7 @@ package Rtsfind is
 
       --  Children of System.Atomic_Operations
 
-       System_Atomic_Operations_Test_And_Set,
+      System_Atomic_Operations_Test_And_Set,
 
       --  Children of System.Dim
 
@@ -527,13 +526,11 @@ package Rtsfind is
    --  value is required syntactically, but no real entry is required or
    --  needed. Use of this value will cause a fatal error in an RTE call.
 
-   --  Note that under no circumstances can any of these entities be defined
-   --  more than once in a given package, i.e. no overloading is allowed for
-   --  any entity that is found using rtsfind. A fatal error is given if this
-   --  rule is violated. The one exception is for Save_Occurrence, where the
-   --  RM mandates the overloading. In this case, the compiler only uses the
-   --  procedure, not the function, and the procedure must come first so that
-   --  the compiler finds it and not the function.
+   --  It is normally not allowed to have more than one of these entities with
+   --  the same name in a given package. The one exception is Save_Occurrence,
+   --  where the RM mandates the overloading. In this case, the compiler uses
+   --  the procedure, not the function, and the procedure must come first so
+   --  that the compiler finds it and not the function.
 
    type RE_Id is (
 
@@ -550,17 +547,13 @@ package Rtsfind is
 
      RE_Set_Deadline,                    -- Ada.Dispatching.EDF
 
-     RE_Code_Loc,                        -- Ada.Exceptions
      RE_Exception_Id,                    -- Ada.Exceptions
-     RE_Exception_Identity,              -- Ada.Exceptions
      RE_Exception_Information,           -- Ada.Exceptions
      RE_Exception_Message,               -- Ada.Exceptions
      RE_Exception_Name_Simple,           -- Ada.Exceptions
      RE_Exception_Occurrence,            -- Ada.Exceptions
-     RE_Exception_Occurrence_Access,     -- Ada.Exceptions
      RE_Null_Id,                         -- Ada.Exceptions
      RE_Null_Occurrence,                 -- Ada.Exceptions
-     RE_Poll,                            -- Ada.Exceptions
      RE_Raise_Exception,                 -- Ada.Exceptions
      RE_Raise_Exception_Always,          -- Ada.Exceptions
      RE_Raise_From_Controlled_Operation, -- Ada.Exceptions
@@ -579,10 +572,13 @@ package Rtsfind is
      RE_Detach_Handler,                  -- Ada.Interrupts
      RE_Reference,                       -- Ada.Interrupts
 
+     RE_Big_Integer,             -- Ada.Numerics.Big_Numbers.Big_Integers
+     RO_GH_Big_Integer,          -- Ada.Numerics.Big_Numbers.Big_Integers_Ghost
+
      RE_Names,                           -- Ada.Interrupts.Names
 
      RE_Clock,                           -- Ada.Real_Time
-     RE_Clock_Time,                      -- Ada.Real_Time
+     RE_Clock_Time,                      -- Ada.Real_Time [used by GNATprove]
      RE_Time_Span,                       -- Ada.Real_Time
      RE_Time_Span_Zero,                  -- Ada.Real_Time
      RO_RT_Time,                         -- Ada.Real_Time
@@ -598,8 +594,6 @@ package Rtsfind is
      RE_Stream_Element_Array,            -- Ada.Streams
      RE_Stream_Element_Offset,           -- Ada.Streams
 
-     RE_Stream_Access,                   -- Ada.Streams.Stream_IO
-
      RO_SU_Super_String,                 -- Ada.Strings.Superbounded
 
      RO_WI_Super_String,                 -- Ada.Strings.Wide_Superbounded
@@ -610,6 +604,7 @@ package Rtsfind is
 
      RE_Root_Buffer_Type,                -- Ada.Strings.Text_Buffers
      RE_Put_UTF_8,                       -- Ada.Strings.Text_Buffers
+     RE_Set_Trim_Leading_Spaces,         -- Ada.Strings.Text_Buffers
      RE_Wide_Wide_Put,                   -- Ada.Strings.Text_Buffers
 
      RE_Buffer_Type,                     -- Ada.Strings.Text_Buffers.Unbounded
@@ -620,13 +615,13 @@ package Rtsfind is
      RE_Wait_For_Release,                -- Ada.Synchronous_Barriers
 
      RE_Suspend_Until_True,              -- Ada.Synchronous_Task_Control
+     RE_Suspension_Object,               -- Ada.Synchronous_Task_Control
 
      RE_Access_Level,                    -- Ada.Tags
      RE_Alignment,                       -- Ada.Tags
      RE_Address_Array,                   -- Ada.Tags
      RE_Addr_Ptr,                        -- Ada.Tags
      RE_Base_Address,                    -- Ada.Tags
-     RE_Check_Interface_Conversion,      -- Ada.Tags
      RE_Check_TSD,                       -- Ada.Tags
      RE_Cstring_Ptr,                     -- Ada.Tags
      RE_CW_Membership,                   -- Ada.Tags
@@ -641,13 +636,11 @@ package Rtsfind is
      RE_External_Tag,                    -- Ada.Tags
      RO_TA_External_Tag,                 -- Ada.Tags
      RE_Get_Access_Level,                -- Ada.Tags
-     RE_Get_Alignment,                   -- Ada.Tags
      RE_Get_Entry_Index,                 -- Ada.Tags
      RE_Get_Offset_Index,                -- Ada.Tags
      RE_Get_Prim_Op_Kind,                -- Ada.Tags
      RE_Get_Tagged_Kind,                 -- Ada.Tags
      RE_HT_Link,                         -- Ada.Tags
-     RE_Idepth,                          -- Ada.Tags
      RE_Interfaces_Array,                -- Ada.Tags
      RE_Interfaces_Table,                -- Ada.Tags
      RE_Interface_Data,                  -- Ada.Tags
@@ -660,8 +653,6 @@ package Rtsfind is
      RE_No_Dispatch_Table_Wrapper,       -- Ada.Tags
      RE_No_Tag,                          -- Ada.Tags
      RE_NDT_Prims_Ptr,                   -- Ada.Tags
-     RE_NDT_TSD,                         -- Ada.Tags
-     RE_Num_Prims,                       -- Ada.Tags
      RE_Object_Specific_Data,            -- Ada.Tags
      RE_Offset_To_Top,                   -- Ada.Tags
      RE_Offset_To_Top_Ptr,               -- Ada.Tags
@@ -684,11 +675,9 @@ package Rtsfind is
      RE_Primary_DT,                      -- Ada.Tags
      RE_Signature,                       -- Ada.Tags
      RE_SSD,                             -- Ada.Tags
-     RE_TSD,                             -- Ada.Tags
      RE_Type_Specific_Data,              -- Ada.Tags
      RE_Register_Interface_Offset,       -- Ada.Tags
      RE_Register_Tag,                    -- Ada.Tags
-     RE_Register_TSD,                    -- Ada.Tags
      RE_Transportable,                   -- Ada.Tags
      RE_Secondary_DT,                    -- Ada.Tags
      RE_Secondary_Tag,                   -- Ada.Tags
@@ -734,7 +723,6 @@ package Rtsfind is
 
      RE_Stream_T,                        -- CUDA.Driver_Types
 
-     RE_Fatbin_Wrapper,                  -- CUDA.Internal
      RE_Launch_Kernel,                   -- CUDA.Internal
      RE_Pop_Call_Configuration,          -- CUDA.Internal
      RE_Push_Call_Configuration,         -- CUDA.Internal
@@ -757,19 +745,14 @@ package Rtsfind is
 
      RO_IC_Unsigned,                     -- Interfaces.C
 
-     RE_Chars_Ptr,                       -- Interfaces.C.Strings
-     RE_New_Char_Array,                  -- Interfaces.C.Strings
-
      RE_Address,                         -- System
      RE_Any_Priority,                    -- System
      RE_Bit_Order,                       -- System
      RE_Default_Priority,                -- System
      RE_High_Order_First,                -- System
      RE_Interrupt_Priority,              -- System
-     RE_Lib_Stop,                        -- System
      RE_Low_Order_First,                 -- System
      RE_Max_Base_Digits,                 -- System
-     RE_Max_Priority,                    -- System
      RE_Null_Address,                    -- System
      RE_Priority,                        -- System
 
@@ -786,8 +769,6 @@ package Rtsfind is
      RE_Multiply_With_Ovflo_Check128,    -- System.Arith_128
      RE_Subtract_With_Ovflo_Check128,    -- System.Arith_128
      RE_Scaled_Divide128,                -- System.Arith_128
-
-     RE_Create_AST_Handler,              -- System.AST_Handling
 
      RE_Assert_Failure,                  -- System.Assertions
      RE_Raise_Assert_Failure,            -- System.Assertions
@@ -809,9 +790,6 @@ package Rtsfind is
      RE_Atomic_Test_And_Set,           -- System.Atomic_Operations.Test_And_Set
 
      RE_AST_Handler,                     -- System.Aux_DEC
-     RE_Import_Address,                  -- System.Aux_DEC
-     RE_Import_Value,                    -- System.Aux_DEC
-     RE_No_AST_Handler,                  -- System.Aux_DEC
      RE_Type_Class,                      -- System.Aux_DEC
      RE_Type_Class_Enumeration,          -- System.Aux_DEC
      RE_Type_Class_Integer,              -- System.Aux_DEC
@@ -895,15 +873,6 @@ package Rtsfind is
      RE_Str_Concat_8,                    -- System.Concat_8
      RE_Str_Concat_9,                    -- System.Concat_9
 
-     RE_Str_Concat_Bounds_2,             -- System.Concat_2
-     RE_Str_Concat_Bounds_3,             -- System.Concat_3
-     RE_Str_Concat_Bounds_4,             -- System.Concat_4
-     RE_Str_Concat_Bounds_5,             -- System.Concat_5
-     RE_Str_Concat_Bounds_6,             -- System.Concat_6
-     RE_Str_Concat_Bounds_7,             -- System.Concat_7
-     RE_Str_Concat_Bounds_8,             -- System.Concat_8
-     RE_Str_Concat_Bounds_9,             -- System.Concat_9
-
      RE_Get_Active_Partition_Id,         -- System.DSA_Services
      RE_Get_Local_Partition_Id,          -- System.DSA_Services
      RE_Get_Passive_Partition_Id,        -- System.DSA_Services
@@ -948,15 +917,6 @@ package Rtsfind is
 
      RE_Attr_Long_Long_Float,            -- System.Fat_LLF
 
-     RE_Attr_VAX_D_Float,                -- System.Fat_VAX_D_Float
-     RE_Fat_VAX_D,                       -- System.Fat_VAX_D_Float
-
-     RE_Attr_VAX_F_Float,                -- System.Fat_VAX_F_Float
-     RE_Fat_VAX_F,                       -- System.Fat_VAX_F_Float
-
-     RE_Attr_VAX_G_Float,                -- System.Fat_VAX_G_Float
-     RE_Fat_VAX_G,                       -- System.Fat_VAX_G_Float
-
      RE_Add_Offset_To_Address,           -- System.Finalization_Masters
      RE_Attach,                          -- System.Finalization_Masters
      RE_Base_Pool,                       -- System.Finalization_Masters
@@ -964,10 +924,8 @@ package Rtsfind is
      RE_Finalization_Master_Ptr,         -- System.Finalization_Masters
      RE_Set_Base_Pool,                   -- System.Finalization_Masters
      RE_Set_Finalize_Address,            -- System.Finalization_Masters
-     RE_Set_Is_Heterogeneous,            -- System.Finalization_Masters
 
      RE_Root_Controlled,                 -- System.Finalization_Root
-     RE_Root_Controlled_Ptr,             -- System.Finalization_Root
 
      RE_Fore_Decimal32,                  -- System.Fore_Decimal_32
 
@@ -1643,9 +1601,7 @@ package Rtsfind is
      RE_Set_127,                         -- System.Pack_127
 
      RE_Adjust_Storage_Size,             -- System.Parameters
-     RE_Default_Secondary_Stack_Size,    -- System.Parameters
      RE_Default_Stack_Size,              -- System.Parameters
-     RE_Garbage_Collected,               -- System.Parameters
      RE_Size_Type,                       -- System.Parameters
      RE_Unspecified_Size,                -- System.Parameters
 
@@ -1670,8 +1626,6 @@ package Rtsfind is
      RE_Get_RAS_Info,                    -- System.Partition_Interface
 
      RE_Global_Pool_Object,              -- System.Pool_Global
-
-     RE_Global_Pool_32_Object,           -- System.Pool_32_Global
 
      RE_Stack_Bounded_Pool,              -- System.Pool_Size
 
@@ -1738,11 +1692,8 @@ package Rtsfind is
      RE_Set_Result,                      -- System.Partition_Interface
      RE_Register_Obj_Receiving_Stub,     -- System.Partition_Interface
      RE_Register_Pkg_Receiving_Stub,     -- System.Partition_Interface
-     RE_Is_Nil,                          -- System.Partition_Interface
-     RE_Entity_Ptr,                      -- System.Partition_Interface
      RE_Entity_Of,                       -- System.Partition_Interface
      RE_Inc_Usage,                       -- System.Partition_Interface
-     RE_Set_Ref,                         -- System.Partition_Interface
      RE_Make_Ref,                        -- System.Partition_Interface
      RE_Get_Local_Address,               -- System.Partition_Interface
      RE_Get_Reference,                   -- System.Partition_Interface
@@ -1827,6 +1778,9 @@ package Rtsfind is
 
      RO_RD_Delay_For,                    -- System.Relative_Delays
 
+     RE_RS_Allocate,                     -- System.Return_Stack
+     RE_RS_Pool,                         -- System.Return_Stack
+
      RE_IS_Is1,                          -- System.Scalar_Values
      RE_IS_Is2,                          -- System.Scalar_Values
      RE_IS_Is4,                          -- System.Scalar_Values
@@ -1872,8 +1826,6 @@ package Rtsfind is
      RE_Deallocate_Any_Controlled,       -- System.Storage_Pools.Subpools
      RE_Header_Size_With_Padding,        -- System.Storage_Pools.Subpools
      RE_Root_Storage_Pool_With_Subpools, -- System.Storage_Pools.Subpools
-     RE_Root_Subpool,                    -- System.Storage_Pools.Subpools
-     RE_Subpool_Handle,                  -- System.Storage_Pools.Subpools
 
      RE_I_AD,                            -- System.Stream_Attributes
      RE_I_AS,                            -- System.Stream_Attributes
@@ -1997,7 +1949,6 @@ package Rtsfind is
      RE_Simple_Mode,                     -- System.Tasking
      RE_Terminate_Mode,                  -- System.Tasking
      RE_Delay_Mode,                      -- System.Tasking
-     RE_Entry_Index,                     -- System.Tasking
      RE_Task_Entry_Index,                -- System.Tasking
      RE_Self,                            -- System.Tasking
 
@@ -2235,17 +2186,13 @@ package Rtsfind is
 
      RE_Set_Deadline                     => Ada_Dispatching_EDF,
 
-     RE_Code_Loc                         => Ada_Exceptions,
      RE_Exception_Id                     => Ada_Exceptions,
-     RE_Exception_Identity               => Ada_Exceptions,
      RE_Exception_Information            => Ada_Exceptions,
      RE_Exception_Message                => Ada_Exceptions,
      RE_Exception_Name_Simple            => Ada_Exceptions,
      RE_Exception_Occurrence             => Ada_Exceptions,
-     RE_Exception_Occurrence_Access      => Ada_Exceptions,
      RE_Null_Id                          => Ada_Exceptions,
      RE_Null_Occurrence                  => Ada_Exceptions,
-     RE_Poll                             => Ada_Exceptions,
      RE_Raise_Exception                  => Ada_Exceptions,
      RE_Raise_Exception_Always           => Ada_Exceptions,
      RE_Raise_From_Controlled_Operation  => Ada_Exceptions,
@@ -2263,6 +2210,9 @@ package Rtsfind is
      RE_Exchange_Handler                 => Ada_Interrupts,
      RE_Detach_Handler                   => Ada_Interrupts,
      RE_Reference                        => Ada_Interrupts,
+
+     RE_Big_Integer             => Ada_Numerics_Big_Numbers_Big_Integers,
+     RO_GH_Big_Integer          => Ada_Numerics_Big_Numbers_Big_Integers_Ghost,
 
      RE_Names                            => Ada_Interrupts_Names,
 
@@ -2283,8 +2233,6 @@ package Rtsfind is
      RE_Stream_Element_Array             => Ada_Streams,
      RE_Stream_Element_Offset            => Ada_Streams,
 
-     RE_Stream_Access                    => Ada_Streams_Stream_IO,
-
      RO_SU_Super_String                  => Ada_Strings_Superbounded,
 
      RO_WI_Super_String                  => Ada_Strings_Wide_Superbounded,
@@ -2295,6 +2243,7 @@ package Rtsfind is
 
      RE_Root_Buffer_Type                 => Ada_Strings_Text_Buffers,
      RE_Put_UTF_8                        => Ada_Strings_Text_Buffers,
+     RE_Set_Trim_Leading_Spaces          => Ada_Strings_Text_Buffers,
      RE_Wide_Wide_Put                    => Ada_Strings_Text_Buffers,
 
      RE_Buffer_Type                      => Ada_Strings_Text_Buffers_Unbounded,
@@ -2305,13 +2254,13 @@ package Rtsfind is
      RE_Wait_For_Release                 => Ada_Synchronous_Barriers,
 
      RE_Suspend_Until_True               => Ada_Synchronous_Task_Control,
+     RE_Suspension_Object                => Ada_Synchronous_Task_Control,
 
      RE_Access_Level                     => Ada_Tags,
      RE_Alignment                        => Ada_Tags,
      RE_Address_Array                    => Ada_Tags,
      RE_Addr_Ptr                         => Ada_Tags,
      RE_Base_Address                     => Ada_Tags,
-     RE_Check_Interface_Conversion       => Ada_Tags,
      RE_Check_TSD                        => Ada_Tags,
      RE_Cstring_Ptr                      => Ada_Tags,
      RE_CW_Membership                    => Ada_Tags,
@@ -2326,13 +2275,11 @@ package Rtsfind is
      RE_External_Tag                     => Ada_Tags,
      RO_TA_External_Tag                  => Ada_Tags,
      RE_Get_Access_Level                 => Ada_Tags,
-     RE_Get_Alignment                    => Ada_Tags,
      RE_Get_Entry_Index                  => Ada_Tags,
      RE_Get_Offset_Index                 => Ada_Tags,
      RE_Get_Prim_Op_Kind                 => Ada_Tags,
      RE_Get_Tagged_Kind                  => Ada_Tags,
      RE_HT_Link                          => Ada_Tags,
-     RE_Idepth                           => Ada_Tags,
      RE_Interfaces_Array                 => Ada_Tags,
      RE_Interfaces_Table                 => Ada_Tags,
      RE_Interface_Data                   => Ada_Tags,
@@ -2345,8 +2292,6 @@ package Rtsfind is
      RE_No_Dispatch_Table_Wrapper        => Ada_Tags,
      RE_No_Tag                           => Ada_Tags,
      RE_NDT_Prims_Ptr                    => Ada_Tags,
-     RE_NDT_TSD                          => Ada_Tags,
-     RE_Num_Prims                        => Ada_Tags,
      RE_Object_Specific_Data             => Ada_Tags,
      RE_Offset_To_Top                    => Ada_Tags,
      RE_Offset_To_Top_Ptr                => Ada_Tags,
@@ -2369,11 +2314,9 @@ package Rtsfind is
      RE_Primary_DT                       => Ada_Tags,
      RE_Signature                        => Ada_Tags,
      RE_SSD                              => Ada_Tags,
-     RE_TSD                              => Ada_Tags,
      RE_Type_Specific_Data               => Ada_Tags,
      RE_Register_Interface_Offset        => Ada_Tags,
      RE_Register_Tag                     => Ada_Tags,
-     RE_Register_TSD                     => Ada_Tags,
      RE_Transportable                    => Ada_Tags,
      RE_Secondary_DT                     => Ada_Tags,
      RE_Secondary_Tag                    => Ada_Tags,
@@ -2419,7 +2362,6 @@ package Rtsfind is
 
      RE_Stream_T                         => CUDA_Driver_Types,
 
-     RE_Fatbin_Wrapper                   => CUDA_Internal,
      RE_Launch_Kernel                    => CUDA_Internal,
      RE_Pop_Call_Configuration           => CUDA_Internal,
      RE_Push_Call_Configuration          => CUDA_Internal,
@@ -2442,19 +2384,14 @@ package Rtsfind is
 
      RO_IC_Unsigned                      => Interfaces_C,
 
-     RE_Chars_Ptr                        => Interfaces_C_Strings,
-     RE_New_Char_Array                   => Interfaces_C_Strings,
-
      RE_Address                          => System,
      RE_Any_Priority                     => System,
      RE_Bit_Order                        => System,
      RE_Default_Priority                 => System,
      RE_High_Order_First                 => System,
      RE_Interrupt_Priority               => System,
-     RE_Lib_Stop                         => System,
      RE_Low_Order_First                  => System,
      RE_Max_Base_Digits                  => System,
-     RE_Max_Priority                     => System,
      RE_Null_Address                     => System,
      RE_Priority                         => System,
 
@@ -2471,8 +2408,6 @@ package Rtsfind is
      RE_Multiply_With_Ovflo_Check128     => System_Arith_128,
      RE_Subtract_With_Ovflo_Check128     => System_Arith_128,
      RE_Scaled_Divide128                 => System_Arith_128,
-
-     RE_Create_AST_Handler               => System_AST_Handling,
 
      RE_Assert_Failure                   => System_Assertions,
      RE_Raise_Assert_Failure             => System_Assertions,
@@ -2494,9 +2429,6 @@ package Rtsfind is
      RE_Atomic_Test_And_Set           => System_Atomic_Operations_Test_And_Set,
 
      RE_AST_Handler                      => System_Aux_DEC,
-     RE_Import_Address                   => System_Aux_DEC,
-     RE_Import_Value                     => System_Aux_DEC,
-     RE_No_AST_Handler                   => System_Aux_DEC,
      RE_Type_Class                       => System_Aux_DEC,
      RE_Type_Class_Enumeration           => System_Aux_DEC,
      RE_Type_Class_Integer               => System_Aux_DEC,
@@ -2586,15 +2518,6 @@ package Rtsfind is
      RE_Str_Concat_8                     => System_Concat_8,
      RE_Str_Concat_9                     => System_Concat_9,
 
-     RE_Str_Concat_Bounds_2              => System_Concat_2,
-     RE_Str_Concat_Bounds_3              => System_Concat_3,
-     RE_Str_Concat_Bounds_4              => System_Concat_4,
-     RE_Str_Concat_Bounds_5              => System_Concat_5,
-     RE_Str_Concat_Bounds_6              => System_Concat_6,
-     RE_Str_Concat_Bounds_7              => System_Concat_7,
-     RE_Str_Concat_Bounds_8              => System_Concat_8,
-     RE_Str_Concat_Bounds_9              => System_Concat_9,
-
      RE_Get_Active_Partition_Id          => System_DSA_Services,
      RE_Get_Local_Partition_Id           => System_DSA_Services,
      RE_Get_Passive_Partition_Id         => System_DSA_Services,
@@ -2639,15 +2562,6 @@ package Rtsfind is
 
      RE_Attr_Long_Long_Float             => System_Fat_LLF,
 
-     RE_Attr_VAX_D_Float                 => System_Fat_VAX_D_Float,
-     RE_Fat_VAX_D                        => System_Fat_VAX_D_Float,
-
-     RE_Attr_VAX_F_Float                 => System_Fat_VAX_F_Float,
-     RE_Fat_VAX_F                        => System_Fat_VAX_F_Float,
-
-     RE_Attr_VAX_G_Float                 => System_Fat_VAX_G_Float,
-     RE_Fat_VAX_G                        => System_Fat_VAX_G_Float,
-
      RE_Add_Offset_To_Address            => System_Finalization_Masters,
      RE_Attach                           => System_Finalization_Masters,
      RE_Base_Pool                        => System_Finalization_Masters,
@@ -2655,10 +2569,8 @@ package Rtsfind is
      RE_Finalization_Master_Ptr          => System_Finalization_Masters,
      RE_Set_Base_Pool                    => System_Finalization_Masters,
      RE_Set_Finalize_Address             => System_Finalization_Masters,
-     RE_Set_Is_Heterogeneous             => System_Finalization_Masters,
 
      RE_Root_Controlled                  => System_Finalization_Root,
-     RE_Root_Controlled_Ptr              => System_Finalization_Root,
 
      RE_Fore_Decimal32                   => System_Fore_Decimal_32,
 
@@ -3336,9 +3248,7 @@ package Rtsfind is
      RE_Set_127                          => System_Pack_127,
 
      RE_Adjust_Storage_Size              => System_Parameters,
-     RE_Default_Secondary_Stack_Size     => System_Parameters,
      RE_Default_Stack_Size               => System_Parameters,
-     RE_Garbage_Collected                => System_Parameters,
      RE_Size_Type                        => System_Parameters,
      RE_Unspecified_Size                 => System_Parameters,
 
@@ -3395,11 +3305,8 @@ package Rtsfind is
      RE_Set_Result                       => System_Partition_Interface,
      RE_Register_Obj_Receiving_Stub      => System_Partition_Interface,
      RE_Register_Pkg_Receiving_Stub      => System_Partition_Interface,
-     RE_Is_Nil                           => System_Partition_Interface,
-     RE_Entity_Ptr                       => System_Partition_Interface,
      RE_Entity_Of                        => System_Partition_Interface,
      RE_Inc_Usage                        => System_Partition_Interface,
-     RE_Set_Ref                          => System_Partition_Interface,
      RE_Make_Ref                         => System_Partition_Interface,
      RE_Get_Local_Address                => System_Partition_Interface,
      RE_Get_Reference                    => System_Partition_Interface,
@@ -3484,8 +3391,6 @@ package Rtsfind is
 
      RE_Global_Pool_Object               => System_Pool_Global,
 
-     RE_Global_Pool_32_Object            => System_Pool_32_Global,
-
      RE_Stack_Bounded_Pool               => System_Pool_Size,
 
      RE_Put_Image_Integer                => System_Put_Images,
@@ -3514,6 +3419,9 @@ package Rtsfind is
      RE_Put_Image_Task                   => System_Put_Task_Images,
 
      RO_RD_Delay_For                     => System_Relative_Delays,
+
+     RE_RS_Allocate                      => System_Return_Stack,
+     RE_RS_Pool                          => System_Return_Stack,
 
      RE_Do_Apc                           => System_RPC,
      RE_Do_Rpc                           => System_RPC,
@@ -3565,8 +3473,6 @@ package Rtsfind is
      RE_Deallocate_Any_Controlled        => System_Storage_Pools_Subpools,
      RE_Header_Size_With_Padding         => System_Storage_Pools_Subpools,
      RE_Root_Storage_Pool_With_Subpools  => System_Storage_Pools_Subpools,
-     RE_Root_Subpool                     => System_Storage_Pools_Subpools,
-     RE_Subpool_Handle                   => System_Storage_Pools_Subpools,
 
      RE_I_AD                             => System_Stream_Attributes,
      RE_I_AS                             => System_Stream_Attributes,
@@ -3690,7 +3596,6 @@ package Rtsfind is
      RE_Simple_Mode                      => System_Tasking,
      RE_Terminate_Mode                   => System_Tasking,
      RE_Delay_Mode                       => System_Tasking,
-     RE_Entry_Index                      => System_Tasking,
      RE_Task_Entry_Index                 => System_Tasking,
      RE_Self                             => System_Tasking,
 
@@ -4001,6 +3906,7 @@ package Rtsfind is
       System_Fat_LLF          => True,
       System_Fat_SFlt         => True,
       System_Machine_Code     => True,
+      System_Return_Stack     => True,
       System_Secondary_Stack  => True,
       System_Storage_Elements => True,
       System_Task_Info        => True,

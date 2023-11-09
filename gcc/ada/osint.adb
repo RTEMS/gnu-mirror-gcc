@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -34,7 +34,7 @@ with Sdefault; use Sdefault;
 with Table;
 with Targparm; use Targparm;
 
-with Unchecked_Conversion;
+with Ada.Unchecked_Conversion;
 
 pragma Warnings (Off);
 --  This package is used also by gnatcoll
@@ -1059,6 +1059,24 @@ package body Osint is
    ----------------------
 
    function File_Names_Equal (File1, File2 : String) return Boolean is
+
+      function To_Lower (A : String) return String;
+      --  For bootstrap reasons, we cannot use To_Lower function from
+      --  System.Case_Util.
+
+      --------------
+      -- To_Lower --
+      --------------
+
+      function To_Lower (A : String) return String is
+         Result : String := A;
+      begin
+         To_Lower (Result);
+         return Result;
+      end To_Lower;
+
+   --  Start of processing for File_Names_Equal
+
    begin
       if File_Names_Case_Sensitive then
          return File1 = File2;
@@ -1868,13 +1886,13 @@ package body Osint is
       end if;
 
       declare
-         Full_Name : String (1 .. Dir_Name'Length + Name'Length + 1);
+         Full_Name :
+           constant String (1 .. Dir_Name'Length + Name'Length + 1) :=
+           Dir_Name.all & Name & ASCII.NUL;
+         --  Use explicit bounds, because Dir_Name might be a substring whose
+         --  'First is not 1.
 
       begin
-         Full_Name (1 .. Dir_Name'Length) := Dir_Name.all;
-         Full_Name (Dir_Name'Length + 1 .. Full_Name'Last - 1) := Name;
-         Full_Name (Full_Name'Last) := ASCII.NUL;
-
          Attr.all := Unknown_Attributes;
 
          if not Is_Regular_File (Full_Name'Address, Attr) then
@@ -1886,10 +1904,8 @@ package body Osint is
             if Dir_Name'Length = 0 then
                Found := N;
             else
-               Name_Len := Full_Name'Length - 1;
-               Name_Buffer (1 .. Name_Len) :=
-                 Full_Name (1 .. Full_Name'Last - 1);
-               Found := Name_Find;
+               Found :=
+                 Name_Find (Full_Name (Full_Name'First .. Full_Name'Last - 1));
             end if;
          end if;
       end;
@@ -1953,9 +1969,9 @@ package body Osint is
    function Nb_Dir_In_Obj_Search_Path return Natural is
    begin
       if Opt.Look_In_Primary_Dir then
-         return Lib_Search_Directories.Last -  Primary_Directory + 1;
+         return Lib_Search_Directories.Last - Primary_Directory + 1;
       else
-         return Lib_Search_Directories.Last -  Primary_Directory;
+         return Lib_Search_Directories.Last - Primary_Directory;
       end if;
    end Nb_Dir_In_Obj_Search_Path;
 
@@ -1966,9 +1982,9 @@ package body Osint is
    function Nb_Dir_In_Src_Search_Path return Natural is
    begin
       if Opt.Look_In_Primary_Dir then
-         return Src_Search_Directories.Last -  Primary_Directory + 1;
+         return Src_Search_Directories.Last - Primary_Directory + 1;
       else
-         return Src_Search_Directories.Last -  Primary_Directory;
+         return Src_Search_Directories.Last - Primary_Directory;
       end if;
    end Nb_Dir_In_Src_Search_Path;
 
@@ -2198,9 +2214,9 @@ package body Osint is
       --  GNAT releases are available with these functions.
 
       function To_Int is
-        new Unchecked_Conversion (OS_Time, Underlying_OS_Time);
+        new Ada.Unchecked_Conversion (OS_Time, Underlying_OS_Time);
       function From_Int is
-        new Unchecked_Conversion (Underlying_OS_Time, OS_Time);
+        new Ada.Unchecked_Conversion (Underlying_OS_Time, OS_Time);
 
       TI : Underlying_OS_Time := To_Int (T);
       Y  : Year_Type;
@@ -2261,8 +2277,6 @@ package body Osint is
 
       Find_Program_Name;
 
-      Start_Of_Suffix := Name_Len + 1;
-
       --  Find the target prefix if any, for the cross compilation case.
       --  For instance in "powerpc-elf-gcc" the target prefix is
       --  "powerpc-elf-"
@@ -2286,9 +2300,7 @@ package body Osint is
          end if;
       end loop;
 
-      if End_Of_Prefix > 1 then
-         Start_Of_Suffix := End_Of_Prefix + Prog'Length + 1;
-      end if;
+      Start_Of_Suffix := End_Of_Prefix + Prog'Length + 1;
 
       --  Create the new program name
 
@@ -2744,7 +2756,25 @@ package body Osint is
 
    begin
       if Std_Prefix = null then
-         Std_Prefix := Executable_Prefix;
+         Std_Prefix := String_Ptr (Getenv ("GNSA_ROOT"));
+
+         if Std_Prefix.all = "" then
+            Std_Prefix := Executable_Prefix;
+
+         elsif not Is_Directory_Separator (Std_Prefix (Std_Prefix'Last)) then
+
+            --  The remainder of this function assumes that Std_Prefix
+            --  terminates with a dir separator, so we force this here.
+
+            declare
+               Old_Prefix : String_Ptr := Std_Prefix;
+            begin
+               Std_Prefix := new String (1 .. Old_Prefix'Length + 1);
+               Std_Prefix (1 .. Old_Prefix'Length) := Old_Prefix.all;
+               Std_Prefix (Old_Prefix'Length + 1) := Directory_Separator;
+               Free (Old_Prefix);
+            end;
+         end if;
 
          if Std_Prefix.all /= "" then
 
@@ -3071,8 +3101,8 @@ package body Osint is
       type Path_String_Access is access Path_String;
 
       function Address_To_Access is new
-        Unchecked_Conversion (Source => Address,
-                              Target => Path_String_Access);
+        Ada.Unchecked_Conversion (Source => Address,
+                                  Target => Path_String_Access);
 
       Path_Access : constant Path_String_Access :=
                       Address_To_Access (Path_Addr);

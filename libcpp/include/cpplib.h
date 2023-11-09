@@ -1,5 +1,5 @@
 /* Definitions for CPP library.
-   Copyright (C) 1995-2021 Free Software Foundation, Inc.
+   Copyright (C) 1995-2023 Free Software Foundation, Inc.
    Written by Per Bothner, 1994-95.
 
 This program is free software; you can redistribute it and/or modify it
@@ -46,7 +46,7 @@ struct _cpp_file;
    '='.  The lexer needs operators ending in '=', like ">>=", to be in
    the same order as their counterparts without the '=', like ">>".
 
-   See the cpp_operator table optab in expr.c if you change the order or
+   See the cpp_operator table optab in expr.cc if you change the order or
    add or remove anything in the first group.  */
 
 #define TTYPE_TABLE							\
@@ -129,17 +129,18 @@ struct _cpp_file;
   TK(UTF8STRING,	LITERAL) /* u8"string" */			\
   TK(OBJC_STRING,	LITERAL) /* @"string" - Objective-C */		\
   TK(HEADER_NAME,	LITERAL) /* <stdio.h> in #include */		\
+  TK(UNEVAL_STRING,	LITERAL) /* unevaluated "string" - C++26 */	\
 									\
-  TK(CHAR_USERDEF,	LITERAL) /* 'char'_suffix - C++-0x */		\
-  TK(WCHAR_USERDEF,	LITERAL) /* L'char'_suffix - C++-0x */		\
-  TK(CHAR16_USERDEF,	LITERAL) /* u'char'_suffix - C++-0x */		\
-  TK(CHAR32_USERDEF,	LITERAL) /* U'char'_suffix - C++-0x */		\
-  TK(UTF8CHAR_USERDEF,	LITERAL) /* u8'char'_suffix - C++-0x */		\
-  TK(STRING_USERDEF,	LITERAL) /* "string"_suffix - C++-0x */		\
-  TK(WSTRING_USERDEF,	LITERAL) /* L"string"_suffix - C++-0x */	\
-  TK(STRING16_USERDEF,	LITERAL) /* u"string"_suffix - C++-0x */	\
-  TK(STRING32_USERDEF,	LITERAL) /* U"string"_suffix - C++-0x */	\
-  TK(UTF8STRING_USERDEF,LITERAL) /* u8"string"_suffix - C++-0x */	\
+  TK(CHAR_USERDEF,	LITERAL) /* 'char'_suffix - C++11 */		\
+  TK(WCHAR_USERDEF,	LITERAL) /* L'char'_suffix - C++11 */		\
+  TK(CHAR16_USERDEF,	LITERAL) /* u'char'_suffix - C++11 */		\
+  TK(CHAR32_USERDEF,	LITERAL) /* U'char'_suffix - C++11 */		\
+  TK(UTF8CHAR_USERDEF,	LITERAL) /* u8'char'_suffix - C++11 */		\
+  TK(STRING_USERDEF,	LITERAL) /* "string"_suffix - C++11 */		\
+  TK(WSTRING_USERDEF,	LITERAL) /* L"string"_suffix - C++11 */		\
+  TK(STRING16_USERDEF,	LITERAL) /* u"string"_suffix - C++11 */		\
+  TK(STRING32_USERDEF,	LITERAL) /* U"string"_suffix - C++11 */		\
+  TK(UTF8STRING_USERDEF,LITERAL) /* u8"string"_suffix - C++11 */	\
 									\
   TK(COMMENT,		LITERAL) /* Only if output comments.  */	\
 				 /* SPELL_LITERAL happens to DTRT.  */	\
@@ -168,18 +169,22 @@ enum cpp_ttype
 #undef TK
 
 /* C language kind, used when calling cpp_create_reader.  */
-enum c_lang {CLK_GNUC89 = 0, CLK_GNUC99, CLK_GNUC11, CLK_GNUC17, CLK_GNUC2X,
+enum c_lang {CLK_GNUC89 = 0, CLK_GNUC99, CLK_GNUC11, CLK_GNUC17, CLK_GNUC23,
 	     CLK_STDC89, CLK_STDC94, CLK_STDC99, CLK_STDC11, CLK_STDC17,
-	     CLK_STDC2X,
+	     CLK_STDC23,
 	     CLK_GNUCXX, CLK_CXX98, CLK_GNUCXX11, CLK_CXX11,
 	     CLK_GNUCXX14, CLK_CXX14, CLK_GNUCXX17, CLK_CXX17,
 	     CLK_GNUCXX20, CLK_CXX20, CLK_GNUCXX23, CLK_CXX23,
-	     CLK_ASM};
+	     CLK_GNUCXX26, CLK_CXX26, CLK_ASM};
 
 /* Payload of a NUMBER, STRING, CHAR or COMMENT token.  */
 struct GTY(()) cpp_string {
   unsigned int len;
-  const unsigned char *text;
+
+  /* TEXT is always null terminated (terminator not included in len); but this
+     GTY markup arranges that PCH streaming works properly even if there is a
+     null byte in the middle of the string.  */
+  const unsigned char * GTY((string_length ("1 + %h.len"))) text;
 };
 
 /* Flags for the cpp_token structure.  */
@@ -190,14 +195,16 @@ struct GTY(()) cpp_string {
 #define NAMED_OP	(1 << 4) /* C++ named operators.  */
 #define PREV_FALLTHROUGH (1 << 5) /* On a token preceeded by FALLTHROUGH
 				     comment.  */
-#define BOL		(1 << 6) /* Token at beginning of line.  */
+#define DECIMAL_INT     (1 << 6) /* Decimal integer, set in c-lex.cc.  */
 #define PURE_ZERO	(1 << 7) /* Single 0 digit, used by the C++ frontend,
-				    set in c-lex.c.  */
+				    set in c-lex.cc.  */
 #define SP_DIGRAPH	(1 << 8) /* # or ## token was a digraph.  */
 #define SP_PREV_WHITE	(1 << 9) /* If whitespace before a ##
 				    operator, or before this token
 				    after a # operator.  */
 #define NO_EXPAND	(1 << 10) /* Do not macro-expand this token.  */
+#define PRAGMA_OP	(1 << 11) /* _Pragma token.  */
+#define BOL		(1 << 12) /* Token at beginning of line.  */
 
 /* Specify which field, if any, of the cpp_token union is used.  */
 
@@ -296,6 +303,9 @@ typedef CPPCHAR_SIGNED_T cppchar_signed_t;
 /* Style of header dependencies to generate.  */
 enum cpp_deps_style { DEPS_NONE = 0, DEPS_USER, DEPS_SYSTEM };
 
+/* Structured format of module dependencies to generate.  */
+enum cpp_fdeps_format { FDEPS_FMT_NONE = 0, FDEPS_FMT_P1689R5 };
+
 /* The possible normalization levels, from most restrictive to least.  */
 enum cpp_normalize_level {
   /* In NFKC.  */
@@ -316,6 +326,18 @@ enum cpp_main_search
 		  header-unit).  */
   CMS_user,    /* Search the user INCLUDE path.  */
   CMS_system,  /* Search the system INCLUDE path.  */
+};
+
+/* The possible bidirectional control characters checking levels.  */
+enum cpp_bidirectional_level {
+  /* No checking.  */
+  bidirectional_none = 0,
+  /* Only detect unpaired uses of bidirectional control characters.  */
+  bidirectional_unpaired = 1,
+  /* Detect any use of bidirectional control characters.  */
+  bidirectional_any = 2,
+  /* Also warn about UCNs.  */
+  bidirectional_ucn = 4
 };
 
 /* This structure is nested inside struct cpp_reader, and
@@ -479,12 +501,12 @@ struct cpp_options
   unsigned char ext_numeric_literals;
 
   /* Nonzero means extended identifiers allow the characters specified
-     in C11 and C++11.  */
+     in C11.  */
   unsigned char c11_identifiers;
 
   /* Nonzero means extended identifiers allow the characters specified
-     in C++23.  */
-  unsigned char cxx23_identifiers;
+     by Unicode XID_Start and XID_Continue properties.  */
+  unsigned char xid_identifiers;
 
   /* Nonzero for C++ 2014 Standard binary constants.  */
   unsigned char binary_constants;
@@ -492,7 +514,7 @@ struct cpp_options
   /* Nonzero for C++ 2014 Standard digit separators.  */
   unsigned char digit_separators;
 
-  /* Nonzero for C2X decimal floating-point constants.  */
+  /* Nonzero for C23 decimal floating-point constants.  */
   unsigned char dfp_constants;
 
   /* Nonzero for C++20 __VA_OPT__ feature.  */
@@ -504,11 +526,20 @@ struct cpp_options
   /* Nonzero for the '#elifdef' and '#elifndef' directives.  */
   unsigned char elifdef;
 
+  /* Nonzero for the '#warning' directive.  */
+  unsigned char warning_directive;
+
   /* Nonzero means tokenize C++20 module directives.  */
   unsigned char module_directives;
 
   /* Nonzero for C++23 size_t literals.  */
   unsigned char size_t_literals;
+
+  /* Nonzero for C++23 delimited escape sequences.  */
+  unsigned char delimited_escape_seqs;
+
+  /* Nonzero for 'true' and 'false' in #if expressions.  */
+  unsigned char true_false;
 
   /* Holds the name of the target (execution) character set.  */
   const char *narrow_charset;
@@ -532,17 +563,38 @@ struct cpp_options
   /* True if warn about differences between C90 and C99.  */
   signed char cpp_warn_c90_c99_compat;
 
-  /* True if warn about differences between C11 and C2X.  */
-  signed char cpp_warn_c11_c2x_compat;
+  /* True if warn about differences between C11 and C23.  */
+  signed char cpp_warn_c11_c23_compat;
 
   /* True if warn about differences between C++98 and C++11.  */
   bool cpp_warn_cxx11_compat;
+
+  /* True if warn about differences between C++17 and C++20.  */
+  bool cpp_warn_cxx20_compat;
+
+  /* Nonzero if bidirectional control characters checking is on.  See enum
+     cpp_bidirectional_level.  */
+  unsigned char cpp_warn_bidirectional;
+
+  /* True if libcpp should warn about invalid UTF-8 characters in comments.
+     2 if it should be a pedwarn.  */
+  unsigned char cpp_warn_invalid_utf8;
+
+  /* True if libcpp should warn about invalid forms of delimited or named
+     escape sequences.  */
+  bool cpp_warn_unicode;
+
+  /* True if -finput-charset= option has been used explicitly.  */
+  bool cpp_input_charset_explicit;
 
   /* Dependency generation.  */
   struct
   {
     /* Style of header dependencies to generate.  */
     enum cpp_deps_style style;
+
+    /* Structured format of module dependencies to generate.  */
+    enum cpp_fdeps_format fdeps_format;
 
     /* Assume missing files are generated files.  */
     bool missing_files;
@@ -568,8 +620,8 @@ struct cpp_options
      ints and target wide characters, respectively.  */
   size_t precision, char_precision, int_precision, wchar_precision;
 
-  /* True means chars (wide chars) are unsigned.  */
-  bool unsigned_char, unsigned_wchar;
+  /* True means chars (wide chars, UTF-8 chars) are unsigned.  */
+  bool unsigned_char, unsigned_wchar, unsigned_utf8char;
 
   /* True if the most significant byte in a word has the lowest
      address in memory.  */
@@ -640,9 +692,13 @@ enum cpp_warning_reason {
   CPP_W_DATE_TIME,
   CPP_W_PEDANTIC,
   CPP_W_C90_C99_COMPAT,
-  CPP_W_C11_C2X_COMPAT,
+  CPP_W_C11_C23_COMPAT,
   CPP_W_CXX11_COMPAT,
-  CPP_W_EXPANSION_TO_DEFINED
+  CPP_W_CXX20_COMPAT,
+  CPP_W_EXPANSION_TO_DEFINED,
+  CPP_W_BIDIRECTIONAL,
+  CPP_W_INVALID_UTF8,
+  CPP_W_UNICODE
 };
 
 /* Callback for header lookup for HEADER, which is the name of a
@@ -739,8 +795,16 @@ struct cpp_callbacks
 
 #ifdef VMS
 #define INO_T_CPP ino_t ino[3]
+#elif defined (_AIX) && SIZEOF_INO_T == 4
+#define INO_T_CPP ino64_t ino
 #else
 #define INO_T_CPP ino_t ino
+#endif
+
+#if defined (_AIX) && SIZEOF_DEV_T == 4
+#define DEV_T_CPP dev64_t dev
+#else
+#define DEV_T_CPP dev_t dev
 #endif
 
 /* Chain of directories to look for include files in.  */
@@ -777,7 +841,7 @@ struct cpp_dir
   /* The C front end uses these to recognize duplicated
      directories in the search path.  */
   INO_T_CPP;
-  dev_t dev;
+  DEV_T_CPP;
 };
 
 /* The kind of the cpp_macro.  */
@@ -946,6 +1010,14 @@ struct GTY(()) cpp_hashnode {
   union _cpp_hashnode_value GTY ((desc ("%1.type"))) value;
 };
 
+/* Extra information we may need to store per identifier, which is needed rarely
+   enough that it's not worth adding directly into the main identifier hash.  */
+struct GTY(()) cpp_hashnode_extra
+{
+  struct ht_identifier ident;
+  location_t poisoned_loc;
+};
+
 /* A class for iterating through the source locations within a
    string token (before escapes are interpreted, and before
    concatenation).  */
@@ -992,12 +1064,15 @@ class cpp_substring_ranges
 
 /* Call this first to get a handle to pass to other functions.
 
-   If you want cpplib to manage its own hashtable, pass in a NULL
-   pointer.  Otherwise you should pass in an initialized hash table
-   that cpplib will share; this technique is used by the C front
-   ends.  */
+   The first hash table argument is for associating a struct cpp_hashnode
+   with each identifier.  The second hash table argument is for associating
+   a struct cpp_hashnode_extra with each identifier that needs one.  For
+   either, pass in a NULL pointer if you want cpplib to create and manage
+   the hash table itself, or else pass a suitably initialized hash table to
+   be managed external to libcpp, as is done by the C-family frontends.  */
 extern cpp_reader *cpp_create_reader (enum c_lang, struct ht *,
-				      class line_maps *);
+				      class line_maps *,
+				      struct ht * = nullptr);
 
 /* Reset the cpp_reader's line_map.  This is only used after reading a
    PCH file.  */
@@ -1055,9 +1130,9 @@ extern void cpp_post_options (cpp_reader *);
 extern void cpp_init_iconv (cpp_reader *);
 
 /* Call this to finish preprocessing.  If you requested dependency
-   generation, pass an open stream to write the information to,
-   otherwise NULL.  It is your responsibility to close the stream.  */
-extern void cpp_finish (cpp_reader *, FILE *deps_stream);
+   generation, pass open stream(s) to write the information to,
+   otherwise NULL.  It is your responsibility to close the stream(s).  */
+extern void cpp_finish (cpp_reader *, FILE *deps_stream, FILE *fdeps_stream = NULL);
 
 /* Call this to release the handle at the end of preprocessing.  Any
    use of the handle after this function returns is invalid.  */
@@ -1174,7 +1249,7 @@ extern int cpp_defined (cpp_reader *, const unsigned char *, int);
    the double integer are set to zero.  */
 
 /* This type has to be equal to unsigned HOST_WIDE_INT, see
-   gcc/c-family/c-lex.c.  */
+   gcc/c-family/c-lex.cc.  */
 typedef uint64_t cpp_num_part;
 typedef struct cpp_num cpp_num;
 struct cpp_num
@@ -1226,6 +1301,8 @@ struct cpp_num
 #define CPP_N_USERDEF	0x1000000 /* C++11 user-defined literal.  */
 
 #define CPP_N_SIZE_T	0x2000000 /* C++23 size_t literal.  */
+#define CPP_N_BFLOAT16	0x4000000 /* std::bfloat16_t type.  */
+#define CPP_N_BITINT	0x8000000 /* C23 _BitInt literal.  */
 
 #define CPP_N_WIDTH_FLOATN_NX	0xF0000000 /* _FloatN / _FloatNx value
 					      of N, divided by 16.  */
@@ -1267,6 +1344,14 @@ extern bool cpp_warning_syshdr (cpp_reader *, enum cpp_warning_reason reason,
 				const char *msgid, ...)
   ATTRIBUTE_PRINTF_3;
 
+/* As their counterparts above, but use RICHLOC.  */
+extern bool cpp_warning_at (cpp_reader *, enum cpp_warning_reason,
+			    rich_location *richloc, const char *msgid, ...)
+  ATTRIBUTE_PRINTF_4;
+extern bool cpp_pedwarning_at (cpp_reader *, enum cpp_warning_reason,
+			       rich_location *richloc, const char *msgid, ...)
+  ATTRIBUTE_PRINTF_4;
+
 /* Output a diagnostic with "MSGID: " preceding the
    error string of errno.  No location is printed.  */
 extern bool cpp_errno (cpp_reader *, enum cpp_diagnostic_level,
@@ -1304,7 +1389,7 @@ extern bool cpp_error_at (cpp_reader * pfile, enum cpp_diagnostic_level,
 			  rich_location *richloc, const char *msgid, ...)
   ATTRIBUTE_PRINTF_4;
 
-/* In lex.c */
+/* In lex.cc */
 extern int cpp_ideq (const cpp_token *, const char *);
 extern void cpp_output_line (cpp_reader *, FILE *);
 extern unsigned char *cpp_output_line_to_string (cpp_reader *,
@@ -1361,7 +1446,7 @@ extern cpp_hashnode *cpp_lookup (cpp_reader *, const unsigned char *,
 typedef int (*cpp_cb) (cpp_reader *, cpp_hashnode *, void *);
 extern void cpp_forall_identifiers (cpp_reader *, cpp_cb, void *);
 
-/* In macro.c */
+/* In macro.cc */
 extern void cpp_scan_nooutput (cpp_reader *);
 extern int  cpp_sys_macro_p (cpp_reader *);
 extern unsigned char *cpp_quote_string (unsigned char *, const unsigned char *,
@@ -1369,7 +1454,7 @@ extern unsigned char *cpp_quote_string (unsigned char *, const unsigned char *,
 extern bool cpp_compare_macros (const cpp_macro *macro1,
 				const cpp_macro *macro2);
 
-/* In files.c */
+/* In files.cc */
 extern bool cpp_included (cpp_reader *, const char *);
 extern bool cpp_included_before (cpp_reader *, const char *, location_t);
 extern void cpp_make_system_header (cpp_reader *, int, int);
@@ -1397,7 +1482,7 @@ struct cpp_converted_source
 cpp_converted_source cpp_get_converted_source (const char *fname,
 					       const char *input_charset);
 
-/* In pch.c */
+/* In pch.cc */
 struct save_macro_data;
 extern int cpp_save_state (cpp_reader *, FILE *);
 extern int cpp_write_pch_deps (cpp_reader *, FILE *);
@@ -1407,7 +1492,7 @@ extern void cpp_prepare_state (cpp_reader *, struct save_macro_data **);
 extern int cpp_read_state (cpp_reader *, const char *, FILE *,
 			   struct save_macro_data *);
 
-/* In lex.c */
+/* In lex.cc */
 extern void cpp_force_token_locations (cpp_reader *, location_t);
 extern void cpp_stop_forcing_token_locations (cpp_reader *);
 enum CPP_DO_task
@@ -1423,7 +1508,7 @@ extern void cpp_directive_only_process (cpp_reader *pfile,
 						    CPP_DO_task,
 						    void *data, ...));
 
-/* In expr.c */
+/* In expr.cc */
 extern enum cpp_ttype cpp_userdef_string_remove_type
   (enum cpp_ttype type);
 extern enum cpp_ttype cpp_userdef_string_add_type
@@ -1439,48 +1524,104 @@ extern bool cpp_userdef_char_p
 extern const char * cpp_get_userdef_suffix
   (const cpp_token *);
 
-/* In charset.c */
+/* In charset.cc */
+
+/* The result of attempting to decode a run of UTF-8 bytes.  */
+
+struct cpp_decoded_char
+{
+  const char *m_start_byte;
+  const char *m_next_byte;
+
+  bool m_valid_ch;
+  cppchar_t m_ch;
+};
+
+/* Information for mapping between code points and display columns.
+
+   This is a tabstop value, along with a callback for getting the
+   widths of characters.  Normally this callback is cpp_wcwidth, but we
+   support other schemes for escaping non-ASCII unicode as a series of
+   ASCII chars when printing the user's source code in diagnostic-show-locus.cc
+
+   For example, consider:
+   - the Unicode character U+03C0 "GREEK SMALL LETTER PI" (UTF-8: 0xCF 0x80)
+   - the Unicode character U+1F642 "SLIGHTLY SMILING FACE"
+     (UTF-8: 0xF0 0x9F 0x99 0x82)
+   - the byte 0xBF (a stray trailing byte of a UTF-8 character)
+   Normally U+03C0 would occupy one display column, U+1F642
+   would occupy two display columns, and the stray byte would be
+   printed verbatim as one display column.
+
+   However when escaping them as unicode code points as "<U+03C0>"
+   and "<U+1F642>" they occupy 8 and 9 display columns respectively,
+   and when escaping them as bytes as "<CF><80>" and "<F0><9F><99><82>"
+   they occupy 8 and 16 display columns respectively.  In both cases
+   the stray byte is escaped to <BF> as 4 display columns.  */
+
+struct cpp_char_column_policy
+{
+  cpp_char_column_policy (int tabstop,
+			  int (*width_cb) (cppchar_t c))
+  : m_tabstop (tabstop),
+    m_undecoded_byte_width (1),
+    m_width_cb (width_cb)
+  {}
+
+  int m_tabstop;
+  /* Width in display columns of a stray byte that isn't decodable
+     as UTF-8.  */
+  int m_undecoded_byte_width;
+  int (*m_width_cb) (cppchar_t c);
+};
 
 /* A class to manage the state while converting a UTF-8 sequence to cppchar_t
    and computing the display width one character at a time.  */
 class cpp_display_width_computation {
  public:
   cpp_display_width_computation (const char *data, int data_length,
-				 int tabstop);
+				 const cpp_char_column_policy &policy);
   const char *next_byte () const { return m_next; }
   int bytes_processed () const { return m_next - m_begin; }
   int bytes_left () const { return m_bytes_left; }
   bool done () const { return !bytes_left (); }
   int display_cols_processed () const { return m_display_cols; }
 
-  int process_next_codepoint ();
+  int process_next_codepoint (cpp_decoded_char *out);
   int advance_display_cols (int n);
 
  private:
   const char *const m_begin;
   const char *m_next;
   size_t m_bytes_left;
-  const int m_tabstop;
+  const cpp_char_column_policy &m_policy;
   int m_display_cols;
 };
 
 /* Convenience functions that are simple use cases for class
    cpp_display_width_computation.  Tab characters will be expanded to spaces
-   as determined by TABSTOP.  */
+   as determined by POLICY.m_tabstop, and non-printable-ASCII characters
+   will be escaped as per POLICY.  */
 
 int cpp_byte_column_to_display_column (const char *data, int data_length,
-				       int column, int tabstop);
+				       int column,
+				       const cpp_char_column_policy &policy);
 inline int cpp_display_width (const char *data, int data_length,
-			      int tabstop)
+			      const cpp_char_column_policy &policy)
 {
   return cpp_byte_column_to_display_column (data, data_length, data_length,
-					    tabstop);
+					    policy);
 }
 int cpp_display_column_to_byte_column (const char *data, int data_length,
-				       int display_col, int tabstop);
+				       int display_col,
+				       const cpp_char_column_policy &policy);
 int cpp_wcwidth (cppchar_t c);
 
 bool cpp_input_conversion_is_trivial (const char *input_charset);
 int cpp_check_utf8_bom (const char *data, size_t data_length);
+bool cpp_valid_utf8_p (const char *data, size_t num_bytes);
+
+bool cpp_is_combining_char (cppchar_t c);
+bool cpp_is_printable_char (cppchar_t c);
 
 #endif /* ! LIBCPP_CPPLIB_H */

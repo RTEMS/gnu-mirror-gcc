@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-options "-O2 -fipa-sra -fno-ipa-pure-const -fdump-ipa-sra" } */
+/* { dg-options "-O2 -fipa-sra -fno-ipa-pure-const -fdump-ipa-sra -fno-ipa-modref" } */
 
 static int
 __attribute__((noinline))
@@ -54,10 +54,10 @@ void caller (void)
   int b = 10;
   int c;
 
-  ox (&a);
+  c = ox (&a);
   ox_ctrl_1 (&a);
   ox_ctrl_2 (&a);
-  *holder = ox_improved (1, &b);
+  *holder = ox_improved (1, &b) + c;
   return;
 }
 

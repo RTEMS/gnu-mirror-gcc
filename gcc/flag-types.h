@@ -1,5 +1,5 @@
 /* Compilation switch flag type definitions for GCC.
-   Copyright (C) 1987-2021 Free Software Foundation, Inc.
+   Copyright (C) 1987-2023 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -24,38 +24,32 @@ along with GCC; see the file COPYING3.  If not see
 
 enum debug_info_type
 {
-  DINFO_TYPE_NONE = 0,		  /* No debug info.  */
-  DINFO_TYPE_DBX = 1,		  /* BSD .stabs for DBX.  */
-  DINFO_TYPE_DWARF2 = 2,	  /* Dwarf v2 debug info.  */
-  DINFO_TYPE_XCOFF = 3,		  /* IBM/Xcoff debug info.  */
-  DINFO_TYPE_VMS = 4,		  /* VMS debug info.  */
-  DINFO_TYPE_CTF = 5,		  /* CTF debug info.  */
-  DINFO_TYPE_BTF = 6,		  /* BTF debug info.  */
-  DINFO_TYPE_BTF_WITH_CORE = 7,	  /* BTF debug info with CO-RE relocations.  */
+  DINFO_TYPE_NONE,		  /* No debug info.  */
+  DINFO_TYPE_DWARF2,		  /* Dwarf v2 debug info.  */
+  DINFO_TYPE_VMS,		  /* VMS debug info.  */
+  DINFO_TYPE_CTF,		  /* CTF debug info.  */
+  DINFO_TYPE_BTF,		  /* BTF debug info.  */
+  DINFO_TYPE_BTF_WITH_CORE,	  /* BTF debug info with CO-RE relocations.  */
   DINFO_TYPE_MAX = DINFO_TYPE_BTF_WITH_CORE /* Marker only.  */
 };
 
 #define NO_DEBUG      (0U)
-/* Write DBX debug info (using dbxout.c).  */
-#define DBX_DEBUG     (1U << DINFO_TYPE_DBX)
-/* Write DWARF2 debug info (using dwarf2out.c).  */
+/* Write DWARF2 debug info (using dwarf2out.cc).  */
 #define DWARF2_DEBUG  (1U << DINFO_TYPE_DWARF2)
-/* Write IBM/XCOFF debug info (using dbxout.c).  */
-#define XCOFF_DEBUG   (1U << DINFO_TYPE_XCOFF)
-/* Write VMS debug info (using vmsdbgout.c).  */
+/* Write VMS debug info (using vmsdbgout.cc).  */
 #define VMS_DEBUG     (1U << DINFO_TYPE_VMS)
-/* Write CTF debug info (using ctfout.c).  */
+/* Write CTF debug info (using ctfout.cc).  */
 #define CTF_DEBUG     (1U << DINFO_TYPE_CTF)
-/* Write BTF debug info (using btfout.c).  */
+/* Write BTF debug info (using btfout.cc).  */
 #define BTF_DEBUG     (1U << DINFO_TYPE_BTF)
-/* Write BTF debug info for BPF CO-RE usecase (using btfout.c).  */
+/* Write BTF debug info for BPF CO-RE usecase (using btfout.cc).  */
 #define BTF_WITH_CORE_DEBUG     (1U << DINFO_TYPE_BTF_WITH_CORE)
 
 /* Note: Adding new definitions to handle -combination- of debug formats,
    like VMS_AND_DWARF2_DEBUG is not recommended.  This definition remains
    here for historical reasons.  */
-/* Write VMS debug info (using vmsdbgout.c) and DWARF v2 debug info (using
-   dwarf2out.c).  */
+/* Write VMS debug info (using vmsdbgout.cc) and DWARF v2 debug info (using
+   dwarf2out.cc).  */
 #define VMS_AND_DWARF2_DEBUG  ((VMS_DEBUG | DWARF2_DEBUG))
 
 enum debug_info_levels
@@ -85,7 +79,7 @@ enum ctf_debug_info_levels
    The following function determines whether or not debug information
    should be generated for a given struct.  The indirect parameter
    indicates that the struct is being handled indirectly, via
-   a pointer.  See opts.c for the implementation. */
+   a pointer.  See opts.cc for the implementation. */
 
 enum debug_info_usage
 {
@@ -163,6 +157,16 @@ enum stack_reuse_level
   SR_ALL
 };
 
+/* Control Flow Redundancy hardening options for noreturn calls.  */
+enum hardcfr_noret
+{
+  HCFRNR_NEVER,
+  HCFRNR_NOTHROW,
+  HCFRNR_NO_XTHROW,
+  HCFRNR_UNSPECIFIED,
+  HCFRNR_ALWAYS,
+};
+
 /* The live patching level.  */
 enum live_patching_level
 {
@@ -191,10 +195,6 @@ enum ira_region
   IRA_REGION_ONE,
   IRA_REGION_ALL,
   IRA_REGION_MIXED,
-  /* This value means that there were no options -fira-region on the
-     command line and that we should choose a value depending on the
-     used -O option.  */
-  IRA_REGION_AUTODETECT
 };
 
 /* The options for excess precision.  */
@@ -325,6 +325,8 @@ enum sanitize_code {
   SANITIZE_HWADDRESS = 1UL << 28,
   SANITIZE_USER_HWADDRESS = 1UL << 29,
   SANITIZE_KERNEL_HWADDRESS = 1UL << 30,
+  /* Shadow Call Stack.  */
+  SANITIZE_SHADOW_CALL_STACK = 1UL << 31,
   SANITIZE_SHIFT = SANITIZE_SHIFT_BASE | SANITIZE_SHIFT_EXPONENT,
   SANITIZE_UNDEFINED = SANITIZE_SHIFT | SANITIZE_DIVIDE | SANITIZE_UNREACHABLE
 		       | SANITIZE_VLA | SANITIZE_NULL | SANITIZE_RETURN
@@ -346,6 +348,7 @@ namespace zero_regs_flags {
   const unsigned int ONLY_GPR = 1UL << 2;
   const unsigned int ONLY_ARG = 1UL << 3;
   const unsigned int ENABLED = 1UL << 4;
+  const unsigned int LEAFY_MODE = 1UL << 5;
   const unsigned int USED_GPR_ARG = ENABLED | ONLY_USED | ONLY_GPR | ONLY_ARG;
   const unsigned int USED_GPR = ENABLED | ONLY_USED | ONLY_GPR;
   const unsigned int USED_ARG = ENABLED | ONLY_USED | ONLY_ARG;
@@ -354,6 +357,10 @@ namespace zero_regs_flags {
   const unsigned int ALL_GPR = ENABLED | ONLY_GPR;
   const unsigned int ALL_ARG = ENABLED | ONLY_ARG;
   const unsigned int ALL = ENABLED;
+  const unsigned int LEAFY_GPR_ARG = ENABLED | LEAFY_MODE | ONLY_GPR | ONLY_ARG;
+  const unsigned int LEAFY_GPR = ENABLED | LEAFY_MODE | ONLY_GPR;
+  const unsigned int LEAFY_ARG = ENABLED | LEAFY_MODE | ONLY_ARG;
+  const unsigned int LEAFY = ENABLED | LEAFY_MODE;
 }
 
 /* Settings of flag_incremental_link.  */
@@ -428,7 +435,15 @@ enum gfc_convert
   GFC_FLAG_CONVERT_NATIVE = 0,
   GFC_FLAG_CONVERT_SWAP,
   GFC_FLAG_CONVERT_BIG,
-  GFC_FLAG_CONVERT_LITTLE
+  GFC_FLAG_CONVERT_LITTLE,
+  GFC_FLAG_CONVERT_R16_IEEE = 4,
+  GFC_FLAG_CONVERT_R16_IEEE_SWAP,
+  GFC_FLAG_CONVERT_R16_IEEE_BIG,
+  GFC_FLAG_CONVERT_R16_IEEE_LITTLE,
+  GFC_FLAG_CONVERT_R16_IBM = 8,
+  GFC_FLAG_CONVERT_R16_IBM_SWAP,
+  GFC_FLAG_CONVERT_R16_IBM_BIG,
+  GFC_FLAG_CONVERT_R16_IBM_LITTLE,
 };
 
 
@@ -453,18 +468,24 @@ enum parloops_schedule_type
   PARLOOPS_SCHEDULE_RUNTIME
 };
 
-/* EVRP mode.  */
-enum evrp_mode
+/* Ranger debug mode.  */
+enum ranger_debug
 {
-  EVRP_MODE_RVRP_ONLY = 0,
-  EVRP_MODE_EVRP_ONLY = 1,
-  EVRP_MODE_EVRP_FIRST = 2,
-  EVRP_MODE_RVRP_FIRST = 3,
-  EVRP_MODE_TRACE = 4,
-  EVRP_MODE_CACHE = (8 | EVRP_MODE_TRACE),
-  EVRP_MODE_GORI = 16,
-  EVRP_MODE_TRACE_GORI = (EVRP_MODE_TRACE | EVRP_MODE_GORI),
-  EVRP_MODE_DEBUG = (EVRP_MODE_GORI | EVRP_MODE_CACHE)
+  RANGER_DEBUG_NONE = 0,
+  RANGER_DEBUG_TRACE = 1,
+  RANGER_DEBUG_CACHE = 2,
+  RANGER_DEBUG_GORI = 4,
+  RANGER_DEBUG_TRACE_GORI = (RANGER_DEBUG_TRACE | RANGER_DEBUG_GORI),
+  RANGER_DEBUG_TRACE_CACHE = (RANGER_DEBUG_TRACE | RANGER_DEBUG_CACHE),
+  RANGER_DEBUG_ALL = (RANGER_DEBUG_GORI | RANGER_DEBUG_CACHE
+		      | RANGER_DEBUG_TRACE)
+};
+
+/* Jump threader verbose dumps.  */
+enum threader_debug
+{
+  THREADER_DEBUG_NONE = 0,
+  THREADER_DEBUG_ALL = 1
 };
 
 /* Modes of OpenACC 'kernels' constructs handling.  */
@@ -479,6 +500,15 @@ enum openacc_privatization
 {
   OPENACC_PRIVATIZATION_QUIET,
   OPENACC_PRIVATIZATION_NOISY
+};
+
+/* Targets for -fopenmp-target-simd-clone.  */
+enum omp_target_simd_clone_device_kind
+{
+  OMP_TARGET_SIMD_CLONE_NONE = 0,
+  OMP_TARGET_SIMD_CLONE_HOST = 1,
+  OMP_TARGET_SIMD_CLONE_NOHOST = 2,
+  OMP_TARGET_SIMD_CLONE_ANY = 3
 };
 
 #endif

@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-options "-Ofast -fdump-tree-vrp-thread1-details" } */
+/* { dg-options "-Ofast -fdump-tree-ethread-details" } */
 
 typedef unsigned short u16;
 typedef unsigned char u8;
@@ -56,11 +56,4 @@ main (int argc, char argv[])
   return crc;
 }
 
-/* Previously we had 3 jump threads, but one of them crossed loops.
-   The reason the old threader was allowing it, was because there was
-   an ASSERT_EXPR getting in the way.  Without the ASSERT_EXPR, we
-   have an empty pre-header block as the final block in the thread,
-   which the threader will simply join with the next block which *is*
-   in a different loop.  */
-/* { dg-final { scan-tree-dump-times "Registering jump thread" 2 "vrp-thread1" } } */
-/* { dg-final { scan-tree-dump-not "joiner" "vrp-thread1" } } */
+/* { dg-final { scan-tree-dump-times "Registering jump thread" 2 "ethread" } } */

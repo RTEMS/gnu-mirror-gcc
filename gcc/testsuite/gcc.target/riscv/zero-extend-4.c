@@ -1,5 +1,6 @@
 /* { dg-do compile { target { riscv64*-*-* } } } */
-/* { dg-options "-march=rv64gc -mabi=lp64 -O2" } */
+/* { dg-options "-march=rv64gc -mabi=lp64" } */
+/* { dg-skip-if "" { *-*-* } { "-O0" } } */
 int a, b, e;
 struct c *d;
 struct c
@@ -17,4 +18,4 @@ f(void)
 	d->binmap[0] = e;
     }
 }
-/* { dg-final { scan-assembler-times "sext.w" 0 } } */
+/* { dg-final { scan-assembler-times {\msext\.w\M} 0 } } */

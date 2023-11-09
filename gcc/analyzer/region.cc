@@ -1,5 +1,5 @@
 /* Regions of memory.
-   Copyright (C) 2019-2021 Free Software Foundation, Inc.
+   Copyright (C) 2019-2023 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -19,6 +19,7 @@ along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
 #include "config.h"
+#define INCLUDE_MEMORY
 #include "system.h"
 #include "coretypes.h"
 #include "tree.h"
@@ -40,11 +41,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-pretty-print.h"
 #include "diagnostic-color.h"
 #include "diagnostic-metadata.h"
-#include "tristate.h"
 #include "bitmap.h"
-#include "selftest.h"
-#include "function.h"
-#include "json.h"
 #include "analyzer/analyzer.h"
 #include "analyzer/analyzer-logging.h"
 #include "ordered-hash-map.h"
@@ -59,10 +56,338 @@ along with GCC; see the file COPYING3.  If not see
 #include "analyzer/store.h"
 #include "analyzer/region.h"
 #include "analyzer/region-model.h"
+#include "analyzer/sm.h"
+#include "analyzer/program-state.h"
 
 #if ENABLE_ANALYZER
 
 namespace ana {
+
+region_offset
+region_offset::make_byte_offset (const region *base_region,
+				 const svalue *num_bytes_sval)
+{
+  if (tree num_bytes_cst = num_bytes_sval->maybe_get_constant ())
+    {
+      gcc_assert (TREE_CODE (num_bytes_cst) == INTEGER_CST);
+      bit_offset_t num_bits = wi::to_offset (num_bytes_cst) * BITS_PER_UNIT;
+      return make_concrete (base_region, num_bits);
+    }
+  else
+    {
+      return make_symbolic (base_region, num_bytes_sval);
+    }
+}
+
+tree
+region_offset::calc_symbolic_bit_offset (const region_model &model) const
+{
+  if (symbolic_p ())
+    {
+      tree num_bytes_expr = model.get_representative_tree (m_sym_offset);
+      if (!num_bytes_expr)
+	return NULL_TREE;
+      tree bytes_to_bits_scale = build_int_cst (size_type_node, BITS_PER_UNIT);
+      return fold_build2 (MULT_EXPR, size_type_node,
+			  num_bytes_expr, bytes_to_bits_scale);
+    }
+  else
+    {
+      tree cst = wide_int_to_tree (size_type_node, m_offset);
+      return cst;
+    }
+}
+
+const svalue *
+region_offset::calc_symbolic_byte_offset (region_model_manager *mgr) const
+{
+  if (symbolic_p ())
+    return m_sym_offset;
+  else
+    {
+      byte_offset_t concrete_byte_offset;
+      if (get_concrete_byte_offset (&concrete_byte_offset))
+	return mgr->get_or_create_int_cst (size_type_node,
+					   concrete_byte_offset);
+      else
+	/* Can't handle bitfields; return UNKNOWN.  */
+	return mgr->get_or_create_unknown_svalue (size_type_node);
+    }
+}
+
+void
+region_offset::dump_to_pp (pretty_printer *pp, bool simple) const
+{
+  if (symbolic_p ())
+    {
+      /* We don't bother showing the base region.  */
+      pp_string (pp, "byte ");
+      m_sym_offset->dump_to_pp (pp, simple);
+    }
+  else
+    {
+      if (m_offset % BITS_PER_UNIT == 0)
+	{
+	  pp_string (pp, "byte ");
+	  pp_wide_int (pp, m_offset / BITS_PER_UNIT, SIGNED);
+	}
+      else
+	{
+	  pp_string (pp, "bit ");
+	  pp_wide_int (pp, m_offset, SIGNED);
+	}
+    }
+}
+
+DEBUG_FUNCTION void
+region_offset::dump (bool simple) const
+{
+  pretty_printer pp;
+  pp_format_decoder (&pp) = default_tree_printer;
+  pp_show_color (&pp) = pp_show_color (global_dc->printer);
+  pp.buffer->stream = stderr;
+  dump_to_pp (&pp, simple);
+  pp_newline (&pp);
+  pp_flush (&pp);
+}
+
+/* An svalue that matches the pattern (BASE * FACTOR) + OFFSET
+   where FACTOR or OFFSET could be the identity (represented as NULL).  */
+
+struct linear_op
+{
+  linear_op (const svalue *base,
+	     const svalue *factor,
+	     const svalue *offset)
+  : m_base (base), m_factor (factor), m_offset (offset)
+  {
+  }
+
+  bool maybe_get_cst_factor (bit_offset_t *out) const
+  {
+    if (m_factor == nullptr)
+      {
+	*out = 1;
+	return true;
+      }
+    if (tree cst_factor = m_factor->maybe_get_constant ())
+      {
+	*out = wi::to_offset (cst_factor);
+	return true;
+      }
+    return false;
+  }
+
+  bool maybe_get_cst_offset (bit_offset_t *out) const
+  {
+    if (m_offset == nullptr)
+      {
+	*out = 0;
+	return true;
+      }
+    if (tree cst_offset = m_offset->maybe_get_constant ())
+      {
+	*out = wi::to_offset (cst_offset);
+	return true;
+      }
+    return false;
+  }
+
+  static tristate
+  less (const linear_op &a, const linear_op &b)
+  {
+    /* Same base.  */
+    if (a.m_base == b.m_base)
+      {
+	bit_offset_t a_wi_factor;
+	bit_offset_t b_wi_factor;
+	if (a.maybe_get_cst_factor (&a_wi_factor)
+	    && b.maybe_get_cst_factor (&b_wi_factor))
+	  {
+	    if (a_wi_factor != b_wi_factor)
+	      return tristate (a_wi_factor < b_wi_factor);
+	    else
+	      {
+		bit_offset_t a_wi_offset;
+		bit_offset_t b_wi_offset;
+		if (a.maybe_get_cst_offset (&a_wi_offset)
+		    && b.maybe_get_cst_offset (&b_wi_offset))
+		  return tristate (a_wi_offset < b_wi_offset);
+	      }
+	  }
+      }
+    return tristate::unknown ();
+  }
+
+  static tristate
+  le (const linear_op &a, const linear_op &b)
+  {
+    /* Same base.  */
+    if (a.m_base == b.m_base)
+      {
+	bit_offset_t a_wi_factor;
+	bit_offset_t b_wi_factor;
+	if (a.maybe_get_cst_factor (&a_wi_factor)
+	    && b.maybe_get_cst_factor (&b_wi_factor))
+	  {
+	    if (a_wi_factor != b_wi_factor)
+	      return tristate (a_wi_factor <= b_wi_factor);
+	    else
+	      {
+		bit_offset_t a_wi_offset;
+		bit_offset_t b_wi_offset;
+		if (a.maybe_get_cst_offset (&a_wi_offset)
+		    && b.maybe_get_cst_offset (&b_wi_offset))
+		  return tristate (a_wi_offset <= b_wi_offset);
+	      }
+	  }
+      }
+    return tristate::unknown ();
+  }
+
+  static bool
+  from_svalue (const svalue &sval, linear_op *out)
+  {
+    switch (sval.get_kind ())
+      {
+      default:
+	break;
+      case SK_BINOP:
+	{
+	  const binop_svalue &binop_sval ((const binop_svalue &)sval);
+	  if (binop_sval.get_op () == MULT_EXPR)
+	    {
+	      *out = linear_op (binop_sval.get_arg0 (),
+				binop_sval.get_arg1 (),
+				NULL);
+	      return true;
+	    }
+	  else if (binop_sval.get_op () == PLUS_EXPR)
+	    {
+	      if (binop_sval.get_arg0 ()->get_kind () == SK_BINOP)
+		{
+		  const binop_svalue &inner_binop_sval
+		    ((const binop_svalue &)*binop_sval.get_arg0 ());
+		  if (inner_binop_sval.get_op () == MULT_EXPR)
+		    {
+		      *out = linear_op (inner_binop_sval.get_arg0 (),
+					inner_binop_sval.get_arg1 (),
+					binop_sval.get_arg1 ());
+		      return true;
+		    }
+		}
+
+	      *out = linear_op (binop_sval.get_arg0 (),
+				NULL,
+				binop_sval.get_arg1 ());
+	      return true;
+	    }
+	}
+	break;
+      }
+    return false;
+  }
+
+  const svalue *m_base;
+  const svalue *m_factor;
+  const svalue *m_offset;
+};
+
+bool
+operator< (const region_offset &a, const region_offset &b)
+{
+  if (a.symbolic_p ())
+    {
+      if (b.symbolic_p ())
+	{
+	  /* Symbolic vs symbolic.  */
+	  const svalue &a_sval = *a.get_symbolic_byte_offset ();
+	  const svalue &b_sval = *b.get_symbolic_byte_offset ();
+
+	  linear_op op_a (NULL, NULL, NULL);
+	  linear_op op_b (NULL, NULL, NULL);
+	  if (linear_op::from_svalue (a_sval, &op_a)
+	      && linear_op::from_svalue (b_sval, &op_b))
+	    {
+	      tristate ts = linear_op::less (op_a, op_b);
+	      if (ts.is_true ())
+		return true;
+	      else if (ts.is_false ())
+		return false;
+	    }
+	  /* Use svalue's deterministic order, for now.  */
+	  return (svalue::cmp_ptr (a.get_symbolic_byte_offset (),
+				   b.get_symbolic_byte_offset ())
+		  < 0);
+	}
+      else
+	/* Symbolic vs concrete: put all symbolic after all concrete.  */
+	return false;
+    }
+  else
+    {
+      if (b.symbolic_p ())
+	/* Concrete vs symbolic: put all concrete before all symbolic.  */
+	return true;
+      else
+	/* Concrete vs concrete.  */
+	return a.get_bit_offset () < b.get_bit_offset ();
+    }
+}
+
+bool
+operator<= (const region_offset &a, const region_offset &b)
+{
+  if (a.symbolic_p ())
+    {
+      if (b.symbolic_p ())
+	{
+	  /* Symbolic vs symbolic.  */
+	  const svalue &a_sval = *a.get_symbolic_byte_offset ();
+	  const svalue &b_sval = *b.get_symbolic_byte_offset ();
+
+	  linear_op op_a (NULL, NULL, NULL);
+	  linear_op op_b (NULL, NULL, NULL);
+	  if (linear_op::from_svalue (a_sval, &op_a)
+	      && linear_op::from_svalue (b_sval, &op_b))
+	    {
+	      tristate ts = linear_op::le (op_a, op_b);
+	      if (ts.is_true ())
+		return true;
+	      else if (ts.is_false ())
+		return false;
+	    }
+	  /* Use svalue's deterministic order, for now.  */
+	  return (svalue::cmp_ptr (a.get_symbolic_byte_offset (),
+				   b.get_symbolic_byte_offset ())
+		  <= 0);
+	}
+      else
+	/* Symbolic vs concrete: put all symbolic after all concrete.  */
+	return false;
+    }
+  else
+    {
+      if (b.symbolic_p ())
+	/* Concrete vs symbolic: put all concrete before all symbolic.  */
+	return true;
+      else
+	/* Concrete vs concrete.  */
+	return a.get_bit_offset () <= b.get_bit_offset ();
+    }
+}
+
+bool
+operator> (const region_offset &a, const region_offset &b)
+{
+  return b < a;
+}
+
+bool
+operator>= (const region_offset &a, const region_offset &b)
+{
+  return b <= a;
+}
 
 /* class region and its various subclasses.  */
 
@@ -71,14 +396,6 @@ namespace ana {
 region::~region ()
 {
   delete m_cached_offset;
-}
-
-/* Compare REG1 and REG2 by id.  */
-
-int
-region::cmp_ids (const region *reg1, const region *reg2)
-{
-  return (long)reg1->get_id () - (long)reg2->get_id ();
 }
 
 /* Determine the base region for this region: when considering bindings
@@ -99,6 +416,7 @@ region::get_base_region () const
 	case RK_ELEMENT:
 	case RK_OFFSET:
 	case RK_SIZED:
+	case RK_BIT_RANGE:
 	  iter = iter->get_parent_region ();
 	  continue;
 	case RK_CAST:
@@ -124,6 +442,7 @@ region::base_region_p () const
     case RK_OFFSET:
     case RK_SIZED:
     case RK_CAST:
+    case RK_BIT_RANGE:
       return false;
 
     default:
@@ -271,6 +590,51 @@ region::can_have_initial_svalue_p () const
     }
 }
 
+/* For regions within a global decl, get the svalue for the initial
+   value of this region when the program starts, caching the result.  */
+
+const svalue *
+region::get_initial_value_at_main (region_model_manager *mgr) const
+{
+  if (!m_cached_init_sval_at_main)
+    m_cached_init_sval_at_main = calc_initial_value_at_main (mgr);
+  return m_cached_init_sval_at_main;
+}
+
+/* Implementation of region::get_initial_value_at_main.  */
+
+const svalue *
+region::calc_initial_value_at_main (region_model_manager *mgr) const
+{
+  const decl_region *base_reg = get_base_region ()->dyn_cast_decl_region ();
+  gcc_assert (base_reg);
+
+  /* Attempt to get the initializer value for base_reg.  */
+  if (const svalue *base_reg_init
+      = base_reg->get_svalue_for_initializer (mgr))
+    {
+      if (this == base_reg)
+	return base_reg_init;
+      else
+	{
+	  /* Get the value for REG within base_reg_init.  */
+	  binding_cluster c (base_reg);
+	  c.bind (mgr->get_store_manager (), base_reg, base_reg_init);
+	  const svalue *sval
+	    = c.get_any_binding (mgr->get_store_manager (), this);
+	  if (sval)
+	    {
+	      if (get_type ())
+		sval = mgr->get_or_create_cast (get_type (), sval);
+	      return sval;
+	    }
+	}
+    }
+
+  /* Otherwise, return INIT_VAL(REG).  */
+  return mgr->get_or_create_initial_value (this);
+}
+
 /* If this region is a decl_region, return the decl.
    Otherwise return NULL.  */
 
@@ -286,11 +650,40 @@ region::maybe_get_decl () const
    first call and caching it internally).  */
 
 region_offset
-region::get_offset () const
+region::get_offset (region_model_manager *mgr) const
 {
   if(!m_cached_offset)
-    m_cached_offset = new region_offset (calc_offset ());
+    m_cached_offset = new region_offset (calc_offset (mgr));
   return *m_cached_offset;
+}
+
+/* Get the region_offset for immediately beyond this region.  */
+
+region_offset
+region::get_next_offset (region_model_manager *mgr) const
+{
+  region_offset start = get_offset (mgr);
+
+  bit_size_t bit_size;
+  if (get_bit_size (&bit_size))
+    {
+      if (start.concrete_p ())
+	{
+	  bit_offset_t next_bit_offset = start.get_bit_offset () + bit_size;
+	  return region_offset::make_concrete (start.get_base_region (),
+					       next_bit_offset);
+	}
+    }
+
+  const svalue *start_byte_offset_sval = start.calc_symbolic_byte_offset (mgr);
+  const svalue *byte_size_sval = get_byte_size_sval (mgr);
+  const svalue *sum_sval
+    = mgr->get_or_create_binop (size_type_node,
+				PLUS_EXPR,
+				start_byte_offset_sval,
+				byte_size_sval);
+  return region_offset::make_symbolic (start.get_base_region (),
+				       sum_sval);
 }
 
 /* Base class implementation of region::get_byte_size vfunc.
@@ -349,7 +742,11 @@ int_size_in_bits (const_tree type, bit_size_t *out)
     }
 
   tree sz = TYPE_SIZE (type);
-  if (sz && tree_fits_uhwi_p (sz))
+  if (sz
+      && tree_fits_uhwi_p (sz)
+      /* If the size is zero, then we may have a zero-sized
+	 array; handle such cases by returning false.  */
+      && !integer_zerop (sz))
     {
       *out = TREE_INT_CST_LOW (sz);
       return true;
@@ -487,54 +884,50 @@ region::get_subregions_for_binding (region_model_manager *mgr,
    or a symbolic offset.  */
 
 region_offset
-region::calc_offset () const
+region::calc_offset (region_model_manager *mgr) const
 {
   const region *iter_region = this;
   bit_offset_t accum_bit_offset = 0;
+  const svalue *accum_byte_sval = NULL;
 
   while (iter_region)
     {
       switch (iter_region->get_kind ())
 	{
 	case RK_FIELD:
-	  {
-	    const field_region *field_reg
-	      = (const field_region *)iter_region;
-	    iter_region = iter_region->get_parent_region ();
-
-	    bit_offset_t rel_bit_offset;
-	    if (!field_reg->get_relative_concrete_offset (&rel_bit_offset))
-	      return region_offset::make_symbolic (iter_region);
-	    accum_bit_offset += rel_bit_offset;
-	  }
-	  continue;
-
 	case RK_ELEMENT:
-	  {
-	    const element_region *element_reg
-	      = (const element_region *)iter_region;
-	    iter_region = iter_region->get_parent_region ();
-
-	    bit_offset_t rel_bit_offset;
-	    if (!element_reg->get_relative_concrete_offset (&rel_bit_offset))
-	      return region_offset::make_symbolic (iter_region);
-	    accum_bit_offset += rel_bit_offset;
-	  }
-	  continue;
-
 	case RK_OFFSET:
-	  {
-	    const offset_region *offset_reg
-	      = (const offset_region *)iter_region;
-	    iter_region = iter_region->get_parent_region ();
-
-	    bit_offset_t rel_bit_offset;
-	    if (!offset_reg->get_relative_concrete_offset (&rel_bit_offset))
-	      return region_offset::make_symbolic (iter_region);
-	    accum_bit_offset += rel_bit_offset;
-	  }
+	case RK_BIT_RANGE:
+	  if (accum_byte_sval)
+	    {
+	      const svalue *sval
+		= iter_region->get_relative_symbolic_offset (mgr);
+	      accum_byte_sval
+		= mgr->get_or_create_binop (sval->get_type (), PLUS_EXPR,
+					    accum_byte_sval, sval);
+	      iter_region = iter_region->get_parent_region ();
+	    }
+	  else
+	    {
+	      bit_offset_t rel_bit_offset;
+	      if (iter_region->get_relative_concrete_offset (&rel_bit_offset))
+		{
+		  accum_bit_offset += rel_bit_offset;
+		  iter_region = iter_region->get_parent_region ();
+		}
+	      else
+		{
+		  /* If the iter_region is not concrete anymore, convert the
+		     accumulated bits to a svalue in bytes and revisit the
+		     iter_region collecting the symbolic value.  */
+		  byte_offset_t byte_offset = accum_bit_offset / BITS_PER_UNIT;
+		  tree offset_tree = wide_int_to_tree (integer_type_node,
+						       byte_offset);
+		  accum_byte_sval
+		    = mgr->get_or_create_constant_svalue (offset_tree);
+		}
+	    }
 	  continue;
-
 	case RK_SIZED:
 	  iter_region = iter_region->get_parent_region ();
 	  continue;
@@ -548,10 +941,18 @@ region::calc_offset () const
 	  continue;
 
 	default:
-	  return region_offset::make_concrete (iter_region, accum_bit_offset);
+	  return accum_byte_sval
+		  ? region_offset::make_symbolic (iter_region,
+						  accum_byte_sval)
+		  : region_offset::make_concrete (iter_region,
+						  accum_bit_offset);
 	}
     }
-  return region_offset::make_concrete (iter_region, accum_bit_offset);
+
+  return accum_byte_sval ? region_offset::make_symbolic (iter_region,
+							 accum_byte_sval)
+			 : region_offset::make_concrete (iter_region,
+							 accum_bit_offset);
 }
 
 /* Base implementation of region::get_relative_concrete_offset vfunc.  */
@@ -562,19 +963,40 @@ region::get_relative_concrete_offset (bit_offset_t *) const
   return false;
 }
 
-/* Copy from SRC_REG to DST_REG, using CTXT for any issues that occur.  */
+/* Base implementation of region::get_relative_symbolic_offset vfunc.  */
 
-void
-region_model::copy_region (const region *dst_reg, const region *src_reg,
-			   region_model_context *ctxt)
+const svalue *
+region::get_relative_symbolic_offset (region_model_manager *mgr) const
 {
-  gcc_assert (dst_reg);
-  gcc_assert (src_reg);
-  if (dst_reg == src_reg)
-    return;
+  return mgr->get_or_create_unknown_svalue (ptrdiff_type_node);
+}
 
-  const svalue *sval = get_store_value (src_reg, ctxt);
-  set_value (dst_reg, sval, ctxt);
+/* Attempt to get the position and size of this region expressed as a
+   concrete range of bytes relative to its parent.
+   If successful, return true and write to *OUT.
+   Otherwise return false.  */
+
+bool
+region::get_relative_concrete_byte_range (byte_range *out) const
+{
+  /* We must have a concrete offset relative to the parent.  */
+  bit_offset_t rel_bit_offset;
+  if (!get_relative_concrete_offset (&rel_bit_offset))
+    return false;
+  /* ...which must be a whole number of bytes.  */
+  if (rel_bit_offset % BITS_PER_UNIT != 0)
+    return false;
+  byte_offset_t start_byte_offset = rel_bit_offset / BITS_PER_UNIT;
+
+  /* We must have a concrete size, which must be a whole number
+     of bytes.  */
+  byte_size_t num_bytes;
+  if (!get_byte_size (&num_bytes))
+    return false;
+
+  /* Success.  */
+  *out = byte_range (start_byte_offset, num_bytes);
+  return true;
 }
 
 /* Dump a description of this region to stderr.  */
@@ -597,8 +1019,7 @@ json::value *
 region::to_json () const
 {
   label_text desc = get_desc (true);
-  json::value *reg_js = new json::string (desc.m_buffer);
-  desc.maybe_free ();
+  json::value *reg_js = new json::string (desc.get ());
   return reg_js;
 }
 
@@ -638,11 +1059,46 @@ region::symbolic_for_unknown_ptr_p () const
   return false;
 }
 
+/* Return true if this is a symbolic region.  */
+
+bool
+region::symbolic_p () const
+{
+  return get_kind () == RK_SYMBOLIC;
+}
+
+/* Return true if this region is known to be zero bits in size.  */
+
+bool
+region::empty_p () const
+{
+  bit_size_t num_bits;
+  if (get_bit_size (&num_bits))
+    if (num_bits == 0)
+      return true;
+  return false;
+}
+
+/* Return true if this is a region for a decl with name DECL_NAME.
+   Intended for use when debugging (for assertions and conditional
+   breakpoints).  */
+
+DEBUG_FUNCTION bool
+region::is_named_decl_p (const char *decl_name) const
+{
+  if (tree decl = maybe_get_decl ())
+    if (DECL_NAME (decl)
+	&& !strcmp (IDENTIFIER_POINTER (DECL_NAME (decl)), decl_name))
+      return true;
+  return false;
+}
+
 /* region's ctor.  */
 
-region::region (complexity c, unsigned id, const region *parent, tree type)
-: m_complexity (c), m_id (id), m_parent (parent), m_type (type),
-  m_cached_offset (NULL)
+region::region (complexity c, symbol::id_t id, const region *parent, tree type)
+: symbol (c, id),
+  m_parent (parent), m_type (type),
+  m_cached_offset (NULL), m_cached_init_sval_at_main (NULL)
 {
   gcc_assert (type == NULL_TREE || TYPE_P (type));
 }
@@ -838,13 +1294,49 @@ frame_region::dump_to_pp (pretty_printer *pp, bool simple) const
 
 const decl_region *
 frame_region::get_region_for_local (region_model_manager *mgr,
-				    tree expr) const
+				    tree expr,
+				    const region_model_context *ctxt) const
 {
-  // TODO: could also check that VAR_DECLs are locals
-  gcc_assert (TREE_CODE (expr) == PARM_DECL
-	      || TREE_CODE (expr) == VAR_DECL
-	      || TREE_CODE (expr) == SSA_NAME
-	      || TREE_CODE (expr) == RESULT_DECL);
+  if (CHECKING_P)
+    {
+      /* Verify that EXPR is a local or SSA name, and that it's for the
+	 correct function for this stack frame.  */
+      gcc_assert (TREE_CODE (expr) == PARM_DECL
+		  || TREE_CODE (expr) == VAR_DECL
+		  || TREE_CODE (expr) == SSA_NAME
+		  || TREE_CODE (expr) == RESULT_DECL);
+      switch (TREE_CODE (expr))
+	{
+	default:
+	  gcc_unreachable ();
+	case VAR_DECL:
+	  gcc_assert (!is_global_var (expr));
+	  /* Fall through.  */
+	case PARM_DECL:
+	case RESULT_DECL:
+	  gcc_assert (DECL_CONTEXT (expr) == m_fun->decl);
+	  break;
+	case SSA_NAME:
+	  {
+	    if (tree var = SSA_NAME_VAR (expr))
+	      {
+		if (DECL_P (var))
+		  gcc_assert (DECL_CONTEXT (var) == m_fun->decl);
+	      }
+	    else if (ctxt)
+	      if (const extrinsic_state *ext_state = ctxt->get_ext_state ())
+		if (const supergraph *sg
+		    = ext_state->get_engine ()->get_supergraph ())
+		  {
+		    const gimple *def_stmt = SSA_NAME_DEF_STMT (expr);
+		    const supernode *snode
+		      = sg->get_supernode_for_stmt (def_stmt);
+		    gcc_assert (snode->get_function () == m_fun);
+		  }
+	  }
+	  break;
+	}
+    }
 
   /* Ideally we'd use mutable here.  */
   map_t &mutable_locals = const_cast <map_t &> (m_locals);
@@ -852,7 +1344,7 @@ frame_region::get_region_for_local (region_model_manager *mgr,
   if (decl_region **slot = mutable_locals.get (expr))
     return *slot;
   decl_region *reg
-    = new decl_region (mgr->alloc_region_id (), this, expr);
+    = new decl_region (mgr->alloc_symbol_id (), this, expr);
   mutable_locals.put (expr, reg);
   return reg;
 }
@@ -951,7 +1443,7 @@ heap_region::dump_to_pp (pretty_printer *pp, bool simple) const
 
 /* root_region's ctor.  */
 
-root_region::root_region (unsigned id)
+root_region::root_region (symbol::id_t id)
 : region (complexity (1, 1), id, NULL, NULL_TREE)
 {
 }
@@ -967,14 +1459,27 @@ root_region::dump_to_pp (pretty_printer *pp, bool simple) const
     pp_string (pp, "root_region()");
 }
 
+/* class thread_local_region : public space_region.  */
+
+void
+thread_local_region::dump_to_pp (pretty_printer *pp, bool simple) const
+{
+  if (simple)
+    pp_string (pp, "thread_local_region");
+  else
+    pp_string (pp, "thread_local_region()");
+}
+
 /* class symbolic_region : public map_region.  */
 
 /* symbolic_region's ctor.  */
 
-symbolic_region::symbolic_region (unsigned id, region *parent,
+symbolic_region::symbolic_region (symbol::id_t id, region *parent,
 				  const svalue *sval_ptr)
 : region (complexity::from_pair (parent, sval_ptr), id, parent,
-	  TREE_TYPE (sval_ptr->get_type ())),
+	  (sval_ptr->get_type ()
+	   ? TREE_TYPE (sval_ptr->get_type ())
+	   : NULL_TREE)),
   m_sval_ptr (sval_ptr)
 {
 }
@@ -1003,8 +1508,11 @@ symbolic_region::dump_to_pp (pretty_printer *pp, bool simple) const
     {
       pp_string (pp, "symbolic_region(");
       get_parent_region ()->dump_to_pp (pp, simple);
-      pp_string (pp, ", ");
-      print_quoted_type (pp, get_type ());
+      if (get_type ())
+	{
+	  pp_string (pp, ", ");
+	  print_quoted_type (pp, get_type ());
+	}
       pp_string (pp, ", ");
       m_sval_ptr->dump_to_pp (pp, simple);
       pp_string (pp, ")");
@@ -1051,7 +1559,7 @@ decl_region::get_stack_depth () const
 const svalue *
 decl_region::maybe_get_constant_value (region_model_manager *mgr) const
 {
-  if (TREE_CODE (m_decl) == VAR_DECL
+  if (VAR_P (m_decl)
       && DECL_IN_CONSTANT_POOL (m_decl)
       && DECL_INITIAL (m_decl)
       && TREE_CODE (DECL_INITIAL (m_decl)) == CONSTRUCTOR)
@@ -1059,14 +1567,13 @@ decl_region::maybe_get_constant_value (region_model_manager *mgr) const
   return NULL;
 }
 
-/* Get an svalue for CTOR, a CONSTRUCTOR for this region's decl.  */
+/* Implementation of decl_region::get_svalue_for_constructor
+   for when the cached value hasn't yet been calculated.  */
 
 const svalue *
-decl_region::get_svalue_for_constructor (tree ctor,
-					 region_model_manager *mgr) const
+decl_region::calc_svalue_for_constructor (tree ctor,
+					  region_model_manager *mgr) const
 {
-  gcc_assert (!TREE_CLOBBER_P (ctor));
-
   /* Create a binding map, applying ctor to it, using this
      decl_region as the base region when building child regions
      for offset calculations.  */
@@ -1076,6 +1583,21 @@ decl_region::get_svalue_for_constructor (tree ctor,
 
   /* Return a compound svalue for the map we built.  */
   return mgr->get_or_create_compound_svalue (get_type (), map);
+}
+
+/* Get an svalue for CTOR, a CONSTRUCTOR for this region's decl.  */
+
+const svalue *
+decl_region::get_svalue_for_constructor (tree ctor,
+					 region_model_manager *mgr) const
+{
+  gcc_assert (!TREE_CLOBBER_P (ctor));
+  gcc_assert (ctor == DECL_INITIAL (m_decl));
+
+  if (!m_ctor_svalue)
+    m_ctor_svalue = calc_svalue_for_constructor (ctor, mgr);
+
+  return m_ctor_svalue;
 }
 
 /* For use on decl_regions for global variables.
@@ -1097,6 +1619,9 @@ decl_region::get_svalue_for_initializer (region_model_manager *mgr) const
       if (DECL_EXTERNAL (m_decl))
 	return NULL;
 
+      if (empty_p ())
+	return NULL;
+
       /* Implicit initialization to zero; use a compound_svalue for it.
 	 Doing so requires that we have a concrete binding for this region,
 	 which can fail if we have a region with unknown size
@@ -1104,6 +1629,11 @@ decl_region::get_svalue_for_initializer (region_model_manager *mgr) const
       const binding_key *binding
 	= binding_key::make (mgr->get_store_manager (), this);
       if (binding->symbolic_p ())
+	return NULL;
+
+      /* If we don't care about tracking the content of this region, then
+	 it's unused, and the value doesn't matter.  */
+      if (!tracked_p ())
 	return NULL;
 
       binding_cluster c (this);
@@ -1123,6 +1653,95 @@ decl_region::get_svalue_for_initializer (region_model_manager *mgr) const
   /* Reuse the get_rvalue logic from region_model.  */
   region_model m (mgr);
   return m.get_rvalue (path_var (init, 0), NULL);
+}
+
+/* Subroutine of symnode_requires_tracking_p; return true if REF
+   might imply that we should be tracking the value of its decl.  */
+
+static bool
+ipa_ref_requires_tracking (ipa_ref *ref)
+{
+  /* If we have a load/store/alias of the symbol, then we'll track
+     the decl's value.  */
+  if (ref->use != IPA_REF_ADDR)
+    return true;
+
+  if (ref->stmt == NULL)
+    return true;
+
+  switch (ref->stmt->code)
+    {
+    default:
+      return true;
+    case GIMPLE_CALL:
+      {
+	cgraph_node *caller_cnode = dyn_cast <cgraph_node *> (ref->referring);
+	if (caller_cnode == NULL)
+	  return true;
+	cgraph_edge *edge = caller_cnode->get_edge (ref->stmt);
+	if (!edge)
+	  return true;
+	if (edge->callee == NULL)
+	  return true; /* e.g. call through function ptr.  */
+	if (edge->callee->definition)
+	  return true;
+	/* If we get here, then this ref is a pointer passed to
+	   a function we don't have the definition for.  */
+	return false;
+      }
+      break;
+    case GIMPLE_ASM:
+      {
+	const gasm *asm_stmt = as_a <const gasm *> (ref->stmt);
+	if (gimple_asm_noutputs (asm_stmt) > 0)
+	  return true;
+	if (gimple_asm_nclobbers (asm_stmt) > 0)
+	  return true;
+	/* If we get here, then this ref is the decl being passed
+	   by pointer to asm with no outputs.  */
+	return false;
+      }
+      break;
+    }
+}
+
+/* Determine if the decl for SYMNODE should have binding_clusters
+   in our state objects; return false to optimize away tracking
+   certain decls in our state objects, as an optimization.  */
+
+static bool
+symnode_requires_tracking_p (symtab_node *symnode)
+{
+  gcc_assert (symnode);
+  if (symnode->externally_visible)
+    return true;
+  tree context_fndecl = DECL_CONTEXT (symnode->decl);
+  if (context_fndecl == NULL)
+    return true;
+  if (TREE_CODE (context_fndecl) != FUNCTION_DECL)
+    return true;
+  for (auto ref : symnode->ref_list.referring)
+    if (ipa_ref_requires_tracking (ref))
+      return true;
+
+  /* If we get here, then we don't have uses of this decl that require
+     tracking; we never read from it or write to it explicitly.  */
+  return false;
+}
+
+/* Subroutine of decl_region ctor: determine whether this decl_region
+   can have binding_clusters; return false to optimize away tracking
+   of certain decls in our state objects, as an optimization.  */
+
+bool
+decl_region::calc_tracked_p (tree decl)
+{
+  /* Precondition of symtab_node::get.  */
+  if (TREE_CODE (decl) == VAR_DECL
+      && (TREE_STATIC (decl) || DECL_EXTERNAL (decl) || in_lto_p))
+    if (symtab_node *symnode = symtab_node::get (decl))
+      return symnode_requires_tracking_p (symnode);
+  return true;
 }
 
 /* class field_region : public region.  */
@@ -1154,7 +1773,7 @@ field_region::dump_to_pp (pretty_printer *pp, bool simple) const
 bool
 field_region::get_relative_concrete_offset (bit_offset_t *out) const
 {
-  /* Compare with e.g. gimple-fold.c's
+  /* Compare with e.g. gimple-fold.cc's
      fold_nonarray_ctor_reference.  */
   tree byte_offset = DECL_FIELD_OFFSET (m_field);
   if (TREE_CODE (byte_offset) != INTEGER_CST)
@@ -1166,6 +1785,25 @@ field_region::get_relative_concrete_offset (bit_offset_t *out) const
        + (wi::to_offset (byte_offset) << LOG2_BITS_PER_UNIT));
   *out = bitoffset;
   return true;
+}
+
+
+/* Implementation of region::get_relative_symbolic_offset vfunc
+   for field_region.
+   If known, the returned svalue is equal to the offset converted to bytes and
+   rounded off.  */
+
+const svalue *
+field_region::get_relative_symbolic_offset (region_model_manager *mgr) const
+{
+  bit_offset_t out;
+  if (get_relative_concrete_offset (&out))
+    {
+      tree cst_tree
+	= wide_int_to_tree (ptrdiff_type_node, out / BITS_PER_UNIT);
+      return mgr->get_or_create_constant_svalue (cst_tree);
+    }
+  return mgr->get_or_create_unknown_svalue (ptrdiff_type_node);
 }
 
 /* class element_region : public region.  */
@@ -1234,6 +1872,29 @@ element_region::get_relative_concrete_offset (bit_offset_t *out) const
   return false;
 }
 
+/* Implementation of region::get_relative_symbolic_offset vfunc
+   for element_region.  */
+
+const svalue *
+element_region::get_relative_symbolic_offset (region_model_manager *mgr) const
+{
+  tree elem_type = get_type ();
+
+  /* First, use int_size_in_bytes, to reject the case where we
+     have an incomplete type, or a non-constant value.  */
+  HOST_WIDE_INT hwi_byte_size = int_size_in_bytes (elem_type);
+  if (hwi_byte_size > 0)
+	  {
+      tree byte_size_tree = wide_int_to_tree (ptrdiff_type_node,
+					      hwi_byte_size);
+      const svalue *byte_size_sval
+	= mgr->get_or_create_constant_svalue (byte_size_tree);
+      return mgr->get_or_create_binop (ptrdiff_type_node, MULT_EXPR,
+				       m_index, byte_size_sval);
+    }
+  return mgr->get_or_create_unknown_svalue (ptrdiff_type_node);
+}
+
 /* class offset_region : public region.  */
 
 /* Implementation of region::accept vfunc for offset_region.  */
@@ -1288,6 +1949,40 @@ offset_region::get_relative_concrete_offset (bit_offset_t *out) const
       return true;
     }
   return false;
+}
+
+/* Implementation of region::get_relative_symbolic_offset vfunc
+   for offset_region.  */
+
+const svalue *
+offset_region::get_relative_symbolic_offset (region_model_manager *mgr
+					      ATTRIBUTE_UNUSED) const
+{
+  return get_byte_offset ();
+}
+
+/* Implementation of region::get_byte_size_sval vfunc for offset_region.  */
+
+const svalue *
+offset_region::get_byte_size_sval (region_model_manager *mgr) const
+{
+  tree offset_cst = get_byte_offset ()->maybe_get_constant ();
+  byte_size_t byte_size;
+  /* If the offset points in the middle of the region,
+     return the remaining bytes.  */
+  if (get_byte_size (&byte_size) && offset_cst)
+    {
+      byte_size_t offset = wi::to_offset (offset_cst);
+      byte_range r (0, byte_size);
+      if (r.contains_p (offset))
+	{
+	  tree remaining_byte_size = wide_int_to_tree (size_type_node,
+						       byte_size - offset);
+	  return mgr->get_or_create_constant_svalue (remaining_byte_size);
+	}
+    }
+
+  return region::get_byte_size_sval (mgr);
 }
 
 /* class sized_region : public region.  */
@@ -1384,6 +2079,16 @@ cast_region::dump_to_pp (pretty_printer *pp, bool simple) const
     }
 }
 
+/* Implementation of region::get_relative_concrete_offset vfunc
+   for cast_region.  */
+
+bool
+cast_region::get_relative_concrete_offset (bit_offset_t *out) const
+{
+  *out = (int) 0;
+  return true;
+}
+
 /* class heap_allocated_region : public region.  */
 
 /* Implementation of region::dump_to_pp vfunc for heap_allocated_region.  */
@@ -1405,9 +2110,9 @@ void
 alloca_region::dump_to_pp (pretty_printer *pp, bool simple) const
 {
   if (simple)
-    pp_string (pp, "ALLOCA_REGION");
+    pp_printf (pp, "ALLOCA_REGION(%i)", get_id ());
   else
-    pp_string (pp, "alloca_region()");
+    pp_printf (pp, "alloca_region(%i)", get_id ());
 }
 
 /* class string_region : public region.  */
@@ -1430,6 +2135,128 @@ string_region::dump_to_pp (pretty_printer *pp, bool simple) const
 	  pp_string (pp, "))");
 	}
     }
+}
+
+/* class bit_range_region : public region.  */
+
+/* Implementation of region::dump_to_pp vfunc for bit_range_region.  */
+
+void
+bit_range_region::dump_to_pp (pretty_printer *pp, bool simple) const
+{
+  if (simple)
+    {
+      pp_string (pp, "BIT_RANGE_REG(");
+      get_parent_region ()->dump_to_pp (pp, simple);
+      pp_string (pp, ", ");
+      m_bits.dump_to_pp (pp);
+      pp_string (pp, ")");
+    }
+  else
+    {
+      pp_string (pp, "bit_range_region(");
+      get_parent_region ()->dump_to_pp (pp, simple);
+      pp_string (pp, ", ");
+      m_bits.dump_to_pp (pp);
+      pp_printf (pp, ")");
+    }
+}
+
+/* Implementation of region::get_byte_size vfunc for bit_range_region.  */
+
+bool
+bit_range_region::get_byte_size (byte_size_t *out) const
+{
+  if (m_bits.m_size_in_bits % BITS_PER_UNIT == 0)
+    {
+      *out = m_bits.m_size_in_bits / BITS_PER_UNIT;
+      return true;
+    }
+  return false;
+}
+
+/* Implementation of region::get_bit_size vfunc for bit_range_region.  */
+
+bool
+bit_range_region::get_bit_size (bit_size_t *out) const
+{
+  *out = m_bits.m_size_in_bits;
+  return true;
+}
+
+/* Implementation of region::get_byte_size_sval vfunc for bit_range_region.  */
+
+const svalue *
+bit_range_region::get_byte_size_sval (region_model_manager *mgr) const
+{
+  if (m_bits.m_size_in_bits % BITS_PER_UNIT != 0)
+    return mgr->get_or_create_unknown_svalue (size_type_node);
+
+  HOST_WIDE_INT num_bytes = m_bits.m_size_in_bits.to_shwi () / BITS_PER_UNIT;
+  return mgr->get_or_create_int_cst (size_type_node, num_bytes);
+}
+
+/* Implementation of region::get_relative_concrete_offset vfunc for
+   bit_range_region.  */
+
+bool
+bit_range_region::get_relative_concrete_offset (bit_offset_t *out) const
+{
+  *out = m_bits.get_start_bit_offset ();
+  return true;
+}
+
+/* Implementation of region::get_relative_symbolic_offset vfunc for
+   bit_range_region.
+   The returned svalue is equal to the offset converted to bytes and
+   rounded off.  */
+
+const svalue *
+bit_range_region::get_relative_symbolic_offset (region_model_manager *mgr)
+  const
+{
+  byte_offset_t start_byte = m_bits.get_start_bit_offset () / BITS_PER_UNIT;
+  tree start_bit_tree = wide_int_to_tree (ptrdiff_type_node, start_byte);
+  return mgr->get_or_create_constant_svalue (start_bit_tree);
+}
+
+/* class var_arg_region : public region.  */
+
+void
+var_arg_region::dump_to_pp (pretty_printer *pp, bool simple) const
+{
+  if (simple)
+    {
+      pp_string (pp, "VAR_ARG_REG(");
+      get_parent_region ()->dump_to_pp (pp, simple);
+      pp_printf (pp, ", arg_idx: %d)", m_idx);
+    }
+  else
+    {
+      pp_string (pp, "var_arg_region(");
+      get_parent_region ()->dump_to_pp (pp, simple);
+      pp_printf (pp, ", arg_idx: %d)", m_idx);
+    }
+}
+
+/* Get the frame_region for this var_arg_region.  */
+
+const frame_region *
+var_arg_region::get_frame_region () const
+{
+  gcc_assert (get_parent_region ());
+  return as_a <const frame_region *> (get_parent_region ());
+}
+
+/* class errno_region : public region.  */
+
+void
+errno_region::dump_to_pp (pretty_printer *pp, bool simple) const
+{
+  if (simple)
+    pp_string (pp, "errno_region");
+  else
+    pp_string (pp, "errno_region()");
 }
 
 /* class unknown_region : public region.  */

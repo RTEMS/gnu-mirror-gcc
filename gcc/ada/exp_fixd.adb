@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -25,6 +25,7 @@
 
 with Atree;          use Atree;
 with Checks;         use Checks;
+with Debug;          use Debug;
 with Einfo;          use Einfo;
 with Einfo.Entities; use Einfo.Entities;
 with Einfo.Utils;    use Einfo.Utils;
@@ -190,6 +191,15 @@ package body Exp_Fixd is
    --  The expression returned is neither analyzed nor resolved. The Etype
    --  of the result is properly set (to Universal_Real).
 
+   function Get_Size_For_Value (V : Uint) return Pos;
+   --  Given a non-negative universal integer value, return the size of a small
+   --  signed integer type covering -V .. V, or Pos'Max if no such type exists.
+
+   function Get_Type_For_Size (Siz : Pos; Force : Boolean) return Entity_Id;
+   --  Return the smallest signed integer type containing at least Siz bits.
+   --  If no such type exists, return Empty if Force is False or the largest
+   --  signed integer type if Force is True.
+
    function Integer_Literal
      (N        : Node_Id;
       V        : Uint;
@@ -324,7 +334,6 @@ package body Exp_Fixd is
       Right_Type  : constant Entity_Id  := Base_Type (Etype (R));
       Left_Size   : Int;
       Right_Size  : Int;
-      Rsize       : Int;
       Result_Type : Entity_Id;
       Rnode       : Node_Id;
 
@@ -354,20 +363,17 @@ package body Exp_Fixd is
          --  the effective size of an operand is the RM_Size of the operand.
          --  But a special case arises with operands whose size is known at
          --  compile time. In this case, we can use the actual value of the
-         --  operand to get its size if it would fit in signed 8/16/32 bits.
+         --  operand to get a size if it would fit in a small signed integer.
 
          Left_Size := UI_To_Int (RM_Size (Left_Type));
 
          if Compile_Time_Known_Value (L) then
             declare
-               Val : constant Uint := Expr_Value (L);
+               Siz : constant Int :=
+                       Get_Size_For_Value (UI_Abs (Expr_Value (L)));
             begin
-               if Val < Uint_2 ** 7 then
-                  Left_Size := 8;
-               elsif Val < Uint_2 ** 15 then
-                  Left_Size := 16;
-               elsif Val < Uint_2 ** 31 then
-                  Left_Size := 32;
+               if Siz < Left_Size then
+                  Left_Size := Siz;
                end if;
             end;
          end if;
@@ -376,35 +382,19 @@ package body Exp_Fixd is
 
          if Compile_Time_Known_Value (R) then
             declare
-               Val : constant Uint := Expr_Value (R);
+               Siz : constant Int :=
+                       Get_Size_For_Value (UI_Abs (Expr_Value (R)));
             begin
-               if Val <= Int'(2 ** 7) then
-                  Right_Size := 8;
-               elsif Val <= Int'(2 ** 15) then
-                  Right_Size := 16;
+               if Siz < Right_Size then
+                  Right_Size := Siz;
                end if;
             end;
          end if;
 
          --  Do the operation using the longer of the two sizes
 
-         Rsize := Int'Max (Left_Size, Right_Size);
-
-         if Rsize <= 8 then
-            Result_Type := Standard_Integer_8;
-
-         elsif Rsize <= 16 then
-            Result_Type := Standard_Integer_16;
-
-         elsif Rsize <= 32 then
-            Result_Type := Standard_Integer_32;
-
-         elsif Rsize <= 64 or else System_Max_Integer_Size < 128 then
-            Result_Type := Standard_Integer_64;
-
-         else
-            Result_Type := Standard_Integer_128;
-         end if;
+         Result_Type :=
+           Get_Type_For_Size (Int'Max (Left_Size, Right_Size), Force => True);
 
          Rnode :=
             Make_Op_Divide (Loc,
@@ -664,7 +654,6 @@ package body Exp_Fixd is
       Right_Type  : constant Entity_Id  := Etype (R);
       Left_Size   : Int;
       Right_Size  : Int;
-      Rsize       : Int;
       Result_Type : Entity_Id;
       Rnode       : Node_Id;
 
@@ -697,20 +686,17 @@ package body Exp_Fixd is
          --  the effective size of an operand is the RM_Size of the operand.
          --  But a special case arises with operands whose size is known at
          --  compile time. In this case, we can use the actual value of the
-         --  operand to get its size if it would fit in signed 8/16/32 bits.
+         --  operand to get a size if it would fit in a small signed integer.
 
          Left_Size := UI_To_Int (RM_Size (Left_Type));
 
          if Compile_Time_Known_Value (L) then
             declare
-               Val : constant Uint := Expr_Value (L);
+               Siz : constant Int :=
+                       Get_Size_For_Value (UI_Abs (Expr_Value (L)));
             begin
-               if Val < Uint_2 ** 7 then
-                  Left_Size := 8;
-               elsif Val < Uint_2 ** 15 then
-                  Left_Size := 16;
-               elsif Val < Uint_2 ** 31 then
-                  Left_Size := 32;
+               if Siz < Left_Size then
+                  Left_Size := Siz;
                end if;
             end;
          end if;
@@ -719,12 +705,11 @@ package body Exp_Fixd is
 
          if Compile_Time_Known_Value (R) then
             declare
-               Val : constant Uint := Expr_Value (R);
+               Siz : constant Int :=
+                       Get_Size_For_Value (UI_Abs (Expr_Value (R)));
             begin
-               if Val <= Int'(2 ** 7) then
-                  Right_Size := 8;
-               elsif Val <= Int'(2 ** 15) then
-                  Right_Size := 16;
+               if Siz < Right_Size then
+                  Right_Size := Siz;
                end if;
             end;
          end if;
@@ -732,23 +717,8 @@ package body Exp_Fixd is
          --  Now the result size must be at least the sum of the two sizes,
          --  to accommodate all possible results.
 
-         Rsize := Left_Size + Right_Size;
-
-         if Rsize <= 8 then
-            Result_Type := Standard_Integer_8;
-
-         elsif Rsize <= 16 then
-            Result_Type := Standard_Integer_16;
-
-         elsif Rsize <= 32 then
-            Result_Type := Standard_Integer_32;
-
-         elsif Rsize <= 64 or else System_Max_Integer_Size < 128 then
-            Result_Type := Standard_Integer_64;
-
-         else
-            Result_Type := Standard_Integer_128;
-         end if;
+         Result_Type :=
+           Get_Type_For_Size (Left_Size + Right_Size, Force => True);
 
          Rnode :=
             Make_Op_Multiply (Loc,
@@ -1542,7 +1512,7 @@ package body Exp_Fixd is
 
       else
          Lit_Int := Integer_Literal (N, Frac_Den, UR_Is_Negative (Frac));
-         Lit_K   := Integer_Literal (N, Frac_Num);
+         Lit_K   := Integer_Literal (N, Frac_Num, False);
 
          if Present (Lit_Int) and then Present (Lit_K) then
             Set_Result (N, Build_Scaled_Divide (N, Left, Lit_K, Lit_Int));
@@ -1655,13 +1625,14 @@ package body Exp_Fixd is
 
       --  Fall through to use floating-point for the close result set case,
       --  as a result of the numerator or denominator of the small ratio not
-      --  being a sufficiently small integer.
+      --  being sufficiently small. See also Expand_Convert_Float_To_Fixed.
 
       Set_Result (N,
         Build_Multiply (N,
           Fpt_Value (Expr),
           Real_Literal (N, Small_Ratio)),
-        Rng_Check);
+        Rng_Check,
+        Trunc => not Rounded_Result (N));
    end Expand_Convert_Fixed_To_Fixed;
 
    -----------------------------------
@@ -1800,23 +1771,23 @@ package body Exp_Fixd is
       if Small = Ureal_1 then
          Set_Result (N, Expr, Rng_Check, Trunc => True);
 
-      --  Normal case where multiply is required. Rounding is truncating
-      --  for decimal fixed point types only, see RM 4.6(29), except if the
-      --  conversion comes from an attribute reference 'Round (RM 3.5.10 (14)):
-      --  The attribute is implemented by means of a conversion that must
-      --  round.
+      --  Normal case where multiply is required. The conversion is truncating
+      --  for fixed-point types, see RM 4.6(29), except if the conversion comes
+      --  from an attribute reference 'Round (RM 3.5.10 (14)): the attribute is
+      --  implemented by means of a conversion that needs to round. However, if
+      --  the switch -gnatd.N is specified, we use rounding for ordinary fixed-
+      --  point types, for compatibility with earlier versions of the compiler.
 
       else
-         Set_Result
-           (N     => N,
-            Expr  =>
-              Build_Multiply
-                (N => N,
-                 L => Fpt_Value (Expr),
-                 R => Real_Literal (N, Ureal_1 / Small)),
-            Rchk  => Rng_Check,
-            Trunc => Is_Decimal_Fixed_Point_Type (Result_Type)
-                       and not Rounded_Result (N));
+         Set_Result (N,
+           Build_Multiply (N,
+             L => Fpt_Value (Expr),
+             R => Real_Literal (N, Ureal_1 / Small)),
+          Rchk  => Rng_Check,
+          Trunc => not Rounded_Result (N)
+                     and then not
+                       (Debug_Flag_Dot_NN
+                         and then Is_Ordinary_Fixed_Point_Type (Result_Type)));
       end if;
    end Expand_Convert_Float_To_Fixed;
 
@@ -1883,13 +1854,14 @@ package body Exp_Fixd is
 
       --  Fall through to use floating-point for the close result set case,
       --  as a result of the numerator or denominator of the small value not
-      --  being a sufficiently small integer.
+      --  being sufficiently small. See also Expand_Convert_Float_To_Fixed.
 
       Set_Result (N,
         Build_Multiply (N,
           Fpt_Value (Expr),
           Real_Literal (N, Ureal_1 / Small)),
-        Rng_Check);
+        Rng_Check,
+        Trunc => not Rounded_Result (N));
    end Expand_Convert_Integer_To_Fixed;
 
    --------------------------------
@@ -2422,6 +2394,64 @@ package body Exp_Fixd is
       return Build_Conversion (N, Universal_Real, N);
    end Fpt_Value;
 
+   ------------------------
+   -- Get_Size_For_Value --
+   ------------------------
+
+   function Get_Size_For_Value (V : Uint) return Pos is
+   begin
+      pragma Assert (V >= Uint_0);
+
+      if V < Uint_2 ** 7 then
+         return 8;
+
+      elsif V < Uint_2 ** 15 then
+         return 16;
+
+      elsif V < Uint_2 ** 31 then
+         return 32;
+
+      elsif V < Uint_2 ** 63 then
+         return 64;
+
+      elsif V < Uint_2 ** 127 then
+         return 128;
+
+      else
+         return Pos'Last;
+      end if;
+   end Get_Size_For_Value;
+
+   -----------------------
+   -- Get_Type_For_Size --
+   -----------------------
+
+   function Get_Type_For_Size (Siz : Pos; Force : Boolean) return Entity_Id is
+   begin
+      if Siz <= 8 then
+         return Standard_Integer_8;
+
+      elsif Siz <= 16 then
+         return Standard_Integer_16;
+
+      elsif Siz <= 32 then
+         return Standard_Integer_32;
+
+      elsif Siz <= 64
+        or else (Force and then System_Max_Integer_Size < 128)
+      then
+         return Standard_Integer_64;
+
+      elsif (Siz <= 128 and then System_Max_Integer_Size = 128)
+        or else Force
+      then
+         return Standard_Integer_128;
+
+      else
+         return Empty;
+      end if;
+   end Get_Type_For_Size;
+
    ---------------------
    -- Integer_Literal --
    ---------------------
@@ -2435,22 +2465,8 @@ package body Exp_Fixd is
       L : Node_Id;
 
    begin
-      if V < Uint_2 ** 7 then
-         T := Standard_Integer_8;
-
-      elsif V < Uint_2 ** 15 then
-         T := Standard_Integer_16;
-
-      elsif V < Uint_2 ** 31 then
-         T := Standard_Integer_32;
-
-      elsif V < Uint_2 ** 63 then
-         T := Standard_Integer_64;
-
-      elsif V < Uint_2 ** 127 and then System_Max_Integer_Size = 128 then
-         T := Standard_Integer_128;
-
-      else
+      T := Get_Type_For_Size (Get_Size_For_Value (V), Force => False);
+      if No (T) then
          return Empty;
       end if;
 

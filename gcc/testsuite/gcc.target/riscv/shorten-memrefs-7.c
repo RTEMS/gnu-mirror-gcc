@@ -1,4 +1,5 @@
-/* { dg-options "-Os -march=rv32imc -mabi=ilp32 -mno-shorten-memrefs" } */
+/* { dg-options "-march=rv32imc -mabi=ilp32 -mno-shorten-memrefs" } */
+/* { dg-skip-if "" { *-*-* } { "-O0" } } */
 
 /* Check that these load/stores do not get rewritten into a compressible format
    when shorten_memrefs is disabled.  */
@@ -43,4 +44,4 @@ load2r (long long *array)
   return a;
 }
 
-/* { dg-final { scan-assembler-not "addi" } } */
+/* { dg-final { scan-assembler-not {\maddi} } } */

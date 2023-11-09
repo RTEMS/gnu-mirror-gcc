@@ -535,7 +535,7 @@ class Type
   make_nil_type();
 
   static Type*
-  make_call_multiple_result_type(Call_expression*);
+  make_call_multiple_result_type();
 
   static Struct_type*
   make_struct_type(Struct_field_list* fields, Location);
@@ -584,8 +584,8 @@ class Type
   // returns false if the type is invalid and we should not continue
   // traversing it.
   bool
-  verify()
-  { return this->do_verify(); }
+  verify(Gogo* gogo)
+  { return this->do_verify(gogo); }
 
   // Bit flags to pass to are_identical and friends.
 
@@ -1101,7 +1101,7 @@ class Type
 
   // Verify the type.
   virtual bool
-  do_verify()
+  do_verify(Gogo*)
   { return true; }
 
   virtual bool
@@ -2297,12 +2297,15 @@ class Pointer_type : public Type
   do_traverse(Traverse*);
 
   bool
-  do_verify()
-  { return this->to_type_->verify(); }
+  do_verify(Gogo* gogo)
+  { return this->to_type_->verify(gogo); }
 
+  // If this is a pointer to a type that can't be in the heap, then
+  // the garbage collector does not have to look at this, so pretend
+  // that this is not a pointer at all.
   bool
   do_has_pointer() const
-  { return true; }
+  { return this->to_type_->in_heap(); }
 
   bool
   do_compare_is_identity(Gogo*)
@@ -2672,7 +2675,7 @@ class Struct_type : public Type
   do_traverse(Traverse*);
 
   bool
-  do_verify();
+  do_verify(Gogo*);
 
   bool
   do_has_pointer() const;
@@ -2797,7 +2800,7 @@ class Array_type : public Type
 
   // Return an expression for the pointer to the values in an array.
   Expression*
-  get_value_pointer(Gogo*, Expression* array, bool is_lvalue) const;
+  get_value_pointer(Gogo*, Expression* array) const;
 
   // Return an expression for the length of an array with this type.
   Expression*
@@ -2852,7 +2855,7 @@ class Array_type : public Type
   do_traverse(Traverse* traverse);
 
   bool
-  do_verify();
+  do_verify(Gogo*);
 
   bool
   do_has_pointer() const;
@@ -2898,7 +2901,7 @@ class Array_type : public Type
 
  private:
   bool
-  verify_length();
+  verify_length(Gogo*);
 
   Expression*
   array_type_descriptor(Gogo*, Named_type*);
@@ -3000,7 +3003,7 @@ class Map_type : public Type
   do_traverse(Traverse*);
 
   bool
-  do_verify();
+  do_verify(Gogo*);
 
   bool
   do_has_pointer() const
@@ -3120,7 +3123,7 @@ class Channel_type : public Type
   { return Type::traverse(this->element_type_, traverse); }
 
   bool
-  do_verify();
+  do_verify(Gogo*);
 
   bool
   do_has_pointer() const
@@ -3268,15 +3271,6 @@ class Interface_type : public Type
   bool
   methods_are_finalized() const
   { return this->methods_are_finalized_; }
-
-  // Sort embedded interfaces by name. Needed when we are preparing
-  // to emit types into the export data.
-  void
-  sort_embedded()
-  {
-    if (parse_methods_ != NULL)
-      parse_methods_->sort_by_name();
-  }
 
  protected:
   int
@@ -3610,7 +3604,7 @@ class Named_type : public Type
   { return Type::traverse(this->type_, traverse); }
 
   bool
-  do_verify();
+  do_verify(Gogo*);
 
   bool
   do_has_pointer() const;
@@ -3768,7 +3762,7 @@ class Forward_declaration_type : public Type
   do_traverse(Traverse* traverse);
 
   bool
-  do_verify();
+  do_verify(Gogo*);
 
   bool
   do_has_pointer() const

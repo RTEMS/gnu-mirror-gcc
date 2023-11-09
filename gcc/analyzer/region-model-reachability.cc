@@ -1,5 +1,5 @@
 /* Finding reachable regions and values.
-   Copyright (C) 2020-2021 Free Software Foundation, Inc.
+   Copyright (C) 2020-2023 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -19,6 +19,7 @@ along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
 #include "config.h"
+#define INCLUDE_MEMORY
 #include "system.h"
 #include "coretypes.h"
 #include "tree.h"
@@ -36,23 +37,18 @@ along with GCC; see the file COPYING3.  If not see
 #include "target.h"
 #include "fold-const.h"
 #include "tree-pretty-print.h"
-#include "tristate.h"
 #include "bitmap.h"
-#include "selftest.h"
-#include "function.h"
 #include "analyzer/analyzer.h"
 #include "analyzer/analyzer-logging.h"
 #include "ordered-hash-map.h"
 #include "options.h"
-#include "cgraph.h"
-#include "cfg.h"
-#include "digraph.h"
-#include "json.h"
 #include "analyzer/call-string.h"
 #include "analyzer/program-point.h"
 #include "analyzer/store.h"
 #include "analyzer/region-model.h"
 #include "analyzer/region-model-reachability.h"
+#include "diagnostic.h"
+#include "tree-diagnostic.h"
 
 #if ENABLE_ANALYZER
 
@@ -252,12 +248,21 @@ reachable_regions::handle_parm (const svalue *sval, tree param_type)
     m_mutable_svals.add (sval);
   else
     m_reachable_svals.add (sval);
-  if (const region_svalue *parm_ptr
-      = sval->dyn_cast_region_svalue ())
+  if (const region *base_reg = sval->maybe_get_deref_base_region ())
+    add (base_reg, is_mutable);
+  /* Treat all svalues within a compound_svalue as reachable.  */
+  if (const compound_svalue *compound_sval
+      = sval->dyn_cast_compound_svalue ())
     {
-      const region *pointee_reg = parm_ptr->get_pointee ();
-      add (pointee_reg, is_mutable);
+      for (compound_svalue::iterator_t iter = compound_sval->begin ();
+	   iter != compound_sval->end (); ++iter)
+	{
+	  const svalue *iter_sval = (*iter).second;
+	  handle_sval (iter_sval);
+	}
     }
+  if (const svalue *cast = sval->maybe_undo_cast ())
+    handle_sval (cast);
 }
 
 /* Update the store to mark the clusters that were found to be mutable

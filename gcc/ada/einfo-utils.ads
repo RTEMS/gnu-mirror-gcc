@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---           Copyright (C) 2020-2021, Free Software Foundation, Inc.        --
+--           Copyright (C) 2020-2023, Free Software Foundation, Inc.        --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -24,49 +24,58 @@
 ------------------------------------------------------------------------------
 
 with Einfo.Entities; use Einfo.Entities;
+with Sinfo.Nodes;    use Sinfo.Nodes;
 
 package Einfo.Utils is
 
-   -----------------------------------
-   -- Renamings of Renamed_Or_Alias --
-   -----------------------------------
+   -------------------------------------------
+   -- Aliases/Renamings of Renamed_Or_Alias --
+   -------------------------------------------
 
    --  See the comment in einfo.ads, "Renaming and Aliasing", which is somewhat
-   --  incorrect. In fact, the compiler uses Alias, Renamed_Entity, and
-   --  Renamed_Object more-or-less interchangeably, so we rename them here.
-   --  Alias isn't really renamed, because we want an assertion in the body.
+   --  incorrect. Each of the following calls [Set_]Renamed_Or_Alias. Alias and
+   --  Renamed_Entity are fields of nonobject Entity_Ids, and the value of the
+   --  field is Entity_Id. Alias is only for callable entities and subprogram
+   --  types. We sometimes call Set_Renamed_Entity and then expect Alias to
+   --  return the value set. Renamed_Object is a field of Entity_Ids that are
+   --  objects, and it returns an expression, because you can rename things
+   --  like "X.all(J).Y". Renamings of entries and subprograms can also be
+   --  expressions, but those use different mechanisms; the fields here are not
+   --  used.
 
-   function Alias (N : Entity_Id) return Node_Id;
-   procedure Set_Alias (N : Entity_Id; Val : Node_Id);
-   function Renamed_Entity
-     (N : Entity_Id) return Node_Id renames Renamed_Or_Alias;
-   procedure Set_Renamed_Entity
-     (N : Entity_Id; Val : Node_Id) renames Set_Renamed_Or_Alias;
-   function Renamed_Object
-     (N : Entity_Id) return Node_Id renames Renamed_Or_Alias;
-   procedure Set_Renamed_Object
-     (N : Entity_Id; Val : Node_Id) renames Set_Renamed_Or_Alias;
+   function Alias (N : Entity_Id) return Entity_Id with Inline;
+   procedure Set_Alias (N : Entity_Id; Val : Entity_Id) with Inline;
+   function Renamed_Entity (N : Entity_Id) return Entity_Id with Inline;
+   procedure Set_Renamed_Entity (N : Entity_Id; Val : Entity_Id) with Inline;
+   function Renamed_Object (N : Entity_Id) return Node_Id with Inline;
+   procedure Set_Renamed_Object (N : Entity_Id; Val : Node_Id) with Inline;
 
-   pragma Inline (Alias);
-   pragma Inline (Set_Alias);
-   pragma Inline (Renamed_Entity);
-   pragma Inline (Set_Renamed_Entity);
-   pragma Inline (Renamed_Object);
-   pragma Inline (Set_Renamed_Object);
+   function Renamed_Entity_Or_Object (N : Entity_Id) return Node_Id
+     with Inline;
+   --  This getter is used when we don't know statically whether we want to
+   --  call Renamed_Entity or Renamed_Object.
+
+   procedure Set_Renamed_Object_Of_Possibly_Void
+     (N : Entity_Id; Val : Node_Id) with Inline;
+   --  Set_Renamed_Object doesn't allow Void; this is used in the rare cases
+   --  where we set the field of an entity that might be Void. It might be a
+   --  good idea to get rid of calls to this.
 
    -------------------
    -- Type Synonyms --
    -------------------
 
    --  The following type synonyms are used to tidy up the function and
-   --  procedure declarations that follow.
+   --  procedure declarations that follow. Note that E and N have predicates
+   --  ensuring the correct kind; we use Entity_Id or Node_Id when the
+   --  predicates can't be satisfied.
 
    subtype B is Boolean;
    subtype C is Component_Alignment_Kind;
-   subtype E is Entity_Id;
+   subtype E is N_Entity_Id;
    subtype F is Float_Rep_Kind;
    subtype M is Mechanism_Type;
-   subtype N is Node_Id;
+   subtype N is Node_Id with Predicate => N /= Empty and then N not in E;
    subtype U is Uint;
    subtype R is Ureal;
    subtype L is Elist_Id;
@@ -83,100 +92,53 @@ package Einfo.Utils is
    --  Is_Generic_Type where the Ekind does not provide the needed
    --  information).
 
-   function Is_Access_Object_Type               (Id : E) return B;
-   function Is_Access_Type                      (Id : E) return B;
-   function Is_Access_Protected_Subprogram_Type (Id : E) return B;
-   function Is_Access_Subprogram_Type           (Id : E) return B;
-   function Is_Aggregate_Type                   (Id : E) return B;
-   function Is_Anonymous_Access_Type            (Id : E) return B;
-   function Is_Array_Type                       (Id : E) return B;
-   function Is_Assignable                       (Id : E) return B;
-   function Is_Class_Wide_Type                  (Id : E) return B;
-   function Is_Composite_Type                   (Id : E) return B;
-   function Is_Concurrent_Body                  (Id : E) return B;
-   function Is_Concurrent_Type                  (Id : E) return B;
-   function Is_Decimal_Fixed_Point_Type         (Id : E) return B;
-   function Is_Digits_Type                      (Id : E) return B;
-   function Is_Discrete_Or_Fixed_Point_Type     (Id : E) return B;
-   function Is_Discrete_Type                    (Id : E) return B;
-   function Is_Elementary_Type                  (Id : E) return B;
-   function Is_Entry                            (Id : E) return B;
-   function Is_Enumeration_Type                 (Id : E) return B;
-   function Is_Fixed_Point_Type                 (Id : E) return B;
-   function Is_Floating_Point_Type              (Id : E) return B;
-   function Is_Formal                           (Id : E) return B;
-   function Is_Formal_Object                    (Id : E) return B;
-   function Is_Generic_Subprogram               (Id : E) return B;
-   function Is_Generic_Unit                     (Id : E) return B;
-   function Is_Ghost_Entity                     (Id : E) return B;
-   function Is_Incomplete_Or_Private_Type       (Id : E) return B;
-   function Is_Incomplete_Type                  (Id : E) return B;
-   function Is_Integer_Type                     (Id : E) return B;
-   function Is_Modular_Integer_Type             (Id : E) return B;
-   function Is_Named_Access_Type                (Id : E) return B;
-   function Is_Named_Number                     (Id : E) return B;
-   function Is_Numeric_Type                     (Id : E) return B;
-   function Is_Object                           (Id : E) return B;
-   function Is_Ordinary_Fixed_Point_Type        (Id : E) return B;
-   function Is_Overloadable                     (Id : E) return B;
-   function Is_Private_Type                     (Id : E) return B;
-   function Is_Protected_Type                   (Id : E) return B;
-   function Is_Real_Type                        (Id : E) return B;
-   function Is_Record_Type                      (Id : E) return B;
-   function Is_Scalar_Type                      (Id : E) return B;
-   function Is_Signed_Integer_Type              (Id : E) return B;
-   function Is_Subprogram                       (Id : E) return B;
-   function Is_Subprogram_Or_Entry              (Id : E) return B;
-   function Is_Subprogram_Or_Generic_Subprogram (Id : E) return B;
-   function Is_Task_Type                        (Id : E) return B;
-   function Is_Type                             (Id : E) return B;
-
-   pragma Inline (Is_Access_Object_Type);
-   pragma Inline (Is_Access_Type);
-   pragma Inline (Is_Access_Protected_Subprogram_Type);
-   pragma Inline (Is_Access_Subprogram_Type);
-   pragma Inline (Is_Aggregate_Type);
-   pragma Inline (Is_Anonymous_Access_Type);
-   pragma Inline (Is_Array_Type);
-   pragma Inline (Is_Assignable);
-   pragma Inline (Is_Class_Wide_Type);
-   pragma Inline (Is_Composite_Type);
-   pragma Inline (Is_Concurrent_Body);
-   pragma Inline (Is_Concurrent_Type);
-   pragma Inline (Is_Decimal_Fixed_Point_Type);
-   pragma Inline (Is_Digits_Type);
-   pragma Inline (Is_Discrete_Type);
-   pragma Inline (Is_Elementary_Type);
-   pragma Inline (Is_Entry);
-   pragma Inline (Is_Enumeration_Type);
-   pragma Inline (Is_Fixed_Point_Type);
-   pragma Inline (Is_Floating_Point_Type);
-   pragma Inline (Is_Formal);
-   pragma Inline (Is_Formal_Object);
-   pragma Inline (Is_Generic_Subprogram);
-   pragma Inline (Is_Generic_Unit);
-   pragma Inline (Is_Ghost_Entity);
-   pragma Inline (Is_Incomplete_Or_Private_Type);
-   pragma Inline (Is_Incomplete_Type);
-   pragma Inline (Is_Integer_Type);
-   pragma Inline (Is_Modular_Integer_Type);
-   pragma Inline (Is_Named_Access_Type);
-   pragma Inline (Is_Named_Number);
-   pragma Inline (Is_Numeric_Type);
-   pragma Inline (Is_Object);
-   pragma Inline (Is_Ordinary_Fixed_Point_Type);
-   pragma Inline (Is_Overloadable);
-   pragma Inline (Is_Private_Type);
-   pragma Inline (Is_Protected_Type);
-   pragma Inline (Is_Real_Type);
-   pragma Inline (Is_Record_Type);
-   pragma Inline (Is_Scalar_Type);
-   pragma Inline (Is_Signed_Integer_Type);
-   pragma Inline (Is_Subprogram);
-   pragma Inline (Is_Subprogram_Or_Entry);
-   pragma Inline (Is_Subprogram_Or_Generic_Subprogram);
-   pragma Inline (Is_Task_Type);
-   pragma Inline (Is_Type);
+   function Is_Access_Object_Type               (Id : E) return B with Inline;
+   function Is_Access_Type                      (Id : E) return B with Inline;
+   function Is_Access_Protected_Subprogram_Type (Id : E) return B with Inline;
+   function Is_Access_Subprogram_Type           (Id : E) return B with Inline;
+   function Is_Aggregate_Type                   (Id : E) return B with Inline;
+   function Is_Anonymous_Access_Type            (Id : E) return B with Inline;
+   function Is_Array_Type                       (Id : E) return B with Inline;
+   function Is_Assignable                       (Id : E) return B with Inline;
+   function Is_Class_Wide_Type                  (Id : E) return B with Inline;
+   function Is_Composite_Type                   (Id : E) return B with Inline;
+   function Is_Concurrent_Body                  (Id : E) return B with Inline;
+   function Is_Concurrent_Type                  (Id : E) return B with Inline;
+   function Is_Decimal_Fixed_Point_Type         (Id : E) return B with Inline;
+   function Is_Digits_Type                      (Id : E) return B with Inline;
+   function Is_Discrete_Or_Fixed_Point_Type     (Id : E) return B with Inline;
+   function Is_Discrete_Type                    (Id : E) return B with Inline;
+   function Is_Elementary_Type                  (Id : E) return B with Inline;
+   function Is_Entry                            (Id : E) return B with Inline;
+   function Is_Enumeration_Type                 (Id : E) return B with Inline;
+   function Is_Fixed_Point_Type                 (Id : E) return B with Inline;
+   function Is_Floating_Point_Type              (Id : E) return B with Inline;
+   function Is_Formal                           (Id : E) return B with Inline;
+   function Is_Formal_Object                    (Id : E) return B with Inline;
+   function Is_Generic_Subprogram               (Id : E) return B with Inline;
+   function Is_Generic_Unit                     (Id : E) return B with Inline;
+   function Is_Ghost_Entity                     (Id : E) return B with Inline;
+   function Is_Incomplete_Or_Private_Type       (Id : E) return B with Inline;
+   function Is_Incomplete_Type                  (Id : E) return B with Inline;
+   function Is_Integer_Type                     (Id : E) return B with Inline;
+   function Is_Modular_Integer_Type             (Id : E) return B with Inline;
+   function Is_Named_Access_Type                (Id : E) return B with Inline;
+   function Is_Named_Number                     (Id : E) return B with Inline;
+   function Is_Numeric_Type                     (Id : E) return B with Inline;
+   function Is_Object                           (Id : E) return B with Inline;
+   function Is_Ordinary_Fixed_Point_Type        (Id : E) return B with Inline;
+   function Is_Overloadable                     (Id : E) return B with Inline;
+   function Is_Private_Type                     (Id : E) return B with Inline;
+   function Is_Protected_Type                   (Id : E) return B with Inline;
+   function Is_Real_Type                        (Id : E) return B with Inline;
+   function Is_Record_Type                      (Id : E) return B with Inline;
+   function Is_Scalar_Type                      (Id : E) return B with Inline;
+   function Is_Signed_Integer_Type              (Id : E) return B with Inline;
+   function Is_Subprogram                       (Id : E) return B with Inline;
+   function Is_Subprogram_Or_Entry              (Id : E) return B with Inline;
+   function Is_Subprogram_Or_Generic_Subprogram (Id : E) return B with Inline;
+   function Is_Task_Type                        (Id : E) return B with Inline;
+   function Is_Type                             (Id : E) return B with Inline;
 
    -------------------------------------
    -- Synthesized Attribute Functions --
@@ -185,17 +147,17 @@ package Einfo.Utils is
    --  The functions in this section synthesize attributes from the tree,
    --  so they do not correspond to defined fields in the entity itself.
 
-   function Address_Clause                      (Id : E) return N;
-   function Aft_Value                           (Id : E) return U;
-   function Alignment_Clause                    (Id : E) return N;
-   function Base_Type                           (Id : E) return E;
-   function Declaration_Node                    (Id : E) return N;
-   function Designated_Type                     (Id : E) return E;
-   function Entry_Index_Type                    (Id : E) return E;
-   function First_Component                     (Id : E) return E;
-   function First_Component_Or_Discriminant     (Id : E) return E;
-   function First_Formal                        (Id : E) return E;
-   function First_Formal_With_Extras            (Id : E) return E;
+   function Address_Clause (Id : E) return Node_Id with Inline;
+   function Aft_Value (Id : E) return U;
+   function Alignment_Clause (Id : E) return Node_Id with Inline;
+   function Base_Type (Id : E) return E with Inline;
+   function Declaration_Node (Id : E) return Node_Id;
+   function Designated_Type (Id : E) return E;
+   function Entry_Index_Type (Id : E) return E;
+   function First_Component (Id : E) return Entity_Id;
+   function First_Component_Or_Discriminant (Id : E) return Entity_Id;
+   function First_Formal (Id : E) return Entity_Id;
+   function First_Formal_With_Extras (Id : E) return Entity_Id;
 
    function Float_Rep
      (N : Entity_Id) return F with Inline, Pre =>
@@ -206,170 +168,92 @@ package Einfo.Utils is
       Ignore_N in E_Void_Id
          | Float_Kind_Id;
 
-   function Has_Attach_Handler                  (Id : E) return B;
-   function Has_DIC                             (Id : E) return B;
-   function Has_Entries                         (Id : E) return B;
-   function Has_Foreign_Convention              (Id : E) return B;
-   function Has_Interrupt_Handler               (Id : E) return B;
-   function Has_Invariants                      (Id : E) return B;
-   function Has_Limited_View                    (Id : E) return B;
-   function Has_Non_Limited_View                (Id : E) return B;
-   function Has_Non_Null_Abstract_State         (Id : E) return B;
-   function Has_Non_Null_Visible_Refinement     (Id : E) return B;
-   function Has_Null_Abstract_State             (Id : E) return B;
-   function Has_Null_Visible_Refinement         (Id : E) return B;
-   function Implementation_Base_Type            (Id : E) return E;
-   function Is_Base_Type                        (Id : E) return B;
+   function Has_Attach_Handler (Id : E) return B;
+   function Has_DIC (Id : E) return B;
+   function Has_Entries (Id : E) return B;
+   function Has_Foreign_Convention (Id : E) return B with Inline;
+   function Has_Interrupt_Handler (Id : E) return B;
+   function Has_Invariants (Id : E) return B;
+   function Has_Limited_View (Id : E) return B;
+   function Has_Non_Limited_View (Id : E) return B with Inline;
+   function Has_Non_Null_Abstract_State (Id : E) return B;
+   function Has_Non_Null_Visible_Refinement (Id : E) return B;
+   function Has_Null_Abstract_State (Id : E) return B;
+   function Has_Null_Visible_Refinement (Id : E) return B;
+   function Implementation_Base_Type (Id : E) return E;
+   function Is_Base_Type (Id : E) return B with Inline;
    --  Note that Is_Base_Type returns True for nontypes
-   function Is_Boolean_Type                     (Id : E) return B;
-   function Is_Constant_Object                  (Id : E) return B;
-   function Is_Controlled                       (Id : E) return B;
-   function Is_Discriminal                      (Id : E) return B;
-   function Is_Dynamic_Scope                    (Id : E) return B;
-   function Is_Elaboration_Target               (Id : E) return B;
-   function Is_External_State                   (Id : E) return B;
-   function Is_Finalizer                        (Id : E) return B;
-   function Is_Full_Access                      (Id : E) return B;
-   function Is_Null_State                       (Id : E) return B;
-   function Is_Package_Or_Generic_Package       (Id : E) return B;
-   function Is_Packed_Array                     (Id : E) return B;
-   function Is_Prival                           (Id : E) return B;
-   function Is_Protected_Component              (Id : E) return B;
-   function Is_Protected_Interface              (Id : E) return B;
-   function Is_Protected_Record_Type            (Id : E) return B;
-   function Is_Relaxed_Initialization_State     (Id : E) return B;
-   function Is_Standard_Character_Type          (Id : E) return B;
-   function Is_Standard_String_Type             (Id : E) return B;
-   function Is_String_Type                      (Id : E) return B;
-   function Is_Synchronized_Interface           (Id : E) return B;
-   function Is_Synchronized_State               (Id : E) return B;
-   function Is_Task_Interface                   (Id : E) return B;
-   function Is_Task_Record_Type                 (Id : E) return B;
-   function Is_Wrapper_Package                  (Id : E) return B;
-   function Last_Formal                         (Id : E) return E;
-   function Machine_Emax_Value                  (Id : E) return U;
-   function Machine_Emin_Value                  (Id : E) return U;
-   function Machine_Mantissa_Value              (Id : E) return U;
-   function Machine_Radix_Value                 (Id : E) return U;
-   function Model_Emin_Value                    (Id : E) return U;
-   function Model_Epsilon_Value                 (Id : E) return R;
-   function Model_Mantissa_Value                (Id : E) return U;
-   function Model_Small_Value                   (Id : E) return R;
-   function Next_Component                      (Id : E) return E;
-   function Next_Component_Or_Discriminant      (Id : E) return E;
-   function Next_Discriminant                   (Id : E) return E;
-   function Next_Formal                         (Id : E) return E;
-   function Next_Formal_With_Extras             (Id : E) return E;
-   function Next_Index                          (Id : N) return N;
-   function Next_Literal                        (Id : E) return E;
-   function Next_Stored_Discriminant            (Id : E) return E;
-   function Number_Dimensions                   (Id : E) return Pos;
-   function Number_Entries                      (Id : E) return Nat;
-   function Number_Formals                      (Id : E) return Pos;
-   function Object_Size_Clause                  (Id : E) return N;
-   function Parameter_Mode                      (Id : E) return Formal_Kind;
-   function Partial_Refinement_Constituents     (Id : E) return L;
-   function Primitive_Operations                (Id : E) return L;
-   function Root_Type                           (Id : E) return E;
-   function Safe_Emax_Value                     (Id : E) return U;
-   function Safe_First_Value                    (Id : E) return R;
-   function Safe_Last_Value                     (Id : E) return R;
-   function Scope_Depth                         (Id : E) return U;
-   function Scope_Depth_Set                     (Id : E) return B;
-   function Size_Clause                         (Id : E) return N;
-   function Stream_Size_Clause                  (Id : E) return N;
-   function Type_High_Bound                     (Id : E) return N;
-   function Type_Low_Bound                      (Id : E) return N;
-   function Underlying_Type                     (Id : E) return E;
+   function Is_Boolean_Type (Id : E) return B with Inline;
+   function Is_Constant_Object (Id : E) return B with Inline;
+   function Is_Controlled (Id : E) return B with Inline;
+   function Is_Discriminal (Id : E) return B with Inline;
+   function Is_Dynamic_Scope (Id : E) return B;
+   function Is_Elaboration_Target (Id : E) return B;
+   function Is_External_State (Id : E) return B;
+   function Is_Finalizer (Id : E) return B with Inline;
+   function Is_Full_Access (Id : E) return B with Inline;
+   function Is_Null_State (Id : E) return B;
+   function Is_Package_Or_Generic_Package (Id : E) return B with Inline;
+   function Is_Packed_Array (Id : E) return B with Inline;
+   function Is_Prival (Id : E) return B with Inline;
+   function Is_Protected_Component (Id : E) return B with Inline;
+   function Is_Protected_Interface (Id : E) return B;
+   function Is_Protected_Record_Type (Id : E) return B with Inline;
+   function Is_Relaxed_Initialization_State (Id : E) return B;
+   function Is_Standard_Character_Type (Id : E) return B;
+   function Is_Standard_String_Type (Id : E) return B;
+   function Is_String_Type (Id : E) return B with Inline;
+   function Is_Synchronized_Interface (Id : E) return B;
+   function Is_Synchronized_State (Id : E) return B;
+   function Is_Task_Interface (Id : E) return B;
+   function Is_Task_Record_Type (Id : E) return B with Inline;
+   function Is_Wrapper_Package (Id : E) return B with Inline;
+   function Last_Formal (Id : E) return Entity_Id;
+   function Machine_Emax_Value (Id : E) return U;
+   function Machine_Emin_Value (Id : E) return U;
+   function Machine_Mantissa_Value (Id : E) return U;
+   function Machine_Radix_Value (Id : E) return U;
+   function Model_Emin_Value (Id : E) return U;
+   function Model_Epsilon_Value (Id : E) return R;
+   function Model_Mantissa_Value (Id : E) return U;
+   function Model_Small_Value (Id : E) return R;
+   function Next_Component (Id : E) return Entity_Id;
+   function Next_Component_Or_Discriminant (Id : E) return Entity_Id;
+   function Next_Discriminant (Id : E) return Entity_Id;
+   function Next_Formal (Id : E) return Entity_Id;
+   function Next_Formal_With_Extras (Id : E) return Entity_Id;
+   function Next_Index (Id : N) return Node_Id;
+   function Next_Literal (Id : E) return Entity_Id;
+   function Next_Stored_Discriminant (Id : E) return Entity_Id;
+   function Number_Dimensions (Id : E) return Pos;
+   function Number_Entries (Id : E) return Nat;
+   function Number_Formals (Id : E) return Nat;
+   function Object_Size_Clause (Id : E) return Node_Id;
+   function Parameter_Mode (Id : E) return Formal_Kind;
+   function Partial_Refinement_Constituents (Id : E) return L;
+   function Primitive_Operations (Id : E) return L;
+   function Root_Type (Id : E) return E;
+   function Safe_Emax_Value (Id : E) return U;
+   function Safe_First_Value (Id : E) return R;
+   function Safe_Last_Value (Id : E) return R;
+   function Size_Clause (Id : E) return Node_Id with Inline;
+   function Stream_Size_Clause (Id : E) return N with Inline;
+   function Type_High_Bound (Id : E) return N with Inline;
+   function Type_Low_Bound (Id : E) return N with Inline;
+   function Underlying_Type (Id : E) return Entity_Id;
 
-   pragma Inline (Address_Clause);
-   pragma Inline (Alignment_Clause);
-   pragma Inline (Base_Type);
-   pragma Inline (Has_Foreign_Convention);
-   pragma Inline (Has_Non_Limited_View);
-   pragma Inline (Is_Base_Type);
-   pragma Inline (Is_Boolean_Type);
-   pragma Inline (Is_Constant_Object);
-   pragma Inline (Is_Controlled);
-   pragma Inline (Is_Discriminal);
-   pragma Inline (Is_Finalizer);
-   pragma Inline (Is_Full_Access);
-   pragma Inline (Is_Null_State);
-   pragma Inline (Is_Package_Or_Generic_Package);
-   pragma Inline (Is_Packed_Array);
-   pragma Inline (Is_Prival);
-   pragma Inline (Is_Protected_Component);
-   pragma Inline (Is_Protected_Record_Type);
-   pragma Inline (Is_String_Type);
-   pragma Inline (Is_Task_Record_Type);
-   pragma Inline (Is_Wrapper_Package);
-   pragma Inline (Scope_Depth);
-   pragma Inline (Scope_Depth_Set);
-   pragma Inline (Size_Clause);
-   pragma Inline (Stream_Size_Clause);
-   pragma Inline (Type_High_Bound);
-   pragma Inline (Type_Low_Bound);
+   function Scope_Depth (Id : Scope_Kind_Id) return U with Inline;
+   function Scope_Depth_Set (Id : Scope_Kind_Id) return B with Inline;
+
+   function Scope_Depth_Default_0 (Id : Scope_Kind_Id) return U;
+   --  In rare cases, the Scope_Depth_Value (queried by Scope_Depth) is
+   --  not correctly set before querying it; this may be used instead of
+   --  Scope_Depth in such cases. It returns Uint_0 if the Scope_Depth_Value
+   --  has not been set. See documentation in Einfo.
 
    ------------------------------------------
    -- Type Representation Attribute Fields --
    ------------------------------------------
-
-   --  Each of the following fields can be in a "known" or "unknown" state:
-
-   --    Alignment
-   --    Component_Size
-   --    Component_Bit_Offset
-   --    Digits_Value
-   --    Esize
-   --    Normalized_First_Bit
-   --    Normalized_Position
-   --    RM_Size
-   --
-   --  NOTE: "known" here does not mean "known at compile time". It means that
-   --  the compiler has computed the value of the field (either by default, or
-   --  by noting some representation clauses), and the field has not been
-   --  reinitialized.
-   --
-   --  We document the Esize functions here; the others are analogous:
-   --
-   --     Known_Esize: True if Set_Esize has been called without a subsequent
-   --     Reinit_Esize.
-   --
-   --     Known_Static_Esize: True if Known_Esize and the Esize is known at
-   --     compile time. (We're not using "static" in the Ada RM sense here. We
-   --     are using it to mean "known at compile time.)
-   --
-   --     Reinit_Esize: Set the Esize field to its initial unknown state.
-   --
-   --     Copy_Esize: Copies the Esize from From to To; Known_Esize (From) may
-   --     be False, in which case Known_Esize (To) becomes False.
-   --
-   --     Esize: This is the normal automatially-generated getter for Esize,
-   --     declared elsewhere. It is an error to call this if Set_Esize has not
-   --     yet been called, or if Reinit_Esize has been called subsequently.
-   --
-   --     Set_Esize: This is the normal automatially-generated setter for
-   --     Esize. After a call to this, Known_Esize is True. It is an error
-   --     to call this with a No_Uint value.
-   --
-   --  Normally, we call Set_Esize first, and then query Esize (and similarly
-   --  for other fields). However in some cases, we need to check Known_Esize
-   --  before calling Esize, because the code is written in such a way that we
-   --  don't know whether Set_Esize has already been called.
-   --
-   --  We intend to use the initial zero value to represent "unknown". Note
-   --  that this value is different from No_Uint, and different from Uint_0.
-   --  However, this is work in progress; we are still using No_Uint or Uint_0
-   --  to represent "unknown" in some cases. Using Uint_0 leads to several
-   --  bugs, because zero is a legitimate value (T'Size can be zero bits) --
-   --  Uint_0 shouldn't mean two different things.
-   --
-   --  In two cases, Known_Static_Esize and Known_Static_RM_Size, there is one
-   --  more consideration, which is that we always return False for generic
-   --  types. Within a template, the size can look Known_Static, because of the
-   --  fake size values we put in template types, but they are not really
-   --  Known_Static and anyone testing if they are Known_Static within the
-   --  template should get False as a result to prevent incorrect assumptions.
 
    function Known_Alignment (E : Entity_Id) return B with Inline;
    procedure Reinit_Alignment (Id : E) with Inline;
@@ -399,6 +283,44 @@ package Einfo.Utils is
    function Known_Static_RM_Size (E : Entity_Id) return B with Inline;
    procedure Reinit_RM_Size (Id : E) with Inline;
    procedure Copy_RM_Size (To, From : E);
+
+   --  NOTE: "known" here does not mean "known at compile time". It means that
+   --  the compiler has computed the value of the field (either by default, or
+   --  by noting some representation clauses), and the field has not been
+   --  reinitialized.
+   --
+   --  We document the Esize functions here; the others above are analogous:
+   --
+   --     Known_Esize: True if Set_Esize has been called without a subsequent
+   --     Reinit_Esize.
+   --
+   --     Known_Static_Esize: True if Known_Esize and the Esize is known at
+   --     compile time. (We're not using "static" in the Ada RM sense here. We
+   --     are using it to mean "known at compile time".)
+   --
+   --     Reinit_Esize: Set the Esize field to its initial unknown state.
+   --
+   --     Copy_Esize: Copies the Esize from From to To; Known_Esize (From) may
+   --     be False, in which case Known_Esize (To) becomes False.
+   --
+   --     Esize: This is the normal automatically-generated getter for Esize,
+   --     declared elsewhere. Returns No_Uint if not Known_Esize.
+   --
+   --     Set_Esize: This is the normal automatically-generated setter for
+   --     Esize. After a call to this, Known_Esize is True. It is an error
+   --     to call this with a No_Uint value.
+   --
+   --  Normally, we call Set_Esize first, and then query Esize (and similarly
+   --  for other fields). However in some cases, we need to check Known_Esize
+   --  before calling Esize, because the code is written in such a way that we
+   --  don't know whether Set_Esize has already been called.
+   --
+   --  In two cases, Known_Static_Esize and Known_Static_RM_Size, there is one
+   --  more consideration, which is that we always return False for generic
+   --  types. Within a template, the size can look Known_Static, because of the
+   --  fake size values we put in template types, but they are not really
+   --  Known_Static and anyone testing if they are Known_Static within the
+   --  template should get False as a result to prevent incorrect assumptions.
 
    ---------------------------------------------------------
    -- Procedures for setting multiple of the above fields --
@@ -430,74 +352,33 @@ package Einfo.Utils is
 
    function Is_Partial_DIC_Procedure             (Id : E) return B;
 
-   function DIC_Procedure                        (Id : E) return E;
-   function Partial_DIC_Procedure                (Id : E) return E;
-   function Invariant_Procedure                  (Id : E) return E;
-   function Partial_Invariant_Procedure          (Id : E) return E;
-   function Predicate_Function                   (Id : E) return E;
-   function Predicate_Function_M                 (Id : E) return E;
+   function DIC_Procedure                        (Id : E) return Entity_Id;
+   function Partial_DIC_Procedure                (Id : E) return Entity_Id;
+   function Invariant_Procedure                  (Id : E) return Entity_Id;
+   function Partial_Invariant_Procedure          (Id : E) return Entity_Id;
+   function Predicate_Function                   (Id : E) return Entity_Id;
 
    procedure Set_DIC_Procedure                   (Id : E; V : E);
    procedure Set_Partial_DIC_Procedure           (Id : E; V : E);
    procedure Set_Invariant_Procedure             (Id : E; V : E);
    procedure Set_Partial_Invariant_Procedure     (Id : E; V : E);
    procedure Set_Predicate_Function              (Id : E; V : E);
-   procedure Set_Predicate_Function_M            (Id : E; V : E);
 
    ---------------
    -- Iterators --
    ---------------
 
-   --  The call to Next_xxx (obj) is equivalent to obj := Next_xxx (obj)
-   --  We define the set of Proc_Next_xxx routines simply for the purposes
-   --  of inlining them without necessarily inlining the function.
+   --  Next_xxx (obj) is equivalent to obj := Next_xxx (obj)
 
-   procedure Proc_Next_Component                 (N : in out Node_Id);
-   procedure Proc_Next_Component_Or_Discriminant (N : in out Node_Id);
-   procedure Proc_Next_Discriminant              (N : in out Node_Id);
-   procedure Proc_Next_Formal                    (N : in out Node_Id);
-   procedure Proc_Next_Formal_With_Extras        (N : in out Node_Id);
-   procedure Proc_Next_Index                     (N : in out Node_Id);
-   procedure Proc_Next_Inlined_Subprogram        (N : in out Node_Id);
-   procedure Proc_Next_Literal                   (N : in out Node_Id);
-   procedure Proc_Next_Stored_Discriminant       (N : in out Node_Id);
-
-   pragma Inline (Proc_Next_Component);
-   pragma Inline (Proc_Next_Component_Or_Discriminant);
-   pragma Inline (Proc_Next_Discriminant);
-   pragma Inline (Proc_Next_Formal);
-   pragma Inline (Proc_Next_Formal_With_Extras);
-   pragma Inline (Proc_Next_Index);
-   pragma Inline (Proc_Next_Inlined_Subprogram);
-   pragma Inline (Proc_Next_Literal);
-   pragma Inline (Proc_Next_Stored_Discriminant);
-
-   procedure Next_Component                 (N : in out Node_Id)
-     renames Proc_Next_Component;
-
-   procedure Next_Component_Or_Discriminant (N : in out Node_Id)
-     renames Proc_Next_Component_Or_Discriminant;
-
-   procedure Next_Discriminant              (N : in out Node_Id)
-     renames Proc_Next_Discriminant;
-
-   procedure Next_Formal                    (N : in out Node_Id)
-     renames Proc_Next_Formal;
-
-   procedure Next_Formal_With_Extras        (N : in out Node_Id)
-     renames Proc_Next_Formal_With_Extras;
-
-   procedure Next_Index                     (N : in out Node_Id)
-     renames Proc_Next_Index;
-
-   procedure Next_Inlined_Subprogram        (N : in out Node_Id)
-     renames Proc_Next_Inlined_Subprogram;
-
-   procedure Next_Literal                   (N : in out Node_Id)
-     renames Proc_Next_Literal;
-
-   procedure Next_Stored_Discriminant       (N : in out Node_Id)
-     renames Proc_Next_Stored_Discriminant;
+   procedure Next_Component                 (N : in out Node_Id) with Inline;
+   procedure Next_Component_Or_Discriminant (N : in out Node_Id) with Inline;
+   procedure Next_Discriminant              (N : in out Node_Id) with Inline;
+   procedure Next_Formal                    (N : in out Node_Id) with Inline;
+   procedure Next_Formal_With_Extras        (N : in out Node_Id) with Inline;
+   procedure Next_Index                     (N : in out Node_Id) with Inline;
+   procedure Next_Inlined_Subprogram        (N : in out Node_Id) with Inline;
+   procedure Next_Literal                   (N : in out Node_Id) with Inline;
+   procedure Next_Stored_Discriminant       (N : in out Node_Id) with Inline;
 
    ---------------------------
    -- Testing Warning Flags --
@@ -558,6 +439,7 @@ package Einfo.Utils is
    --  node, otherwise Empty is returned. The following contract pragmas that
    --  appear in N_Contract nodes are also handled by this routine:
    --    Abstract_State
+   --    Always_Terminates
    --    Async_Readers
    --    Async_Writers
    --    Attach_Handler
@@ -566,6 +448,7 @@ package Einfo.Utils is
    --    Depends
    --    Effective_Reads
    --    Effective_Writes
+   --    Exceptional_Cases
    --    Global
    --    Initial_Condition
    --    Initializes
@@ -578,6 +461,7 @@ package Einfo.Utils is
    --    Refined_Global
    --    Refined_Post
    --    Refined_State
+   --    Side_Effects
    --    Subprogram_Variant
    --    Test_Case
    --    Volatile_Function
@@ -619,7 +503,7 @@ package Einfo.Utils is
    --  is the name of a class_wide type whose root is incomplete, return the
    --  corresponding full declaration, else return T itself.
 
-   function Is_Entity_Name (N : Node_Id) return Boolean;
+   function Is_Entity_Name (N : Node_Id) return Boolean with Inline;
    --  Test if the node N is the name of an entity (i.e. is an identifier,
    --  expanded name, or an attribute reference that returns an entity).
 
@@ -657,8 +541,6 @@ package Einfo.Utils is
    --  foreign convention, then we set Can_Use_Internal_Rep to False on E.
    --  Also, if the Etype of E is set and is an anonymous access type with
    --  no convention set, this anonymous type inherits the convention of E.
-
-   pragma Inline (Is_Entity_Name);
 
    ----------------------------------
    -- Debugging Output Subprograms --

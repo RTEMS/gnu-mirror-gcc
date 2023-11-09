@@ -1,4 +1,4 @@
-#  Copyright (C) 2003-2021 Free Software Foundation, Inc.
+#  Copyright (C) 2003-2023 Free Software Foundation, Inc.
 #  Contributed by Kelley Cook, June 2004.
 #  Original code from Neil Booth, May 2003.
 #
@@ -22,6 +22,7 @@ BEGIN {
 	n_opts = 0
 	n_langs = 0
 	n_target_save = 0
+        n_target_vars = 0
 	n_extra_vars = 0
 	n_extra_target_vars = 0
 	n_extra_masks = 0
@@ -97,10 +98,14 @@ BEGIN {
 			enum_name = opt_args_non_empty("Enum", props)
 			string = opt_args_non_empty("String", props)
 			value = opt_args_non_empty("Value", props)
+			set = opt_args("Set", props)
 			val_flags = "0"
 			val_flags = val_flags \
 			  test_flag("Canonical", props, "| CL_ENUM_CANONICAL") \
 			  test_flag("DriverOnly", props, "| CL_ENUM_DRIVER_ONLY")
+			if (set != "")
+				val_flags = val_flags "| ((" set \
+					    ") << CL_ENUM_SET_SHIFT)"
 			enum_data[enum_name] = enum_data[enum_name] \
 			  "  { " quote string quote ", " value ", " val_flags \
 			  " },\n"
@@ -117,7 +122,21 @@ BEGIN {
 				n_opts++;
 			}
 			else {
-				extra_masks[n_extra_masks++] = name
+				target_var = opt_args("Var", $0)
+				if (target_var)
+				{
+					target_var = opt_args("Var", $1)
+					var_index = find_index(target_var, target_vars, n_target_vars)
+					if (var_index == n_target_vars)
+					{
+						target_vars[n_target_vars++] = target_var
+					}
+					other_masks[var_index "," n_other_mask[var_index]++] = name
+				}
+				else
+				{
+					extra_masks[n_extra_masks++] = name
+				}
 			}
 		}
 	}

@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -44,6 +44,7 @@ with Stringt;  use Stringt;
 with Targparm;
 with Uintp;    use Uintp;
 with Widechar; use Widechar;
+with Warnsw;   use Warnsw;
 
 package body Erroutc is
 
@@ -277,7 +278,9 @@ package body Erroutc is
    begin
       for J in 1 .. Errors.Last loop
          begin
-            if Errors.Table (J).Warn and Errors.Table (J).Compile_Time_Pragma
+            if Errors.Table (J).Warn
+               and then Errors.Table (J).Compile_Time_Pragma
+               and then not Errors.Table (J).Deleted
             then
                Result := Result + 1;
             end if;
@@ -309,32 +312,33 @@ package body Erroutc is
 
    begin
       w ("Dumping error message, Id = ", Int (Id));
-      w ("  Text     = ", E.Text.all);
-      w ("  Next     = ", Int (E.Next));
-      w ("  Prev     = ", Int (E.Prev));
-      w ("  Sfile    = ", Int (E.Sfile));
+      w ("  Text               = ", E.Text.all);
+      w ("  Next               = ", Int (E.Next));
+      w ("  Prev               = ", Int (E.Prev));
+      w ("  Sfile              = ", Int (E.Sfile));
 
       Write_Str
-        ("  Sptr     = ");
+        ("  Sptr               = ");
       Write_Location (E.Sptr.Ptr);  --  ??? Do not write the full span for now
       Write_Eol;
 
       Write_Str
-        ("  Optr     = ");
-      Write_Location (E.Optr);
+        ("  Optr               = ");
+      Write_Location (E.Optr.Ptr);
       Write_Eol;
 
-      w ("  Line     = ", Int (E.Line));
-      w ("  Col      = ", Int (E.Col));
-      w ("  Warn     = ", E.Warn);
-      w ("  Warn_Err = ", E.Warn_Err);
-      w ("  Warn_Chr = '" & E.Warn_Chr & ''');
-      w ("  Style    = ", E.Style);
-      w ("  Serious  = ", E.Serious);
-      w ("  Uncond   = ", E.Uncond);
-      w ("  Msg_Cont = ", E.Msg_Cont);
-      w ("  Deleted  = ", E.Deleted);
-      w ("  Node     = ", Int (E.Node));
+      w ("  Line               = ", Int (E.Line));
+      w ("  Col                = ", Int (E.Col));
+      w ("  Warn               = ", E.Warn);
+      w ("  Warn_Err           = ", E.Warn_Err);
+      w ("  Warn_Runtime_Raise = ", E.Warn_Runtime_Raise);
+      w ("  Warn_Chr           = '" & E.Warn_Chr & ''');
+      w ("  Style              = ", E.Style);
+      w ("  Serious            = ", E.Serious);
+      w ("  Uncond             = ", E.Uncond);
+      w ("  Msg_Cont           = ", E.Msg_Cont);
+      w ("  Deleted            = ", E.Deleted);
+      w ("  Node               = ", Int (E.Node));
 
       Write_Eol;
    end dmsg;
@@ -357,29 +361,56 @@ package body Erroutc is
       return Cur_Msg;
    end Get_Msg_Id;
 
+   ------------------------
+   -- Get_Warning_Option --
+   ------------------------
+
+   function Get_Warning_Option (Id : Error_Msg_Id) return String is
+      Warn     : constant Boolean         := Errors.Table (Id).Warn;
+      Style    : constant Boolean         := Errors.Table (Id).Style;
+      Warn_Chr : constant String (1 .. 2) := Errors.Table (Id).Warn_Chr;
+
+   begin
+      if (Warn or Style)
+        and then Warn_Chr /= "  "
+        and then Warn_Chr (1) /= '?'
+      then
+         if Warn_Chr = "$ " then
+            return "-gnatel";
+         elsif Style then
+            return "-gnaty" & Warn_Chr (1);
+         elsif Warn_Chr (2) = ' ' then
+            return "-gnatw" & Warn_Chr (1);
+         else
+            return "-gnatw" & Warn_Chr;
+         end if;
+      end if;
+
+      return "";
+   end Get_Warning_Option;
+
    ---------------------
    -- Get_Warning_Tag --
    ---------------------
 
    function Get_Warning_Tag (Id : Error_Msg_Id) return String is
-      Warn     : constant Boolean    := Errors.Table (Id).Warn;
-      Warn_Chr : constant Character  := Errors.Table (Id).Warn_Chr;
+      Warn     : constant Boolean         := Errors.Table (Id).Warn;
+      Style    : constant Boolean         := Errors.Table (Id).Style;
+      Warn_Chr : constant String (1 .. 2) := Errors.Table (Id).Warn_Chr;
+      Option   : constant String          := Get_Warning_Option (Id);
+
    begin
-      if Warn and then Warn_Chr /= ' ' then
-         if Warn_Chr = '?' then
+      if Warn or Style then
+         if Warn_Chr = "? " then
             return "[enabled by default]";
-         elsif Warn_Chr = '*' then
+         elsif Warn_Chr = "* " then
             return "[restriction warning]";
-         elsif Warn_Chr = '$' then
-            return "[-gnatel]";
-         elsif Warn_Chr in 'a' .. 'z' then
-            return "[-gnatw" & Warn_Chr & ']';
-         else pragma Assert (Warn_Chr in 'A' .. 'Z');
-            return "[-gnatw." & Fold_Lower (Warn_Chr) & ']';
+         elsif Option /= "" then
+            return "[" & Option & "]";
          end if;
-      else
-         return "";
       end if;
+
+      return "";
    end Get_Warning_Tag;
 
    -------------
@@ -839,6 +870,51 @@ package body Erroutc is
    procedure Prescan_Message (Msg : String) is
       J : Natural;
 
+      function Parse_Message_Class return String;
+      --  Convert the warning insertion sequence to a warning class represented
+      --  as a length-two string padded, if necessary, with spaces.
+      --  Return the Message class and set the iterator J to the character
+      --  following the sequence.
+      --  Raise a Program_Error if the insertion sequence is not valid.
+
+      -------------------------
+      -- Parse_Message_Class --
+      -------------------------
+
+      function Parse_Message_Class return String is
+         C : constant Character := Msg (J - 1);
+         Message_Class : String (1 .. 2) := "  ";
+      begin
+         if J <= Msg'Last and then Msg (J) = C then
+            Message_Class := "? ";
+            J := J + 1;
+
+         elsif J < Msg'Last and then Msg (J + 1) = C
+           and then Msg (J) in 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '*' | '$'
+         then
+            Message_Class := Msg (J) & " ";
+            J := J + 2;
+
+         elsif J + 1 < Msg'Last and then Msg (J + 2) = C
+           and then Msg (J) in '.' | '_'
+           and then Msg (J + 1) in 'a' .. 'z'
+         then
+            Message_Class := Msg (J .. J + 1);
+            J := J + 3;
+         elsif (J < Msg'Last and then Msg (J + 1) = C) or else
+            (J + 1 < Msg'Last and then Msg (J + 2) = C)
+         then
+            raise Program_Error;
+         end if;
+
+         --  In any other cases, this is not a warning insertion sequence
+         --  and the default "  " value is returned.
+
+         return Message_Class;
+      end Parse_Message_Class;
+
+   --  Start of processing for Prescan_Message
+
    begin
       --  Nothing to do for continuation line, unless -gnatdF is set
 
@@ -846,7 +922,7 @@ package body Erroutc is
          return;
 
       --  Some global variables are not set for continuation messages, as they
-      --  only make sense for the initial mesage.
+      --  only make sense for the initial message.
 
       elsif Msg (Msg'First) /= '\' then
 
@@ -855,6 +931,7 @@ package body Erroutc is
          Is_Serious_Error     := True;
          Is_Unconditional_Msg := False;
          Is_Warning_Msg       := False;
+         Is_Runtime_Raise     := False;
 
          --  Check style message
 
@@ -882,6 +959,7 @@ package body Erroutc is
       end if;
 
       Has_Double_Exclam  := False;
+      Has_Error_Code     := False;
       Has_Insertion_Line := False;
 
       --  Loop through message looking for relevant insertion sequences
@@ -897,38 +975,20 @@ package body Erroutc is
          --  Warning message (? or < insertion sequence)
 
          elsif Msg (J) = '?' or else Msg (J) = '<' then
-            Is_Warning_Msg := Msg (J) = '?' or else Error_Msg_Warn;
-            Warning_Msg_Char := ' ';
-            J := J + 1;
+            if Msg (J) = '?' or else Error_Msg_Warn then
+               Is_Warning_Msg := not Is_Style_Msg;
+               J := J + 1;
+               Warning_Msg_Char := Parse_Message_Class;
 
-            if Is_Warning_Msg then
-               declare
-                  C : constant Character := Msg (J - 1);
-               begin
-                  if J <= Msg'Last then
-                     if Msg (J) = C then
-                        Warning_Msg_Char := '?';
-                        J := J + 1;
+               --  Bomb if untagged warning message. This code can be
+               --  uncommented for debugging when looking for untagged warning
+               --  messages.
 
-                     elsif J < Msg'Last and then Msg (J + 1) = C
-                       and then (Msg (J) in 'a' .. 'z' or else
-                                 Msg (J) in 'A' .. 'Z' or else
-                                 Msg (J) = '*'         or else
-                                 Msg (J) = '$')
-                     then
-                        Warning_Msg_Char := Msg (J);
-                        J := J + 2;
-                     end if;
-                  end if;
-               end;
+               --  pragma Assert (Warning_Msg_Char /= "  ");
+
+            else
+               J := J + 1;
             end if;
-
-            --  Bomb if untagged warning message. This code can be uncommented
-            --  for debugging when looking for untagged warning messages.
-
-            --  if Is_Warning_Msg and then Warning_Msg_Char = ' ' then
-            --     raise Program_Error;
-            --  end if;
 
          --  Unconditional message (! insertion)
 
@@ -952,6 +1012,15 @@ package body Erroutc is
          elsif Msg (J) = '|' then
             Is_Serious_Error := False;
             J := J + 1;
+
+         --  Error code ([] insertion)
+
+         elsif Msg (J) = '['
+           and then J < Msg'Last
+           and then Msg (J + 1) = ']'
+         then
+            Has_Error_Code := True;
+            J := J + 2;
 
          else
             J := J + 1;
@@ -1097,6 +1166,42 @@ package body Erroutc is
       end if;
    end Set_Msg_Char;
 
+   ----------------------------
+   -- Set_Msg_Insertion_Code --
+   ----------------------------
+
+   procedure Set_Msg_Insertion_Code is
+      H : constant array (Nat range 0 .. 9) of Character := "0123456789";
+      P10 : constant array (Natural range 0 .. 3) of Nat :=
+        (10 ** 0,
+         10 ** 1,
+         10 ** 2,
+         10 ** 3);
+
+      Code_Len : constant Natural :=
+        (case Error_Msg_Code is
+           when    0         => 0,
+           when    1 ..    9 => 1,
+           when   10 ..   99 => 2,
+           when  100 ..  999 => 3,
+           when 1000 .. 9999 => 4);
+      Code_Rest  : Nat := Error_Msg_Code;
+      Code_Digit : Nat;
+
+   begin
+      Set_Msg_Char ('E');
+
+      for J in 1 .. Error_Msg_Code_Digits - Code_Len loop
+         Set_Msg_Char ('0');
+      end loop;
+
+      for J in 1 .. Code_Len loop
+         Code_Digit := Code_Rest / P10 (Code_Len - J);
+         Set_Msg_Char (H (Code_Digit));
+         Code_Rest := Code_Rest - Code_Digit * P10 (Code_Len - J);
+      end loop;
+   end Set_Msg_Insertion_Code;
+
    ---------------------------------
    -- Set_Msg_Insertion_File_Name --
    ---------------------------------
@@ -1198,7 +1303,6 @@ package body Erroutc is
          else
             Set_At;
             Set_Msg_Str ("line ");
-            Int_File := False;
             Set_Msg_Int (Int (Get_Logical_Line_Number (Loc)));
          end if;
 
@@ -1272,8 +1376,8 @@ package body Erroutc is
             Name_Len := Name_Len - 1;
          end if;
 
-         --  If operator name or character literal name, just print it as is
-         --  Also print as is if it ends in a right paren (case of x'val(nnn))
+         --  If operator name or character literal name, just print it as is.
+         --  Also print as is if it ends in a right paren (case of x'val(nnn)).
 
          if Name_Buffer (1) = '"'
            or else Name_Buffer (1) = '''
@@ -1291,12 +1395,15 @@ package body Erroutc is
          end if;
       end if;
 
-      --  The following assignments ensure that the second and third percent
-      --  insertion characters will correspond to the Error_Msg_Name_2 and
-      --  Error_Msg_Name_3 as required.
+      --  The following assignments ensure that other percent insertion
+      --  characters will correspond to their appropriate Error_Msg_Name_#
+      --  values as required.
 
       Error_Msg_Name_1 := Error_Msg_Name_2;
       Error_Msg_Name_2 := Error_Msg_Name_3;
+      Error_Msg_Name_3 := Error_Msg_Name_4;
+      Error_Msg_Name_4 := Error_Msg_Name_5;
+      Error_Msg_Name_5 := Error_Msg_Name_6;
    end Set_Msg_Insertion_Name;
 
    ------------------------------------
@@ -1320,12 +1427,15 @@ package body Erroutc is
          Set_Msg_Quote;
       end if;
 
-      --  The following assignments ensure that the second and third % or %%
-      --  insertion characters will correspond to the Error_Msg_Name_2 and
-      --  Error_Msg_Name_3 values.
+      --  The following assignments ensure that other percent insertion
+      --  characters will correspond to their appropriate Error_Msg_Name_#
+      --  values as required.
 
       Error_Msg_Name_1 := Error_Msg_Name_2;
       Error_Msg_Name_2 := Error_Msg_Name_3;
+      Error_Msg_Name_3 := Error_Msg_Name_4;
+      Error_Msg_Name_4 := Error_Msg_Name_5;
+      Error_Msg_Name_5 := Error_Msg_Name_6;
    end Set_Msg_Insertion_Name_Literal;
 
    -------------------------------------
@@ -1434,6 +1544,7 @@ package body Erroutc is
    procedure Set_Msg_Name_Buffer is
    begin
       Set_Msg_Str (Name_Buffer (1 .. Name_Len));
+      Destroy_Global_Name_Buffer;
    end Set_Msg_Name_Buffer;
 
    -------------------
@@ -1481,6 +1592,32 @@ package body Erroutc is
 
       elsif Text = "_TYPE_INVARIANT" then
          Set_Msg_Str ("TYPE_INVARIANT'CLASS");
+
+      --  Preserve casing for names that include acronyms
+
+      elsif Text = "Cpp_Class" then
+         Set_Msg_Str ("CPP_Class");
+
+      elsif Text = "Cpp_Constructor" then
+         Set_Msg_Str ("CPP_Constructor");
+
+      elsif Text = "Cpp_Virtual" then
+         Set_Msg_Str ("CPP_Virtual");
+
+      elsif Text = "Cpp_Vtable" then
+         Set_Msg_Str ("CPP_Vtable");
+
+      elsif Text = "Persistent_Bss" then
+         Set_Msg_Str ("Persistent_BSS");
+
+      elsif Text = "Spark_Mode" then
+         Set_Msg_Str ("SPARK_Mode");
+
+      elsif Text = "Use_Vads_Size" then
+         Set_Msg_Str ("Use_VADS_Size");
+
+      elsif Text = "Vads_Size" then
+         Set_Msg_Str ("VADS_size");
 
       --  Normal case with no replacement
 
@@ -1685,7 +1822,7 @@ package body Erroutc is
 
                if SWE.Open then
                   Eproc.all
-                    ("?W?pragma Warnings Off with no matching Warnings On",
+                    ("?.w?pragma Warnings Off with no matching Warnings On",
                      SWE.Start);
 
                --  Warn for ineffective Warnings (Off, ..)
@@ -1700,7 +1837,7 @@ package body Erroutc is
                    (SWE.Msg'Length > 3 and then SWE.Msg (2 .. 3) = "-W")
                then
                   Eproc.all
-                    ("?W?no warning suppressed by this pragma", SWE.Start);
+                    ("?.w?no warning suppressed by this pragma", SWE.Start);
                end if;
             end if;
          end;

@@ -1,5 +1,5 @@
-/* dwarf2out.h - Various declarations for functions found in dwarf2out.c
-   Copyright (C) 1998-2021 Free Software Foundation, Inc.
+/* dwarf2out.h - Various declarations for functions found in dwarf2out.cc
+   Copyright (C) 1998-2023 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -30,7 +30,7 @@ typedef struct dw_cfi_node *dw_cfi_ref;
 typedef struct dw_loc_descr_node *dw_loc_descr_ref;
 typedef struct dw_loc_list_struct *dw_loc_list_ref;
 typedef struct dw_discr_list_node *dw_discr_list_ref;
-typedef wide_int *wide_int_ptr;
+typedef struct dw_wide_int *dw_wide_int_ptr;
 
 
 /* Call frames are described using a sequence of Call Frame
@@ -108,7 +108,7 @@ struct GTY(()) dw_fde_node {
   /* True iff dw_fde_second_begin label is in text_section or
      cold_text_section.  */
   unsigned second_in_std_section : 1;
-  /* True if Rule 18 described in dwarf2cfi.c is in action, i.e. for dynamic
+  /* True if Rule 18 described in dwarf2cfi.cc is in action, i.e. for dynamic
      stack realignment in between pushing of hard frame pointer to stack
      and setting hard frame pointer to stack pointer.  The register save for
      hard frame pointer register should be emitted only on the latter
@@ -119,16 +119,49 @@ struct GTY(()) dw_fde_node {
 };
 
 
+/* This represents a register, in DWARF_FRAME_REGNUM space, for use in CFA
+   definitions and expressions.
+   Most architectures only need a single register number, but some (amdgcn)
+   have pointers that span multiple registers.  DWARF permits arbitrary
+   register sets but existing use-cases only require contiguous register
+   sets, as represented here.  */
+struct GTY(()) cfa_reg {
+  unsigned int reg;
+  unsigned short span;
+  unsigned short span_width;  /* A.K.A. register mode size.  */
+
+  cfa_reg& set_by_dwreg (unsigned int r)
+    {
+      reg = r;
+      span = 1;
+      span_width = 0;  /* Unknown size (permitted when span == 1).  */
+      return *this;
+    }
+
+  bool operator== (const cfa_reg &other) const
+    {
+      return (reg == other.reg && span == other.span
+	      && (span_width == other.span_width
+		  || (span == 1
+		      && (span_width == 0 || other.span_width == 0))));
+    }
+
+  bool operator!= (const cfa_reg &other) const
+    {
+      return !(*this == other);
+    }
+};
+
 /* This is how we define the location of the CFA. We use to handle it
    as REG + OFFSET all the time,  but now it can be more complex.
    It can now be either REG + CFA_OFFSET or *(REG + BASE_OFFSET) + CFA_OFFSET.
    Instead of passing around REG and OFFSET, we pass a copy
    of this structure.  */
 struct GTY(()) dw_cfa_location {
-  poly_int64_pod offset;
-  poly_int64_pod base_offset;
+  poly_int64 offset;
+  poly_int64 base_offset;
   /* REG is in DWARF_FRAME_REGNUM space, *not* normal REGNO space.  */
-  unsigned int reg;
+  struct cfa_reg reg;
   BOOL_BITFIELD indirect : 1;  /* 1 if CFA is accessed via a dereference.  */
   BOOL_BITFIELD in_use : 1;    /* 1 if a saved cfa is stored here.  */
 };
@@ -219,7 +252,7 @@ struct GTY(()) dw_val_node {
       unsigned HOST_WIDE_INT
 	GTY ((tag ("dw_val_class_unsigned_const"))) val_unsigned;
       double_int GTY ((tag ("dw_val_class_const_double"))) val_double;
-      wide_int_ptr GTY ((tag ("dw_val_class_wide_int"))) val_wide;
+      dw_wide_int_ptr GTY ((tag ("dw_val_class_wide_int"))) val_wide;
       dw_vec_const GTY ((tag ("dw_val_class_vec"))) val_vec;
       struct dw_val_die_union
 	{
@@ -280,11 +313,41 @@ struct GTY(()) dw_discr_list_node {
   int dw_discr_range;
 };
 
-/* Interface from dwarf2out.c to dwarf2cfi.c.  */
+struct GTY((variable_size)) dw_wide_int {
+  unsigned int precision;
+  unsigned int len;
+  HOST_WIDE_INT val[1];
+
+  unsigned int get_precision () const { return precision; }
+  unsigned int get_len () const { return len; }
+  const HOST_WIDE_INT *get_val () const { return val; }
+  inline HOST_WIDE_INT elt (unsigned int) const;
+  inline bool operator == (const dw_wide_int &) const;
+};
+
+inline HOST_WIDE_INT
+dw_wide_int::elt (unsigned int i) const
+{
+  if (i < len)
+    return val[i];
+  wide_int_ref ref = wi::storage_ref (val, len, precision);
+  return wi::sign_mask (ref);
+}
+
+inline bool
+dw_wide_int::operator == (const dw_wide_int &o) const
+{
+  wide_int_ref ref1 = wi::storage_ref (val, len, precision);
+  wide_int_ref ref2 = wi::storage_ref (o.val, o.len, o.precision);
+  return ref1 == ref2;
+}
+
+/* Interface from dwarf2out.cc to dwarf2cfi.cc.  */
 extern struct dw_loc_descr_node *build_cfa_loc
   (dw_cfa_location *, poly_int64);
 extern struct dw_loc_descr_node *build_cfa_aligned_loc
   (dw_cfa_location *, poly_int64, HOST_WIDE_INT);
+extern struct dw_loc_descr_node *build_span_loc (struct cfa_reg);
 extern struct dw_loc_descr_node *mem_loc_descriptor
   (rtx, machine_mode mode, machine_mode mem_mode,
    enum var_init_status);
@@ -295,7 +358,7 @@ extern unsigned long size_of_locs (dw_loc_descr_ref);
 extern void output_loc_sequence (dw_loc_descr_ref, int);
 extern void output_loc_sequence_raw (dw_loc_descr_ref);
 
-/* Interface from dwarf2cfi.c to dwarf2out.c.  */
+/* Interface from dwarf2cfi.cc to dwarf2out.cc.  */
 extern void lookup_cfa_1 (dw_cfi_ref cfi, dw_cfa_location *loc,
 			  dw_cfa_location *remember);
 extern bool cfa_equal_p (const dw_cfa_location *, const dw_cfa_location *);
@@ -385,7 +448,8 @@ struct fixed_point_type_info
     } scale_factor;
 };
 
-void dwarf2out_c_finalize (void);
+void dwarf2cfi_cc_finalize (void);
+void dwarf2out_cc_finalize (void);
 
 /* Some DWARF internals are exposed for the needs of DWARF-based debug
    formats.  */

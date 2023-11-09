@@ -3,6 +3,7 @@ extern "C" {
 #endif
 
 int omp_get_num_teams (void);
+int bar (void);
 
 #ifdef __cplusplus
 }
@@ -10,7 +11,7 @@ int omp_get_num_teams (void);
 
 /* { dg-do compile } */
 
-#pragma omp requires reverse_offload /* { dg-message "sorry, unimplemented: 'reverse_offload' clause on 'requires' directive not supported yet" } */
+#pragma omp requires reverse_offload
 
 void
 foo (void)
@@ -22,6 +23,7 @@ foo (void)
 
   #pragma omp target device (ancestor: 1)
     {
+      a = bar (); /* OK */
       a = omp_get_num_teams (); /* { dg-error "OpenMP runtime API call '\[^\n\r]*omp_get_num_teams\[^\n\r]*' in a region with 'device\\(ancestor\\)' clause" }  */
     }
 

@@ -1,5 +1,5 @@
 /* A class for referring to events within a diagnostic_path.
-   Copyright (C) 2019-2021 Free Software Foundation, Inc.
+   Copyright (C) 2019-2023 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>
 
 This file is part of GCC.
@@ -29,7 +29,7 @@ along with GCC; see the file COPYING3.  If not see
    For example, a 3-event path has event offsets 0, 1, and 2,
    which would be shown to the user as "(1)", "(2)" and "(3)".
 
-   This has its own header so that pretty-print.c can use this
+   This has its own header so that pretty-print.cc can use this
    to implement "%@" without bringing in all of diagnostic_path
    (which e.g. refers to "tree").  */
 
@@ -57,5 +57,10 @@ class diagnostic_event_id_t
    colorization, e.g. "(1)".
    The %@ format code requires that known_p be true for the event ID. */
 typedef diagnostic_event_id_t *diagnostic_event_id_ptr;
+
+/* A type for compactly referring to a particular thread within a
+   diagnostic_path.  Typically there is just one thread per path,
+   with id 0.  */
+typedef unsigned diagnostic_thread_id_t;
 
 #endif /* ! GCC_DIAGNOSTIC_EVENT_ID_H */

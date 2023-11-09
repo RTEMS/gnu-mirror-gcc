@@ -8,6 +8,7 @@
 /* { dg-additional-sources routine-nohost-2_2.c } */
 
 /* { dg-additional-options "-fno-inline" } for stable results regarding OpenACC 'routine'.  */
+/* { dg-add-options weak_undefined } */
 
 #include <assert.h>
 #include <openacc.h>
@@ -21,7 +22,7 @@ int main()
   int x = -10;
 
 #pragma acc serial copy(x)
-  /* { dg-warning {using vector_length \(32\), ignoring 1} "" { target openacc_nvidia_accel_selected } .-1 } */
+  /* { dg-warning {using .vector_length \(32\)., ignoring 1} "" { target openacc_nvidia_accel_selected } .-1 } */
   {
     if (f1)
       x = f1(x);

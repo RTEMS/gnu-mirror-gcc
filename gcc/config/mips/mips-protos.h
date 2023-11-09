@@ -1,5 +1,5 @@
 /* Prototypes of target machine for GNU compiler.  MIPS version.
-   Copyright (C) 1989-2021 Free Software Foundation, Inc.
+   Copyright (C) 1989-2023 Free Software Foundation, Inc.
    Contributed by A. Lichnewsky (lich@inria.inria.fr).
    Changed by Michael Meissner	(meissner@osf.org).
    64-bit r4000 support by Ian Lance Taylor (ian@cygnus.com) and
@@ -271,7 +271,7 @@ extern void mips_declare_object (FILE *, const char *, const char *,
 extern void mips_declare_object_name (FILE *, const char *, tree);
 extern void mips_finish_declare_object (FILE *, tree, int, int);
 extern void mips_set_text_contents_type (FILE *, const char *,
-					 unsigned long, bool);
+					 unsigned HOST_WIDE_INT, bool);
 
 extern bool mips_small_data_pattern_p (rtx);
 extern rtx mips_rewrite_small_data (rtx);
@@ -388,8 +388,10 @@ extern void mips_register_frame_header_opt (void);
 extern void mips_expand_vec_cond_expr (machine_mode, machine_mode, rtx *);
 extern void mips_expand_vec_cmp_expr (rtx *);
 
-/* Routines implemented in mips-d.c  */
-extern void mips_d_target_versions (void);
-extern void mips_d_register_target_info (void);
+extern void mips_emit_speculation_barrier_function (void);
+
+extern bool mips_bit_clear_p (enum machine_mode, unsigned HOST_WIDE_INT);
+extern void mips_bit_clear_info (enum machine_mode, unsigned HOST_WIDE_INT,
+				  int *, int *);
 
 #endif /* ! GCC_MIPS_PROTOS_H */

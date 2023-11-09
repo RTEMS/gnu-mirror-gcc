@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -180,21 +180,6 @@ package body Ch6 is
    --    FUNCTION SPECIFICATION IS (EXPRESSION)
    --      [ASPECT_SPECIFICATIONS];
 
-   --  The value in Pf_Flags indicates which of these possible declarations
-   --  is acceptable to the caller:
-
-   --    Pf_Flags.Decl                 Set if declaration OK
-   --    Pf_Flags.Gins                 Set if generic instantiation OK
-   --    Pf_Flags.Pbod                 Set if proper body OK
-   --    Pf_Flags.Rnam                 Set if renaming declaration OK
-   --    Pf_Flags.Stub                 Set if body stub OK
-   --    Pf_Flags.Pexp                 Set if expression function OK
-
-   --  If an inappropriate form is encountered, it is scanned out but an
-   --  error message indicating that it is appearing in an inappropriate
-   --  context is issued. The only possible values for Pf_Flags are those
-   --  defined as constants in the Par package.
-
    --  The caller has checked that the initial token is FUNCTION, PROCEDURE,
    --  NOT or OVERRIDING.
 
@@ -316,7 +301,7 @@ package body Ch6 is
          then
             Error_Msg_SC ("overriding indicator not allowed here!");
 
-         elsif Token /= Tok_Function and then Token /= Tok_Procedure then
+         elsif Token not in Tok_Function | Tok_Procedure then
             Error_Msg_SC -- CODEFIX
               ("FUNCTION or PROCEDURE expected!");
          end if;
@@ -737,22 +722,15 @@ package body Ch6 is
                   --  or a pragma, then we definitely have a subprogram body.
                   --  This is a common case, so worth testing first.
 
-                  if Token = Tok_Begin
-                    or else Token in Token_Class_Declk
-                    or else Token = Tok_Pragma
-                  then
+                  if Token in Tok_Begin | Token_Class_Declk | Tok_Pragma then
                      return False;
 
                   --  Test for tokens which could only start an expression and
                   --  thus signal the case of a expression function.
 
-                  elsif Token     in Token_Class_Literal
-                    or else Token in Token_Class_Unary_Addop
-                    or else Token =  Tok_Left_Paren
-                    or else Token =  Tok_Abs
-                    or else Token =  Tok_Null
-                    or else Token =  Tok_New
-                    or else Token =  Tok_Not
+                  elsif Token in
+                    Token_Class_Literal | Token_Class_Unary_Addop |
+                    Tok_Left_Paren | Tok_Abs | Tok_Null | Tok_New | Tok_Not
                   then
                      null;
 
@@ -841,7 +819,14 @@ package body Ch6 is
             begin
                --  Expression_Function case
 
-               if Token = Tok_Left_Paren
+               --  If likely an aggregate, check we are in Ada 2022 mode
+
+               if Token = Tok_Left_Bracket then
+                  Error_Msg_Ada_2022_Feature
+                    ("!aggregates as expression function", Token_Ptr);
+               end if;
+
+               if Token in Tok_Left_Paren | Tok_Left_Bracket
                  or else Likely_Expression_Function
                then
                   --  Check expression function allowed here
@@ -950,7 +935,6 @@ package body Ch6 is
                   --  the body.
 
                   if Is_Non_Empty_List (Aspects) then
-                     Set_Parent (Aspects, Body_Node);
                      Set_Aspect_Specifications (Body_Node, Aspects);
                   end if;
 
@@ -989,7 +973,6 @@ package body Ch6 is
 
          else
             if Is_Non_Empty_List (Aspects) then
-               Set_Parent (Aspects, Decl_Node);
                Set_Aspect_Specifications (Decl_Node, Aspects);
             end if;
 
@@ -1144,7 +1127,7 @@ package body Ch6 is
       --------------
 
       function Real_Dot return Boolean is
-         Scan_State  : Saved_Scan_State;
+         Scan_State : Saved_Scan_State;
 
       begin
          if Token /= Tok_Dot then
@@ -1154,9 +1137,8 @@ package body Ch6 is
             Save_Scan_State (Scan_State);
             Scan; -- past dot
 
-            if Token = Tok_Identifier
-              or else Token = Tok_Operator_Symbol
-              or else Token = Tok_String_Literal
+            if Token in
+              Tok_Identifier | Tok_Operator_Symbol | Tok_String_Literal
             then
                return True;
 
@@ -1173,8 +1155,7 @@ package body Ch6 is
       Ident_Node := Token_Node;
       Scan; -- past initial token
 
-      if Prev_Token = Tok_Operator_Symbol
-        or else Prev_Token = Tok_String_Literal
+      if Prev_Token in Tok_Operator_Symbol | Tok_String_Literal
         or else not Real_Dot
       then
          return Ident_Node;
@@ -1209,7 +1190,7 @@ package body Ch6 is
 
    exception
       when Error_Resync =>
-         while Token = Tok_Dot or else Token = Tok_Identifier loop
+         while Token in Tok_Dot | Tok_Identifier loop
             Scan;
          end loop;
 
@@ -1320,7 +1301,7 @@ package body Ch6 is
 
    exception
       when Error_Resync =>
-         while Token = Tok_Dot or else Token = Tok_Identifier loop
+         while Token in Tok_Dot | Tok_Identifier loop
             Scan;
          end loop;
 
@@ -1455,10 +1436,8 @@ package body Ch6 is
                      --  and on a right paren, e.g. Parms (X Y), and also
                      --  on an assignment symbol, e.g. Parms (X Y := ..)
 
-                     if Token = Tok_Semicolon
-                       or else Token = Tok_Right_Paren
-                       or else Token = Tok_EOF
-                       or else Token = Tok_Colon_Equal
+                     if Token in Tok_Semicolon | Tok_Right_Paren |
+                       Tok_EOF | Tok_Colon_Equal
                      then
                         Restore_Scan_State (Scan_State);
                         exit Ident_Loop;
@@ -1467,9 +1446,7 @@ package body Ch6 is
                      --  comma, e.g. Parms (A B : ...). Also assume a missing
                      --  comma if we hit another comma, e.g. Parms (A B, C ..)
 
-                     elsif Token = Tok_Colon
-                       or else Token = Tok_Comma
-                     then
+                     elsif Token in Tok_Colon | Tok_Comma then
                         Restore_Scan_State (Scan_State);
                         exit Look_Ahead;
                      end if;
@@ -1544,7 +1521,7 @@ package body Ch6 is
                --  Case of IN or OUT present
 
                else
-                  if Token = Tok_In or else Token = Tok_Out then
+                  if Token in Tok_In | Tok_Out then
                      if Not_Null_Present then
                         Error_Msg
                           ("`NOT NULL` can only be used with `ACCESS`",
@@ -1620,7 +1597,7 @@ package body Ch6 is
             --  If we have RETURN or IS after the semicolon, then assume
             --  that semicolon should have been a right parenthesis and exit
 
-            if Token = Tok_Is or else Token = Tok_Return then
+            if Token in Tok_Is | Tok_Return then
                Error_Msg_SP -- CODEFIX
                  ("|"";"" should be "")""");
                exit Specification_Loop;
@@ -1648,6 +1625,28 @@ package body Ch6 is
               ("aspect on formal parameter", Token_Ptr);
 
             P_Aspect_Specifications (Specification_Node, False);
+
+            --  Set the aspect specifications for previous Ids
+
+            if Has_Aspects (Specification_Node)
+              and then Prev_Ids (Specification_Node)
+            then
+               --  Loop through each previous id
+
+               declare
+                  Prev_Id : Node_Id := Prev (Specification_Node);
+               begin
+                  loop
+                     Set_Aspect_Specifications
+                       (Prev_Id, Aspect_Specifications (Specification_Node));
+
+                     --  Exit when we reach the first parameter in the list
+
+                     exit when not Prev_Ids (Prev_Id);
+                     Prev_Id := Prev (Prev_Id);
+                  end loop;
+               end;
+            end if;
 
             if Token = Tok_Right_Paren then
                Scan;  -- past right paren
@@ -1712,7 +1711,7 @@ package body Ch6 is
 
          if Style.Mode_In_Check and then Token /= Tok_Out then
             Error_Msg_SP -- CODEFIX
-              ("(style) IN should be omitted");
+              ("(style) IN should be omitted?I?");
          end if;
 
          --  Since Ada 2005, formal objects can have an anonymous access type,
@@ -1992,7 +1991,7 @@ package body Ch6 is
             --  at a Return_when_statement
 
             if Token = Tok_When and then not Missing_Semicolon_On_When then
-               Error_Msg_GNAT_Extension ("return when statement");
+               Error_Msg_GNAT_Extension ("return when statement", Token_Ptr);
                Mutate_Nkind (Ret_Node, N_Return_When_Statement);
 
                Scan; -- past WHEN
@@ -2001,7 +2000,7 @@ package body Ch6 is
             --  Allow IF instead of WHEN, giving error message
 
             elsif Token = Tok_If then
-               Error_Msg_GNAT_Extension ("return when statement");
+               Error_Msg_GNAT_Extension ("return when statement", Token_Ptr);
                Mutate_Nkind (Ret_Node, N_Return_When_Statement);
 
                T_When;

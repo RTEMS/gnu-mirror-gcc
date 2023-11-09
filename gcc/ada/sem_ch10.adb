@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -31,6 +31,7 @@ with Einfo;          use Einfo;
 with Einfo.Entities; use Einfo.Entities;
 with Einfo.Utils;    use Einfo.Utils;
 with Errout;         use Errout;
+with Exp_Disp;       use Exp_Disp;
 with Exp_Put_Image;
 with Exp_Util;       use Exp_Util;
 with Elists;         use Elists;
@@ -73,6 +74,7 @@ with Style;          use Style;
 with Stylesw;        use Stylesw;
 with Tbuild;         use Tbuild;
 with Uname;          use Uname;
+with Warnsw;         use Warnsw;
 
 package body Sem_Ch10 is
 
@@ -82,6 +84,14 @@ package body Sem_Ch10 is
 
    procedure Analyze_Context (N : Node_Id);
    --  Analyzes items in the context clause of compilation unit
+
+   procedure Analyze_Required_Limited_With_Units (N : Node_Id);
+   --  Subsidiary of Analyze_Compilation_Unit. Perform full analysis of the
+   --  limited-with units of N when it is a package declaration that does not
+   --  require a package body, and the profile of some subprogram defined in N
+   --  depends on shadow incomplete type entities visible through limited-with
+   --  context clauses. This analysis is required to provide the backend with
+   --  the non-limited view of these shadow entities.
 
    procedure Build_Limited_Views (N : Node_Id);
    --  Build and decorate the list of shadow entities for a package mentioned
@@ -228,6 +238,9 @@ package body Sem_Ch10 is
    --  Reset all visibility flags on unit after compiling it, either as a main
    --  unit or as a unit in the context.
 
+   procedure Replace (Old_E, New_E : Entity_Id);
+   --  Replace Old_E by New_E on visibility list
+
    procedure Unchain (E : Entity_Id);
    --  Remove single entity from visibility list
 
@@ -268,6 +281,8 @@ package body Sem_Ch10 is
    ------------------------------
 
    procedure Analyze_Compilation_Unit (N : Node_Id) is
+      Unit_Node : constant Node_Id := Unit (N);
+
       procedure Check_Redundant_Withs
         (Context_Items      : List_Id;
          Spec_Context_Items : List_Id := No_List);
@@ -341,8 +356,8 @@ package body Sem_Ch10 is
             function Same_Unit (N : Node_Id; P : Entity_Id) return Boolean is
             begin
                return Entity (N) = P
-                 or else (Present (Renamed_Object (P))
-                           and then Entity (N) = Renamed_Object (P));
+                 or else (Present (Renamed_Entity (P))
+                           and then Entity (N) = Renamed_Entity (P));
             end Same_Unit;
 
          --  Start of processing for Process_Body_Clauses
@@ -577,16 +592,18 @@ package body Sem_Ch10 is
                         Error_Msg_N -- CODEFIX
                           ("redundant with clause in body?r?", Clause);
                      end if;
-
-                     Used_In_Body      := False;
-                     Used_In_Spec      := False;
-                     Used_Type_Or_Elab := False;
-                     Withed_In_Spec    := False;
                   end;
 
                --  Standalone package spec or body check
 
                else
+                  if Is_Ancestor_Package (Entity (Name (Clause)),
+                                          Defining_Entity (Unit_Node))
+                  then
+                     Error_Msg_N
+                       ("unnecessary with of ancestor?r?", Clause);
+                  end if;
+
                   declare
                      Dummy  : Boolean := False;
                      Withed : Boolean := False;
@@ -617,11 +634,11 @@ package body Sem_Ch10 is
       --  Local variables
 
       Main_Cunit    : constant Node_Id := Cunit (Main_Unit);
-      Unit_Node     : constant Node_Id := Unit (N);
       Lib_Unit      : Node_Id          := Library_Unit (N);
       Par_Spec_Name : Unit_Name_Type;
       Spec_Id       : Entity_Id;
       Unum          : Unit_Number_Type;
+      Options       : Style_Check_Options;
 
    --  Start of processing for Analyze_Compilation_Unit
 
@@ -700,6 +717,11 @@ package body Sem_Ch10 is
       else
          Set_Context_Pending (N);
       end if;
+
+      --  Store the style check options before analyzing context pragmas that
+      --  might change them for this compilation unit.
+
+      Save_Style_Check_Options (Options);
 
       Analyze_Context (N);
 
@@ -943,16 +965,14 @@ package body Sem_Ch10 is
 
       --  Treat compilation unit pragmas that appear after the library unit
 
-      if Present (Pragmas_After (Aux_Decls_Node (N))) then
-         declare
-            Prag_Node : Node_Id := First (Pragmas_After (Aux_Decls_Node (N)));
-         begin
-            while Present (Prag_Node) loop
-               Analyze (Prag_Node);
-               Next (Prag_Node);
-            end loop;
-         end;
-      end if;
+      declare
+         Prag_Node : Node_Id := First (Pragmas_After (Aux_Decls_Node (N)));
+      begin
+         while Present (Prag_Node) loop
+            Analyze (Prag_Node);
+            Next (Prag_Node);
+         end loop;
+      end;
 
       --  Analyze the contract of a [generic] subprogram that acts as a
       --  compilation unit after all compilation pragmas have been analyzed.
@@ -997,6 +1017,22 @@ package body Sem_Ch10 is
 
             Add_Stub_Constructs (N);
          end if;
+      end if;
+
+      --  Build dispatch tables of library-level tagged types only now because
+      --  the generation of distribution stubs above may create some of them.
+
+      if Expander_Active and then Tagged_Type_Expansion then
+         case Nkind (Unit_Node) is
+            when N_Package_Declaration | N_Package_Body =>
+               Build_Static_Dispatch_Tables (Unit_Node);
+
+            when N_Package_Instantiation =>
+               Build_Static_Dispatch_Tables (Instance_Spec (Unit_Node));
+
+            when others =>
+               null;
+         end case;
       end if;
 
       --  Remove unit from visibility, so that environment is clean for the
@@ -1102,14 +1138,14 @@ package body Sem_Ch10 is
                   then
                      Style_Check := False;
 
-                     if Present (Renamed_Object (Nam)) then
+                     if Present (Renamed_Entity (Nam)) then
                         Un :=
                           Load_Unit
                             (Load_Name  =>
                                Get_Body_Name
                                  (Get_Unit_Name
                                    (Unit_Declaration_Node
-                                     (Renamed_Object (Nam)))),
+                                     (Renamed_Entity (Nam)))),
                              Required   => False,
                              Subunit    => False,
                              Error_Node => N,
@@ -1365,12 +1401,23 @@ package body Sem_Ch10 is
          Pop_Scope;
       end if;
 
+      --  Finally restore all the original style check options
+
+      Set_Style_Check_Options (Options);
+
       --  If No_Elaboration_Code_All was encountered, this is where we do the
       --  transitive test of with'ed units to make sure they have the aspect.
       --  This is delayed till the end of analyzing the compilation unit to
       --  ensure that the pragma/aspect, if present, has been analyzed.
 
       Check_No_Elab_Code_All (N);
+
+      --  If this is a main compilation containing a package declaration that
+      --  requires no package body, and the profile of some subprogram depends
+      --  on shadow incomplete entities then perform full analysis of its
+      --  limited-with units.
+
+      Analyze_Required_Limited_With_Units (N);
    end Analyze_Compilation_Unit;
 
    ---------------------
@@ -1650,9 +1697,7 @@ package body Sem_Ch10 is
          Mutate_Ekind (Id, E_Package_Body);
          Set_Etype (Id, Standard_Void_Type);
 
-         if Has_Aspects (N) then
-            Analyze_Aspect_Specifications (N, Id);
-         end if;
+         Analyze_Aspect_Specifications (N, Id);
 
          Set_Has_Completion (Nam);
          Set_Corresponding_Spec_Of_Stub (N, Nam);
@@ -1992,9 +2037,7 @@ package body Sem_Ch10 is
          Mutate_Ekind (Id, E_Protected_Body);
          Set_Etype (Id, Standard_Void_Type);
 
-         if Has_Aspects (N) then
-            Analyze_Aspect_Specifications (N, Id);
-         end if;
+         Analyze_Aspect_Specifications (N, Id);
 
          Set_Has_Completion (Etype (Nam));
          Set_Corresponding_Spec_Of_Stub (N, Nam);
@@ -2004,6 +2047,149 @@ package body Sem_Ch10 is
          Restore_Config_Switches (Opts);
       end if;
    end Analyze_Protected_Body_Stub;
+
+   -----------------------------------------
+   -- Analyze_Required_Limited_With_Units --
+   -----------------------------------------
+
+   procedure Analyze_Required_Limited_With_Units (N : Node_Id) is
+      Unit_Node : constant Node_Id   := Unit (N);
+      Spec_Id   : constant Entity_Id := Defining_Entity (Unit_Node);
+
+      function Depends_On_Limited_Views (Pkg_Id : Entity_Id) return Boolean;
+      --  Determines whether the given package has some subprogram with a
+      --  profile that depends on shadow incomplete type entities of a
+      --  limited-with unit.
+
+      function Has_Limited_With_Clauses return Boolean;
+      --  Determines whether the compilation unit N has limited-with context
+      --  clauses.
+
+      ------------------------------
+      -- Has_Limited_With_Clauses --
+      ------------------------------
+
+      function Has_Limited_With_Clauses return Boolean is
+         Item : Node_Id := First (Context_Items (N));
+
+      begin
+         while Present (Item) loop
+            if Nkind (Item) = N_With_Clause
+              and then Limited_Present (Item)
+              and then not Implicit_With (Item)
+            then
+               return True;
+            end if;
+
+            Next (Item);
+         end loop;
+
+         return False;
+      end Has_Limited_With_Clauses;
+
+      ------------------------------
+      -- Depends_On_Limited_Views --
+      ------------------------------
+
+      function Depends_On_Limited_Views (Pkg_Id : Entity_Id) return Boolean is
+
+         function Has_Limited_View_Types (Subp : Entity_Id) return Boolean;
+         --  Determines whether the type of some formal of Subp, or its return
+         --  type, is a shadow incomplete entity of a limited-with unit.
+
+         ----------------------------
+         -- Has_Limited_View_Types --
+         ----------------------------
+
+         function Has_Limited_View_Types (Subp : Entity_Id) return Boolean is
+            Formal : Entity_Id := First_Formal (Subp);
+
+         begin
+            while Present (Formal) loop
+               if From_Limited_With (Etype (Formal))
+                 and then Has_Non_Limited_View (Etype (Formal))
+                 and then Ekind (Non_Limited_View (Etype (Formal)))
+                            = E_Incomplete_Type
+               then
+                  return True;
+               end if;
+
+               Formal := Next_Formal (Formal);
+            end loop;
+
+            if Ekind (Subp) = E_Function
+              and then From_Limited_With (Etype (Subp))
+              and then Has_Non_Limited_View (Etype (Subp))
+              and then Ekind (Non_Limited_View (Etype (Subp)))
+                         = E_Incomplete_Type
+            then
+               return True;
+            end if;
+
+            return False;
+         end Has_Limited_View_Types;
+
+         --  Local variables
+
+         E : Entity_Id := First_Entity (Pkg_Id);
+
+      begin
+         while Present (E) loop
+            if Is_Subprogram (E)
+              and then Has_Limited_View_Types (E)
+            then
+               return True;
+
+            --  Recursion on nested packages skipping package renamings
+
+            elsif Ekind (E) = E_Package
+              and then No (Renamed_Entity (E))
+              and then Depends_On_Limited_Views (E)
+            then
+               return True;
+            end if;
+
+            Next_Entity (E);
+         end loop;
+
+         return False;
+      end Depends_On_Limited_Views;
+
+      --  Local variables
+
+      Item : Node_Id;
+
+   --  Start of processing for Analyze_Required_Limited_With_Units
+
+   begin
+      --  Cases where no action is required
+
+      if not Expander_Active
+        or else Nkind (Unit_Node) /= N_Package_Declaration
+        or else Main_Unit_Entity /= Spec_Id
+        or else Is_Generic_Unit (Spec_Id)
+        or else Unit_Requires_Body (Spec_Id)
+        or else not Has_Limited_With_Clauses
+        or else not Depends_On_Limited_Views (Spec_Id)
+      then
+         return;
+      end if;
+
+      --  Perform full analyis of limited-with units to provide the backend
+      --  with the full-view of shadow entities.
+
+      Item := First (Context_Items (N));
+      while Present (Item) loop
+         if Nkind (Item) = N_With_Clause
+           and then Limited_Present (Item)
+           and then not Implicit_With (Item)
+         then
+            Semantics (Library_Unit (Item));
+         end if;
+
+         Next (Item);
+      end loop;
+   end Analyze_Required_Limited_With_Units;
 
    ----------------------------------
    -- Analyze_Subprogram_Body_Stub --
@@ -2032,8 +2218,8 @@ package body Sem_Ch10 is
          Decl := First (Declarations (Parent (N)));
          while Present (Decl) and then Decl /= N loop
             if Nkind (Decl) = N_Subprogram_Body_Stub
-              and then (Chars (Defining_Unit_Name (Specification (Decl))) =
-                        Chars (Defining_Unit_Name (Specification (N))))
+              and then Chars (Defining_Unit_Name (Specification (Decl))) =
+                       Chars (Defining_Unit_Name (Specification (N)))
             then
                Error_Msg_N ("identifier for stub is not unique", N);
             end if;
@@ -2276,7 +2462,7 @@ package body Sem_Ch10 is
       ----------------------------
 
       procedure Re_Install_Use_Clauses is
-         U  : Node_Id;
+         U : Node_Id;
       begin
          for J in reverse 1 .. Num_Scopes loop
             U := Use_Clauses (J);
@@ -2503,9 +2689,7 @@ package body Sem_Ch10 is
          Mutate_Ekind (Id, E_Task_Body);
          Set_Etype (Id, Standard_Void_Type);
 
-         if Has_Aspects (N) then
-            Analyze_Aspect_Specifications (N, Id);
-         end if;
+         Analyze_Aspect_Specifications (N, Id);
 
          Generate_Reference (Nam, Id, 'b');
          Set_Corresponding_Spec_Of_Stub (N, Nam);
@@ -2579,10 +2763,18 @@ package body Sem_Ch10 is
       --  Note: this is not quite right if the user defines one of these units
       --  himself, but that's a marginal case, and fixing it is hard ???
 
-      if Restriction_Check_Required (No_Obsolescent_Features) then
-         if In_Predefined_Renaming (U) then
+      if Ada_Version >= Ada_95
+        and then In_Predefined_Renaming (U)
+      then
+         if Restriction_Check_Required (No_Obsolescent_Features) then
             Check_Restriction (No_Obsolescent_Features, N);
             Restriction_Violation := True;
+         end if;
+
+         if Warn_On_Obsolescent_Feature then
+            Error_Msg_N
+              ("renamed predefined unit is an obsolescent feature "
+               & "(RM J.1)?j?", N);
          end if;
       end if;
 
@@ -2870,7 +3062,7 @@ package body Sem_Ch10 is
             --  been analyzed.
 
             Analyze (Parent (Parent (Entity (Pref))));
-            pragma Assert (Renamed_Object (Entity (Pref)) = Par_Name);
+            pragma Assert (Renamed_Entity (Entity (Pref)) = Par_Name);
             Par_Name := Entity (Pref);
          end if;
 
@@ -2951,23 +3143,6 @@ package body Sem_Ch10 is
       Priv_Child : Entity_Id;
       Par_Lib    : Entity_Id;
       Par_Spec   : Node_Id;
-
-      function Is_Private_Library_Unit (Unit : Entity_Id) return Boolean;
-      --  Returns true if and only if the library unit is declared with
-      --  an explicit designation of private.
-
-      -----------------------------
-      -- Is_Private_Library_Unit --
-      -----------------------------
-
-      function Is_Private_Library_Unit (Unit : Entity_Id) return Boolean is
-         Comp_Unit : constant Node_Id := Parent (Unit_Declaration_Node (Unit));
-
-      begin
-         return Private_Present (Comp_Unit);
-      end Is_Private_Library_Unit;
-
-   --  Start of processing for Check_Private_Child_Unit
 
    begin
       if Nkind (Lib_Unit) in N_Package_Body | N_Subprogram_Body then
@@ -3120,6 +3295,73 @@ package body Sem_Ch10 is
          Error_Msg_N ("missing proper body", N);
       end if;
    end Check_Stub_Level;
+
+   -------------------
+   -- Decorate_Type --
+   -------------------
+
+   procedure Decorate_Type
+     (Ent         : Entity_Id;
+      Scop        : Entity_Id;
+      Is_Tagged   : Boolean := False;
+      Materialize : Boolean := False)
+   is
+      CW_Typ : Entity_Id;
+
+   begin
+      --  An unanalyzed type or a shadow entity of a type is treated as an
+      --  incomplete type, and carries the corresponding attributes.
+
+      Mutate_Ekind           (Ent, E_Incomplete_Type);
+      Set_Is_Not_Self_Hidden (Ent);
+      Set_Etype              (Ent, Ent);
+      Set_Full_View          (Ent, Empty);
+      Set_Is_First_Subtype   (Ent);
+      Set_Scope              (Ent, Scop);
+      Set_Stored_Constraint  (Ent, No_Elist);
+      Reinit_Size_Align      (Ent);
+
+      if From_Limited_With (Ent) then
+         Set_Private_Dependents (Ent, New_Elmt_List);
+      end if;
+
+      --  A tagged type and its corresponding shadow entity share one common
+      --  class-wide type. The list of primitive operations for the shadow
+      --  entity is empty.
+
+      if Is_Tagged then
+         Set_Is_Tagged_Type (Ent);
+         Set_Direct_Primitive_Operations (Ent, New_Elmt_List);
+
+         CW_Typ :=
+           New_External_Entity
+             (E_Void, Scope (Ent), Sloc (Ent), Ent, 'C', 0, 'T');
+
+         Set_Class_Wide_Type (Ent, CW_Typ);
+
+         --  Set parent to be the same as the parent of the tagged type.
+         --  We need a parent field set, and it is supposed to point to
+         --  the declaration of the type. The tagged type declaration
+         --  essentially declares two separate types, the tagged type
+         --  itself and the corresponding class-wide type, so it is
+         --  reasonable for the parent fields to point to the declaration
+         --  in both cases.
+
+         Set_Parent (CW_Typ, Parent (Ent));
+
+         Mutate_Ekind                  (CW_Typ, E_Class_Wide_Type);
+         Set_Class_Wide_Type           (CW_Typ, CW_Typ);
+         Set_Etype                     (CW_Typ, Ent);
+         Set_Equivalent_Type           (CW_Typ, Empty);
+         Set_From_Limited_With         (CW_Typ, From_Limited_With (Ent));
+         Set_Has_Unknown_Discriminants (CW_Typ);
+         Set_Is_First_Subtype          (CW_Typ);
+         Set_Is_Tagged_Type            (CW_Typ);
+         Set_Materialize_Entity        (CW_Typ, Materialize);
+         Set_Scope                     (CW_Typ, Scop);
+         Reinit_Size_Align             (CW_Typ);
+      end if;
+   end Decorate_Type;
 
    ------------------------
    -- Expand_With_Clause --
@@ -3301,19 +3543,17 @@ package body Sem_Ch10 is
    --  Start of processing for Has_With_Clause
 
    begin
-      if Present (Context_Items (C_Unit)) then
-         Item := First (Context_Items (C_Unit));
-         while Present (Item) loop
-            if Nkind (Item) = N_With_Clause
-              and then Limited_Present (Item) = Is_Limited
-              and then Named_Unit (Item) = Pack
-            then
-               return True;
-            end if;
+      Item := First (Context_Items (C_Unit));
+      while Present (Item) loop
+         if Nkind (Item) = N_With_Clause
+           and then Limited_Present (Item) = Is_Limited
+           and then Named_Unit (Item) = Pack
+         then
+            return True;
+         end if;
 
-            Next (Item);
-         end loop;
-      end if;
+         Next (Item);
+      end loop;
 
       return False;
    end Has_With_Clause;
@@ -4120,6 +4360,10 @@ package body Sem_Ch10 is
                      Set_Subtype_Indication (Decl,
                        New_Occurrence_Of (Non_Lim_View, Sloc (Def_Id)));
                      Set_Etype (Def_Id, Non_Lim_View);
+                     Reinit_Field_To_Zero (Def_Id, F_Non_Limited_View,
+                       Old_Ekind => (E_Incomplete_Subtype => True,
+                                     others => False));
+                     Reinit_Field_To_Zero (Def_Id, F_Private_Dependents);
                      Mutate_Ekind
                        (Def_Id, Subtype_Kind (Ekind (Non_Lim_View)));
                      Set_Analyzed (Decl, False);
@@ -4162,8 +4406,7 @@ package body Sem_Ch10 is
       end if;
 
       if Ekind (P_Name) = E_Generic_Package
-        and then Nkind (Lib_Unit) not in N_Generic_Subprogram_Declaration
-                                       | N_Generic_Package_Declaration
+        and then Nkind (Lib_Unit) not in N_Generic_Declaration
                                        | N_Generic_Renaming_Declaration
       then
          Error_Msg_N
@@ -4174,7 +4417,7 @@ package body Sem_Ch10 is
            ("parent unit must be package or generic package", Lib_Unit);
          raise Unrecoverable_Error;
 
-      elsif Present (Renamed_Object (P_Name)) then
+      elsif Present (Renamed_Entity (P_Name)) then
          Error_Msg_N ("parent unit cannot be a renaming", Lib_Unit);
          raise Unrecoverable_Error;
 
@@ -4623,9 +4866,9 @@ package body Sem_Ch10 is
                --  Save for subsequent examination of import pragmas.
 
                if Comes_From_Source (Decl)
-                 and then (Nkind (Decl) in N_Subprogram_Declaration
-                                         | N_Subprogram_Renaming_Declaration
-                                         | N_Generic_Subprogram_Declaration)
+                 and then Nkind (Decl) in N_Subprogram_Declaration
+                                        | N_Subprogram_Renaming_Declaration
+                                        | N_Generic_Subprogram_Declaration
                then
                   Append_Elmt (Defining_Entity (Decl), Subp_List);
 
@@ -5036,9 +5279,8 @@ package body Sem_Ch10 is
       --  by the shadow ones.
 
       --  This code must be kept synchronized with the code that replaces the
-      --  shadow entities by the real entities (see body of Remove_Limited
-      --  With_Clause); otherwise the contents of the homonym chains are not
-      --  consistent.
+      --  shadow entities by the real entities in Remove_Limited_With_Unit,
+      --  otherwise the contents of the homonym chains are not consistent.
 
       else
          --  Hide all the type entities of the public part of the package to
@@ -5075,14 +5317,13 @@ package body Sem_Ch10 is
               and then not Is_Child_Unit (Lim_Typ)
             then
                declare
+                  Typ : constant Entity_Id := Non_Limited_View (Lim_Typ);
+
                   Prev : Entity_Id;
 
                begin
-                  Prev := Current_Entity (Lim_Typ);
-                  E := Prev;
-
-                  --  Replace E in the homonyms list, so that the limited view
-                  --  becomes available.
+                  --  Replace Typ by Lim_Typ in the homonyms list, so that the
+                  --  limited view becomes available.
 
                   --  If the nonlimited view is a record with an anonymous
                   --  self-referential component, the analysis of the record
@@ -5091,38 +5332,69 @@ package body Sem_Ch10 is
                   --  entity is now the incomplete type, and that is the one to
                   --  replace in the visibility structure.
 
-                  if E = Non_Limited_View (Lim_Typ)
-                    or else
-                      (Ekind (E) = E_Incomplete_Type
-                        and then Full_View (E) = Non_Limited_View (Lim_Typ))
-                  then
-                     Set_Homonym (Lim_Typ, Homonym (Prev));
-                     Set_Current_Entity (Lim_Typ);
+                  --  Similarly, if the source already contains the incomplete
+                  --  type declaration, the limited view of the incomplete type
+                  --  is in fact never visible (AI05-129) but we have created a
+                  --  shadow entity E1 for it that points to E2, the incomplete
+                  --  type at stake. This in turn has full view E3 that is the
+                  --  full declaration, with a corresponding shadow entity E4.
+                  --  When reinstalling the limited view, the visible entity E2
+                  --  is first replaced with E1, but E4 must eventually become
+                  --  the visible entity as per the AI and thus displace E1, as
+                  --  it is replacing E3 in the homonyms list.
+                  --
+                  --           regular views          limited views
+                  --
+                  --        * E2 (incomplete)   <--    E1 (shadow)
+                  --
+                  --                |
+                  --                V
+                  --
+                  --           E3 (full)        <--    E4 (shadow) *
+                  --
+                  --  [*] denotes the visible entity (Current_Entity)
 
-                  else
-                     loop
-                        E := Homonym (Prev);
+                  Prev := Current_Entity (Lim_Typ);
 
-                        --  E may have been removed when installing a previous
-                        --  limited_with_clause.
+                  while Present (Prev) loop
+                     --  This is a regular replacement
 
-                        exit when No (E);
-                        exit when E = Non_Limited_View (Lim_Typ);
-                        Prev := Homonym (Prev);
-                     end loop;
+                     if Prev = Typ
+                       or else (Ekind (Prev) = E_Incomplete_Type
+                                 and then Full_View (Prev) = Typ)
+                     then
+                        Replace (Prev, Lim_Typ);
 
-                     if Present (E) then
-                        Set_Homonym (Lim_Typ, Homonym (Homonym (Prev)));
-                        Set_Homonym (Prev, Lim_Typ);
+                        if Debug_Flag_I then
+                           Write_Str ("   (homonym) replace ");
+                           Write_Name (Chars (Typ));
+                           Write_Eol;
+                        end if;
+
+                        exit;
+
+                     --  This is where E1 is replaced with E4
+
+                     elsif Ekind (Prev) = E_Incomplete_Type
+                       and then From_Limited_With (Prev)
+                       and then
+                         Ekind (Non_Limited_View (Prev)) = E_Incomplete_Type
+                       and then Full_View (Non_Limited_View (Prev)) = Typ
+                     then
+                        Replace (Prev, Lim_Typ);
+
+                        if Debug_Flag_I then
+                           Write_Str ("   (homonym) E1 -> E4 ");
+                           Write_Name (Chars (Typ));
+                           Write_Eol;
+                        end if;
+
+                        exit;
                      end if;
-                  end if;
-               end;
 
-               if Debug_Flag_I then
-                  Write_Str ("   (homonym) chain ");
-                  Write_Name (Chars (Lim_Typ));
-                  Write_Eol;
-               end if;
+                     Prev := Homonym (Prev);
+                  end loop;
+               end;
             end if;
 
             Next_Entity (Lim_Typ);
@@ -5215,6 +5487,10 @@ package body Sem_Ch10 is
       if Debug_Flag_I then
          if Private_Present (With_Clause) then
             Write_Str ("install private withed unit ");
+         elsif Parent_With (With_Clause) then
+            Write_Str ("install parent withed unit ");
+         elsif Implicit_With (With_Clause) then
+            Write_Str ("install implicit withed unit ");
          else
             Write_Str ("install withed unit ");
          end if;
@@ -5289,7 +5565,7 @@ package body Sem_Ch10 is
             end if;
 
             if Is_Generic_Instance (Uname)
-              and then Ekind (Uname) in Subprogram_Kind
+              and then Is_Subprogram (Uname)
             then
                --  Set flag as well on the visible entity that denotes the
                --  instance, which renames the current one.
@@ -5610,9 +5886,8 @@ package body Sem_Ch10 is
    --  demand, at the point of instantiation (see ch12).
 
    procedure Load_Needed_Body
-     (N          : Node_Id;
-      OK         : out Boolean;
-      Do_Analyze : Boolean := True)
+     (N  : Node_Id;
+      OK : out Boolean)
    is
       Body_Name : Unit_Name_Type;
       Unum      : Unit_Number_Type;
@@ -5646,9 +5921,8 @@ package body Sem_Ch10 is
                Write_Eol;
             end if;
 
-            if Do_Analyze then
-               Semantics (Cunit (Unum));
-            end if;
+            --  We always perform analyses
+            Semantics (Cunit (Unum));
          end if;
 
          OK := True;
@@ -5682,7 +5956,7 @@ package body Sem_Ch10 is
       --  Create a shadow entity that hides Ent and offers an abstract or
       --  incomplete view of Ent. Scop is the proper scope. Flag Is_Tagged
       --  should be set when Ent is a tagged type. The generated entity is
-      --  added to Lim_Header. This routine updates the value of Last_Shadow.
+      --  added to Shadow_Pack. The routine updates the value of Last_Shadow.
 
       procedure Decorate_Package (Ent : Entity_Id; Scop : Entity_Id);
       --  Perform minimal decoration of a package or its corresponding shadow
@@ -5691,17 +5965,6 @@ package body Sem_Ch10 is
       procedure Decorate_State (Ent : Entity_Id; Scop : Entity_Id);
       --  Perform full decoration of an abstract state or its corresponding
       --  shadow entity denoted by Ent. Scop is the proper scope.
-
-      procedure Decorate_Type
-        (Ent         : Entity_Id;
-         Scop        : Entity_Id;
-         Is_Tagged   : Boolean := False;
-         Materialize : Boolean := False);
-      --  Perform minimal decoration of a type or its corresponding shadow
-      --  entity denoted by Ent. Scop is the proper scope. Flag Is_Tagged
-      --  should be set when Ent is a tagged type. Flag Materialize should be
-      --  set when Ent is a tagged type and its class-wide type needs to appear
-      --  in the tree.
 
       procedure Decorate_Variable (Ent : Entity_Id; Scop : Entity_Id);
       --  Perform minimal decoration of a variable denoted by Ent. Scop is the
@@ -5744,7 +6007,8 @@ package body Sem_Ch10 is
             Mutate_Ekind (Shadow, Ekind (Ent));
          end if;
 
-         Set_Is_Internal       (Shadow);
+         Set_Is_Not_Self_Hidden (Shadow);
+         Set_Is_Internal (Shadow);
          Set_From_Limited_With (Shadow);
 
          --  Add the new shadow entity to the limited view of the package
@@ -5762,8 +6026,21 @@ package body Sem_Ch10 is
             Decorate_Package (Shadow, Scop);
 
          elsif Is_Type (Ent) then
-            Decorate_Type        (Shadow, Scop, Is_Tagged);
-            Set_Non_Limited_View (Shadow, Ent);
+            Decorate_Type (Shadow, Scop, Is_Tagged);
+
+            --  If Ent is a private type and we are analyzing the body of its
+            --  scope, its private and full views are swapped and, therefore,
+            --  we need to undo this swapping in order to build the same shadow
+            --  entity as we would have in other contexts.
+
+            if Is_Private_Type (Ent)
+              and then Present (Full_View (Ent))
+              and then In_Package_Body (Scop)
+            then
+               Set_Non_Limited_View (Shadow, Full_View (Ent));
+            else
+               Set_Non_Limited_View (Shadow, Ent);
+            end if;
 
             if Is_Tagged then
                Set_Non_Limited_View
@@ -5798,76 +6075,11 @@ package body Sem_Ch10 is
       procedure Decorate_State (Ent : Entity_Id; Scop : Entity_Id) is
       begin
          Mutate_Ekind            (Ent, E_Abstract_State);
+         Set_Is_Not_Self_Hidden  (Ent);
          Set_Etype               (Ent, Standard_Void_Type);
          Set_Scope               (Ent, Scop);
          Set_Encapsulating_State (Ent, Empty);
       end Decorate_State;
-
-      -------------------
-      -- Decorate_Type --
-      -------------------
-
-      procedure Decorate_Type
-        (Ent         : Entity_Id;
-         Scop        : Entity_Id;
-         Is_Tagged   : Boolean := False;
-         Materialize : Boolean := False)
-      is
-         CW_Typ : Entity_Id;
-
-      begin
-         --  An unanalyzed type or a shadow entity of a type is treated as an
-         --  incomplete type, and carries the corresponding attributes.
-
-         Mutate_Ekind           (Ent, E_Incomplete_Type);
-         Set_Etype              (Ent, Ent);
-         Set_Full_View          (Ent, Empty);
-         Set_Is_First_Subtype   (Ent);
-         Set_Scope              (Ent, Scop);
-         Set_Stored_Constraint  (Ent, No_Elist);
-         Reinit_Size_Align      (Ent);
-
-         if From_Limited_With (Ent) then
-            Set_Private_Dependents (Ent, New_Elmt_List);
-         end if;
-
-         --  A tagged type and its corresponding shadow entity share one common
-         --  class-wide type. The list of primitive operations for the shadow
-         --  entity is empty.
-
-         if Is_Tagged then
-            Set_Is_Tagged_Type (Ent);
-            Set_Direct_Primitive_Operations (Ent, New_Elmt_List);
-
-            CW_Typ :=
-              New_External_Entity
-                (E_Void, Scope (Ent), Sloc (Ent), Ent, 'C', 0, 'T');
-
-            Set_Class_Wide_Type (Ent, CW_Typ);
-
-            --  Set parent to be the same as the parent of the tagged type.
-            --  We need a parent field set, and it is supposed to point to
-            --  the declaration of the type. The tagged type declaration
-            --  essentially declares two separate types, the tagged type
-            --  itself and the corresponding class-wide type, so it is
-            --  reasonable for the parent fields to point to the declaration
-            --  in both cases.
-
-            Set_Parent (CW_Typ, Parent (Ent));
-
-            Mutate_Ekind                  (CW_Typ, E_Class_Wide_Type);
-            Set_Class_Wide_Type           (CW_Typ, CW_Typ);
-            Set_Etype                     (CW_Typ, Ent);
-            Set_Equivalent_Type           (CW_Typ, Empty);
-            Set_From_Limited_With         (CW_Typ, From_Limited_With (Ent));
-            Set_Has_Unknown_Discriminants (CW_Typ);
-            Set_Is_First_Subtype          (CW_Typ);
-            Set_Is_Tagged_Type            (CW_Typ);
-            Set_Materialize_Entity        (CW_Typ, Materialize);
-            Set_Scope                     (CW_Typ, Scop);
-            Reinit_Size_Align             (CW_Typ);
-         end if;
-      end Decorate_Type;
 
       -----------------------
       -- Decorate_Variable --
@@ -6195,9 +6407,7 @@ package body Sem_Ch10 is
               ("subprogram not allowed in `LIMITED WITH` clause", N);
             return;
 
-         when N_Generic_Package_Declaration
-            | N_Generic_Subprogram_Declaration
-         =>
+         when N_Generic_Declaration =>
             Error_Msg_N ("generic not allowed in `LIMITED WITH` clause", N);
             return;
 
@@ -6226,11 +6436,12 @@ package body Sem_Ch10 is
             raise Program_Error;
       end case;
 
-      --  The withed unit may not be analyzed, but the with calause itself
+      --  The withed unit may not be analyzed, but the with clause itself
       --  must be minimally decorated. This ensures that the checks on unused
       --  with clauses also process limieted withs.
 
       Mutate_Ekind (Pack, E_Package);
+      Set_Is_Not_Self_Hidden (Pack);
       Set_Etype (Pack, Standard_Void_Type);
 
       if Is_Entity_Name (Nam) then
@@ -6596,6 +6807,10 @@ package body Sem_Ch10 is
       -- Remove_Shadow_Entities_With_Restore --
       -----------------------------------------
 
+      --  This code must be kept synchronized with the code that replaces the
+      --  real entities by the shadow entities in Install_Limited_With_Clause,
+      --  otherwise the contents of the homonym chains are not consistent.
+
       procedure Remove_Shadow_Entities_With_Restore (Pack_Id : Entity_Id) is
          procedure Restore_Chain_For_Shadow (Shadow : Entity_Id);
          --  Remove shadow entity Shadow by updating the entity and homonym
@@ -6618,49 +6833,68 @@ package body Sem_Ch10 is
          ------------------------------
 
          procedure Restore_Chain_For_Shadow (Shadow : Entity_Id) is
-            Prev : Entity_Id;
-            Typ  : Entity_Id;
+            Typ : constant Entity_Id := Non_Limited_View (Shadow);
+            pragma Assert (not In_Chain (Typ));
+
+            Prev  : Entity_Id;
 
          begin
             --  If the package has incomplete types, the limited view of the
             --  incomplete type is in fact never visible (AI05-129) but we
             --  have created a shadow entity E1 for it, that points to E2,
-            --  a nonlimited incomplete type. This in turn has a full view
-            --  E3 that is the full declaration. There is a corresponding
+            --  the incomplete type at stake. This in turn has a full view
+            --  E3 that is the full declaration, with a corresponding
             --  shadow entity E4. When reinstalling the nonlimited view,
-            --  E2 must become the current entity and E3 must be ignored.
-
-            Typ := Non_Limited_View (Shadow);
-
-            --  Shadow is the limited view of a full type declaration that has
-            --  a previous incomplete declaration, i.e. E3 from the previous
-            --  description. Nothing to insert.
-
-            if Present (Current_Entity (Typ))
-              and then Ekind (Current_Entity (Typ)) = E_Incomplete_Type
-              and then Full_View (Current_Entity (Typ)) = Typ
-            then
-               return;
-            end if;
-
-            pragma Assert (not In_Chain (Typ));
+            --  the visible entity E4 is replaced directly with E2 in the
+            --  the homonyms list and E3 is simply ignored.
+            --
+            --           regular views          limited views
+            --
+            --        * E2 (incomplete)   <--    E1 (shadow)
+            --
+            --                |
+            --                V
+            --
+            --           E3 (full)        <--    E4 (shadow) *
+            --
+            --  [*] denotes the visible entity (Current_Entity)
 
             Prev := Current_Entity (Shadow);
 
-            if Prev = Shadow then
-               Set_Current_Entity (Typ);
+            while Present (Prev) loop
+               --  This is a regular replacement
 
-            else
-               while Present (Prev) and then Homonym (Prev) /= Shadow loop
-                  Prev := Homonym (Prev);
-               end loop;
+               if Prev = Shadow then
+                  Replace (Prev, Typ);
 
-               if Present (Prev) then
-                  Set_Homonym (Prev, Typ);
+                  if Debug_Flag_I then
+                     Write_Str ("   (homonym) replace ");
+                     Write_Name (Chars (Typ));
+                     Write_Eol;
+                  end if;
+
+                  exit;
+
+               --  This is where E4 is replaced with E2
+
+               elsif Ekind (Prev) = E_Incomplete_Type
+                 and then From_Limited_With (Prev)
+                 and then Ekind (Typ) = E_Incomplete_Type
+                 and then Full_View (Typ) = Non_Limited_View (Prev)
+               then
+                  Replace (Prev, Typ);
+
+                  if Debug_Flag_I then
+                     Write_Str ("   (homonym) E4 -> E2 ");
+                     Write_Name (Chars (Typ));
+                     Write_Eol;
+                  end if;
+
+                  exit;
                end if;
-            end if;
 
-            Set_Homonym (Typ, Homonym (Shadow));
+               Prev := Homonym (Prev);
+            end loop;
          end Restore_Chain_For_Shadow;
 
          --------------------
@@ -6778,9 +7012,6 @@ package body Sem_Ch10 is
       --  its shadow entities must be replaced by the real entities they hide
       --  and the previously hidden entities must be entered back into direct
       --  visibility.
-
-      --  WARNING: This code must be kept synchronized with that of routine
-      --  Install_Limited_Withed_Clause.
 
       if Analyzed (Pack_Decl) then
          Remove_Shadow_Entities_With_Restore (Pack_Id);
@@ -6964,6 +7195,35 @@ package body Sem_Ch10 is
    begin
       null;
    end sm;
+
+   -------------
+   -- Replace --
+   -------------
+
+   procedure Replace (Old_E, New_E : Entity_Id) is
+      Prev : Entity_Id;
+
+   begin
+      Prev := Current_Entity (Old_E);
+
+      if No (Prev) then
+         return;
+
+      elsif Prev = Old_E then
+         Set_Current_Entity (New_E);
+         Set_Homonym (New_E, Homonym (Old_E));
+
+      else
+         while Present (Prev) and then Homonym (Prev) /= Old_E loop
+            Prev := Homonym (Prev);
+         end loop;
+
+         if Present (Prev) then
+            Set_Homonym (Prev, New_E);
+            Set_Homonym (New_E, Homonym (Old_E));
+         end if;
+      end if;
+   end Replace;
 
    -------------
    -- Unchain --

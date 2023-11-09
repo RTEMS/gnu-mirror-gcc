@@ -1,8 +1,12 @@
 /*
 TEST_OUTPUT:
 ---
-fail_compilation/fail18970.d(22): Error: no property `y` for type `S`
-fail_compilation/fail18970.d(29): Error: no property `yyy` for type `S2`
+fail_compilation/fail18970.d(26): Error: no property `y` for `S()` of type `fail18970.S`
+fail_compilation/fail18970.d(26):        potentially malformed `opDispatch`. Use an explicit instantiation to get a better error message
+fail_compilation/fail18970.d(15):        struct `S` defined here
+fail_compilation/fail18970.d(33): Error: no property `yyy` for `this` of type `fail18970.S2`
+fail_compilation/fail18970.d(33):        potentially malformed `opDispatch`. Use an explicit instantiation to get a better error message
+fail_compilation/fail18970.d(29):        struct `S2` defined here
 ---
 */
 

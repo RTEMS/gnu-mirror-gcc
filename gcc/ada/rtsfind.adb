@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -564,8 +564,12 @@ package body Rtsfind is
      Ada_Interrupts_Names .. Ada_Interrupts_Names;
 
    subtype Ada_Numerics_Descendant is Ada_Descendant
-     range Ada_Numerics_Generic_Elementary_Functions ..
-           Ada_Numerics_Generic_Elementary_Functions;
+     range Ada_Numerics_Big_Numbers ..
+           Ada_Numerics_Big_Numbers_Big_Integers_Ghost;
+
+   subtype Ada_Numerics_Big_Numbers_Descendant is Ada_Descendant
+     range Ada_Numerics_Big_Numbers_Big_Integers ..
+           Ada_Numerics_Big_Numbers_Big_Integers_Ghost;
 
    subtype Ada_Real_Time_Descendant is Ada_Descendant
      range Ada_Real_Time_Delays .. Ada_Real_Time_Timing_Events;
@@ -656,6 +660,10 @@ package body Rtsfind is
 
          elsif U_Id in Ada_Numerics_Descendant then
             Name_Buffer (13) := '.';
+
+            if U_Id in Ada_Numerics_Big_Numbers_Descendant then
+               Name_Buffer (25) := '.';
+            end if;
 
          elsif U_Id in Ada_Real_Time_Descendant then
             Name_Buffer (14) := '.';
@@ -1015,6 +1023,13 @@ package body Rtsfind is
       U        : RT_Unit_Table_Record renames RT_Unit_Table (U_Id);
       Priv_Par : constant Elist_Id := New_Elmt_List;
       Lib_Unit : Node_Id;
+      Saved_GM  : constant Ghost_Mode_Type := Ghost_Mode;
+      Saved_IGR : constant Node_Id         := Ignored_Ghost_Region;
+      Saved_ISMP : constant Boolean        :=
+                     Ignore_SPARK_Mode_Pragmas_In_Instance;
+      Saved_SM  : constant SPARK_Mode_Type := SPARK_Mode;
+      Saved_SMP : constant Node_Id         := SPARK_Mode_Pragma;
+      --  Save Ghost and SPARK mode-related data to restore on exit
 
       procedure Save_Private_Visibility;
       --  If the current unit is the body of child unit or the spec of a
@@ -1025,6 +1040,9 @@ package body Rtsfind is
 
       procedure Restore_Private_Visibility;
       --  Restore the visibility of ancestors after compiling RTU
+
+      procedure Restore_SPARK_Context;
+      --  Restore Ghost and SPARK mode-related data saved on procedure entry
 
       --------------------------------
       -- Restore_Private_Visibility --
@@ -1067,15 +1085,16 @@ package body Rtsfind is
          end loop;
       end Save_Private_Visibility;
 
-      --  Local variables
+      ---------------------------
+      -- Restore_SPARK_Context --
+      ---------------------------
 
-      Saved_GM  : constant Ghost_Mode_Type := Ghost_Mode;
-      Saved_IGR : constant Node_Id         := Ignored_Ghost_Region;
-      Saved_ISMP : constant Boolean        :=
-                     Ignore_SPARK_Mode_Pragmas_In_Instance;
-      Saved_SM  : constant SPARK_Mode_Type := SPARK_Mode;
-      Saved_SMP : constant Node_Id         := SPARK_Mode_Pragma;
-      --  Save Ghost and SPARK mode-related data to restore on exit
+      procedure Restore_SPARK_Context is
+      begin
+         Ignore_SPARK_Mode_Pragmas_In_Instance := Saved_ISMP;
+         Restore_Ghost_Region (Saved_GM, Saved_IGR);
+         Restore_SPARK_Mode   (Saved_SM, Saved_SMP);
+      end Restore_SPARK_Context;
 
    --  Start of processing for Load_RTU
 
@@ -1187,9 +1206,17 @@ package body Rtsfind is
          Set_Is_Potentially_Use_Visible (U.Entity, True);
       end if;
 
-      Ignore_SPARK_Mode_Pragmas_In_Instance := Saved_ISMP;
-      Restore_Ghost_Region (Saved_GM, Saved_IGR);
-      Restore_SPARK_Mode   (Saved_SM, Saved_SMP);
+      Restore_SPARK_Context;
+
+   exception
+      --  The Load_Fail procedure that is called when the result of Load_Unit
+      --  is not satisfactory raises an exception. As the compiler is able to
+      --  recover in some cases (i.e. when RE_Not_Available is raised), we need
+      --  to restore the SPARK/Ghost context correctly.
+
+      when others =>
+         Restore_SPARK_Context;
+         raise;
    end Load_RTU;
 
    --------------------
@@ -1248,9 +1275,10 @@ package body Rtsfind is
       --  for this unit to the current compilation unit.
 
       declare
-         LibUnit : constant Node_Id := Unit (Cunit (U.Unum));
-         Clause  : Node_Id;
-         Withn   : Node_Id;
+         LibUnit  : constant Node_Id         := Unit (Cunit (U.Unum));
+         Saved_GM : constant Ghost_Mode_Type := Ghost_Mode;
+         Clause   : Node_Id;
+         Withn    : Node_Id;
 
       begin
          Clause := U.First_Implicit_With;
@@ -1262,11 +1290,18 @@ package body Rtsfind is
             Clause := Next_Implicit_With (Clause);
          end loop;
 
+         --  We want to make sure that the "with" we create below isn't
+         --  marked as ignored ghost code because this list may be walked
+         --  later, after ignored ghost code is converted to a null
+         --  statement.
+
+         Ghost_Mode := None;
          Withn :=
            Make_With_Clause (Standard_Location,
              Name =>
                Make_Unit_Name
                  (U, Defining_Unit_Name (Specification (LibUnit))));
+         Ghost_Mode := Saved_GM;
 
          Set_Corresponding_Spec  (Withn, U.Entity);
          Set_First_Name          (Withn);
@@ -1652,7 +1687,7 @@ package body Rtsfind is
 
       --  Load unit if unit not previously loaded
 
-      if not Present (U.Entity) then
+      if No (U.Entity) then
          Load_RTU (U_Id, Id => E);
       end if;
 
@@ -1671,7 +1706,7 @@ package body Rtsfind is
             E1 := First_Entity (Pkg_Ent);
             while Present (E1) loop
                if Ename = Chars (E1) then
-                  pragma Assert (not Present (Found_E));
+                  pragma Assert (No (Found_E));
                   Found_E := E1;
                end if;
 

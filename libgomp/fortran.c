@@ -1,4 +1,4 @@
-/* Copyright (C) 2005-2021 Free Software Foundation, Inc.
+/* Copyright (C) 2005-2023 Free Software Foundation, Inc.
    Contributed by Jakub Jelinek <jakub@redhat.com>.
 
    This file is part of the GNU Offloading and Multi Processing Library
@@ -67,11 +67,16 @@ ialias_redirect (omp_get_thread_limit)
 ialias_redirect (omp_set_max_active_levels)
 ialias_redirect (omp_get_max_active_levels)
 ialias_redirect (omp_get_supported_active_levels)
+ialias_redirect (omp_set_num_teams)
+ialias_redirect (omp_get_max_teams)
+ialias_redirect (omp_set_teams_thread_limit)
+ialias_redirect (omp_get_teams_thread_limit)
 ialias_redirect (omp_get_level)
 ialias_redirect (omp_get_ancestor_thread_num)
 ialias_redirect (omp_get_team_size)
 ialias_redirect (omp_get_active_level)
 ialias_redirect (omp_in_final)
+ialias_redirect (omp_in_explicit_task)
 ialias_redirect (omp_get_cancellation)
 ialias_redirect (omp_get_proc_bind)
 ialias_redirect (omp_get_num_places)
@@ -476,6 +481,48 @@ int32_t
 omp_in_final_ (void)
 {
   return omp_in_final ();
+}
+
+int32_t
+omp_in_explicit_task_ (void)
+{
+  return omp_in_explicit_task ();
+}
+
+void
+omp_set_num_teams_ (const int32_t *num_teams)
+{
+  omp_set_num_teams (*num_teams);
+}
+
+void
+omp_set_num_teams_8_ (const int64_t *num_teams)
+{
+  omp_set_num_teams (TO_INT (*num_teams));
+}
+
+int32_t
+omp_get_max_teams_ (void)
+{
+  return omp_get_max_teams ();
+}
+
+void
+omp_set_teams_thread_limit_ (const int32_t *thread_limit)
+{
+  omp_set_teams_thread_limit (*thread_limit);
+}
+
+void
+omp_set_teams_thread_limit_8_ (const int64_t *thread_limit)
+{
+  omp_set_teams_thread_limit (TO_INT (*thread_limit));
+}
+
+int32_t
+omp_get_teams_thread_limit_ (void)
+{
+  return omp_get_teams_thread_limit ();
 }
 
 int32_t

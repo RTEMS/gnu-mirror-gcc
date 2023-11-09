@@ -1,6 +1,6 @@
 /* Definitions of target machine for GNU compiler,
    for 64 bit PowerPC linux.
-   Copyright (C) 2000-2021 Free Software Foundation, Inc.
+   Copyright (C) 2000-2023 Free Software Foundation, Inc.
 
    This file is part of GCC.
 
@@ -224,9 +224,7 @@ extern int dot_symbols;
 #undef  ROUND_TYPE_ALIGN
 #define ROUND_TYPE_ALIGN(STRUCT, COMPUTED, SPECIFIED)			\
   ((TARGET_64BIT							\
-    && (TREE_CODE (STRUCT) == RECORD_TYPE				\
-	|| TREE_CODE (STRUCT) == UNION_TYPE				\
-	|| TREE_CODE (STRUCT) == QUAL_UNION_TYPE)			\
+    && RECORD_OR_UNION_TYPE_P (STRUCT)			\
     && TARGET_ALIGN_NATURAL == 0)					\
    ? rs6000_special_round_type_align (STRUCT, COMPUTED, SPECIFIED)	\
    : MAX ((COMPUTED), (SPECIFIED)))
@@ -265,23 +263,31 @@ extern int dot_symbols;
 #define OS_MISSING_POWERPC64 !TARGET_64BIT
 
 #ifdef SINGLE_LIBC
-#define OPTION_GLIBC  (DEFAULT_LIBC == LIBC_GLIBC)
-#define OPTION_UCLIBC (DEFAULT_LIBC == LIBC_UCLIBC)
-#define OPTION_BIONIC (DEFAULT_LIBC == LIBC_BIONIC)
-#undef OPTION_MUSL
-#define OPTION_MUSL   (DEFAULT_LIBC == LIBC_MUSL)
+#define OPTION_GLIBC_P(opts)	(DEFAULT_LIBC == LIBC_GLIBC)
+#define OPTION_UCLIBC_P(opts)	(DEFAULT_LIBC == LIBC_UCLIBC)
+#define OPTION_BIONIC_P(opts)	(DEFAULT_LIBC == LIBC_BIONIC)
+#undef OPTION_MUSL_P
+#define OPTION_MUSL_P(opts)	(DEFAULT_LIBC == LIBC_MUSL)
 #else
-#define OPTION_GLIBC  (linux_libc == LIBC_GLIBC)
-#define OPTION_UCLIBC (linux_libc == LIBC_UCLIBC)
-#define OPTION_BIONIC (linux_libc == LIBC_BIONIC)
-#undef OPTION_MUSL
-#define OPTION_MUSL   (linux_libc == LIBC_MUSL)
+#define OPTION_GLIBC_P(opts)	((opts)->x_linux_libc == LIBC_GLIBC)
+#define OPTION_UCLIBC_P(opts)	((opts)->x_linux_libc == LIBC_UCLIBC)
+#define OPTION_BIONIC_P(opts)	((opts)->x_linux_libc == LIBC_BIONIC)
+#undef OPTION_MUSL_P
+#define OPTION_MUSL_P(opts)	((opts)->x_linux_libc == LIBC_MUSL)
 #endif
+#define OPTION_GLIBC		OPTION_GLIBC_P (&global_options)
+#define OPTION_UCLIBC		OPTION_UCLIBC_P (&global_options)
+#define OPTION_BIONIC		OPTION_BIONIC_P (&global_options)
+#undef OPTION_MUSL
+#define OPTION_MUSL		OPTION_MUSL_P (&global_options)
 
 /* Determine what functions are present at the runtime;
    this includes full c99 runtime and sincos.  */
 #undef TARGET_LIBC_HAS_FUNCTION
 #define TARGET_LIBC_HAS_FUNCTION linux_libc_has_function
+
+#undef TARGET_LIBM_FUNCTION_MAX_ERROR
+#define TARGET_LIBM_FUNCTION_MAX_ERROR rs6000_linux_libm_function_max_error
 
 #undef  TARGET_OS_CPP_BUILTINS
 #define TARGET_OS_CPP_BUILTINS()			\

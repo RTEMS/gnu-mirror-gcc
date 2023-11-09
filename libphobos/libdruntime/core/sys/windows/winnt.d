@@ -4,11 +4,10 @@
  * Translated from MinGW API for MS-Windows 3.12
  *
  * License: $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
- * Source: $(DRUNTIMESRC src/core/sys/windows/_winnt.d)
+ * Source: $(DRUNTIMESRC core/sys/windows/_winnt.d)
  */
 module core.sys.windows.winnt;
 version (Windows):
-@system:
 
 version (ANSI) {} else version = Unicode;
 
@@ -1200,7 +1199,7 @@ enum size_t
 
 PIMAGE_SECTION_HEADER IMAGE_FIRST_SECTION(PIMAGE_NT_HEADERS h) {
     return cast(PIMAGE_SECTION_HEADER)
-        (&h.OptionalHeader + h.FileHeader.SizeOfOptionalHeader);
+        (cast(ubyte*) &h.OptionalHeader + h.FileHeader.SizeOfOptionalHeader);
 }
 
 // ImageDirectoryEntryToDataEx()

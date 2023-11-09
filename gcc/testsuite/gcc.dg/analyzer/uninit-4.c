@@ -14,7 +14,7 @@ struct foo
 struct foo *__attribute__((noinline))
 alloc_foo (int a, int b)
 {
-  struct foo *p = malloc (sizeof (struct foo));
+  struct foo *p = malloc (sizeof (struct foo)); /* { dg-message "region created on heap here" } */
   if (!p)
     return NULL;
   p->i = a;
@@ -22,7 +22,7 @@ alloc_foo (int a, int b)
   return p;
 }
 
-void test (int x, int y, int z)
+void test_access_inited_fields (int x, int y, int z)
 {
   struct foo *p = alloc_foo (x, z);
   if (!p)
@@ -30,10 +30,20 @@ void test (int x, int y, int z)
 
   __analyzer_eval (p->i == x); /* { dg-warning "TRUE" } */
 
-  __analyzer_eval (p->j == y); /* { dg-warning "UNKNOWN" "unknown" } */
-  /* { dg-warning "use of uninitialized value '\\*p\\.j'" "uninit" { target *-*-* } .-1 } */
-
   __analyzer_eval (p->k == z); /* { dg-warning "TRUE" } */
   
   free (p);
+}
+
+void test_stop_after_accessing_uninit (int x, int y, int z)
+{
+  struct foo *p = alloc_foo (x, z);
+  if (!p)
+    return;
+
+  __analyzer_eval (p->i == x); /* { dg-warning "TRUE" } */
+
+  __analyzer_eval (p->j == y); /* { dg-warning "use of uninitialized value '\\*p\\.j'" } */
+
+  __analyzer_dump_path (); /* { dg-bogus "path" } */
 }

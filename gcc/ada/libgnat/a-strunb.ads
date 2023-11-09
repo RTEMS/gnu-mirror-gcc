@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- This specification is derived from the Ada Reference Manual for use with --
 -- GNAT. The copyright notice above, and the license provisions that follow --
@@ -54,7 +54,8 @@ private with Ada.Strings.Text_Buffers;
 
 package Ada.Strings.Unbounded with
   SPARK_Mode,
-  Initial_Condition => Length (Null_Unbounded_String) = 0
+  Initial_Condition => Length (Null_Unbounded_String) = 0,
+  Always_Terminates
 is
    pragma Preelaborate;
 
@@ -85,21 +86,22 @@ is
    function To_Unbounded_String
      (Source : String)  return Unbounded_String
    with
-     Post   => Length (To_Unbounded_String'Result) = Source'Length,
+     Post   => To_String (To_Unbounded_String'Result) = Source,
      Global => null;
    --  Returns an Unbounded_String that represents Source
 
    function To_Unbounded_String
      (Length : Natural) return Unbounded_String
    with
-     Post   =>
-       Ada.Strings.Unbounded.Length (To_Unbounded_String'Result) = Length,
-     Global => null;
+     SPARK_Mode => Off,
+     Global     => null;
    --  Returns an Unbounded_String that represents an uninitialized String
    --  whose length is Length.
 
    function To_String (Source : Unbounded_String) return String with
-     Post   => To_String'Result'Length = Length (Source),
+     Post   =>
+       To_String'Result'First = 1
+         and then To_String'Result'Length = Length (Source),
      Global => null;
    --  Returns the String with lower bound 1 represented by Source
 
@@ -114,6 +116,7 @@ is
      (Target : out Unbounded_String;
       Source : String)
    with
+     Post   => To_String (Target) = Source,
      Global => null;
    pragma Ada_05 (Set_Unbounded_String);
    --  Sets Target to an Unbounded_String that represents Source
@@ -197,6 +200,7 @@ is
       Index  : Positive) return Character
    with
      Pre    => Index <= Length (Source),
+     Post   => Element'Result = To_String (Source) (Index),
      Global => null;
    --  Returns the character at position Index in the string represented by
    --  Source; propagates Index_Error if Index > Length (Source).
@@ -258,18 +262,21 @@ is
      (Left  : Unbounded_String;
       Right : Unbounded_String) return Boolean
    with
+     Post   => "="'Result = (To_String (Left) = To_String (Right)),
      Global => null;
 
    function "="
      (Left  : Unbounded_String;
       Right : String) return Boolean
    with
+     Post   => "="'Result = (To_String (Left) = Right),
      Global => null;
 
    function "="
      (Left  : String;
       Right : Unbounded_String) return Boolean
    with
+     Post   => "="'Result = (Left = To_String (Right)),
      Global => null;
 
    function "<"
@@ -746,8 +753,8 @@ private
      renames To_Unbounded_String;
 
    type Unbounded_String is new AF.Controlled with record
-      Reference : String_Access := Null_String'Access;
-      Last      : Natural       := 0;
+      Reference : not null String_Access := Null_String'Access;
+      Last      : Natural                := 0;
    end record with Put_Image => Put_Image;
 
    procedure Put_Image

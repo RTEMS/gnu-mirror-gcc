@@ -1,5 +1,5 @@
 /* { dg-do compile { target { riscv64*-*-* } } } */
-/* { dg-options "-march=rv64gc -mabi=lp64 -O2" } */
+/* { dg-options "-march=rv64gc -mabi=lp64" } */
 
 /* Test for riscv_extend_comparands patch.  */
 extern void asdf(int);
@@ -12,4 +12,4 @@ void foo(signed char x) {
   case 4: asdf(14); break;
   }
 }
-/* { dg-final { scan-assembler-not "andi" } } */
+/* { dg-final { scan-assembler-not {\mandi} } } */

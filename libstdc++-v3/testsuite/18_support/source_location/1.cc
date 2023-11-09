@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2021 Free Software Foundation, Inc.
+// Copyright (C) 2020-2023 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -18,8 +18,8 @@
 // Example from C++ Standard Working Draft N4842, November 2019 Mailing
 // Adapted for testing.
 
-// { dg-options "-std=gnu++2a -include string -include stdexcept" }
-// { dg-do run { target c++2a } }
+// { dg-options "-include string -include stdexcept" }
+// { dg-do run { target c++20 } }
 
 #include <source_location>
 

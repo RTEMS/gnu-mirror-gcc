@@ -1,5 +1,5 @@
 /* Local Register Allocator (LRA) intercommunication header file.
-   Copyright (C) 2010-2021 Free Software Foundation, Inc.
+   Copyright (C) 2010-2023 Free Software Foundation, Inc.
    Contributed by Vladimir Makarov <vmakarov@redhat.com>.
 
 This file is part of GCC.
@@ -73,6 +73,9 @@ public:
   /* The following fields are defined only for pseudos.	 */
   /* Hard registers with which the pseudo conflicts.  */
   HARD_REG_SET conflict_hard_regs;
+  /* Pseudo allocno class hard registers which cannot be a start hard register
+     of the pseudo.  */
+  HARD_REG_SET exclude_start_hard_regs;
   /* We assign hard registers to reload pseudos which can occur in few
      places.  So two hard register preferences are enough for them.
      The following fields define the preferred hard registers.	If
@@ -100,14 +103,14 @@ public:
   int val;
   /* Offset from relative eliminate register to pesudo reg.  */
   poly_int64 offset;
-  /* These members are set up in lra-lives.c and updated in
-     lra-coalesce.c.  */
+  /* These members are set up in lra-lives.cc and updated in
+     lra-coalesce.cc.  */
   /* The biggest size mode in which each pseudo reg is referred in
      whole function (possibly via subreg).  */
   machine_mode biggest_mode;
   /* Live ranges of the pseudo.	 */
   lra_live_range_t live_ranges;
-  /* This member is set up in lra-lives.c for subsequent
+  /* This member is set up in lra-lives.cc for subsequent
      assignments.  */
   lra_copy_t copies;
 };
@@ -119,7 +122,7 @@ extern HARD_REG_SET hard_regs_spilled_into;
 
 /* Static info about each insn operand (common for all insns with the
    same ICODE).	 Warning: if the structure definition is changed, the
-   initializer for debug_operand_data in lra.c should be changed
+   initializer for debug_operand_data in lra.cc should be changed
    too.	 */
 struct lra_operand_data
 {
@@ -164,7 +167,7 @@ struct lra_insn_reg
    internal insn info. It exists in at most one exemplar for each
    non-negative ICODE. There is only one exception. Each asm insn has
    own structure.  Warning: if the structure definition is changed,
-   the initializer for debug_insn_static_data in lra.c should be
+   the initializer for debug_insn_static_data in lra.cc should be
    changed too.  */
 struct lra_static_insn_data
 {
@@ -206,6 +209,9 @@ public:
      debug insn.  LRA_NON_CLOBBERED_ALT means ignoring any earlier
      clobbers for the insn.  */
   int used_insn_alternative;
+  /* Defined for asm insn and it is how many times we already generated reloads
+     for the asm insn.  */
+  int asm_reloads_num;
   /* SP offset before the insn relative to one at the func start.  */
   poly_int64 sp_offset;
   /* The insn itself.  */
@@ -269,7 +275,7 @@ typedef class lra_insn_recog_data *lra_insn_recog_data_t;
 #error wrong LRA_MAX_REMATERIALIZATION_PASSES value
 #endif
 
-/* lra.c: */
+/* lra.cc: */
 
 extern FILE *lra_dump_file;
 
@@ -292,8 +298,11 @@ extern void lra_push_insn_and_update_insn_regno_info (rtx_insn *);
 extern rtx_insn *lra_pop_insn (void);
 extern unsigned int lra_insn_stack_length (void);
 
+extern rtx lra_create_new_reg (machine_mode, rtx, enum reg_class, HARD_REG_SET *,
+			       const char *);
 extern rtx lra_create_new_reg_with_unique_value (machine_mode, rtx,
-						 enum reg_class, const char *);
+						 enum reg_class, HARD_REG_SET *,
+						 const char *);
 extern void lra_set_regno_unique_value (int);
 extern void lra_invalidate_insn_data (rtx_insn *);
 extern void lra_set_insn_deleted (rtx_insn *);
@@ -301,6 +310,7 @@ extern void lra_delete_dead_insn (rtx_insn *);
 extern void lra_emit_add (rtx, rtx, rtx);
 extern void lra_emit_move (rtx, rtx);
 extern void lra_update_dups (lra_insn_recog_data_t, signed char *);
+extern void lra_asm_insn_error (rtx_insn *insn);
 
 extern void lra_process_new_insns (rtx_insn *, rtx_insn *, rtx_insn *,
 				   const char *);
@@ -330,7 +340,7 @@ extern bitmap_head lra_split_regs;
 extern bitmap_head lra_subreg_reload_pseudos;
 extern bitmap_head lra_optional_reload_pseudos;
 
-/* lra-constraints.c: */
+/* lra-constraints.cc: */
 
 extern void lra_init_equiv (void);
 extern int lra_constraint_offset (int, machine_mode);
@@ -347,7 +357,7 @@ extern bool spill_hard_reg_in_range (int, enum reg_class, rtx_insn *, rtx_insn *
 extern void lra_inheritance (void);
 extern bool lra_undo_inheritance (void);
 
-/* lra-lives.c: */
+/* lra-lives.cc: */
 
 extern int lra_live_max_point;
 extern int *lra_point_freq;
@@ -372,7 +382,7 @@ extern void lra_live_ranges_init (void);
 extern void lra_live_ranges_finish (void);
 extern void lra_setup_reload_pseudo_preferenced_hard_reg (int, int, int);
 
-/* lra-assigns.c: */
+/* lra-assigns.cc: */
 
 extern int lra_assignment_iter;
 extern int lra_assignment_iter_after_spill;
@@ -380,19 +390,19 @@ extern void lra_setup_reg_renumber (int, int, bool);
 extern bool lra_assign (bool &);
 extern bool lra_split_hard_reg_for (void);
 
-/* lra-coalesce.c: */
+/* lra-coalesce.cc: */
 
 extern int lra_coalesce_iter;
 extern bool lra_coalesce (void);
 
-/* lra-spills.c:  */
+/* lra-spills.cc:  */
 
 extern bool lra_need_for_scratch_reg_p (void);
 extern bool lra_need_for_spills_p (void);
 extern void lra_spill (void);
 extern void lra_final_code_change (void);
 
-/* lra-remat.c:  */
+/* lra-remat.cc:  */
 
 extern int lra_rematerialization_iter;
 extern bool lra_remat (void);
@@ -404,8 +414,10 @@ extern int lra_get_elimination_hard_regno (int);
 extern rtx lra_eliminate_regs_1 (rtx_insn *, rtx, machine_mode,
 				 bool, bool, poly_int64, bool);
 extern void eliminate_regs_in_insn (rtx_insn *insn, bool, bool, poly_int64);
+extern int lra_update_fp2sp_elimination (int *spilled_pseudos);
 extern void lra_eliminate (bool, bool);
 
+extern poly_int64 lra_update_sp_offset (rtx, poly_int64);
 extern void lra_eliminate_reg_if_possible (rtx *);
 
 
@@ -413,7 +425,7 @@ extern void lra_eliminate_reg_if_possible (rtx *);
 /* Return the hard register which given pseudo REGNO assigned to.
    Negative value means that the register got memory or we don't know
    allocation yet.  */
-static inline int
+inline int
 lra_get_regno_hard_regno (int regno)
 {
   resize_reg_info ();
@@ -422,7 +434,7 @@ lra_get_regno_hard_regno (int regno)
 
 /* Change class of pseudo REGNO to NEW_CLASS.  Print info about it
    using TITLE.  Output a new line if NL_P.  */
-static void inline
+inline void
 lra_change_class (int regno, enum reg_class new_class,
 		  const char *title, bool nl_p)
 {
@@ -437,7 +449,7 @@ lra_change_class (int regno, enum reg_class new_class,
 
 /* Update insn operands which are duplication of NOP operand.  The
    insn is represented by its LRA internal representation ID.  */
-static inline void
+inline void
 lra_update_dup (lra_insn_recog_data_t id, int nop)
 {
   int i;
@@ -452,7 +464,7 @@ lra_update_dup (lra_insn_recog_data_t id, int nop)
    operands processing.	 Generally speaking, we could do this probably
    simultaneously with operands processing because a common practice
    is to enumerate the operators after their operands.	*/
-static inline void
+inline void
 lra_update_operator_dups (lra_insn_recog_data_t id)
 {
   int i;
@@ -468,7 +480,7 @@ lra_update_operator_dups (lra_insn_recog_data_t id)
 }
 
 /* Return info about INSN.  Set up the info if it is not done yet.  */
-static inline lra_insn_recog_data_t
+inline lra_insn_recog_data_t
 lra_get_insn_recog_data (rtx_insn *insn)
 {
   lra_insn_recog_data_t data;
@@ -488,7 +500,7 @@ lra_get_insn_recog_data (rtx_insn *insn)
 }
 
 /* Update offset from pseudos with VAL by INCR.  */
-static inline void
+inline void
 lra_update_reg_val_offset (int val, poly_int64 incr)
 {
   int i;
@@ -501,7 +513,7 @@ lra_update_reg_val_offset (int val, poly_int64 incr)
 }
 
 /* Return true if register content is equal to VAL with OFFSET.  */
-static inline bool
+inline bool
 lra_reg_val_equal_p (int regno, int val, poly_int64 offset)
 {
   if (lra_reg_info[regno].val == val
@@ -512,7 +524,7 @@ lra_reg_val_equal_p (int regno, int val, poly_int64 offset)
 }
 
 /* Assign value of register FROM to TO.  */
-static inline void
+inline void
 lra_assign_reg_val (int from, int to)
 {
   lra_reg_info[to].val = lra_reg_info[from].val;

@@ -1,4 +1,5 @@
 // { dg-do compile }
+// Explicit { dg-require-effective-target exceptions_enabled } to avoid verify compiler messages FAILs for '-fno-exceptions'.
 // { dg-options "-std=c++2a" }
 
 consteval int bar (int i) { if (i != 1) throw 1; return 0; }	// { dg-error "is not a constant expression" }
@@ -15,10 +16,11 @@ void qux ()
   int a = bar (N);	// { dg-message "in 'constexpr' expansion of 'bar\\(2\\)'" }
 }
 
+// This function is not instantiated so NDR.
 template <int N>
 void quux ()
 {
-  int a = bar (5);	// { dg-message "in 'constexpr' expansion of 'bar\\(5\\)'" }
+  int a = bar (5);
 }
 
 void

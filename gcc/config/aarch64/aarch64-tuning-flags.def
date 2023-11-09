@@ -1,4 +1,4 @@
-/* Copyright (C) 2015-2021 Free Software Foundation, Inc.
+/* Copyright (C) 2015-2023 Free Software Foundation, Inc.
    Contributed by ARM Ltd.
 
    This file is part of GCC.
@@ -29,11 +29,6 @@
      AARCH64_TUNE_ to give an enum name. */
 
 AARCH64_EXTRA_TUNING_OPTION ("rename_fma_regs", RENAME_FMA_REGS)
-
-/* Don't create non-8 byte aligned load/store pair.  That is if the
-two load/stores are not at least 8 byte aligned don't create load/store
-pairs.   */
-AARCH64_EXTRA_TUNING_OPTION ("slow_unaligned_ldpw", SLOW_UNALIGNED_LDPW)
 
 /* Some of the optional shift to some arthematic instructions are
    considered cheap.  Logical shift left <=4 with or without a

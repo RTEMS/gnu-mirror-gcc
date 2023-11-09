@@ -6,7 +6,7 @@
  *                                                                          *
  *                          C Implementation File                           *
  *                                                                          *
- *          Copyright (C) 1992-2021, Free Software Foundation, Inc.         *
+ *          Copyright (C) 1992-2023, Free Software Foundation, Inc.         *
  *                                                                          *
  * GNAT is free software;  you can  redistribute it  and/or modify it under *
  * terms of the  GNU General Public License as published  by the Free Soft- *
@@ -200,11 +200,7 @@ UINT __gnat_current_ccs_encoding;
 #endif
 
 /* wait.h processing */
-#ifdef __MINGW32__
-# if OLD_MINGW
-#  include <sys/wait.h>
-# endif
-#elif defined (__vxworks) && defined (__RTP__)
+#if defined (__vxworks) && defined (__RTP__)
 # include <wait.h>
 #elif defined (__Lynx__)
 /* ??? We really need wait.h and it includes resource.h on Lynx.  GCC
@@ -214,7 +210,7 @@ UINT __gnat_current_ccs_encoding;
    preventing the inclusion of the GCC header from doing anything.  */
 # define GCC_RESOURCE_H
 # include <sys/wait.h>
-#elif defined (__PikeOS__)
+#elif defined (__PikeOS__) || defined (__MINGW32__)
 /* No wait() or waitpid() calls available.  */
 #else
 /* Default case.  */
@@ -231,6 +227,10 @@ UINT __gnat_current_ccs_encoding;
 
 #elif defined (_WIN32)
 
+/* Cannot redefine abort here.  */
+#undef abort
+
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <accctrl.h>
 #include <aclapi.h>
@@ -335,11 +335,6 @@ const char *__gnat_library_template = GNAT_LIBRARY_TEMPLATE;
 
 #if defined (__MINGW32__)
 #include "mingw32.h"
-
-#if OLD_MINGW
-#include <sys/param.h>
-#endif
-
 #else
 #include <sys/param.h>
 #endif
@@ -1512,7 +1507,16 @@ extern long long __gnat_file_time(char* name)
     long long ll_time;
   } t_write;
 
-  if (!GetFileAttributesExA(name, GetFileExInfoStandard, &fad)) {
+  TCHAR wname [GNAT_MAX_PATH_LEN + 2];
+  int name_len;
+
+  S2WSC (wname, name, GNAT_MAX_PATH_LEN + 2);
+  name_len = _tcslen (wname);
+
+  if (name_len > GNAT_MAX_PATH_LEN)
+    return LLONG_MIN;
+
+  if (!GetFileAttributesEx(wname, GetFileExInfoStandard, &fad)) {
     return LLONG_MIN;
   }
 
@@ -2424,8 +2428,10 @@ __gnat_portable_spawn (char *args[] ATTRIBUTE_UNUSED)
   if (pid == 0)
     {
       /* The child. */
-      if (execv (args[0], MAYBE_TO_PTR32 (args)) != 0)
-	_exit (1);
+      execv (args[0], MAYBE_TO_PTR32 (args));
+
+      /* execv() returns only on error */
+      _exit (1);
     }
 
   /* The parent.  */
@@ -2822,8 +2828,10 @@ __gnat_portable_no_block_spawn (char *args[] ATTRIBUTE_UNUSED)
   if (pid == 0)
     {
       /* The child.  */
-      if (execv (args[0], MAYBE_TO_PTR32 (args)) != 0)
-	_exit (1);
+      execv (args[0], MAYBE_TO_PTR32 (args));
+
+      /* execv() returns only on error */
+      _exit (1);
     }
 
   return pid;
@@ -3529,6 +3537,9 @@ __gnat_cpu_set (int cpu, size_t count ATTRIBUTE_UNUSED, cpu_set_t *set)
 
 #if defined (__APPLE__)
 #include <mach-o/dyld.h>
+#elif defined (__linux__)
+#include <features.h>
+#include <link.h>
 #endif
 
 const void *
@@ -3537,10 +3548,8 @@ __gnat_get_executable_load_address (void)
 #if defined (__APPLE__)
   return _dyld_get_image_header (0);
 
-#elif 0 && defined (__linux__)
-  /* Currently disabled as it needs at least -ldl.  */
+#elif defined (__linux__) && (defined (__GLIBC__) || defined (__UCLIBC__))
   struct link_map *map = _r_debug.r_map;
-
   return (const void *)map->l_addr;
 
 #elif defined (_WIN32)
@@ -3552,26 +3561,24 @@ __gnat_get_executable_load_address (void)
 }
 
 void
-__gnat_kill (int pid, int sig, int close ATTRIBUTE_UNUSED)
+__gnat_kill (int pid, int sig)
 {
 #if defined(_WIN32)
-  HANDLE h = OpenProcess (PROCESS_ALL_ACCESS, FALSE, pid);
-  if (h == NULL)
-    return;
-  if (sig == 9)
-    {
-      TerminateProcess (h, 1);
-    }
-  else if (sig == SIGINT)
-    GenerateConsoleCtrlEvent (CTRL_C_EVENT, pid);
-  else if (sig == SIGBREAK)
-    GenerateConsoleCtrlEvent (CTRL_BREAK_EVENT, pid);
-  /* ??? The last two alternatives don't really work. SIGBREAK requires setting
-     up process groups at start time which we don't do; treating SIGINT is just
-     not possible apparently. So we really only support signal 9. Fortunately
-     that's all we use in GNAT.Expect */
+  HANDLE h;
 
-  CloseHandle (h);
+  switch (sig) {
+    case 9: // SIGKILL is not declared in Windows headers
+    case SIGINT:
+    case SIGBREAK:
+    case SIGTERM:
+    case SIGABRT:
+      h = OpenProcess (PROCESS_ALL_ACCESS, FALSE, pid);
+      if (h != NULL) {
+        TerminateProcess (h, sig);
+        CloseHandle (h);
+      }
+  }
+
 #elif defined (__vxworks)
   /* Not implemented */
 #else
@@ -3593,7 +3600,7 @@ void __gnat_killprocesstree (int pid, int sig_num)
 
   if (hSnap == INVALID_HANDLE_VALUE)
     {
-      __gnat_kill (pid, sig_num, 1);
+      __gnat_kill (pid, sig_num);
       return;
     }
 
@@ -3616,7 +3623,7 @@ void __gnat_killprocesstree (int pid, int sig_num)
 
   /* kill process */
 
-  __gnat_kill (pid, sig_num, 1);
+  __gnat_kill (pid, sig_num);
 
 #elif defined (__vxworks)
   /* not implemented */
@@ -3633,7 +3640,7 @@ void __gnat_killprocesstree (int pid, int sig_num)
 
   if (!dir)
     {
-      __gnat_kill (pid, sig_num, 1);
+      __gnat_kill (pid, sig_num);
       return;
     }
 
@@ -3671,9 +3678,9 @@ void __gnat_killprocesstree (int pid, int sig_num)
 
   /* kill process */
 
-  __gnat_kill (pid, sig_num, 1);
+  __gnat_kill (pid, sig_num);
 #else
-  __gnat_kill (pid, sig_num, 1);
+  __gnat_kill (pid, sig_num);
 #endif
   /* Note on Solaris it is possible to read /proc/<PID>/status.
      The 5th and 6th words are the pid and the 7th and 8th the ppid.

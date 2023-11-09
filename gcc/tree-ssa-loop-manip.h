@@ -1,5 +1,5 @@
 /* Header file for High-level loop manipulation functions.
-   Copyright (C) 2013-2021 Free Software Foundation, Inc.
+   Copyright (C) 2013-2023 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -22,15 +22,12 @@ along with GCC; see the file COPYING3.  If not see
 
 typedef void (*transform_callback)(class loop *, void *);
 
-extern void create_iv (tree, tree, tree, class loop *, gimple_stmt_iterator *,
-		       bool, tree *, tree *);
-extern void rewrite_into_loop_closed_ssa_1 (bitmap, unsigned, int,
-					    class loop *);
+extern void create_iv (tree, tree_code, tree, tree, class loop *,
+		       gimple_stmt_iterator *, bool, tree *, tree *);
 extern void rewrite_into_loop_closed_ssa (bitmap, unsigned);
-extern void rewrite_virtuals_into_loop_closed_ssa (class loop *);
 extern void verify_loop_closed_ssa (bool, class loop * = NULL);
 
-static inline void
+inline void
 checking_verify_loop_closed_ssa (bool verify_ssa_p, class loop *loop = NULL)
 {
   if (flag_checking)
@@ -42,10 +39,9 @@ extern basic_block ip_end_pos (class loop *);
 extern basic_block ip_normal_pos (class loop *);
 extern void standard_iv_increment_position (class loop *,
 					    gimple_stmt_iterator *, bool *);
-extern bool gimple_duplicate_loop_to_header_edge (class loop *, edge,
-						  unsigned int, sbitmap,
-						  edge, vec<edge> *,
-						  int);
+extern bool
+gimple_duplicate_loop_body_to_header_edge (class loop *, edge, unsigned int,
+					   sbitmap, edge, vec<edge> *, int);
 extern bool can_unroll_loop_p (class loop *loop, unsigned factor,
 			       class tree_niter_desc *niter);
 extern gcov_type niter_for_unrolled_loop (class loop *, unsigned);

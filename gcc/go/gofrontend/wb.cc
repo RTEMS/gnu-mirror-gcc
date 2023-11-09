@@ -191,9 +191,8 @@ Mark_address_taken::expression(Expression** pexpr)
 class Check_escape : public Traverse
 {
  public:
-  Check_escape(Gogo* gogo)
-    : Traverse(traverse_expressions | traverse_variables),
-      gogo_(gogo)
+  Check_escape()
+    : Traverse(traverse_expressions | traverse_variables)
   { }
 
   int
@@ -201,9 +200,6 @@ class Check_escape : public Traverse
 
   int
   variable(Named_object*);
-
- private:
-  Gogo* gogo_;
 };
 
 int
@@ -664,7 +660,7 @@ Gogo::add_write_barriers()
     {
       this->propagate_writebarrierrec();
 
-      Check_escape chk(this);
+      Check_escape chk;
       this->traverse(&chk);
     }
 
@@ -927,7 +923,8 @@ Gogo::assign_with_write_barrier(Function* function, Block* enclosing,
       {
 	// These types are all represented by a single pointer.
 	rhs = Expression::make_unsafe_cast(uintptr_type, rhs, loc);
-	call = Runtime::make_call(Runtime::GCWRITEBARRIER, loc, 2, lhs, rhs);
+	call = Runtime::make_call(this, Runtime::GCWRITEBARRIER, loc, 2,
+				  lhs, rhs);
       }
       break;
 
@@ -957,7 +954,8 @@ Gogo::assign_with_write_barrier(Function* function, Block* enclosing,
         assign = Statement::make_assignment(lhs, rhs, loc);
         lhs = Expression::make_unary(OPERATOR_AND, lhs, loc);
         rhs = Expression::make_unsafe_cast(uintptr_type, rhs, loc);
-        call = Runtime::make_call(Runtime::GCWRITEBARRIER, loc, 2, lhs, rhs);
+        call = Runtime::make_call(this, Runtime::GCWRITEBARRIER, loc, 2,
+				  lhs, rhs);
       }
       break;
 
@@ -994,7 +992,8 @@ Gogo::assign_with_write_barrier(Function* function, Block* enclosing,
         assign = Statement::make_assignment(lhs, rhs, loc);
         lhs = Expression::make_unary(OPERATOR_AND, lhs, loc);
         rhs = Expression::make_unsafe_cast(uintptr_type, rhs, loc);
-        call = Runtime::make_call(Runtime::GCWRITEBARRIER, loc, 2, lhs, rhs);
+        call = Runtime::make_call(this, Runtime::GCWRITEBARRIER, loc, 2,
+				  lhs, rhs);
       }
       break;
 
@@ -1037,7 +1036,8 @@ Gogo::assign_with_write_barrier(Function* function, Block* enclosing,
           assign = Statement::make_assignment(lhs, rhs, loc);
           lhs = Expression::make_unary(OPERATOR_AND, lhs, loc);
           rhs = Expression::make_unsafe_cast(uintptr_type, rhs, loc);
-          call = Runtime::make_call(Runtime::GCWRITEBARRIER, loc, 2, lhs, rhs);
+          call = Runtime::make_call(this, Runtime::GCWRITEBARRIER, loc, 2,
+				    lhs, rhs);
           break;
         }
       // fallthrough
@@ -1047,14 +1047,15 @@ Gogo::assign_with_write_barrier(Function* function, Block* enclosing,
         {
           rhs = Expression::unpack_direct_iface(rhs, loc);
           rhs = Expression::make_unsafe_cast(uintptr_type, rhs, loc);
-          call = Runtime::make_call(Runtime::GCWRITEBARRIER, loc, 2, lhs, rhs);
+          call = Runtime::make_call(this, Runtime::GCWRITEBARRIER, loc, 2,
+				    lhs, rhs);
         }
       else
         {
           // TODO: split assignments for small struct/array?
           rhs = Expression::make_unary(OPERATOR_AND, rhs, loc);
           rhs->unary_expression()->set_does_not_escape();
-          call = Runtime::make_call(Runtime::TYPEDMEMMOVE, loc, 3,
+          call = Runtime::make_call(this, Runtime::TYPEDMEMMOVE, loc, 3,
                                     Expression::make_type_descriptor(type, loc),
                                     lhs, rhs);
         }

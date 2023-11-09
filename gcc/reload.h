@@ -1,5 +1,5 @@
-/* Communication between reload.c, reload1.c and the rest of compiler.
-   Copyright (C) 1987-2021 Free Software Foundation, Inc.
+/* Communication between reload.cc, reload1.cc and the rest of compiler.
+   Copyright (C) 1987-2023 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -97,7 +97,7 @@ struct reload
   /* Positive amount to increment or decrement by if
      reload_in is a PRE_DEC, PRE_INC, POST_DEC, POST_INC.
      Ignored otherwise (don't assume it is zero).  */
-  poly_int64_pod inc;
+  poly_int64 inc;
   /* A reg for which reload_in is the equivalent.
      If reload_in is a symbol_ref which came from
      reg_equiv_constant, then this is the pseudo
@@ -330,7 +330,7 @@ extern class insn_chain *new_insn_chain (void);
 extern void compute_use_by_pseudos (HARD_REG_SET *, bitmap);
 #endif
 
-/* Functions from reload.c:  */
+/* Functions from reload.cc:  */
 
 extern reg_class_t secondary_reload_class (bool, reg_class_t,
 					   machine_mode, rtx);
@@ -411,7 +411,7 @@ extern int push_reload (rtx, rtx, rtx *, rtx *, enum reg_class,
 			machine_mode, machine_mode,
 			int, int, int, enum reload_type);
 
-/* Functions in reload1.c:  */
+/* Functions in reload1.cc:  */
 
 /* Initialize the reload pass once per compilation.  */
 extern void init_reload (void);
@@ -435,7 +435,7 @@ extern void calculate_elim_costs_all_insns (void);
 /* Deallocate the reload register used by reload number R.  */
 extern void deallocate_reload_reg (int r);
 
-/* Functions in caller-save.c:  */
+/* Functions in caller-save.cc:  */
 
 /* Initialize for caller-save.  */
 extern void init_caller_save (void);

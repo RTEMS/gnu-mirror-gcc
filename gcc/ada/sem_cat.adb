@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2021, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -346,14 +346,13 @@ package body Sem_Cat is
 
       if Null_Present (Recdef) then
          return;
-      else
-         Component_Decl := First (Component_Items (Component_List (Recdef)));
       end if;
 
-      while Present (Component_Decl)
-        and then Nkind (Component_Decl) = N_Component_Declaration
-      loop
-         if Present (Expression (Component_Decl))
+      Component_Decl := First (Component_Items (Component_List (Recdef)));
+
+      while Present (Component_Decl) loop
+         if Nkind (Component_Decl) = N_Component_Declaration
+           and then Present (Expression (Component_Decl))
            and then Nkind (Expression (Component_Decl)) /= N_Null
            and then not Is_OK_Static_Expression (Expression (Component_Decl))
 
@@ -432,12 +431,13 @@ package body Sem_Cat is
    -------------------------------
 
    function Has_Read_Write_Attributes (E : Entity_Id) return Boolean is
+      Real_Rep : Node_Id;
    begin
       return True
         and then Has_Stream_Attribute_Definition
-                   (E, TSS_Stream_Read,  At_Any_Place => True)
+                   (E, TSS_Stream_Read, Real_Rep, At_Any_Place => True)
         and then Has_Stream_Attribute_Definition
-                   (E, TSS_Stream_Write, At_Any_Place => True);
+                   (E, TSS_Stream_Write, Real_Rep, At_Any_Place => True);
    end Has_Read_Write_Attributes;
 
    -------------------------------------
@@ -447,17 +447,10 @@ package body Sem_Cat is
    function Has_Stream_Attribute_Definition
      (Typ          : Entity_Id;
       Nam          : TSS_Name_Type;
+      Real_Rep     : out Node_Id;
       At_Any_Place : Boolean := False) return Boolean
    is
       Rep_Item : Node_Id;
-
-      Real_Rep : Node_Id;
-      --  The stream operation may be specified by an attribute definition
-      --  clause in the source, or by an aspect that generates such an
-      --  attribute definition. For an aspect, the generated attribute
-      --  definition may be placed at the freeze point of the full view of
-      --  the type, but the aspect specification makes the operation visible
-      --  to a client wherever the partial view is visible.
 
    begin
       --  We start from the declaration node and then loop until the end of
@@ -466,6 +459,8 @@ package body Sem_Cat is
       --  visible (this is tested using the corresponding Entity, which is
       --  inserted by the expander at the point where the clause occurs),
       --  unless At_Any_Place is true.
+
+      Real_Rep := Empty;
 
       Rep_Item := First_Rep_Item (Typ);
       while Present (Rep_Item) loop
@@ -511,7 +506,7 @@ package body Sem_Cat is
         and then Present (Full_View (Typ))
       then
          return Has_Stream_Attribute_Definition
-            (Underlying_Type (Typ), Nam, At_Any_Place);
+                  (Underlying_Type (Typ), Nam, Real_Rep, At_Any_Place);
 
       --  Otherwise, if At_Any_Place is true, return True if the attribute is
       --  available at any place; if it is false, return True only if the
@@ -530,8 +525,8 @@ package body Sem_Cat is
    ----------------------------
 
    function In_Package_Declaration return Boolean is
-      Unit_Kind   : constant Node_Kind :=
-                      Nkind (Unit (Cunit (Current_Sem_Unit)));
+      Unit_Kind  : constant Node_Kind :=
+                     Nkind (Unit (Cunit (Current_Sem_Unit)));
 
    begin
       --  There are no restrictions on the body of an RCI or RT unit
@@ -566,7 +561,7 @@ package body Sem_Cat is
       --  There are no constraints on the body of Remote_Call_Interface or
       --  Remote_Types packages.
 
-      return (Unit_Entity /= Standard_Standard)
+      return Unit_Entity /= Standard_Standard
         and then (Is_Preelaborated (Unit_Entity)
                     or else Is_Pure (Unit_Entity)
                     or else Is_Shared_Passive (Unit_Entity)
@@ -807,7 +802,7 @@ package body Sem_Cat is
       end if;
 
       if not Is_Remote_Call_Interface (E) then
-         if Ekind (E) in Subprogram_Kind then
+         if Is_Subprogram (E) then
             Declaration := Unit_Declaration_Node (E);
 
             if Nkind (Declaration) in

@@ -1,5 +1,5 @@
 /* Header file for jump threading path solver.
-   Copyright (C) 2021 Free Software Foundation, Inc.
+   Copyright (C) 2021-2023 Free Software Foundation, Inc.
    Contributed by Aldy Hernandez <aldyh@redhat.com>.
 
 This file is part of GCC.
@@ -32,59 +32,70 @@ along with GCC; see the file COPYING3.  If not see
 class path_range_query : public range_query
 {
 public:
-  path_range_query (class gimple_ranger &ranger, bool resolve);
+  path_range_query (class gimple_ranger &ranger,
+		    const vec<basic_block> &path,
+		    const bitmap_head *dependencies = NULL,
+		    bool resolve = true);
+  path_range_query (gimple_ranger &ranger, bool resolve = true);
   virtual ~path_range_query ();
-  void compute_ranges (const vec<basic_block> &, const bitmap_head *imports);
-  bool range_of_expr (irange &r, tree name, gimple * = NULL) override;
-  bool range_of_stmt (irange &r, gimple *, tree name = NULL) override;
+  void reset_path (const vec<basic_block> &, const bitmap_head *dependencies);
+  bool range_of_expr (vrange &r, tree name, gimple * = NULL) override;
+  bool range_of_stmt (vrange &r, gimple *, tree name = NULL) override;
   bool unreachable_path_p ();
   void dump (FILE *) override;
   void debug ();
 
 private:
-  bool internal_range_of_expr (irange &r, tree name, gimple *);
+  bool internal_range_of_expr (vrange &r, tree name, gimple *);
+  void compute_ranges (const bitmap_head *dependencies);
+  void compute_exit_dependencies (bitmap_head *dependencies);
   bool defined_outside_path (tree name);
-  void range_on_path_entry (irange &r, tree name);
+  void range_on_path_entry (vrange &r, tree name);
   path_oracle *get_path_oracle () { return (path_oracle *)m_oracle; }
 
   // Cache manipulation.
-  void set_cache (const irange &r, tree name);
-  bool get_cache (irange &r, tree name);
-  void clear_cache (tree name);
+  bool get_cache (vrange &r, tree name);
 
   // Methods to compute ranges for the given path.
-  bool range_defined_in_block (irange &, tree name, basic_block bb);
+  bool range_defined_in_block (vrange &, tree name, basic_block bb);
   void compute_ranges_in_block (basic_block bb);
+  void compute_ranges_in_phis (basic_block bb);
   void adjust_for_non_null_uses (basic_block bb);
-  void ssa_range_in_phi (irange &r, gphi *phi);
-  void compute_relations (const vec<basic_block> &);
+  void ssa_range_in_phi (vrange &r, gphi *phi);
+  void compute_outgoing_relations (basic_block bb, basic_block next);
   void compute_phi_relations (basic_block bb, basic_block prev);
-  void add_copies_to_imports ();
-  bool add_to_imports (tree name, bitmap imports);
+  void maybe_register_phi_relation (gphi *, edge e);
+  bool add_to_exit_dependencies (tree name, bitmap dependencies);
+  bool exit_dependency_p (tree name);
+  bool ssa_defined_in_bb (tree name, basic_block bb);
+  bool relations_may_be_invalidated (edge);
 
   // Path navigation.
-  void set_path (const vec<basic_block> &);
-  basic_block entry_bb () { return (*m_path)[m_path->length () - 1]; }
-  basic_block exit_bb ()  { return (*m_path)[0]; }
-  basic_block curr_bb ()  { return (*m_path)[m_pos]; }
-  basic_block prev_bb ()  { return (*m_path)[m_pos + 1]; }
-  basic_block next_bb ()  { return (*m_path)[m_pos - 1]; }
-  bool at_entry ()	  { return m_pos == m_path->length () - 1; }
+  basic_block entry_bb () { return m_path[m_path.length () - 1]; }
+  basic_block exit_bb ()  { return m_path[0]; }
+  basic_block curr_bb ()  { return m_path[m_pos]; }
+  basic_block prev_bb ()  { return m_path[m_pos + 1]; }
+  basic_block next_bb ()  { return m_path[m_pos - 1]; }
+  bool at_entry ()	  { return m_pos == m_path.length () - 1; }
   bool at_exit ()	  { return m_pos == 0; }
   void move_next ()	  { --m_pos; }
 
   // Range cache for SSA names.
-  ssa_global_cache *m_cache;
-
-  // Set for each SSA that has an active entry in the cache.
-  bitmap m_has_cache_entry;
+  ssa_lazy_cache m_cache;
 
   // Path being analyzed.
-  const vec<basic_block> *m_path;
+  auto_vec<basic_block> m_path;
 
-  auto_bitmap m_imports;
+  // This is a list of SSA names that may have relevant context
+  // information for solving the final conditional along the path.
+  // Ranges for these SSA names are pre-calculated and cached during a
+  // top-down traversal of the path, and are then used to answer
+  // questions at the path exit.
+  auto_bitmap m_exit_dependencies;
+
+  // A ranger used to resolve ranges for SSA names whose values come
+  // from outside the path.
   gimple_ranger &m_ranger;
-  non_null_ref m_non_null;
 
   // Current path position.
   unsigned m_pos;

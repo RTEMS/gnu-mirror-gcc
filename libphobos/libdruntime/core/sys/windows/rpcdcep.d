@@ -4,11 +4,10 @@
  * Translated from MinGW Windows headers
  *
  * License: $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
- * Source: $(DRUNTIMESRC src/core/sys/windows/_rpcdcep.d)
+ * Source: $(DRUNTIMESRC core/sys/windows/_rpcdcep.d)
  */
 module core.sys.windows.rpcdcep;
 version (Windows):
-@system:
 
 version (ANSI) {} else version = Unicode;
 
@@ -98,7 +97,7 @@ const(void)*          InterpreterInfo;
 }
 alias RPC_CLIENT_INTERFACE* PRPC_CLIENT_INTERFACE;
 
-alias TypeDef!(void*) I_RPC_MUTEX;
+alias void* I_RPC_MUTEX;
 
 struct RPC_TRANSFER_SYNTAX {
     GUID   Uuid;
