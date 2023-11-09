@@ -3437,6 +3437,13 @@ Like @code{d}, if @option{-mpowerpc-gfxopt} is used; otherwise, @code{NO_REGS}.
 @item wA
 Like @code{b}, if @option{-mpowerpc64} is used; otherwise, @code{NO_REGS}.
 
+@item wD
+Accumulator register if @option{-mma} is used; otherwise,
+@code{NO_REGS}.  If @option{-mdense-math} is used, the accumulator
+register will be in the dense match register set.  If
+@option{-mno-dense-math} is used, the accumulator register will
+overlap with the VSX vector registers 0..31.
+
 @item wB
 Signed 5-bit constant integer that can be loaded into an Altivec register.
 
