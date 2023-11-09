@@ -172,6 +172,14 @@ jobs:
           else \
             echo "Warning: \"Mail\" program is missing, so skipping emailing of testresults!"; \
           fi
+          for mydir in "${OLDPWD}" .. build path testsuite ../build ../path ../testsuite "${OLDPWD}"/build "${OLDPWD}"/path "${OLDPWD}"/testsuite; do \
+            if test -d "${mydir}" && test -r "${mydir}" && test -w "${mydir}" && test -x "${mydir}"; then \
+              find . -name '*.log' -exec cp -v {} "${mydir}" ";" || echo "failed copying a logfile to ${mydir}"; \
+              break; \
+            else \
+              echo "skipping attempt to copy logfiles to ${mydir}"; \
+            fi; \
+          done
 
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v3.1.3
@@ -184,4 +192,3 @@ jobs:
             build/*.log
             path/*.log
             testsuite/*.log
-            **/*.log
