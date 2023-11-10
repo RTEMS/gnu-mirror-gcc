@@ -6229,6 +6229,17 @@ num_insns_constant_gpr (HOST_WIDE_INT value)
   else if (TARGET_PREFIXED && SIGNED_INTEGER_34BIT_P (value))
     return 1;
 
+  /* PADDIS support.  */
+  else if (TARGET_PADDIS && TARGET_POWERPC64
+	   && !IN_RANGE (value >> 32, -1, 0)
+	   && (SIGNED_INTEGER_32BIT_P (value >> 32)))
+    {
+      fprintf (stderr, "=== 0x%lx ===\n", (long)value);
+      return ((value & HOST_WIDE_INT_C (0xffffffff)) == 0
+	      ? 1
+	      : 2);
+    }
+
   else if (TARGET_POWERPC64)
     {
       HOST_WIDE_INT low = sext_hwi (value, 32);
@@ -6261,6 +6272,14 @@ num_insns_constant_multi (HOST_WIDE_INT value, machine_mode mode)
 {
   int nregs = (GET_MODE_SIZE (mode) + UNITS_PER_WORD - 1) / UNITS_PER_WORD;
   int total = 0;
+  if (nregs == 1
+      && TARGET_PADDIS && TARGET_POWERPC64
+      && !IN_RANGE (value >> 32, -1, 0)
+      && SIGNED_INTEGER_32BIT_P (value >> 32))
+    return ((value & HOST_WIDE_INT_C (0xffffffff)) == 0
+	    ? 1
+	    : 2);
+
   while (nregs-- > 0)
     {
       HOST_WIDE_INT low = sext_hwi (value, BITS_PER_WORD);
@@ -14301,6 +14320,15 @@ print_operand (FILE *file, rtx x, int code)
 	output_operand_lossage ("invalid %%A value");
       else
 	fprintf (file, "%d", (REGNO (x) - FIRST_FPR_REGNO) / 4);
+      return;
+
+    case 'B':
+      /* Upper 32-bits of a constant.  */
+      if (!CONST_INT_P (x))
+	output_operand_lossage ("Not a constant.");
+
+      uval = ((UINTVAL (x) >> 32) & HOST_WIDE_INT_UC (0xffffffff));
+      fprintf (file, "0x%" HOST_LONG_FORMAT "x", uval);
       return;
 
     case 'D':
@@ -24719,6 +24747,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "modulo",			OPTION_MASK_MODULO,		false, true  },
   { "mulhw",			OPTION_MASK_MULHW,		false, true  },
   { "multiple",			OPTION_MASK_MULTIPLE,		false, true  },
+  { "paddis",			OPTION_MASK_PADDIS,		false, true  },
   { "pcrel",			OPTION_MASK_PCREL,		false, true  },
   { "pcrel-opt",		OPTION_MASK_PCREL_OPT,		false, true  },
   { "popcntb",			OPTION_MASK_POPCNTB,		false, true  },
