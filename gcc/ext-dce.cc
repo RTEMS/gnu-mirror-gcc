@@ -42,31 +42,6 @@ along with GCC; see the file COPYING3.  If not see
 
 #define UNSPEC_P(X) (GET_CODE (X) == UNSPEC || GET_CODE (X) == UNSPEC_VOLATILE)
 
-void
-rollback_call_set (rtx_insn *insn, bitmap livenow)
-{
-  gcc_assert (CALL_P (insn));
-
-  subrtx_iterator::array_type array;
-
-  rtx pat = PATTERN (insn);
-  FOR_EACH_SUBRTX (iter, array, pat, NONCONST)
-    {
-      const_rtx x = *iter;
-      if (x == NULL_RTX)
-       continue;
-
-      if (GET_CODE (x) == SET)
-	{
-	  rtx dst = SET_DEST (x);
-	  if (REG_P (dst))
-	    bitmap_clear_range (livenow, 4 * REGNO (dst), 4);
-	  break;
-	}      
-    }
-}
-
-
 /* If we know the destination of CODE only uses some low bits
    (say just the QI bits of an SI operation), then return true
    if we can propagate the need for just the subset of bits
@@ -414,7 +389,7 @@ ext_dce_process_bb (basic_block bb, bitmap livenow, bool modify, bitmap changed_
 			      rn = 4 * REGNO (y);
 			      unsigned HOST_WIDE_INT tmp_mask = mask;
 
-			      if (!safe_for_live_propagation (GET_CODE (y)))
+			      if (!safe_for_live_propagation (code))
 				tmp_mask = GET_MODE_MASK (GET_MODE (y));
 
 			      if (tmp_mask & 0xff)
@@ -502,11 +477,6 @@ ext_dce_process_bb (basic_block bb, bitmap livenow, bool modify, bitmap changed_
 	      if (global_regs[i])
 		bitmap_set_range (livenow, i * 4, 4);
 	}
-#if 0
-skip_insn:
-#endif
-	if (CALL_P (insn))
-	  rollback_call_set (insn, livenow);
 	BITMAP_FREE (live_tmp);
     }
   return livenow;
