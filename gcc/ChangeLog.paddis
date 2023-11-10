@@ -1,3 +1,14 @@
+==================== Branch work144-paddis, patch #601 ====================
+
+Print out paddis value as a signed value.
+
+2023-11-10  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (print_operand): Print out paddis value as a
+	signed value.
+
 ==================== Branch work144-paddis, patch #600 ====================
 
 Add paddis support.
