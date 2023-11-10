@@ -14327,8 +14327,7 @@ print_operand (FILE *file, rtx x, int code)
       if (!CONST_INT_P (x))
 	output_operand_lossage ("Not a constant.");
 
-      uval = ((UINTVAL (x) >> 32) & HOST_WIDE_INT_UC (0xffffffff));
-      fprintf (file, "0x%" HOST_LONG_FORMAT "x", uval);
+      fprintf (file, "%" HOST_LONG_FORMAT "d", INTVAL (x) >> 32);
       return;
 
     case 'D':
