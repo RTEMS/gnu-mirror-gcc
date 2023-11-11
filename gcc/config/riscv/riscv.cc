@@ -9932,7 +9932,7 @@ riscv_frm_mode_after (rtx_insn *insn, int mode)
 /* Return the mode that an insn results in.  */
 
 static int
-riscv_mode_after (int entity, int mode, rtx_insn *insn)
+riscv_mode_after (int entity, int mode, rtx_insn *insn, HARD_REG_SET)
 {
   switch (entity)
     {
