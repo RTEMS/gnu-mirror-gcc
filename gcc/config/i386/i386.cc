@@ -14590,7 +14590,7 @@ ix86_i387_mode_needed (int entity, rtx_insn *insn)
    prior to the execution of insn.  */
 
 static int
-ix86_mode_needed (int entity, rtx_insn *insn)
+ix86_mode_needed (int entity, rtx_insn *insn, HARD_REG_SET)
 {
   switch (entity)
     {
