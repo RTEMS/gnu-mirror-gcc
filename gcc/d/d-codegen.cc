@@ -1115,7 +1115,7 @@ build_array_struct_comparison (tree_code code, StructDeclaration *sd,
 	if (length == 0 || result OP 0) break;  */
   t = build_boolop (EQ_EXPR, length, d_convert (lentype, integer_zero_node));
   t = build_boolop (TRUTH_ORIF_EXPR, t, build_boolop (code, result,
-						      boolean_false_node));
+						      d_bool_false_node));
   t = build1 (EXIT_EXPR, void_type_node, t);
   add_stmt (t);
 
@@ -2188,14 +2188,16 @@ d_build_call (TypeFunction *tf, tree callable, tree object,
       for (size_t i = 0; i < arguments->length; ++i)
 	{
 	  Expression *arg = (*arguments)[i];
-	  tree targ = build_expr (arg);
+	  tree targ;
 
 	  if (i - varargs < nparams && i >= varargs)
 	    {
 	      /* Actual arguments for declared formal arguments.  */
 	      Parameter *parg = tf->parameterList[i - varargs];
-	      targ = convert_for_argument (targ, parg);
+	      targ = convert_for_argument (arg, parg);
 	    }
+	  else
+	    targ = build_expr (arg);
 
 	  /* Don't pass empty aggregates by value.  */
 	  if (empty_aggregate_p (TREE_TYPE (targ)) && !TREE_ADDRESSABLE (targ)

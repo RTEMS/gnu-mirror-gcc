@@ -1,3 +1,41 @@
+2023-11-04  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-11-03  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/97245
+	* match.cc (gfc_match_call): If a procedure pointer has already been
+	resolved, do not create a new symbol in a procedure reference of
+	the same name shadowing the first one if it is host-associated.
+
+2023-11-03  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2023-11-02  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/112316
+	* parse.cc (parse_associate): Remove condition that caused this
+	regression.
+
+2023-10-26  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2023-10-12  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/67740
+	* trans-expr.cc (gfc_trans_pointer_assignment): Set the hidden
+	string length component for pointer assignment to character
+	pointer components.
+
+2023-10-21  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-10-17  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/111837
+	* frontend-passes.cc (traverse_io_block): Dependency check of loop
+	nest shall be triangular, not banded.
+
 2023-10-04  Paul Thomas  <pault@gcc.gnu.org>
 
 	Backported from master:
