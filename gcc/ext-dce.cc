@@ -47,7 +47,7 @@ along with GCC; see the file COPYING3.  If not see
    if we can propagate the need for just the subset of bits
    from the destination to the sources.  */
 
-bool
+static bool
 safe_for_live_propagation (rtx_code code)
 {
   switch (code)
@@ -73,7 +73,11 @@ safe_for_live_propagation (rtx_code code)
     }
 }
 
-int
+/* Clear bits in LIVENOW and set bits in LIVE_TMP for objects
+   set/clobbered by INSN.  Return nonzero if we see
+   CALL_INSN_FUNCTION_USAGE.  */
+
+static int
 ext_dce_process_sets (rtx_insn *insn, bitmap livenow, bitmap live_tmp)
 {
   subrtx_iterator::array_type array;
@@ -184,13 +188,291 @@ ext_dce_process_sets (rtx_insn *insn, bitmap livenow, bitmap live_tmp)
 	}
       if (GET_CODE (insn) != CALL_INSN || seen_fusage > 0)
 	break;
+
+      /* At this point INSN must be a CALL_INSN.  */
       pat = CALL_INSN_FUNCTION_USAGE (insn);
       seen_fusage++;
     }
   return seen_fusage;
 }
 
-bitmap
+/* INSN has a sign/zero extended source inside SET that we will
+   try to turn into a SUBREG.  */
+static void
+ext_dce_try_optimize_insn (rtx_insn *insn, rtx set, bitmap changed_pseudos)
+{
+  rtx src = SET_SRC (set);
+  rtx inner = XEXP (src, 0);
+
+  rtx new_pattern;
+  if (dump_file)
+    {
+      fprintf (dump_file, "Processing insn:\n");
+      dump_insn_slim (dump_file, insn);
+      fprintf (dump_file, "Trying to simplify pattern:\n");
+      print_rtl_single (dump_file, SET_SRC (set));
+    }
+
+  new_pattern = simplify_gen_subreg (GET_MODE (src), inner,
+				     GET_MODE (inner), 0);
+  /* simplify_gen_subreg may fail in which case NEW_PATTERN will be NULL.
+     We must not pass that as a replacement pattern to validate_change.  */
+  if (new_pattern)
+    {
+      int ok = validate_change (insn, &SET_SRC (set), new_pattern, false);
+
+      if (ok)
+	bitmap_set_bit (changed_pseudos, REGNO (SET_DEST (set)));
+
+      if (dump_file)
+	{
+	  if (ok)
+	    fprintf (dump_file, "Successfully transformed to:\n");
+	  else
+	    fprintf (dump_file, "Failed transformation to:\n");
+
+	  print_rtl_single (dump_file, new_pattern);
+	  fprintf (dump_file, "\n");
+	}
+    }
+  else
+    {
+      if (dump_file)
+	fprintf (dump_file, "Unable to generate valid SUBREG expression.\n");
+    }
+}
+
+static void
+ext_dce_process_uses (rtx_insn *insn, bitmap livenow, bitmap live_tmp, bool modify, int seen_fusage, bitmap changed_pseudos)
+{
+  /* Now, process the uses.  */
+  if (JUMP_P (insn) && find_reg_note (insn, REG_NON_LOCAL_GOTO, NULL_RTX))
+    {
+      /* The frame ptr is used by a non-local goto.  */
+      bitmap_set_range (livenow, FRAME_POINTER_REGNUM * 4, 4);
+      if (!HARD_FRAME_POINTER_IS_FRAME_POINTER)
+	bitmap_set_range (livenow, HARD_FRAME_POINTER_REGNUM * 4, 4);
+    }
+
+  for (rtx pat = PATTERN (insn);;)
+    {
+      subrtx_var_iterator::array_type array_var;
+      FOR_EACH_SUBRTX_VAR (iter, array_var, pat, NONCONST)
+	{
+	  rtx x = *iter;
+	  /* An EXPR_LIST (from call fusage) ends in NULL_RTX.  */
+	  if (x == NULL_RTX)
+	    continue;
+	  enum rtx_code xcode = GET_CODE (x);
+
+	  if (GET_CODE (x) == SET)
+	    {
+	      const_rtx dst = SET_DEST (x);
+	      rtx src = SET_SRC (x);
+	      const_rtx y;
+	      unsigned HOST_WIDE_INT bit = 0;
+	      enum rtx_code code = GET_CODE (src);
+
+	      if (SUBREG_P (dst))
+		{
+		  bit = SUBREG_BYTE (dst).to_constant () * BITS_PER_UNIT;
+		  if (WORDS_BIG_ENDIAN)
+		    bit = (GET_MODE_BITSIZE (GET_MODE (SUBREG_REG (dst))).to_constant ()
+			   - GET_MODE_BITSIZE (GET_MODE (dst)).to_constant () - bit);
+		  if (bit >= HOST_BITS_PER_WIDE_INT)
+		    bit = HOST_BITS_PER_WIDE_INT - 1;
+		  dst = SUBREG_REG (dst);
+		}
+	      else if (GET_CODE (dst) == ZERO_EXTRACT
+		       || GET_CODE (dst) == STRICT_LOW_PART)
+		dst = XEXP (dst, 0);
+
+	      if (REG_P (dst)
+		  && (code == PLUS || code == MINUS || code == MULT
+		      || code == ASHIFT
+		      || code == ZERO_EXTEND || code == SIGN_EXTEND
+		      || code == AND || code == IOR || code == XOR
+		      || code == REG
+		      || (code == SUBREG && REG_P (SUBREG_REG (src)))))
+		{
+		  /* Create a mask representing the bits of the output
+		     operand that are live after this insn.  We can use
+		     this information to refine the live in state of
+		     inputs to this insn.
+
+		     If the set handling above left LIVE_TMP empty, then
+		     it means it was unable to meaningfully process the
+		     destination.  So make no assumptions about our
+		     ability to narrow the live bits in the sources.  */
+		  unsigned HOST_WIDE_INT mask = 0;
+		  HOST_WIDE_INT rn = REGNO (dst);
+		  unsigned HOST_WIDE_INT mask_array[]
+		    = { 0xff, 0xff00, 0xffff0000ULL, -0x100000000ULL };
+		  for (int i = 0; i < 4; i++)
+		    if (bitmap_bit_p (live_tmp, 4 * rn + i))
+		      mask |= mask_array[i];
+		  mask >>= bit;
+
+		  /* ??? Could also handle ZERO_EXTRACT / SIGN_EXTRACT
+		     of the source specially to improve optimization.  */
+		  if (code == SIGN_EXTEND || code == ZERO_EXTEND)
+		    {
+		      rtx inner = XEXP (src, 0);
+		      unsigned HOST_WIDE_INT mask2
+			= GET_MODE_MASK (GET_MODE (inner));
+
+		      /* Pretend there is one additional higher bit set in
+			 MASK2 to account for the sign bit propagation from the
+			 input value into the output value.  */
+		      if (code == SIGN_EXTEND)
+			{
+			  mask2 <<= 1;
+			  mask2 |= 1;
+			}
+
+		      /* (subreg (mem)) is technically valid RTL, but is severely
+			 discouraged.  So give up if we're about to create one.
+
+			 If this were to be loosened, then we'd still need to reject
+			 mode dependent addresses and volatile memory accesses.  */
+		      if (GET_CODE (inner) == MEM)
+			continue;
+
+		      /* MASK could be zero if we had something in the SET that
+			 we couldn't handle.  */
+		      if (modify && mask && (mask & ~mask2) == 0)
+			ext_dce_try_optimize_insn (insn, x, changed_pseudos);
+
+		      mask &= mask2;
+		      src = XEXP (src, 0);
+		      code = GET_CODE (src);
+		    }
+		  if (code == PLUS || code == MINUS || code == MULT
+		      || code == ASHIFT)
+		    mask = mask ? ((2ULL << floor_log2 (mask)) - 1) : 0;
+		  if (BINARY_P (src))
+		    y = XEXP (src, 0);
+		  else
+		    y = src;
+		  for (;;)
+		    {
+		      if (SUBREG_P (y))
+			{
+			  bit = (SUBREG_BYTE (y).to_constant ()
+				 * BITS_PER_UNIT);
+			  if (WORDS_BIG_ENDIAN)
+			    bit = (GET_MODE_BITSIZE
+				   (GET_MODE (SUBREG_REG (y))).to_constant ()
+				    - GET_MODE_BITSIZE (GET_MODE (y)).to_constant () - bit);
+			  if (mask)
+			    {
+			      mask <<= bit;
+			      if (!mask)
+				mask = -0x100000000ULL;
+			    }
+			  y = SUBREG_REG (y);
+			}
+		      if (REG_P (y))
+			{
+			  rn = 4 * REGNO (y);
+			  unsigned HOST_WIDE_INT tmp_mask = mask;
+
+			  if (!safe_for_live_propagation (code))
+			    tmp_mask = GET_MODE_MASK (GET_MODE (y));
+
+			  if (tmp_mask & 0xff)
+			    bitmap_set_bit (livenow, rn);
+			  if (tmp_mask & 0xff00)
+			    bitmap_set_bit (livenow, rn + 1);
+			  if (tmp_mask & 0xffff0000ULL)
+			    bitmap_set_bit (livenow, rn + 2);
+			  if (tmp_mask & -0x100000000ULL)
+			    bitmap_set_bit (livenow, rn + 3);
+
+			  /* All the bits in the shift count are potentially
+			     relevant. ?!? What about SHIFT_COUNT_TRUNCATED?  */
+			  /* ?!? What about rotates?  */
+			  if (code == ASHIFT || code == LSHIFTRT || code == ASHIFTRT)
+			    {
+			      rtx x = XEXP (src, 1);
+			      if (GET_CODE (x) == SUBREG)
+				x = SUBREG_REG (x);
+			      if (REG_P (x))
+				{
+				  bitmap_set_range (livenow, REGNO (x) * 4, 4);
+				  break;
+				}
+			    }
+			}
+		      else if (!CONSTANT_P (y))
+			break;
+		      /* We might have (ashift (const_int 1) (reg...)) */
+		      else if (CONSTANT_P (y) && GET_CODE (src) == ASHIFT)
+			{
+			  rtx x = XEXP (src, 1);
+			  if (GET_CODE (x) == SUBREG)
+			    x = SUBREG_REG (x);
+
+			  if (REG_P (x))
+			    {
+			      bitmap_set_range (livenow, REGNO (x) * 4, 4);
+			      break;
+			    }
+			}
+		      if (!BINARY_P (src))
+			break;
+		      y = XEXP (src, 1), src = pc_rtx;
+		    }
+
+		  if (REG_P (y) || CONSTANT_P (y))
+		    iter.skip_subrtxes ();
+		}
+	      else if (REG_P (dst))
+		iter.substitute (src);
+	    }
+	  /* If we are reading the low part of a SUBREG, then we can
+	     refine liveness of the input register, otherwise let the
+	     iterator continue into SUBREG_REG.  */
+	  else if (xcode == SUBREG
+		   && REG_P (SUBREG_REG (x))
+		   && subreg_lowpart_p (x)
+		   && GET_MODE_BITSIZE (GET_MODE  (x)).to_constant () <= 32)
+	    {
+	      HOST_WIDE_INT size
+		= GET_MODE_BITSIZE (GET_MODE  (x)).to_constant ();
+
+	      HOST_WIDE_INT rn = 4 * REGNO (SUBREG_REG (x));
+
+	      bitmap_set_bit (livenow, rn);
+		if (size > 8)
+		  bitmap_set_bit (livenow, rn+1);
+		if (size > 16)
+		  bitmap_set_bit (livenow, rn+2);
+		if (size > 32)
+		  bitmap_set_bit (livenow, rn+3);
+		iter.skip_subrtxes ();
+	    }
+	  else if (REG_P (x))
+	    bitmap_set_range (livenow, REGNO (x) * 4, 4);
+	  else if (GET_CODE (x) == CLOBBER)
+	    continue;
+	}
+      if (GET_CODE (insn) != CALL_INSN || seen_fusage > 1)
+	break;
+      pat = CALL_INSN_FUNCTION_USAGE (insn);
+      seen_fusage++;
+      if (!FAKE_CALL_P (insn))
+	bitmap_set_range (livenow, STACK_POINTER_REGNUM * 4, 4);
+      /* Unless this is a call to a const function, it can read any
+	 global register.  */
+      if (RTL_CONST_CALL_P (insn))
+	for (unsigned i = 0; i < FIRST_PSEUDO_REGISTER; i++)
+	  if (global_regs[i])
+	    bitmap_set_range (livenow, i * 4, 4);
+    }
+}
+
+static bitmap
 ext_dce_process_bb (basic_block bb, bitmap livenow, bool modify, bitmap changed_pseudos)
 {
   rtx_insn *insn;
@@ -200,302 +482,22 @@ ext_dce_process_bb (basic_block bb, bitmap livenow, bool modify, bitmap changed_
       if (!NONDEBUG_INSN_P (insn))
 	continue;
 
-
       /* Live-out state of the destination of this insn.  We can
 	 use this to refine the live-in state of the sources of
 	 this insn in many cases.  */
       bitmap live_tmp = BITMAP_ALLOC (NULL);
 
+      /* First process any sets/clobbers in INSN.  */
       int seen_fusage = ext_dce_process_sets (insn, livenow, live_tmp);
 
-      /* Now, process the uses.  */
-      if (JUMP_P (insn) && find_reg_note (insn, REG_NON_LOCAL_GOTO, NULL_RTX))
-	{
-	  /* The frame ptr is used by a non-local goto.  */
-	  bitmap_set_range (livenow, FRAME_POINTER_REGNUM * 4, 4);
-	  if (!HARD_FRAME_POINTER_IS_FRAME_POINTER)
-	    bitmap_set_range (livenow, HARD_FRAME_POINTER_REGNUM * 4, 4);
-	}
+      ext_dce_process_uses (insn, livenow, live_tmp, modify, seen_fusage, changed_pseudos);
 
-      for (rtx pat = PATTERN (insn);;)
-	{
-	  subrtx_var_iterator::array_type array_var;
-	  FOR_EACH_SUBRTX_VAR (iter, array_var, pat, NONCONST)
-	    {
-	      rtx x = *iter;
-	      /* An EXPR_LIST (from call fusage) ends in NULL_RTX.  */
-	      if (x == NULL_RTX)
-		continue;
-	      enum rtx_code xcode = GET_CODE (x);
-
-	      if (GET_CODE (x) == SET)
-		{
-		  const_rtx dst = SET_DEST (x);
-		  rtx src = SET_SRC (x);
-		  const_rtx y;
-
-#if 0
-		  if (VECTOR_MODE_P (GET_MODE (dst)))
-		    goto skip_insn;
-#endif
-		
-		  unsigned HOST_WIDE_INT bit = 0;
-		  enum rtx_code code = GET_CODE (src);
-
-#if 0
-		  if (UNSPEC_P (src))
-		    goto skip_insn;
-#endif
-
-		  if (SUBREG_P (dst))
-		    {
-		      bit = SUBREG_BYTE (dst).to_constant () * BITS_PER_UNIT;
-		      if (WORDS_BIG_ENDIAN)
-			bit = (GET_MODE_BITSIZE (GET_MODE (SUBREG_REG (dst))).to_constant ()
-			       - GET_MODE_BITSIZE (GET_MODE (dst)).to_constant () - bit);
-		      if (bit >= HOST_BITS_PER_WIDE_INT)
-			bit = HOST_BITS_PER_WIDE_INT - 1;
-		      dst = SUBREG_REG (dst);
-		    }
-		  else if (GET_CODE (dst) == ZERO_EXTRACT
-			   || GET_CODE (dst) == STRICT_LOW_PART)
-		    dst = XEXP (dst, 0);
-		  if (REG_P (dst)
-		      && (code == PLUS || code == MINUS || code == MULT
-			  || code == ASHIFT
-			  || code == ZERO_EXTEND || code == SIGN_EXTEND
-			  || code == AND || code == IOR || code == XOR
-			  || code == REG
-			  || (code == SUBREG && REG_P (SUBREG_REG (src)))))
-		    {
-		      /* Create a mask representing the bits of the output
-			 operand that are live after this insn.  We can use
-			 this information to refine the live in state of
-			 inputs to this insn.
-
-			 If the set handling above left LIVE_TMP empty, then
-			 it means it was unable to meaningfully process the
-			 destination.  So make no assumptions about our
-			 ability to narrow the live bits in the sources.  */
-		      unsigned HOST_WIDE_INT mask = 0;
-		      HOST_WIDE_INT rn = REGNO (dst);
-		      unsigned HOST_WIDE_INT mask_array[]
-			= { 0xff, 0xff00, 0xffff0000ULL, -0x100000000ULL };
-		      for (int i = 0; i < 4; i++)
-			if (bitmap_bit_p (live_tmp, 4 * rn + i))
-			  mask |= mask_array[i];
-		      mask >>= bit;
-
-		      /* ??? Could also handle ZERO_EXTRACT / SIGN_EXTRACT
-			 of the source specially to improve optimization.  */
-
-		      if (code == SIGN_EXTEND || code == ZERO_EXTEND)
-			{
-			  rtx inner = XEXP (src, 0);
-			  unsigned HOST_WIDE_INT mask2
-			    = GET_MODE_MASK (GET_MODE (inner));
-
-			  /* Pretend there is one additional higher bit set in
-			     MASK2 to account for the sign bit propagation from the
-			     input value into the output value.  */
-			  if (code == SIGN_EXTEND)
-			    {
-			      mask2 <<= 1;
-			      mask2 |= 1;
-			    }
-
-			  /* (subreg (mem)) is technically valid RTL, but is severely
-			     discouraged.  So give up if we're about to create one.
-
-			     If this were to be loosened, then we'd still need to reject
-			     mode dependent addresses and volatile memory accesses.  */
-			  if (GET_CODE (inner) == MEM)
-			    continue;
-
-			  /* Delete dead sign / zero extensions.  */
-			  if (0 && modify)
-			    {
-			      debug_rtx (insn);
-			      debug_bitmap (live_tmp);
-			      fprintf (stderr, "m " HOST_WIDE_INT_PRINT_HEX " m2 " HOST_WIDE_INT_PRINT_HEX "\n", mask, mask2);
-			    }
-
-			  /* MASK could be zero if we had something in the SET that
-			     we couldn't handle.  */
-			  if (modify && mask && (mask & ~mask2) == 0)
-			    {
-
-			      rtx new_pattern;
-			      if (dump_file)
-				{
-				  fprintf (dump_file, "Processing insn:\n");
-				  dump_insn_slim (dump_file, insn);
-				  fprintf (dump_file, "Trying to simplify pattern:\n");
-				  print_rtl_single (dump_file, SET_SRC (x));
-				}
-
-			      new_pattern = simplify_gen_subreg (GET_MODE (src),
-								 inner, GET_MODE (inner), 0);
-			      /* simplify_gen_subreg may fail in which case NEW_PATTERN will be NULL.
-				 We must not pass that as a replacement pattern to validate_change.  */
-			      if (new_pattern)
-				{
-				  int ok = validate_change (insn, &SET_SRC (x),
-							    new_pattern, false);
-
-				  if (ok)
-				    bitmap_set_bit (changed_pseudos, REGNO (dst));
-
-				  if (dump_file)
-				    {
-				      if (ok)
-					fprintf (dump_file, "Successfully transformed to:\n");
-				      else
-					fprintf (dump_file, "Failed transformation to:\n");
-
-				      print_rtl_single (dump_file, new_pattern);
-				      fprintf (dump_file, "\n");
-				    }
-				}
-			      else
-				{
-				  if (dump_file)
-				    fprintf (dump_file, "Unable to generate valid SUBREG expression.\n");
-				}
-			    }
-
-			  mask &= mask2;
-			  src = XEXP (src, 0);
-			  code = GET_CODE (src);
-			}
-		      if (code == PLUS || code == MINUS || code == MULT
-			  || code == ASHIFT)
-			mask = mask ? ((2ULL << floor_log2 (mask)) - 1) : 0;
-		      if (BINARY_P (src))
-			y = XEXP (src, 0);
-		      else
-			y = src;
-		      for (;;)
-			{
-			  if (SUBREG_P (y))
-			    {
-			      bit = (SUBREG_BYTE (y).to_constant ()
-				     * BITS_PER_UNIT);
-			      if (WORDS_BIG_ENDIAN)
-				bit = (GET_MODE_BITSIZE
-					(GET_MODE (SUBREG_REG (y))).to_constant ()
-					 - GET_MODE_BITSIZE (GET_MODE (y)).to_constant () - bit);
-			      if (mask)
-				{
-				  mask <<= bit;
-				  if (!mask)
-				    mask = -0x100000000ULL;
-				}
-			      y = SUBREG_REG (y);
-			    }
-			  if (REG_P (y))
-			    {
-			      rn = 4 * REGNO (y);
-			      unsigned HOST_WIDE_INT tmp_mask = mask;
-
-			      if (!safe_for_live_propagation (code))
-				tmp_mask = GET_MODE_MASK (GET_MODE (y));
-
-			      if (tmp_mask & 0xff)
-				bitmap_set_bit(livenow, rn);
-			      if (tmp_mask & 0xff00)
-				bitmap_set_bit(livenow, rn + 1);
-			      if (tmp_mask & 0xffff0000ULL)
-				bitmap_set_bit(livenow, rn + 2);
-			      if (tmp_mask & -0x100000000ULL)
-				bitmap_set_bit(livenow, rn + 3);
-
-			      /* All the bits in the shift count are potentially
-				 relevant.  */
-			      /* ?!? What about rotates?  */
-			      if (code == ASHIFT || code == LSHIFTRT || code == ASHIFTRT)
-				{
-				  rtx x = XEXP (src, 1);
-				  if (GET_CODE (x) == SUBREG)
-				    x = SUBREG_REG (x);
-				  if (REG_P (x))
-				    {
-				      bitmap_set_range (livenow, REGNO (x) * 4, 4);
-				      break;
-				    }
-				}
-			    }
-			  else if (!CONSTANT_P (y))
-			    break;
-			  /* We might have (ashift (const_int 1) (reg...)) */
-			  else if (CONSTANT_P (y) && GET_CODE (src) == ASHIFT)
-			    {
-			      rtx x = XEXP (src, 1);
-			      if (GET_CODE (x) == SUBREG)
-				x = SUBREG_REG (x);
-
-			      if (REG_P (x))
-				{
-				  bitmap_set_range (livenow, REGNO (x) * 4, 4);
-				  break;
-				}
-			    }
-			  if (!BINARY_P (src))
-			    break;
-			  y = XEXP (src, 1), src = pc_rtx;
-			}
-		      if (REG_P (y) || CONSTANT_P (y))
-			iter.skip_subrtxes ();
-		    }
-		  else if (REG_P (dst))
-		    iter.substitute (src);
-		}
-	      /* If we are reading the low part of a SUBREG, then we can
-		 refine liveness of the input register, otherwise let the
-		 iterator continue into SUBREG_REG.  */
-	      else if (xcode == SUBREG
-		       && REG_P (SUBREG_REG (x))
-		       && subreg_lowpart_p (x)
-		       && GET_MODE_BITSIZE (GET_MODE  (x)).to_constant () <= 32)
-		{
-		  HOST_WIDE_INT size
-		    = GET_MODE_BITSIZE (GET_MODE  (x)).to_constant ();
-
-		  HOST_WIDE_INT rn = 4 * REGNO (SUBREG_REG (x));
-
-		  bitmap_set_bit (livenow, rn);
-		  if (size > 8)
-		    bitmap_set_bit (livenow, rn+1);
-		  if (size > 16)
-		    bitmap_set_bit (livenow, rn+2);
-		  if (size > 32)
-		    bitmap_set_bit (livenow, rn+3);
-		  iter.skip_subrtxes ();
-		}
-	      else if (REG_P (x))
-		bitmap_set_range (livenow, REGNO (x) * 4, 4);
-	      else if (GET_CODE (x) == CLOBBER)
-		continue;
-	    }
-	  if (GET_CODE (insn) != CALL_INSN || seen_fusage > 1)
-	    break;
-	  pat = CALL_INSN_FUNCTION_USAGE (insn);
-	  seen_fusage++;
-	  if (!FAKE_CALL_P (insn))
-	    bitmap_set_range (livenow, STACK_POINTER_REGNUM * 4, 4);
-	  /* Unless this is a call to a const function, it can read any
-	     global register.  */
-	  if (RTL_CONST_CALL_P (insn))
-	    for (unsigned i = 0; i < FIRST_PSEUDO_REGISTER; i++)
-	      if (global_regs[i])
-		bitmap_set_range (livenow, i * 4, 4);
-	}
-	BITMAP_FREE (live_tmp);
+      BITMAP_FREE (live_tmp);
     }
   return livenow;
 }
 
-void
+static void
 ext_dce (void)
 {
   /* Proper PRE is hard, so for now just extend return values without
