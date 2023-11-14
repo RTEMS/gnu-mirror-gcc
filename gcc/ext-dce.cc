@@ -106,8 +106,14 @@ ext_dce_process_sets (rtx_insn *insn, bitmap livenow, bitmap live_tmp)
 	  /* Now handle the actual object that was changed.  */
 	    continue;
 
+	  /* We could have (strict_low_part (subreg ...)).  It's always safe
+	     to leave bits live, even when they are not.  So we can just
+	     strip the STRICT_LOW_PART for now.  */
+	  if (GET_CODE (x) == STRICT_LOW_PART)
+	    x = XEXP (x, 0);
+
 	  /* Phase one of destination handling.  First remove any wrapper
-	     such as SUBREG, STRICT_LOW_PART or ZERO_EXTRACT.  */
+	     such as SUBREG or ZERO_EXTRACT.  */
 	  unsigned HOST_WIDE_INT mask = GET_MODE_MASK (GET_MODE (x));
 	  if (SUBREG_P (x))
 	    {
@@ -125,14 +131,11 @@ ext_dce_process_sets (rtx_insn *insn, bitmap livenow, bitmap live_tmp)
 		mask = -0x100000000ULL;
 	      x = SUBREG_REG (x);
 	    }
-	  else if (GET_CODE (x) == STRICT_LOW_PART)
-	    {
-	      x = XEXP (x, 0);
-	    }
 	  if (GET_CODE (x) == ZERO_EXTRACT)
 	    {
-	      /* If we are not sure what is being overwritten,
-		 assume nothing is.  */
+	      /* If either the size or the start position is unknown,
+		 then assume we know nothing about what is overwritten.
+		 This is overly conservative, but safe.  */
 	      if (!CONST_INT_P (XEXP (x, 1)) || !CONST_INT_P (XEXP (x, 2)))
 		continue;
 	      mask = (1ULL << INTVAL (XEXP (x, 1))) - 1;
@@ -143,12 +146,11 @@ ext_dce_process_sets (rtx_insn *insn, bitmap livenow, bitmap live_tmp)
 	      x = XEXP (x, 0);
 	    }
 
-	  /* In theory we shouldn't have a ZERO_EXTRACT or STRICT_LOW_PART
-	     wrapping a SUBREG.  Catch it if it happens.  */
+	  /* Catch if we have (zero_extract (subreg ...)).  */
 	  gcc_assert (GET_CODE (x) != SUBREG);
 
 	  /* BIT > 3 indicates something went horribly wrong.  */
-	  gcc_assert (bit <= 3);
+	  gcc_assert (bit <= 32);
 
 	  /* Now handle the actual object that was changed.  */
 	  if (REG_P (x))
