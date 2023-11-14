@@ -520,124 +520,47 @@ ext_dce_process_bb (basic_block bb, bitmap livenow,
 }
 
 static void
+reset_subreg_promoted_p (bitmap changed_pseudos)
+{
+  /* If we removed an extension, that changed the promoted state
+     of the destination of that extension.  Thus we need to go
+     find any SUBREGs that reference that pseudo and adjust their
+     SUBREG_PROMOTED_P state.  */
+  for (rtx_insn *insn = get_insns(); insn; insn = NEXT_INSN (insn))
+    {
+      if (!NONDEBUG_INSN_P (insn))
+	continue;
+
+      rtx pat = PATTERN (insn);
+      subrtx_var_iterator::array_type array;
+      FOR_EACH_SUBRTX_VAR (iter, array, pat, NONCONST)
+	{
+	  rtx sub = *iter;
+
+	  /* We only care about SUBREGs.  */
+	  if (GET_CODE (sub) != SUBREG)
+	    continue;
+
+	  const_rtx x = SUBREG_REG (sub);
+
+	  /* We only care if the inner object is a REG.  */
+	  if (!REG_P (x))
+	    continue;
+
+	  /* And only if the SUBREG is a promoted var.  */
+	  if (!SUBREG_PROMOTED_VAR_P (sub))
+	    continue;
+
+	  if (bitmap_bit_p (changed_pseudos, REGNO (x)))
+	    SUBREG_PROMOTED_VAR_P (sub) = 0;
+	}
+    }
+}
+
+
+static void
 ext_dce (void)
 {
-  /* Proper PRE is hard, so for now just extend return values without
-    checking if that'll help.
-    (To check if it'd help, we'd have to do a dataflow computation to check
-     if a highpart computed from an extension that could be changed into a
-     no-op move reaches the return value copy.)
-    If a function is inlined, the return value should already be used
-    just in the mode needed, so normal ext-dce should work just fine.  */
-  if (flag_ext_dce == 2)
-    {
-      edge_iterator ei;
-      edge e;
-      rtx_insn *insn;
-      bool need_commit = false;
-
-      FOR_EACH_EDGE (e, ei, EXIT_BLOCK_PTR_FOR_FN (cfun)->preds)
-	FOR_BB_INSNS (e->src, insn)
-	  {
-	    rtx set = single_set (insn);
-	    if (!set
-		|| !REG_P (SET_SRC (set))
-		|| !REG_P (SET_DEST (set)))
-	      continue;
-	    tree decl = REG_EXPR (SET_SRC (set));
-	    if (!decl || TREE_CODE (decl) != RESULT_DECL
-		|| TREE_CODE (TREE_TYPE (decl)) != INTEGER_TYPE
-		|| maybe_ge (TYPE_PRECISION (TREE_TYPE (decl)),
-			     GET_MODE_BITSIZE (GET_MODE (SET_SRC (set)))))
-	      continue;
-
-	    rtx ext = gen_rtx_SUBREG (TYPE_MODE (TREE_TYPE (decl)),
-				      SET_SRC (set), 0);
-	    ext = gen_rtx_fmt_e ((TYPE_UNSIGNED (TREE_TYPE (decl))
-				  ? ZERO_EXTEND : SIGN_EXTEND),
-				 GET_MODE (SET_DEST (set)), ext);
-
-	    /* Filter out a trivial case of a useless extension:
-	       if the register was just set to a constant or memory value.  */
-	    rtx_insn *prev = prev_nonnote_nondebug_insn (insn);
-	    if ((!prev || LABEL_P (prev)) && !bb_has_abnormal_pred (e->src))
-	      {
-		edge_iterator ei2;
-		edge e2;
-		auto_vec<edge> live_preds;
-
-		FOR_EACH_EDGE (e2, ei2, e->src->preds)
-		  {
-		    prev = BB_END (e2->src);
-		    if (NOTE_P (prev) || DEBUG_INSN_P (prev))
-		      prev = prev_nonnote_nondebug_insn (prev);
-		    rtx prev_set = NULL_RTX;
-		    if (prev)
-		      prev_set = single_set (prev);
-		    if (prev_set
-			&& rtx_equal_p (SET_DEST (prev_set), SET_SRC (set))
-			&& (CONSTANT_P (SET_SRC (prev_set))
-			    || MEM_P (SET_SRC (prev))))
-		      continue;
-		    live_preds.safe_push (e2);
-		  }
-		if (!live_preds.length ())
-		  continue;
-
-		start_sequence ();
-		rtx_insn *ext_insn
-		  = emit_insn (gen_rtx_SET (SET_SRC (set), ext));
-		if (recog (PATTERN (ext_insn), ext_insn, NULL) < 0)
-		  ext_insn = NULL;
-		end_sequence ();
-
-		if (ext_insn
-		    && live_preds.length () < EDGE_COUNT (e->src->preds)
-		    && find_regno_note (insn, REG_DEAD, REGNO (SET_SRC (set))))
-		  {
-		    unsigned int i;
-		    FOR_EACH_VEC_ELT (live_preds, i, e2)
-		      insert_insn_on_edge (copy_rtx (PATTERN (ext_insn)), e2);
-		    need_commit = true;
-		    continue;
-		  }
-	      }
-	    else
-	      {
-		rtx prev_set = NULL_RTX;
-		if (prev)
-		  prev_set = single_set (prev);
-		if (prev_set
-		    && rtx_equal_p (SET_DEST (prev_set), SET_SRC (set))
-		    && (CONSTANT_P (SET_SRC (prev_set))
-			|| MEM_P (SET_SRC (prev))))
-		  continue;
-	      }
-
-	    if (dump_file)
-	      {
-		fprintf (dump_file, "Processing insn:\n");
-		dump_insn_slim (dump_file, insn);
-		fprintf (dump_file, "Trying to simplify pattern:\n");
-		print_rtl_single (dump_file, SET_SRC (set));
-	      }
-
-	    int ok = validate_change (insn, &SET_SRC (set), ext, false);
-	    if (dump_file)
-	      {
-		if (ok)
-		  fprintf (dump_file, "Successfully transformed to:\n");
-		else
-		  fprintf (dump_file, "Failed transformation to:\n");
-
-		print_rtl_single (dump_file, ext);
-		fprintf (dump_file, "\n");
-	      }
-	  }
-      if (need_commit)
-	commit_edge_insertions();
-    }
-
   basic_block bb, *worklist, *qin, *qout, *qend;
   unsigned int qlen;
   vec<bitmap_head> livein;
@@ -738,39 +661,7 @@ ext_dce (void)
 	}
     } while (!modify++);
 
-  /* If we removed an extension, that changed the promoted state
-     of the destination of that extension.  Thus we need to go
-     find any SUBREGs that reference that pseudo and adjust their
-     SUBREG_PROMOTED_P state.  */
-  for (rtx_insn *insn = get_insns(); insn; insn = NEXT_INSN (insn))
-    {
-      if (!NONDEBUG_INSN_P (insn))
-	continue;
-
-      rtx pat = PATTERN (insn);
-      subrtx_var_iterator::array_type array;
-      FOR_EACH_SUBRTX_VAR (iter, array, pat, NONCONST)
-	{
-	  rtx sub = *iter;
-
-	  /* We only care about SUBREGs.  */
-	  if (GET_CODE (sub) != SUBREG)
-	    continue;
-
-	  const_rtx x = SUBREG_REG (sub);
-
-	  /* We only care if the inner object is a REG.  */
-	  if (!REG_P (x))
-	    continue;
-
-	  /* And only if the SUBREG is a promoted var.  */
-	  if (!SUBREG_PROMOTED_VAR_P (sub))
-	    continue;
-
-	  if (bitmap_bit_p (changed_pseudos, REGNO (x)))
-	    SUBREG_PROMOTED_VAR_P (sub) = 0;
-	}
-    }
+  reset_subreg_promoted_p (changed_pseudos);
 
   /* Clean up.  */
   BITMAP_FREE (changed_pseudos);
