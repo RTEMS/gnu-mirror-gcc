@@ -145,12 +145,15 @@ ext_dce_process_sets (rtx_insn *insn, bitmap livenow, bitmap live_tmp)
 		bit = (GET_MODE_BITSIZE (GET_MODE (x))
 		       - INTVAL (XEXP (x, 1)) - bit).to_constant ();
 	      x = XEXP (x, 0);
+
+	      /* We can certainly get (zero_extract (subreg ...)).  The
+		 mode of the zero_extract and location should be sufficient
+		 and we can just strip the SUBREG.  */
+	      if (GET_CODE (x) == SUBREG)
+		x = SUBREG_REG (x);
 	    }
 
-	  /* Catch if we have (zero_extract (subreg ...)).  */
-	  gcc_assert (GET_CODE (x) != SUBREG);
-
-	  /* BIT > 3 indicates something went horribly wrong.  */
+	  /* BIT > 32 indicates something went horribly wrong.  */
 	  gcc_assert (bit <= 32);
 
 	  /* Now handle the actual object that was changed.  */
