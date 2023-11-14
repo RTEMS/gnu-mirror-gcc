@@ -156,8 +156,8 @@ ext_dce_process_sets (rtx_insn *insn, bitmap livenow, bitmap live_tmp)
 		x = SUBREG_REG (x);
 	    }
 
-	  /* BIT > 32 indicates something went horribly wrong.  */
-	  gcc_assert (bit <= 32);
+	  /* BIT >= 64 indicates something went horribly wrong.  */
+	  gcc_assert (bit <= 63);
 
 	  /* Now handle the actual object that was changed.  */
 	  if (REG_P (x))
