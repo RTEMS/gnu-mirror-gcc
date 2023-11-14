@@ -108,14 +108,15 @@ ext_dce_process_sets (rtx_insn *insn, bitmap livenow, bitmap live_tmp)
 
 	  /* We could have (strict_low_part (subreg ...)).  It's always safe
 	     to leave bits live, even when they are not.  So we can just
-	     strip the STRICT_LOW_PART for now.  */
-	  if (GET_CODE (x) == STRICT_LOW_PART)
+	     strip the STRICT_LOW_PART for now.  Similarly for a paradoxical
+	     SUBREG.  */
+	  if (GET_CODE (x) == STRICT_LOW_PART || paradoxical_subreg_p (x))
 	    x = XEXP (x, 0);
 
 	  /* Phase one of destination handling.  First remove any wrapper
 	     such as SUBREG or ZERO_EXTRACT.  */
 	  unsigned HOST_WIDE_INT mask = GET_MODE_MASK (GET_MODE (x));
-	  if (SUBREG_P (x))
+	  if (SUBREG_P (x) && !paradoxical_subreg_p (x))
 	    {
 	      bit = SUBREG_BYTE (x).to_constant () * BITS_PER_UNIT;
 	      if (WORDS_BIG_ENDIAN)
