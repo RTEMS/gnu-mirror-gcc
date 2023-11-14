@@ -74,7 +74,17 @@ safe_for_live_propagation (rtx_code code)
 }
 
 /* Clear bits in LIVENOW and set bits in LIVE_TMP for objects
-   set/clobbered by INSN.  */
+   set/clobbered by INSN.
+
+   Conceptually it is always safe to ignore a particular destination
+   here as that will result in more chunks of data being considered
+   live.  That's what happens when we "continue" the main loop when
+   we see something we don't know how to handle such as a vector
+   mode destination.
+
+   The more accurate we are in identifying what objects (and chunks
+   within an object) are set by INSN, the more aggressive the
+   optimziation phase during use handling will be.  */
 
 static void
 ext_dce_process_sets (rtx_insn *insn, bitmap livenow, bitmap live_tmp)
@@ -162,11 +172,17 @@ ext_dce_process_sets (rtx_insn *insn, bitmap livenow, bitmap live_tmp)
 	  /* Now handle the actual object that was changed.  */
 	  if (REG_P (x))
 	    {
+	      /* Transfer the appropriate bits from LIVENOW into
+		 LIVE_TMP.  */
 	      HOST_WIDE_INT rn = REGNO (x);
 	      for (HOST_WIDE_INT i = 4 * rn; i < 4 * rn + 4; i++)
 		if (bitmap_bit_p (livenow, i))
 		  bitmap_set_bit (live_tmp, i);
-	      int start = (bit == 0 ? 0 : bit == 8 ? 1 : bit == 16 ? 2 : 3);
+
+	      /* Now clear the bits known written by this instruction.
+		 Note that BIT need not be a power of two, consider a
+		 ZERO_EXTRACT destination.  */
+	      int start = (bit < 8 ? 0 : bit < 16 ? 1 : bit < 32 ? 2 : 3);
 	      int end = ((mask & ~0xffffffffULL) ? 4
 			 : (mask & 0xffff0000ULL) ? 3
 			 : (mask & 0xff00) ? 2 : 1);
