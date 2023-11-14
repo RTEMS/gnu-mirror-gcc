@@ -74,126 +74,119 @@ safe_for_live_propagation (rtx_code code)
 }
 
 /* Clear bits in LIVENOW and set bits in LIVE_TMP for objects
-   set/clobbered by INSN.  Return nonzero if we see
-   CALL_INSN_FUNCTION_USAGE.  */
+   set/clobbered by INSN.  */
 
-static int
+static void
 ext_dce_process_sets (rtx_insn *insn, bitmap livenow, bitmap live_tmp)
 {
   subrtx_iterator::array_type array;
-  int seen_fusage = 0;
+  bool seen_fusage = false;
 
-  for (rtx pat = PATTERN (insn);;)
+ restart:
+  rtx pat = PATTERN (insn);
+  FOR_EACH_SUBRTX (iter, array, pat, NONCONST)
     {
-      FOR_EACH_SUBRTX (iter, array, pat, NONCONST)
+      const_rtx x = *iter;
+
+      /* An EXPR_LIST (from call fusage) ends in NULL_RTX.  */
+      if (x == NULL_RTX)
+	continue;
+
+      if (UNSPEC_P (x))
+	continue;
+
+      if (GET_CODE (x) == SET || GET_CODE (x) == CLOBBER)
 	{
-	  const_rtx x = *iter;
-	  /* An EXPR_LIST (from call fusage) ends in NULL_RTX.  */
-	  if (x == NULL_RTX)
+	  unsigned bit = 0;
+	  x = SET_DEST (x);
+
+	  /* We don't support vector destinations or destinations
+	     wider than DImode.  */
+	  if (VECTOR_MODE_P (GET_MODE (x)) || GET_MODE (x) > E_DImode)
+	  /* Now handle the actual object that was changed.  */
 	    continue;
 
-	  if (UNSPEC_P (x))
+	  /* Phase one of destination handling.  First remove any wrapper
+	     such as SUBREG, STRICT_LOW_PART or ZERO_EXTRACT.  */
+	  unsigned HOST_WIDE_INT mask = GET_MODE_MASK (GET_MODE (x));
+	  if (SUBREG_P (x))
+	    {
+	      bit = SUBREG_BYTE (x).to_constant () * BITS_PER_UNIT;
+	      if (WORDS_BIG_ENDIAN)
+		bit = (GET_MODE_BITSIZE (GET_MODE (SUBREG_REG (x))).to_constant ()
+		       - GET_MODE_BITSIZE (GET_MODE (x)).to_constant () - bit);
+
+	      /* Catch big endian correctness issues rather than triggering
+		 undefined behavior.  */
+	      gcc_assert (bit < sizeof (HOST_WIDE_INT) * 8);
+
+	      mask = GET_MODE_MASK (GET_MODE (SUBREG_REG (x))) << bit;
+	      if (!mask)
+		mask = -0x100000000ULL;
+	      x = SUBREG_REG (x);
+	    }
+	  else if (GET_CODE (x) == STRICT_LOW_PART)
+	    {
+	      x = XEXP (x, 0);
+	    }
+	  if (GET_CODE (x) == ZERO_EXTRACT)
+	    {
+	      /* If we are not sure what is being overwritten,
+		 assume nothing is.  */
+	      if (!CONST_INT_P (XEXP (x, 1)) || !CONST_INT_P (XEXP (x, 2)))
+		continue;
+	      mask = (1ULL << INTVAL (XEXP (x, 1))) - 1;
+	      bit = INTVAL (XEXP (x, 2));
+	      if (BITS_BIG_ENDIAN)
+		bit = (GET_MODE_BITSIZE (GET_MODE (x))
+		       - INTVAL (XEXP (x, 1)) - bit).to_constant ();
+	      x = XEXP (x, 0);
+	    }
+
+	  /* In theory we shouldn't have a ZERO_EXTRACT or STRICT_LOW_PART
+	     wrapping a SUBREG.  Catch it if it happens.  */
+	  gcc_assert (GET_CODE (x) != SUBREG);
+
+	  /* BIT > 3 indicates something went horribly wrong.  */
+	  gcc_assert (bit <= 3);
+
+	  /* Now handle the actual object that was changed.  */
+	  if (REG_P (x))
+	    {
+	      HOST_WIDE_INT rn = REGNO (x);
+	      for (HOST_WIDE_INT i = 4 * rn; i < 4 * rn + 4; i++)
+		if (bitmap_bit_p (livenow, i))
+		  bitmap_set_bit (live_tmp, i);
+	      int start = (bit == 0 ? 0 : bit == 8 ? 1 : bit == 16 ? 2 : 3);
+	      int end = ((mask & ~0xffffffffULL) ? 4
+			 : (mask & 0xffff0000ULL) ? 3
+			 : (mask & 0xff00) ? 2 : 1);
+	      bitmap_clear_range (livenow, 4 * rn + start, end - start);
+	    }
+	  /* Some ports generate (clobber (const_int)).  */
+	  else if (CONST_INT_P (x))
 	    continue;
+	  else
+	    gcc_assert (CALL_P (insn)
+			|| MEM_P (x)
+			|| x == pc_rtx
+			|| GET_CODE (x) == SCRATCH);
 
-	  if (GET_CODE (x) == SET || GET_CODE (x) == CLOBBER)
-	    {
-	      unsigned bit = 0;
-	      x = SET_DEST (x);
-
-	      if (VECTOR_MODE_P (GET_MODE (x)))
-		continue;
-
-	      if (GET_CODE (x) == SET)
-		{
-		  rtx src = SET_SRC (x);
-		  if (UNSPEC_P (src))
-		    continue;
-		}
-
-	      /* We don't support sizes wider than DImode.  */
-	      if (GET_MODE (x) > E_DImode)
-		continue;
-
-	      unsigned HOST_WIDE_INT mask = GET_MODE_MASK (GET_MODE (x));
-	      if (SUBREG_P (x))
-		{
-		  bit = SUBREG_BYTE (x).to_constant () * BITS_PER_UNIT;
-		  if (WORDS_BIG_ENDIAN)
-		    bit = (GET_MODE_BITSIZE (GET_MODE (SUBREG_REG (x))).to_constant ()
-			   - GET_MODE_BITSIZE (GET_MODE (x)).to_constant () - bit);
-
-		  /* We have to be careful of undefined behavior here if bit
-		     is too big.   If we reach this state, assume nothing
-		     about what is overwritten.  */
-		  if (bit >= sizeof (HOST_WIDE_INT) * 8)
-		    continue;
-
-		  mask = GET_MODE_MASK (GET_MODE (SUBREG_REG (x))) << bit;
-		  if (!mask)
-		    mask = -0x100000000ULL;
-		  x = SUBREG_REG (x);
-		}
-	      else if (GET_CODE (x) == STRICT_LOW_PART)
-		{
-		  x = XEXP (x, 0);
-		}
-	      else if (GET_CODE (x) == ZERO_EXTRACT)
-		{
-		  /* If we are not sure what is being overwritten,
-		     assume nothing is.  */
-		  if (!CONST_INT_P (XEXP (x, 1))
-		      || !CONST_INT_P (XEXP (x, 2)))
-		    continue;
-		  mask = (1ULL << INTVAL (XEXP (x, 1))) - 1;
-		  bit = INTVAL (XEXP (x, 2));
-		  if (BITS_BIG_ENDIAN)
-		    bit = (GET_MODE_BITSIZE (GET_MODE (x))
-			   - INTVAL (XEXP (x, 1)) - bit).to_constant ();
-		  x = XEXP (x, 0);
-		}
-
-	      if (SUBREG_P (x))
-		x = SUBREG_REG (x);
-
-	      if (REG_P (x))
-		{
-		  HOST_WIDE_INT rn = REGNO (x);
-		  for (HOST_WIDE_INT i = 4 * rn; i < 4 * rn + 4; i++)
-		    if (bitmap_bit_p (livenow, i))
-		      bitmap_set_bit (live_tmp, i);
-		  int start = (bit == 0 ? 0 : bit == 8 ? 1
-			       : bit == 16 ? 2 : 3);
-		  int end = ((mask & ~0xffffffffULL) ? 4
-			     : (mask & 0xffff0000ULL) ? 3
-			     : (mask & 0xff00) ? 2 : 1);
-		  bitmap_clear_range (livenow, 4 * rn + start, end - start);
-		}
-	      else if (GET_CODE (x) == SUBREG)
-		continue;
-	      /* Some ports generate (clobber (const_int)).  */
-	      else if (CONST_INT_P (x))
-		continue;
-	      else
-		gcc_assert (CALL_P (insn)
-			    || MEM_P (x)
-			    || x == pc_rtx
-			    || GET_CODE (x) == SCRATCH);
-
-	      iter.skip_subrtxes ();
-	    }
-	  else if (GET_CODE (x) == COND_EXEC)
-	    {
-	      iter.skip_subrtxes ();
-	    }
+	  iter.skip_subrtxes ();
 	}
-      if (GET_CODE (insn) != CALL_INSN || seen_fusage > 0)
-	break;
-
-      /* At this point INSN must be a CALL_INSN.  */
-      pat = CALL_INSN_FUNCTION_USAGE (insn);
-      seen_fusage++;
+      else if (GET_CODE (x) == COND_EXEC)
+	{
+	  /* This isn't ideal, but may not be so bad in practice.  */
+	  iter.skip_subrtxes ();
+	}
     }
-  return seen_fusage;
+
+  /* If this is CALL_INSN, then process its fusage data.  */
+  if (GET_CODE (insn) == CALL_INSN && !seen_fusage)
+    {
+      seen_fusage = true;
+      goto restart;
+    }
 }
 
 /* INSN has a sign/zero extended source inside SET that we will
@@ -243,8 +236,10 @@ ext_dce_try_optimize_insn (rtx_insn *insn, rtx set, bitmap changed_pseudos)
 }
 
 static void
-ext_dce_process_uses (rtx_insn *insn, bitmap livenow, bitmap live_tmp, bool modify, int seen_fusage, bitmap changed_pseudos)
+ext_dce_process_uses (rtx_insn *insn, bitmap livenow, bitmap live_tmp, bool modify, bitmap changed_pseudos)
 {
+  bool seen_fusage = false;
+
   /* Now, process the uses.  */
   if (JUMP_P (insn) && find_reg_note (insn, REG_NON_LOCAL_GOTO, NULL_RTX))
     {
@@ -457,10 +452,10 @@ ext_dce_process_uses (rtx_insn *insn, bitmap livenow, bitmap live_tmp, bool modi
 	  else if (GET_CODE (x) == CLOBBER)
 	    continue;
 	}
-      if (GET_CODE (insn) != CALL_INSN || seen_fusage > 1)
+      if (GET_CODE (insn) != CALL_INSN || seen_fusage)
 	break;
       pat = CALL_INSN_FUNCTION_USAGE (insn);
-      seen_fusage++;
+      seen_fusage = true;
       if (!FAKE_CALL_P (insn))
 	bitmap_set_range (livenow, STACK_POINTER_REGNUM * 4, 4);
       /* Unless this is a call to a const function, it can read any
@@ -473,7 +468,8 @@ ext_dce_process_uses (rtx_insn *insn, bitmap livenow, bitmap live_tmp, bool modi
 }
 
 static bitmap
-ext_dce_process_bb (basic_block bb, bitmap livenow, bool modify, bitmap changed_pseudos)
+ext_dce_process_bb (basic_block bb, bitmap livenow,
+		    bool modify, bitmap changed_pseudos)
 {
   rtx_insn *insn;
 
@@ -488,9 +484,10 @@ ext_dce_process_bb (basic_block bb, bitmap livenow, bool modify, bitmap changed_
       bitmap live_tmp = BITMAP_ALLOC (NULL);
 
       /* First process any sets/clobbers in INSN.  */
-      int seen_fusage = ext_dce_process_sets (insn, livenow, live_tmp);
+      ext_dce_process_sets (insn, livenow, live_tmp);
 
-      ext_dce_process_uses (insn, livenow, live_tmp, modify, seen_fusage, changed_pseudos);
+      /* And now uses, optimizing away SIGN/ZERO extensions as we go.  */
+      ext_dce_process_uses (insn, livenow, live_tmp, modify, changed_pseudos);
 
       BITMAP_FREE (live_tmp);
     }
