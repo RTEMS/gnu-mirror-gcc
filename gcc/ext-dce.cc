@@ -103,7 +103,10 @@ ext_dce_process_sets (rtx_insn *insn, bitmap livenow, bitmap live_tmp)
 	  /* We don't support vector destinations or destinations
 	     wider than DImode.  */
 	  if (VECTOR_MODE_P (GET_MODE (x)) || GET_MODE (x) > E_DImode)
-	  /* Now handle the actual object that was changed.  */
+	    continue;
+
+	  /* Similarly if we have a SUBREG of a wide mode.  */
+	  if (SUBREG_P (x) && GET_MODE (SUBREG_REG (x)) > E_DImode)
 	    continue;
 
 	  /* We could have (strict_low_part (subreg ...)).  It's always safe
