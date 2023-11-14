@@ -115,16 +115,18 @@ ext_dce_process_sets (rtx_insn *insn, bitmap livenow, bitmap live_tmp)
 	  if (VECTOR_MODE_P (GET_MODE (x)) || GET_MODE (x) > E_DImode)
 	    continue;
 
-	  /* Similarly if we have a SUBREG of a wide mode.  */
-	  if (SUBREG_P (x) && GET_MODE (SUBREG_REG (x)) > E_DImode)
-	    continue;
-
 	  /* We could have (strict_low_part (subreg ...)).  It's always safe
 	     to leave bits live, even when they are not.  So we can just
 	     strip the STRICT_LOW_PART for now.  Similarly for a paradoxical
 	     SUBREG.  */
 	  if (GET_CODE (x) == STRICT_LOW_PART || paradoxical_subreg_p (x))
 	    x = XEXP (x, 0);
+
+	  /* Similarly if we have a SUBREG of a wide mode.  Do this after
+	     stripping STRICT_LOW_PART or a paradoxical SUBREG to catch
+	     stuff like (strict_low_part (subreg:HI (reg:TI))).  */
+	  if (SUBREG_P (x) && GET_MODE (SUBREG_REG (x)) > E_DImode)
+	    continue;
 
 	  /* Phase one of destination handling.  First remove any wrapper
 	     such as SUBREG or ZERO_EXTRACT.  */
