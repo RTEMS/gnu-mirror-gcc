@@ -1,3 +1,14 @@
+==================== Branch work144-vsize, patch #402 ====================
+
+Require -mvector-size-32 for vector pair init, extract, and set.
+
+2023-11-15  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector.md (VEC_E): Check for -mvector-size-32 for vector
+	pair modes.
+
 ==================== Branch work144-vsize, patch #401 ====================
 
 Add init, extract, and set support for vector pair modes.
