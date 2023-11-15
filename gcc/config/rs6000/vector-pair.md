@@ -78,7 +78,7 @@
 (define_insn_and_split "*mov<mode>"
   [(set (match_operand:VPAIR 0 "nonimmediate_operand" "=wa,wa,ZwO,QwO,wa")
 	(match_operand:VPAIR 1 "input_operand" "ZwO,QwO,wa,wa,wa"))]
-  "TARGET_MMA
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32
    && (gpc_reg_operand (operands[0], <MODE>mode)
        || gpc_reg_operand (operands[1], <MODE>mode))"
   "@
