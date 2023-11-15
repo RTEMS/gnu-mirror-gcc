@@ -68,12 +68,12 @@
 			     V2DI
 			     V4SF
 			     V2DF
-			     (V32QI	"TARGET_MMA")
-			     (V16HI	"TARGET_MMA")
-			     (V8SI	"TARGET_MMA")
-			     (V4DI	"TARGET_MMA")
-			     (V8SF	"TARGET_MMA")
-			     (V4DF	"TARGET_MMA")])
+			     (V32QI	"TARGET_MMA && TARGET_VECTOR_SIZE_32")
+			     (V16HI	"TARGET_MMA && TARGET_VECTOR_SIZE_32")
+			     (V8SI	"TARGET_MMA && TARGET_VECTOR_SIZE_32")
+			     (V4DI	"TARGET_MMA && TARGET_VECTOR_SIZE_32")
+			     (V8SF	"TARGET_MMA && TARGET_VECTOR_SIZE_32")
+			     (V4DF	"TARGET_MMA && TARGET_VECTOR_SIZE_32")])
 
 ;; Vector modes for 64-bit base types
 (define_mode_iterator VEC_64 [V2DI V2DF])
