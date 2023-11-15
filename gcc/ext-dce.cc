@@ -262,15 +262,46 @@ ext_dce_try_optimize_insn (rtx_insn *insn, rtx set, bitmap changed_pseudos)
     }
 }
 
+/* Some operators imply that their second operand is fully live,
+   regardless of how many bits in the output are live.  An example
+   would be the shift count on a target without SHIFT_COUNT_TRUCATED
+   defined. 
+
+   Return TRUE if CODE is such an operator.  FALSE otherwise.  */
+
+static bool
+binop_implies_op2_fully_live (rtx_code code)
+{
+  switch (code)
+    {
+      case ASHIFT:
+      case LSHIFTRT:
+      case ASHIFTRT:
+      case ROTATE:
+      case ROTATERT:
+	return !SHIFT_COUNT_TRUNCATED;
+
+      default:
+	return false;
+    }
+}
+
+/* Process uses in INSN.  Set appropriate bits in LIVENOW for any chunks of
+   pseudos that become live, potentially filtering using bits from LIVE_TMP.
+
+   If MODIFIED is true, then optimize sign/zero extensions to SUBREGs when
+   the extended bits are never read and mark pseudos which had extensions
+   eliminated in CHANGED_PSEUDOS.  */
+
 static void
-ext_dce_process_uses (rtx_insn *insn, bitmap livenow, bitmap live_tmp, bool modify, bitmap changed_pseudos)
+ext_dce_process_uses (rtx_insn *insn, bitmap livenow, bitmap live_tmp,
+		      bool modify, bitmap changed_pseudos)
 {
   bool seen_fusage = false;
 
-  /* Now, process the uses.  */
+  /* A nonlocal goto implicitly uses the frame pointer.  */
   if (JUMP_P (insn) && find_reg_note (insn, REG_NON_LOCAL_GOTO, NULL_RTX))
     {
-      /* The frame ptr is used by a non-local goto.  */
       bitmap_set_range (livenow, FRAME_POINTER_REGNUM * 4, 4);
       if (!HARD_FRAME_POINTER_IS_FRAME_POINTER)
 	bitmap_set_range (livenow, HARD_FRAME_POINTER_REGNUM * 4, 4);
@@ -295,6 +326,8 @@ ext_dce_process_uses (rtx_insn *insn, bitmap livenow, bitmap live_tmp, bool modi
 	      unsigned HOST_WIDE_INT bit = 0;
 	      enum rtx_code code = GET_CODE (src);
 
+	      /* ?!? How much of this should mirror SET handling, potentially
+		 being shared?  */
 	      if (SUBREG_P (dst))
 		{
 		  bit = SUBREG_BYTE (dst).to_constant () * BITS_PER_UNIT;
@@ -309,76 +342,95 @@ ext_dce_process_uses (rtx_insn *insn, bitmap livenow, bitmap live_tmp, bool modi
 		       || GET_CODE (dst) == STRICT_LOW_PART)
 		dst = XEXP (dst, 0);
 
-	      if (REG_P (dst)
-		  && (code == PLUS || code == MINUS || code == MULT
-		      || code == ASHIFT
-		      || code == ZERO_EXTEND || code == SIGN_EXTEND
-		      || code == AND || code == IOR || code == XOR
-		      || code == REG
-		      || (code == SUBREG && REG_P (SUBREG_REG (src)))))
+	      /* Main processing of the uses.  Two major goals here.
+
+		 First, we want to try and propagate liveness (or the lack
+		 thereof) from the destination register to the source
+		 register(s).
+
+		 Second, if the source is an extension, try to optimize
+		 it into a SUBREG.  The SUBREG form indicates we don't
+		 care about the upper bits and will usually be copy
+		 propagated away.  */
+	      /* ?!? What to do with SUBREGs that aren't REGS?  */
+	      if (REG_P (dst) && safe_for_live_propagation (code))
 		{
-		  /* Create a mask representing the bits of the output
+		  /* Create a mask representing the bits of this output
 		     operand that are live after this insn.  We can use
 		     this information to refine the live in state of
 		     inputs to this insn.
 
-		     If the set handling above left LIVE_TMP empty, then
-		     it means it was unable to meaningfully process the
-		     destination.  So make no assumptions about our
-		     ability to narrow the live bits in the sources.  */
-		  unsigned HOST_WIDE_INT mask = 0;
+		     We have to do this on a per SET basis, we might have
+		     an INSN with multiple SETS, some of which can narrow
+		     the source operand liveness, some of which may not.  */
+		  unsigned HOST_WIDE_INT dst_mask = 0;
 		  HOST_WIDE_INT rn = REGNO (dst);
 		  unsigned HOST_WIDE_INT mask_array[]
 		    = { 0xff, 0xff00, 0xffff0000ULL, -0x100000000ULL };
 		  for (int i = 0; i < 4; i++)
 		    if (bitmap_bit_p (live_tmp, 4 * rn + i))
-		      mask |= mask_array[i];
-		  mask >>= bit;
+		      dst_mask |= mask_array[i];
+		  dst_mask >>= bit;
 
 		  /* ??? Could also handle ZERO_EXTRACT / SIGN_EXTRACT
 		     of the source specially to improve optimization.  */
 		  if (code == SIGN_EXTEND || code == ZERO_EXTEND)
 		    {
 		      rtx inner = XEXP (src, 0);
-		      unsigned HOST_WIDE_INT mask2
+		      unsigned HOST_WIDE_INT src_mask
 			= GET_MODE_MASK (GET_MODE (inner));
 
+#if 0
+		      /* ?!? This seems like it shouldn't be necessary.  */
 		      /* Pretend there is one additional higher bit set in
 			 MASK2 to account for the sign bit propagation from the
 			 input value into the output value.  */
 		      if (code == SIGN_EXTEND)
 			{
-			  mask2 <<= 1;
-			  mask2 |= 1;
+			  src_mask <<= 1;
+			  src_mask |= 1;
 			}
+#endif
 
-		      /* (subreg (mem)) is technically valid RTL, but is severely
-			 discouraged.  So give up if we're about to create one.
+		      /* (subreg (mem)) is technically valid RTL, but is
+			 severely discouraged.  So give up if we're about to
+			 create one.
 
-			 If this were to be loosened, then we'd still need to reject
-			 mode dependent addresses and volatile memory accesses.  */
-		      if (GET_CODE (inner) == MEM)
+			 If this were to be loosened, then we'd still need to
+			 reject mode dependent addresses and volatile memory
+			 accesses.  */
+		      if (!REG_P (inner))
 			continue;
 
-		      /* MASK could be zero if we had something in the SET that
-			 we couldn't handle.  */
-		      if (modify && mask && (mask & ~mask2) == 0)
+		      /* DST_MASK could be zero if we had something in the SET
+			 that we couldn't handle.  */
+		      if (modify && dst_mask && (dst_mask & ~src_mask) == 0)
 			ext_dce_try_optimize_insn (insn, x, changed_pseudos);
 
-		      mask &= mask2;
+		      dst_mask &= src_mask;
 		      src = XEXP (src, 0);
 		      code = GET_CODE (src);
 		    }
+
+
+		  /* ?!? What is the point of this adjustment to DST_MASK?  */
 		  if (code == PLUS || code == MINUS || code == MULT
 		      || code == ASHIFT)
-		    mask = mask ? ((2ULL << floor_log2 (mask)) - 1) : 0;
+		    dst_mask
+		      = dst_mask ? ((2ULL << floor_log2 (dst_mask)) - 1) : 0;
+
+		  /* We will handle the other operand of a binary operator
+		     at the bottom of the loop by resetting Y.  */
 		  if (BINARY_P (src))
 		    y = XEXP (src, 0);
 		  else
 		    y = src;
+
 		  for (;;)
 		    {
-		      if (SUBREG_P (y))
+		      if (paradoxical_subreg_p (y))
+			y = SUBREG_REG (y);
+		      else if (SUBREG_P (y))
 			{
 			  bit = (SUBREG_BYTE (y).to_constant ()
 				 * BITS_PER_UNIT);
@@ -386,18 +438,19 @@ ext_dce_process_uses (rtx_insn *insn, bitmap livenow, bitmap live_tmp, bool modi
 			    bit = (GET_MODE_BITSIZE
 				   (GET_MODE (SUBREG_REG (y))).to_constant ()
 				    - GET_MODE_BITSIZE (GET_MODE (y)).to_constant () - bit);
-			  if (mask)
+			  if (dst_mask)
 			    {
-			      mask <<= bit;
-			      if (!mask)
-				mask = -0x100000000ULL;
+			      dst_mask <<= bit;
+			      if (!dst_mask)
+				dst_mask = -0x100000000ULL;
 			    }
 			  y = SUBREG_REG (y);
 			}
+
 		      if (REG_P (y))
 			{
 			  rn = 4 * REGNO (y);
-			  unsigned HOST_WIDE_INT tmp_mask = mask;
+			  unsigned HOST_WIDE_INT tmp_mask = dst_mask;
 
 			  if (!safe_for_live_propagation (code))
 			    tmp_mask = GET_MODE_MASK (GET_MODE (y));
@@ -411,10 +464,10 @@ ext_dce_process_uses (rtx_insn *insn, bitmap livenow, bitmap live_tmp, bool modi
 			  if (tmp_mask & -0x100000000ULL)
 			    bitmap_set_bit (livenow, rn + 3);
 
-			  /* All the bits in the shift count are potentially
-			     relevant. ?!? What about SHIFT_COUNT_TRUNCATED?  */
-			  /* ?!? What about rotates?  */
-			  if (code == ASHIFT || code == LSHIFTRT || code == ASHIFTRT)
+
+			  /* Some operators imply their second operand
+			     is fully live.  */
+			  if (binop_implies_op2_fully_live (code))
 			    {
 			      rtx x = XEXP (src, 1);
 			      if (GET_CODE (x) == SUBREG)
@@ -426,10 +479,16 @@ ext_dce_process_uses (rtx_insn *insn, bitmap livenow, bitmap live_tmp, bool modi
 				}
 			    }
 			}
+		      /* !?! This looks wrong.  Y does not have to be a leaf
+			 here.  Consider a shift-add as an example or a PLUS
+			 where one or both operands are sign/zero extended. 
+			 Breaking out of the loop would cause us to fail to
+			 set liveness correctly.  */
 		      else if (!CONSTANT_P (y))
 			break;
 		      /* We might have (ashift (const_int 1) (reg...)) */
-		      else if (CONSTANT_P (y) && GET_CODE (src) == ASHIFT)
+		      else if (CONSTANT_P (y) 
+			       && binop_implies_op2_fully_live (GET_CODE (src)))
 			{
 			  rtx x = XEXP (src, 1);
 			  if (GET_CODE (x) == SUBREG)
@@ -441,6 +500,7 @@ ext_dce_process_uses (rtx_insn *insn, bitmap livenow, bitmap live_tmp, bool modi
 			      break;
 			    }
 			}
+		      /* This looks wrong for ternary operators.  */
 		      if (!BINARY_P (src))
 			break;
 		      y = XEXP (src, 1), src = pc_rtx;
@@ -466,13 +526,13 @@ ext_dce_process_uses (rtx_insn *insn, bitmap livenow, bitmap live_tmp, bool modi
 	      HOST_WIDE_INT rn = 4 * REGNO (SUBREG_REG (x));
 
 	      bitmap_set_bit (livenow, rn);
-		if (size > 8)
-		  bitmap_set_bit (livenow, rn+1);
-		if (size > 16)
-		  bitmap_set_bit (livenow, rn+2);
-		if (size > 32)
-		  bitmap_set_bit (livenow, rn+3);
-		iter.skip_subrtxes ();
+	      if (size > 8)
+		bitmap_set_bit (livenow, rn+1);
+	      if (size > 16)
+		bitmap_set_bit (livenow, rn+2);
+	      if (size > 32)
+		bitmap_set_bit (livenow, rn+3);
+	      iter.skip_subrtxes ();
 	    }
 	  else if (REG_P (x))
 	    bitmap_set_range (livenow, REGNO (x) * 4, 4);
@@ -493,6 +553,13 @@ ext_dce_process_uses (rtx_insn *insn, bitmap livenow, bitmap live_tmp, bool modi
 	    bitmap_set_range (livenow, i * 4, 4);
     }
 }
+
+/* Process a single basic block BB with current liveness information
+   in LIVENOW, returning updated liveness information.
+
+   If MODIFY is true, then this is the last pass and unnecessary
+   extensions should be eliminated when possible.  If an extension
+   is removed, the source pseudo is marked in CHANGED_PSEUDOS.  */
 
 static bitmap
 ext_dce_process_bb (basic_block bb, bitmap livenow,
@@ -520,6 +587,14 @@ ext_dce_process_bb (basic_block bb, bitmap livenow,
     }
   return livenow;
 }
+
+/* We optimize away sign/zero extensions in this pass and replace
+   them with SUBREGs indicating certain bits are don't cares.
+
+   This changes the SUBREG_PROMOTED_VAR_P state of the object.
+   It is fairly painful to fix this on the fly, so we have
+   recorded which pseudos are affected and we look for SUBREGs
+   of those pseudos and fix them up.  */
 
 static void
 reset_subreg_promoted_p (bitmap changed_pseudos)
@@ -559,6 +634,9 @@ reset_subreg_promoted_p (bitmap changed_pseudos)
     }
 }
 
+/* Use lifetime analyis to identify extensions that set bits that
+   are never read.  Turn such extensions into SUBREGs instead which
+   can often be propagated away.  */
 
 static void
 ext_dce (void)
@@ -637,7 +715,8 @@ ext_dce (void)
 	  FOR_EACH_EDGE (e, ei, bb->succs)
 	    bitmap_ior_into (livenow, &livein[e->dest->index]);
 
-	  livenow = ext_dce_process_bb (bb, livenow, modify > 0, changed_pseudos);
+	  livenow = ext_dce_process_bb (bb, livenow,
+					modify > 0, changed_pseudos);
 
 	  if (!bitmap_equal_p (&livein[bb->index], livenow))
 	    {
