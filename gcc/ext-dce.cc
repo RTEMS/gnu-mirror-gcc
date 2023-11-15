@@ -395,18 +395,6 @@ ext_dce_process_uses (rtx_insn *insn, bitmap livenow, bitmap live_tmp,
 		  unsigned HOST_WIDE_INT src_mask
 		    = GET_MODE_MASK (GET_MODE (inner));
 
-#if 0
-		  /* ?!? This seems like it shouldn't be necessary.  */
-		  /* Pretend there is one additional higher bit set in
-		     MASK2 to account for the sign bit propagation from the
-		     input value into the output value.  */
-		  if (code == SIGN_EXTEND)
-		    {
-		      src_mask <<= 1;
-		      src_mask |= 1;
-		    }
-#endif
-
 		  /* (subreg (mem)) is technically valid RTL, but is
 		     severely discouraged.  So give up if we're about to
 		     create one.
