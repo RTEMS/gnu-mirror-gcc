@@ -40,6 +40,9 @@ along with GCC; see the file COPYING3.  If not see
    bit 16..31
    bit 32..BITS_PER_WORD-1  */
 
+/* Note this pass could be used to narrow memory loads too.  It's
+   not clear if that's profitable or not in general.  */
+
 #define UNSPEC_P(X) (GET_CODE (X) == UNSPEC || GET_CODE (X) == UNSPEC_VOLATILE)
 
 /* If we know the destination of CODE only uses some low bits
@@ -50,26 +53,56 @@ along with GCC; see the file COPYING3.  If not see
 static bool
 safe_for_live_propagation (rtx_code code)
 {
+  /* First handle rtx classes which as a whole are known to
+     be either safe or unsafe.  */
+  switch (GET_RTX_CLASS (code))
+    {
+      case RTX_OBJ:
+	return true;
+
+      case RTX_COMPARE:
+      case RTX_COMM_COMPARE:
+      case RTX_TERNARY:
+	return false;
+
+      default:
+	break;
+    }
+
+  /* What's left are specific codes.  We only need to identify those
+     which are safe.   */
   switch (code)
     {
-    case REG:
+    /* These are trivially safe.  */
     case SUBREG:
+    case NOT:
+    case ZERO_EXTEND:
+    case SIGN_EXTEND:
+    case TRUNCATE:
+    case SS_TRUNCATE:
+    case US_TRUNCATE:
+    case PLUS:
+    case MULT:
+    case SS_MULT:
+    case US_MULT:
+    case SMUL_HIGHPART:
+    case UMUL_HIGHPART:
     case AND:
     case IOR:
     case XOR:
-    case NOT:
-    case PLUS:
-    case MULT:
-    case ZERO_EXTEND:
-    case SIGN_EXTEND:
+    case SS_PLUS:
+    case US_PLUS:
+      return true;
 
-    /* ?!? These should be double-checked.  */
-    case MINUS:
-    case TRUNCATE:
-
-    /* This seems wrong for the shift count.  */
+    /* We can propagate for the shifted operand, but not the shift
+       count.  The count is handled specially.  */
+    case SS_ASHIFT:
+    case US_ASHIFT:
     case ASHIFT:
       return true;
+
+    /* There may be other safe codes.  If so they can be added
+       individually when discovered.  */
     default:
       return false;
     }
@@ -226,6 +259,11 @@ ext_dce_try_optimize_insn (rtx_insn *insn, rtx set, bitmap changed_pseudos)
   rtx src = SET_SRC (set);
   rtx inner = XEXP (src, 0);
 
+  /* Avoid (subreg (mem)) and other constructs which may are valid RTL, but
+     not useful for this optimization.  */
+  if (!REG_P (inner) && !SUBREG_P (inner))
+    return;
+
   rtx new_pattern;
   if (dump_file)
     {
@@ -309,9 +347,9 @@ ext_dce_process_uses (rtx_insn *insn, bitmap livenow, bitmap live_tmp,
 	bitmap_set_range (livenow, HARD_FRAME_POINTER_REGNUM * 4, 4);
     }
 
- restart:
   subrtx_var_iterator::array_type array_var;
   rtx pat = PATTERN (insn);
+ restart:
   FOR_EACH_SUBRTX_VAR (iter, array_var, pat, NONCONST)
     {
       /* An EXPR_LIST (from call fusage) ends in NULL_RTX.  */
@@ -328,7 +366,7 @@ ext_dce_process_uses (rtx_insn *insn, bitmap livenow, bitmap live_tmp,
 	 is never safe as it can lead us to fail to process some of the
 	 RTL and thus not make objects live when necessary.  */
       enum rtx_code xcode = GET_CODE (x);
-      if (GET_CODE (x) == SET)
+      if (xcode == SET)
 	{
 	  const_rtx dst = SET_DEST (x);
 	  rtx src = SET_SRC (x);
@@ -395,16 +433,6 @@ ext_dce_process_uses (rtx_insn *insn, bitmap livenow, bitmap live_tmp,
 		  unsigned HOST_WIDE_INT src_mask
 		    = GET_MODE_MASK (GET_MODE (inner));
 
-		  /* (subreg (mem)) is technically valid RTL, but is
-		     severely discouraged.  So give up if we're about to
-		     create one.
-
-		     If this were to be loosened, then we'd still need to
-		     reject mode dependent addresses and volatile memory
-		     accesses.  */
-		  if (MEM_P (inner))
-		    continue;
-
 		  /* DST_MASK could be zero if we had something in the SET
 		     that we couldn't handle.  */
 		  if (modify && dst_mask && (dst_mask & ~src_mask) == 0)
@@ -438,8 +466,13 @@ ext_dce_process_uses (rtx_insn *insn, bitmap livenow, bitmap live_tmp,
 		 if we see something we don't know how to handle.  */
 	      for (;;)
 		{
-		  if (paradoxical_subreg_p (y))
-		    y = SUBREG_REG (y);
+		  /* Strip an outer STRICT_LOW_PART or paradoxical subreg.
+		     That has the effect of making the whole referenced
+		     register live.  We might be able to avoid that for
+		     STRICT_LOW_PART at some point.  */
+		  if (GET_CODE (x) == STRICT_LOW_PART
+		      || paradoxical_subreg_p (x))
+		    x = XEXP (x, 0);
 		  else if (SUBREG_P (y))
 		    {
 		      /* For anything but (subreg (reg)), break the inner loop
@@ -462,6 +495,10 @@ ext_dce_process_uses (rtx_insn *insn, bitmap livenow, bitmap live_tmp,
 
 		  if (REG_P (y))
 		    {
+		      /* We have found the use of a register.  We need to mark
+			 the appropriate chunks of the register live.  The mode
+			 of the REG is a starting point.  We may refine that
+			 based on what chunks in the output were live.  */
 		      rn = 4 * REGNO (y);
 		      unsigned HOST_WIDE_INT tmp_mask = dst_mask;
 
@@ -483,7 +520,7 @@ ext_dce_process_uses (rtx_insn *insn, bitmap livenow, bitmap live_tmp,
 		      /* Some operators imply their second operand
 			 is fully live, break this inner loop which
 			 will cause the iterator to descent into the
-			 sub-rtxs which should be safe.  */
+			 sub-rtxs outside the SET processing.  */
 		      if (binop_implies_op2_fully_live (code))
 			break;
 		    }
@@ -496,7 +533,7 @@ ext_dce_process_uses (rtx_insn *insn, bitmap livenow, bitmap live_tmp,
 
 		  /* If this was anything but a binary operand, break the inner
 		     loop.  This is conservatively correct as it will cause the
-		     iterator to look at the sub-rtxs.  */
+		     iterator to look at the sub-rtxs outside the SET context.  */
 		  if (!BINARY_P (src))
 		    break;
 
@@ -505,11 +542,10 @@ ext_dce_process_uses (rtx_insn *insn, bitmap livenow, bitmap live_tmp,
 		  y = XEXP (src, 1), src = pc_rtx;
 		}
 
+	      /* These are leaf nodes, no need to iterate down into them.  */
 	      if (REG_P (y) || CONSTANT_P (y))
 		iter.skip_subrtxes ();
 	    }
-	  else if (REG_P (dst))
-	    iter.substitute (src);
 	}
       /* If we are reading the low part of a SUBREG, then we can
 	 refine liveness of the input register, otherwise let the
