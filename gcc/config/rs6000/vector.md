@@ -62,7 +62,18 @@
 (define_mode_iterator VEC_C [V16QI V8HI V4SI V2DI V4SF V2DF V1TI])
 
 ;; Vector init/extract modes
-(define_mode_iterator VEC_E [V16QI V8HI V4SI V2DI V4SF V2DF])
+(define_mode_iterator VEC_E [V16QI
+			     V8HI
+			     V4SI
+			     V2DI
+			     V4SF
+			     V2DF
+			     (V32QI	"TARGET_MMA")
+			     (V16HI	"TARGET_MMA")
+			     (V8SI	"TARGET_MMA")
+			     (V4DI	"TARGET_MMA")
+			     (V8SF	"TARGET_MMA")
+			     (V4DF	"TARGET_MMA")])
 
 ;; Vector modes for 64-bit base types
 (define_mode_iterator VEC_64 [V2DI V2DF])
@@ -87,11 +98,17 @@
 			    (TI    "TI")])
 
 ;; As above, but in lower case
-(define_mode_attr VEC_base_l [(V16QI "qi")
+(define_mode_attr VEC_base_l [(V32QI "qi")
+			      (V16QI "qi")
+			      (V16HI "hi")
 			      (V8HI  "hi")
+			      (V8SI  "si")
 			      (V4SI  "si")
+			      (V4DI  "di")
 			      (V2DI  "di")
+			      (V8SF  "sf")
 			      (V4SF  "sf")
+			      (V4DF  "df")
 			      (V2DF  "df")
 			      (V1TI  "ti")
 			      (TI    "ti")])
