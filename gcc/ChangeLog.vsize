@@ -1,3 +1,13 @@
+==================== Branch work144-vsize, patch #403 ====================
+
+Add -mvector-size-32 requirement to vector pair move insns
+
+2023-11-15  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-pair.md (mov<mode>): Add -mvector-size-32 check.
+
 ==================== Branch work144-vsize, patch #402 ====================
 
 Require -mvector-size-32 for vector pair init, extract, and set.
