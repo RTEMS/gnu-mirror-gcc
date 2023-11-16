@@ -1,5 +1,31 @@
 ==================== Branch work144-vsize, patch #406 ====================
 
+Rework vector pair init, stub vector pair set and extract.
+
+2023-11-16  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-protos.h (rs6000_expand_vector_pair_init): New
+	declaration.
+	(rs6000_expand_vector_pair_set): Likewise.
+	(rs6000_expand_vector_pair_extract): Likewise.
+	* config/rs6000/rs6000.cc (rs6000_expand_vector_init): Remove vector
+	pair code.
+	(rs6000_expand_vector_pair_init): New function.
+	(rs6000_expand_vector_pair_set): New stub function.
+	(rs6000_expand_vector_extract): Remove vector pair support.
+	(rs6000_expand_vector_pair_extract): New stub function.
+	* config/rs6000/vector-pair.md (vpair_element_l): Return correct types.
+	(vec_init<mode><vpair_element_l>): New insn.
+	(vec_set<mode>): Likewise.
+	(vec_extract<mode><vpair_element_l): Likewise.
+	* config/rs6000/vector.md (VEC_E): Remvoe vector pair support.
+	(VEC_base): Likewise.
+	(VEC_base_l): Likewise.
+
+==================== Branch work144-vsize, patch #406 ====================
+
 Fix typo.
 
 2023-11-16  Michael Meissner  <meissner@linux.ibm.com>
