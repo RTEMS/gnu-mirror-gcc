@@ -1,3 +1,31 @@
+==================== Branch work144-vsize, patch #405 ====================
+
+Add vpair assemble, splat support.
+
+2023-11-15  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/predicates.md (mma_assemble_input_operand): Allow all
+	16-byte vector types.  Also allow constants that are easy to generate.
+	* config/rs6000/rs6000.cc (rs6000_expand_vector_init): Add support for
+	splatting vector pair types.
+	* config/rs6000/vector-pair.md (UNSPEC_VPAIR_ASSEMBLE): New unspec.
+	(UNSPEC_VPAIR_SPLAT): Likewise.
+	(vpair_vector_l): Rename from vpair_vector.
+	(VPAIR_ELEMENT): New mode attribute.
+	(vpair_element_l): Likewise.
+	(mov<mode>): Add alternative for zeroing the vector pair.
+	(vpair_assemble_<mode>): New insn.
+	(vpair_splat_<mode>): Likewise.
+	(<vpair_op><mode>2): Rename vpair_vector to vpair_vector_l.
+	(nabs<mode>2): Likewise.
+	(vpair_op><mode3): Likewise.
+	(fma<mode>4): Likewise.
+	(fms<mode>4): Likewise.
+	(nfma<mode>4): Likewise.
+	(nfms<mode>4): Likewise.
+
 ==================== Branch work144-vsize, patch #404 ====================
 
 Delete vector pair integer support.
