@@ -1,3 +1,21 @@
+==================== Branch work144-vsize, patch #409 ====================
+
+Convert -mvector-size-32 to variable, not mask.
+
+2023-11-16  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-c.cc (rs6000_cpu_cpp_builtins): Check for -mmma
+	as well as -mvector-size-32.
+	* config/rs6000/rs6000-cpus.def (OTHER_POWER10_MASKS): Convert
+	-mvector-size-32 to variable.
+	(POWERPOC_MASKS): Likewise.
+	* config/rs6000/rs6000.cc (rs6000_option_override_internal): Likewise.
+	(rs6000_opt_masks): Likewise.
+	(rs6000_opt_vars): Likewise.
+	* config/rs6000/rs6000.opt (-mvector-size-32): Likewise.
+
 ==================== Branch work144-vsize, patch #408 ====================
 
 Rework vector pair extract.
