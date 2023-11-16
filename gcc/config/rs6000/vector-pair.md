@@ -171,7 +171,7 @@
 	 (match_operand:<VPAIR_VECTOR> 2 "input_operand")))]
   "TARGET_MMA && TARGET_VECTOR_SIZE_32")
 
-(define_insn_and_split "vpair_concat_<mode>_be"
+(define_insn_and_split "*vpair_concat_<mode>_be"
   [(set (match_operand:VPAIR 0 "vsx_register_operand" "=wa,&wa")
 	(vec_concat:VPAIR
 	 (match_operand:<VPAIR_VECTOR> 1 "input_operand" "0,mwajeP")
@@ -189,7 +189,7 @@
 }
   [(set_attr "length" "8")])
 
-(define_insn_and_split "vpair_concat_<mode>_le"
+(define_insn_and_split "*vpair_concat_<mode>_le"
   [(set (match_operand:VPAIR 0 "vsx_register_operand" "=&wa,wa")
 	(vec_concat:VPAIR
 	 (match_operand:<VPAIR_VECTOR> 1 "input_operand" "mwajeP,0")
