@@ -103,7 +103,7 @@
       machine_mode vmode = <VPAIR_VECTOR>mode;
       rtx op0_reg0 = simplify_gen_subreg (vmode, op0, <MODE>mode, 0);
       rtx op0_reg1 = simplify_gen_subreg (vmode, op0, <MODE>mode, 16);
-      rtx zero = CONST0_RTX (<MODE>mode);
+      rtx zero = CONST0_RTX (vmode);
       emit_move_insn (op0_reg0, zero);
       emit_move_insn (op0_reg1, zero);
       DONE;
