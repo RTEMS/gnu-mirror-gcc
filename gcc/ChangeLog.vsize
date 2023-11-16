@@ -1,3 +1,14 @@
+==================== Branch work144-vsize, patch #411 ====================
+
+Eliminate vpair_concat_<mode>_{le,be} rtl constructor.
+
+2023-11-16  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-pair.md (vpair_concat_<mode>_{be,le}): Eliminate
+	rtl constructor.
+
 ==================== Branch work144-vsize, patch #410 ====================
 
 Use vec_concat for building up vector pair vectors.
