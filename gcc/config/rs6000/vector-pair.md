@@ -26,6 +26,10 @@
 ;; interleave other instructions between these pairs of instructions if
 ;; possible.
 
+(define_c_enum "unspec"
+  [UNSPEC_VPAIR_ASSEMBLE
+   UNSPEC_VPAIR_SPLAT])
+
 ;; Iterator for all vector pair modes
 (define_mode_iterator VPAIR [V8SF V4DF])
 
@@ -51,8 +55,16 @@
 
 ;; Map vector pair mode to vector mode in lower case after the vector pair is
 ;; split to two vectors.
-(define_mode_attr vpair_vector [(V8SF  "v4sf")
-				(V4DF  "v2df")])
+(define_mode_attr vpair_vector_l [(V8SF  "v4sf")
+				  (V4DF  "v2df")])
+
+;; Map vector pair mode to the base element mode.
+(define_mode_attr VPAIR_ELEMENT [(V8SF  "SF")
+				 (V4DF  "DF")])
+
+;; Map vector pair mode to the base element mode in lower case.
+(define_mode_attr vpair_element_l [(V8SF  "v4sf")
+				   (V4DF  "v2df")])
 
 ;; Vector pair move support.
 (define_expand "mov<mode>"
@@ -65,8 +77,8 @@
 })
 
 (define_insn_and_split "*mov<mode>"
-  [(set (match_operand:VPAIR 0 "nonimmediate_operand" "=wa,wa,ZwO,QwO,wa")
-	(match_operand:VPAIR 1 "input_operand" "ZwO,QwO,wa,wa,wa"))]
+  [(set (match_operand:VPAIR 0 "nonimmediate_operand" "=wa,wa,ZwO,QwO,wa,wa")
+	(match_operand:VPAIR 1 "input_operand" "ZwO,QwO,wa,wa,wa,j"))]
   "TARGET_MMA && TARGET_VECTOR_SIZE_32
    && (gpc_reg_operand (operands[0], <MODE>mode)
        || gpc_reg_operand (operands[1], <MODE>mode))"
@@ -75,6 +87,7 @@
    #
    stxvp%X0 %x1,%0
    #
+   #
    #"
   "&& reload_completed
    && ((MEM_P (operands[0]) && !TARGET_STORE_VECTOR_PAIR)
@@ -82,14 +95,92 @@
        || (!MEM_P (operands[0]) && !MEM_P (operands[1])))"
   [(const_int 0)]
 {
+  rtx op0 = operands[0];
+  rtx op1 = operands[1];
+
+  if (op1 == CONST0_RTX (<MODE>mode))
+    {
+      machine_mode vmode = <VPAIR_VECTOR>mode;
+      rtx op0_reg0 = simplify_gen_subreg (vmode, op0, <MODE>mode, 0);
+      rtx op0_reg1 = simplify_gen_subreg (vmode, op0, <MODE>mode, 16);
+      rtx zero = CONST0_RTX (<MODE>mode);
+      emit_move_insn (op0_reg0, zero);
+      emit_move_insn (op0_reg1, zero);
+      DONE;
+    }
+
   rs6000_split_multireg_move (operands[0], operands[1]);
   DONE;
 }
-  [(set_attr "type" "vecload,vecload,vecstore,vecstore,veclogical")
+  [(set_attr "type" "vecload,vecload,vecstore,vecstore,veclogical,vecperm")
    (set_attr "size" "256")
-   (set_attr "length" "*,8,*,8,8")
-   (set_attr "isa" "lxvp,*,stxvp,*,*")])
+   (set_attr "length" "*,8,*,8,8,8")
+   (set_attr "isa" "lxvp,*,stxvp,*,*,*")])
+
+;; Assemble a vector pair from two vectors.  Unlike
+;; __builtin_mma_assemble_pair, this function produces a vector pair output
+;; directly and it takes all of the vector types.
+;;
+;; We cannot update the two output registers atomically, so mark the output as
+;; an early clobber so we don't accidentally clobber the input operands.  */
 
+(define_insn_and_split "vpair_assemble_<mode>"
+  [(set (match_operand:VPAIR 0 "vsx_register_operand" "=&wa")
+	(unspec:VPAIR
+	 [(match_operand:<VPAIR_VECTOR> 1 "mma_assemble_input_operand" "mwajeP")
+	  (match_operand:<VPAIR_VECTOR> 2 "mma_assemble_input_operand" "mwajeP")]
+	 UNSPEC_VPAIR_ASSEMBLE))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 3) (match_dup 1))
+   (set (match_dup 4) (match_dup 2))]
+{
+  machine_mode vmode = <VPAIR_VECTOR>mode;
+  rtx op0 = operands[0];
+  operands[3] = simplify_gen_subreg (vmode, op0, <MODE>mode, 0);
+  operands[4] = simplify_gen_subreg (vmode, op0, <MODE>mode, 16);
+}
+  [(set_attr "length" "8")])
+
+;; Zero a vector pair
+(define_expand "vpair_zero_<mode>"
+  [(set (match_operand:VPAIR 0 "vsx_register_operand") (match_dup 1))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+{
+  operands[1] = CONST0_RTX (<MODE>mode);
+})
+
+;; Create a vector pair with a value splat'ed (duplicated) to all of the
+;; elements.
+(define_expand "vpair_splat_<mode>"
+  [(use (match_operand:VPAIR 0 "vsx_register_operand"))
+   (use (match_operand:<VPAIR_ELEMENT> 1 "input_operand"))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+{
+  machine_mode vmode = <VPAIR_VECTOR>mode;
+  rtx op0 = operands[0];
+  rtx op1 = operands[1];
+
+  if (op1 == CONST0_RTX (vmode))
+    {
+      emit_insn (gen_vpair_zero_<mode> (op0));
+      DONE;
+    }
+
+  rtx tmp = gen_reg_rtx (vmode);
+
+  unsigned num_elements = GET_MODE_NUNITS (vmode);
+  rtvec elements = rtvec_alloc (num_elements);
+  for (size_t i = 0; i < num_elements; i++)
+    RTVEC_ELT (elements, i) = copy_rtx (op1);
+
+  rtx vec_elements = gen_rtx_PARALLEL (vmode, elements);
+  rs6000_expand_vector_init (tmp, vec_elements);
+  emit_insn (gen_vpair_assemble_<mode> (op0, tmp, tmp));
+  DONE;
+})
+	     
 
 ;; Vector pair floating point arithmetic unary operations
 (define_insn_and_split "<vpair_op><mode>2"
@@ -102,7 +193,7 @@
   [(const_int 0)]
 {
   split_unary_vector_pair (<VPAIR_VECTOR>mode, operands,
-			   gen_<vpair_op><vpair_vector>2);
+			   gen_<vpair_op><vpair_vector_l>2);
   DONE;
 }
   [(set_attr "length" "8")])
@@ -119,7 +210,7 @@
   [(const_int 0)]
 {
   split_unary_vector_pair (<VPAIR_VECTOR>mode, operands,
-			   gen_vsx_nabs<vpair_vector>2);
+			   gen_vsx_nabs<vpair_vector_l>2);
   DONE;
 }
   [(set_attr "length" "8")])
@@ -136,7 +227,7 @@
   [(const_int 0)]
 {
   split_binary_vector_pair (<VPAIR_VECTOR>mode, operands,
-			    gen_<vpair_op><vpair_vector>3);
+			    gen_<vpair_op><vpair_vector_l>3);
   DONE;
 }
   [(set_attr "length" "8")])
@@ -154,7 +245,7 @@
   [(const_int 0)]
 {
   split_fma_vector_pair (<VPAIR_VECTOR>mode, operands,
-			 gen_fma<vpair_vector>4);
+			 gen_fma<vpair_vector_l>4);
   DONE;
 }
   [(set_attr "length" "8")])
@@ -173,7 +264,7 @@
   [(const_int 0)]
 {
   split_fma_vector_pair (<VPAIR_VECTOR>mode, operands,
-			 gen_fms<vpair_vector>4);
+			 gen_fms<vpair_vector_l>4);
   DONE;
 }
   [(set_attr "length" "8")])
@@ -192,7 +283,7 @@
   [(const_int 0)]
 {
   split_fma_vector_pair (<VPAIR_VECTOR>mode, operands,
-			 gen_nfma<vpair_vector>4);
+			 gen_nfma<vpair_vector_l>4);
   DONE;
 }
   [(set_attr "length" "8")])
@@ -212,7 +303,7 @@
   [(const_int 0)]
 {
   split_fma_vector_pair (<VPAIR_VECTOR>mode, operands,
-			 gen_nfms<vpair_vector>4);
+			 gen_nfms<vpair_vector_l>4);
   DONE;
 }
   [(set_attr "length" "8")])

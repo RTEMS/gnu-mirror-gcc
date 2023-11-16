@@ -7103,6 +7103,19 @@ rs6000_expand_vector_init (rtx target, rtx vals)
 	}
     }
 
+  /* Handle vector pair splats.  */
+  if (all_same && mode == V4DFmode)
+    {
+      emit_insn (gen_vpair_splat_v4df (target, XVECEXP (vals, 0, 0)));
+      return;
+    }
+
+  if (all_same && mode == V8SFmode)
+    {
+      emit_insn (gen_vpair_splat_v8sf (target, XVECEXP (vals, 0, 0)));
+      return;
+    }
+
   /* Store value to stack temp.  Load vector element.  Splat.  However, splat
      of 64-bit items is not supported on Altivec.  */
   if (all_same && GET_MODE_SIZE (inner_mode) <= 4)

@@ -1306,8 +1306,10 @@
 
 ;; Return 1 if this operand is valid for a MMA assemble accumulator insn.
 (define_special_predicate "mma_assemble_input_operand"
-  (match_test "(mode == V16QImode
+  (match_test "(GET_MODE_SIZE (mode) == 16 && VECTOR_MODE_P (mode)
 		&& (vsx_register_operand (op, mode)
+		    || op == CONST0_RTX (mode)
+		    || vsx_prefixed_constant (op, mode)
 		    || (MEM_P (op)
 			&& (indexed_or_indirect_address (XEXP (op, 0), mode)
 			    || quad_address_p (XEXP (op, 0), mode, false)))))"))
