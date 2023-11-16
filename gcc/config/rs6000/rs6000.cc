@@ -7329,20 +7329,20 @@ rs6000_expand_vector_pair_init (rtx target, rtx vals)
   bool all_same = true;
   rtx first = XVECEXP (vals, 0, 0);
   rtx (*gen_splat) (rtx, rtx);
-  rtx (*gen_assemble) (rtx, rtx, rtx);
+  rtx (*gen_concat) (rtx, rtx, rtx);
 
   switch (mode_vpair)
     {
     case E_V4DFmode:
       mode_vector = V2DFmode;
       gen_splat = gen_vpair_splat_v4df;
-      gen_assemble = gen_vpair_assemble_v4df;
+      gen_concat = gen_vpair_concat_v4df;
       break;
 
     case E_V8SFmode:
       mode_vector = V8SFmode;
       gen_splat = gen_vpair_splat_v8sf;
-      gen_assemble = gen_vpair_assemble_v8sf;
+      gen_concat = gen_vpair_concat_v8sf;
       break;
 
     default:
@@ -7379,7 +7379,7 @@ rs6000_expand_vector_pair_init (rtx target, rtx vals)
 
   rs6000_expand_vector_init (vector_hi, gen_rtx_CONST_VECTOR (mode_vector, vals_hi));
   rs6000_expand_vector_init (vector_lo, gen_rtx_CONST_VECTOR (mode_vector, vals_lo));
-  emit_insn (gen_assemble (target, vector_hi, vector_lo));
+  emit_insn (gen_concat (target, vector_hi, vector_lo));
   return;
 }
 

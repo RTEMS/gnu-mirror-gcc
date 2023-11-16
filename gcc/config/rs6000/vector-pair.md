@@ -26,10 +26,6 @@
 ;; interleave other instructions between these pairs of instructions if
 ;; possible.
 
-(define_c_enum "unspec"
-  [UNSPEC_VPAIR_ASSEMBLE
-   UNSPEC_VPAIR_SPLAT])
-
 ;; Iterator for all vector pair modes
 (define_mode_iterator VPAIR [V8SF V4DF])
 
@@ -164,20 +160,41 @@
   DONE;
 })
 
-;; Assemble a vector pair from two vectors.  Unlike
-;; __builtin_mma_assemble_pair, this function produces a vector pair output
-;; directly and it takes all of the vector types.
+;; Assemble a vector pair from two vectors.
 ;;
-;; We cannot update the two output registers atomically, so mark the output as
-;; an early clobber so we don't accidentally clobber the input operands.  */
+;; We have both endian versions to change which input register will be moved
+;; the the first register in the vector pair.
+(define_expand "vpair_concat_<mode>"
+  [(set (match_operand:VPAIR 0 "vsx_register_operand")
+	(vec_concat:VPAIR
+	 (match_operand:<VPAIR_VECTOR> 1 "input_operand")
+	 (match_operand:<VPAIR_VECTOR> 2 "input_operand")))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32")
 
-(define_insn_and_split "vpair_assemble_<mode>"
-  [(set (match_operand:VPAIR 0 "vsx_register_operand" "=&wa")
-	(unspec:VPAIR
-	 [(match_operand:<VPAIR_VECTOR> 1 "mma_assemble_input_operand" "mwajeP")
-	  (match_operand:<VPAIR_VECTOR> 2 "mma_assemble_input_operand" "mwajeP")]
-	 UNSPEC_VPAIR_ASSEMBLE))]
-  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+(define_insn_and_split "vpair_concat_<mode>_be"
+  [(set (match_operand:VPAIR 0 "vsx_register_operand" "=wa,&wa")
+	(vec_concat:VPAIR
+	 (match_operand:<VPAIR_VECTOR> 1 "input_operand" "0,mwajeP")
+	 (match_operand:<VPAIR_VECTOR> 2 "input_operand" "mwajeP,mwajeP")))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32 && WORDS_BIG_ENDIAN"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 3) (match_dup 1))
+   (set (match_dup 4) (match_dup 2))]
+{
+  machine_mode vmode = <VPAIR_VECTOR>mode;
+  rtx op0 = operands[0];
+  operands[3] = simplify_gen_subreg (vmode, op0, <MODE>mode, 0);
+  operands[4] = simplify_gen_subreg (vmode, op0, <MODE>mode, 16);
+}
+  [(set_attr "length" "8")])
+
+(define_insn_and_split "vpair_concat_<mode>_le"
+  [(set (match_operand:VPAIR 0 "vsx_register_operand" "=&wa,wa")
+	(vec_concat:VPAIR
+	 (match_operand:<VPAIR_VECTOR> 1 "input_operand" "mwajeP,0")
+	 (match_operand:<VPAIR_VECTOR> 2 "input_operand" "mwajeP,mwajeP")))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32 && !WORDS_BIG_ENDIAN"
   "#"
   "&& reload_completed"
   [(set (match_dup 3) (match_dup 1))
@@ -224,7 +241,7 @@
 
   rtx vec_elements = gen_rtx_PARALLEL (vmode, elements);
   rs6000_expand_vector_init (tmp, vec_elements);
-  emit_insn (gen_vpair_assemble_<mode> (op0, tmp, tmp));
+  emit_insn (gen_vpair_concat_<mode> (op0, tmp, tmp));
   DONE;
 })
 	     
