@@ -1,3 +1,13 @@
+==================== Branch work144-vsize, patch #406 ====================
+
+Fix typo.
+
+2023-11-16  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-pair.md (mov<mode>): Fix typo.
+
 ==================== Branch work144-vsize, patch #405 ====================
 
 Add vpair assemble, splat support.
