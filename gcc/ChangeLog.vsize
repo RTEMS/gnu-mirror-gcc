@@ -1,3 +1,52 @@
+==================== Branch work144-vsize, patch #404 ====================
+
+Delete vector pair integer support.
+
+2023-11-15  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_init_hard_regno_mode_ok): Delete
+	vector pair integer support.
+	(rs6000_expand_vector_extract): Likewise.
+	(reg_offset_addressing_ok_p): Likewise.
+	(rs6000_emit_move): Likewise.
+	(vector_pair_to_vector_mode): Likewise.
+	* config/rs6000/rs6000.md (RELOAD): Likewise.
+	* config/rs6000/vector-pair.md (VPAIR): Likewise.
+	(VPAIR_INT): Delete.
+	(VPAIR_NEG_VNEG): Likewise.
+	(VPAIR_NEG_SUB): Likewise.
+	(VPAIR_FP): Likewise.
+	(VPAIR_UNARY): Rename from VPAIR_FP_UNARY.
+	(VPAIR_BINARY): Rename from VPAIR_FP_BINARY
+	(vpair_op): Delete vector pair integer support.
+	(VPAIR_VECTOR): Move from vsx.md.  Delete vector pair integer support.
+	(vpair_vectore): Likewise.
+	(<vpair_op><mode>2, VPAIR_UNARY iterator): Change VPAIR_FP -> VPAIR.
+	(nabs<mode>2): Likewise.
+	(<vpair_op><mode>3, VPAIR_BINARY unary): Likewise.
+	(fma<mode>4): Change <name>3 -> name<4>.  Change VPAIR_FP -> VPAIR.
+	(fms<mode>4): Likewise.
+	(nfma<mode>4): Likewise.
+	(nfms<mode>4): Likewise.
+	(fma_fpcontract_<mode>4): Likewise.
+	(fms_fpcontract_<mode>4): Likewise.
+	(nfma_fpcontract_<mode>4): Likewise.
+	(nfms_fpcontract_<mode>4): Likewise.
+	(all integer vpair insns): Delete.
+	* config/rs6000/vector.md (VEC_E): Delete integer vector pair support.
+	(VEC_base): Likewise.
+	(VEC_base_l): Likewise.
+	* config/rs6000/vsx.md (VSX_EXTRACT_PREDICATE): Likewise.
+	(VSX_EX): Likewise.
+	(VPAIR_V4DI_V4DF): Delete.
+	(VPAIR_SMALL_INT): Likewise.
+	(VPAIR_VECTOR): Move to vector-pair.md.
+	(vpair_vector): Likewise.
+	(vsx_extract_v4df): Rename from vsx_extract_<mode>, delete V4DI support.
+	(vsx_extract_<mode>, VPAIR_SMALL_INT iterator): Delete.
+
 ==================== Branch work144-vsize, patch #403 ====================
 
 Add -mvector-size-32 requirement to vector pair move insns
