@@ -117,7 +117,7 @@
    (set_attr "length" "*,8,*,8,8,8")
    (set_attr "isa" "lxvp,*,stxvp,*,*,*")])
 
-;; Vector initialization, set, extract
+;; Vector pair initialization
 (define_expand "vec_init<mode><vpair_element_l>"
   [(match_operand:VPAIR 0 "vlogical_operand")
    (match_operand:VPAIR 1 "")]
@@ -127,6 +127,7 @@
   DONE;
 })
 
+;; Vector pair set element
 (define_expand "vec_set<mode>"
   [(match_operand:VPAIR 0 "vlogical_operand")
    (match_operand:<VPAIR_ELEMENT> 1 "register_operand")
@@ -137,13 +138,29 @@
   DONE;
 })
 
-(define_expand "vec_extract<mode><vpair_element_l>"
-  [(match_operand:<VPAIR_ELEMENT> 0 "register_operand")
-   (match_operand:VPAIR 1 "vlogical_operand")
-   (match_operand 2 "const_int_operand")]
+;; Vector pair extraction
+(define_insn_and_split "vec_extract<mode><vpair_element_l>"
+  [(set (match_operand:<VPAIR_ELEMENT> 0 "vsx_register_operand" "=wa")
+	(vec_select:<VPAIR_ELEMENT>
+	 (match_operand:VPAIR 1 "vsx_register_operand" "wa")
+	 (parallel [(match_operand:QI 2 "const_int_operand" "n")])))]
   "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
 {
-  rs6000_expand_vector_pair_extract (operands[0], operands[1], operands[2]);
+  rtx op0 = operands[0];
+  rtx op1 = operands[1];
+  HOST_WIDE_INT elt = INTVAL (operands[2]);
+  machine_mode mode = <MODE>mode;
+  machine_mode vmode = <VPAIR_VECTOR>mode;
+  unsigned vsize = GET_MODE_SIZE (<VPAIR_VECTOR>mode);
+  unsigned reg_num = ((WORDS_BIG_ENDIAN && elt >= vsize)
+		      || (!WORDS_BIG_ENDIAN && elt < vsize));
+	   
+  rtx vreg = simplify_gen_subreg (vmode, op1, mode, reg_num * 16);
+  emit_insn (gen_vsx_extract_<vpair_vector_l> (op0, vreg,
+					       GEN_INT (elt % vsize)));
   DONE;
 })
 

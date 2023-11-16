@@ -7846,15 +7846,6 @@ rs6000_expand_vector_extract (rtx target, rtx vec, rtx elt)
     }
 }
 
-/* Extract field ELT from VEC into TARGET.  */
-
-void
-rs6000_expand_vector_pair_extract (rtx target, rtx vec, rtx elt)
-{
-  if (target || vec || elt)
-    gcc_unreachable ();
-}
-
 /* Return the offset within a memory object (MEM) of a vector type to a given
    element within the vector (ELEMENT) with an element size (SCALAR_SIZE).  If
    the element is constant, we return a constant integer.
