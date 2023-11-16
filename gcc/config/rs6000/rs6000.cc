@@ -4464,11 +4464,11 @@ rs6000_option_override_internal (bool global_init_p)
 
   if (!TARGET_MMA && TARGET_VECTOR_SIZE_32)
     {
-      if ((rs6000_isa_flags_explicit & OPTION_MASK_STORE_VECTOR_PAIR) != 0)
+      if (OPTION_SET_P (TARGET_VECTOR_SIZE_32))
 	warning (0, "%qs should not be used unless you use %qs",
 		 "-mvector-size-32", "-mmma");
 
-      rs6000_isa_flags &= OPTION_MASK_VECTOR_SIZE_32;
+      TARGET_VECTOR_SIZE_32 = 0;
     }
 
   /* Enable power10 fusion if we are tuning for power10, even if we aren't
@@ -24610,7 +24610,6 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "store-vector-pair",	OPTION_MASK_STORE_VECTOR_PAIR,	false, true  },
   { "string",			0,				false, true  },
   { "update",			OPTION_MASK_NO_UPDATE,		true , true  },
-  { "vector-size-32",		OPTION_MASK_VECTOR_SIZE_32,	false, true  },
   { "vsx",			OPTION_MASK_VSX,		false, true  },
 #ifdef OPTION_MASK_64BIT
 #if TARGET_AIX_OS
@@ -24682,6 +24681,9 @@ static struct rs6000_opt_var const rs6000_opt_vars[] =
   { "speculate-indirect-jumps",
     offsetof (struct gcc_options, x_rs6000_speculate_indirect_jumps),
     offsetof (struct cl_target_option, x_rs6000_speculate_indirect_jumps), },
+  { "vector-size-32",
+    offsetof (struct gcc_options, x_TARGET_VECTOR_SIZE_32),
+    offsetof (struct cl_target_option, x_TARGET_VECTOR_SIZE_32), },
 };
 
 /* Inner function to handle attribute((target("..."))) and #pragma GCC target
