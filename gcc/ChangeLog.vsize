@@ -1,3 +1,19 @@
+==================== Branch work144-vsize, patch #410 ====================
+
+Use vec_concat for building up vector pair vectors.
+
+2023-11-16  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_expand_vector_pair_init): Rename
+	gen_vpair_assemble_<mode> to gen_vpair_concat_<mode>.
+	* config/rs6000/vector-pair.md (UNSPEC_VPAIR_ASSEMBLE): Delete
+	(UNSPEC_VPAIR_SPLAT): Likewise.
+	(vpair_concat_<mode>): Rename from vpair_assemble_<mode>.  Re-implement
+	it, using vec_concat.
+	(vpair_splat_<mode>): Likewise.
+
 ==================== Branch work144-vsize, patch #409 ====================
 
 Convert -mvector-size-32 to variable, not mask.
