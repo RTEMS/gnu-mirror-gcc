@@ -1,4 +1,17 @@
-==================== Branch work144-vsize, patch #406 ====================
+==================== Branch work144-vsize, patch #408 ====================
+
+Rework vector pair extract.
+
+2023-11-16  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-protos.h (rs6000_expand_vector_pair_extract):
+	Delete.
+	* config/rs6000/rs6000.cc (rs6000_expand_vector_pair_extract): Delete.
+	* config/rs6000/vector-pair.md (vec_extract<mode><vpair_element_l>): Rework.
+
+==================== Branch work144-vsize, patch #407 ====================
 
 Rework vector pair init, stub vector pair set and extract.
 
