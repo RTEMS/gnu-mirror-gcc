@@ -68,10 +68,6 @@
 			     V2DI
 			     V4SF
 			     V2DF
-			     (V32QI	"TARGET_MMA && TARGET_VECTOR_SIZE_32")
-			     (V16HI	"TARGET_MMA && TARGET_VECTOR_SIZE_32")
-			     (V8SI	"TARGET_MMA && TARGET_VECTOR_SIZE_32")
-			     (V4DI	"TARGET_MMA && TARGET_VECTOR_SIZE_32")
 			     (V8SF	"TARGET_MMA && TARGET_VECTOR_SIZE_32")
 			     (V4DF	"TARGET_MMA && TARGET_VECTOR_SIZE_32")])
 
@@ -82,13 +78,9 @@
 (define_mode_iterator VI [V4SI V8HI V16QI])
 
 ;; Base type from vector mode
-(define_mode_attr VEC_base [(V32QI "QI")
-			    (V16QI "QI")
-			    (V16HI "HI")
+(define_mode_attr VEC_base [(V16QI "QI")
 			    (V8HI  "HI")
-			    (V8SI  "SI")
 			    (V4SI  "SI")
-			    (V4DI  "DI")
 			    (V2DI  "DI")
 			    (V8SF  "SF")
 			    (V4SF  "SF")
@@ -98,13 +90,9 @@
 			    (TI    "TI")])
 
 ;; As above, but in lower case
-(define_mode_attr VEC_base_l [(V32QI "qi")
-			      (V16QI "qi")
-			      (V16HI "hi")
+(define_mode_attr VEC_base_l [(V16QI "qi")
 			      (V8HI  "hi")
-			      (V8SI  "si")
 			      (V4SI  "si")
-			      (V4DI  "di")
 			      (V2DI  "di")
 			      (V8SF  "sf")
 			      (V4SF  "sf")

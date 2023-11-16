@@ -2949,22 +2949,6 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 
   if (TARGET_MMA && TARGET_VECTOR_SIZE_32)
     {
-      rs6000_vector_unit[V32QImode] = VECTOR_NONE;
-      rs6000_vector_mem[V32QImode] = VECTOR_VSX;
-      rs6000_vector_align[V32QImode] = 256;
-
-      rs6000_vector_unit[V16HImode] = VECTOR_NONE;
-      rs6000_vector_mem[V16HImode] = VECTOR_VSX;
-      rs6000_vector_align[V16HImode] = 256;
-
-      rs6000_vector_unit[V8SImode] = VECTOR_NONE;
-      rs6000_vector_mem[V8SImode] = VECTOR_VSX;
-      rs6000_vector_align[V8SImode] = 256;
-
-      rs6000_vector_unit[V4DImode] = VECTOR_NONE;
-      rs6000_vector_mem[V4DImode] = VECTOR_VSX;
-      rs6000_vector_align[V4DImode] = 256;
-
       rs6000_vector_unit[V8SFmode] = VECTOR_NONE;
       rs6000_vector_mem[V8SFmode] = VECTOR_VSX;
       rs6000_vector_align[V8SFmode] = 256;
@@ -3108,14 +3092,6 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 
 	      if (TARGET_MMA && TARGET_VECTOR_SIZE_32)
 		{
-		  reg_addr[V32QImode].reload_store = CODE_FOR_reload_v32qi_di_store;
-		  reg_addr[V32QImode].reload_load = CODE_FOR_reload_v32qi_di_load;
-		  reg_addr[V16HImode].reload_store = CODE_FOR_reload_v16hi_di_store;
-		  reg_addr[V16HImode].reload_load = CODE_FOR_reload_v16hi_di_load;
-		  reg_addr[V8SImode].reload_store = CODE_FOR_reload_v8si_di_store;
-		  reg_addr[V8SImode].reload_load = CODE_FOR_reload_v8si_di_load;
-		  reg_addr[V4DImode].reload_store = CODE_FOR_reload_v4di_di_store;
-		  reg_addr[V4DImode].reload_load = CODE_FOR_reload_v4di_di_load;
 		  reg_addr[V8SFmode].reload_store = CODE_FOR_reload_v8sf_di_store;
 		  reg_addr[V8SFmode].reload_load = CODE_FOR_reload_v8sf_di_load;
 		  reg_addr[V4DFmode].reload_store = CODE_FOR_reload_v4df_di_store;
@@ -3181,14 +3157,6 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 
 	  if (TARGET_MMA && TARGET_VECTOR_SIZE_32)
 	    {
-	      reg_addr[V32QImode].reload_store = CODE_FOR_reload_v32qi_si_store;
-	      reg_addr[V32QImode].reload_load = CODE_FOR_reload_v32qi_si_load;
-	      reg_addr[V16HImode].reload_store = CODE_FOR_reload_v16hi_si_store;
-	      reg_addr[V16HImode].reload_load = CODE_FOR_reload_v16hi_si_load;
-	      reg_addr[V8SImode].reload_store = CODE_FOR_reload_v8si_si_store;
-	      reg_addr[V8SImode].reload_load = CODE_FOR_reload_v8si_si_load;
-	      reg_addr[V4DImode].reload_store = CODE_FOR_reload_v4di_si_store;
-	      reg_addr[V4DImode].reload_load = CODE_FOR_reload_v4di_si_load;
 	      reg_addr[V8SFmode].reload_store = CODE_FOR_reload_v8sf_si_store;
 	      reg_addr[V8SFmode].reload_load = CODE_FOR_reload_v8sf_si_load;
 	      reg_addr[V4DFmode].reload_store = CODE_FOR_reload_v4df_si_store;
@@ -7727,43 +7695,15 @@ rs6000_expand_vector_extract (rtx target, rtx vec, rtx elt)
 	      return;
 	    }
 	  break;
-	case E_V4DImode:
-	  if (TARGET_MMA && TARGET_VECTOR_SIZE_32)
-	    {
-	      emit_insn (gen_vsx_extract_v4di (target, vec, elt));
-	      return;
-	    }
-	  break;
-	case E_V8SImode:
-	  if (TARGET_MMA && TARGET_VECTOR_SIZE_32)
-	    {
-	      emit_insn (gen_vsx_extract_v8si (target, vec, elt));
-	      return;
-	    }
-	  break;
-	case E_V16HImode:
-	  if (TARGET_MMA && TARGET_VECTOR_SIZE_32)
-	    {
-	      emit_insn (gen_vsx_extract_v16hi (target, vec, elt));
-	      return;
-	    }
-	  break;
-	case E_V32QImode:
-	  if (TARGET_MMA && TARGET_VECTOR_SIZE_32)
-	    {
-	      emit_insn (gen_vsx_extract_v32qi (target, vec, elt));
-	      return;
-	    }
-	  break;
 	case E_V4DFmode:
-	  if (TARGET_MMA)
+	  if (TARGET_MMA && TARGET_VECTOR_SIZE_32)
 	    {
 	      emit_insn (gen_vsx_extract_v4df (target, vec, elt));
 	      return;
 	    }
 	  break;
 	case E_V8SFmode:
-	  if (TARGET_MMA)
+	  if (TARGET_MMA && TARGET_VECTOR_SIZE_32)
 	    {
 	      emit_insn (gen_vsx_extract_v8sf (target, vec, elt));
 	      return;
@@ -8812,10 +8752,6 @@ reg_offset_addressing_ok_p (machine_mode mode)
     case E_OOmode:
     case E_V8SFmode:
     case E_V4DFmode:
-    case E_V32QImode:
-    case E_V16HImode:
-    case E_V8SImode:
-    case E_V4DImode:
     case E_XOmode:
       return TARGET_MMA;
 
@@ -11317,17 +11253,13 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
 	operands[1] = force_const_mem (mode, operands[1]);
       break;
 
-    case E_V32QImode:
     case E_V16QImode:
-    case E_V16HImode:
     case E_V8HImode:
     case E_V8SFmode:
     case E_V4SFmode:
-    case E_V8SImode:
     case E_V4SImode:
     case E_V4DFmode:
     case E_V2DFmode:
-    case E_V4DImode:
     case E_V2DImode:
     case E_V1TImode:
       if (CONSTANT_P (operands[1])
@@ -27534,11 +27466,7 @@ vector_pair_to_vector_mode (machine_mode mode)
 
   switch (mode)
     {
-    case E_V32QImode: vmode = V16QImode; break;
-    case E_V16HImode: vmode = V8HImode;  break;
-    case E_V8SImode:  vmode = V4SImode;  break;
     case E_V8SFmode:  vmode = V4SFmode;  break;
-    case E_V4DImode:  vmode = V2DImode;  break;
     case E_V4DFmode:  vmode = V2DFmode;  break;
     default:          vmode = VOIDmode;  break;
     }
