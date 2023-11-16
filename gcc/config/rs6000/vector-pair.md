@@ -63,8 +63,8 @@
 				 (V4DF  "DF")])
 
 ;; Map vector pair mode to the base element mode in lower case.
-(define_mode_attr vpair_element_l [(V8SF  "v4sf")
-				   (V4DF  "v2df")])
+(define_mode_attr vpair_element_l [(V8SF  "sf")
+				   (V4DF  "df")])
 
 ;; Vector pair move support.
 (define_expand "mov<mode>"
@@ -117,6 +117,36 @@
    (set_attr "length" "*,8,*,8,8,8")
    (set_attr "isa" "lxvp,*,stxvp,*,*,*")])
 
+;; Vector initialization, set, extract
+(define_expand "vec_init<mode><vpair_element_l>"
+  [(match_operand:VPAIR 0 "vlogical_operand")
+   (match_operand:VPAIR 1 "")]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+{
+  rs6000_expand_vector_pair_init (operands[0], operands[1]);
+  DONE;
+})
+
+(define_expand "vec_set<mode>"
+  [(match_operand:VPAIR 0 "vlogical_operand")
+   (match_operand:<VPAIR_ELEMENT> 1 "register_operand")
+   (match_operand 2 "vec_set_index_operand")]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+{
+  rs6000_expand_vector_pair_set (operands[0], operands[1], operands[2]);
+  DONE;
+})
+
+(define_expand "vec_extract<mode><vpair_element_l>"
+  [(match_operand:<VPAIR_ELEMENT> 0 "register_operand")
+   (match_operand:VPAIR 1 "vlogical_operand")
+   (match_operand 2 "const_int_operand")]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+{
+  rs6000_expand_vector_pair_extract (operands[0], operands[1], operands[2]);
+  DONE;
+})
+
 ;; Assemble a vector pair from two vectors.  Unlike
 ;; __builtin_mma_assemble_pair, this function produces a vector pair output
 ;; directly and it takes all of the vector types.

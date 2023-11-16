@@ -7103,19 +7103,6 @@ rs6000_expand_vector_init (rtx target, rtx vals)
 	}
     }
 
-  /* Handle vector pair splats.  */
-  if (all_same && mode == V4DFmode)
-    {
-      emit_insn (gen_vpair_splat_v4df (target, XVECEXP (vals, 0, 0)));
-      return;
-    }
-
-  if (all_same && mode == V8SFmode)
-    {
-      emit_insn (gen_vpair_splat_v8sf (target, XVECEXP (vals, 0, 0)));
-      return;
-    }
-
   /* Store value to stack temp.  Load vector element.  Splat.  However, splat
      of 64-bit items is not supported on Altivec.  */
   if (all_same && GET_MODE_SIZE (inner_mode) <= 4)
@@ -7328,6 +7315,72 @@ rs6000_expand_vector_init (rtx target, rtx vals)
 				    i * GET_MODE_SIZE (inner_mode)),
 		    XVECEXP (vals, 0, i));
   emit_move_insn (target, mem);
+}
+
+/* Initialize vector pair TARGET to VALS.  */
+
+void
+rs6000_expand_vector_pair_init (rtx target, rtx vals)
+{
+  machine_mode mode_vpair = GET_MODE (target);
+  machine_mode mode_vector;
+  size_t n_elts_vpair = GET_MODE_NUNITS (mode_vpair);
+  size_t n_elts_vector = n_elts_vpair / 2;
+  bool all_same = true;
+  rtx first = XVECEXP (vals, 0, 0);
+  rtx (*gen_splat) (rtx, rtx);
+  rtx (*gen_assemble) (rtx, rtx, rtx);
+
+  switch (mode_vpair)
+    {
+    case E_V4DFmode:
+      mode_vector = V2DFmode;
+      gen_splat = gen_vpair_splat_v4df;
+      gen_assemble = gen_vpair_assemble_v4df;
+      break;
+
+    case E_V8SFmode:
+      mode_vector = V8SFmode;
+      gen_splat = gen_vpair_splat_v8sf;
+      gen_assemble = gen_vpair_assemble_v8sf;
+      break;
+
+    default:
+      gcc_unreachable ();
+    }
+
+  /* See if we can do a splat operation.  */
+  for (size_t i = 1; i < n_elts_vpair; ++i)
+    {
+      if (!rtx_equal_p (XVECEXP (vals, 0, i), first))
+	{
+	  all_same = false;
+	  break;
+	}
+    }
+
+  if (all_same)
+    {
+      emit_insn (gen_splat (target, first));
+      return;
+    }
+
+  /* Break the initialization into two parts.  */
+  rtx vector_hi = gen_reg_rtx (mode_vector);
+  rtx vector_lo = gen_reg_rtx (mode_vector);
+  rtvec vals_hi = rtvec_alloc (n_elts_vector);
+  rtvec vals_lo = rtvec_alloc (n_elts_vector);
+
+  for (size_t i = 0; i < n_elts_vector; i++)
+    {
+      RTVEC_ELT (vals_hi, i) = XVECEXP (vals, 0, i);
+      RTVEC_ELT (vals_lo, i) = XVECEXP (vals, 0, i + n_elts_vector);
+    }
+
+  rs6000_expand_vector_init (vector_hi, gen_rtx_CONST_VECTOR (mode_vector, vals_hi));
+  rs6000_expand_vector_init (vector_lo, gen_rtx_CONST_VECTOR (mode_vector, vals_lo));
+  emit_insn (gen_assemble (target, vector_hi, vector_lo));
+  return;
 }
 
 /* Insert VAL into IDX of TARGET, VAL size is same of the vector element, IDX
@@ -7658,6 +7711,15 @@ rs6000_expand_vector_set (rtx target, rtx val, rtx elt_rtx)
   emit_insn (gen_rtx_SET (target, x));
 }
 
+/* Set field ELT_RTX of vaector pair TARGET to VAL.  */
+
+void
+rs6000_expand_vector_pair_set (rtx target, rtx val, rtx elt_rtx)
+{
+  if (target || val || elt_rtx)
+    gcc_unreachable ();
+}
+
 /* Extract field ELT from VEC into TARGET.  */
 
 void
@@ -7705,20 +7767,6 @@ rs6000_expand_vector_extract (rtx target, rtx vec, rtx elt)
 	  if (TARGET_DIRECT_MOVE_64BIT)
 	    {
 	      emit_insn (gen_vsx_extract_v4si (target, vec, elt));
-	      return;
-	    }
-	  break;
-	case E_V4DFmode:
-	  if (TARGET_MMA && TARGET_VECTOR_SIZE_32)
-	    {
-	      emit_insn (gen_vsx_extract_v4df (target, vec, elt));
-	      return;
-	    }
-	  break;
-	case E_V8SFmode:
-	  if (TARGET_MMA && TARGET_VECTOR_SIZE_32)
-	    {
-	      emit_insn (gen_vsx_extract_v8sf (target, vec, elt));
 	      return;
 	    }
 	  break;
@@ -7796,6 +7844,15 @@ rs6000_expand_vector_extract (rtx target, rtx vec, rtx elt)
       new_addr = change_address (mem, inner_mode, new_addr);
       emit_move_insn (target, new_addr);
     }
+}
+
+/* Extract field ELT from VEC into TARGET.  */
+
+void
+rs6000_expand_vector_pair_extract (rtx target, rtx vec, rtx elt)
+{
+  if (target || vec || elt)
+    gcc_unreachable ();
 }
 
 /* Return the offset within a memory object (MEM) of a vector type to a given
