@@ -1,4 +1,24 @@
-==================== Branch work144-vsize, patch #411 ====================
+==================== Branch work144-vsize, patch #413 ====================
+
+Add some integer vector pair support.
+
+
+2023-11-16  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-pair.md (VPAIR_INT): Rename from VPAIR_LOGICAL.
+	(VPAIR_NEG_VNEG): New mode iterator.
+	(VPAIR_NEG_SUB): Likewise.
+	(VPAIR_INT_BINARY): Likewise.
+	(vpair_op): Fix standard name for not.
+	(vec_init<mode><vpair_element_l>): Use vsx_register_operand.
+	(neg<mode>2, VPAIR_NEG_VNEG iterator): New insn.
+	(neg<mode>2, VPAIR_NEG_SUB): Likewise.
+	(vector pair integer ops): Update iterators.  Add add, subtract, min,
+	max, and negate support.
+
+==================== Branch work144-vsize, patch #412 ====================
 
 Add integer logical vector pair instructions
 
