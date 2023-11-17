@@ -1,3 +1,33 @@
+==================== Branch work146-dmf, patch #109 ====================
+
+Add paddis support.
+
+2023-11-17  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/constraints.md (eU): New constraint.
+	(eV): Likewise.
+	* config/rs6000/predicates.md (paddis_operand): New predicate.
+	(paddis_paddi_operand): Likewise.
+	(add_operand): Add paddis support.
+	* config/rs6000/rs6000-cpus.def (ISA_FUTURE_MASKS): Add -mpaddis
+	support.
+	(POWERPC_MASKS): Likewise.
+	* config/rs6000/rs6000.cc (num_insns_constant_gpr): Add -mpaddis
+	support.
+	(num_insns_constant_multi): Likewise.
+	(print_operand): Add %B<n> for paddis support.
+	(rs6000_opt_masks): Add -mpaddis.
+	& config/rs6000/rs6000.h (SIGNED_INTEGER_32BIT_P): New macro.
+	* config/rs6000/rs6000.md (isa attribute): Add -mpaddis support.
+	(enabled attribute); Likewise.
+	(add<mode>3): Likewise.
+	(adddi3 splitter): New splitter for paddis.
+	(movdi_internal64): Add -mpaddis support.
+	(movdi splitter): New splitter for -mpaddis.
+	* config/rs6000/rs6000.opt (-mpaddis): New switch.
+
 ==================== Branch work146-dmf, patch #108 ====================
 
 Add saturating subtract built-ins.
