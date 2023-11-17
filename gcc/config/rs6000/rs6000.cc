@@ -1965,14 +1965,14 @@ rs6000_hard_regno_mode_ok (unsigned int regno, machine_mode mode)
 static bool
 rs6000_modes_tieable_p (machine_mode mode1, machine_mode mode2)
 {
-  if (mode1 == PTImode || mode1 == XOmode || mode2 == PTImode
-      || mode2 == XOmode)
-    return mode1 == mode2;
-
+  if (mode1 == PTImode || mode1 == XOmode
+       || mode2 == PTImode || mode2 == XOmode)
+     return mode1 == mode2;
+ 
   if (VECTOR_PAIR_MODE (mode1))
     return VECTOR_PAIR_MODE (mode2);
   if (VECTOR_PAIR_MODE (mode2))
-    return false;
+    return ALTIVEC_OR_VSX_VECTOR_MODE (mode1);
 
   if (ALTIVEC_OR_VSX_VECTOR_MODE (mode1))
     return ALTIVEC_OR_VSX_VECTOR_MODE (mode2);
@@ -7317,6 +7317,56 @@ rs6000_expand_vector_init (rtx target, rtx vals)
   emit_move_insn (target, mem);
 }
 
+/* For a vector pair mode, return the equivalent vector mode or VOIDmode.  */
+
+static machine_mode
+vector_pair_to_vector_mode (machine_mode mode)
+{
+  machine_mode vmode;
+
+  switch (mode)
+    {
+    case E_V32QImode:  vmode = V16QImode; break;
+    case E_V16HImode:  vmode = V8HImode;  break;
+    case E_V8SImode:   vmode = V4SImode;  break;
+    case E_V4DImode:   vmode = V2DImode;  break;
+    case E_V8SFmode:   vmode = V4SFmode;  break;
+    case E_V4DFmode:   vmode = V2DFmode;  break;
+    default:           vmode = VOIDmode;  break;
+    }
+
+  return vmode;
+}
+
+/* Split a vector constant for a type that can be held into a vector register
+   pair into 2 separate constants that can be held in a single vector register.
+   Return true if we can split the constant.  */
+
+static bool
+rs6000_split_vpair_constant (rtx op, rtx *high, rtx *low)
+{
+  machine_mode vmode = vector_pair_to_vector_mode (GET_MODE (op));
+
+  *high = *low = NULL_RTX;
+
+  if (!CONST_VECTOR_P (op) || vmode == GET_MODE (op))
+    return false;
+
+  size_t nunits = GET_MODE_NUNITS (vmode);
+  rtvec hi_vec = rtvec_alloc (nunits);
+  rtvec lo_vec = rtvec_alloc (nunits);
+
+  for (size_t i = 0; i < nunits; i++)
+    {
+      RTVEC_ELT (hi_vec, i) = CONST_VECTOR_ELT (op, i);
+      RTVEC_ELT (lo_vec, i) = CONST_VECTOR_ELT (op, i + nunits);
+    }
+
+  *high = gen_rtx_CONST_VECTOR (vmode, hi_vec);
+  *low = gen_rtx_CONST_VECTOR (vmode, lo_vec);
+  return true;
+}
+
 /* Initialize vector pair TARGET to VALS.  */
 
 void
@@ -7325,7 +7375,6 @@ rs6000_expand_vector_pair_init (rtx target, rtx vals)
   machine_mode mode_vpair = GET_MODE (target);
   machine_mode mode_vector;
   size_t n_elts_vpair = GET_MODE_NUNITS (mode_vpair);
-  size_t n_elts_vector = n_elts_vpair / 2;
   bool all_same = true;
   rtx first = XVECEXP (vals, 0, 0);
   rtx (*gen_splat) (rtx, rtx);
@@ -7333,16 +7382,40 @@ rs6000_expand_vector_pair_init (rtx target, rtx vals)
 
   switch (mode_vpair)
     {
+    case E_V32QImode:
+      mode_vector = V16QImode;
+      gen_splat = gen_vpair_splat_v32qi;
+      gen_concat = gen_vpair_concat_v32qi;
+      break;
+
+    case E_V16HImode:
+      mode_vector = V8HImode;
+      gen_splat = gen_vpair_splat_v16hi;
+      gen_concat = gen_vpair_concat_v16hi;
+      break;
+
+    case E_V8SImode:
+      mode_vector = V4SImode;
+      gen_splat = gen_vpair_splat_v8si;
+      gen_concat = gen_vpair_concat_v8si;
+      break;
+
+    case E_V4DImode:
+      mode_vector = V2DImode;
+      gen_splat = gen_vpair_splat_v4di;
+      gen_concat = gen_vpair_concat_v4di;
+      break;
+
+    case E_V8SFmode:
+      mode_vector = V4SFmode;
+      gen_splat = gen_vpair_splat_v8sf;
+      gen_concat = gen_vpair_concat_v8sf;
+      break;
+
     case E_V4DFmode:
       mode_vector = V2DFmode;
       gen_splat = gen_vpair_splat_v4df;
       gen_concat = gen_vpair_concat_v4df;
-      break;
-
-    case E_V8SFmode:
-      mode_vector = V8SFmode;
-      gen_splat = gen_vpair_splat_v8sf;
-      gen_concat = gen_vpair_concat_v8sf;
       break;
 
     default:
@@ -7368,17 +7441,13 @@ rs6000_expand_vector_pair_init (rtx target, rtx vals)
   /* Break the initialization into two parts.  */
   rtx vector_hi = gen_reg_rtx (mode_vector);
   rtx vector_lo = gen_reg_rtx (mode_vector);
-  rtvec vals_hi = rtvec_alloc (n_elts_vector);
-  rtvec vals_lo = rtvec_alloc (n_elts_vector);
+  rtx vals_hi;
+  rtx vals_lo;
 
-  for (size_t i = 0; i < n_elts_vector; i++)
-    {
-      RTVEC_ELT (vals_hi, i) = XVECEXP (vals, 0, i);
-      RTVEC_ELT (vals_lo, i) = XVECEXP (vals, 0, i + n_elts_vector);
-    }
+  rs6000_split_vpair_constant (vals, &vals_hi, &vals_lo);
 
-  rs6000_expand_vector_init (vector_hi, gen_rtx_CONST_VECTOR (mode_vector, vals_hi));
-  rs6000_expand_vector_init (vector_lo, gen_rtx_CONST_VECTOR (mode_vector, vals_lo));
+  rs6000_expand_vector_init (vector_hi, vals_hi);
+  rs6000_expand_vector_init (vector_lo, vals_lo);
   emit_insn (gen_concat (target, vector_hi, vector_lo));
   return;
 }
@@ -23526,6 +23595,7 @@ altivec_expand_vec_perm_le (rtx operands[4])
   rtx tmp = target;
   rtx norreg = gen_reg_rtx (V16QImode);
   machine_mode mode = GET_MODE (target);
+  machine_mode qi_vmode = VECTOR_PAIR_MODE (mode) ? V32QImode : V16QImode;
 
   /* Get everything in regs so the pattern matches.  */
   if (!REG_P (op0))
@@ -23533,7 +23603,7 @@ altivec_expand_vec_perm_le (rtx operands[4])
   if (!REG_P (op1))
     op1 = force_reg (mode, op1);
   if (!REG_P (sel))
-    sel = force_reg (V16QImode, sel);
+    sel = force_reg (qi_vmode, sel);
   if (!REG_P (target))
     tmp = gen_reg_rtx (mode);
 
@@ -23546,10 +23616,10 @@ altivec_expand_vec_perm_le (rtx operands[4])
     {
       /* Invert the selector with a VNAND if available, else a VNOR.
 	 The VNAND is preferred for future fusion opportunities.  */
-      notx = gen_rtx_NOT (V16QImode, sel);
+      notx = gen_rtx_NOT (qi_vmode, sel);
       iorx = (TARGET_P8_VECTOR
-	      ? gen_rtx_IOR (V16QImode, notx, notx)
-	      : gen_rtx_AND (V16QImode, notx, notx));
+	      ? gen_rtx_IOR (qi_vmode, notx, notx)
+	      : gen_rtx_AND (qi_vmode, notx, notx));
       emit_insn (gen_rtx_SET (norreg, iorx));
 
       /* Permute with operands reversed and adjusted selector.  */
@@ -27518,94 +27588,6 @@ rs6000_split_logical (rtx operands[3],
     }
 
   return;
-}
-
-/* For a vector pair mode, return the equivalent vector mode or VOIDmode.  */
-
-machine_mode
-vector_pair_to_vector_mode (machine_mode mode)
-{
-  machine_mode vmode;
-
-  switch (mode)
-    {
-    case E_V8SFmode:  vmode = V4SFmode;  break;
-    case E_V4DFmode:  vmode = V2DFmode;  break;
-    default:          vmode = VOIDmode;  break;
-    }
-
-  return vmode;
-}
-
-/* Adjust a vector pair register, element number, and mode to reflect the
-   vector register after splitting it.
-
-   Return the vector mode if the mode is a vector pair, or the original mode if
-   it wasn't.
-
-   MODE is the original mode, P_REG is a pointer to the register to be adjust,
-   and P_ELEMENT is a pointer to the element number to be adjusted.  */
-
-machine_mode
-rs6000_adjust_for_vector_pair (machine_mode orig_mode,
-			       rtx *p_reg,
-			       int *p_element)
-{
-  machine_mode vmode = vector_pair_to_vector_mode (orig_mode);
-
-  /* Return if not a vector pair.  */
-  if (vmode == VOIDmode)
-    return orig_mode;
-
-  unsigned regno = reg_or_subregno (*p_reg);
-  int element = *p_element;
-
-  /* Choose which register.  We have to reverse the words for little
-     endian.  */
-  int nunits = GET_MODE_NUNITS (vmode);
-  if (element >= nunits)
-    {
-      element -= nunits;
-      if (WORDS_BIG_ENDIAN)
-	regno++;
-    }
-  else if (!WORDS_BIG_ENDIAN)
-    regno++;
-
-  /* Adjust elements.  */
-  *p_reg = gen_rtx_REG (vmode, regno);
-  *p_element = element;
-  return vmode;
-}
-
-
-/* Split a vector constant for a type that can be held into a vector register
-   pair into 2 separate constants that can be held in a single vector register.
-   Return true if we can split the constant.  */
-
-bool
-rs6000_split_vpair_constant (rtx op, rtx *high, rtx *low)
-{
-  machine_mode vmode = vector_pair_to_vector_mode (GET_MODE (op));
-
-  *high = *low = NULL_RTX;
-
-  if (!CONST_VECTOR_P (op) || vmode == GET_MODE (op))
-    return false;
-
-  size_t nunits = GET_MODE_NUNITS (vmode);
-  rtvec hi_vec = rtvec_alloc (nunits);
-  rtvec lo_vec = rtvec_alloc (nunits);
-
-  for (size_t i = 0; i < nunits; i++)
-    {
-      RTVEC_ELT (hi_vec, i) = CONST_VECTOR_ELT (op, i);
-      RTVEC_ELT (lo_vec, i) = CONST_VECTOR_ELT (op, i + nunits);
-    }
-
-  *high = gen_rtx_CONST_VECTOR (vmode, hi_vec);
-  *low = gen_rtx_CONST_VECTOR (vmode, lo_vec);
-  return true;
 }
 
 /* Split a unary vector pair insn into two separate vector insns.  */
