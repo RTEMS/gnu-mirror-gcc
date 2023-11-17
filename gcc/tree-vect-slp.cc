@@ -8272,6 +8272,247 @@ vect_slp_if_converted_bb (basic_block bb, loop_p orig_loop)
   return vect_slp_bbs (bbs, orig_loop);
 }
 
+/* If NAME is an SSA_NAME defined by an assignment, return that assignment.
+   If SINGLE_USE_ONLY is true and NAME has multiple uses, return NULL.  */
+
+static gassign *
+get_tree_def (tree name, bool single_use_only)
+{
+  if (TREE_CODE (name) != SSA_NAME)
+    return NULL;
+
+  gimple *def_stmt = SSA_NAME_DEF_STMT (name);
+
+  if (single_use_only && !has_single_use (name))
+    return NULL;
+
+  if (!is_gimple_assign (def_stmt))
+    return NULL;
+
+  return dyn_cast <gassign *> (def_stmt);
+}
+
+/* Helper function for vect_slp_optimize_permutes.  Return true if STMT is an
+   expression of the form:
+
+     src1_perm = VEC_PERM_EXPR <SRC1, SRC1, CONST_VEC>
+     src2_perm = VEC_PERM_EXPR <SRC2, SRC2, CONST_VEC>
+     bop1 = src1_perm BINOP1 src2_perm
+     bop2 = src1_perm BINOP2 src2_perm
+     STMT = VEC_PERM_EXPR <bop1, bop2, CONST_VEC>
+
+   and src1_perm, src2_perm, bop1, bop2 are not used outside of STMT.
+   Return the first two permute statements and the binops through the
+   corresponding pointer arguments.  */
+
+static bool
+recognise_perm_binop_perm_pattern (gassign *stmt,
+				   gassign **bop1_out, gassign **bop2_out,
+				   gassign **perm1_out, gassign **perm2_out)
+{
+  enum tree_code code = gimple_assign_rhs_code (stmt);
+
+  if (code != VEC_PERM_EXPR)
+    return false;
+
+  gassign *bop1, *bop2;
+  if (!(bop1 = get_tree_def(gimple_assign_rhs1 (stmt), true))
+      || !(bop2 = get_tree_def(gimple_assign_rhs2 (stmt), true))
+      || !VECTOR_CST_NELTS (gimple_assign_rhs3 (stmt)).is_constant ()
+      || TREE_CODE_CLASS (gimple_assign_rhs_code (bop1)) != tcc_binary
+      || TREE_CODE_CLASS (gimple_assign_rhs_code (bop2)) != tcc_binary)
+    return false;
+
+  if (gimple_assign_rhs1 (bop1) != gimple_assign_rhs1 (bop2)
+      || gimple_assign_rhs2 (bop1) != gimple_assign_rhs2 (bop2)
+      || bop1 == bop2)
+    return false;
+
+  tree src1_perm = gimple_assign_rhs1 (bop1);
+  tree src2_perm = gimple_assign_rhs2 (bop1);
+
+  gassign *perm1, *perm2;
+  if (!(perm1 = get_tree_def(src1_perm, false))
+      || !(perm2 = get_tree_def(src2_perm, false))
+      || num_imm_uses (src1_perm) != 2
+      || num_imm_uses (src2_perm) != 2
+      || gimple_assign_rhs_code (perm1) != VEC_PERM_EXPR
+      || gimple_assign_rhs_code (perm2) != VEC_PERM_EXPR
+      || gimple_assign_rhs1 (perm1) != gimple_assign_rhs2 (perm1)
+      || gimple_assign_rhs1 (perm2) != gimple_assign_rhs2 (perm2)
+      || !VECTOR_CST_NELTS (gimple_assign_rhs3 (perm1)).is_constant ()
+      || !VECTOR_CST_NELTS (gimple_assign_rhs3 (perm2)).is_constant ())
+    return false;
+
+  *bop1_out = bop1;
+  *bop2_out = bop2;
+  *perm1_out = perm1;
+  *perm2_out = perm2;
+
+  return true;
+}
+
+typedef hash_map<int_hash<unsigned HOST_WIDE_INT, -1, -1>, unsigned HOST_WIDE_INT> lane_map;
+
+/* Iterate over the basic blocks of FUN and try to optimize VEC_PERM
+   expressions.  This is done at the end of vectorization so it can optimize
+   expressions that are part of multiple different vectorized blocks/loops.  */
+
+static void
+vect_slp_optimize_permutes (function *fun)
+{
+  basic_block bb;
+  FOR_EACH_BB_FN (bb, fun)
+    for (gimple_stmt_iterator gsi = gsi_start_bb (bb); !gsi_end_p (gsi);)
+      {
+	gimple_stmt_iterator gsi_stmt1 = gsi;
+	gassign *stmt1 = dyn_cast <gassign *> (gsi_stmt (gsi));
+	gsi_next (&gsi);
+
+	if (gsi_end_p (gsi))
+	  break;
+
+	gassign *stmt2 = dyn_cast <gassign *> (gsi_stmt (gsi));
+
+	if (!stmt1 || !stmt2)
+	  continue;
+
+	/* Try to identify select permutes which utilize only part of a
+	   vector and merge two of them into one. This case can arise from
+	   TWO_OPERATOR SLP patterns because the final permute uses only half
+	   of each input vector.  */
+	gassign *bop1_1, *bop1_2, *bop2_1, *bop2_2;
+	gassign *src1_1, *src1_2, *src2_1, *src2_2;
+
+	if (!recognise_perm_binop_perm_pattern(stmt1, &bop1_1, &bop1_2,
+					       &src1_1, &src1_2))
+	  continue;
+
+	if (!recognise_perm_binop_perm_pattern(stmt2, &bop2_1, &bop2_2,
+					       &src2_1, &src2_2))
+	  continue;
+
+	if (gimple_assign_rhs_code (bop1_1) != gimple_assign_rhs_code (bop2_1))
+	  continue;
+
+	if (gimple_assign_rhs_code (bop1_2) != gimple_assign_rhs_code (bop2_2))
+	  continue;
+
+	tree mask1 = gimple_assign_rhs3 (stmt1);
+	tree mask2 = gimple_assign_rhs3 (stmt2);
+
+	/* Calculate the lanes that the first permute needs.  */
+	lane_map mask1_lanes;
+	unsigned HOST_WIDE_INT i;
+	unsigned HOST_WIDE_INT nelts = VECTOR_CST_NELTS (mask1).to_constant ();
+	for (i = 0; i < nelts; i++)
+	  {
+	    tree val = VECTOR_CST_ELT (mask1, i);
+	    gcc_assert (TREE_CODE (val) == INTEGER_CST);
+	    unsigned HOST_WIDE_INT j = TREE_INT_CST_LOW (val) & (nelts - 1);
+	    mask1_lanes.put(j, j);
+	  }
+
+	/* Calculate the lanes that the second permute needs and rewrite
+	   them to use the lanes that are unused from the first permute.  */
+	lane_map mask2_lanes;
+	unsigned HOST_WIDE_INT lane_gen = 0;
+	for (i = 0; i < nelts; i++)
+	  {
+	    tree val = VECTOR_CST_ELT (mask2, i);
+	    gcc_assert (TREE_CODE (val) == INTEGER_CST);
+	    unsigned HOST_WIDE_INT j = TREE_INT_CST_LOW (val) & (nelts - 1);
+	    bool existed;
+	    unsigned HOST_WIDE_INT &rewrite_lane
+	      = mask2_lanes.get_or_insert(j, &existed);
+	    if (!existed)
+	      {
+		while (mask1_lanes.get (lane_gen))
+		  lane_gen++;
+		if (lane_gen >= nelts)
+		  break;
+		rewrite_lane = lane_gen;
+		lane_gen++;
+	      }
+	  }
+
+	/* The requested lanes need more than one permute.  */
+	if (i < nelts)
+	  continue;
+
+	vec_perm_builder sel (nelts, nelts, 1);
+	vec_perm_builder sel_1 (nelts, nelts, 1);
+	vec_perm_builder sel_2 (nelts, nelts, 1);
+
+	/* Rewrite the permutations based on MASK1_LANES/MASK2_LANES.  */
+	for (i = 0; i < nelts; i++)
+	  {
+	    /* Calculate new mask for STMT2.  */
+	    tree val = VECTOR_CST_ELT (mask2, i);
+	    unsigned HOST_WIDE_INT lane
+	      = TREE_INT_CST_LOW (val) & (2 * nelts - 1);
+	    unsigned off = (lane < nelts) ? 0 : nelts;
+	    unsigned HOST_WIDE_INT new_lane
+	      = *mask2_lanes.get (lane - off) + off;
+	    sel.quick_push (new_lane);
+
+	    /* Calculate new masks for SRC1_1 and SRC1_2.  */
+	    bool use_src1 = mask1_lanes.get (i);
+	    tree mask1 = gimple_assign_rhs3 (use_src1 ? src1_1 : src2_1);
+	    tree mask2 = gimple_assign_rhs3 (use_src1 ? src1_2 : src2_2);
+	    unsigned HOST_WIDE_INT lane1
+	      = TREE_INT_CST_LOW (VECTOR_CST_ELT (mask1, i)) & (nelts - 1);
+	    unsigned HOST_WIDE_INT lane2
+	      = TREE_INT_CST_LOW (VECTOR_CST_ELT (mask2, i)) & (nelts - 1);
+	    sel_1.quick_push (lane1 + (use_src1 ? 0 : nelts));
+	    sel_2.quick_push (lane2 + (use_src1 ? 0 : nelts));
+	  }
+
+	vec_perm_indices indices (sel, 2, nelts);
+	vec_perm_indices indices1_1 (sel_1, 2, nelts);
+	vec_perm_indices indices1_2 (sel_2, 2, nelts);
+
+	tree vectype = TREE_TYPE (gimple_assign_lhs (stmt2));
+	if (!can_vec_perm_const_p (TYPE_MODE (vectype), TYPE_MODE (vectype), indices)
+	    || !can_vec_perm_const_p (TYPE_MODE (vectype), TYPE_MODE (vectype), indices1_1)
+	    || !can_vec_perm_const_p (TYPE_MODE (vectype), TYPE_MODE (vectype), indices1_2))
+	  continue;
+
+	/* Success.  Update all the statements.  */
+	gimple_assign_set_rhs1 (stmt2, gimple_assign_rhs1 (stmt1));
+	gimple_assign_set_rhs2 (stmt2, gimple_assign_rhs2 (stmt1));
+	gimple_assign_set_rhs3 (stmt2, vect_gen_perm_mask_checked (vectype, indices));
+
+	gimple_assign_set_rhs2 (src1_1, gimple_assign_rhs1 (src2_1));
+	gimple_assign_set_rhs2 (src1_2, gimple_assign_rhs1 (src2_2));
+
+	gimple_assign_set_rhs3 (src1_1, vect_gen_perm_mask_checked (vectype, indices1_1));
+	gimple_assign_set_rhs3 (src1_2, vect_gen_perm_mask_checked (vectype, indices1_2));
+
+	update_stmt (stmt2);
+	update_stmt (src1_1);
+	update_stmt (src1_2);
+
+	/* We need to move the updated statements because otherwise they may
+	   come before some variable that they depend on.  Since we know that
+	   they don't have uses outside the pattern, we can remove them and
+	   add them back in order.  */
+	gimple_stmt_iterator gsi_rm = gsi_for_stmt (bop1_1);
+	gsi_remove (&gsi_rm, false);
+	gsi_rm = gsi_for_stmt (bop1_2);
+	gsi_remove (&gsi_rm, false);
+	gsi_rm = gsi_for_stmt (src1_1);
+	gsi_remove (&gsi_rm, false);
+	gsi_rm = gsi_for_stmt (src1_2);
+	gsi_remove (&gsi_rm, false);
+
+	gsi_insert_before (&gsi_stmt1, src1_1, GSI_SAME_STMT);
+	gsi_insert_before (&gsi_stmt1, src1_2, GSI_SAME_STMT);
+	gsi_insert_before (&gsi_stmt1, bop1_1, GSI_SAME_STMT);
+	gsi_insert_before (&gsi_stmt1, bop1_2, GSI_SAME_STMT);
+      }
+}
+
 /* Main entry for the BB vectorizer.  Analyze and transform BB, returns
    true if anything in the basic-block was vectorized.  */
 
@@ -8379,6 +8620,8 @@ vect_slp_function (function *fun)
 
   if (!bbs.is_empty ())
     r |= vect_slp_bbs (bbs, NULL);
+
+  vect_slp_optimize_permutes(fun);
 
   free (rpo);
 
