@@ -1310,7 +1310,7 @@ See RS/6000 and PowerPC Options.
 -mstack-protector-guard=@var{guard} -mstack-protector-guard-reg=@var{reg}
 -mstack-protector-guard-offset=@var{offset} -mprefixed -mno-prefixed
 -mpcrel -mno-pcrel -mmma -mno-mmma -mrop-protect -mno-rop-protect
--mprivileged -mno-privileged}
+-mprivileged -mno-privileged -mvector-size-32 -mno-vector-size-32}
 
 @emph{RX Options}
 @gccoptlist{-m64bit-doubles  -m32bit-doubles  -fpu  -nofpu
@@ -30977,6 +30977,18 @@ optimization (@option{-fshrink-wrap}).
 @item -mprivileged
 @itemx -mno-privileged
 Generate (do not generate) code that will run in privileged state.
+
+@opindex mvector-size-32
+@opindex mno-vector-size-32
+@item -mvector-size-32
+@itemx -mno-vector-size-32
+Generate (do not generate) code that will use the load vector pair and
+store vector pair instructions for vectorization.  This options
+requires @option{-mma} to be enabled.
+
+At the present time, @option{-mvector-size-32} is not enabled by
+default.  If you use @option{-mvector-size-32}, if will only enable
+vectorized for @code{float} and @code{double} operations.
 
 @opindex block-ops-unaligned-vsx
 @opindex no-block-ops-unaligned-vsx
