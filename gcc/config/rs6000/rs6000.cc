@@ -5216,6 +5216,15 @@ rs6000_builtin_vectorization_cost (enum vect_cost_for_stmt type_of_cost,
 static machine_mode
 rs6000_preferred_simd_mode (scalar_mode mode)
 {
+  /* Prefer vector pair for floating point, but not for integer modes.  */
+  if (TARGET_MMA && TARGET_VECTOR_SIZE_32)
+    {
+      if (mode == DFmode)
+	return V4DFmode;
+      else if (mode == SFmode)
+	return V8SFmode;
+    }
+
   opt_machine_mode vmode = mode_for_vector (mode, 16 / GET_MODE_SIZE (mode));
 
   if (vmode.exists () && !VECTOR_MEM_NONE_P (vmode.require ()))
