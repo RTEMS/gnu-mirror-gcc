@@ -605,6 +605,10 @@ mstore-vector-pair
 Target Undocumented Mask(STORE_VECTOR_PAIR) Var(rs6000_isa_flags)
 Generate (do not generate) store vector pair instructions.
 
+mpaddis
+Target Undocumented Var(TARGET_PADDIS) Save
+Generate (do not generate) the paddis instruction.
+
 mrelative-jumptables
 Target Undocumented Var(rs6000_relative_jumptables) Init(1) Save
 
