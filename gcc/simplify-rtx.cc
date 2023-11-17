@@ -7545,6 +7545,10 @@ rtx
 simplify_context::simplify_subreg (machine_mode outermode, rtx op,
 				   machine_mode innermode, poly_uint64 byte)
 {
+  /* XXX */
+  if (innermode == VOIDmode)
+    return NULL_RTX;
+
   /* Little bit of sanity checking.  */
   gcc_assert (innermode != VOIDmode);
   gcc_assert (outermode != VOIDmode);

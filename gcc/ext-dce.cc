@@ -150,11 +150,57 @@ ext_dce_process_sets (rtx_insn *insn, bitmap livenow, bitmap live_tmp)
 	  if (VECTOR_MODE_P (GET_MODE (x)) || GET_MODE (x) > E_DImode)
 	    continue;
 
-	  /* We could have (strict_low_part (subreg ...)).  It's always safe
-	     to leave bits live, even when they are not.  So we can just
-	     strip the STRICT_LOW_PART for now.  Similarly for a paradoxical
-	     SUBREG.  */
-	  if (GET_CODE (x) == STRICT_LOW_PART || paradoxical_subreg_p (x))
+	  /* We could have (strict_low_part (subreg ...)).  We can not just
+	     strip the STRICT_LOW_PART as that would result in clearing
+	     some bits in LIVENOW that are still live.  So process the
+	     STRICT_LOW_PART specially.  */
+	  if (GET_CODE (x) == STRICT_LOW_PART)
+	    {
+	      x = XEXP (x, 0);
+
+	      /* The only valid operand of a STRICT_LOW_PART is a non
+		 paradoxical SUBREG.  */
+	      gcc_assert (SUBREG_P (x) && !paradoxical_subreg_p (x));
+
+	      /* I think we should always see a REG here.  But let's
+		 be sure.  */
+	      gcc_assert (REG_P (SUBREG_REG (x)));
+
+	      /* We don't track values larger than DImode.  */
+	      gcc_assert (GET_MODE (x) <= E_DImode);
+
+	      /* But the inner mode might be larger, just punt for
+		 that case.  Remember, we can not just continue to process
+		 the inner RTXs due to the STRICT_LOW_PART.  */
+	      if (GET_MODE (SUBREG_REG (x)) > E_DImode)
+		{
+		  /* Skip the subrtxs of the STRICT_LOW_PART.  We can't
+		     process them because it'll set objects as no longer
+		     live when they are in fact still live.  */
+		  iter.skip_subrtxes ();
+		  continue;
+		}
+
+	      /* The mode of the SUBREG tells us how many bits we can
+		 clear.  */
+	      HOST_WIDE_INT rn = REGNO (SUBREG_REG (x));
+	      for (HOST_WIDE_INT i = 4 * rn; i < 4 * rn + 4; i++)
+		if (bitmap_bit_p (livenow, i))
+		  bitmap_set_bit (live_tmp, i);
+
+	      machine_mode mode = GET_MODE (x);
+	      HOST_WIDE_INT size = GET_MODE_SIZE (mode).to_constant ();
+	      bitmap_clear_range (livenow, 4 * rn, size);
+
+	      /* We have fully processed this destination.  */
+	      iter.skip_subrtxes ();
+	      continue;
+	    }
+
+	  /* We can safely strip a paradoxical subreg.  The inner mode will
+	     be narrower than the outer mode.  We'll clear fewer bits in
+	     LIVENOW than we'd like, but that's always safe.  */
+	  if (paradoxical_subreg_p (x))
 	    x = XEXP (x, 0);
 
 	  /* Similarly if we have a SUBREG of a wide mode.  Do this after
