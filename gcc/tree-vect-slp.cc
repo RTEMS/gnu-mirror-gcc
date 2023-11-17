@@ -2906,7 +2906,25 @@ fail:
 	  gassign *ostmt = as_a <gassign *> (ostmt_info->stmt);
 	  if (gimple_assign_rhs_code (ostmt) != code0)
 	    {
-	      SLP_TREE_LANE_PERMUTATION (node).safe_push (std::make_pair (1, i));
+	      /* If the current element can be found in another lane that has
+		 been used previously then use that one instead.  This can
+		 happen when the ONE and TWO contain duplicate elements and
+		 reduces the number of 'active' lanes.  */
+	      int idx = i;
+	      for (int alt_idx = (int) i - 1; alt_idx >= 0; alt_idx--)
+		{
+		  gassign *alt_stmt = as_a <gassign *> (stmts[alt_idx]->stmt);
+		  if (gimple_assign_rhs_code (alt_stmt) == code0
+		      && gimple_assign_rhs1 (ostmt)
+			== gimple_assign_rhs1 (alt_stmt)
+		      && gimple_assign_rhs2 (ostmt)
+			== gimple_assign_rhs2 (alt_stmt))
+		    {
+		      idx = alt_idx;
+		      break;
+		    }
+		}
+	      SLP_TREE_LANE_PERMUTATION (node).safe_push (std::make_pair (1, idx));
 	      ocode = gimple_assign_rhs_code (ostmt);
 	      j = i;
 	    }
