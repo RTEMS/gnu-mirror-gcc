@@ -21498,6 +21498,7 @@ The following built-in functions operate on pairs of
 @smallexample
 __vector_pair __builtin_vpair_f32_abs (__vector_pair);
 __vector_pair __builtin_vpair_f32_add (__vector_pair, __vector_pair);
+float __builtin_vpair_f32_add_elements (__vector_pair);
 __vector_pair __builtin_vpair_f32_assemble (vector float, vector float);
 vector float __builtin_vpair_f32_extract_vector (__vector_pair, int);
 __vector_pair __builtin_vpair_f32_fma (__vector_pair, __vector_pair, __vector_pair);
@@ -21515,6 +21516,7 @@ The following built-in functions operate on pairs of
 @smallexample
 __vector_pair __builtin_vpair_f64_abs (__vector_pair);
 __vector_pair __builtin_vpair_f64_add (__vector_pair, __vector_pair);
+double __builtin_vpair_f64_add_elements (__vector_pair);
 __vector_pair __builtin_vpair_f64_assemble (vector double, vector double);
 vector double __builtin_vpair_f64_extract_vector (__vector_pair, int);
 __vector_pair __builtin_vpair_f64_fma (__vector_pair, __vector_pair, __vector_pair);
@@ -21531,6 +21533,7 @@ The following built-in functions operate on pairs of
 
 @smallexample
 __vector_pair __builtin_vpair_i64_add (__vector_pair, __vector_pair);
+long long __builtin_vpair_i64_add_elements (__vector_pair);
 __vector_pair __builtin_vpair_i64_and (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_i64_assemble (vector long long,
                                             vector long long);
