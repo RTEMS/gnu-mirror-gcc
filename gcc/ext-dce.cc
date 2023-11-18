@@ -146,7 +146,9 @@ ext_dce_process_sets (rtx_insn *insn, bitmap livenow, bitmap live_tmp)
 	  x = SET_DEST (x);
 
 	  /* We don't support vector destinations or destinations
-	     wider than DImode.  */
+	     wider than DImode.   It is safe to continue this loop.
+	     At worst, it will leave things live which could have
+	     been made dead.  */
 	  if (VECTOR_MODE_P (GET_MODE (x)) || GET_MODE (x) > E_DImode)
 	    continue;
 
@@ -160,7 +162,9 @@ ext_dce_process_sets (rtx_insn *insn, bitmap livenow, bitmap live_tmp)
 
 	      /* The only valid operand of a STRICT_LOW_PART is a non
 		 paradoxical SUBREG.  */
-	      gcc_assert (SUBREG_P (x) && !paradoxical_subreg_p (x));
+	      gcc_assert (SUBREG_P (x)
+			  && !paradoxical_subreg_p (x)
+			  && SUBREG_BYTE (x).is_constant ());
 
 	      /* I think we should always see a REG here.  But let's
 		 be sure.  */
@@ -181,13 +185,14 @@ ext_dce_process_sets (rtx_insn *insn, bitmap livenow, bitmap live_tmp)
 		  continue;
 		}
 
-	      /* The mode of the SUBREG tells us how many bits we can
-		 clear.  */
+	      /* Transfer all the LIVENOW bits for X into LIVE_TMP.  */
 	      HOST_WIDE_INT rn = REGNO (SUBREG_REG (x));
 	      for (HOST_WIDE_INT i = 4 * rn; i < 4 * rn + 4; i++)
 		if (bitmap_bit_p (livenow, i))
 		  bitmap_set_bit (live_tmp, i);
 
+	      /* The mode of the SUBREG tells us how many bits we can
+		 clear.  */
 	      machine_mode mode = GET_MODE (x);
 	      HOST_WIDE_INT size = GET_MODE_SIZE (mode).to_constant ();
 	      bitmap_clear_range (livenow, 4 * rn, size);
@@ -203,16 +208,17 @@ ext_dce_process_sets (rtx_insn *insn, bitmap livenow, bitmap live_tmp)
 	  if (paradoxical_subreg_p (x))
 	    x = XEXP (x, 0);
 
-	  /* Similarly if we have a SUBREG of a wide mode.  Do this after
-	     stripping STRICT_LOW_PART or a paradoxical SUBREG to catch
-	     stuff like (strict_low_part (subreg:HI (reg:TI))).  */
+	  /* If we have a SUBREG that is too wide, just continue the loop
+	     and let the iterator go down into SUBREG_REG.  */
 	  if (SUBREG_P (x) && GET_MODE (SUBREG_REG (x)) > E_DImode)
 	    continue;
 
 	  /* Phase one of destination handling.  First remove any wrapper
 	     such as SUBREG or ZERO_EXTRACT.  */
 	  unsigned HOST_WIDE_INT mask = GET_MODE_MASK (GET_MODE (x));
-	  if (SUBREG_P (x) && !paradoxical_subreg_p (x))
+	  if (SUBREG_P (x)
+	      && !paradoxical_subreg_p (x)
+	      && SUBREG_BYTE (x).is_constant ())
 	    {
 	      bit = SUBREG_BYTE (x).to_constant () * BITS_PER_UNIT;
 	      if (WORDS_BIG_ENDIAN)
@@ -228,6 +234,7 @@ ext_dce_process_sets (rtx_insn *insn, bitmap livenow, bitmap live_tmp)
 		mask = -0x100000000ULL;
 	      x = SUBREG_REG (x);
 	    }
+
 	  if (GET_CODE (x) == ZERO_EXTRACT)
 	    {
 	      /* If either the size or the start position is unknown,
@@ -423,8 +430,8 @@ ext_dce_process_uses (rtx_insn *insn, bitmap livenow, bitmap live_tmp,
 	  enum rtx_code code = GET_CODE (src);
 
 	  /* ?!? How much of this should mirror SET handling, potentially
-	     being shared?  */
-	  if (SUBREG_P (dst))
+	     being shared?   */
+	  if (SUBREG_BYTE (dst).is_constant () && SUBREG_P (dst))
 	    {
 	      bit = SUBREG_BYTE (dst).to_constant () * BITS_PER_UNIT;
 	      if (WORDS_BIG_ENDIAN)
@@ -519,7 +526,7 @@ ext_dce_process_uses (rtx_insn *insn, bitmap livenow, bitmap live_tmp,
 		  if (GET_CODE (x) == STRICT_LOW_PART
 		      || paradoxical_subreg_p (x))
 		    x = XEXP (x, 0);
-		  else if (SUBREG_P (y))
+		  else if (SUBREG_P (y) && SUBREG_BYTE (y).is_constant ())
 		    {
 		      /* For anything but (subreg (reg)), break the inner loop
 			 and process normally (conservatively).  */
@@ -599,7 +606,8 @@ ext_dce_process_uses (rtx_insn *insn, bitmap livenow, bitmap live_tmp,
       else if (xcode == SUBREG
 	       && REG_P (SUBREG_REG (x))
 	       && subreg_lowpart_p (x)
-	       && GET_MODE_BITSIZE (GET_MODE  (x)).to_constant () <= 32)
+	       && GET_MODE_BITSIZE (GET_MODE (x)).is_constant ()
+	       && GET_MODE_BITSIZE (GET_MODE (x)).to_constant () <= 32)
 	{
 	  HOST_WIDE_INT size = GET_MODE_BITSIZE (GET_MODE  (x)).to_constant ();
 	  HOST_WIDE_INT rn = 4 * REGNO (SUBREG_REG (x));
