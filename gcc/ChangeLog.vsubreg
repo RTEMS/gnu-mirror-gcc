@@ -1,3 +1,63 @@
+==================== Branch work146-vsubreg, patch #402 (vsize patches #300) ====================
+
+Add vector_size(32) support.
+
+Slightly modified from the vsize branch to accomidate both vpair and visze.
+
+2023-11-17  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/predicates.md (const_0_to_31_operand): New predicate.
+	(mma_assemble_input_operand): Allow any 16-byte vector type, not just
+	V16QImode.
+	* config/rs6000/rs6000-c.c (rs6000_cpu_cpp_builtins): Define
+	__VECTOR_SIZE_32__ if -mvector-size-32 used.
+	* config/rs6000/rs6000-protos.h (rs6000_expand_vector_pair_init): New
+	declaration.
+	(rs6000_expand_vector_pair_set): Likewise.
+	(split_unary_vector_pair): Likewise.
+	(split_binary_vector_pair): Likewisee.
+	(split_fma_vector_pair): Likewise.
+	* config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached): Add
+	support for -mvector-size-32.
+	(rs6000_hard_regno_mode_ok): Likewise.
+	(rs6000_setup_reg_addr_masks): Likewise.
+	(rs6000_init_hard_regno_mode_ok): Likewise.
+	(rs6000_option_override_internal): Likewise.
+	(rs6000_builtin_vectorization_cost): Likewise.
+	(vector_pair_to_vector_mode): New function.
+	(+rs6000_split_vpair_constan): Likewise.
+	(rs6000_expand_vector_pair_ini): Likewise.
+	(rs6000_expand_vector_pair_set): Likewise.
+	(reg_offset_addressing_ok_p): Likewise.
+	(rs6000_emit_move): Likewise.
+	(altivec_expand_vec_perm_le): Likewise.
+	(rs6000_opt_var): Add -mvector-size-32.
+	(split_unary_vector_pair): New function.
+	(split_binary_vector_pair): Likewise.
+	(split_fma_vector_pai): Likewise.
+	(rs6000_split_multireg_move): Add -mvector-size-32 support.
+	* config/rs6000/rs6000.h (VECTOR_PAIR_MODE): New macro.
+	* config/rs6000/rs6000.md (wd mode attribute): Add vector pair modes.
+	(RELOAD mode iterator): Likewise.
+	(toplevel): Include vector-pair.md.
+	* config/rs6000/rs6000.opt (-mvector-size-32): New option.
+	* config/rs6000/vector-pair.md: New file.
+	* config/rs6000/vsx.md (vsx_extract_v4df): New insn.
+	(vsx_extract_v8sf): Likewise.
+	* doc/invoke.texi (RS/6000 and PowerPC Options): Document
+	-mvector-size-32.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-size-32-1.c: New test.
+	* gcc.target/powerpc/vector-size-32-2.c: Likewise.
+	* gcc.target/powerpc/vector-size-32-3.c: Likewise.
+	* gcc.target/powerpc/vector-size-32-4.c: Likewise.
+	* gcc.target/powerpc/vector-size-32-5.c: Likewise.
+	* gcc.target/powerpc/vector-size-32-6.c: Likewise.
+
 ==================== Branch work146-vsubreg, patch #401 (vpair patches #201-206) ====================
 
 Add support for vector pair built-in functions.
