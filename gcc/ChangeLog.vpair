@@ -1,3 +1,22 @@
+==================== Branch work146-vpair, patch #206 ====================
+
+Rename things so it can be combined with the vsize branch.
+
+2023-11-17  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair*): Rename all insn
+	names from VPAIR... to VPAIR_FUNC... to allow building the combined
+	vsubreg branch.
+	* config/rs6000/rs6000-overload.def (__builtin_vpair*): Likewise.
+	* config/rs6000/rs6000.md (toplevel): Include vpair-func.md instead of
+	vector-pair.md.
+	* config/rs6000/t-rs6000: (MD_INCLUDES): Change vector-pair.md to
+	vpair-func.md.
+	* config/rs6000/vpair-func.md: Rename from vector-pair.md to
+	vpair-func.md.  Change all VPAIR names to be VPAIR_FUNC.
+
 ==================== Branch work146-vpair, patch #205 ====================
 
 Add overloads for __builtin_vpair_assemble.
