@@ -61,9 +61,7 @@ extern bool rs6000_move_128bit_ok_p (rtx []);
 extern bool rs6000_split_128bit_ok_p (rtx []);
 extern void rs6000_expand_float128_convert (rtx, rtx, bool);
 extern void rs6000_expand_vector_init (rtx, rtx);
-extern void rs6000_expand_vector_pair_init (rtx, rtx);
 extern void rs6000_expand_vector_set (rtx, rtx, rtx);
-extern void rs6000_expand_vector_pair_set (rtx, rtx, rtx);
 extern void rs6000_expand_vector_extract (rtx, rtx, rtx);
 extern void rs6000_split_vec_extract_var (rtx, rtx, rtx, rtx, rtx);
 extern rtx rs6000_adjust_vec_address (rtx, rtx, rtx, rtx, machine_mode);
@@ -140,11 +138,6 @@ extern void rs6000_emit_swsqrt (rtx, rtx, bool);
 extern void output_toc (FILE *, rtx, int, machine_mode);
 extern void rs6000_fatal_bad_address (rtx);
 extern rtx create_TOC_reference (rtx, rtx);
-extern void split_unary_vector_pair (machine_mode, rtx [], rtx (*)(rtx, rtx));
-extern void split_binary_vector_pair (machine_mode, rtx [],
-				      rtx (*)(rtx, rtx, rtx));
-extern void split_fma_vector_pair (machine_mode, rtx [],
-				   rtx (*)(rtx, rtx, rtx, rtx));
 extern void rs6000_split_multireg_move (rtx, rtx);
 extern void rs6000_emit_le_vsx_permute (rtx, rtx, machine_mode);
 extern void rs6000_emit_le_vsx_move (rtx, rtx, machine_mode);
