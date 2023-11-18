@@ -3566,33 +3566,6 @@
 }
   [(set_attr "type" "fpload,load")])
 
-;; Exctract DF from V4DF, convert it into extract from V2DF.
-(define_insn_and_split "vsx_extract_v4df"
-  [(set (match_operand:DF 0 "gpc_reg_operand" "=wa,r")
-	(vec_select:DF
-	 (match_operand:V4DF 1 "gpc_reg_operand" "wa,wa")
-	 (parallel
-	  [(match_operand:QI 2 "const_0_to_3_operand" "n,n")])))]
-  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
-  "#"
-  "&& reload_completed"
-  [(set (match_dup 0)
-	(vec_select:DF
-	 (match_dup 3)
-	 (parallel [(match_dup 4)])))]
-{
-  HOST_WIDE_INT element = INTVAL (operands[2]);
-  unsigned reg_num = reg_or_subregno (operands[1]);
-
-  if ((WORDS_BIG_ENDIAN && element >= 2)
-      || (!WORDS_BIG_ENDIAN && element < 2))
-    reg_num++;
-
-  operands[3] = gen_rtx_REG (V2DFmode, reg_num);
-  operands[4] = GEN_INT (element & 1);
-}
-  [(set_attr "type" "mfvsr,vecperm")])
-
 ;; Extract a SF element from V4SF
 (define_insn_and_split "vsx_extract_v4sf"
   [(set (match_operand:SF 0 "vsx_register_operand" "=wa")
@@ -3679,35 +3652,6 @@
 					   operands[3], SFmode);
 }
   [(set_attr "type" "fpload,load")])
-
-;; Extract SF from V8SF, converting it into an extract from V4SF
-(define_insn_and_split "vsx_extract_v8sf"
-  [(set (match_operand:SF 0 "vsx_register_operand" "=wa")
-	(vec_select:SF
-	 (match_operand:V8SF 1 "vsx_register_operand" "wa")
-	 (parallel [(match_operand:QI 2 "const_0_to_7_operand" "n")])))
-   (clobber (match_scratch:V4SF 3 "=0"))]
-  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
-  "#"
-  "&& reload_completed"
-  [(parallel [(set (match_dup 0)
-		   (vec_select:SF
-		    (match_dup 4)
-		    (parallel [(match_dup 5)])))
-	      (clobber (match_dup 3))])]
-{
-  HOST_WIDE_INT element = INTVAL (operands[2]);
-  unsigned reg_num = reg_or_subregno (operands[1]);
-
-  if ((WORDS_BIG_ENDIAN && element >= 4)
-      || (!WORDS_BIG_ENDIAN && element < 4))
-    reg_num++;
-
-  operands[3] = gen_rtx_REG (V4SFmode, reg_num);
-  operands[4] = GEN_INT (element & 3);
-}
-  [(set_attr "length" "8")
-   (set_attr "type" "fp")])
 
 ;; Expand the builtin form of xxpermdi to canonical rtl.
 (define_expand "vsx_xxpermdi_<mode>"
