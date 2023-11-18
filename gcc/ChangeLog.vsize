@@ -1,3 +1,17 @@
+==================== Branch work146-vsize, patch #303 ====================
+
+Add set/extract support on vector pairs with double word elements.
+
+2023-11-18  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-protos.h (rs6000_expand_vector_pair_set): Delete.
+	* config/rs6000/rs6000.cc (rs6000_expand_vector_pair_set): Likewise.
+	* config/rs6000/vector-pair.md (vec_set<mode>): Replace with a version
+	that only handles setting double word elements.
+	(vec_extract<mode><vpair_element_l>): Likewise.
+
 ==================== Branch work146-vsize, patch #302 ====================
 
 Add vector pair add/sub/umin/umax/sqrt/div.
