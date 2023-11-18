@@ -52,7 +52,7 @@
 (define_code_iterator VPAIR_LOGICAL_UNARY  [not])
 (define_code_iterator VPAIR_LOGICAL_BINARY [and ior xor])
 
-(define_code_iterator VPAIR_INT_BINARY     [plus minus smin smax])
+(define_code_iterator VPAIR_INT_BINARY     [plus minus smin smax umin umax])
 
 ;; Give the insn name from the opertion
 (define_code_attr vpair_op [(abs   "abs")
@@ -67,6 +67,9 @@
 			    (plus  "add")
 			    (smin  "smin")
 			    (smax  "smax")
+			    (sqrt  "sqrt")
+			    (umin  "umin")
+			    (umax  "umax")
 			    (xor   "xor")])
 
 ;; Map vector pair mode to vector mode in upper case after the vector pair is
@@ -175,7 +178,7 @@
   DONE;
 })
 
-;; Vector pair extraction
+;; Vector pair extracti element
 (define_insn_and_split "vec_extract<mode><vpair_element_l>"
   [(set (match_operand:<VPAIR_ELEMENT> 0 "vsx_register_operand" "=wa")
 	(vec_select:<VPAIR_ELEMENT>
@@ -199,7 +202,8 @@
   emit_insn (gen_vsx_extract_<vpair_vector_l> (op0, vreg,
 					       GEN_INT (elt % vsize)));
   DONE;
-})
+}
+  [(set_attr "type" "veclogical")])
 
 ;; Assemble a vector pair from two vectors.
 ;;
@@ -300,7 +304,39 @@
 			   gen_<vpair_op><vpair_vector_l>2);
   DONE;
 }
-  [(set_attr "length" "8")])
+  [(set_attr "length" "8")
+   (set_attr "type" "vecfloat")])
+
+;; Sqrt needs different type attributes between V8SF and V4DF
+(define_insn_and_split "sqrtv8sf2"
+  [(set (match_operand:V8SF 0 "vsx_register_operand" "=wa")
+	(sqrt:V8SF
+	 (match_operand:V8SF 1 "vsx_register_operand" "wa")))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_unary_vector_pair (V4SFmode, operands, gen_sqrtv4sf2);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "vecfdiv")])
+
+(define_insn_and_split "sqrtv4df2"
+  [(set (match_operand:V4DF 0 "vsx_register_operand" "=wa")
+	(sqrt:V4DF
+	 (match_operand:V4DF 1 "vsx_register_operand" "wa")))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_unary_vector_pair (V2DFmode, operands, gen_sqrtv2df2);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "vecdiv")])
 
 ;; Optimize negative absolute value (both floating point and integer)
 (define_insn_and_split "nabs<mode>2"
@@ -317,7 +353,8 @@
 			   gen_vsx_nabs<vpair_vector_l>2);
   DONE;
 }
-  [(set_attr "length" "8")])
+  [(set_attr "length" "8")
+   (set_attr "type" "vecfloat")])
 
 ;; Vector pair floating point arithmetic binary operations
 (define_insn_and_split "<vpair_op><mode>3"
@@ -334,7 +371,41 @@
 			    gen_<vpair_op><vpair_vector_l>3);
   DONE;
 }
-  [(set_attr "length" "8")])
+  [(set_attr "length" "8")
+   (set_attr "type" "vecfloat")])
+
+;; Divide needs different type attributes between V8SF and V4DF
+(define_insn_and_split "divv8sf3"
+  [(set (match_operand:V8SF 0 "vsx_register_operand" "=wa")
+	(div:V8SF
+	 (match_operand:V8SF 1 "vsx_register_operand" "wa")
+	 (match_operand:V8SF 2 "vsx_register_operand" "wa")))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_binary_vector_pair (V4SFmode, operands, gen_divv4sf3);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "vecfdiv")])
+
+(define_insn_and_split "divv4df3"
+  [(set (match_operand:V4DF 0 "vsx_register_operand" "=wa")
+	(div:V4DF
+	 (match_operand:V4DF 1 "vsx_register_operand" "wa")
+	 (match_operand:V4DF 2 "vsx_register_operand" "wa")))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_binary_vector_pair (V2DFmode, operands, gen_divv2df3);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "vecdiv")])
 
 ;; Vector pair floating point fused multiply-add
 (define_insn_and_split "fma<mode>4"
@@ -352,7 +423,8 @@
 			 gen_fma<vpair_vector_l>4);
   DONE;
 }
-  [(set_attr "length" "8")])
+  [(set_attr "length" "8")
+   (set_attr "type" "vecfloat")])
 
 ;; Vector pair floating point fused multiply-subtract
 (define_insn_and_split "fms<mode>4"
@@ -371,7 +443,8 @@
 			 gen_fms<vpair_vector_l>4);
   DONE;
 }
-  [(set_attr "length" "8")])
+  [(set_attr "length" "8")
+   (set_attr "type" "vecfloat")])
 
 ;; Vector pair floating point negative fused multiply-add
 (define_insn_and_split "nfma<mode>4"
@@ -410,7 +483,8 @@
 			 gen_nfms<vpair_vector_l>4);
   DONE;
 }
-  [(set_attr "length" "8")])
+  [(set_attr "length" "8")
+   (set_attr "type" "vecfloat")])
 
 ;; Optimize vector pair (a * b) + c into fma (a, b, c)
 (define_insn_and_split "*fma_fpcontract_<mode>4"
@@ -451,7 +525,8 @@
 		       (match_dup 3))))]
 {
 }
-  [(set_attr "length" "8")])
+  [(set_attr "length" "8")
+   (set_attr "type" "vecfloat")])
 
 ;; Optimize vector pair -((a * b) + c) into -fma (a, b, c)
 (define_insn_and_split "*nfma_fpcontract_<mode>4"
@@ -496,7 +571,8 @@
 			(match_dup 3)))))]
 {
 }
-  [(set_attr "length" "8")])
+  [(set_attr "length" "8")
+   (set_attr "type" "vecfloat")])
 
 ;; Vector pair negate if we have the VNEGx instruction.
 (define_insn_and_split "neg<mode>2"
@@ -512,7 +588,8 @@
 			   gen_neg<vpair_vector_l>2);
   DONE;
 }
-  [(set_attr "length" "8")])
+  [(set_attr "length" "8")
+   (set_attr "type" "vecfloat")])
 
 ;; Vector pair negate if we have to do a subtract from 0
 (define_insn_and_split "neg<mode>2"
@@ -541,9 +618,11 @@
 
   DONE;
 }
-  [(set_attr "length" "8")])
-
-;; Vector pair logical unary operations
+  [(set_attr "length" "8")
+   (set_attr "type" "vecfloat")])
+
+;; Vector pair logical unary operations.  These operations can use all VSX
+;; registers.
 (define_insn_and_split "<vpair_op><mode>2"
   [(set (match_operand:VPAIR_INT 0 "vsx_register_operand" "=wa")
 	(VPAIR_LOGICAL_UNARY:VPAIR_INT
@@ -557,9 +636,11 @@
 			   gen_<vpair_op><vpair_vector_l>2);
   DONE;
 }
-  [(set_attr "length" "8")])
+  [(set_attr "length" "8")
+   (set_attr "type" "veclogical")])
 
-;; Vector pair logical binary operations
+;; Vector pair logical binary operations.  These operations can use all VSX
+;; registers.
 (define_insn_and_split "<vpair_op><mode>3"
   [(set (match_operand:VPAIR_INT 0 "vsx_register_operand" "=wa")
 	(VPAIR_LOGICAL_BINARY:VPAIR_INT
@@ -574,7 +655,27 @@
 			    gen_<vpair_op><vpair_vector_l>3);
   DONE;
 }
-  [(set_attr "length" "8")])
+  [(set_attr "length" "8")
+   (set_attr "type" "veclogical")])
+
+;; Vector pair logical binary operations.  These operations require Altivec
+;; registers.
+(define_insn_and_split "<vpair_op><mode>3"
+  [(set (match_operand:VPAIR_INT 0 "vsx_register_operand" "=v")
+	(VPAIR_INT_BINARY:VPAIR_INT
+	 (match_operand:VPAIR_INT 1 "vsx_register_operand" "v")
+	 (match_operand:VPAIR_INT 2 "vsx_register_operand" "v")))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_binary_vector_pair (<VPAIR_VECTOR>mode, operands,
+			    gen_<vpair_op><vpair_vector_l>3);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "vecsimple")])
 
 ;; Optiomize vector pair ~(a | b)  or ((~a) & (~b)) to produce xxlnor
 (define_insn_and_split "*nor<mode>3_1"
@@ -592,7 +693,8 @@
 			    gen_nor<vpair_vector_l>3);
   DONE;
 }
-  [(set_attr "length" "8")])
+  [(set_attr "length" "8")
+   (set_attr "type" "veclogical")])
 
 (define_insn_and_split "*nor<mode>3_2"
   [(set (match_operand:VPAIR_INT 0 "vsx_register_operand" "=wa")
@@ -610,7 +712,8 @@
 			    gen_nor<vpair_vector_l>3);
   DONE;
 }
-  [(set_attr "length" "8")])
+  [(set_attr "length" "8")
+   (set_attr "type" "veclogical")])
 
 ;; Optimize vector pair (~a) & b to use xxlandc
 (define_insn_and_split "*andc<mode>3"
@@ -628,7 +731,8 @@
 			    gen_andc<vpair_vector_l>3);
   DONE;
 }
-  [(set_attr "length" "8")])
+  [(set_attr "length" "8")
+   (set_attr "type" "veclogical")])
 
 ;; Optimize vector pair ~(a ^ b) to produce xxleqv
 (define_insn_and_split "*eqv<mode>3"
@@ -646,7 +750,8 @@
 			    gen_nor<vpair_vector_l>3);
   DONE;
 }
-[(set_attr "length" "8")])
+  [(set_attr "length" "8")
+   (set_attr "type" "veclogical")])
 
 
 ;; Optiomize vector pair ~(a & b) or ((~a) | (~b)) to produce xxlnand
@@ -665,7 +770,8 @@
 			    gen_nand<vpair_vector_l>3);
   DONE;
 }
-  [(set_attr "length" "8")])
+  [(set_attr "length" "8")
+   (set_attr "type" "veclogical")])
 
 (define_insn_and_split "*nand<mode>3_2"
   [(set (match_operand:VPAIR_INT 0 "vsx_register_operand" "=wa")
@@ -683,7 +789,8 @@
 			    gen_nand<vpair_vector_l>3);
   DONE;
 }
-  [(set_attr "length" "8")])
+  [(set_attr "length" "8")
+   (set_attr "type" "veclogical")])
 
 ;; Optimize vector pair (~a) | b to produce xxlorc
 (define_insn_and_split "*orc<mode>3"
@@ -701,4 +808,5 @@
 			    gen_orc<vpair_vector_l>3);
   DONE;
 }
-  [(set_attr "length" "8")])
+  [(set_attr "length" "8")
+   (set_attr "type" "veclogical")])

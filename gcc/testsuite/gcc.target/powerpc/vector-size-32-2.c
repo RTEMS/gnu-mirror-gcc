@@ -36,6 +36,15 @@ test_multiply (vectype_t *dest,
 }
 
 void
+test_divide (vectype_t *dest,
+	     vectype_t *a,
+	     vectype_t *b)
+{
+  /* 2 lxvp, 2 xvdivsp, 1 stxvp.  */
+  *dest = *a / *b;
+}
+
+void
 test_negate (vectype_t *dest,
 	     vectype_t *a,
 	     vectype_t *b)
@@ -84,9 +93,10 @@ test_nfms (vectype_t *dest,
   *dest = -((*a * *b) - *c);
 }
 
-/* { dg-final { scan-assembler-times {\mlxvp\M}       19 } } */
-/* { dg-final { scan-assembler-times {\mstxvp\M}       8 } } */
+/* { dg-final { scan-assembler-times {\mlxvp\M}       21 } } */
+/* { dg-final { scan-assembler-times {\mstxvp\M}       9 } } */
 /* { dg-final { scan-assembler-times {\mxvaddsp\M}     2 } } */
+/* { dg-final { scan-assembler-times {\mxvdivsp\M}     2 } } */
 /* { dg-final { scan-assembler-times {\mxvmadd.sp\M}   2 } } */
 /* { dg-final { scan-assembler-times {\mxvmsub.sp\M}   2 } } */
 /* { dg-final { scan-assembler-times {\mxvmulsp\M}     2 } } */
