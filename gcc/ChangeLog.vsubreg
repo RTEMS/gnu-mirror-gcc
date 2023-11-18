@@ -1,4 +1,25 @@
-==================== Branch work146-vsubreg, patch #402 (vsize patches #300) ====================
+==================== Branch work146-vsubreg, patch #403 (vsize patches #302) ====================
+
+Add vector pair add/sub/umin/umax/sqrt/div.
+
+2023-11-18  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-pair.md (VPAIR_INT_BINARY): Add umin/umax.
+	(vpair_op):  Add umin/umax/sqrt.
+	(most insns): Set the type attribute.
+	(sqrtv8sf2): New insn.
+	(sqrtv4df2): Likewise.
+	(divv8sf3): Likewise.
+	(divv4df3): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-size-32-1.c: Add divide.  Adjust counts.
+	* gcc.target/powerpc/vector-size-32-1.c: Likewise.
+
+==================== Branch work146-vsubreg, patch #402 (vsize patches #301) ====================
 
 Add vector_size(32) support.
 
