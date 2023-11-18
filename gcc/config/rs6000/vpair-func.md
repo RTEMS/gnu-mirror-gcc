@@ -27,149 +27,149 @@
 ;; possible.
 
 (define_c_enum "unspec"
-  [UNSPEC_VPAIR_V4DF
-   UNSPEC_VPAIR_V8SF
-   UNSPEC_VPAIR_V32QI
-   UNSPEC_VPAIR_V16HI
-   UNSPEC_VPAIR_V8SI
-   UNSPEC_VPAIR_V4DI
-   UNSPEC_VPAIR_ZERO
-   UNSPEC_VPAIR_SPLAT
-   UNSPEC_VPAIR_REDUCE_PLUS_F32
-   UNSPEC_VPAIR_REDUCE_PLUS_F64
-   UNSPEC_VPAIR_REDUCE_PLUS_I64
+  [UNSPEC_VPAIR_FUNC_V4DF
+   UNSPEC_VPAIR_FUNC_V8SF
+   UNSPEC_VPAIR_FUNC_V32QI
+   UNSPEC_VPAIR_FUNC_V16HI
+   UNSPEC_VPAIR_FUNC_V8SI
+   UNSPEC_VPAIR_FUNC_V4DI
+   UNSPEC_VPAIR_FUNC_ZERO
+   UNSPEC_VPAIR_FUNC_SPLAT
+   UNSPEC_VPAIR_FUNC_REDUCE_PLUS_F32
+   UNSPEC_VPAIR_FUNC_REDUCE_PLUS_F64
+   UNSPEC_VPAIR_FUNC_REDUCE_PLUS_I64
    ])
 
 ;; Iterator doing unary/binary arithmetic on vector pairs
-(define_code_iterator VP_FP_UNARY  [abs neg])
-(define_code_iterator VP_FP_BINARY [minus mult plus smin smax])
+(define_code_iterator VP_FUNC_FP_UNARY  [abs neg])
+(define_code_iterator VP_FUNC_FP_BINARY [minus mult plus smin smax])
 
-(define_code_iterator VP_INT_BINARY  [and ior minus plus smax smin umax umin xor])
+(define_code_iterator VP_FUNC_INT_BINARY  [and ior minus plus smax smin umax umin xor])
 
 ;; Return the insn name from the VP_* code iterator
-(define_code_attr vp_insn [(abs      "abs")
-			   (and      "and")
-			   (ior      "ior")
-			   (minus    "sub")
-			   (mult     "mul")
-			   (not      "one_cmpl")
-			   (neg      "neg")
-			   (plus     "add")
-			   (smin     "smin")
-			   (smax     "smax")
-			   (umin     "umin")
-			   (umax     "umax")
-			   (xor      "xor")])
+(define_code_attr vp_func_insn [(abs      "abs")
+				(and      "and")
+				(ior      "ior")
+				(minus    "sub")
+				(mult     "mul")
+				(not      "one_cmpl")
+				(neg      "neg")
+				(plus     "add")
+				(smin     "smin")
+				(smax     "smax")
+				(umin     "umin")
+				(umax     "umax")
+				(xor      "xor")])
 
 ;; Return the register constraint ("v" or "wa") for the integer code iterator
 ;; used.  For arithmetic operations, we need to use "v" in order to use the
 ;; Altivec instruction.  For logical operations, we can use wa.
-(define_code_attr vp_ireg [(and   "wa")
-			   (ior   "wa")
-			   (minus "v")
-			   (not   "wa")
-			   (neg   "v")
-			   (plus  "v")
-			   (smax  "v")
-			   (smin  "v")
-			   (umax  "v")
-			   (umin  "v")
-			   (xor   "wa")])
+(define_code_attr vp_func_ireg [(and   "wa")
+				(ior   "wa")
+				(minus "v")
+				(not   "wa")
+				(neg   "v")
+				(plus  "v")
+				(smax  "v")
+				(smin  "v")
+				(umax  "v")
+				(umin  "v")
+				(xor   "wa")])
 
 ;; Return the register previdcate for the integer code iterator used
-(define_code_attr vp_ipredicate [(and   "vsx_register_operand")
-				 (ior   "vsx_register_operand")
-				 (minus "altivec_register_operand")
-				 (not   "vsx_register_operand")
-				 (neg   "altivec_register_operand")
-				 (plus  "altivec_register_operand")
-				 (smax  "altivec_register_operand")
-				 (smin  "altivec_register_operand")
-				 (umax  "altivec_register_operand")
-				 (umin  "altivec_register_operand")
-				 (xor   "vsx_register_operand")])
+(define_code_attr vp_func_ipredicate [(and   "vsx_register_operand")
+				      (ior   "vsx_register_operand")
+				      (minus "altivec_register_operand")
+				      (not   "vsx_register_operand")
+				      (neg   "altivec_register_operand")
+				      (plus  "altivec_register_operand")
+				      (smax  "altivec_register_operand")
+				      (smin  "altivec_register_operand")
+				      (umax  "altivec_register_operand")
+				      (umin  "altivec_register_operand")
+				      (xor   "vsx_register_operand")])
 
 ;; Iterator for creating the unspecs for vector pair built-ins
-(define_int_iterator VP_FP [UNSPEC_VPAIR_V4DF
-			    UNSPEC_VPAIR_V8SF])
+(define_int_iterator VP_FUNC_FP [UNSPEC_VPAIR_FUNC_V4DF
+				 UNSPEC_VPAIR_FUNC_V8SF])
 
-(define_int_iterator VP_INT [UNSPEC_VPAIR_V4DI
-			     UNSPEC_VPAIR_V8SI
-			     UNSPEC_VPAIR_V16HI
-			     UNSPEC_VPAIR_V32QI])
+(define_int_iterator VP_FUNC_INT [UNSPEC_VPAIR_FUNC_V4DI
+				  UNSPEC_VPAIR_FUNC_V8SI
+				  UNSPEC_VPAIR_FUNC_V16HI
+				  UNSPEC_VPAIR_FUNC_V32QI])
 
-(define_int_iterator VP_ALL [UNSPEC_VPAIR_V4DF
-			     UNSPEC_VPAIR_V8SF
-			     UNSPEC_VPAIR_V4DI
-			     UNSPEC_VPAIR_V8SI
-			     UNSPEC_VPAIR_V16HI
-			     UNSPEC_VPAIR_V32QI])
+(define_int_iterator VP_FUNC_ALL [UNSPEC_VPAIR_FUNC_V4DF
+				  UNSPEC_VPAIR_FUNC_V8SF
+				  UNSPEC_VPAIR_FUNC_V4DI
+				  UNSPEC_VPAIR_FUNC_V8SI
+				  UNSPEC_VPAIR_FUNC_V16HI
+				  UNSPEC_VPAIR_FUNC_V32QI])
 
 ;; Map VP_* to vector mode of the arguments after they are split
-(define_int_attr VP_VEC_MODE [(UNSPEC_VPAIR_V4DF  "V2DF")
-			      (UNSPEC_VPAIR_V8SF  "V4SF")
-			      (UNSPEC_VPAIR_V32QI "V16QI")
-			      (UNSPEC_VPAIR_V16HI "V8HI")
-			      (UNSPEC_VPAIR_V8SI  "V4SI")
-			      (UNSPEC_VPAIR_V4DI  "V2DI")])
+(define_int_attr VP_VEC_MODE [(UNSPEC_VPAIR_FUNC_V4DF  "V2DF")
+			      (UNSPEC_VPAIR_FUNC_V8SF  "V4SF")
+			      (UNSPEC_VPAIR_FUNC_V32QI "V16QI")
+			      (UNSPEC_VPAIR_FUNC_V16HI "V8HI")
+			      (UNSPEC_VPAIR_FUNC_V8SI  "V4SI")
+			      (UNSPEC_VPAIR_FUNC_V4DI  "V2DI")])
 
 ;; Map VP_* to a lower case name to identify the vector pair.
-(define_int_attr vp_pmode [(UNSPEC_VPAIR_V4DF  "v4df")
-			   (UNSPEC_VPAIR_V8SF  "v8sf")
-			   (UNSPEC_VPAIR_V32QI "v32qi")
-			   (UNSPEC_VPAIR_V16HI "v16hi")
-			   (UNSPEC_VPAIR_V8SI  "v8si")
-			   (UNSPEC_VPAIR_V4DI  "v4di")])
+(define_int_attr vp_pmode [(UNSPEC_VPAIR_FUNC_V4DF  "v4df")
+			   (UNSPEC_VPAIR_FUNC_V8SF  "v8sf")
+			   (UNSPEC_VPAIR_FUNC_V32QI "v32qi")
+			   (UNSPEC_VPAIR_FUNC_V16HI "v16hi")
+			   (UNSPEC_VPAIR_FUNC_V8SI  "v8si")
+			   (UNSPEC_VPAIR_FUNC_V4DI  "v4di")])
 
 ;; Map VP_* to a lower case name to identify the vector after the vector pair
 ;; has been split.
-(define_int_attr vp_vmode [(UNSPEC_VPAIR_V4DF  "v2df")
-			   (UNSPEC_VPAIR_V8SF  "v4sf")
-			   (UNSPEC_VPAIR_V32QI "v16qi")
-			   (UNSPEC_VPAIR_V16HI "v8hi")
-			   (UNSPEC_VPAIR_V8SI  "v4si")
-			   (UNSPEC_VPAIR_V4DI  "v2di")])
+(define_int_attr vp_vmode [(UNSPEC_VPAIR_FUNC_V4DF  "v2df")
+			   (UNSPEC_VPAIR_FUNC_V8SF  "v4sf")
+			   (UNSPEC_VPAIR_FUNC_V32QI "v16qi")
+			   (UNSPEC_VPAIR_FUNC_V16HI "v8hi")
+			   (UNSPEC_VPAIR_FUNC_V8SI  "v4si")
+			   (UNSPEC_VPAIR_FUNC_V4DI  "v2di")])
 
-;; Map VP_INT to constraints used for the negate scratch register.  For vectors
+;; Map VP_FUNC_INT to constraints used for the negate scratch register.  For vectors
 ;; of QI and HI, we need to change -a into 0 - a since we don't have a negate
 ;; operation.  We do have a vnegw/vnegd operation for SI and DI modes.
-(define_int_attr vp_neg_reg [(UNSPEC_VPAIR_V32QI "&v")
-			     (UNSPEC_VPAIR_V16HI "&v")
-			     (UNSPEC_VPAIR_V8SI  "X")
-			     (UNSPEC_VPAIR_V4DI  "X")])
+(define_int_attr vp_neg_reg [(UNSPEC_VPAIR_FUNC_V32QI "&v")
+			     (UNSPEC_VPAIR_FUNC_V16HI "&v")
+			     (UNSPEC_VPAIR_FUNC_V8SI  "X")
+			     (UNSPEC_VPAIR_FUNC_V4DI  "X")])
 
 ;; Moddes of the vector element to splat to vector pair
-(define_mode_iterator VP_SPLAT [DF SF DI SI HI QI])
+(define_mode_iterator VP_FUNC_SPLAT [DF SF DI SI HI QI])
 
 ;; Moddes of the vector to splat to vector pair
-(define_mode_iterator VP_SPLAT_VEC [V2DF V4SF V2DI V4SI V8HI V16QI])
+(define_mode_iterator VP_FUNC_SPLAT_VEC [V2DF V4SF V2DI V4SI V8HI V16QI])
 
-;; MAP VP_SPLAT and VP_SPLAT_VEC to the mode of the vector pair operation
-(define_mode_attr vp_splat_pmode [(DF    "v4df")
-				  (V2DF  "v4df")
-				  (SF    "v8sf")
-				  (V4SF  "v8sf")
-				  (DI    "v4di")
-				  (V2DI  "v4di")
-				  (SI    "v8si")
-				  (V4SI  "v8si")
-				  (HI    "v16hi")
-				  (V8HI  "v16hi")
-				  (QI    "v32qi")
-				  (V16QI "v32qi")])
+;; MAP VP_FUNC_SPLAT and VP_FUNC_SPLAT_VEC to the mode of the vector pair operation
+(define_mode_attr vp_func_splat_pmode [(DF    "v4df")
+				       (V2DF  "v4df")
+				       (SF    "v8sf")
+				       (V4SF  "v8sf")
+				       (DI    "v4di")
+				       (V2DI  "v4di")
+				       (SI    "v8si")
+				       (V4SI  "v8si")
+				       (HI    "v16hi")
+				       (V8HI  "v16hi")
+				       (QI    "v32qi")
+				       (V16QI "v32qi")])
 
-;; MAP VP_SPLAT to the mode of the vector containing the element
-(define_mode_attr VP_SPLAT_VMODE [(DF "V2DF")
-				  (SF "V4SF")
-				  (DI "V2DI")
-				  (SI "V4SI")
-				  (HI "V8HI")
-				  (QI "V16QI")])
+;; MAP VP_FUNC_SPLAT to the mode of the vector containing the element
+(define_mode_attr VP_FUNC_SPLAT_VMODE [(DF "V2DF")
+				       (SF "V4SF")
+				       (DI "V2DI")
+				       (SI "V4SI")
+				       (HI "V8HI")
+				       (QI "V16QI")])
 
 ;; Initialize a vector pair to 0
-(define_insn_and_split "vpair_zero"
+(define_insn_and_split "vpair_func_zero"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
-	(unspec:OO [(const_int 0)] UNSPEC_VPAIR_ZERO))]
+	(unspec:OO [(const_int 0)] UNSPEC_VPAIR_FUNC_ZERO))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -193,12 +193,12 @@
 ;; We cannot update the two output registers atomically, so mark the output as
 ;; an early clobber so we don't accidentally clobber the input operands.  */
 
-(define_insn_and_split "vpair_assemble_<vp_pmode>"
+(define_insn_and_split "vpair_func_assemble_<vp_pmode>"
   [(set (match_operand:OO 0 "vsx_register_operand" "=&wa")
 	(unspec:OO
 	 [(match_operand:<VP_VEC_MODE> 1 "mma_assemble_input_operand" "mwa")
 	  (match_operand:<VP_VEC_MODE> 2 "mma_assemble_input_operand" "mwa")]
-	 VP_ALL))]
+	 VP_FUNC_ALL))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -213,12 +213,12 @@
   [(set_attr "length" "8")])
 
 ;; Extract one of the two 128-bit vectors from a vector pair.
-(define_insn_and_split "vpair_extract_vector_<vp_pmode>"
+(define_insn_and_split "vpair_func_extract_vector_<vp_pmode>"
   [(set (match_operand:<VP_VEC_MODE> 0 "vsx_register_operand" "=wa")
 	(unspec:<VP_VEC_MODE>
 	 [(match_operand:OO 1 "vsx_register_operand" "wa")
 	  (match_operand 2 "const_0_to_1_operand" "n")]
-	 VP_ALL))]
+	 VP_FUNC_ALL))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -233,12 +233,12 @@
 })
 
 ;; Optimize extracting an 128-bit vector from a vector pair in memory.
-(define_insn_and_split "*vpair_extract_vector_<vp_pmode>_mem"
+(define_insn_and_split "*vpair_func_extract_vector_<vp_pmode>_mem"
   [(set (match_operand:<VP_VEC_MODE> 0 "vsx_register_operand" "=wa")
 	(unspec:<VP_VEC_MODE>
 	 [(match_operand:OO 1 "memory_operand" "o")
 	  (match_operand 2 "const_0_to_1_operand" "n")]
-	 VP_ALL))]
+	 VP_FUNC_ALL))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -251,19 +251,19 @@
 
 ;; Create a vector pair with a value splat'ed (duplicated) to all of the
 ;; elements.
-(define_expand "vpair_splat_<vp_splat_pmode>"
+(define_expand "vpair_func_splat_<vp_func_splat_pmode>"
   [(use (match_operand:OO 0 "vsx_register_operand"))
-   (use (match_operand:VP_SPLAT 1 "input_operand"))]
+   (use (match_operand:VP_FUNC_SPLAT 1 "input_operand"))]
   "TARGET_MMA"
 {
   rtx op0 = operands[0];
   rtx op1 = operands[1];
   machine_mode element_mode = <MODE>mode;
-  machine_mode vector_mode = <VP_SPLAT_VMODE>mode;
+  machine_mode vector_mode = <VP_FUNC_SPLAT_VMODE>mode;
 
   if (op1 == CONST0_RTX (element_mode))
     {
-      emit_insn (gen_vpair_zero (op0));
+      emit_insn (gen_vpair_func_zero (op0));
       DONE;
     }
 
@@ -274,18 +274,18 @@
     RTVEC_ELT (elements, i) = copy_rtx (op1);
 
   rs6000_expand_vector_init (vec, gen_rtx_PARALLEL (vector_mode, elements));
-  emit_insn (gen_vpair_splat_<vp_splat_pmode>_internal (op0, vec));
+  emit_insn (gen_vpair_func_splat_<vp_func_splat_pmode>_internal (op0, vec));
   DONE;
 })
 
 ;; Inner splat support.  Operand1 is the vector splat created above.  Allow
 ;; operand 1 to overlap with the output registers to eliminate one move
 ;; instruction.
-(define_insn_and_split "vpair_splat_<vp_splat_pmode>_internal"
+(define_insn_and_split "vpair_func_splat_<vp_func_splat_pmode>_internal"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
 	(unspec:OO
-	 [(match_operand:VP_SPLAT_VEC 1 "vsx_register_operand" "0,wa")]
-	 UNSPEC_VPAIR_SPLAT))]
+	 [(match_operand:VP_FUNC_SPLAT_VEC 1 "vsx_register_operand" "0,wa")]
+	 UNSPEC_VPAIR_FUNC_SPLAT))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -316,31 +316,31 @@
 
 
 ;; Vector pair floating point unary operations
-(define_insn_and_split "vpair_<vp_insn>_<vp_pmode>2"
+(define_insn_and_split "vpair_func_<vp_func_insn>_<vp_pmode>2"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
-	(unspec:OO [(VP_FP_UNARY:OO
+	(unspec:OO [(VP_FUNC_FP_UNARY:OO
 		     (match_operand:OO 1 "vsx_register_operand" "wa"))]
-		   VP_FP))]
+		   VP_FUNC_FP))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
   [(const_int 0)]
 {
   split_unary_vector_pair (<VP_VEC_MODE>mode, operands,
-			   gen_<vp_insn><vp_vmode>2);
+			   gen_<vp_func_insn><vp_vmode>2);
   DONE;
 }
   [(set_attr "length" "8")])
 
 ;; Optimize vector pair negate of absolute value
-(define_insn_and_split "vpair_nabs_<vp_pmode>2"
+(define_insn_and_split "vpair_func_nabs_<vp_pmode>2"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
 	(unspec:OO
 	 [(neg:OO
 	   (unspec:OO
 	    [(abs:OO (match_operand:OO 1 "vsx_register_operand" "ww"))]
-	    VP_FP))]
-	 VP_FP))]
+	    VP_FUNC_FP))]
+	 VP_FUNC_FP))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -353,32 +353,32 @@
   [(set_attr "length" "8")])
 
 ;; Vector pair floating binary operations
-(define_insn_and_split "vpair_<vp_insn>_<vp_pmode>3"
+(define_insn_and_split "vpair_func_<vp_func_insn>_<vp_pmode>3"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
-	(unspec:OO [(VP_FP_BINARY:OO
+	(unspec:OO [(VP_FUNC_FP_BINARY:OO
 		     (match_operand:OO 1 "vsx_register_operand" "wa")
 		     (match_operand:OO 2 "vsx_register_operand" "wa"))]
-		   VP_FP))]
+		   VP_FUNC_FP))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
   [(const_int 0)]
 {
   split_binary_vector_pair (<VP_VEC_MODE>mode, operands,
-			    gen_<vp_insn><vp_vmode>3);
+			    gen_<vp_func_insn><vp_vmode>3);
   DONE;
 }
   [(set_attr "length" "8")])
 
 ;; Vector pair fused multiply-add floating point operations
-(define_insn_and_split "vpair_fma_<vp_pmode>4"
+(define_insn_and_split "vpair_func_fma_<vp_pmode>4"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
 	(unspec:OO
 	 [(fma:OO
 	   (match_operand:OO 1 "vsx_register_operand" "%wa,wa")
 	   (match_operand:OO 2 "vsx_register_operand" "wa,0")
 	   (match_operand:OO 3 "vsx_register_operand" "0,wa"))]
-	 VP_FP))]
+	 VP_FUNC_FP))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -390,7 +390,7 @@
 }
   [(set_attr "length" "8")])
 
-(define_insn_and_split "vpair_fms_<vp_pmode>4"
+(define_insn_and_split "vpair_func_fms_<vp_pmode>4"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
 	(unspec:OO
 	 [(fma:OO
@@ -398,8 +398,8 @@
 	   (match_operand:OO 2 "vsx_register_operand" "wa,0")
 	   (unspec:OO
 	    [(neg:OO (match_operand:OO 3 "vsx_register_operand" "0,wa"))]
-	     VP_FP))]
-	 VP_FP))]
+	     VP_FUNC_FP))]
+	 VP_FUNC_FP))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -411,7 +411,7 @@
 }
   [(set_attr "length" "8")])
 
-(define_insn_and_split "vpair_nfma_<vp_pmode>4"
+(define_insn_and_split "vpair_func_nfma_<vp_pmode>4"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
 	(unspec:OO
 	 [(neg:OO
@@ -420,8 +420,8 @@
 	      (match_operand:OO 1 "vsx_register_operand" "%wa,wa")
 	      (match_operand:OO 2 "vsx_register_operand" "wa,0")
 	      (match_operand:OO 3 "vsx_register_operand" "0,wa"))]
-	    VP_FP))]
-	 VP_FP))]
+	    VP_FUNC_FP))]
+	 VP_FUNC_FP))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -433,7 +433,7 @@
 }
   [(set_attr "length" "8")])
 
-(define_insn_and_split "vpair_nfms_<vp_pmode>4"
+(define_insn_and_split "vpair_func_nfms_<vp_pmode>4"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
 	(unspec:OO
 	 [(neg:OO
@@ -443,9 +443,9 @@
 	      (match_operand:OO 2 "vsx_register_operand" "wa,0")
 	      (unspec:OO
 	       [(neg:OO (match_operand:OO 3 "vsx_register_operand" "0,wa"))]
-	       VP_FP))]
-	   VP_FP))]
-	 VP_FP))]
+	       VP_FUNC_FP))]
+	   VP_FUNC_FP))]
+	 VP_FUNC_FP))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -458,7 +458,7 @@
   [(set_attr "length" "8")])
 
 ;; Optimize vector pair (a * b) + c into vector pair fma (a, b, c).
-(define_insn_and_split "*vpair_fma_fpcontract_<vp_pmode>4"
+(define_insn_and_split "*vpair_func_fma_fpcontract_<vp_pmode>4"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
 	(unspec:OO
 	 [(plus:OO
@@ -466,9 +466,9 @@
 	    [(mult:OO
 	      (match_operand:OO 1 "vsx_register_operand" "%wa,wa")
 	      (match_operand:OO 2 "vsx_register_operand" "wa,0"))]
-	    VP_FP)
+	    VP_FUNC_FP)
 	   (match_operand:OO 3 "vsx_register_operand" "0,wa"))]
-	 VP_FP))]
+	 VP_FUNC_FP))]
   "TARGET_MMA && flag_fp_contract_mode == FP_CONTRACT_FAST"
   "#"
   "&& 1"
@@ -478,13 +478,13 @@
 	   (match_dup 1)
 	   (match_dup 2)
 	   (match_dup 3))]
-	 VP_FP))]
+	 VP_FUNC_FP))]
 {
 }
   [(set_attr "length" "8")])
 
 ;; Optimize vector pair (a * b) - c into vector pair fma (a, b, -c)
-(define_insn_and_split "*vpair_fms_fpcontract_<vp_pmode>4"
+(define_insn_and_split "*vpair_func_fms_fpcontract_<vp_pmode>4"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
 	(unspec:OO
 	 [(minus:OO
@@ -492,9 +492,9 @@
 	    [(mult:OO
 	      (match_operand:OO 1 "vsx_register_operand" "%wa,wa")
 	      (match_operand:OO 2 "vsx_register_operand" "wa,0"))]
-	    VP_FP)
+	    VP_FUNC_FP)
 	   (match_operand:OO 3 "vsx_register_operand" "0,wa"))]
-	 VP_FP))]
+	 VP_FUNC_FP))]
   "TARGET_MMA && flag_fp_contract_mode == FP_CONTRACT_FAST"
   "#"
   "&& 1"
@@ -506,15 +506,15 @@
 	   (unspec:OO
 	    [(neg:OO
 	      (match_dup 3))]
-	    VP_FP))]
-	 VP_FP))]
+	    VP_FUNC_FP))]
+	 VP_FUNC_FP))]
 {
 }
   [(set_attr "length" "8")])
 
 
 ;; Optimize vector pair -((a * b) + c) into vector pair -fma (a, b, c).
-(define_insn_and_split "*vpair_nfma_fpcontract_<vp_pmode>4"
+(define_insn_and_split "*vpair_func_nfma_fpcontract_<vp_pmode>4"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
 	(unspec:OO
 	 [(neg:OO
@@ -524,10 +524,10 @@
 	       [(mult:OO
 		 (match_operand:OO 1 "vsx_register_operand" "%wa,wa")
 		 (match_operand:OO 2 "vsx_register_operand" "wa,0"))]
-	       VP_FP)
+	       VP_FUNC_FP)
 	      (match_operand:OO 3 "vsx_register_operand" "0,wa"))]
-	    VP_FP))]
-	 VP_FP))]
+	    VP_FUNC_FP))]
+	 VP_FUNC_FP))]
   "TARGET_MMA && flag_fp_contract_mode == FP_CONTRACT_FAST"
   "#"
   "&& 1"
@@ -539,14 +539,14 @@
 	      (match_dup 1)
 	      (match_dup 2)
 	      (match_dup 3))]
-	    VP_FP))]
-	 VP_FP))]
+	    VP_FUNC_FP))]
+	 VP_FUNC_FP))]
 {
 }
   [(set_attr "length" "8")])
 
 ;; Optimize vector pair -((a * b) - c) into vector pair -fma (a, b, -c)
-(define_insn_and_split "*vpair_nfms_fpcontract_<vp_pmode>4"
+(define_insn_and_split "*vpair_func_nfms_fpcontract_<vp_pmode>4"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
 	(unspec:OO
 	 [(neg:OO
@@ -556,10 +556,10 @@
 	       [(mult:OO
 		 (match_operand:OO 1 "vsx_register_operand" "%wa,wa")
 		 (match_operand:OO 2 "vsx_register_operand" "wa,0"))]
-	       VP_FP)
+	       VP_FUNC_FP)
 	      (match_operand:OO 3 "vsx_register_operand" "0,wa"))]
-	    VP_FP))]
-	 VP_FP))]
+	    VP_FUNC_FP))]
+	 VP_FUNC_FP))]
   "TARGET_MMA && flag_fp_contract_mode == FP_CONTRACT_FAST"
   "#"
   "&& 1"
@@ -573,19 +573,19 @@
 	      (unspec:OO
 	       [(neg:OO
 		 (match_dup 3))]
-	       VP_FP))]
-	    VP_FP))]
-	 VP_FP))]
+	       VP_FUNC_FP))]
+	    VP_FUNC_FP))]
+	 VP_FUNC_FP))]
 {
 }
   [(set_attr "length" "8")])
 
 
 ;; Add all elements in a pair of V4SF vectors.
-(define_insn_and_split "vpair_reduc_plus_scale_v8sf"
+(define_insn_and_split "vpair_func_reduc_plus_scale_v8sf"
   [(set (match_operand:SF 0 "vsx_register_operand" "=wa")
 	(unspec:SF [(match_operand:OO 1 "vsx_register_operand" "v")]
-		   UNSPEC_VPAIR_REDUCE_PLUS_F32))
+		   UNSPEC_VPAIR_FUNC_REDUCE_PLUS_F32))
    (clobber (match_scratch:V4SF 2 "=&v"))
    (clobber (match_scratch:V4SF 3 "=&v"))]
   "TARGET_MMA"
@@ -612,10 +612,10 @@
   [(set_attr "length" "24")])
 
 ;; Add all elements in a pair of V2DF vectors
-(define_insn_and_split "vpair_reduc_plus_scale_v4df"
+(define_insn_and_split "vpair_func_reduc_plus_scale_v4df"
   [(set (match_operand:DF 0 "vsx_register_operand" "=&wa")
 	(unspec:DF [(match_operand:OO 1 "vsx_register_operand" "wa")]
-		   UNSPEC_VPAIR_REDUCE_PLUS_F64))
+		   UNSPEC_VPAIR_FUNC_REDUCE_PLUS_F64))
    (clobber (match_scratch:DF 2 "=&wa"))
    (clobber (match_scratch:V2DF 3 "=&wa"))]
   "TARGET_MMA"
@@ -642,11 +642,11 @@
 
 
 ;; Vector pair integer negate support.
-(define_insn_and_split "vpair_neg_<vp_pmode>2"
+(define_insn_and_split "vpair_func_neg_<vp_pmode>2"
   [(set (match_operand:OO 0 "altivec_register_operand" "=v")
 	(unspec:OO [(neg:OO
 		     (match_operand:OO 1 "altivec_register_operand" "v"))]
-		   VP_INT))
+		   VP_FUNC_INT))
    (clobber (match_scratch:<VP_VEC_MODE> 2 "=<vp_neg_reg>"))]
   "TARGET_MMA"
   "#"
@@ -687,10 +687,10 @@
   [(set_attr "length" "8")])
 
 ;; Vector pair integer not support.
-(define_insn_and_split "vpair_not_<vp_pmode>2"
+(define_insn_and_split "vpair_func_not_<vp_pmode>2"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
 	(unspec:OO [(not:OO (match_operand:OO 1 "vsx_register_operand" "wa"))]
-		   VP_INT))]
+		   VP_FUNC_INT))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -703,33 +703,33 @@
   [(set_attr "length" "8")])
 
 ;; Vector pair integer binary operations.
-(define_insn_and_split "vpair_<vp_insn>_<vp_pmode>3"
-  [(set (match_operand:OO 0 "<vp_ipredicate>" "=<vp_ireg>")
-	(unspec:OO [(VP_INT_BINARY:OO
-		     (match_operand:OO 1 "<vp_ipredicate>" "<vp_ireg>")
-		     (match_operand:OO 2 "<vp_ipredicate>" "<vp_ireg>"))]
-		   VP_INT))]
+(define_insn_and_split "vpair_func_<vp_func_insn>_<vp_pmode>3"
+  [(set (match_operand:OO 0 "<vp_func_ipredicate>" "=<vp_func_ireg>")
+	(unspec:OO [(VP_FUNC_INT_BINARY:OO
+		     (match_operand:OO 1 "<vp_func_ipredicate>" "<vp_func_ireg>")
+		     (match_operand:OO 2 "<vp_func_ipredicate>" "<vp_func_ireg>"))]
+		   VP_FUNC_INT))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
   [(const_int 0)]
 {
   split_binary_vector_pair (<VP_VEC_MODE>mode, operands,
-			    gen_<vp_insn><vp_vmode>3);
+			    gen_<vp_func_insn><vp_vmode>3);
   DONE;
 }
   [(set_attr "length" "8")])
 
 ;; Optimize vector pair a & ~b
-(define_insn_and_split "*vpair_andc_<vp_pmode>"
+(define_insn_and_split "*vpair_func_andc_<vp_pmode>"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
 	(unspec:OO [(and:OO
 		     (unspec:OO
 		      [(not:OO
 			(match_operand:OO 1 "vsx_register_operand" "wa"))]
-		      VP_INT)
+		      VP_FUNC_INT)
 		     (match_operand:OO 2 "vsx_register_operand" "wa"))]
-		   VP_INT))]
+		   VP_FUNC_INT))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -742,15 +742,15 @@
   [(set_attr "length" "8")])
 
 ;; Optimize vector pair a | ~b
-(define_insn_and_split "*vpair_iorc_<vp_pmode>"
+(define_insn_and_split "*vpair_func_iorc_<vp_pmode>"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
 	(unspec:OO [(ior:OO
 		     (unspec:OO
 		      [(not:OO
 			(match_operand:OO 1 "vsx_register_operand" "wa"))]
-		      VP_INT)
+		      VP_FUNC_INT)
 		     (match_operand:OO 2 "vsx_register_operand" "wa"))]
-		   VP_INT))]
+		   VP_FUNC_INT))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -763,15 +763,15 @@
   [(set_attr "length" "8")])
 
 ;; Optiomize vector pair ~(a & b) or ((~a) | (~b))
-(define_insn_and_split "*vpair_nand_<vp_pmode>_1"
+(define_insn_and_split "*vpair_func_nand_<vp_pmode>_1"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
 	(unspec:OO
 	 [(not:OO
 	   (unspec:OO [(and:OO
 			(match_operand:OO 1 "vsx_register_operand" "wa")
 			(match_operand:OO 2 "vsx_register_operand" "wa"))]
-		      VP_INT))]
-	 VP_INT))]
+		      VP_FUNC_INT))]
+	 VP_FUNC_INT))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -783,19 +783,19 @@
 }
   [(set_attr "length" "8")])
 
-(define_insn_and_split "*vpair_nand_<vp_pmode>_2"
+(define_insn_and_split "*vpair_func_nand_<vp_pmode>_2"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
 	(unspec:OO
 	 [(ior:OO
 	   (unspec:OO
 	    [(not:OO
 	      (match_operand:OO 1 "vsx_register_operand" "wa"))]
-	    VP_INT)
+	    VP_FUNC_INT)
 	   (unspec:OO
 	    [(not:OO
 	      (match_operand:OO 2 "vsx_register_operand" "wa"))]
-	    VP_INT))]
-	 VP_INT))]
+	    VP_FUNC_INT))]
+	 VP_FUNC_INT))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -808,15 +808,15 @@
   [(set_attr "length" "8")])
 
 ;; Optiomize vector pair ~(a | b)  or ((~a) & (~b))
-(define_insn_and_split "*vpair_nor_<vp_pmode>_1"
+(define_insn_and_split "*vpair_func_nor_<vp_pmode>_1"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
 	(unspec:OO
 	 [(not:OO
 	   (unspec:OO [(ior:OO
 			(match_operand:OO 1 "vsx_register_operand" "wa")
 			(match_operand:OO 2 "vsx_register_operand" "wa"))]
-		      VP_INT))]
-	 VP_INT))]
+		      VP_FUNC_INT))]
+	 VP_FUNC_INT))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -828,17 +828,17 @@
 }
   [(set_attr "length" "8")])
 
-(define_insn_and_split "*vpair_nor_<vp_pmode>_2"
+(define_insn_and_split "*vpair_func_nor_<vp_pmode>_2"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
 	(unspec:OO
 	 [(ior:OO
 	   (unspec:OO
 	    [(not:OO (match_operand:OO 1 "vsx_register_operand" "wa"))]
-	    VP_INT)
+	    VP_FUNC_INT)
 	   (unspec:OO
 	    [(not:OO (match_operand:OO 2 "vsx_register_operand" "wa"))]
-	    VP_INT))]
-	 VP_INT))]
+	    VP_FUNC_INT))]
+	 VP_FUNC_INT))]
   "TARGET_MMA"
   "#"
   "&& reload_completed"
@@ -851,10 +851,10 @@
   [(set_attr "length" "8")])
 
 ;; Add all elements in a pair of V2DI vectors
-(define_insn_and_split "vpair_reduc_plus_scale_v4di"
+(define_insn_and_split "vpair_func_reduc_plus_scale_v4di"
   [(set (match_operand:DI 0 "gpc_reg_operand" "=&r")
 	(unspec:DI [(match_operand:OO 1 "altivec_register_operand" "v")]
-		   UNSPEC_VPAIR_REDUCE_PLUS_I64))
+		   UNSPEC_VPAIR_FUNC_REDUCE_PLUS_I64))
    (clobber (match_scratch:V2DI 2 "=&v"))
    (clobber (match_scratch:DI 3 "=&r"))]
   "TARGET_MMA && TARGET_POWERPC64"
