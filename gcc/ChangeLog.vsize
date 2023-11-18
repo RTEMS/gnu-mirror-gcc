@@ -2,7 +2,7 @@
 
 Add vector_size(32) support.
 
-2023-11-17  Michael Meissner  <meissner@linux.ibm.com>
+2023-11-18  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -23,15 +23,15 @@ gcc/
 	(rs6000_setup_reg_addr_masks): Likewise.
 	(rs6000_init_hard_regno_mode_ok): Likewise.
 	(rs6000_option_override_internal): Likewise.
-	(rs6000_builtin_vectorization_cost): Likewise.
 	(vector_pair_to_vector_mode): New function.
-	(+rs6000_split_vpair_constan): Likewise.
-	(rs6000_expand_vector_pair_ini): Likewise.
+	(+rs6000_split_vpair_constant): Likewise.
+	(rs6000_expand_vector_pair_init): Likewise.
 	(rs6000_expand_vector_pair_set): Likewise.
-	(reg_offset_addressing_ok_p): Likewise.
+	(reg_offset_addressing_ok_p): Add support for -mvector-size-32.
 	(rs6000_emit_move): Likewise.
+	(rs6000_preferred_reload_class): Likewise.
 	(altivec_expand_vec_perm_le): Likewise.
-	(rs6000_opt_var): Add -mvector-size-32.
+	(rs6000_opt_vars): Add -mvector-size-32.
 	(split_unary_vector_pair): New function.
 	(split_binary_vector_pair): Likewise.
 	(split_fma_vector_pai): Likewise.
@@ -55,6 +55,8 @@ gcc/testsuite/
 	* gcc.target/powerpc/vector-size-32-4.c: Likewise.
 	* gcc.target/powerpc/vector-size-32-5.c: Likewise.
 	* gcc.target/powerpc/vector-size-32-6.c: Likewise.
+
+==================== Branch work146-vsize, patch #300 was reverted ====================
 
 ==================== Branch work146-vsize, patch #1 (main branch) ====================
 
