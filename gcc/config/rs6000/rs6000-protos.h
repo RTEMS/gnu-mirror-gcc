@@ -61,6 +61,8 @@ extern bool rs6000_move_128bit_ok_p (rtx []);
 extern bool rs6000_split_128bit_ok_p (rtx []);
 extern void rs6000_expand_float128_convert (rtx, rtx, bool);
 extern void rs6000_expand_vector_init (rtx, rtx);
+extern machine_mode vector_pair_to_vector_mode (machine_mode);
+extern bool split_vector_pair_constant (rtx, rtx *, rtx *);
 extern void rs6000_expand_vector_pair_init (rtx, rtx);
 extern void rs6000_expand_vector_set (rtx, rtx, rtx);
 extern void rs6000_expand_vector_extract (rtx, rtx, rtx);
