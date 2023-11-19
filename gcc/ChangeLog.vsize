@@ -1,3 +1,17 @@
+==================== Branch work146-vsize, patch #304 ====================
+
+Work on vector pair extracts.
+
+2023-11-19  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-pair.md (vec_extract<mode><vpair_element_l>):
+	Rewrite.
+	(vec_extractv8sf): New insn.
+	* config/rs6000/vsx.md (vsx_extract_v4df): Delete.
+	(vsx_extract_v8sf): Delete.
+
 ==================== Branch work146-vsize, patch #303 ====================
 
 Add set/extract support on vector pairs with double word elements.
