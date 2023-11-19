@@ -1,3 +1,32 @@
+==================== Branch work146-vsubreg, patch #406 (vsize patches #305) ====================
+
+Add more vector pair constants.
+
+2023-11-19  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/constraints.md (eV): New constraint.
+	* config/rs6000/predicates.md (easy_vector_constant): Add support for
+	vector pair constants.
+	(easy_vector_pair_constant): New predicate.
+	* config/rs6000/rs6000-protos.h (vector_pair_to_vector_mode): New
+	declaration.
+	(split_vector_ppair_constant): Likewise.
+	* config/rs6000/rs6000.cc (vector_pair_to_vector_mode): Make global.
+	(split_vector_ppair_constant): Make global.  Rename from
+	rs6000_split_vector_pair_constant.
+	(rs6000_expand_vector_pair_init): Rename split_vector_pair_constant
+	call.
+	(rs6000_split_multireg_move): Likewise.
+	* config/rs6000/vector-pair.md (mov<mode>): Add support for other vector
+	pair constants that can be loaded in 2 instructions.
+	* doc/md.texi (eV constraint): Document
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-size-32-7.c: New test.
+
 ==================== Branch work146-vsubreg, patch #405 (vsize patches #304) ====================
 
 Work on vector pair extracts.
