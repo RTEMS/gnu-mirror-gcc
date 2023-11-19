@@ -212,32 +212,74 @@
   [(set_attr "length" "8")
    (set_attr "type" "vecperm")])
 
-;; Extract an element in a vector pair with double word elements
+;; Exctract DF/DI from V4DF/V4DI, convert it into extract from V2DF/V2DI.
 (define_insn_and_split "vec_extract<mode><vpair_element_l>"
-  [(set (match_operand:<VPAIR_ELEMENT> 0 "vsx_register_operand" "=wa")
+  [(set (match_operand:<VPAIR_ELEMENT> 0 "gpc_reg_operand" "=wa,r")
 	(vec_select:<VPAIR_ELEMENT>
-	 (match_operand:VPAIR_DWORD 1 "vsx_register_operand" "wa")
-	 (parallel [(match_operand 2 "const_0_to_3_operand" "n")])))]
+	 (match_operand:VPAIR_DWORD 1 "gpc_reg_operand" "wa,wa")
+	 (parallel
+	  [(match_operand:QI 2 "const_0_to_3_operand" "n,n")])))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 0)
+	(vec_select:<VPAIR_ELEMENT>
+	 (match_dup 3)
+	 (parallel [(match_dup 4)])))]
+{
+  machine_mode vmode = <VPAIR_VECTOR>mode;
+  rtx op1 = operands[1];
+  HOST_WIDE_INT element = INTVAL (operands[2]);
+  unsigned reg_num = 0;
+
+  if ((WORDS_BIG_ENDIAN && element >= 2)
+      || (!WORDS_BIG_ENDIAN && element < 2))
+    reg_num++;
+
+  operands[3] = simplify_gen_subreg (vmode, op1, <MODE>mode, reg_num * 16);
+  operands[4] = GEN_INT (element & 1);
+}
+  [(set_attr "type" "mfvsr,vecperm")])
+
+;; Extract a SFmode element from V8SF
+(define_insn_and_split "vec_extractv8sfsf"
+  [(set (match_operand:SF 0 "vsx_register_operand" "=wa")
+	(vec_select:SF
+	 (match_operand:V8SF 1 "vsx_register_operand" "wa")
+	 (parallel [(match_operand:QI 2 "const_0_to_7_operand" "n")])))]
   "TARGET_MMA && TARGET_VECTOR_SIZE_32"
   "#"
   "&& reload_completed"
   [(const_int 0)]
 {
-  rtx dest = operands[0];
-  rtx vpair = operands[1];
-  HOST_WIDE_INT elt = INTVAL (operands[2]);
-  machine_mode mode = <MODE>mode;
-  machine_mode vmode = <VPAIR_VECTOR>mode;
-  unsigned vsize = GET_MODE_SIZE (<VPAIR_VECTOR>mode);
-  unsigned reg_num = ((WORDS_BIG_ENDIAN && elt >= vsize)
-		      || (!WORDS_BIG_ENDIAN && elt < vsize));
-	   
-  rtx vreg = simplify_gen_subreg (vmode, vpair, mode, reg_num * 16);
-  rtx elt_in_vreg = GEN_INT (elt & 0x1);
-  emit_insn (gen_vsx_extract_<vpair_vector_l> (dest, vreg, elt_in_vreg));
+  rtx op0 = operands[0];
+  rtx op1 = operands[1];
+  rtx tmp;
+  HOST_WIDE_INT element = INTVAL (operands[2]);
+  unsigned reg_num = 0;
+
+  if ((WORDS_BIG_ENDIAN && element >= 4)
+      || (!WORDS_BIG_ENDIAN && element < 4))
+    reg_num++;
+
+  rtx vreg = simplify_gen_subreg (V4SFmode, op1, V8SFmode, reg_num * 16);
+  HOST_WIDE_INT vreg_elt = element & 3;
+
+  /* Get the element into position 0 if it isn't there already.  */
+  if (!vreg_elt)
+    tmp = vreg;
+  else
+    {
+      tmp = gen_rtx_REG (V4SFmode, reg_or_subregno (op0));
+      emit_insn (gen_vsx_xxsldwi_v4sf (tmp, vreg, vreg, GEN_INT (vreg_elt)));
+    }
+
+  /* Convert the float element to double precision.  */
+  emit_insn (gen_vsx_xscvspdp_scalar2 (op0, tmp));
   DONE;
 }
-  [(set_attr "type" "vecperm")])
+  [(set_attr "length" "8")
+   (set_attr "type" "fp")])
 
 ;; Assemble a vector pair from two vectors.
 ;;
