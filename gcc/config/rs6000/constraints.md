@@ -219,12 +219,6 @@
   "An IEEE 128-bit constant that can be loaded into VSX registers."
   (match_operand 0 "easy_vector_constant_ieee128"))
 
-;; A vector pair constant that can be loaded into registers without using a
-;; load operation.
-(define_constraint "eV"
-  "A vector pair constant that can be loaded into VSX registers."
-  (match_operand 0 "easy_vector_pair_constant"))
-
 ;; Floating-point constraints.  These two are defined so that insn
 ;; length attributes can be calculated exactly.
 
