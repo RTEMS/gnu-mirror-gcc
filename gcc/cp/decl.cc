@@ -3607,8 +3607,8 @@ identify_goto (tree decl, location_t loc, const location_t *locus,
 {
   bool complained
     = emit_diagnostic (diag_kind, loc, 0,
-		       decl ? N_("jump to label %qD")
-		       : N_("jump to case label"), decl);
+		       decl ? G_("jump to label %qD")
+		       : G_("jump to case label"), decl);
   if (complained && locus)
     inform (*locus, "  from here");
   return complained;
@@ -5281,7 +5281,8 @@ push_cp_library_fn (enum tree_code operator_code, tree type,
 tree
 push_throw_library_fn (tree name, tree type)
 {
-  tree fn = push_library_fn (name, type, NULL_TREE, ECF_NORETURN | ECF_COLD);
+  tree fn = push_library_fn (name, type, NULL_TREE,
+			     ECF_NORETURN | ECF_XTHROW | ECF_COLD);
   return fn;
 }
 
@@ -6613,6 +6614,7 @@ is_direct_enum_init (tree type, tree init)
       && CONSTRUCTOR_NELTS (init) == 1
       /* DR 2374: The single element needs to be implicitly
 	 convertible to the underlying type of the enum.  */
+      && !type_dependent_expression_p (CONSTRUCTOR_ELT (init, 0)->value)
       && can_convert_arg (ENUM_UNDERLYING_TYPE (type),
 			  TREE_TYPE (CONSTRUCTOR_ELT (init, 0)->value),
 			  CONSTRUCTOR_ELT (init, 0)->value,
@@ -9591,6 +9593,9 @@ get_atexit_node (void)
 static tree
 get_thread_atexit_node (void)
 {
+  if (thread_atexit_node)
+    return thread_atexit_node;
+
   /* The declaration for `__cxa_thread_atexit' is:
 
      int __cxa_thread_atexit (void (*)(void *), void *, void *) */
@@ -9599,10 +9604,18 @@ get_thread_atexit_node (void)
 					   ptr_type_node, ptr_type_node,
 					   NULL_TREE);
 
-  /* Now, build the function declaration.  */
+  /* Now, build the function declaration, as with __cxa_atexit.  */
+  unsigned flags = push_abi_namespace ();
   tree atexit_fndecl = build_library_fn_ptr ("__cxa_thread_atexit", fn_type,
 					     ECF_LEAF | ECF_NOTHROW);
-  return decay_conversion (atexit_fndecl, tf_warning_or_error);
+  DECL_CONTEXT (atexit_fndecl) = FROB_CONTEXT (current_namespace);
+  DECL_SOURCE_LOCATION (atexit_fndecl) = BUILTINS_LOCATION;
+  atexit_fndecl = pushdecl (atexit_fndecl, /*hiding=*/true);
+  pop_abi_namespace (flags);
+  mark_used (atexit_fndecl);
+  thread_atexit_node = decay_conversion (atexit_fndecl, tf_warning_or_error);
+
+  return thread_atexit_node;
 }
 
 /* Returns the __dso_handle VAR_DECL.  */
@@ -18307,9 +18320,7 @@ finish_function (bool inline_p)
 	      && current_class_ref
 	      && same_type_ignoring_top_level_qualifiers_p
 		  (TREE_TYPE (valtype), TREE_TYPE (current_class_ref))
-	      && global_dc->option_enabled (OPT_Wreturn_type,
-					    global_dc->lang_mask,
-					    global_dc->option_state))
+	      && global_dc->option_enabled_p (OPT_Wreturn_type))
 	    add_return_star_this_fixit (&richloc, fndecl);
 	}
       if (cxx_dialect >= cxx14

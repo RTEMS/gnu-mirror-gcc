@@ -968,7 +968,7 @@ public:
 	return;
       }
 
-    if (global.params.verbose)
+    if (global.params.v.verbose)
       message ("function  %s", d->toPrettyChars ());
 
     tree old_context = start_function (d);
@@ -1554,7 +1554,7 @@ get_symbol_decl (Declaration *decl)
   /* Symbol is going in thread local storage.  */
   if (decl->isThreadlocal () && !DECL_ARTIFICIAL (decl->csym))
     {
-      if (global.params.vtls)
+      if (global.params.v.tls)
 	message (decl->loc, "`%s` is thread local", decl->toChars ());
 
       set_decl_tls_model (decl->csym, decl_default_tls_model (decl->csym));
@@ -2377,7 +2377,7 @@ layout_class_initializer (ClassDeclaration *cd)
   NewExp *ne = NewExp::create (cd->loc, NULL, cd->type, NULL);
   ne->type = cd->type;
 
-  Expression *e = ne->ctfeInterpret ();
+  Expression *e = ctfeInterpret (ne);
   gcc_assert (e->op == EXP::classReference);
 
   return build_class_instance (e->isClassReferenceExp ());

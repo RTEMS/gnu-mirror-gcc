@@ -33,6 +33,7 @@ import dmd.dmodule;
 import dmd.dscope;
 import dmd.dsymbol;
 import dmd.dsymbolsem : dsymbolSemantic;
+import dmd.errors;
 import dmd.expression;
 import dmd.expressionsem;
 import dmd.func;
@@ -664,7 +665,7 @@ extern (C++) final class VisibilityDeclaration : AttribDeclaration
             {
                 Package pkg = m.parent ? m.parent.isPackage() : null;
                 if (!pkg || !visibility.pkg.isAncestorPackageOf(pkg))
-                    error("does not bind to one of ancestor packages of module `%s`", m.toPrettyChars(true));
+                    .error(loc, "%s `%s` does not bind to one of ancestor packages of module `%s`", kind(), toPrettyChars(false), m.toPrettyChars(true));
             }
         }
         return AttribDeclaration.addMember(sc, sds);
@@ -679,7 +680,7 @@ extern (C++) final class VisibilityDeclaration : AttribDeclaration
     {
         assert(visibility.kind > Visibility.Kind.undefined);
         OutBuffer buf;
-        visibilityToBuffer(&buf, visibility);
+        visibilityToBuffer(buf, visibility);
         return buf.extractChars();
     }
 
@@ -838,10 +839,10 @@ extern (C++) final class AnonDeclaration : AttribDeclaration
             /* Given the anon 'member's size and alignment,
              * go ahead and place it.
              */
-            anonoffset = AggregateDeclaration.placeField(
-                &fieldState.offset,
+            anonoffset = placeField(
+                fieldState.offset,
                 anonstructsize, anonalignsize, alignment,
-                &ad.structsize, &ad.alignsize,
+                ad.structsize, ad.alignsize,
                 isunion);
 
             // Add to the anon fields the base offset of this anonymous aggregate
@@ -1473,12 +1474,12 @@ extern (C++) final class UserAttributeDeclaration : AttribDeclaration
             {
                 if (sym.isCPPNamespaceDeclaration() || sym.isNspace())
                 {
-                    exp.error("`@%s` cannot be applied to namespaces", Id.udaGNUAbiTag.toChars());
+                    .error(exp.loc, "`@%s` cannot be applied to namespaces", Id.udaGNUAbiTag.toChars());
                     sym.errors = true;
                 }
                 else if (linkage != LINK.cpp)
                 {
-                    exp.error("`@%s` can only apply to C++ symbols", Id.udaGNUAbiTag.toChars());
+                    .error(exp.loc, "`@%s` can only apply to C++ symbols", Id.udaGNUAbiTag.toChars());
                     sym.errors = true;
                 }
                 // Only one `@gnuAbiTag` is allowed by semantic2

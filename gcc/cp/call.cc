@@ -2032,12 +2032,14 @@ reference_binding (tree rto, tree rfrom, tree expr, bool c_cast_p, int flags,
   return conv;
 }
 
-/* Most of the implementation of implicit_conversion, with the same
-   parameters.  */
+/* Returns the implicit conversion sequence (see [over.ics]) from type
+   FROM to type TO.  The optional expression EXPR may affect the
+   conversion.  FLAGS are the usual overloading flags.  If C_CAST_P is
+   true, this conversion is coming from a C-style cast.  */
 
 static conversion *
-implicit_conversion_1 (tree to, tree from, tree expr, bool c_cast_p,
-		       int flags, tsubst_flags_t complain)
+implicit_conversion (tree to, tree from, tree expr, bool c_cast_p,
+		     int flags, tsubst_flags_t complain)
 {
   conversion *conv;
 
@@ -2165,26 +2167,6 @@ implicit_conversion_1 (tree to, tree from, tree expr, bool c_cast_p,
     }
 
   return NULL;
-}
-
-/* Returns the implicit conversion sequence (see [over.ics]) from type
-   FROM to type TO.  The optional expression EXPR may affect the
-   conversion.  FLAGS are the usual overloading flags.  If C_CAST_P is
-   true, this conversion is coming from a C-style cast.  */
-
-static conversion *
-implicit_conversion (tree to, tree from, tree expr, bool c_cast_p,
-		     int flags, tsubst_flags_t complain)
-{
-  conversion *conv = implicit_conversion_1 (to, from, expr, c_cast_p,
-					    flags, complain);
-  if (!conv || conv->bad_p)
-    return conv;
-  if (conv_is_prvalue (conv)
-      && CLASS_TYPE_P (conv->type)
-      && CLASSTYPE_PURE_VIRTUALS (conv->type))
-    conv->bad_p = true;
-  return conv;
 }
 
 /* Like implicit_conversion, but return NULL if the conversion is bad.
@@ -6181,19 +6163,36 @@ build_conditional_expr (const op_location_t &loc,
 		  == DECL_CONTEXT (stripped_orig_arg3)))
 	    /* Two enumerators from the same enumeration can have different
 	       types when the enumeration is still being defined.  */;
-          else if (complain & tf_warning)
-	    warning_at (loc, OPT_Wenum_compare, "enumerated mismatch "
-			"in conditional expression: %qT vs %qT",
-			arg2_type, arg3_type);
+	  else if (complain & (cxx_dialect >= cxx26
+			       ? tf_warning_or_error : tf_warning))
+	    emit_diagnostic (cxx_dialect >= cxx26 ? DK_PEDWARN : DK_WARNING,
+			     loc, OPT_Wenum_compare, "enumerated mismatch "
+			     "in conditional expression: %qT vs %qT",
+			     arg2_type, arg3_type);
+	  else if (cxx_dialect >= cxx26)
+	    return error_mark_node;
         }
-      else if ((complain & tf_warning)
-	       && warn_deprecated_enum_float_conv
+      else if ((((complain & (cxx_dialect >= cxx26
+			      ? tf_warning_or_error : tf_warning))
+		 && warn_deprecated_enum_float_conv)
+		|| (cxx_dialect >= cxx26
+		    && (complain & tf_warning_or_error) == 0))
 	       && ((TREE_CODE (arg2_type) == ENUMERAL_TYPE
 		    && SCALAR_FLOAT_TYPE_P (arg3_type))
 		   || (SCALAR_FLOAT_TYPE_P (arg2_type)
 		       && TREE_CODE (arg3_type) == ENUMERAL_TYPE)))
 	{
-	  if (TREE_CODE (arg2_type) == ENUMERAL_TYPE)
+	  if (cxx_dialect >= cxx26 && (complain & tf_warning_or_error) == 0)
+	    return error_mark_node;
+	  if (cxx_dialect >= cxx26 && TREE_CODE (arg2_type) == ENUMERAL_TYPE)
+	    pedwarn (loc, OPT_Wdeprecated_enum_float_conversion,
+		     "conditional expression between enumeration type "
+		     "%qT and floating-point type %qT", arg2_type, arg3_type);
+	  else if (cxx_dialect >= cxx26)
+	    pedwarn (loc, OPT_Wdeprecated_enum_float_conversion,
+		     "conditional expression between floating-point type "
+		     "%qT and enumeration type %qT", arg2_type, arg3_type);
+	  else if (TREE_CODE (arg2_type) == ENUMERAL_TYPE)
 	    warning_at (loc, OPT_Wdeprecated_enum_float_conversion,
 			"conditional expression between enumeration type "
 			"%qT and floating-point type %qT is deprecated",
@@ -7276,11 +7275,18 @@ build_new_op (const op_location_t &loc, enum tree_code code, int flags,
 	      if (TREE_CODE (arg1_type) == ENUMERAL_TYPE
 		  && TREE_CODE (arg2_type) == ENUMERAL_TYPE
 		  && (TYPE_MAIN_VARIANT (arg1_type)
-		      != TYPE_MAIN_VARIANT (arg2_type))
-		  && (complain & tf_warning))
-		warning_at (loc, OPT_Wenum_compare,
-			    "comparison between %q#T and %q#T",
-			    arg1_type, arg2_type);
+		      != TYPE_MAIN_VARIANT (arg2_type)))
+		{
+		  if (cxx_dialect >= cxx26
+		      && (complain & tf_warning_or_error) == 0)
+		    result = error_mark_node;
+		  else if (cxx_dialect >= cxx26 || (complain & tf_warning))
+		    emit_diagnostic (cxx_dialect >= cxx26
+				     ? DK_PEDWARN : DK_WARNING,
+				     loc, OPT_Wenum_compare,
+				     "comparison between %q#T and %q#T",
+				     arg1_type, arg2_type);
+		}
 	      break;
 	    default:
 	      break;
@@ -8321,15 +8327,17 @@ convert_like_internal (conversion *convs, tree expr, tree fn, int argnum,
 							    totype))
 	  {
 	  case 2:
-	    if (pedwarn (loc, 0, "converting to %qH from %qI with greater "
-				 "conversion rank", totype, TREE_TYPE (expr)))
+	    if (pedwarn (loc, OPT_Wnarrowing, "ISO C++ does not allow "
+			 "converting to %qH from %qI with greater "
+			 "conversion rank", totype, TREE_TYPE (expr)))
 	      complained = 1;
 	    else if (!complained)
 	      complained = -1;
 	    break;
 	  case 3:
-	    if (pedwarn (loc, 0, "converting to %qH from %qI with unordered "
-				 "conversion ranks", totype, TREE_TYPE (expr)))
+	    if (pedwarn (loc, OPT_Wnarrowing, "ISO C++ does not allow "
+			 "converting to %qH from %qI with unordered "
+			 "conversion rank", totype, TREE_TYPE (expr)))
 	      complained = 1;
 	    else if (!complained)
 	      complained = -1;
@@ -9308,7 +9316,9 @@ convert_for_arg_passing (tree type, tree val, tsubst_flags_t complain)
    This is true for some builtins which don't act like normal functions.
    Return 2 if just decay_conversion and removal of excess precision should
    be done, 1 if just decay_conversion.  Return 3 for special treatment of
-   the 3rd argument for __builtin_*_overflow_p.  */
+   the 3rd argument for __builtin_*_overflow_p.  Return 4 for special
+   treatment of the 1st argument for
+   __builtin_{clz,ctz,clrsb,ffs,parity,popcount}g.  */
 
 int
 magic_varargs_p (tree fn)
@@ -9334,6 +9344,14 @@ magic_varargs_p (tree fn)
       case BUILT_IN_ISNORMAL:
       case BUILT_IN_FPCLASSIFY:
 	return 2;
+
+      case BUILT_IN_CLZG:
+      case BUILT_IN_CTZG:
+      case BUILT_IN_CLRSBG:
+      case BUILT_IN_FFSG:
+      case BUILT_IN_PARITYG:
+      case BUILT_IN_POPCOUNTG:
+	return 4;
 
       default:
 	return lookup_attribute ("type generic",
@@ -10140,7 +10158,7 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
   for (; arg_index < vec_safe_length (args); ++arg_index)
     {
       tree a = (*args)[arg_index];
-      if (magic == 3 && arg_index == 2)
+      if ((magic == 3 && arg_index == 2) || (magic == 4 && arg_index == 0))
 	{
 	  /* Do no conversions for certain magic varargs.  */
 	  a = mark_type_use (a);
@@ -10330,10 +10348,7 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
 	   && DECL_OVERLOADED_OPERATOR_IS (fn, NOP_EXPR)
 	   && trivial_fn_p (fn))
     {
-      /* Don't use cp_build_fold_indirect_ref, op= returns an lvalue even if
-	 the object argument isn't one.  */
-      tree to = cp_build_indirect_ref (input_location, argarray[0],
-				       RO_ARROW, complain);
+      tree to = cp_build_fold_indirect_ref (argarray[0]);
       tree type = TREE_TYPE (to);
       tree as_base = CLASSTYPE_AS_BASE (type);
       tree arg = argarray[1];
@@ -10341,7 +10356,11 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
 
       if (is_really_empty_class (type, /*ignore_vptr*/true))
 	{
-	  /* Avoid copying empty classes.  */
+	  /* Avoid copying empty classes, but ensure op= returns an lvalue even
+	     if the object argument isn't one. This isn't needed in other cases
+	     since MODIFY_EXPR is always considered an lvalue.  */
+	  to = cp_build_addr_expr (to, tf_none);
+	  to = cp_build_indirect_ref (input_location, to, RO_ARROW, complain);
 	  val = build2 (COMPOUND_EXPR, type, arg, to);
 	  suppress_warning (val, OPT_Wunused);
 	}
@@ -11430,12 +11449,7 @@ build_new_method_call (tree instance, tree fns, vec<tree, va_gc> **args,
     }
 
   if (processing_template_decl)
-    {
-      orig_args = args == NULL ? NULL : make_tree_vector_copy (*args);
-      instance = build_non_dependent_expr (instance);
-      if (args != NULL)
-	make_args_non_dependent (*args);
-    }
+    orig_args = args == NULL ? NULL : make_tree_vector_copy (*args);
 
   /* Process the argument list.  */
   if (args != NULL && *args != NULL)
@@ -13231,10 +13245,11 @@ tourney (struct z_candidate *candidates, tsubst_flags_t complain)
      been compared to.  */
 
   for (challenger = candidates;
-       challenger != champ
-	 && challenger != champ_compared_to_predecessor;
+       challenger != champ;
        challenger = challenger->next)
     {
+      if (challenger == champ_compared_to_predecessor)
+	continue;
       fate = joust (champ, challenger, 0, complain);
       if (fate != 1)
 	return NULL;
@@ -13981,9 +13996,9 @@ maybe_warn_dangling_reference (const_tree decl, tree init)
      a system header.  If the DECL is not in a system header, or if
      -Wsystem-headers was provided, warn.  */
   auto wsh
-    = make_temp_override (global_dc->dc_warn_system_headers,
+    = make_temp_override (global_dc->m_warn_system_headers,
 			  (!in_system_header_at (DECL_SOURCE_LOCATION (decl))
-			   || global_dc->dc_warn_system_headers));
+			   || global_dc->m_warn_system_headers));
   if (tree call = do_warn_dangling_reference (init, /*arg_p=*/false))
     {
       auto_diagnostic_group d;

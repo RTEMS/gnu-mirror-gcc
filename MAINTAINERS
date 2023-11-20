@@ -91,7 +91,7 @@ m68k port		Andreas Schwab		<schwab@linux-m68k.org>
 m68k-motorola-sysv port	Philippe De Muyter	<phdm@macqel.be>
 mcore port		Nick Clifton		<nickc@redhat.com>
 microblaze		Michael Eager		<eager@eagercon.com>
-mips port		YunQiang Su		<yunqiang.su@cipunited.com>
+mips port		YunQiang Su		<syq@gcc.gnu.org>
 mmix port		Hans-Peter Nilsson	<hp@bitrange.com>
 mn10300 port		Jeff Law		<jeffreyalaw@gmail.com>
 mn10300 port		Alexandre Oliva		<aoliva@gcc.gnu.org>
@@ -445,8 +445,9 @@ Wei Guozhi					<carrot@google.com>
 Vineet Gupta					<vineetg@rivosinc.com>
 Naveen H.S					<naveenh@marvell.com>
 Mostafa Hagog					<hagog@gcc.gnu.org>
+Jivan Hakobyan					<jivanhakobyan9@gmail.com>
 Andrew Haley					<aph@redhat.com>
-Frederik Harwath				<frederik@codesourcery.com>
+Frederik Harwath				<frederik@harwath.name>
 Stuart Hastings					<stuart@apple.com>
 Michael Haubenwallner				<michael.haubenwallner@ssi-schaefer.com>
 Pat Haugen					<pthaugen@us.ibm.com>
@@ -485,6 +486,7 @@ Fariborz Jahanian				<fjahanian@apple.com>
 Surya Kumari Jangala				<jskumari@linux.ibm.com>
 Haochen Jiang					<haochen.jiang@intel.com>
 Qian Jianhua					<qianjh@fujitsu.com>
+Michal Jires					<mjires@suse.cz>
 Janis Johnson					<janis.marie.johnson@gmail.com>
 Teresa Johnson					<tejohnson@google.com>
 Kean Johnston					<jkj@sco.com>
@@ -540,7 +542,7 @@ Ralph Loader					<rcl@ihug.co.nz>
 Sheldon Lobo					<sheldon.lobo@oracle.com
 Gabor Loki					<loki@inf.u-szeged.hu>
 Manuel López-Ibáñez				<manu@gcc.gnu.org>
-Carl Love					<cel@us.ibm.com>
+Carl Love					<cel@linux.ibm.com>
 Martin v. Löwis					<loewis@informatik.hu-berlin.de>
 Edwin Lu						<ewlu@rivosinc.com>
 H.J. Lu						<hjl.tools@gmail.com>
@@ -578,6 +580,7 @@ Brooks Moses					<bmoses@google.com>
 Dirk Mueller					<dmueller@suse.de>
 Phil Muldoon					<pmuldoon@redhat.com>
 Gaius Mulley					<gaiusmod2@gmail.com>
+Christoph Müllner				<christoph.muellner@vrull.eu>
 Steven Munroe					<munroesj52@gmail.com>
 Szabolcs Nagy					<szabolcs.nagy@arm.com>
 Victor Do Nascimento				<victor.donascimento@arm.com>
@@ -679,7 +682,7 @@ Dinar Temirbulatov				<dtemirbulatov@gmail.com>
 Kresten Krab Thorup				<krab@gcc.gnu.org>
 Kai Tietz					<ktietz70@googlemail.com>
 Ilya Tocar					<tocarip@gmail.com>
-Petter Tomner					<tomner@kth.se>
+Petter Tomner					<tomner@bahnhof.se>
 Philipp Tomsich					<philipp.tomsich@vrull.eu>
 Daniel Towner					<dant@picochip.com>
 Konrad Trifunovic				<konrad.trifunovic@inria.fr>
@@ -751,6 +754,7 @@ information.
 
 Robin Dapp					<rdapp.gcc@gmail.com>
 Robin Dapp					<rdapp@ventanamicro.com>
+Michal Jires					<mjires@suse.cz>
 Matthias Kretz					<m.kretz@gsi.de>
 Tim Lange					<mail@tim-lange.me>
 Jeff Law					<jeffreyalaw@gmail.com>
@@ -765,7 +769,7 @@ Trevor Saunders					<tbsaunde+gcc@tbsaunde.org>
 Bill Schmidt					<bill.schmidt@fastmail.com>
 Nathan Sidwell					<nathan@acm.org>
 Edward Smith-Rowland				<esmithrowland@gmail.com>
-Petter Tomner					<tomner@kth.se>
+Petter Tomner					<tomner@bahnhof.se>
 Martin Uecker					<uecker@gcc.gnu.org>
 Jonathan Wakely					<jwakely@redhat.com>
 Chung-Ju Wu					<jasonwucj@gmail.com>

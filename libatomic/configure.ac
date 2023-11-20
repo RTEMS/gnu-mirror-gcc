@@ -155,6 +155,8 @@ AC_SUBST(enable_shared)
 AC_SUBST(enable_static)
 AM_MAINTAINER_MODE
 
+AM_CONDITIONAL([ENABLE_DARWIN_AT_RPATH], [test x$enable_darwin_at_rpath = xyes])
+
 # For libtool versioning info, format is CURRENT:REVISION:AGE
 libtool_VERSION=3:0:2
 AC_SUBST(libtool_VERSION)
@@ -169,6 +171,8 @@ case "$target" in
     ACX_PROG_CC_WARNING_OPTS([-march=armv8-a+lse],[enable_aarch64_lse])
     ;;
 esac
+
+AC_SUBST(SYSROOT_CFLAGS_FOR_TARGET)
 
 # Get target configury.
 . ${srcdir}/configure.tgt

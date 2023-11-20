@@ -4981,7 +4981,7 @@ package body Sem_Attr is
          --  Loop_Entry must create a constant initialized by the evaluated
          --  prefix.
 
-         if Is_Limited_View (Etype (P)) then
+         if Is_Inherently_Limited_Type (Etype (P)) then
             Error_Attr_P ("prefix of attribute % cannot be limited");
          end if;
 
@@ -6457,17 +6457,30 @@ package body Sem_Attr is
                        or else Size_Known_At_Compile_Time (Entity (P)))
          then
             declare
-               Siz : Uint;
+               Prefix_E : Entity_Id := Entity (P);
+               Siz      : Uint;
 
             begin
-               if Known_Static_RM_Size (Entity (P)) then
-                  Siz := RM_Size (Entity (P));
-               else
-                  Siz := Esize (Entity (P));
+               --  Handle private and incomplete types
+
+               if Present (Underlying_Type (Prefix_E)) then
+                  Prefix_E := Underlying_Type (Prefix_E);
                end if;
 
-               Rewrite (N, Make_Integer_Literal (Sloc (N), Siz));
-               Analyze (N);
+               if Known_Static_RM_Size (Prefix_E) then
+                  Siz := RM_Size (Prefix_E);
+               else
+                  Siz := Esize (Prefix_E);
+               end if;
+
+               --  Protect the frontend against cases where the attribute
+               --  Size_Known_At_Compile_Time is set, but the Esize value
+               --  is not available (see Einfo.ads).
+
+               if Present (Siz) then
+                  Rewrite (N, Make_Integer_Literal (Sloc (N), Siz));
+                  Analyze (N);
+               end if;
             end;
          end if;
 
@@ -7344,7 +7357,7 @@ package body Sem_Attr is
          then
             Error_Attr_P ("prefix of attribute % must be a record or array");
 
-         elsif Is_Limited_View (P_Type) then
+         elsif Is_Inherently_Limited_Type (P_Type) then
             Error_Attr ("prefix of attribute % cannot be limited", N);
 
          elsif Nkind (E1) /= N_Aggregate then

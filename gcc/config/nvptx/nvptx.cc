@@ -335,8 +335,9 @@ nvptx_option_override (void)
   init_machine_status = nvptx_init_machine_status;
 
   /* Via nvptx 'OPTION_DEFAULT_SPECS', '-misa' always appears on the command
-     line.  */
-  gcc_checking_assert (OPTION_SET_P (ptx_isa_option));
+     line; but handle the case that the compiler is not run via the driver.  */
+  if (!OPTION_SET_P (ptx_isa_option))
+    fatal_error (UNKNOWN_LOCATION, "%<-march=%> must be specified");
 
   handle_ptx_version_option ();
 
@@ -5918,7 +5919,11 @@ nvptx_record_offload_symbol (tree decl)
 	/* OpenMP offloading does not set this attribute.  */
 	tree dims = attr ? TREE_VALUE (attr) : NULL_TREE;
 
-	fprintf (asm_out_file, "//:FUNC_MAP \"%s\"",
+	fprintf (asm_out_file, "//:");
+	if (lookup_attribute ("omp declare target indirect",
+			      DECL_ATTRIBUTES (decl)))
+	  fprintf (asm_out_file, "IND_");
+	fprintf (asm_out_file, "FUNC_MAP \"%s\"",
 		 IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl)));
 
 	for (; dims; dims = TREE_CHAIN (dims))

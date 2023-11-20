@@ -365,6 +365,7 @@ struct gcn_image_desc
   } *gcn_image;
   const unsigned kernel_count;
   struct hsa_kernel_description *kernel_infos;
+  const unsigned ind_func_count;
   const unsigned global_variable_count;
 };
 
@@ -377,7 +378,8 @@ typedef enum {
   EF_AMDGPU_MACH_AMDGCN_GFX900 = 0x02c,
   EF_AMDGPU_MACH_AMDGCN_GFX906 = 0x02f,
   EF_AMDGPU_MACH_AMDGCN_GFX908 = 0x030,
-  EF_AMDGPU_MACH_AMDGCN_GFX90a = 0x03f
+  EF_AMDGPU_MACH_AMDGCN_GFX90a = 0x03f,
+  EF_AMDGPU_MACH_AMDGCN_GFX1030 = 0x036
 } EF_AMDGPU_MACH;
 
 const static int EF_AMDGPU_MACH_MASK = 0x000000ff;
@@ -1633,6 +1635,7 @@ const static char *gcn_gfx900_s = "gfx900";
 const static char *gcn_gfx906_s = "gfx906";
 const static char *gcn_gfx908_s = "gfx908";
 const static char *gcn_gfx90a_s = "gfx90a";
+const static char *gcn_gfx1030_s = "gfx1030";
 const static int gcn_isa_name_len = 6;
 
 /* Returns the name that the HSA runtime uses for the ISA or NULL if we do not
@@ -1652,6 +1655,8 @@ isa_hsa_name (int isa) {
       return gcn_gfx908_s;
     case EF_AMDGPU_MACH_AMDGCN_GFX90a:
       return gcn_gfx90a_s;
+    case EF_AMDGPU_MACH_AMDGCN_GFX1030:
+      return gcn_gfx1030_s;
     }
   return NULL;
 }
@@ -1691,7 +1696,29 @@ isa_code(const char *isa) {
   if (!strncmp (isa, gcn_gfx90a_s, gcn_isa_name_len))
     return EF_AMDGPU_MACH_AMDGCN_GFX90a;
 
+  if (!strncmp (isa, gcn_gfx1030_s, gcn_isa_name_len))
+    return EF_AMDGPU_MACH_AMDGCN_GFX1030;
+
   return -1;
+}
+
+/* CDNA2 devices have twice as many VGPRs compared to older devices.  */
+
+static int
+max_isa_vgprs (int isa)
+{
+  switch (isa)
+    {
+    case EF_AMDGPU_MACH_AMDGCN_GFX803:
+    case EF_AMDGPU_MACH_AMDGCN_GFX900:
+    case EF_AMDGPU_MACH_AMDGCN_GFX906:
+    case EF_AMDGPU_MACH_AMDGCN_GFX908:
+    case EF_AMDGPU_MACH_AMDGCN_GFX1030:
+      return 256;
+    case EF_AMDGPU_MACH_AMDGCN_GFX90a:
+      return 512;
+    }
+  GOMP_PLUGIN_fatal ("unhandled ISA in max_isa_vgprs");
 }
 
 /* }}}  */
@@ -2135,6 +2162,7 @@ run_kernel (struct kernel_info *kernel, void *vars,
 	    struct GOMP_kernel_launch_attributes *kla,
 	    struct goacc_asyncqueue *aq, bool module_locked)
 {
+  struct agent_info *agent = kernel->agent;
   GCN_DEBUG ("SGPRs: %d, VGPRs: %d\n", kernel->description->sgpr_count,
 	     kernel->description->vpgr_count);
 
@@ -2142,8 +2170,9 @@ run_kernel (struct kernel_info *kernel, void *vars,
      VGPRs available to run the kernels together.  */
   if (kla->ndim == 3 && kernel->description->vpgr_count > 0)
     {
+      int max_vgprs = max_isa_vgprs (agent->device_isa);
       int granulated_vgprs = (kernel->description->vpgr_count + 3) & ~3;
-      int max_threads = (256 / granulated_vgprs) * 4;
+      int max_threads = (max_vgprs / granulated_vgprs) * 4;
       if (kla->gdims[2] > max_threads)
 	{
 	  GCN_WARNING ("Too many VGPRs required to support %d threads/workers"
@@ -2180,7 +2209,6 @@ run_kernel (struct kernel_info *kernel, void *vars,
   DEBUG_PRINT ("]\n");
   DEBUG_FLUSH ();
 
-  struct agent_info *agent = kernel->agent;
   if (!module_locked && pthread_rwlock_rdlock (&agent->module_rwlock))
     GOMP_PLUGIN_fatal ("Unable to read-lock a GCN agent rwlock");
 
@@ -3359,7 +3387,8 @@ GOMP_OFFLOAD_init_device (int n)
 int
 GOMP_OFFLOAD_load_image (int ord, unsigned version, const void *target_data,
 			 struct addr_pair **target_table,
-			 uint64_t **rev_fn_table)
+			 uint64_t **rev_fn_table,
+			 uint64_t *host_ind_fn_table)
 {
   if (GOMP_VERSION_DEV (version) != GOMP_VERSION_GCN)
     {
@@ -3375,6 +3404,8 @@ GOMP_OFFLOAD_load_image (int ord, unsigned version, const void *target_data,
   struct module_info *module;
   struct kernel_info *kernel;
   int kernel_count = image_desc->kernel_count;
+  unsigned ind_func_count = GOMP_VERSION_SUPPORTS_INDIRECT_FUNCS (version)
+			      ? image_desc->ind_func_count : 0;
   unsigned var_count = image_desc->global_variable_count;
   /* Currently, "others" is a struct of ICVS.  */
   int other_count = 1;
@@ -3393,6 +3424,7 @@ GOMP_OFFLOAD_load_image (int ord, unsigned version, const void *target_data,
     return -1;
 
   GCN_DEBUG ("Encountered %d kernels in an image\n", kernel_count);
+  GCN_DEBUG ("Encountered %d indirect functions in an image\n", ind_func_count);
   GCN_DEBUG ("Encountered %u global variables in an image\n", var_count);
   GCN_DEBUG ("Expect %d other variables in an image\n", other_count);
   pair = GOMP_PLUGIN_malloc ((kernel_count + var_count + other_count - 2)
@@ -3472,6 +3504,87 @@ GOMP_OFFLOAD_load_image (int ord, unsigned version, const void *target_data,
 		     (void *)var_table[i].addr, var_table[i].size);
 	  pair++;
 	}
+    }
+
+  if (ind_func_count > 0)
+    {
+      hsa_status_t status;
+
+      /* Read indirect function table from image.  */
+      hsa_executable_symbol_t ind_funcs_symbol;
+      status = hsa_fns.hsa_executable_get_symbol_fn (agent->executable, NULL,
+						     ".offload_ind_func_table",
+						     agent->id,
+						     0, &ind_funcs_symbol);
+
+      if (status != HSA_STATUS_SUCCESS)
+	hsa_fatal ("Could not find .offload_ind_func_table symbol in the "
+		   "code object", status);
+
+      uint64_t ind_funcs_table_addr;
+      status = hsa_fns.hsa_executable_symbol_get_info_fn
+	(ind_funcs_symbol, HSA_EXECUTABLE_SYMBOL_INFO_VARIABLE_ADDRESS,
+	 &ind_funcs_table_addr);
+      if (status != HSA_STATUS_SUCCESS)
+	hsa_fatal ("Could not extract a variable from its symbol", status);
+
+      uint64_t ind_funcs_table[ind_func_count];
+      GOMP_OFFLOAD_dev2host (agent->device_id, ind_funcs_table,
+			     (void*) ind_funcs_table_addr,
+			     sizeof (ind_funcs_table));
+
+      /* Build host->target address map for indirect functions.  */
+      uint64_t ind_fn_map[ind_func_count * 2 + 1];
+      for (unsigned i = 0; i < ind_func_count; i++)
+	{
+	  ind_fn_map[i * 2] = host_ind_fn_table[i];
+	  ind_fn_map[i * 2 + 1] = ind_funcs_table[i];
+	  GCN_DEBUG ("Indirect function %d: %lx->%lx\n",
+		     i, host_ind_fn_table[i], ind_funcs_table[i]);
+	}
+      ind_fn_map[ind_func_count * 2] = 0;
+
+      /* Write the map onto the target.  */
+      void *map_target_addr
+	= GOMP_OFFLOAD_alloc (agent->device_id, sizeof (ind_fn_map));
+      GCN_DEBUG ("Allocated indirect map at %p\n", map_target_addr);
+
+      GOMP_OFFLOAD_host2dev (agent->device_id, map_target_addr,
+			     (void*) ind_fn_map,
+			     sizeof (ind_fn_map));
+
+      /* Write address of the map onto the target.  */
+      hsa_executable_symbol_t symbol;
+
+      status
+	= hsa_fns.hsa_executable_get_symbol_fn (agent->executable, NULL,
+						XSTRING (GOMP_INDIRECT_ADDR_MAP),
+						agent->id, 0, &symbol);
+      if (status != HSA_STATUS_SUCCESS)
+	hsa_fatal ("Could not find GOMP_INDIRECT_ADDR_MAP in code object",
+		   status);
+
+      uint64_t varptr;
+      uint32_t varsize;
+
+      status = hsa_fns.hsa_executable_symbol_get_info_fn
+	(symbol, HSA_EXECUTABLE_SYMBOL_INFO_VARIABLE_ADDRESS,
+	 &varptr);
+      if (status != HSA_STATUS_SUCCESS)
+	hsa_fatal ("Could not extract a variable from its symbol", status);
+      status = hsa_fns.hsa_executable_symbol_get_info_fn
+	(symbol, HSA_EXECUTABLE_SYMBOL_INFO_VARIABLE_SIZE,
+	&varsize);
+      if (status != HSA_STATUS_SUCCESS)
+	hsa_fatal ("Could not extract a variable size from its symbol",
+		   status);
+
+      GCN_DEBUG ("Found GOMP_INDIRECT_ADDR_MAP at %lx with size %d\n",
+		 varptr, varsize);
+
+      GOMP_OFFLOAD_host2dev (agent->device_id, (void *) varptr,
+			     &map_target_addr,
+			     sizeof (map_target_addr));
     }
 
   GCN_DEBUG ("Looking for variable %s\n", XSTRING (GOMP_ADDITIONAL_ICVS));

@@ -436,18 +436,20 @@ i[34567]86-*-* | x86_64-*-*)
 		       avx512vbmi2vlintrin.h avx512vnniintrin.h
 		       avx512vnnivlintrin.h vaesintrin.h vpclmulqdqintrin.h
 		       avx512vpopcntdqvlintrin.h avx512bitalgintrin.h
-		       pconfigintrin.h wbnoinvdintrin.h movdirintrin.h
-		       waitpkgintrin.h cldemoteintrin.h avx512bf16vlintrin.h
-		       avx512bf16intrin.h enqcmdintrin.h serializeintrin.h
-		       avx512vp2intersectintrin.h avx512vp2intersectvlintrin.h
-		       tsxldtrkintrin.h amxtileintrin.h amxint8intrin.h
-		       amxbf16intrin.h x86gprintrin.h uintrintrin.h
-		       hresetintrin.h keylockerintrin.h avxvnniintrin.h
-		       mwaitintrin.h avx512fp16intrin.h avx512fp16vlintrin.h
-		       avxifmaintrin.h avxvnniint8intrin.h avxneconvertintrin.h
+		       avx512bitalgvlintrin.h pconfigintrin.h wbnoinvdintrin.h
+		       movdirintrin.h waitpkgintrin.h cldemoteintrin.h
+		       avx512bf16vlintrin.h avx512bf16intrin.h enqcmdintrin.h
+		       serializeintrin.h avx512vp2intersectintrin.h
+		       avx512vp2intersectvlintrin.h tsxldtrkintrin.h
+		       amxtileintrin.h amxint8intrin.h amxbf16intrin.h
+		       x86gprintrin.h uintrintrin.h hresetintrin.h
+		       keylockerintrin.h avxvnniintrin.h mwaitintrin.h
+		       avx512fp16intrin.h avx512fp16vlintrin.h avxifmaintrin.h
+		       avxvnniint8intrin.h avxneconvertintrin.h
 		       cmpccxaddintrin.h amxfp16intrin.h prfchiintrin.h
 		       raointintrin.h amxcomplexintrin.h avxvnniint16intrin.h
-		       sm3intrin.h sha512intrin.h sm4intrin.h"
+		       sm3intrin.h sha512intrin.h sm4intrin.h
+		       usermsrintrin.h"
 	;;
 ia64-*-*)
 	extra_headers=ia64intrin.h
@@ -542,9 +544,9 @@ pru-*-*)
 riscv*)
 	cpu_type=riscv
 	extra_objs="riscv-builtins.o riscv-c.o riscv-sr.o riscv-shorten-memrefs.o riscv-selftests.o riscv-string.o"
-	extra_objs="${extra_objs} riscv-v.o riscv-vsetvl.o riscv-vector-costs.o"
+	extra_objs="${extra_objs} riscv-v.o riscv-vsetvl.o riscv-vector-costs.o riscv-avlprop.o"
 	extra_objs="${extra_objs} riscv-vector-builtins.o riscv-vector-builtins-shapes.o riscv-vector-builtins-bases.o"
-	extra_objs="${extra_objs} thead.o"
+	extra_objs="${extra_objs} thead.o riscv-target-attr.o"
 	d_target_objs="riscv-d.o"
 	extra_headers="riscv_vector.h"
 	target_gtfiles="$target_gtfiles \$(srcdir)/config/riscv/riscv-vector-builtins.cc"
@@ -569,6 +571,7 @@ s390*-*-*)
 	d_target_objs="s390-d.o"
 	extra_options="${extra_options} fused-madd.opt"
 	extra_headers="s390intrin.h htmintrin.h htmxlintrin.h vecintrin.h"
+	target_gtfiles="./s390-gen-builtins.h"
 	;;
 # Note the 'l'; we need to be able to match e.g. "shle" or "shl".
 sh[123456789lbe]*-*-* | sh-*-*)
@@ -704,9 +707,9 @@ slm nehalem westmere sandybridge ivybridge haswell broadwell bonnell \
 silvermont knl knm skylake-avx512 cannonlake icelake-client icelake-server \
 skylake goldmont goldmont-plus tremont cascadelake tigerlake cooperlake \
 sapphirerapids alderlake rocketlake eden-x2 nano nano-1000 nano-2000 nano-3000 \
-nano-x2 eden-x4 nano-x4 lujiazui x86-64 x86-64-v2 x86-64-v3 x86-64-v4 \
+nano-x2 eden-x4 nano-x4 lujiazui yongfeng x86-64 x86-64-v2 x86-64-v3 x86-64-v4 \
 sierraforest graniterapids graniterapids-d grandridge arrowlake arrowlake-s \
-native"
+clearwaterforest pantherlake native"
 
 # Additional x86 processors supported by --with-cpu=.  Each processor
 # MUST be separated by exactly one space.
@@ -1166,6 +1169,17 @@ case ${target} in
   no-no) use_gcc_stdint=provide ;;
   *) ;;
   esac
+  ;;
+esac
+
+# Figure out if we need to enable heap trampolines by default
+case ${target} in
+*-*-darwin2*)
+  # Currently, we do this for macOS 11 and above.
+  tm_defines="$tm_defines HEAP_TRAMPOLINES_INIT=1"
+  ;;
+*)
+  tm_defines="$tm_defines HEAP_TRAMPOLINES_INIT=0"
   ;;
 esac
 
@@ -2524,7 +2538,7 @@ riscv*-*-freebsd*)
 
 loongarch*-*-linux*)
 	tm_file="elfos.h gnu-user.h linux.h linux-android.h glibc-stdint.h ${tm_file}"
-	tm_file="${tm_file} loongarch/gnu-user.h loongarch/linux.h"
+	tm_file="${tm_file} loongarch/gnu-user.h loongarch/linux.h loongarch/loongarch-driver.h"
 	extra_options="${extra_options} linux-android.opt"
 	tmake_file="${tmake_file} loongarch/t-multilib loongarch/t-linux"
 	gnu_ld=yes
@@ -2537,7 +2551,7 @@ loongarch*-*-linux*)
 
 loongarch*-*-elf*)
 	tm_file="elfos.h newlib-stdint.h ${tm_file}"
-	tm_file="${tm_file} loongarch/elf.h loongarch/linux.h"
+	tm_file="${tm_file} loongarch/elf.h loongarch/linux.h loongarch/loongarch-driver.h"
 	tmake_file="${tmake_file} loongarch/t-multilib loongarch/t-linux"
 	gnu_ld=yes
 	gas=yes
@@ -3798,6 +3812,10 @@ case ${target} in
 	arch=lujiazui
 	cpu=lujiazui
 	;;
+      yongfeng-*)
+	arch=yongfeng
+	cpu=yongfeng
+	;;
       pentium2-*)
 	arch=pentium2
 	cpu=pentium2
@@ -3911,9 +3929,13 @@ case ${target} in
 	arch=k8
 	cpu=k8
 	;;
-    lujiazui-*)
+      lujiazui-*)
 	arch=lujiazui
 	cpu=lujiazui
+	;;
+      yongfeng-*)
+	arch=yongfeng
+	cpu=yongfeng
 	;;
       nocona-*)
 	arch=nocona
@@ -4186,8 +4208,8 @@ case "${target}" in
 		fi
 		for which in cpu arch tune; do
 			eval "val=\$with_$which"
-			base_val=`echo $val | sed -e 's/\+.*//'`
-			ext_val=`echo $val | sed -e 's/[a-z0-9.-]\+//'`
+			base_val=`echo $val | sed -E -e 's/\+.*//'`
+			ext_val=`echo $val | sed -E -e 's/[a-z0-9.-]+//'`
 
 			if [ $which = arch ]; then
 			  def=aarch64-arches.def
@@ -4219,9 +4241,9 @@ case "${target}" in
 
 			  while [ x"$ext_val" != x ]
 			  do
-				ext_val=`echo $ext_val | sed -e 's/\+//'`
-				ext=`echo $ext_val | sed -e 's/\+.*//'`
-				base_ext=`echo $ext | sed -e 's/^no//'`
+				ext_val=`echo $ext_val | sed -E -e 's/\+//'`
+				ext=`echo $ext_val | sed -E -e 's/\+.*//'`
+				base_ext=`echo $ext | sed -E -e 's/^no//'`
 				opt_line=`echo -e "$options_parsed" | \
 					grep "^\"$base_ext\""`
 
@@ -4232,7 +4254,7 @@ case "${target}" in
 				  echo "Unknown extension used in --with-$which=$val" 1>&2
 				  exit 1
 				fi
-				ext_val=`echo $ext_val | sed -e 's/[a-z0-9]\+//'`
+				ext_val=`echo $ext_val | sed -E -e 's/[a-z0-9]+//'`
 			  done
 
 			  true
@@ -4527,7 +4549,7 @@ case "${target}" in
 		for which in arch tune; do
 			eval "val=\$with_$which"
 			case ${val} in
-			"" | fiji | gfx900 | gfx906 | gfx908 | gfx90a)
+			"" | fiji | gfx900 | gfx906 | gfx908 | gfx90a | gfx1030)
 				# OK
 				;;
 			*)
@@ -4536,7 +4558,19 @@ case "${target}" in
 				;;
 			esac
 		done
-		[ "x$with_arch" = x ] && with_arch=fiji
+		[ "x$with_arch" = x ] && with_arch=gfx900
+
+		case "x${with_multilib_list}" in
+		x | xno)
+			TM_MULTILIB_CONFIG=
+			;;
+		xdefault | xyes)
+			TM_MULTILIB_CONFIG=`echo "gfx900,gfx906,gfx908,gfx90a" | sed "s/${with_arch},\?//;s/,$//"`
+			;;
+		*)
+			TM_MULTILIB_CONFIG="${with_multilib_list}"
+			;;
+		esac
 		;;
 
 	hppa*-*-*)
@@ -5005,7 +5039,7 @@ case "${target}" in
 
 		# Perform initial sanity checks on --with-* options.
 		case ${with_arch} in
-		"" | abi-default | loongarch64 | la464) ;; # OK, append here.
+		"" | abi-default | loongarch64 | la[46]64) ;; # OK, append here.
 		native)
 			if test x${host} != x${target}; then
 				echo "--with-arch=native is illegal for cross-compiler." 1>&2
@@ -5054,7 +5088,7 @@ case "${target}" in
 		case ${abi_base}/${abi_ext} in
 		lp64*/base)
 			# architectures that support lp64* ABI
-			arch_pattern="native|abi-default|loongarch64|la464"
+			arch_pattern="native|abi-default|loongarch64|la[46]64"
 			# default architecture for lp64* ABI
 			arch_default="abi-default"
 			;;
@@ -5129,7 +5163,7 @@ case "${target}" in
 		# Check default with_tune configuration using with_arch.
 		case ${with_arch} in
 		loongarch64)
-			tune_pattern="native|abi-default|loongarch64|la464"
+			tune_pattern="native|abi-default|loongarch64|la[46]64"
 			;;
 		*)
 			# By default, $with_tune == $with_arch
@@ -5185,7 +5219,7 @@ case "${target}" in
 					# Fixed: use the default gcc configuration for all multilib
 					# builds by default.
 					with_multilib_default="" ;;
-				arch,native|arch,loongarch64|arch,la464) # OK, append here.
+				arch,native|arch,loongarch64|arch,la[46]64) # OK, append here.
 					with_multilib_default="/march=${component}" ;;
 				arch,*)
 					with_multilib_default="/march=abi-default"
@@ -5273,7 +5307,7 @@ case "${target}" in
 				if test x${parse_state} = x"arch"; then
 					# -march option
 					case ${component} in
-					native | abi-default | loongarch64 | la464) # OK, append here.
+					native | abi-default | loongarch64 | la[46]64) # OK, append here.
 						# Append -march spec for each multilib variant.
 						loongarch_multilib_list_make="${loongarch_multilib_list_make}/march=${component}"
 						parse_state="opts"

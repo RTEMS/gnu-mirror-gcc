@@ -443,19 +443,20 @@
     {
     case SYMBOL_PCREL:
       if (TARGET_CMODEL_EXTREME
-	  || (TARGET_CMODEL_MEDIUM && !TARGET_EXPLICIT_RELOCS))
+	  || (TARGET_CMODEL_MEDIUM
+	      && (la_opt_explicit_relocs == EXPLICIT_RELOCS_NONE)))
 	return false;
       else
-	return 1;
+	return true;
 
     case SYMBOL_GOT_DISP:
       if (TARGET_CMODEL_EXTREME
 	  || !flag_plt
 	  || (flag_plt && TARGET_CMODEL_MEDIUM
-	      && !TARGET_EXPLICIT_RELOCS))
+	      && (la_opt_explicit_relocs == EXPLICIT_RELOCS_NONE)))
 	return false;
       else
-	return 1;
+	return true;
 
     default:
       return false;
@@ -541,16 +542,14 @@
     case SYMBOL_REF:
     case LABEL_REF:
       return (loongarch_symbolic_constant_p (op, &symbol_type)
-	      && (!TARGET_EXPLICIT_RELOCS
+	      && (!loongarch_explicit_relocs_p (symbol_type)
 		  || !loongarch_split_symbol_type (symbol_type)));
 
     case HIGH:
-      /* '-mno-explicit-relocs' don't generate high/low pairs.  */
-      if (!TARGET_EXPLICIT_RELOCS)
-	return false;
-
       op = XEXP (op, 0);
+
       return (loongarch_symbolic_constant_p (op, &symbol_type)
+	      && loongarch_explicit_relocs_p (symbol_type)
 	      && loongarch_split_symbol_type (symbol_type));
 
     default:
@@ -563,6 +562,13 @@
 {
   enum loongarch_symbol_type type;
   return loongarch_symbolic_constant_p (op, &type);
+})
+
+(define_predicate "symbolic_pcrel_operand"
+  (match_code "const,symbol_ref,label_ref")
+{
+  enum loongarch_symbol_type type;
+  return loongarch_symbolic_constant_p (op, &type) && type == SYMBOL_PCREL;
 })
 
 (define_predicate "equality_operator"

@@ -956,6 +956,19 @@ fi
 
 AC_SUBST(DEFAULT_MATCHPD_PARTITIONS)
 
+# Specify the number of splits of insn-emit.cc to generate.
+AC_ARG_WITH(insnemit-partitions,
+[AS_HELP_STRING([--with-insnemit-partitions=num],
+[Set the number of partitions of insn-emit.cc for genemit to create. [default=10]])],
+[DEFAULT_INSNEMIT_PARTITIONS="$with_insnemit_partitions"], [DEFAULT_INSNEMIT_PARTITIONS=10])
+if (test $DEFAULT_INSNEMIT_PARTITIONS -lt 1); then
+  AC_MSG_ERROR(m4_normalize([
+		Invalid value $DEFAULT_INSNEMIT_PARTITIONS for --with-insnemit-partitions. \
+		Cannot be negative.]))
+fi
+
+AC_SUBST(DEFAULT_INSNEMIT_PARTITIONS)
+
 # Enable __cxa_atexit for C++.
 AC_ARG_ENABLE(__cxa_atexit,
 [AS_HELP_STRING([--enable-__cxa_atexit], [enable __cxa_atexit for C++])],
@@ -2631,6 +2644,21 @@ m4_defun([_LT_CONFIG_COMMANDS], [])
 AC_PROG_LIBTOOL
 AC_SUBST(objdir)
 AC_SUBST(enable_fast_install)
+
+AM_CONDITIONAL([ENABLE_DARWIN_AT_RPATH], [test x$enable_darwin_at_rpath = xyes])
+DARWIN_DO_EXTRA_RPATH=0
+AC_ARG_WITH(darwin-extra-rpath,
+[AS_HELP_STRING(
+  [[--with-darwin-extra-rpath=[ARG]]],
+   [Specify a runpath directory, additional to those provided by the compiler])],
+[if test x"$withval" != x; then
+   DARWIN_ADD_RPATH="$withval"
+   DARWIN_DO_EXTRA_RPATH=1
+ fi])
+AC_DEFINE_UNQUOTED(DARWIN_DO_EXTRA_RPATH, $DARWIN_DO_EXTRA_RPATH,
+  [Should add an extra runpath directory])
+AC_DEFINE_UNQUOTED(DARWIN_ADD_RPATH, "$DARWIN_ADD_RPATH",
+  [Specify a runpath directory, additional to those provided by the compiler])
 
 # Identify the assembler which will work hand-in-glove with the newly
 # built GCC, so that we can examine its features.  This is the assembler
@@ -4374,6 +4402,14 @@ case "$target_os" in
       [-mmacosx-version-min=10.1], [.text],,
       [AC_DEFINE(HAVE_AS_MMACOSX_VERSION_MIN_OPTION, 1,
 	[Define if your macOS assembler supports the -mmacos-version-min option.])])
+    if test x$gcc_cv_as_mmacosx_version_min = "xyes"; then
+       gcc_GAS_CHECK_FEATURE([.build_version],
+           gcc_cv_as_darwin_build_version,
+           [-mmacosx-version-min=10.14],
+           [ .build_version macos, 10, 14 sdk_version 10, 14],,
+      [AC_DEFINE(HAVE_AS_MACOS_BUILD_VERSION, 1,
+	[Define if your macOS assembler supports .build_version directives])])
+    fi
     ;;
 esac
 
@@ -5097,6 +5133,23 @@ gd:
 	  [Define if your assembler supports mfcr field.])])
 
     case $target in
+      *-*-aix*) conftest_s='	.machine "pwr10"
+	.csect .text[[PR]]
+	tend. 0';;
+      *-*-darwin*) conftest_s='	.text
+	tend. 0';;
+      *) conftest_s='	.machine power10
+	.text
+	tend. 0';;
+    esac
+
+    gcc_GAS_CHECK_FEATURE([htm support on Power10],
+      gcc_cv_as_power10_htm,,
+      [$conftest_s],,
+      [AC_DEFINE(HAVE_AS_POWER10_HTM, 1,
+	  [Define if your assembler supports htm insns on power10.])])
+
+    case $target in
       *-*-aix*) conftest_s='	.csect .text[[PR]]
 LCF..0:
 	addis 11,30,_GLOBAL_OFFSET_TABLE_-LCF..0@ha';;
@@ -5388,6 +5441,12 @@ x:
       [a:pcalau12i $t0,%pc_hi20(a)],,
       [AC_DEFINE(HAVE_AS_EXPLICIT_RELOCS, 1,
 	  [Define if your assembler supports explicit relocation.])])
+    gcc_GAS_CHECK_FEATURE([call36 relocation support],
+      gcc_cv_as_loongarch_call36,,
+      [pcaddu18i $r1, %call36(a)
+       jirl $r1, $r1, 0],,
+      [AC_DEFINE(HAVE_AS_SUPPORT_CALL36, 1,
+	  [Define if your assembler supports call36 relocation.])])
     gcc_GAS_CHECK_FEATURE([eh_frame pcrel encoding support],
       gcc_cv_as_loongarch_eh_frame_pcrel_encoding_support,,
       [.cfi_startproc
@@ -5400,6 +5459,16 @@ x:
       [-mrelax], [.text],,
       [AC_DEFINE(HAVE_AS_MRELAX_OPTION, 1,
 		[Define if your assembler supports -mrelax option.])])
+    gcc_GAS_CHECK_FEATURE([conditional branch relaxation support],
+      gcc_cv_as_loongarch_cond_branch_relax,
+      [],
+      [a:
+       .rept 32769
+       nop
+       .endr
+       beq $a0,$a1,a],,
+      [AC_DEFINE(HAVE_AS_COND_BRANCH_RELAXATION, 1,
+		[Define if your assembler supports conditional branch relaxation.])])
     ;;
     s390*-*-*)
     gcc_GAS_CHECK_FEATURE([.gnu_attribute support],

@@ -843,7 +843,7 @@ Thus, @code{array (pointer (char), 4)} is the type of arrays of 4
 pointers to @code{char}.
 @end itemize
 
-The ISO C2X operator @code{typeof_unqual} is available in ISO C2X mode
+The ISO C23 operator @code{typeof_unqual} is available in ISO C23 mode
 and its result is the non-atomic unqualified version of what @code{typeof}
 operator returns.  Alternate spelling @code{__typeof_unqual__} is
 available in all C modes and provides non-atomic unqualified version of
@@ -2497,7 +2497,7 @@ hack ((union foo) x);
 @cindex code, mixed with declarations
 
 ISO C99 and ISO C++ allow declarations and code to be freely mixed
-within compound statements.  ISO C2X allows labels to be
+within compound statements.  ISO C23 allows labels to be
 placed before declarations and at the end of a compound statement.
 As an extension, GNU C also allows all this in C90 mode.  For example,
 you could do:
@@ -3054,6 +3054,17 @@ a message in @code{.gnu.warning*} section),
 when using these attributes the problem is diagnosed
 earlier and with exact location of the call even in presence of inline
 functions or when not emitting debugging information.
+
+@cindex @code{expected_throw} function attribute
+@item expected_throw
+This attribute, attached to a function, tells the compiler the function
+is more likely to raise or propagate an exception than to return, loop
+forever, or terminate the program.
+
+This hint is mostly ignored by the compiler.  The only effect is when
+it's applied to @code{noreturn} functions and
+@samp{-fharden-control-flow-redundancy} is enabled, and
+@samp{-fhardcfr-check-noreturn-calls=not-always} is not overridden.
 
 @cindex @code{externally_visible} function attribute
 @item externally_visible
@@ -3743,6 +3754,63 @@ extern void *
 my_memcpy (void *dest, const void *src, size_t len)
         __attribute__((nonnull));
 @end smallexample
+
+@cindex @code{null_terminated_string_arg} function attribute
+@item null_terminated_string_arg
+@itemx null_terminated_string_arg (@var{N})
+The @code{null_terminated_string_arg} attribute may be applied to a
+function that takes a @code{char *} or @code{const char *} at
+referenced argument @var{N}.
+
+It indicates that the passed argument must be a C-style null-terminated
+string.  Specifically, the presence of the attribute implies that, if
+the pointer is non-null, the function may scan through the referenced
+buffer looking for the first zero byte.
+
+In particular, when the analyzer is enabled (via @option{-fanalyzer}),
+if the pointer is non-null, it will simulate scanning for the first
+zero byte in the referenced buffer, and potentially emit
+@option{-Wanalyzer-use-of-uninitialized-value}
+or @option{-Wanalyzer-out-of-bounds} on improperly terminated buffers.
+
+For example, given the following:
+
+@smallexample
+char *example_1 (const char *p)
+  __attribute__((null_terminated_string_arg (1)));
+@end smallexample
+
+the analyzer will check that any non-null pointers passed to the function
+are validly terminated.
+
+If the parameter must be non-null, it is appropriate to use both this
+attribute and the attribute @code{nonnull}, such as in:
+
+@smallexample
+extern char *example_2 (const char *p)
+  __attribute__((null_terminated_string_arg (1),
+                 nonnull (1)));
+@end smallexample
+
+See the @code{nonnull} attribute for more information and
+caveats.
+
+If the pointer argument is also referred to by an @code{access} attribute on the
+function with @var{access-mode} either @code{read_only} or @code{read_write}
+and the latter attribute has the optional @var{size-index} argument
+referring to a size argument, this expressses the maximum size of the access.
+For example, given:
+
+@smallexample
+extern char *example_fn (const char *p, size_t n)
+  __attribute__((null_terminated_string_arg (1),
+                 access (read_only, 1, 2),
+                 nonnull (1)));
+@end smallexample
+
+the analyzer will require the first parameter to be non-null, and either
+be validly null-terminated, or validly readable up to the size specified by
+the second parameter.
 
 @cindex @code{noplt} function attribute
 @item noplt
@@ -6227,7 +6295,65 @@ void f (void) __attribute__ ((interrupt ("user")));
 Permissible values for this parameter are @code{user}, @code{supervisor},
 and @code{machine}.  If there is no parameter, then it defaults to
 @code{machine}.
+
 @end table
+
+The following target-specific function attributes are available for the
+RISC-V target.  For the most part, these options mirror the behavior of
+similar command-line options (@pxref{RISC-V Options}), but on a
+per-function basis.
+
+@table @code
+@cindex @code{arch=} function attribute, RISC-V
+@item arch=
+Specifies the architecture version and architectural extensions to use
+for this function.  The behavior and permissible arguments are the same as
+for the @option{-march=} command-line option, in addtion, it also support
+extension enablement list, a list of extension name and prefixed with @code{+},
+like @code{arch=+zba} means enable @code{zba} extension.
+Multiple extension can be enabled by separating them with a comma.  For example:
+@code{arch=+zba,+zbb}.
+
+@cindex @code{tune=} function attribute, RISC-V
+@item tune=
+Specifies the core for which to tune the performance of this function.
+The behavior and permissible arguments are the same as for the @option{-mtune=}
+command-line option.
+
+@cindex @code{cpu=} function attribute, RISC-V
+@item cpu=
+Specifies the core for which to tune the performance of this function and also
+whose architectural features to use.  The behavior and valid arguments are the
+same as for the @option{-mcpu=} command-line option.
+
+@end table
+
+The above target attributes can be specified as follows:
+
+@smallexample
+__attribute__((target("@var{attr-string}")))
+int
+f (int a)
+@{
+  return a + 5;
+@}
+@end smallexample
+
+where @code{@var{attr-string}} is one of the attribute strings specified above.
+
+Multiple target function attributes can be specified by separating them with
+a semicolon.  For example:
+@smallexample
+__attribute__((target("arch=+zba,+zbb;tune=rocket")))
+int
+foo (int a)
+@{
+  return a + 5;
+@}
+@end smallexample
+
+is valid and compiles function @code{foo} with @code{zba}
+and @code{zbb} extensions and tunes it for @code{rocket}.
 
 @node RL78 Function Attributes
 @subsection RL78 Function Attributes
@@ -7209,6 +7335,11 @@ Enable/disable the generation of the SHA512 instructions.
 @item sm4
 @itemx no-sm4
 Enable/disable the generation of the SM4 instructions.
+
+@cindex @code{target("usermsr")} function attribute, x86
+@item usermsr
+@itemx no-usermsr
+Enable/disable the generation of the USER_MSR instructions.
 
 @cindex @code{target("cld")} function attribute, x86
 @item cld
@@ -9370,8 +9501,8 @@ default language dialect for both C and C++.  More specifically, this
 syntax was first introduced in the C++11 language standard
 (@pxref{Standards}), and is supported by GCC in C++ code with
 @option{-std=c++11} or @option{-std=gnu++11} or later.  It is also
-part of the C2x language standard and is supported when compiling C
-code with @option{-std=c2x} or @option{-std=gnu17} or later.
+part of the C23 language standard and is supported when compiling C
+code with @option{-std=c23} or @option{-std=gnu17} or later.
 
 When using GNU-specific attributes in the standard syntax, you must
 prefix their names with @samp{gnu::}, such as @code{gnu::section}.
@@ -11978,7 +12109,7 @@ In C, writing:
 @end smallexample
 
 suppresses warnings about using @samp{[[]]} attributes in C versions
-that predate C2X@.  Since the scope token @samp{::} is not a single
+that predate C23@.  Since the scope token @samp{::} is not a single
 lexing token in earlier versions of C, this construct also allows two colons
 to be used in place of @code{::}.  GCC does not check whether the two
 colons are immediately adjacent.
@@ -14223,14 +14354,16 @@ an error if there is no such function.
 
 @defbuiltin{int __builtin_constant_p (@var{exp})}
 You can use the built-in function @code{__builtin_constant_p} to
-determine if a value is known to be constant at compile time and hence
-that GCC can perform constant-folding on expressions involving that
-value.  The argument of the function is the value to test.  The function
+determine if the expression @var{exp} is known to be constant at
+compile time and hence that GCC can perform constant-folding on expressions
+involving that value.  The argument of the function is the expression to test.
+The expression is not evaluated, side-effects are discarded.  The function
 returns the integer 1 if the argument is known to be a compile-time
-constant and 0 if it is not known to be a compile-time constant.  A
-return of 0 does not indicate that the value is @emph{not} a constant,
-but merely that GCC cannot prove it is a constant with the specified
-value of the @option{-O} option.
+constant and 0 if it is not known to be a compile-time constant.
+Any expression that has side-effects makes the function return 0.
+A return of 0 does not indicate that the expression is @emph{not} a constant,
+but merely that GCC cannot prove it is a constant within the constraints
+of the active set of optimization options.
 
 You typically use this function in an embedded application where
 memory is a critical resource.  If you have some complex calculation,
@@ -14885,6 +15018,48 @@ Similar to @code{__builtin_parity}, except the argument type is
 @code{unsigned long long}.
 @enddefbuiltin
 
+@defbuiltin{int __builtin_ffsg (...)}
+Similar to @code{__builtin_ffs}, except the argument is type-generic
+signed integer (standard, extended or bit-precise).  No integral argument
+promotions are performed on the argument.
+@enddefbuiltin
+
+@defbuiltin{int __builtin_clzg (...)}
+Similar to @code{__builtin_clz}, except the argument is type-generic
+unsigned integer (standard, extended or bit-precise) and there is
+optional second argument with int type.  No integral argument promotions
+are performed on the first argument.  If two arguments are specified,
+and first argument is 0, the result is the second argument.  If only
+one argument is specified and it is 0, the result is undefined.
+@enddefbuiltin
+
+@defbuiltin{int __builtin_ctzg (...)}
+Similar to @code{__builtin_ctz}, except the argument is type-generic
+unsigned integer (standard, extended or bit-precise) and there is
+optional second argument with int type.  No integral argument promotions
+are performed on the first argument.  If two arguments are specified,
+and first argument is 0, the result is the second argument.  If only
+one argument is specified and it is 0, the result is undefined.
+@enddefbuiltin
+
+@defbuiltin{int __builtin_clrsbg (...)}
+Similar to @code{__builtin_clrsb}, except the argument is type-generic
+signed integer (standard, extended or bit-precise).  No integral argument
+promotions are performed on the argument.
+@enddefbuiltin
+
+@defbuiltin{int __builtin_popcountg (...)}
+Similar to @code{__builtin_popcount}, except the argument is type-generic
+unsigned integer (standard, extended or bit-precise).  No integral argument
+promotions are performed on the argument.
+@enddefbuiltin
+
+@defbuiltin{int __builtin_parityg (...)}
+Similar to @code{__builtin_parity}, except the argument is type-generic
+unsigned integer (standard, extended or bit-precise).  No integral argument
+promotions are performed on the argument.
+@enddefbuiltin
+
 @defbuiltin{double __builtin_powi (double, int)}
 @defbuiltinx{float __builtin_powif (float, int)}
 @defbuiltinx{{long double} __builtin_powil (long double, int)}
@@ -14970,6 +15145,7 @@ instructions, but allow the compiler to schedule those calls.
 * PRU Built-in Functions::
 * RISC-V Built-in Functions::
 * RISC-V Vector Intrinsics::
+* CORE-V Built-in Functions::
 * RX Built-in Functions::
 * S/390 System z Built-in Functions::
 * SH Built-in Functions::
@@ -16732,6 +16908,11 @@ __float128 __builtin_nanq (void);
 __float128 __builtin_nansq (void);
 @end smallexample
 
+Returns the value that is currently set in the @samp{tp} register.
+@smallexample
+    void * __builtin_thread_pointer (void)
+@end smallexample
+
 @node MIPS DSP Built-in Functions
 @subsection MIPS DSP Built-in Functions
 
@@ -18348,7 +18529,6 @@ These built-in functions are available for the Nvidia PTX target:
 
 @defbuiltin{unsigned int __builtin_nvptx_brev (unsigned int @var{x})}
 Reverse the bit order of a 32-bit unsigned integer.
-Disable global interrupt.
 @enddefbuiltin
 
 @defbuiltin{unsigned long long __builtin_nvptx_brevll (unsigned long long @var{x})}
@@ -20126,12 +20306,16 @@ int __builtin_bcdadd_ov (vector unsigned char, vector unsigned char, const int);
 vector __int128 __builtin_bcdsub (vector __int128, vector __int128, const int);
 vector unsigned char __builtin_bcdsub (vector unsigned char, vector unsigned char,
                                        const int);
+int __builtin_bcdsub_le (vector __int128, vector __int128, const int);
+int __builtin_bcdsub_le (vector unsigned char, vector unsigned char, const int);
 int __builtin_bcdsub_lt (vector __int128, vector __int128, const int);
 int __builtin_bcdsub_lt (vector unsigned char, vector unsigned char, const int);
 int __builtin_bcdsub_eq (vector __int128, vector __int128, const int);
 int __builtin_bcdsub_eq (vector unsigned char, vector unsigned char, const int);
 int __builtin_bcdsub_gt (vector __int128, vector __int128, const int);
 int __builtin_bcdsub_gt (vector unsigned char, vector unsigned char, const int);
+int __builtin_bcdsub_ge (vector __int128, vector __int128, const int);
+int __builtin_bcdsub_ge (vector unsigned char, vector unsigned char, const int);
 int __builtin_bcdsub_ov (vector __int128, vector __int128, const int);
 int __builtin_bcdsub_ov (vector unsigned char, vector unsigned char, const int);
 @end smallexample
@@ -21712,6 +21896,179 @@ vector intrinsic specification, which is available at the following link:
 @uref{https://github.com/riscv-non-isa/rvv-intrinsic-doc/tree/v0.11.x}.
 All of these functions are declared in the include file @file{riscv_vector.h}.
 
+@node CORE-V Built-in Functions
+@subsection CORE-V Built-in Functions
+
+These built-in functions are available for the CORE-V MAC machine
+architecture. For more information on CORE-V built-ins, please see
+@uref{https://github.com/openhwgroup/core-v-sw/blob/master/specifications/corev-builtin-spec.md#listing-of-multiply-accumulate-builtins-xcvmac}.
+
+@deftypefn {Built-in Function} {int32_t} __builtin_riscv_cv_mac_mac (int32_t, int32_t, int32_t)
+Generated assembler @code{cv.mac}
+@end deftypefn
+
+@deftypefn {Built-in Function} {int32_t} __builtin_riscv_cv_mac_msu (int32_t, int32_t, int32_t)
+Generates the @code{cv.msu} machine instruction.
+@end deftypefn
+
+@deftypefn {Built-in Function} {uint32_t} __builtin_riscv_cv_mac_muluN (uint32_t, uint32_t, uint8_t)
+Generates the @code{cv.muluN} machine instruction.
+@end deftypefn
+
+@deftypefn {Built-in Function} {uint32_t} __builtin_riscv_cv_mac_mulhhuN (uint32_t, uint32_t, uint8_t)
+Generates the @code{cv.mulhhuN} machine instruction.
+@end deftypefn
+
+@deftypefn {Built-in Function} {int32_t} __builtin_riscv_cv_mac_mulsN (int32_t, int32_t, uint8_t)
+Generates the @code{cv.mulsN} machine instruction.
+@end deftypefn
+
+@deftypefn {Built-in Function} {int32_t} __builtin_riscv_cv_mac_mulhhsN (int32_t, int32_t, uint8_t)
+Generates the @code{cv.mulhhsN} machine instruction.
+@end deftypefn
+
+@deftypefn {Built-in Function} {uint32_t} __builtin_riscv_cv_mac_muluRN (uint32_t, uint32_t, uint8_t)
+Generates the @code{cv.muluRN} machine instruction.
+@end deftypefn
+
+@deftypefn {Built-in Function} {uint32_t} __builtin_riscv_cv_mac_mulhhuRN (uint32_t, uint32_t, uint8_t)
+Generates the @code{cv.mulhhuRN} machine instruction.
+@end deftypefn
+
+@deftypefn {Built-in Function} {int32_t} __builtin_riscv_cv_mac_mulsRN (int32_t, int32_t, uint8_t)
+Generates the @code{cv.mulsRN} machine instruction.
+@end deftypefn
+
+@deftypefn {Built-in Function} {int32_t} __builtin_riscv_cv_mac_mulhhsRN (int32_t, int32_t, uint8_t)
+Generates the @code{cv.mulhhsRN} machine instruction.
+@end deftypefn
+
+@deftypefn {Built-in Function} {uint32_t} __builtin_riscv_cv_mac_macuN (uint32_t, uint32_t, uint8_t)
+Generates the @code{cv.macuN} machine instruction.
+@end deftypefn
+
+@deftypefn {Built-in Function} {uint32_t} __builtin_riscv_cv_mac_machhuN (uint32_t, uint32_t, uint8_t)
+Generates the @code{cv.machhuN} machine instruction.
+@end deftypefn
+
+@deftypefn {Built-in Function} {int32_t} __builtin_riscv_cv_mac_macsN (int32_t, int32_t, uint8_t)
+Generates the @code{cv.macsN} machine instruction.
+@end deftypefn
+
+@deftypefn {Built-in Function} {int32_t} __builtin_riscv_cv_mac_machhsN (int32_t, int32_t, uint8_t)
+Generates the @code{cv.machhsN} machine instruction.
+@end deftypefn
+
+@deftypefn {Built-in Function} {uint32_t} __builtin_riscv_cv_mac_macuRN (uint32_t, uint32_t, uint8_t)
+Generates the @code{cv.macuRN} machine instruction.
+@end deftypefn
+
+@deftypefn {Built-in Function} {uint32_t} __builtin_riscv_cv_mac_machhuRN (uint32_t, uint32_t, uint8_t)
+Generates the @code{cv.machhuRN} machine instruction.
+@end deftypefn
+
+@deftypefn {Built-in Function} {int32_t} __builtin_riscv_cv_mac_macsRN (int32_t, int32_t, uint8_t)
+Generates the @code{cv.macsRN} machine instruction.
+@end deftypefn
+
+@deftypefn {Built-in Function} {int32_t} __builtin_riscv_cv_mac_machhsRN (int32_t, int32_t, uint8_t)
+Generates the @code{cv.machhsRN} machine instruction.
+@end deftypefn
+
+These built-in functions are available for the CORE-V ALU machine
+architecture. For more information on CORE-V built-ins, please see
+@uref{https://github.com/openhwgroup/core-v-sw/blob/master/specifications/corev-builtin-spec.md#listing-of-miscellaneous-alu-builtins-xcvalu}
+
+@deftypefn {Built-in Function} {int} __builtin_riscv_cv_alu_slet (int32_t, int32_t)
+Generated assembler @code{cv.slet}
+@end deftypefn
+
+@deftypefn {Built-in Function} {int} __builtin_riscv_cv_alu_sletu (uint32_t, uint32_t)
+Generated assembler @code{cv.sletu}
+@end deftypefn
+
+@deftypefn {Built-in Function} {int32_t} __builtin_riscv_cv_alu_min (int32_t, int32_t)
+Generated assembler @code{cv.min}
+@end deftypefn
+
+@deftypefn {Built-in Function} {uint32_t} __builtin_riscv_cv_alu_minu (uint32_t, uint32_t)
+Generated assembler @code{cv.minu}
+@end deftypefn
+
+@deftypefn {Built-in Function} {int32_t} __builtin_riscv_cv_alu_max (int32_t, int32_t)
+Generated assembler @code{cv.max}
+@end deftypefn
+
+@deftypefn {Built-in Function} {uint32_tnt} __builtin_riscv_cv_alu_maxu (uint32_t, uint32_t)
+Generated assembler @code{cv.maxu}
+@end deftypefn
+
+@deftypefn {Built-in Function} {int32_t} __builtin_riscv_cv_alu_exths (int16_t)
+Generated assembler @code{cv.exths}
+@end deftypefn
+
+@deftypefn {Built-in Function} {uint32_t} __builtin_riscv_cv_alu_exthz (uint16_t)
+Generated assembler @code{cv.exthz}
+@end deftypefn
+
+@deftypefn {Built-in Function} {int32_t} __builtin_riscv_cv_alu_extbs (int8_t)
+Generated assembler @code{cv.extbs}
+@end deftypefn
+
+@deftypefn {Built-in Function} {uint32_t} __builtin_riscv_cv_alu_extbz (uint8_t)
+Generated assembler @code{cv.extbz}
+@end deftypefn
+
+@deftypefn {Built-in Function} {int32_t} __builtin_riscv_cv_alu_clip (int32_t, uint32_t)
+Generated assembler @code{cv.clip} if the uint32_t operand is a constant and an exact power of 2.
+Generated assembler @code{cv.clipr} if  the it is a register.
+@end deftypefn
+
+@deftypefn {Built-in Function} {uint32_t} __builtin_riscv_cv_alu_clipu (uint32_t, uint32_t)
+Generated assembler @code{cv.clipu} if the uint32_t operand is a constant and an exact power of 2.
+Generated assembler @code{cv.clipur} if  the it is a register.
+@end deftypefn
+
+@deftypefn {Built-in Function} {int32_t} __builtin_riscv_cv_alu_addN (int32_t, int32_t, uint8_t)
+Generated assembler @code{cv.addN} if the uint8_t operand is a constant and in the range 0 <= shft <= 31.
+Generated assembler @code{cv.addNr} if  the it is a register.
+@end deftypefn
+
+@deftypefn {Built-in Function} {uint32_t} __builtin_riscv_cv_alu_adduN (uint32_t, uint32_t, uint8_t)
+Generated assembler @code{cv.adduN} if the uint8_t operand is a constant and in the range 0 <= shft <= 31.
+Generated assembler @code{cv.adduNr} if  the it is a register.
+@end deftypefn
+
+@deftypefn {Built-in Function} {int32_t} __builtin_riscv_cv_alu_addRN (int32_t, int32_t, uint8_t)
+Generated assembler @code{cv.addRN} if the uint8_t operand is a constant and in the range 0 <= shft <= 31.
+Generated assembler @code{cv.addRNr} if  the it is a register.
+@end deftypefn
+
+@deftypefn {Built-in Function} {uint32_t} __builtin_riscv_cv_alu_adduRN (uint32_t, uint32_t, uint8_t)
+Generated assembler @code{cv.adduRN} if the uint8_t operand is a constant and in the range 0 <= shft <= 31.
+Generated assembler @code{cv.adduRNr} if  the it is a register.
+@end deftypefn
+
+@deftypefn {Built-in Function} {int32_t} __builtin_riscv_cv_alu_subN (int32_t, int32_t, uint8_t)
+Generated assembler @code{cv.subN} if the uint8_t operand is a constant and in the range 0 <= shft <= 31.
+Generated assembler @code{cv.subNr} if  the it is a register.
+@end deftypefn
+
+@deftypefn {Built-in Function} {uint32_t} __builtin_riscv_cv_alu_subuN (uint32_t, uint32_t, uint8_t)
+Generated assembler @code{cv.subuN} if the uint8_t operand is a constant and in the range 0 <= shft <= 31.
+Generated assembler @code{cv.subuNr} if  the it is a register.
+@end deftypefn
+
+@deftypefn {Built-in Function} {int32_t} __builtin_riscv_cv_alu_subRN (int32_t, int32_t, uint8_t)
+Generated assembler @code{cv.subRN} if the uint8_t operand is a constant and in the range 0 <= shft <= 31.
+Generated assembler @code{cv.subRNr} if  the it is a register.
+@end deftypefn
+
+@deftypefn {Built-in Function} {uint32_t} __builtin_riscv_cv_alu_subuRN (uint32_t, uint32_t, uint8_t)
+Generated assembler @code{cv.subuRN} if the uint8_t operand is a constant and in the range 0 <= shft <= 31.
+Generated assembler @code{cv.subuRNr} if  the it is a register.
+@end deftypefn
+
 @node RX Built-in Functions
 @subsection RX Built-in Functions
 GCC supports some of the RX instructions which cannot be expressed in
@@ -22430,6 +22787,15 @@ Intel Core i7 graniterapids CPU.
 @item graniterapids-d
 Intel Core i7 graniterapids D CPU.
 
+@item arrowlake
+Intel Core i7 Arrow Lake CPU.
+
+@item arrowlake-s
+Intel Core i7 Arrow Lake S CPU.
+
+@item pantherlake
+Intel Core i7 Panther Lake CPU.
+
 @item bonnell
 Intel Atom Bonnell CPU.
 
@@ -22451,11 +22817,8 @@ Intel Atom Sierra Forest CPU.
 @item grandridge
 Intel Atom Grand Ridge CPU.
 
-@item arrowlake
-Intel Core i7 Arrow Lake CPU.
-
-@item arrowlake-s
-Intel Core i7 Arrow Lake S CPU.
+@item clearwaterforest
+Intel Atom Clearwater Forest CPU.
 
 @item knl
 Intel Knights Landing CPU.
@@ -22465,6 +22828,9 @@ Intel Knights Mill CPU.
 
 @item lujiazui
 ZHAOXIN lujiazui CPU.
+
+@item yongfeng
+ZHAOXIN yongfeng CPU.
 
 @item amdfam10h
 AMD Family 10h CPU.
@@ -24483,7 +24849,7 @@ restored.
 @item #pragma GCC diagnostic ignored_attributes
 
 Similarly to @option{-Wno-attributes=}, this pragma allows users to suppress
-warnings about unknown scoped attributes (in C++11 and C2X).  For example,
+warnings about unknown scoped attributes (in C++11 and C23).  For example,
 @code{#pragma GCC diagnostic ignored_attributes "vendor::attr"} disables
 warning about the following declaration:
 

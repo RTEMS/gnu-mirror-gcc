@@ -24,6 +24,7 @@ import dmd.astenums;
 import dmd.ast_node;
 import dmd.gluelayer;
 import dmd.dclass;
+import dmd.dcast;
 import dmd.declaration;
 import dmd.denum;
 import dmd.dmangle;
@@ -46,7 +47,7 @@ import dmd.opover;
 import dmd.root.ctfloat;
 import dmd.common.outbuffer;
 import dmd.root.rmem;
-import dmd.root.rootobject;
+import dmd.rootobject;
 import dmd.root.stringtable;
 import dmd.target;
 import dmd.tokens;
@@ -157,7 +158,7 @@ MOD MODmerge(MOD mod1, MOD mod2) pure nothrow @nogc @safe
 /*********************************
  * Store modifier name into buf.
  */
-void MODtoBuffer(OutBuffer* buf, MOD mod) nothrow @safe
+void MODtoBuffer(ref OutBuffer buf, MOD mod) nothrow @safe
 {
     buf.writestring(MODtoString(mod));
 }
@@ -787,7 +788,7 @@ extern (C++) abstract class Type : ASTNode
         HdrGenState hgs;
         hgs.fullQual = (ty == Tclass && !mod);
 
-        .toCBuffer(this, &buf, null, &hgs);
+        toCBuffer(this, buf, null, hgs);
         return buf.extractChars();
     }
 
@@ -799,7 +800,7 @@ extern (C++) abstract class Type : ASTNode
         HdrGenState hgs;
         hgs.fullQual = QualifyTypes;
 
-        .toCBuffer(this, &buf, null, &hgs);
+        toCBuffer(this, buf, null, hgs);
         return buf.extractChars();
     }
 
@@ -973,7 +974,7 @@ extern (C++) abstract class Type : ASTNode
     /*********************************
      * Store this type's modifier name into buf.
      */
-    final void modToBuffer(OutBuffer* buf) nothrow const
+    final void modToBuffer(ref OutBuffer buf) nothrow const
     {
         if (mod)
         {
@@ -989,7 +990,7 @@ extern (C++) abstract class Type : ASTNode
     {
         OutBuffer buf;
         buf.reserve(16);
-        modToBuffer(&buf);
+        modToBuffer(buf);
         return buf.extractChars();
     }
 
@@ -1393,7 +1394,7 @@ extern (C++) abstract class Type : ASTNode
      * For our new type 'this', which is type-constructed from t,
      * fill in the cto, ito, sto, scto, wto shortcuts.
      */
-    final void fixTo(Type t)
+    extern (D) final void fixTo(Type t)
     {
         // If fixing this: immutable(T*) by t: immutable(T)*,
         // cache t to this.xto won't break transitivity.
@@ -1528,7 +1529,7 @@ extern (C++) abstract class Type : ASTNode
     /***************************
      * Look for bugs in constructing types.
      */
-    final void check()
+    extern (D) final void check()
     {
         if (mcache)
         with (mcache)
@@ -1722,7 +1723,7 @@ extern (C++) abstract class Type : ASTNode
      * Apply STCxxxx bits to existing type.
      * Use *before* semantic analysis is run.
      */
-    final Type addSTC(StorageClass stc)
+    extern (D) final Type addSTC(StorageClass stc)
     {
         Type t = this;
         if (t.isImmutable())
@@ -2555,7 +2556,7 @@ extern (C++) abstract class Type : ASTNode
      * Return the mask that an integral type will
      * fit into.
      */
-    final uinteger_t sizemask()
+    extern (D) final uinteger_t sizemask()
     {
         uinteger_t m;
         switch (toBasetype().ty)
@@ -4404,10 +4405,13 @@ extern (C++) final class TypeFunction : TypeNext
      * Params:
      *  tthis = type of `this` parameter, null if none
      *  p = parameter to this function
+     *  outerVars = context variables p could escape into, if any
+     *  indirect = is this for an indirect or virtual function call?
      * Returns:
      *  storage class with STC.scope_ or STC.return_ OR'd in
      */
-    StorageClass parameterStorageClass(Type tthis, Parameter p)
+    StorageClass parameterStorageClass(Type tthis, Parameter p, VarDeclarations* outerVars = null,
+        bool indirect = false)
     {
         //printf("parameterStorageClass(p: %s)\n", p.toChars());
         auto stc = p.storageClass;
@@ -4441,6 +4445,15 @@ extern (C++) final class TypeFunction : TypeNext
         // See if p can escape via any of the other parameters
         if (purity == PURE.weak)
         {
+            /*
+             * Indirect calls may escape p through a nested context
+             * See:
+             *   https://issues.dlang.org/show_bug.cgi?id=24212
+             *   https://issues.dlang.org/show_bug.cgi?id=24213
+             */
+            if (indirect)
+                return stc;
+
             // Check escaping through parameters
             foreach (i, fparam; parameterList)
             {
@@ -4473,6 +4486,16 @@ extern (C++) final class TypeFunction : TypeNext
             if (tthis && tthis.isMutable())
             {
                 foreach (VarDeclaration v; isAggregate(tthis).fields)
+                {
+                    if (v.hasPointers())
+                        return stc;
+                }
+            }
+
+            // Check escaping through nested context
+            if (outerVars && this.isMutable())
+            {
+                foreach (VarDeclaration v; *outerVars)
                 {
                     if (v.hasPointers())
                         return stc;
@@ -4563,7 +4586,7 @@ extern (C++) final class TypeFunction : TypeNext
                 continue;
             if (params == parameterList.parameters)
                 params = parameterList.parameters.copy();
-            (*params)[i] = new Parameter(p.storageClass, t, null, null, null);
+            (*params)[i] = new Parameter(p.loc, p.storageClass, t, null, null, null);
         }
         if (next == tret && params == parameterList.parameters)
             return this;
@@ -4592,7 +4615,7 @@ extern (C++) final class TypeFunction : TypeNext
     // arguments get specially formatted
     private const(char)* getParamError(Expression arg, Parameter par)
     {
-        if (global.gag && !global.params.showGaggedErrors)
+        if (global.gag && !global.params.v.showGaggedErrors)
             return null;
         // show qualification when toChars() is the same but types are different
         // https://issues.dlang.org/show_bug.cgi?id=19948
@@ -4611,7 +4634,7 @@ extern (C++) final class TypeFunction : TypeNext
 
     private extern(D) const(char)* getMatchError(A...)(const(char)* format, A args)
     {
-        if (global.gag && !global.params.showGaggedErrors)
+        if (global.gag && !global.params.v.showGaggedErrors)
             return null;
         OutBuffer buf;
         buf.printf(format, args);
@@ -5227,7 +5250,7 @@ extern (C++) abstract class TypeQualified : Type
     // us a `TypeQualified`
     abstract override TypeQualified syntaxCopy();
 
-    final void syntaxCopyHelper(TypeQualified t)
+    extern (D) final void syntaxCopyHelper(TypeQualified t)
     {
         //printf("TypeQualified::syntaxCopyHelper(%s) %s\n", t.toChars(), toChars());
         idents.setDim(t.idents.length);
@@ -5265,17 +5288,17 @@ extern (C++) abstract class TypeQualified : Type
         }
     }
 
-    final void addIdent(Identifier ident)
+    extern (D) final void addIdent(Identifier ident)
     {
         idents.push(ident);
     }
 
-    final void addInst(TemplateInstance inst)
+    extern (D) final void addInst(TemplateInstance inst)
     {
         idents.push(inst);
     }
 
-    final void addIndex(RootObject e)
+    extern (D) final void addIndex(RootObject e)
     {
         idents.push(e);
     }
@@ -6217,8 +6240,8 @@ extern (C++) final class TypeTuple : Type
             {
                 Expression e = (*exps)[i];
                 if (e.type.ty == Ttuple)
-                    e.error("cannot form sequence of sequences");
-                auto arg = new Parameter(STC.undefined_, e.type, null, null, null);
+                    error(e.loc, "cannot form sequence of sequences");
+                auto arg = new Parameter(e.loc, STC.undefined_, e.type, null, null, null);
                 (*arguments)[i] = arg;
             }
         }
@@ -6244,15 +6267,15 @@ extern (C++) final class TypeTuple : Type
     {
         super(Ttuple);
         arguments = new Parameters();
-        arguments.push(new Parameter(0, t1, null, null, null));
+        arguments.push(new Parameter(Loc.initial, 0, t1, null, null, null));
     }
 
     extern (D) this(Type t1, Type t2)
     {
         super(Ttuple);
         arguments = new Parameters();
-        arguments.push(new Parameter(0, t1, null, null, null));
-        arguments.push(new Parameter(0, t2, null, null, null));
+        arguments.push(new Parameter(Loc.initial, 0, t1, null, null, null));
+        arguments.push(new Parameter(Loc.initial, 0, t2, null, null, null));
     }
 
     static TypeTuple create() @safe
@@ -6661,14 +6684,16 @@ extern (C++) final class Parameter : ASTNode
 {
     import dmd.attrib : UserAttributeDeclaration;
 
+    Loc loc;
     StorageClass storageClass;
     Type type;
     Identifier ident;
     Expression defaultArg;
     UserAttributeDeclaration userAttribDecl; // user defined attributes
 
-    extern (D) this(StorageClass storageClass, Type type, Identifier ident, Expression defaultArg, UserAttributeDeclaration userAttribDecl) @safe
+    extern (D) this(const ref Loc loc, StorageClass storageClass, Type type, Identifier ident, Expression defaultArg, UserAttributeDeclaration userAttribDecl) @safe
     {
+        this.loc = loc;
         this.type = type;
         this.ident = ident;
         this.storageClass = storageClass;
@@ -6676,14 +6701,14 @@ extern (C++) final class Parameter : ASTNode
         this.userAttribDecl = userAttribDecl;
     }
 
-    static Parameter create(StorageClass storageClass, Type type, Identifier ident, Expression defaultArg, UserAttributeDeclaration userAttribDecl) @safe
+    static Parameter create(const ref Loc loc, StorageClass storageClass, Type type, Identifier ident, Expression defaultArg, UserAttributeDeclaration userAttribDecl) @safe
     {
-        return new Parameter(storageClass, type, ident, defaultArg, userAttribDecl);
+        return new Parameter(loc, storageClass, type, ident, defaultArg, userAttribDecl);
     }
 
     Parameter syntaxCopy()
     {
-        return new Parameter(storageClass, type ? type.syntaxCopy() : null, ident, defaultArg ? defaultArg.syntaxCopy() : null, userAttribDecl ? userAttribDecl.syntaxCopy(null) : null);
+        return new Parameter(loc, storageClass, type ? type.syntaxCopy() : null, ident, defaultArg ? defaultArg.syntaxCopy() : null, userAttribDecl ? userAttribDecl.syntaxCopy(null) : null);
     }
 
     /****************************************************
@@ -7687,4 +7712,29 @@ pure string visitTYCase(string handler) @safe
             ";
     }
     assert(0);
+}
+
+
+/**
+ * Returns:
+ *     `TypeIdentifier` corresponding to `object.Throwable`
+ */
+TypeIdentifier getThrowable()
+{
+    auto tid = new TypeIdentifier(Loc.initial, Id.empty);
+    tid.addIdent(Id.object);
+    tid.addIdent(Id.Throwable);
+    return tid;
+}
+
+/**
+ * Returns:
+ *      TypeIdentifier corresponding to `object.Exception`
+ */
+TypeIdentifier getException()
+{
+    auto tid = new TypeIdentifier(Loc.initial, Id.empty);
+    tid.addIdent(Id.object);
+    tid.addIdent(Id.Exception);
+    return tid;
 }

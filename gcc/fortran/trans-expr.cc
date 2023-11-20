@@ -6030,6 +6030,28 @@ post_call:
 }
 
 
+/* Create "conditional temporary" to handle scalar dummy variables with the
+   OPTIONAL+VALUE attribute that shall not be dereferenced.  Use null value
+   as fallback.  Only instances of intrinsic basic type are supported.  */
+
+static void
+conv_cond_temp (gfc_se * parmse, gfc_expr * e, tree cond)
+{
+  tree temp;
+  gcc_assert (e->ts.type != BT_DERIVED && e->ts.type != BT_CLASS);
+  gcc_assert (e->rank == 0);
+  temp = gfc_create_var (TREE_TYPE (parmse->expr), "condtemp");
+  TREE_STATIC (temp) = 1;
+  TREE_CONSTANT (temp) = 1;
+  TREE_READONLY (temp) = 1;
+  DECL_INITIAL (temp) = build_zero_cst (TREE_TYPE (temp));
+  parmse->expr = fold_build3_loc (input_location, COND_EXPR,
+				  TREE_TYPE (parmse->expr),
+				  cond, parmse->expr, temp);
+  parmse->expr = gfc_evaluate_now (parmse->expr, &parmse->pre);
+}
+
+
 /* Generate code for a procedure call.  Note can return se->post != NULL.
    If se->direct_byref is set then se->expr contains the return parameter.
    Return nonzero, if the call has alternate specifiers.
@@ -6470,9 +6492,31 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
 			&& fsym->ts.type != BT_CLASS
 			&& fsym->ts.type != BT_DERIVED)
 		      {
-			if (e->expr_type != EXPR_VARIABLE
-			    || !e->symtree->n.sym->attr.optional
-			    || e->ref != NULL)
+			/* F2018:15.5.2.12 Argument presence and
+			   restrictions on arguments not present.  */
+			if (e->expr_type == EXPR_VARIABLE
+			    && (gfc_expr_attr (e).allocatable
+				|| gfc_expr_attr (e).pointer))
+			  {
+			    gfc_se argse;
+			    tree cond;
+			    gfc_init_se (&argse, NULL);
+			    argse.want_pointer = 1;
+			    gfc_conv_expr (&argse, e);
+			    cond = fold_convert (TREE_TYPE (argse.expr),
+						 null_pointer_node);
+			    cond = fold_build2_loc (input_location, NE_EXPR,
+						    logical_type_node,
+						    argse.expr, cond);
+			    vec_safe_push (optionalargs,
+					   fold_convert (boolean_type_node,
+							 cond));
+			    /* Create "conditional temporary".  */
+			    conv_cond_temp (&parmse, e, cond);
+			  }
+			else if (e->expr_type != EXPR_VARIABLE
+				 || !e->symtree->n.sym->attr.optional
+				 || e->ref != NULL)
 			  vec_safe_push (optionalargs, boolean_true_node);
 			else
 			  {
@@ -10403,11 +10447,36 @@ gfc_trans_pointer_assignment (gfc_expr * expr1, gfc_expr * expr2)
 	}
 
       if (expr1->ts.type == BT_CHARACTER
-	  && expr1->symtree->n.sym->ts.deferred
-	  && expr1->symtree->n.sym->ts.u.cl->backend_decl
-	  && VAR_P (expr1->symtree->n.sym->ts.u.cl->backend_decl))
+	  && expr1->ts.deferred)
 	{
-	  tmp = expr1->symtree->n.sym->ts.u.cl->backend_decl;
+	  gfc_symbol *psym = expr1->symtree->n.sym;
+	  tmp = NULL_TREE;
+	  if (psym->ts.type == BT_CHARACTER)
+	    {
+	      gcc_assert (psym->ts.u.cl->backend_decl
+			  && VAR_P (psym->ts.u.cl->backend_decl));
+	      tmp = psym->ts.u.cl->backend_decl;
+	    }
+	  else if (expr1->ts.u.cl->backend_decl
+		   && VAR_P (expr1->ts.u.cl->backend_decl))
+	    tmp = expr1->ts.u.cl->backend_decl;
+	  else if (TREE_CODE (lse.expr) == COMPONENT_REF)
+	    {
+	      gfc_ref *ref = expr1->ref;
+	      for (;ref; ref = ref->next)
+		{
+		  if (ref->type == REF_COMPONENT
+		      && ref->u.c.component->ts.type == BT_CHARACTER
+		      && gfc_deferred_strlen (ref->u.c.component, &tmp))
+		    tmp = fold_build3_loc (input_location, COMPONENT_REF,
+					   TREE_TYPE (tmp),
+					   TREE_OPERAND (lse.expr, 0),
+					   tmp, NULL_TREE);
+		}
+	    }
+
+	  gcc_assert (tmp);
+
 	  if (expr2->expr_type != EXPR_NULL)
 	    gfc_add_modify (&block, tmp,
 			    fold_convert (TREE_TYPE (tmp), strlen_rhs));
@@ -11990,7 +12059,10 @@ gfc_trans_assignment_1 (gfc_expr * expr1, gfc_expr * expr2, bool init_flag,
 		 && !is_runtime_conformable (expr1, expr2);
 
   /* Only analyze the expressions for coarray properties, when in coarray-lib
-     mode.  */
+     mode.  Avoid false-positive uninitialized diagnostics with initializing
+     the codimension flag unconditionally.  */
+  lhs_caf_attr.codimension = false;
+  rhs_caf_attr.codimension = false;
   if (flag_coarray == GFC_FCOARRAY_LIB)
     {
       lhs_caf_attr = gfc_caf_attr (expr1, false, &lhs_refs_comp);

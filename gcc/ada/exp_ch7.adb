@@ -788,7 +788,7 @@ package body Exp_Ch7 is
            Typ   => Typ,
            Stmts => Make_Deep_Array_Body (Initialize_Case, Typ)));
 
-      if not Is_Limited_View (Typ) then
+      if not Is_Inherently_Limited_Type (Typ) then
          Set_TSS (Typ,
            Make_Deep_Proc
              (Prim  => Adjust_Case,
@@ -3814,7 +3814,7 @@ package body Exp_Ch7 is
            Typ   => Typ,
            Stmts => Make_Deep_Record_Body (Initialize_Case, Typ)));
 
-      if not Is_Limited_View (Typ) then
+      if not Is_Inherently_Limited_Type (Typ) then
          Set_TSS (Typ,
            Make_Deep_Proc
              (Prim  => Adjust_Case,
@@ -4529,7 +4529,7 @@ package body Exp_Ch7 is
 
          Push_Scope (Trans_Scop);
          Scope_Stack.Table (Scope_Stack.Last).Node_To_Be_Wrapped := Context;
-         Set_Scope_Is_Transient;
+         Scope_Stack.Table (Scope_Stack.Last).Is_Transient := True;
 
          --  The transient scope must also manage the secondary stack
 

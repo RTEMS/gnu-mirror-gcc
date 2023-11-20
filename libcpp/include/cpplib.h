@@ -38,6 +38,8 @@ typedef struct cpp_dir cpp_dir;
 
 struct _cpp_file;
 
+class rich_location;
+
 /* The first three groups, apart from '=', can appear in preprocessor
    expressions (+= and -= are used to indicate unary + and - resp.).
    This allows a lookup table to be implemented in _cpp_parse_expr.
@@ -129,17 +131,18 @@ struct _cpp_file;
   TK(UTF8STRING,	LITERAL) /* u8"string" */			\
   TK(OBJC_STRING,	LITERAL) /* @"string" - Objective-C */		\
   TK(HEADER_NAME,	LITERAL) /* <stdio.h> in #include */		\
+  TK(UNEVAL_STRING,	LITERAL) /* unevaluated "string" - C++26 */	\
 									\
-  TK(CHAR_USERDEF,	LITERAL) /* 'char'_suffix - C++-0x */		\
-  TK(WCHAR_USERDEF,	LITERAL) /* L'char'_suffix - C++-0x */		\
-  TK(CHAR16_USERDEF,	LITERAL) /* u'char'_suffix - C++-0x */		\
-  TK(CHAR32_USERDEF,	LITERAL) /* U'char'_suffix - C++-0x */		\
-  TK(UTF8CHAR_USERDEF,	LITERAL) /* u8'char'_suffix - C++-0x */		\
-  TK(STRING_USERDEF,	LITERAL) /* "string"_suffix - C++-0x */		\
-  TK(WSTRING_USERDEF,	LITERAL) /* L"string"_suffix - C++-0x */	\
-  TK(STRING16_USERDEF,	LITERAL) /* u"string"_suffix - C++-0x */	\
-  TK(STRING32_USERDEF,	LITERAL) /* U"string"_suffix - C++-0x */	\
-  TK(UTF8STRING_USERDEF,LITERAL) /* u8"string"_suffix - C++-0x */	\
+  TK(CHAR_USERDEF,	LITERAL) /* 'char'_suffix - C++11 */		\
+  TK(WCHAR_USERDEF,	LITERAL) /* L'char'_suffix - C++11 */		\
+  TK(CHAR16_USERDEF,	LITERAL) /* u'char'_suffix - C++11 */		\
+  TK(CHAR32_USERDEF,	LITERAL) /* U'char'_suffix - C++11 */		\
+  TK(UTF8CHAR_USERDEF,	LITERAL) /* u8'char'_suffix - C++11 */		\
+  TK(STRING_USERDEF,	LITERAL) /* "string"_suffix - C++11 */		\
+  TK(WSTRING_USERDEF,	LITERAL) /* L"string"_suffix - C++11 */		\
+  TK(STRING16_USERDEF,	LITERAL) /* u"string"_suffix - C++11 */		\
+  TK(STRING32_USERDEF,	LITERAL) /* U"string"_suffix - C++11 */		\
+  TK(UTF8STRING_USERDEF,LITERAL) /* u8"string"_suffix - C++11 */	\
 									\
   TK(COMMENT,		LITERAL) /* Only if output comments.  */	\
 				 /* SPELL_LITERAL happens to DTRT.  */	\
@@ -168,9 +171,9 @@ enum cpp_ttype
 #undef TK
 
 /* C language kind, used when calling cpp_create_reader.  */
-enum c_lang {CLK_GNUC89 = 0, CLK_GNUC99, CLK_GNUC11, CLK_GNUC17, CLK_GNUC2X,
+enum c_lang {CLK_GNUC89 = 0, CLK_GNUC99, CLK_GNUC11, CLK_GNUC17, CLK_GNUC23,
 	     CLK_STDC89, CLK_STDC94, CLK_STDC99, CLK_STDC11, CLK_STDC17,
-	     CLK_STDC2X,
+	     CLK_STDC23,
 	     CLK_GNUCXX, CLK_CXX98, CLK_GNUCXX11, CLK_CXX11,
 	     CLK_GNUCXX14, CLK_CXX14, CLK_GNUCXX17, CLK_CXX17,
 	     CLK_GNUCXX20, CLK_CXX20, CLK_GNUCXX23, CLK_CXX23,
@@ -513,7 +516,7 @@ struct cpp_options
   /* Nonzero for C++ 2014 Standard digit separators.  */
   unsigned char digit_separators;
 
-  /* Nonzero for C2X decimal floating-point constants.  */
+  /* Nonzero for C23 decimal floating-point constants.  */
   unsigned char dfp_constants;
 
   /* Nonzero for C++20 __VA_OPT__ feature.  */
@@ -562,8 +565,8 @@ struct cpp_options
   /* True if warn about differences between C90 and C99.  */
   signed char cpp_warn_c90_c99_compat;
 
-  /* True if warn about differences between C11 and C2X.  */
-  signed char cpp_warn_c11_c2x_compat;
+  /* True if warn about differences between C11 and C23.  */
+  signed char cpp_warn_c11_c23_compat;
 
   /* True if warn about differences between C++98 and C++11.  */
   bool cpp_warn_cxx11_compat;
@@ -691,7 +694,7 @@ enum cpp_warning_reason {
   CPP_W_DATE_TIME,
   CPP_W_PEDANTIC,
   CPP_W_C90_C99_COMPAT,
-  CPP_W_C11_C2X_COMPAT,
+  CPP_W_C11_C23_COMPAT,
   CPP_W_CXX11_COMPAT,
   CPP_W_CXX20_COMPAT,
   CPP_W_EXPANSION_TO_DEFINED,
@@ -1009,6 +1012,14 @@ struct GTY(()) cpp_hashnode {
   union _cpp_hashnode_value GTY ((desc ("%1.type"))) value;
 };
 
+/* Extra information we may need to store per identifier, which is needed rarely
+   enough that it's not worth adding directly into the main identifier hash.  */
+struct GTY(()) cpp_hashnode_extra
+{
+  struct ht_identifier ident;
+  location_t poisoned_loc;
+};
+
 /* A class for iterating through the source locations within a
    string token (before escapes are interpreted, and before
    concatenation).  */
@@ -1055,12 +1066,15 @@ class cpp_substring_ranges
 
 /* Call this first to get a handle to pass to other functions.
 
-   If you want cpplib to manage its own hashtable, pass in a NULL
-   pointer.  Otherwise you should pass in an initialized hash table
-   that cpplib will share; this technique is used by the C front
-   ends.  */
+   The first hash table argument is for associating a struct cpp_hashnode
+   with each identifier.  The second hash table argument is for associating
+   a struct cpp_hashnode_extra with each identifier that needs one.  For
+   either, pass in a NULL pointer if you want cpplib to create and manage
+   the hash table itself, or else pass a suitably initialized hash table to
+   be managed external to libcpp, as is done by the C-family frontends.  */
 extern cpp_reader *cpp_create_reader (enum c_lang, struct ht *,
-				      class line_maps *);
+				      class line_maps *,
+				      struct ht * = nullptr);
 
 /* Reset the cpp_reader's line_map.  This is only used after reading a
    PCH file.  */
@@ -1290,7 +1304,7 @@ struct cpp_num
 
 #define CPP_N_SIZE_T	0x2000000 /* C++23 size_t literal.  */
 #define CPP_N_BFLOAT16	0x4000000 /* std::bfloat16_t type.  */
-#define CPP_N_BITINT	0x8000000 /* C2X _BitInt literal.  */
+#define CPP_N_BITINT	0x8000000 /* C23 _BitInt literal.  */
 
 #define CPP_N_WIDTH_FLOATN_NX	0xF0000000 /* _FloatN / _FloatNx value
 					      of N, divided by 16.  */

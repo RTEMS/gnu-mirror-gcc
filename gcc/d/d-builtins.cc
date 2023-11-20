@@ -322,7 +322,8 @@ build_frontend_type (tree type)
 		  return NULL;
 		}
 
-	      args->push (Parameter::create (sc, targ, NULL, NULL, NULL));
+	      args->push (Parameter::create (Loc (), sc, targ,
+					     NULL, NULL, NULL));
 	    }
 
 	  /* GCC generic and placeholder built-ins are marked as variadic, yet
@@ -954,6 +955,9 @@ d_build_d_type_nodes (void)
   /* Bool and Character types.  */
   d_bool_type = make_unsigned_type (1);
   TREE_SET_CODE (d_bool_type, BOOLEAN_TYPE);
+
+  d_bool_false_node = TYPE_MIN_VALUE (d_bool_type);
+  d_bool_true_node = TYPE_MAX_VALUE (d_bool_type);
 
   char8_type_node = make_unsigned_type (8);
   TYPE_STRING_FLAG (char8_type_node) = 1;

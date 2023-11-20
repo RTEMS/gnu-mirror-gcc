@@ -1,3 +1,274 @@
+2023-11-19  David Malcolm  <dmalcolm@redhat.com>
+
+	* analyzer.h: Include "rich-location.h".
+
+2023-11-19  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/107573
+	* analyzer.h (register_known_functions): Add region_model_manager
+	param.
+	* analyzer.opt (Wanalyzer-undefined-behavior-strtok): New.
+	* call-summary.cc
+	(call_summary_replay::convert_region_from_summary_1): Handle
+	RK_PRIVATE.
+	* engine.cc (impl_run_checkers): Pass model manager to
+	register_known_functions.
+	* kf.cc (class undefined_function_behavior): New.
+	(class kf_strtok): New.
+	(register_known_functions): Add region_model_manager param.
+	Use it to register "strtok".
+	* region-model-manager.cc
+	(region_model_manager::get_or_create_conjured_svalue): Add "idx"
+	param.
+	* region-model-manager.h
+	(region_model_manager::get_or_create_conjured_svalue): Add "idx"
+	param.
+	(region_model_manager::get_root_region): New accessor.
+	* region-model.cc (region_model::scan_for_null_terminator): Handle
+	"expr" being null.
+	(region_model::get_representative_path_var_1): Handle RK_PRIVATE.
+	* region-model.h (region_model::called_from_main_p): Make public.
+	* region.cc (region::get_memory_space): Handle RK_PRIVATE.
+	(region::can_have_initial_svalue_p): Handle MEMSPACE_PRIVATE.
+	(private_region::dump_to_pp): New.
+	* region.h (MEMSPACE_PRIVATE): New.
+	(RK_PRIVATE): New.
+	(class private_region): New.
+	(is_a_helper <const private_region *>::test): New.
+	* store.cc (store::replay_call_summary_cluster): Handle
+	RK_PRIVATE.
+	* svalue.h (struct conjured_svalue::key_t): Add "idx" param to
+	ctor and "m_idx" field.
+	(class conjured_svalue::conjured_svalue): Likewise.
+
+2023-11-18  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/106147
+	* analyzer.opt (Wanalyzer-infinite-loop): New option.
+	(fdump-analyzer-infinite-loop): New option.
+	* checker-event.h (start_cfg_edge_event::get_desc): Drop "final".
+	(start_cfg_edge_event::maybe_describe_condition): Convert from
+	private to protected.
+	* checker-path.h (checker_path::get_logger): New.
+	* diagnostic-manager.cc (process_worklist_item): Update for
+	new context param of maybe_update_for_edge.
+	* engine.cc
+	(impl_region_model_context::impl_region_model_context): Add
+	out_could_have_done_work param to both ctors and use it to
+	initialize mm_out_could_have_done_work.
+	(impl_region_model_context::maybe_did_work): New vfunc
+	implementation.
+	(exploded_node::on_stmt): Add out_could_have_done_work param and
+	pass to ctxt ctor.
+	(exploded_node::on_stmt_pre): Treat setjmp and longjmp as "doing
+	work".
+	(exploded_node::on_longjmp): Likewise.
+	(exploded_edge::exploded_edge): Add "could_do_work" param and use
+	it to initialize m_could_do_work_p.
+	(exploded_edge::dump_dot_label): Add result of could_do_work_p.
+	(exploded_graph::add_function_entry): Mark edge as doing no work.
+	(exploded_graph::add_edge): Add "could_do_work" param and pass to
+	exploded_edge ctor.
+	(add_tainted_args_callback): Treat as doing no work.
+	(exploded_graph::process_worklist): Likewise when merging nodes.
+	(maybe_process_run_of_before_supernode_enodes::item): Likewise.
+	(exploded_graph::maybe_create_dynamic_call): Likewise.
+	(exploded_graph::process_node): Likewise for phi nodes.
+	Pass in a "could_have_done_work" bool when handling stmts and use
+	when creating edges.  Assume work is done at bifurcation.
+	(exploded_path::feasible_p): Update for new context param of
+	maybe_update_for_edge.
+	(feasibility_state::feasibility_state): New ctor.
+	(feasibility_state::operator=): New.
+	(feasibility_state::maybe_update_for_edge): Add ctxt param and use
+	it.  Fix missing newline when logging state.
+	(impl_run_checkers): Call exploded_graph::detect_infinite_loops.
+	* exploded-graph.h
+	(impl_region_model_context::impl_region_model_context): Add
+	out_could_have_done_work param to both ctors.
+	(impl_region_model_context::maybe_did_work): New decl.
+	(impl_region_model_context::checking_for_infinite_loop_p): New.
+	(impl_region_model_context::on_unusable_in_infinite_loop): New.
+	(impl_region_model_context::m_out_could_have_done_work): New
+	field.
+	(exploded_node::on_stmt): Add "out_could_have_done_work" param.
+	(exploded_edge::exploded_edge): Add "could_do_work" param.
+	(exploded_edge::could_do_work_p): New accessor.
+	(exploded_edge::m_could_do_work_p): New field.
+	(exploded_graph::add_edge): Add "could_do_work" param.
+	(exploded_graph::detect_infinite_loops): New decl.
+	(feasibility_state::feasibility_state): New ctor.
+	(feasibility_state::operator=): New decl.
+	(feasibility_state::maybe_update_for_edge): Add ctxt param.
+	* infinite-loop.cc: New file.
+	* program-state.cc (program_state::on_edge): Log the rejected
+	constraint when region_model::maybe_update_for_edge fails.
+	* region-model.cc (region_model::on_assignment): Treat any writes
+	other than to the stack as "doing work".
+	(region_model::on_stmt_pre): Treat all asm stmts as "doing work".
+	(region_model::on_call_post): Likewise for all calls to functions
+	with unknown side effects.
+	(region_model::handle_phi): Add svals_changing_meaning param.
+	Mark widening svalue in phi nodes as changing meaning.
+	(unusable_in_infinite_loop_constraint_p): New.
+	(region_model::add_constraint): If we're checking for an infinite
+	loop, bail out on unusable svalues, or if we don't have a definite
+	true/false for the constraint.
+	(region_model::update_for_phis): Gather all svalues changing
+	meaning in phi nodes, and purge constraints involving them.
+	(region_model::replay_call_summary): Treat all call summaries as
+	doing work.
+	(region_model::can_merge_with_p): Purge constraints involving
+	svalues that change meaning.
+	(model_merger::on_widening_reuse): New.
+	(test_iteration_1): Likewise.
+	(selftest::test_iteration_1): Remove assertion that model6 "knows"
+	that i < 157.
+	* region-model.h (region_model::handle_phi): Add
+	svals_changing_meaning param
+	(region_model_context::maybe_did_work): New pure virtual func.
+	(region_model_context::checking_for_infinite_loop_p): Likewise.
+	(region_model_context::on_unusable_in_infinite_loop): Likewise.
+	(noop_region_model_context::maybe_did_work): Implement.
+	(noop_region_model_context::checking_for_infinite_loop_p):
+	Likewise.
+	(noop_region_model_context::on_unusable_in_infinite_loop):
+	Likewise.
+	(region_model_context_decorator::maybe_did_work): Implement.
+	(region_model_context_decorator::checking_for_infinite_loop_p):
+	Likewise.
+	(region_model_context_decorator::on_unusable_in_infinite_loop):
+	Likewise.
+	(model_merger::on_widening_reuse): New decl.
+	(model_merger::m_svals_changing_meaning): New field.
+	* sm-signal.cc (register_signal_handler::impl_transition): Assume
+	the edge "does work".
+	* supergraph.cc (supernode::get_start_location): Use CFG edge's
+	goto_locus if available.
+	(supernode::get_end_location): Likewise.
+	(cfg_superedge::dump_label_to_pp): Dump edges with a "goto_locus"
+	* supergraph.h (cfg_superedge::get_goto_locus): New.
+	* svalue.cc (svalue::can_merge_p): Call on_widening_reuse for
+	widening values.
+	(involvement_visitor::visit_widening_svalue): New.
+	(svalue::involves_p): Update assertion to allow widening svalues.
+
+2023-11-14  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/103533
+	* sm-taint.cc: Remove "experimental" from comment.
+	* sm.cc (make_checkers): Always add taint state machine.
+
+2023-11-04  David Malcolm  <dmalcolm@redhat.com>
+
+	* bounds-checking.cc: Update for changes to diagnostic_context.
+
+2023-11-02  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/112317
+	* access-diagram.cc (class x_aligned_x_ruler_widget): Eliminate
+	unused field "m_col_widths".
+	(access_diagram_impl::add_valid_vs_invalid_ruler): Update for
+	above change.
+	* region-model.cc
+	(check_one_function_attr_null_terminated_string_arg): Remove
+	unused variables "cd_unchecked", "strlen_sval", and
+	"limited_sval".
+	* region-model.h (region_model_context_decorator::warn): Add
+	missing "override".
+
+2023-10-31  David Malcolm  <dmalcolm@redhat.com>
+
+	* record-layout.cc: New file, based on material in region-model.cc.
+	* record-layout.h: Likewise.
+	* region-model.cc: Include "analyzer/record-layout.h".
+	(class record_layout): Move to record-layout.cc and .h
+
+2023-10-26  David Malcolm  <dmalcolm@redhat.com>
+
+	* region-model.cc
+	(region_model::check_external_function_for_access_attr): Split
+	out, replacing with...
+	(region_model::check_function_attr_access): ...this new function
+	and...
+	(region_model::check_function_attrs): ...this new function.
+	(region_model::check_one_function_attr_null_terminated_string_arg):
+	New.
+	(region_model::check_function_attr_null_terminated_string_arg):
+	New.
+	(region_model::handle_unrecognized_call): Update for renaming of
+	check_external_function_for_access_attr to check_function_attrs.
+	(region_model::check_for_null_terminated_string_arg): Add return
+	value to one overload.  Make both overloads const.
+	* region-model.h: Include "stringpool.h" and "attribs.h".
+	(region_model::check_for_null_terminated_string_arg): Add return
+	value to one overload.  Make both overloads const.
+	(region_model::check_external_function_for_access_attr): Delete
+	decl.
+	(region_model::check_function_attr_access): New decl.
+	(region_model::check_function_attr_null_terminated_string_arg):
+	New decl.
+	(region_model::check_one_function_attr_null_terminated_string_arg):
+	New decl.
+	(region_model::check_function_attrs): New decl.
+
+2023-10-09  David Malcolm  <dmalcolm@redhat.com>
+
+	* access-diagram.cc (boundaries::add): Explicitly state
+	"boundaries::" scope for "kind" enum.
+
+2023-10-08  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/111155
+	* access-diagram.cc (boundaries::boundaries): Add logger param
+	(boundaries::add): Add logging.
+	(boundaries::get_hard_boundaries_in_range): New.
+	(boundaries::m_logger): New field.
+	(boundaries::get_table_x_for_offset): Make public.
+	(class svalue_spatial_item): New.
+	(class compound_svalue_spatial_item): New.
+	(add_ellipsis_to_gaps): New.
+	(valid_region_spatial_item::valid_region_spatial_item): Add theme
+	param.  Initialize m_boundaries, m_existing_sval, and
+	m_existing_sval_spatial_item.
+	(valid_region_spatial_item::add_boundaries): Set m_boundaries.
+	Add boundaries for any m_existing_sval_spatial_item.
+	(valid_region_spatial_item::add_array_elements_to_table): Rewrite
+	creation of min/max index in terms of
+	maybe_add_array_index_to_table.  Rewrite ellipsis code using
+	add_ellipsis_to_gaps. Add index values for any hard boundaries
+	within the valid region.
+	(valid_region_spatial_item::maybe_add_array_index_to_table): New,
+	based on code formerly in add_array_elements_to_table.
+	(valid_region_spatial_item::make_table): Make use of
+	m_existing_sval_spatial_item, if any.
+	(valid_region_spatial_item::m_boundaries): New field.
+	(valid_region_spatial_item::m_existing_sval): New field.
+	(valid_region_spatial_item::m_existing_sval_spatial_item): New
+	field.
+	(class svalue_spatial_item): Rename to...
+	(class written_svalue_spatial_item): ...this.
+	(class string_region_spatial_item): Rename to..
+	(class string_literal_spatial_item): ...this.  Add "kind".
+	(string_literal_spatial_item::add_boundaries): Use m_kind to
+	determine kind of boundary.  Update for renaming of m_actual_bits
+	to m_bits.
+	(string_literal_spatial_item::make_table): Likewise.  Support not
+	displaying a row for byte indexes, and not displaying a row for
+	the type.
+	(string_literal_spatial_item::add_column_for_byte): Make byte index
+	row optional.
+	(svalue_spatial_item::make): Convert to...
+	(make_written_svalue_spatial_item): ...this.
+	(make_existing_svalue_spatial_item): New.
+	(access_diagram_impl::access_diagram_impl): Pass theme to
+	m_valid_region_spatial_item ctor.  Update for renaming of
+	m_svalue_spatial_item.
+	(access_diagram_impl::find_boundaries): Pass logger to boundaries.
+	Update for renaming of...
+	(access_diagram_impl::m_svalue_spatial_item): Rename to...
+	(access_diagram_impl::m_written_svalue_spatial_item): ...this.
+
 2023-10-03  David Malcolm  <dmalcolm@redhat.com>
 
 	* analyzer-logging.cc (logger::log_va_partial): Use text_info

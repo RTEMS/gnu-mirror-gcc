@@ -5688,6 +5688,14 @@ type_has_virtual_destructor (tree type)
   return (dtor && DECL_VIRTUAL_P (dtor));
 }
 
+/* True iff class TYPE has a non-deleted trivial default
+   constructor.  */
+
+bool type_has_non_deleted_trivial_default_ctor (tree type)
+{
+  return TYPE_HAS_TRIVIAL_DFLT (type) && locate_ctor (type);
+}
+
 /* Returns true iff T, a class, has a move-assignment or
    move-constructor.  Does not lazily declare either.
    If USER_P is false, any move function will do.  If it is true, the
@@ -6954,7 +6962,8 @@ layout_class_type (tree t, tree *virtuals_p)
 	     check_bitfield_decl eventually sets DECL_SIZE (field)
 	     to that width.  */
 	  && (DECL_SIZE (field) == NULL_TREE
-	      || integer_zerop (DECL_SIZE (field))))
+	      || integer_zerop (DECL_SIZE (field)))
+	  && TREE_TYPE (field) != error_mark_node)
 	SET_DECL_FIELD_CXX_ZERO_WIDTH_BIT_FIELD (field, 1);
       check_non_pod_aggregate (field);
     }
@@ -8843,15 +8852,6 @@ instantiate_type (tree lhstype, tree rhs, tsubst_flags_t complain)
       rhs = BASELINK_FUNCTIONS (rhs);
     }
 
-  /* If we are in a template, and have a NON_DEPENDENT_EXPR, we cannot
-     deduce any type information.  */
-  if (TREE_CODE (rhs) == NON_DEPENDENT_EXPR)
-    {
-      if (complain & tf_error)
-	error ("not enough type information");
-      return error_mark_node;
-    }
-
   /* There are only a few kinds of expressions that may have a type
      dependent on overload resolution.  */
   gcc_assert (TREE_CODE (rhs) == ADDR_EXPR
@@ -9123,7 +9123,7 @@ note_name_declared_in_class (tree name, tree decl)
 	 A name N used in a class S shall refer to the same declaration
 	 in its context and when re-evaluated in the completed scope of
 	 S.  */
-      auto ov = make_temp_override (global_dc->pedantic_errors);
+      auto ov = make_temp_override (global_dc->m_pedantic_errors);
       if (TREE_CODE (decl) == TYPE_DECL
 	  && TREE_CODE (olddecl) == TYPE_DECL
 	  && same_type_p (TREE_TYPE (decl), TREE_TYPE (olddecl)))
@@ -9132,7 +9132,7 @@ note_name_declared_in_class (tree name, tree decl)
 	/* Let -fpermissive make it a warning like past versions.  */;
       else
 	/* Make it an error.  */
-	global_dc->pedantic_errors = 1;
+	global_dc->m_pedantic_errors = 1;
       if (pedwarn (location_of (decl), OPT_Wchanges_meaning,
 		   "declaration of %q#D changes meaning of %qD",
 		   decl, OVL_NAME (decl)))

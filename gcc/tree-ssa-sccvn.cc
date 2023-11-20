@@ -5747,9 +5747,12 @@ visit_reference_op_load (tree lhs, tree op, gimple *stmt)
     {
       /* Avoid the type punning in case the result mode has padding where
 	 the op we lookup has not.  */
-      if (maybe_lt (GET_MODE_PRECISION (TYPE_MODE (TREE_TYPE (result))),
-		    GET_MODE_PRECISION (TYPE_MODE (TREE_TYPE (op)))))
+      if (TYPE_MODE (TREE_TYPE (result)) != BLKmode
+	  && maybe_lt (GET_MODE_PRECISION (TYPE_MODE (TREE_TYPE (result))),
+		       GET_MODE_PRECISION (TYPE_MODE (TREE_TYPE (op)))))
 	result = NULL_TREE;
+      else if (CONSTANT_CLASS_P (result))
+	result = const_unop (VIEW_CONVERT_EXPR, TREE_TYPE (op), result);
       else
 	{
 	  /* We will be setting the value number of lhs to the value number
@@ -5908,6 +5911,7 @@ static bool
 visit_phi (gimple *phi, bool *inserted, bool backedges_varying_p)
 {
   tree result, sameval = VN_TOP, seen_undef = NULL_TREE;
+  bool seen_undef_visited = false;
   tree backedge_val = NULL_TREE;
   bool seen_non_backedge = false;
   tree sameval_base = NULL_TREE;
@@ -5938,10 +5942,12 @@ visit_phi (gimple *phi, bool *inserted, bool backedges_varying_p)
 	if (def == PHI_RESULT (phi))
 	  continue;
 	++n_executable;
+	bool visited = true;
 	if (TREE_CODE (def) == SSA_NAME)
 	  {
+	    tree val = SSA_VAL (def, &visited);
 	    if (!backedges_varying_p || !(e->flags & EDGE_DFS_BACK))
-	      def = SSA_VAL (def);
+	      def = val;
 	    if (e->flags & EDGE_DFS_BACK)
 	      backedge_val = def;
 	  }
@@ -5953,7 +5959,16 @@ visit_phi (gimple *phi, bool *inserted, bool backedges_varying_p)
 	else if (TREE_CODE (def) == SSA_NAME
 		 && ! virtual_operand_p (def)
 		 && ssa_undefined_value_p (def, false))
-	  seen_undef = def;
+	  {
+	    if (!seen_undef
+		/* Avoid having not visited undefined defs if we also have
+		   a visited one.  */
+		|| (!seen_undef_visited && visited))
+	      {
+		seen_undef = def;
+		seen_undef_visited = visited;
+	      }
+	  }
 	else if (sameval == VN_TOP)
 	  {
 	    sameval = def;

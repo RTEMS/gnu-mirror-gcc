@@ -128,20 +128,24 @@ along with GCC; see the file COPYING3.  If not see
 #define m_ROCKETLAKE (HOST_WIDE_INT_1U<<PROCESSOR_ROCKETLAKE)
 #define m_GRANITERAPIDS (HOST_WIDE_INT_1U<<PROCESSOR_GRANITERAPIDS)
 #define m_GRANITERAPIDS_D (HOST_WIDE_INT_1U<<PROCESSOR_GRANITERAPIDS_D)
+#define m_ARROWLAKE (HOST_WIDE_INT_1U<<PROCESSOR_ARROWLAKE)
+#define m_ARROWLAKE_S (HOST_WIDE_INT_1U<<PROCESSOR_ARROWLAKE_S)
+#define m_PANTHERLAKE (HOST_WIDE_INT_1U<<PROCESSOR_PANTHERLAKE)
 #define m_CORE_AVX512 (m_SKYLAKE_AVX512 | m_CANNONLAKE \
 		       | m_ICELAKE_CLIENT | m_ICELAKE_SERVER | m_CASCADELAKE \
 		       | m_TIGERLAKE | m_COOPERLAKE | m_SAPPHIRERAPIDS \
 		       | m_ROCKETLAKE | m_GRANITERAPIDS | m_GRANITERAPIDS_D)
 #define m_CORE_AVX2 (m_HASWELL | m_SKYLAKE | m_CORE_AVX512)
 #define m_CORE_ALL (m_CORE2 | m_NEHALEM  | m_SANDYBRIDGE | m_CORE_AVX2)
+#define m_CORE_HYBRID (m_ALDERLAKE | m_ARROWLAKE | m_ARROWLAKE_S \
+		       | m_PANTHERLAKE)
 #define m_GOLDMONT (HOST_WIDE_INT_1U<<PROCESSOR_GOLDMONT)
 #define m_GOLDMONT_PLUS (HOST_WIDE_INT_1U<<PROCESSOR_GOLDMONT_PLUS)
 #define m_TREMONT (HOST_WIDE_INT_1U<<PROCESSOR_TREMONT)
 #define m_SIERRAFOREST (HOST_WIDE_INT_1U<<PROCESSOR_SIERRAFOREST)
 #define m_GRANDRIDGE (HOST_WIDE_INT_1U<<PROCESSOR_GRANDRIDGE)
-#define m_ARROWLAKE (HOST_WIDE_INT_1U<<PROCESSOR_ARROWLAKE)
-#define m_ARROWLAKE_S (HOST_WIDE_INT_1U<<PROCESSOR_ARROWLAKE_S)
-#define m_CORE_ATOM (m_SIERRAFOREST | m_GRANDRIDGE)
+#define m_CLEARWATERFOREST (HOST_WIDE_INT_1U<<PROCESSOR_CLEARWATERFOREST)
+#define m_CORE_ATOM (m_SIERRAFOREST | m_GRANDRIDGE | m_CLEARWATERFOREST)
 #define m_INTEL (HOST_WIDE_INT_1U<<PROCESSOR_INTEL)
 /* Gather Data Sampling / CVE-2022-40982 / INTEL-SA-00828.
    Software mitigation.  */
@@ -150,6 +154,8 @@ along with GCC; see the file COPYING3.  If not see
 	       | m_TIGERLAKE | m_COOPERLAKE | m_ROCKETLAKE)
 
 #define m_LUJIAZUI (HOST_WIDE_INT_1U<<PROCESSOR_LUJIAZUI)
+#define m_YONGFENG (HOST_WIDE_INT_1U<<PROCESSOR_YONGFENG)
+#define m_ZHAOXIN  (m_LUJIAZUI | m_YONGFENG)
 
 #define m_GEODE (HOST_WIDE_INT_1U<<PROCESSOR_GEODE)
 #define m_K6 (HOST_WIDE_INT_1U<<PROCESSOR_K6)
@@ -250,7 +256,9 @@ static struct ix86_target_opts isa2_opts[] =
   { "-mavxvnniint16",	OPTION_MASK_ISA2_AVXVNNIINT16 },
   { "-msm3",		OPTION_MASK_ISA2_SM3 },
   { "-msha512",		OPTION_MASK_ISA2_SHA512 },
-  { "-msm4",            OPTION_MASK_ISA2_SM4 }
+  { "-msm4",            OPTION_MASK_ISA2_SM4 },
+  { "-mevex512",	OPTION_MASK_ISA2_EVEX512 },
+  { "-musermsr",	OPTION_MASK_ISA2_USER_MSR }
 };
 static struct ix86_target_opts isa_opts[] =
 {
@@ -765,6 +773,7 @@ static const struct processor_costs *processor_cost_table[] =
   &tremont_cost,
   &alderlake_cost,
   &alderlake_cost,
+  &alderlake_cost,
   &slm_cost,
   &slm_cost,
   &skylake_cost,
@@ -780,10 +789,12 @@ static const struct processor_costs *processor_cost_table[] =
   &icelake_cost,
   &icelake_cost,
   &icelake_cost,
+  &alderlake_cost,
   &alderlake_cost,
   &alderlake_cost,
   &intel_cost,
   &lujiazui_cost,
+  &yongfeng_cost,
   &geode_cost,
   &k6_cost,
   &athlon_cost,
@@ -1112,6 +1123,8 @@ ix86_valid_target_attribute_inner_p (tree fndecl, tree args, char *p_strings[],
     IX86_ATTR_ISA ("sha512", OPT_msha512),
     IX86_ATTR_ISA ("sm4", OPT_msm4),
     IX86_ATTR_ISA ("apxf", OPT_mapxf),
+    IX86_ATTR_ISA ("evex512", OPT_mevex512),
+    IX86_ATTR_ISA ("usermsr", OPT_musermsr),
 
     /* enum options */
     IX86_ATTR_ENUM ("fpmath=",	OPT_mfpmath_),
@@ -2577,6 +2590,21 @@ ix86_option_override_internal (bool main_args_p,
       &= ~((OPTION_MASK_ISA_BMI | OPTION_MASK_ISA_BMI2 | OPTION_MASK_ISA_TBM)
 	   & ~opts->x_ix86_isa_flags_explicit);
 
+  /* Set EVEX512 target if it is not explicitly set
+     when AVX512 is enabled.  */
+  if (TARGET_AVX512F_P(opts->x_ix86_isa_flags)
+      && !(opts->x_ix86_isa_flags2_explicit & OPTION_MASK_ISA2_EVEX512))
+    opts->x_ix86_isa_flags2 |= OPTION_MASK_ISA2_EVEX512;
+
+  /* Disable AVX512{PF,ER,4VNNIW,4FAMPS} for -mno-evex512.  */
+  if (!TARGET_EVEX512_P(opts->x_ix86_isa_flags2))
+    {
+      opts->x_ix86_isa_flags
+	&= ~(OPTION_MASK_ISA_AVX512PF | OPTION_MASK_ISA_AVX512ER);
+      opts->x_ix86_isa_flags2
+	&= ~(OPTION_MASK_ISA2_AVX5124FMAPS | OPTION_MASK_ISA2_AVX5124VNNIW);
+    }
+
   /* Validate -mpreferred-stack-boundary= value or default it to
      PREFERRED_STACK_BOUNDARY_DEFAULT.  */
   ix86_preferred_stack_boundary = PREFERRED_STACK_BOUNDARY_DEFAULT;
@@ -2846,7 +2874,8 @@ ix86_option_override_internal (bool main_args_p,
 	  opts->x_ix86_move_max = opts->x_prefer_vector_width_type;
 	  if (opts_set->x_ix86_move_max == PVW_NONE)
 	    {
-	      if (TARGET_AVX512F_P (opts->x_ix86_isa_flags))
+	      if (TARGET_AVX512F_P (opts->x_ix86_isa_flags)
+		  && TARGET_EVEX512_P (opts->x_ix86_isa_flags2))
 		opts->x_ix86_move_max = PVW_AVX512;
 	      else
 		opts->x_ix86_move_max = PVW_AVX128;
@@ -2867,7 +2896,8 @@ ix86_option_override_internal (bool main_args_p,
 	  opts->x_ix86_store_max = opts->x_prefer_vector_width_type;
 	  if (opts_set->x_ix86_store_max == PVW_NONE)
 	    {
-	      if (TARGET_AVX512F_P (opts->x_ix86_isa_flags))
+	      if (TARGET_AVX512F_P (opts->x_ix86_isa_flags)
+		  && TARGET_EVEX512_P (opts->x_ix86_isa_flags2))
 		opts->x_ix86_store_max = PVW_AVX512;
 	      else
 		opts->x_ix86_store_max = PVW_AVX128;
@@ -3146,13 +3176,13 @@ ix86_simd_clone_adjust (struct cgraph_node *node)
     case 'e':
       if (TARGET_PREFER_AVX256)
 	{
-	  if (!TARGET_AVX512F)
-	    str = "avx512f,prefer-vector-width=512";
+	  if (!TARGET_AVX512F || !TARGET_EVEX512)
+	    str = "avx512f,evex512,prefer-vector-width=512";
 	  else
 	    str = "prefer-vector-width=512";
 	}
-      else if (!TARGET_AVX512F)
-	str = "avx512f";
+      else if (!TARGET_AVX512F || !TARGET_EVEX512)
+	str = "avx512f,evex512";
       break;
     default:
       gcc_unreachable ();

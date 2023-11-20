@@ -949,7 +949,8 @@ copy_loop_before (class loop *loop, bool redirect_lc_phi_defs)
   edge preheader = loop_preheader_edge (loop);
 
   initialize_original_copy_tables ();
-  res = slpeel_tree_duplicate_loop_to_edge_cfg (loop, NULL, preheader);
+  res = slpeel_tree_duplicate_loop_to_edge_cfg (loop, single_exit (loop), NULL,
+						NULL, preheader, NULL, false);
   gcc_assert (res != NULL);
 
   /* When a not last partition is supposed to keep the LC PHIs computed
@@ -1439,7 +1440,7 @@ loop_distribution::data_dep_in_cycle_p (struct graph *rdg,
   else if (DDR_NUM_DIST_VECTS (ddr) > 1)
     return true;
   else if (DDR_REVERSED_P (ddr)
-	   || lambda_vector_zerop (DDR_DIST_VECT (ddr, 0), 1))
+	   || lambda_vector_zerop (DDR_DIST_VECT (ddr, 0), DDR_NB_LOOPS (ddr)))
     return false;
 
   return true;

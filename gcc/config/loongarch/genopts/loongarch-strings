@@ -26,9 +26,11 @@ STR_CPU_NATIVE	      native
 STR_CPU_ABI_DEFAULT   abi-default
 STR_CPU_LOONGARCH64   loongarch64
 STR_CPU_LA464	      la464
+STR_CPU_LA664	      la664
 
 # Base architecture
 STR_ISA_BASE_LA64V100 la64
+STR_ISA_BASE_LA64V110 la64v1.1
 
 # -mfpu
 OPTSTR_ISA_EXT_FPU    fpu
@@ -63,3 +65,9 @@ STR_CMODEL_TS	      tiny-static
 STR_CMODEL_MEDIUM     medium
 STR_CMODEL_LARGE      large
 STR_CMODEL_EXTREME    extreme
+
+# -mexplicit-relocs
+OPTSTR_EXPLICIT_RELOCS		explicit-relocs
+STR_EXPLICIT_RELOCS_AUTO	auto
+STR_EXPLICIT_RELOCS_NONE	none
+STR_EXPLICIT_RELOCS_ALWAYS	always

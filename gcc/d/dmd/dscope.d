@@ -169,6 +169,7 @@ extern (C++) struct Scope
         sc.scopesym = new ScopeDsymbol();
         sc.scopesym.symtab = new DsymbolTable();
         sc.eSink = eSink;
+        assert(eSink);
         // Add top level package as member of this global scope
         Dsymbol m = _module;
         while (m.parent)
@@ -343,7 +344,7 @@ extern (C++) struct Scope
      * Returns:
      *  symbol if found, null if not
      */
-    extern (C++) Dsymbol search(const ref Loc loc, Identifier ident, Dsymbol* pscopesym, int flags = IgnoreNone)
+    extern (D) Dsymbol search(const ref Loc loc, Identifier ident, Dsymbol* pscopesym, int flags = IgnoreNone)
     {
         version (LOGSEARCH)
         {
@@ -477,12 +478,6 @@ extern (C++) struct Scope
                                 goto NotFound;
                             s = *ps;
                         }
-                    }
-                    if (!(flags & (SearchImportsOnly | IgnoreErrors)) &&
-                        ident == Id.length && sc.scopesym.isArrayScopeSymbol() &&
-                        sc.enclosing && sc.enclosing.search(loc, ident, null, flags))
-                    {
-                        warning(s.loc, "array `length` hides other `length` name in outer scope");
                     }
                     //printMsg("\tfound local", s);
                     if (pscopesym)

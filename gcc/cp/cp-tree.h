@@ -231,6 +231,7 @@ enum cp_tree_index
     CPTI_RETHROW_FN,
     CPTI_ATEXIT_FN_PTR_TYPE,
     CPTI_ATEXIT,
+    CPTI_THREAD_ATEXIT,
     CPTI_DSO_HANDLE,
     CPTI_DCAST,
 
@@ -374,6 +375,9 @@ extern GTY(()) tree cp_global_trees[CPTI_MAX];
 
 /* A pointer to `std::atexit'.  */
 #define atexit_node			cp_global_trees[CPTI_ATEXIT]
+
+/* A pointer to `__cxa_thread_atexit'.  */
+#define thread_atexit_node		cp_global_trees[CPTI_THREAD_ATEXIT]
 
 /* A pointer to `__dso_handle'.  */
 #define dso_handle_node			cp_global_trees[CPTI_DSO_HANDLE]
@@ -673,10 +677,14 @@ template_info_decl_check (const_tree t, const char* f, int l, const char* fn)
       tree_check_failed (__t, __FILE__, __LINE__, __FUNCTION__, 0);	\
      __t; })
 
+#define DECL_TEMPLATE_PARM_CHECK(NODE) \
+  decl_template_parm_check ((NODE), __FILE__, __LINE__, __FUNCTION__)
+
 #else /* ENABLE_TREE_CHECKING */
 
 #define TEMPLATE_INFO_DECL_CHECK(NODE) (NODE)
 #define THUNK_FUNCTION_CHECK(NODE) (NODE)
+#define DECL_TEMPLATE_PARM_CHECK(NODE) (NODE)
 
 #endif /* ENABLE_TREE_CHECKING */
 
@@ -1831,6 +1839,7 @@ union GTY((desc ("cp_tree_node_structure (&%h)"),
 struct GTY(()) cp_omp_declare_target_attr {
   bool attr_syntax;
   int device_type;
+  bool indirect;
 };
 
 struct GTY(()) cp_omp_begin_assumes_data {
@@ -3572,6 +3581,11 @@ struct GTY(()) lang_decl {
    need.  But we want a more descriptive name.  */
 #define DECL_VTABLE_OR_VTT_P(NODE) DECL_VIRTUAL_P (VAR_DECL_CHECK (NODE))
 
+/* 1 iff a _DECL for a template parameter came from
+   synthesize_implicit_template_parm.  */
+#define DECL_IMPLICIT_TEMPLATE_PARM_P(NODE) \
+  DECL_VIRTUAL_P (DECL_TEMPLATE_PARM_CHECK (NODE))
+
 /* 1 iff FUNCTION_TYPE or METHOD_TYPE has a ref-qualifier (either & or &&). */
 #define FUNCTION_REF_QUALIFIED(NODE) \
   TREE_LANG_FLAG_4 (FUNC_OR_METHOD_CHECK (NODE))
@@ -4082,6 +4096,10 @@ struct GTY(()) lang_decl {
   (INDIRECT_REF_P (NODE)				\
    && TREE_TYPE (TREE_OPERAND (NODE, 0))		\
    && TYPE_REF_P (TREE_TYPE (TREE_OPERAND ((NODE), 0))))
+
+/* Look through an implicit INDIRECT_REF from convert_from_reference.  */
+#define STRIP_REFERENCE_REF(NODE)			\
+  (REFERENCE_REF_P (NODE) ? TREE_OPERAND (NODE, 0) : NODE)
 
 /* True iff this represents an lvalue being treated as an rvalue during return
    or throw as per [class.copy.elision].  */
@@ -4969,12 +4987,14 @@ get_vec_init_expr (tree t)
 /* The DECL_TEMPLATE_PARMS are a list.  The TREE_PURPOSE of each node
    is a INT_CST whose TREE_INT_CST_LOW indicates the level of the
    template parameters, with 1 being the outermost set of template
-   parameters.  The TREE_VALUE is a vector, whose elements are the
+   parameters.  The TREE_TYPE is TEMPLATE_PARMS_CONSTRAINTS.
+   The TREE_VALUE is a vector, whose elements are the
    template parameters at each level.  Each element in the vector is a
    TREE_LIST, whose TREE_VALUE is a PARM_DECL (if the parameter is a
    non-type parameter), or a TYPE_DECL (if the parameter is a type
    parameter) or a TEMPLATE_DECL (if the parameter is a template
-   parameter).  The TREE_PURPOSE is the default value, if any.  The
+   parameter).  The TREE_PURPOSE is the default value, if any.
+   The TREE_TYPE is TEMPLATE_PARM_CONSTRAINTS.  The
    TEMPLATE_PARM_INDEX for the parameter is available as the
    DECL_INITIAL (for a PARM_DECL) or as the TREE_TYPE (for a
    TYPE_DECL).
@@ -5045,6 +5065,16 @@ get_vec_init_expr (tree t)
        || TREE_CODE (NODE) == PARM_DECL		\
        || TREE_CODE (NODE) == TYPE_DECL		\
        || TREE_CODE (NODE) == TEMPLATE_DECL))
+
+#if ENABLE_TREE_CHECKING
+inline tree
+decl_template_parm_check (const_tree t, const char *f, int l, const char *fn)
+{
+  if (!DECL_TEMPLATE_PARM_P (t))
+    tree_check_failed (t, f, l, fn, 0);
+  return const_cast<tree>(t);
+}
+#endif
 
 /* Nonzero for a raw template parameter node.  */
 #define TEMPLATE_PARM_P(NODE)					\
@@ -5619,6 +5649,9 @@ enum tsubst_flags {
   tf_qualifying_scope = 1 << 14, /* Substituting the LHS of the :: operator.
 				    Affects TYPENAME_TYPE resolution from
 				    make_typename_type.  */
+  tf_no_name_lookup = 1 << 15, /* Don't look up the terminal name of an
+				  outermost id-expression, or resolve its
+				  constituent template-ids or qualified-ids.  */
   /* Convenient substitution flags combinations.  */
   tf_warning_or_error = tf_warning | tf_error
 };
@@ -6815,6 +6848,7 @@ extern bool trivial_default_constructor_is_constexpr (tree);
 extern bool type_has_constexpr_default_constructor (tree);
 extern bool type_has_constexpr_destructor	(tree);
 extern bool type_has_virtual_destructor		(tree);
+extern bool type_has_non_deleted_trivial_default_ctor (tree);
 extern bool classtype_has_move_assign_or_move_ctor_p (tree, bool user_declared);
 extern bool classtype_has_non_deleted_move_ctor (tree);
 extern tree classtype_has_depr_implicit_copy	(tree);
@@ -7455,7 +7489,6 @@ extern void instantiate_pending_templates	(int);
 extern tree tsubst_default_argument		(tree, int, tree, tree,
 						 tsubst_flags_t);
 extern tree tsubst (tree, tree, tsubst_flags_t, tree);
-extern tree tsubst_copy_and_build		(tree, tree, tsubst_flags_t, tree);
 extern tree tsubst_expr                         (tree, tree, tsubst_flags_t, tree);
 extern tree tsubst_pack_expansion		(tree, tree, tsubst_flags_t, tree);
 extern tree tsubst_argument_pack		(tree, tree, tsubst_flags_t, tree);
@@ -7488,8 +7521,6 @@ extern bool any_value_dependent_elements_p      (const_tree);
 extern bool dependent_omp_for_p			(tree, tree, tree, tree);
 extern tree resolve_typename_type		(tree, bool);
 extern tree template_for_substitution		(tree);
-extern tree build_non_dependent_expr		(tree);
-extern void make_args_non_dependent		(vec<tree, va_gc> *);
 extern bool reregister_specialization		(tree, tree, tree);
 extern tree instantiate_non_dependent_expr	(tree, tsubst_flags_t = tf_error);
 extern tree instantiate_non_dependent_expr_internal (tree, tsubst_flags_t);
@@ -7872,6 +7903,7 @@ extern tree lambda_regenerating_args		(tree);
 extern tree most_general_lambda			(tree);
 extern tree finish_omp_target			(location_t, tree, tree, bool);
 extern void finish_omp_target_clauses		(location_t, tree, tree *);
+extern void maybe_warn_unparenthesized_assignment (tree, tsubst_flags_t);
 
 /* in tree.cc */
 extern int cp_tree_operand_length		(const_tree);
@@ -8209,9 +8241,9 @@ extern void maybe_warn_about_useless_cast       (location_t, tree, tree,
 						 tsubst_flags_t);
 extern tree cp_perform_integral_promotions      (tree, tsubst_flags_t);
 
-extern tree finish_left_unary_fold_expr      (tree, int);
-extern tree finish_right_unary_fold_expr     (tree, int);
-extern tree finish_binary_fold_expr          (tree, tree, int);
+extern tree finish_left_unary_fold_expr      (location_t, tree, int);
+extern tree finish_right_unary_fold_expr     (location_t, tree, int);
+extern tree finish_binary_fold_expr          (location_t, tree, tree, int);
 extern tree treat_lvalue_as_rvalue_p	     (tree, bool);
 extern bool decl_in_std_namespace_p	     (tree);
 extern void maybe_warn_pessimizing_move	     (tree, tree, bool);

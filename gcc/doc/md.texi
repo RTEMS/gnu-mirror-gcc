@@ -2010,6 +2010,9 @@ Any @code{symbol_ref} or @code{label_ref}
 @item v
 VGPR register
 
+@item a
+Accelerator VGPR register (CDNA1 onwards)
+
 @item Sg
 SGPR register
 
@@ -5306,6 +5309,21 @@ no need to define this instruction pattern if the others are supported.
 Similar to @code{vcond@var{m}@var{n}} but operand 3 holds a pre-computed
 result of vector comparison.
 
+@cindex @code{vcond_mask_len_@var{m}@var{n}} instruction pattern
+@item @samp{vcond_mask_@var{m}@var{n}}
+Set each element of operand 0 to the corresponding element of operand 2
+or operand 3.  Choose operand 2 if both the element index is less than
+operand 4 plus operand 5 and the corresponding element of operand 1
+is nonzero:
+
+@smallexample
+for (i = 0; i < GET_MODE_NUNITS (@var{m}); i++)
+  op0[i] = i < op4 + op5 && op1[i] ? op2[i] : op3[i];
+@end smallexample
+
+Operands 0, 2 and 3 have mode @var{m}.  Operand 1 has mode @var{n}.
+Operands 4 and 5 have a target-dependent scalar integer mode.
+
 @cindex @code{maskload@var{m}@var{n}} instruction pattern
 @item @samp{maskload@var{m}@var{n}}
 Perform a masked load of vector from memory operand 1 of mode @var{m}
@@ -7341,8 +7359,10 @@ store the result in operand 0, otherwise store operand 2 in operand 0.
 The operation only works for the operands are vectors.
 
 @smallexample
-for (i = 0; i < ops[4] + ops[5]; i++)
-  op0[i] = op1[i] ? @var{op} op2[i] : op3[i];
+for (i = 0; i < GET_MODE_NUNITS (@var{m}); i++)
+  op0[i] = (i < ops[4] + ops[5] && op1[i]
+            ? @var{op} op2[i]
+            : op3[i]);
 @end smallexample
 
 where, for example, @var{op} is @code{~} for @samp{cond_len_one_cmpl@var{mode}}.
@@ -7403,8 +7423,10 @@ store the result in operand 0, otherwise store operand 4 in operand 0.
 The operation only works for the operands are vectors.
 
 @smallexample
-for (i = 0; i < ops[5] + ops[6]; i++)
-  op0[i] = op1[i] ? op2[i] @var{op} op3[i] : op4[i];
+for (i = 0; i < GET_MODE_NUNITS (@var{m}); i++)
+  op0[i] = (i < ops[5] + ops[6] && op1[i]
+            ? op2[i] @var{op} op3[i]
+            : op4[i]);
 @end smallexample
 
 where, for example, @var{op} is @code{+} for @samp{cond_len_add@var{mode}}.
@@ -7436,8 +7458,10 @@ takes 3 operands rather than two.  For example, the vector form of
 @samp{cond_len_fma@var{mode}} is equivalent to:
 
 @smallexample
-for (i = 0; i < ops[6] + ops[7]; i++)
-  op0[i] = op1[i] ? fma (op2[i], op3[i], op4[i]) : op5[i];
+for (i = 0; i < GET_MODE_NUNITS (@var{m}); i++)
+  op0[i] = (i < ops[6] + ops[7] && op1[i]
+            ? fma (op2[i], op3[i], op4[i])
+            : op5[i]);
 @end smallexample
 
 @cindex @code{neg@var{mode}cc} instruction pattern
@@ -11775,6 +11799,19 @@ to @code{@var{mode}}.  For example:
 
 means that the @code{:DI} expansion only applies if @code{TARGET_64BIT}
 but that the @code{:SI} expansion has no such constraint.
+
+It is also possible to include iterators in other iterators.  For example:
+
+@smallexample
+(define_mode_iterator VI [V16QI V8HI V4SI V2DI])
+(define_mode_iterator VF [V8HF V4SF (V2DF "TARGET_DOUBLE")])
+(define_mode_iterator V [VI (VF "TARGET_FLOAT")])
+@end smallexample
+
+makes @samp{:V} iterate over the modes in @code{VI} and the modes
+in @code{VF}.  When a construct uses @samp{:V}, the @code{V8HF} and
+@code{V4SF} expansions require @samp{TARGET_FLOAT} while the @code{V2DF}
+expansion requires @samp{TARGET_DOUBLE && TARGET_FLOAT}.
 
 Iterators are applied in the order they are defined.  This can be
 significant if two iterators are used in a construct that requires

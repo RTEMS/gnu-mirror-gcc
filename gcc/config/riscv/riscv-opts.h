@@ -52,7 +52,8 @@ extern enum riscv_isa_spec_class riscv_isa_spec;
 /* Keep this list in sync with define_attr "tune" in riscv.md.  */
 enum riscv_microarchitecture_type {
   generic,
-  sifive_7
+  sifive_7,
+  generic_ooo
 };
 extern enum riscv_microarchitecture_type riscv_microarchitecture;
 
@@ -101,6 +102,18 @@ enum riscv_entity
   MAX_RISCV_ENTITIES
 };
 
+/* RISC-V stringop strategy. */
+enum riscv_stringop_strategy_enum {
+  /* Use scalar or vector instructions. */
+  USE_AUTO,
+  /* Always use a library call. */
+  USE_LIBCALL,
+  /* Only use scalar instructions. */
+  USE_SCALAR,
+  /* Only use vector instructions. */
+  USE_VECTOR
+};
+
 #define TARGET_ZICOND_LIKE (TARGET_ZICOND || (TARGET_XVENTANACONDOPS && TARGET_64BIT))
 
 /* Bit of riscv_zvl_flags will set contintuly, N-1 bit will set if N-bit is
@@ -111,9 +124,17 @@ enum riscv_entity
    ? 0 \
    : 32 << (__builtin_popcount (riscv_zvl_flags) - 1))
 
-/* We only enable VLS modes for VLA vectorization since fixed length VLMAX mode
-   is the highest priority choice and should not conflict with VLS modes.  */
-#define TARGET_VECTOR_VLS                                                      \
-  (TARGET_VECTOR && riscv_autovec_preference == RVV_SCALABLE)
+/* Same as TARGET_MIN_VLEN, but take an OPTS as gcc_options.  */
+#define TARGET_MIN_VLEN_OPTS(opts)                                             \
+  ((opts->x_riscv_zvl_flags == 0)                                              \
+     ? 0                                                                       \
+     : 32 << (__builtin_popcount (opts->x_riscv_zvl_flags) - 1))
+
+/* TODO: Enable RVV movmisalign by default for now.  */
+#define TARGET_VECTOR_MISALIGN_SUPPORTED 1
+
+/* The maximmum LMUL according to user configuration.  */
+#define TARGET_MAX_LMUL                                                        \
+  (int) (riscv_autovec_lmul == RVV_DYNAMIC ? RVV_M8 : riscv_autovec_lmul)
 
 #endif /* ! GCC_RISCV_OPTS_H */

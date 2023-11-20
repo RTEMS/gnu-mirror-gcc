@@ -5748,6 +5748,26 @@ aarch64_internal_mov_immediate (rtx dest, rtx imm, bool generate,
 	    }
 	  return 2;
 	}
+
+      /* Try 2 bitmask immediates which are xor'd together. */
+      for (i = 0; i < 64; i += 16)
+	{
+	  val2 = (val >> i) & mask;
+	  val2 |= val2 << 16;
+	  val2 |= val2 << 32;
+	  if (aarch64_bitmask_imm (val2) && aarch64_bitmask_imm (val ^ val2))
+	    break;
+	}
+
+      if (i != 64)
+	{
+	  if (generate)
+	    {
+	      emit_insn (gen_rtx_SET (dest, GEN_INT (val2)));
+	      emit_insn (gen_xordi3 (dest, dest, GEN_INT (val ^ val2)));
+	    }
+	  return 2;
+	}
     }
 
   /* Try a bitmask plus 2 movk to generate the immediate in 3 instructions.  */
@@ -8527,12 +8547,16 @@ aarch64_save_regs_above_locals_p ()
 static void
 aarch64_layout_frame (void)
 {
-  int regno, last_fp_reg = INVALID_REGNUM;
+  unsigned regno, last_fp_reg = INVALID_REGNUM;
   machine_mode vector_save_mode = aarch64_reg_save_mode (V8_REGNUM);
   poly_int64 vector_save_size = GET_MODE_SIZE (vector_save_mode);
   bool frame_related_fp_reg_p = false;
   aarch64_frame &frame = cfun->machine->frame;
   poly_int64 top_of_locals = -1;
+
+  vec_safe_truncate (frame.saved_gprs, 0);
+  vec_safe_truncate (frame.saved_fprs, 0);
+  vec_safe_truncate (frame.saved_prs, 0);
 
   frame.emit_frame_chain = aarch64_needs_frame_chain ();
 
@@ -8618,6 +8642,7 @@ aarch64_layout_frame (void)
   for (regno = P0_REGNUM; regno <= P15_REGNUM; regno++)
     if (known_eq (frame.reg_offset[regno], SLOT_REQUIRED))
       {
+	vec_safe_push (frame.saved_prs, regno);
 	if (frame.sve_save_and_probe == INVALID_REGNUM)
 	  frame.sve_save_and_probe = regno;
 	frame.reg_offset[regno] = offset;
@@ -8639,7 +8664,7 @@ aarch64_layout_frame (void)
 	 If we don't have any vector registers to save, and we know how
 	 big the predicate save area is, we can just round it up to the
 	 next 16-byte boundary.  */
-      if (last_fp_reg == (int) INVALID_REGNUM && offset.is_constant ())
+      if (last_fp_reg == INVALID_REGNUM && offset.is_constant ())
 	offset = aligned_upper_bound (offset, STACK_BOUNDARY / BITS_PER_UNIT);
       else
 	{
@@ -8653,10 +8678,11 @@ aarch64_layout_frame (void)
     }
 
   /* If we need to save any SVE vector registers, add them next.  */
-  if (last_fp_reg != (int) INVALID_REGNUM && crtl->abi->id () == ARM_PCS_SVE)
+  if (last_fp_reg != INVALID_REGNUM && crtl->abi->id () == ARM_PCS_SVE)
     for (regno = V0_REGNUM; regno <= V31_REGNUM; regno++)
       if (known_eq (frame.reg_offset[regno], SLOT_REQUIRED))
 	{
+	  vec_safe_push (frame.saved_fprs, regno);
 	  if (frame.sve_save_and_probe == INVALID_REGNUM)
 	    frame.sve_save_and_probe = regno;
 	  frame.reg_offset[regno] = offset;
@@ -8677,13 +8703,8 @@ aarch64_layout_frame (void)
 
   auto allocate_gpr_slot = [&](unsigned int regno)
     {
-      if (frame.hard_fp_save_and_probe == INVALID_REGNUM)
-	frame.hard_fp_save_and_probe = regno;
+      vec_safe_push (frame.saved_gprs, regno);
       frame.reg_offset[regno] = offset;
-      if (frame.wb_push_candidate1 == INVALID_REGNUM)
-	frame.wb_push_candidate1 = regno;
-      else if (frame.wb_push_candidate2 == INVALID_REGNUM)
-	frame.wb_push_candidate2 = regno;
       offset += UNITS_PER_WORD;
     };
 
@@ -8693,7 +8714,7 @@ aarch64_layout_frame (void)
       allocate_gpr_slot (R29_REGNUM);
       allocate_gpr_slot (R30_REGNUM);
     }
-  else if (flag_stack_clash_protection
+  else if ((flag_stack_clash_protection || !frame.is_scs_enabled)
 	   && known_eq (frame.reg_offset[R30_REGNUM], SLOT_REQUIRED))
     /* Put the LR save slot first, since it makes a good choice of probe
        for stack clash purposes.  The idea is that the link register usually
@@ -8712,8 +8733,7 @@ aarch64_layout_frame (void)
   for (regno = V0_REGNUM; regno <= V31_REGNUM; regno++)
     if (known_eq (frame.reg_offset[regno], SLOT_REQUIRED))
       {
-	if (frame.hard_fp_save_and_probe == INVALID_REGNUM)
-	  frame.hard_fp_save_and_probe = regno;
+	vec_safe_push (frame.saved_fprs, regno);
 	/* If there is an alignment gap between integer and fp callee-saves,
 	   allocate the last fp register to it if possible.  */
 	if (regno == last_fp_reg
@@ -8726,21 +8746,25 @@ aarch64_layout_frame (void)
 	  }
 
 	frame.reg_offset[regno] = offset;
-	if (frame.wb_push_candidate1 == INVALID_REGNUM)
-	  frame.wb_push_candidate1 = regno;
-	else if (frame.wb_push_candidate2 == INVALID_REGNUM
-		 && frame.wb_push_candidate1 >= V0_REGNUM)
-	  frame.wb_push_candidate2 = regno;
 	offset += vector_save_size;
       }
 
   offset = aligned_upper_bound (offset, STACK_BOUNDARY / BITS_PER_UNIT);
-
   auto saved_regs_size = offset - frame.bytes_below_saved_regs;
-  gcc_assert (known_eq (saved_regs_size, below_hard_fp_saved_regs_size)
-	      || (frame.hard_fp_save_and_probe != INVALID_REGNUM
-		  && known_eq (frame.reg_offset[frame.hard_fp_save_and_probe],
-			       frame.bytes_below_hard_fp)));
+
+  array_slice<unsigned int> push_regs = (!vec_safe_is_empty (frame.saved_gprs)
+					 ? frame.saved_gprs
+					 : frame.saved_fprs);
+  if (!push_regs.empty ()
+      && known_eq (frame.reg_offset[push_regs[0]], frame.bytes_below_hard_fp))
+    {
+      frame.hard_fp_save_and_probe = push_regs[0];
+      frame.wb_push_candidate1 = push_regs[0];
+      if (push_regs.size () > 1)
+	frame.wb_push_candidate2 = push_regs[1];
+    }
+  else
+    gcc_assert (known_eq (saved_regs_size, below_hard_fp_saved_regs_size));
 
   /* With stack-clash, a register must be saved in non-leaf functions.
      The saving of the bottommost register counts as an implicit probe,
@@ -8904,12 +8928,14 @@ aarch64_layout_frame (void)
 			+ frame.sve_callee_adjust
 			+ frame.final_adjust, frame.frame_size));
 
-  if (!frame.emit_frame_chain && frame.callee_adjust == 0)
+  if (frame.callee_adjust == 0)
     {
-      /* We've decided not to associate any register saves with the initial
-	 stack allocation.  */
-      frame.wb_pop_candidate1 = frame.wb_push_candidate1 = INVALID_REGNUM;
-      frame.wb_pop_candidate2 = frame.wb_push_candidate2 = INVALID_REGNUM;
+      /* We've decided not to do a "real" push and pop.  However,
+	 setting up the frame chain is treated as being essentially
+	 a multi-instruction push.  */
+      frame.wb_pop_candidate1 = frame.wb_pop_candidate2 = INVALID_REGNUM;
+      if (!frame.emit_frame_chain)
+	frame.wb_push_candidate1 = frame.wb_push_candidate2 = INVALID_REGNUM;
     }
 
   frame.laid_out = true;
@@ -8922,17 +8948,6 @@ static bool
 aarch64_register_saved_on_entry (int regno)
 {
   return known_ge (cfun->machine->frame.reg_offset[regno], 0);
-}
-
-/* Return the next register up from REGNO up to LIMIT for the callee
-   to save.  */
-
-static unsigned
-aarch64_next_callee_save (unsigned regno, unsigned limit)
-{
-  while (regno <= limit && !aarch64_register_saved_on_entry (regno))
-    regno ++;
-  return regno;
 }
 
 /* Push the register number REGNO of mode MODE to the stack with write-back
@@ -9252,41 +9267,46 @@ aarch64_add_cfa_expression (rtx_insn *insn, rtx reg,
   add_reg_note (insn, REG_CFA_EXPRESSION, gen_rtx_SET (mem, reg));
 }
 
-/* Emit code to save the callee-saved registers from register number START
-   to LIMIT to the stack.  The stack pointer is currently BYTES_BELOW_SP
-   bytes above the bottom of the static frame.  Skip any write-back
-   candidates if SKIP_WB is true.  HARD_FP_VALID_P is true if the hard
-   frame pointer has been set up.  */
+/* Emit code to save the callee-saved registers in REGS.  Skip any
+   write-back candidates if SKIP_WB is true, otherwise consider only
+   write-back candidates.
+
+   The stack pointer is currently BYTES_BELOW_SP bytes above the bottom
+   of the static frame.  HARD_FP_VALID_P is true if the hard frame pointer
+   has been set up.  */
 
 static void
 aarch64_save_callee_saves (poly_int64 bytes_below_sp,
-			   unsigned start, unsigned limit, bool skip_wb,
+			   array_slice<unsigned int> regs, bool skip_wb,
 			   bool hard_fp_valid_p)
 {
   aarch64_frame &frame = cfun->machine->frame;
   rtx_insn *insn;
-  unsigned regno;
-  unsigned regno2;
   rtx anchor_reg = NULL_RTX, ptrue = NULL_RTX;
 
-  for (regno = aarch64_next_callee_save (start, limit);
-       regno <= limit;
-       regno = aarch64_next_callee_save (regno + 1, limit))
+  auto skip_save_p = [&](unsigned int regno)
     {
-      rtx reg, mem;
+      if (cfun->machine->reg_is_wrapped_separately[regno])
+	return true;
+
+      if (skip_wb == (regno == frame.wb_push_candidate1
+		      || regno == frame.wb_push_candidate2))
+	return true;
+
+      return false;
+    };
+
+  for (unsigned int i = 0; i < regs.size (); ++i)
+    {
+      unsigned int regno = regs[i];
       poly_int64 offset;
       bool frame_related_p = aarch64_emit_cfi_for_reg_p (regno);
 
-      if (skip_wb
-	  && (regno == frame.wb_push_candidate1
-	      || regno == frame.wb_push_candidate2))
-	continue;
-
-      if (cfun->machine->reg_is_wrapped_separately[regno])
+      if (skip_save_p (regno))
 	continue;
 
       machine_mode mode = aarch64_reg_save_mode (regno);
-      reg = gen_rtx_REG (mode, regno);
+      rtx reg = gen_rtx_REG (mode, regno);
       offset = frame.reg_offset[regno] - bytes_below_sp;
       rtx base_rtx = stack_pointer_rtx;
       poly_int64 sp_offset = offset;
@@ -9313,12 +9333,13 @@ aarch64_save_callee_saves (poly_int64 bytes_below_sp,
 	    }
 	  offset -= fp_offset;
 	}
-      mem = gen_frame_mem (mode, plus_constant (Pmode, base_rtx, offset));
+      rtx mem = gen_frame_mem (mode, plus_constant (Pmode, base_rtx, offset));
       bool need_cfa_note_p = (base_rtx != stack_pointer_rtx);
 
+      unsigned int regno2;
       if (!aarch64_sve_mode_p (mode)
-	  && (regno2 = aarch64_next_callee_save (regno + 1, limit)) <= limit
-	  && !cfun->machine->reg_is_wrapped_separately[regno2]
+	  && i + 1 < regs.size ()
+	  && (regno2 = regs[i + 1], !skip_save_p (regno2))
 	  && known_eq (GET_MODE_SIZE (mode),
 		       frame.reg_offset[regno2] - frame.reg_offset[regno]))
 	{
@@ -9344,6 +9365,7 @@ aarch64_save_callee_saves (poly_int64 bytes_below_sp,
 	    }
 
 	  regno = regno2;
+	  ++i;
 	}
       else if (mode == VNx2DImode && BYTES_BIG_ENDIAN)
 	{
@@ -9361,49 +9383,57 @@ aarch64_save_callee_saves (poly_int64 bytes_below_sp,
     }
 }
 
-/* Emit code to restore the callee registers from register number START
-   up to and including LIMIT.  The stack pointer is currently BYTES_BELOW_SP
-   bytes above the bottom of the static frame.  Skip any write-back
-   candidates if SKIP_WB is true.  Write the appropriate REG_CFA_RESTORE
-   notes into CFI_OPS.  */
+/* Emit code to restore the callee registers in REGS, ignoring pop candidates
+   and any other registers that are handled separately.  Write the appropriate
+   REG_CFA_RESTORE notes into CFI_OPS.
+
+   The stack pointer is currently BYTES_BELOW_SP bytes above the bottom
+   of the static frame.  */
 
 static void
-aarch64_restore_callee_saves (poly_int64 bytes_below_sp, unsigned start,
-			      unsigned limit, bool skip_wb, rtx *cfi_ops)
+aarch64_restore_callee_saves (poly_int64 bytes_below_sp,
+			      array_slice<unsigned int> regs, rtx *cfi_ops)
 {
   aarch64_frame &frame = cfun->machine->frame;
-  unsigned regno;
-  unsigned regno2;
   poly_int64 offset;
   rtx anchor_reg = NULL_RTX, ptrue = NULL_RTX;
 
-  for (regno = aarch64_next_callee_save (start, limit);
-       regno <= limit;
-       regno = aarch64_next_callee_save (regno + 1, limit))
+  auto skip_restore_p = [&](unsigned int regno)
     {
-      bool frame_related_p = aarch64_emit_cfi_for_reg_p (regno);
       if (cfun->machine->reg_is_wrapped_separately[regno])
-	continue;
+	return true;
 
-      rtx reg, mem;
+      if (regno == frame.wb_pop_candidate1
+	  || regno == frame.wb_pop_candidate2)
+	return true;
 
-      if (skip_wb
-	  && (regno == frame.wb_pop_candidate1
-	      || regno == frame.wb_pop_candidate2))
+      /* The shadow call stack code restores LR separately.  */
+      if (frame.is_scs_enabled && regno == LR_REGNUM)
+	return true;
+
+      return false;
+    };
+
+  for (unsigned int i = 0; i < regs.size (); ++i)
+    {
+      unsigned int regno = regs[i];
+      bool frame_related_p = aarch64_emit_cfi_for_reg_p (regno);
+      if (skip_restore_p (regno))
 	continue;
 
       machine_mode mode = aarch64_reg_save_mode (regno);
-      reg = gen_rtx_REG (mode, regno);
+      rtx reg = gen_rtx_REG (mode, regno);
       offset = frame.reg_offset[regno] - bytes_below_sp;
       rtx base_rtx = stack_pointer_rtx;
       if (mode == VNx2DImode && BYTES_BIG_ENDIAN)
 	aarch64_adjust_sve_callee_save_base (mode, base_rtx, anchor_reg,
 					     offset, ptrue);
-      mem = gen_frame_mem (mode, plus_constant (Pmode, base_rtx, offset));
+      rtx mem = gen_frame_mem (mode, plus_constant (Pmode, base_rtx, offset));
 
+      unsigned int regno2;
       if (!aarch64_sve_mode_p (mode)
-	  && (regno2 = aarch64_next_callee_save (regno + 1, limit)) <= limit
-	  && !cfun->machine->reg_is_wrapped_separately[regno2]
+	  && i + 1 < regs.size ()
+	  && (regno2 = regs[i + 1], !skip_restore_p (regno2))
 	  && known_eq (GET_MODE_SIZE (mode),
 		       frame.reg_offset[regno2] - frame.reg_offset[regno]))
 	{
@@ -9416,6 +9446,7 @@ aarch64_restore_callee_saves (poly_int64 bytes_below_sp, unsigned start,
 
 	  *cfi_ops = alloc_reg_note (REG_CFA_RESTORE, reg2, *cfi_ops);
 	  regno = regno2;
+	  ++i;
 	}
       else if (mode == VNx2DImode && BYTES_BIG_ENDIAN)
 	emit_insn (gen_aarch64_pred_mov (mode, reg, ptrue, mem));
@@ -10237,13 +10268,10 @@ aarch64_expand_prologue (void)
 				 - frame.bytes_above_hard_fp);
       gcc_assert (known_ge (chain_offset, 0));
 
+      gcc_assert (reg1 == R29_REGNUM && reg2 == R30_REGNUM);
       if (callee_adjust == 0)
-	{
-	  reg1 = R29_REGNUM;
-	  reg2 = R30_REGNUM;
-	  aarch64_save_callee_saves (bytes_below_sp, reg1, reg2,
-				     false, false);
-	}
+	aarch64_save_callee_saves (bytes_below_sp, frame.saved_gprs,
+				   false, false);
       else
 	gcc_assert (known_eq (chain_offset, 0));
       aarch64_add_offset (Pmode, hard_frame_pointer_rtx,
@@ -10281,8 +10309,7 @@ aarch64_expand_prologue (void)
       aarch64_emit_stack_tie (hard_frame_pointer_rtx);
     }
 
-  aarch64_save_callee_saves (bytes_below_sp, R0_REGNUM, R30_REGNUM,
-			     callee_adjust != 0 || emit_frame_chain,
+  aarch64_save_callee_saves (bytes_below_sp, frame.saved_gprs, true,
 			     emit_frame_chain);
   if (maybe_ne (sve_callee_adjust, 0))
     {
@@ -10293,10 +10320,9 @@ aarch64_expand_prologue (void)
 					      !frame_pointer_needed, false);
       bytes_below_sp -= sve_callee_adjust;
     }
-  aarch64_save_callee_saves (bytes_below_sp, P0_REGNUM, P15_REGNUM,
-			     false, emit_frame_chain);
-  aarch64_save_callee_saves (bytes_below_sp, V0_REGNUM, V31_REGNUM,
-			     callee_adjust != 0 || emit_frame_chain,
+  aarch64_save_callee_saves (bytes_below_sp, frame.saved_prs, true,
+			     emit_frame_chain);
+  aarch64_save_callee_saves (bytes_below_sp, frame.saved_fprs, true,
 			     emit_frame_chain);
 
   /* We may need to probe the final adjustment if it is larger than the guard
@@ -10342,8 +10368,6 @@ aarch64_expand_epilogue (bool for_sibcall)
   poly_int64 bytes_below_hard_fp = frame.bytes_below_hard_fp;
   unsigned reg1 = frame.wb_pop_candidate1;
   unsigned reg2 = frame.wb_pop_candidate2;
-  unsigned int last_gpr = (frame.is_scs_enabled
-			   ? R29_REGNUM : R30_REGNUM);
   rtx cfi_ops = NULL;
   rtx_insn *insn;
   /* A stack clash protection prologue may not have left EP0_REGNUM or
@@ -10407,10 +10431,8 @@ aarch64_expand_epilogue (bool for_sibcall)
 
   /* Restore the vector registers before the predicate registers,
      so that we can use P4 as a temporary for big-endian SVE frames.  */
-  aarch64_restore_callee_saves (final_adjust, V0_REGNUM, V31_REGNUM,
-				callee_adjust != 0, &cfi_ops);
-  aarch64_restore_callee_saves (final_adjust, P0_REGNUM, P15_REGNUM,
-				false, &cfi_ops);
+  aarch64_restore_callee_saves (final_adjust, frame.saved_fprs, &cfi_ops);
+  aarch64_restore_callee_saves (final_adjust, frame.saved_prs, &cfi_ops);
   if (maybe_ne (sve_callee_adjust, 0))
     aarch64_add_sp (NULL_RTX, NULL_RTX, sve_callee_adjust, true);
 
@@ -10418,8 +10440,7 @@ aarch64_expand_epilogue (bool for_sibcall)
      restore x30, we don't need to restore x30 again in the traditional
      way.  */
   aarch64_restore_callee_saves (final_adjust + sve_callee_adjust,
-				R0_REGNUM, last_gpr,
-				callee_adjust != 0, &cfi_ops);
+				frame.saved_gprs, &cfi_ops);
 
   if (need_barrier_p)
     aarch64_emit_stack_tie (stack_pointer_rtx);
@@ -11873,16 +11894,18 @@ aarch64_get_condition_code_1 (machine_mode mode, enum rtx_code comp_code)
 /* Return true if X is a CONST_INT, CONST_WIDE_INT or a constant vector
    duplicate of such constants.  If so, store in RET_WI the wide_int
    representation of the constant paired with the inner mode of the vector mode
-   or TImode for scalar X constants.  */
+   or MODE for scalar X constants.  If MODE is not provided then TImode is
+   used.  */
 
 static bool
-aarch64_extract_vec_duplicate_wide_int (rtx x, wide_int *ret_wi)
+aarch64_extract_vec_duplicate_wide_int (rtx x, wide_int *ret_wi,
+					scalar_mode mode = TImode)
 {
   rtx elt = unwrap_const_vec_duplicate (x);
   if (!CONST_SCALAR_INT_P (elt))
     return false;
   scalar_mode smode
-    = CONST_SCALAR_INT_P (x) ? TImode : GET_MODE_INNER (GET_MODE (x));
+    = CONST_SCALAR_INT_P (x) ? mode : GET_MODE_INNER (GET_MODE (x));
   *ret_wi = rtx_mode_t (elt, smode);
   return true;
 }
@@ -11929,6 +11952,49 @@ aarch64_const_vec_all_same_in_range_p (rtx x,
   return (const_vec_duplicate_p (x, &elt)
 	  && CONST_INT_P (elt)
 	  && IN_RANGE (INTVAL (elt), minval, maxval));
+}
+
+/* Some constants can't be made using normal mov instructions in Advanced SIMD
+   but we can still create them in various ways.  If the constant in VAL can be
+   created using alternate methods then if possible then return true and
+   additionally set TARGET to the rtx for the sequence if TARGET is not NULL.
+   Otherwise return false if sequence is not possible.  */
+
+bool
+aarch64_maybe_generate_simd_constant (rtx target, rtx val, machine_mode mode)
+{
+  wide_int wval;
+  auto smode = GET_MODE_INNER (mode);
+  if (!aarch64_extract_vec_duplicate_wide_int (val, &wval, smode))
+    return false;
+
+  /* For Advanced SIMD we can create an integer with only the top bit set
+     using fneg (0.0f).  */
+  if (TARGET_SIMD
+      && !TARGET_SVE
+      && smode == DImode
+      && wi::only_sign_bit_p (wval))
+    {
+      if (!target)
+	return true;
+
+      /* Use the same base type as aarch64_gen_shareable_zero.  */
+      rtx zero = CONST0_RTX (V4SImode);
+      emit_move_insn (lowpart_subreg (V4SImode, target, mode), zero);
+      rtx neg = lowpart_subreg (V2DFmode, target, mode);
+      emit_insn (gen_negv2df2 (neg, copy_rtx (neg)));
+      return true;
+    }
+
+  return false;
+}
+
+/* Check if the value in VAL with mode MODE can be created using special
+   instruction sequences.  */
+
+bool aarch64_simd_special_constant_p (rtx val, machine_mode mode)
+{
+  return aarch64_maybe_generate_simd_constant (NULL_RTX, val, mode);
 }
 
 bool
@@ -12070,6 +12136,10 @@ sizetochar (int size)
      'N':		Take the duplicated element in a vector constant
 			and print the negative of it in decimal.
      'b/h/s/d/q':	Print a scalar FP/SIMD register name.
+     'Z':		Same for SVE registers.  ('z' was already taken.)
+			Note that it is not necessary to use %Z for operands
+			that have SVE modes.  The convention is to use %Z
+			only for non-SVE (or potentially non-SVE) modes.
      'S/T/U/V':		Print a FP/SIMD register name for a register list.
 			The register printed is the FP/SIMD register name
 			of X + 0/1/2/3 for S/T/U/V.
@@ -12242,6 +12312,8 @@ aarch64_print_operand (FILE *f, rtx x, int code)
     case 's':
     case 'd':
     case 'q':
+    case 'Z':
+      code = TOLOWER (code);
       if (!REG_P (x) || !FP_REGNUM_P (REGNO (x)))
 	{
 	  output_operand_lossage ("incompatible floating point / vector register operand for '%%%c'", code);
@@ -12345,6 +12417,11 @@ aarch64_print_operand (FILE *f, rtx x, int code)
 
       switch (GET_CODE (x))
 	{
+	case CONST_STRING:
+	  {
+	    asm_fprintf (f, "%s", XSTR (x, 0));
+	    break;
+	  }
 	case REG:
 	  if (aarch64_sve_data_mode_p (GET_MODE (x)))
 	    {
@@ -15538,6 +15615,28 @@ aarch64_memory_move_cost (machine_mode mode, reg_class_t rclass_i, bool in)
   return (in
 	  ? aarch64_tune_params.memmov_cost.load_int
 	  : aarch64_tune_params.memmov_cost.store_int);
+}
+
+/* Implement TARGET_INSN_COST.  We have the opportunity to do something
+   much more productive here, such as using insn attributes to cost things.
+   But we don't, not yet.
+
+   The main point of this current definition is to make calling insn_cost
+   on one instruction equivalent to calling seq_cost on a sequence that
+   contains only that instruction.  The default definition would instead
+   only look at SET_SRCs, ignoring SET_DESTs.
+
+   This ensures that, for example, storing a 128-bit zero vector is more
+   expensive than storing a 128-bit vector register.  A move of zero
+   into a 128-bit vector register followed by multiple stores of that
+   register is then cheaper than multiple stores of zero (which would
+   use STP of XZR).  This in turn allows STP Qs to be formed.  */
+static int
+aarch64_insn_cost (rtx_insn *insn, bool speed)
+{
+  if (rtx set = single_set (insn))
+    return set_rtx_cost (set, speed);
+  return pattern_cost (PATTERN (insn), speed);
 }
 
 /* Implement TARGET_INIT_BUILTINS.  */
@@ -25167,53 +25266,131 @@ aarch64_expand_sve_vcond (machine_mode data_mode, machine_mode cmp_mode,
   emit_set_insn (ops[0], gen_rtx_UNSPEC (data_mode, vec, UNSPEC_SEL));
 }
 
-/* Implement TARGET_MODES_TIEABLE_P.  In principle we should always return
-   true.  However due to issues with register allocation it is preferable
-   to avoid tieing integer scalar and FP scalar modes.  Executing integer
-   operations in general registers is better than treating them as scalar
-   vector operations.  This reduces latency and avoids redundant int<->FP
-   moves.  So tie modes if they are either the same class, or vector modes
-   with other vector modes, vector structs or any scalar mode.  */
+/* Return true if:
+
+   (a) MODE1 and MODE2 use the same layout for bytes that are common
+       to both modes;
+
+   (b) subregs involving the two modes behave as the target-independent
+       subreg rules require; and
+
+   (c) there is at least one register that can hold both modes.
+
+   Return false otherwise.  */
 
 static bool
-aarch64_modes_tieable_p (machine_mode mode1, machine_mode mode2)
+aarch64_modes_compatible_p (machine_mode mode1, machine_mode mode2)
 {
-  if ((aarch64_advsimd_partial_struct_mode_p (mode1)
-       != aarch64_advsimd_partial_struct_mode_p (mode2))
+  unsigned int flags1 = aarch64_classify_vector_mode (mode1);
+  unsigned int flags2 = aarch64_classify_vector_mode (mode2);
+
+  bool sve1_p = (flags1 & VEC_ANY_SVE);
+  bool sve2_p = (flags2 & VEC_ANY_SVE);
+
+  bool partial_sve1_p = sve1_p && (flags1 & VEC_PARTIAL);
+  bool partial_sve2_p = sve2_p && (flags2 & VEC_PARTIAL);
+
+  bool pred1_p = (flags1 & VEC_SVE_PRED);
+  bool pred2_p = (flags2 & VEC_SVE_PRED);
+
+  bool partial_advsimd_struct1_p = (flags1 == (VEC_ADVSIMD | VEC_STRUCT
+					       | VEC_PARTIAL));
+  bool partial_advsimd_struct2_p = (flags2 == (VEC_ADVSIMD | VEC_STRUCT
+					       | VEC_PARTIAL));
+
+  /* Don't allow changes between predicate modes and other modes.
+     Only predicate registers can hold predicate modes and only
+     non-predicate registers can hold non-predicate modes, so any
+     attempt to mix them would require a round trip through memory.  */
+  if (pred1_p != pred2_p)
+    return false;
+
+  /* The contents of partial SVE modes are distributed evenly across
+     the register, whereas GCC expects them to be clustered together.
+     We therefore need to be careful about mode changes involving them.  */
+  if (partial_sve1_p && partial_sve2_p)
+    {
+      /* Reject changes between partial SVE modes that have different
+	 patterns of significant and insignificant bits.  */
+      if ((aarch64_sve_container_bits (mode1)
+	   != aarch64_sve_container_bits (mode2))
+	  || GET_MODE_UNIT_SIZE (mode1) != GET_MODE_UNIT_SIZE (mode2))
+	return false;
+    }
+  else if (partial_sve1_p)
+    {
+      /* The first lane of MODE1 is where GCC expects it, but anything
+	 bigger than that is not.  */
+      if (maybe_gt (GET_MODE_SIZE (mode2), GET_MODE_UNIT_SIZE (mode1)))
+	return false;
+    }
+  else if (partial_sve2_p)
+    {
+      /* Similarly in reverse.  */
+      if (maybe_gt (GET_MODE_SIZE (mode1), GET_MODE_UNIT_SIZE (mode2)))
+	return false;
+    }
+
+  /* Don't allow changes between partial Advanced SIMD structure modes
+     and other modes that are bigger than 8 bytes.  E.g. V16QI and V2x8QI
+     are the same size, but the former occupies one Q register while the
+     latter occupies two D registers.  */
+  if (partial_advsimd_struct1_p != partial_advsimd_struct2_p
       && maybe_gt (GET_MODE_SIZE (mode1), 8)
       && maybe_gt (GET_MODE_SIZE (mode2), 8))
     return false;
 
-  if (GET_MODE_CLASS (mode1) == GET_MODE_CLASS (mode2))
-    return true;
+  if (maybe_ne (BITS_PER_SVE_VECTOR, 128u))
+    {
+      /* Don't allow changes between SVE modes and other modes that might
+	 be bigger than 128 bits.  In particular, OImode, CImode and XImode
+	 divide into 128-bit quantities while SVE modes divide into
+	 BITS_PER_SVE_VECTOR quantities.  */
+      if (sve1_p && !sve2_p && maybe_gt (GET_MODE_BITSIZE (mode2), 128))
+	return false;
+      if (sve2_p && !sve1_p && maybe_gt (GET_MODE_BITSIZE (mode1), 128))
+	return false;
+    }
 
-  /* Allow changes between scalar modes if both modes fit within 64 bits.
-     This is because:
+  if (BYTES_BIG_ENDIAN)
+    {
+      /* Don't allow changes between SVE data modes and non-SVE modes.
+	 See the comment at the head of aarch64-sve.md for details.  */
+      if (sve1_p != sve2_p)
+	return false;
 
-     - We allow all such modes for both FPRs and GPRs.
-     - They occupy a single register for both FPRs and GPRs.
-     - We can reinterpret one mode as another in both types of register.  */
-  if (is_a<scalar_mode> (mode1)
-      && is_a<scalar_mode> (mode2)
-      && known_le (GET_MODE_SIZE (mode1), 8)
-      && known_le (GET_MODE_SIZE (mode2), 8))
-    return true;
+      /* Don't allow changes in element size: lane 0 of the new vector
+	 would not then be lane 0 of the old vector.  See the comment
+	 above aarch64_maybe_expand_sve_subreg_move for a more detailed
+	 description.
 
-  /* We specifically want to allow elements of "structure" modes to
-     be tieable to the structure.  This more general condition allows
-     other rarer situations too.  The reason we don't extend this to
-     predicate modes is that there are no predicate structure modes
-     nor any specific instructions for extracting part of a predicate
-     register.  */
-  if (aarch64_vector_data_mode_p (mode1)
-      && aarch64_vector_data_mode_p (mode2))
-    return true;
+	 In the worst case, this forces a register to be spilled in
+	 one mode and reloaded in the other, which handles the
+	 endianness correctly.  */
+      if (sve1_p && GET_MODE_UNIT_SIZE (mode1) != GET_MODE_UNIT_SIZE (mode2))
+	return false;
+    }
+  return true;
+}
 
-  /* Also allow any scalar modes with vectors.  */
-  if (aarch64_vector_mode_supported_p (mode1)
-      || aarch64_vector_mode_supported_p (mode2))
-    return true;
+/* Implement TARGET_MODES_TIEABLE_P.  In principle we should always defer
+   to aarch64_modes_compatible_p.  However due to issues with register
+   allocation it is preferable to avoid tieing integer scalar and FP
+   scalar modes.  Executing integer operations in general registers is
+   better than treating them as scalar vector operations.  This reduces
+   latency and avoids redundant int<->FP moves.  So tie modes if they
+   are either the same class, or one of them is a vector mode.  */
 
+static bool
+aarch64_modes_tieable_p (machine_mode mode1, machine_mode mode2)
+{
+  if (aarch64_modes_compatible_p (mode1, mode2))
+    {
+      if (GET_MODE_CLASS (mode1) == GET_MODE_CLASS (mode2))
+	return true;
+      if (VECTOR_MODE_P (mode1) || VECTOR_MODE_P (mode2))
+	return true;
+    }
   return false;
 }
 
@@ -27246,80 +27423,7 @@ static bool
 aarch64_can_change_mode_class (machine_mode from,
 			       machine_mode to, reg_class_t)
 {
-  unsigned int from_flags = aarch64_classify_vector_mode (from);
-  unsigned int to_flags = aarch64_classify_vector_mode (to);
-
-  bool from_sve_p = (from_flags & VEC_ANY_SVE);
-  bool to_sve_p = (to_flags & VEC_ANY_SVE);
-
-  bool from_partial_sve_p = from_sve_p && (from_flags & VEC_PARTIAL);
-  bool to_partial_sve_p = to_sve_p && (to_flags & VEC_PARTIAL);
-
-  bool from_pred_p = (from_flags & VEC_SVE_PRED);
-  bool to_pred_p = (to_flags & VEC_SVE_PRED);
-
-  bool to_partial_advsimd_struct_p = (to_flags == (VEC_ADVSIMD | VEC_STRUCT
-						   | VEC_PARTIAL));
-  bool from_partial_advsimd_struct_p = (from_flags == (VEC_ADVSIMD | VEC_STRUCT
-						   | VEC_PARTIAL));
-
-  /* Don't allow changes between predicate modes and other modes.
-     Only predicate registers can hold predicate modes and only
-     non-predicate registers can hold non-predicate modes, so any
-     attempt to mix them would require a round trip through memory.  */
-  if (from_pred_p != to_pred_p)
-    return false;
-
-  /* Don't allow changes between partial SVE modes and other modes.
-     The contents of partial SVE modes are distributed evenly across
-     the register, whereas GCC expects them to be clustered together.  */
-  if (from_partial_sve_p != to_partial_sve_p)
-    return false;
-
-  /* Similarly reject changes between partial SVE modes that have
-     different patterns of significant and insignificant bits.  */
-  if (from_partial_sve_p
-      && (aarch64_sve_container_bits (from) != aarch64_sve_container_bits (to)
-	  || GET_MODE_UNIT_SIZE (from) != GET_MODE_UNIT_SIZE (to)))
-    return false;
-
-  /* Don't allow changes between partial and other registers only if
-     one is a normal SIMD register, allow only if not larger than 64-bit.  */
-  if ((to_partial_advsimd_struct_p ^ from_partial_advsimd_struct_p)
-      && (known_gt (GET_MODE_SIZE (to), 8) || known_gt (GET_MODE_SIZE (to), 8)))
-    return false;
-
-  if (maybe_ne (BITS_PER_SVE_VECTOR, 128u))
-    {
-      /* Don't allow changes between SVE modes and other modes that might
-	 be bigger than 128 bits.  In particular, OImode, CImode and XImode
-	 divide into 128-bit quantities while SVE modes divide into
-	 BITS_PER_SVE_VECTOR quantities.  */
-      if (from_sve_p && !to_sve_p && maybe_gt (GET_MODE_BITSIZE (to), 128))
-	return false;
-      if (to_sve_p && !from_sve_p && maybe_gt (GET_MODE_BITSIZE (from), 128))
-	return false;
-    }
-
-  if (BYTES_BIG_ENDIAN)
-    {
-      /* Don't allow changes between SVE data modes and non-SVE modes.
-	 See the comment at the head of aarch64-sve.md for details.  */
-      if (from_sve_p != to_sve_p)
-	return false;
-
-      /* Don't allow changes in element size: lane 0 of the new vector
-	 would not then be lane 0 of the old vector.  See the comment
-	 above aarch64_maybe_expand_sve_subreg_move for a more detailed
-	 description.
-
-	 In the worst case, this forces a register to be spilled in
-	 one mode and reloaded in the other, which handles the
-	 endianness correctly.  */
-      if (from_sve_p && GET_MODE_UNIT_SIZE (from) != GET_MODE_UNIT_SIZE (to))
-	return false;
-    }
-  return true;
+  return aarch64_modes_compatible_p (from, to);
 }
 
 /* Implement TARGET_EARLY_REMAT_MODES.  */
@@ -28078,18 +28182,18 @@ aarch64_test_fractional_cost ()
   ASSERT_EQ (cf (2, 3) * 5, cf (10, 3));
   ASSERT_EQ (14 * cf (11, 21), cf (22, 3));
 
-  ASSERT_TRUE (cf (4, 15) < cf (5, 15));
-  ASSERT_FALSE (cf (5, 15) < cf (5, 15));
-  ASSERT_FALSE (cf (6, 15) < cf (5, 15));
-  ASSERT_TRUE (cf (1, 3) < cf (2, 5));
-  ASSERT_TRUE (cf (1, 12) < cf (1, 6));
-  ASSERT_FALSE (cf (5, 3) < cf (5, 3));
-  ASSERT_TRUE (cf (239, 240) < 1);
-  ASSERT_FALSE (cf (240, 240) < 1);
-  ASSERT_FALSE (cf (241, 240) < 1);
-  ASSERT_FALSE (2 < cf (207, 104));
-  ASSERT_FALSE (2 < cf (208, 104));
-  ASSERT_TRUE (2 < cf (209, 104));
+  ASSERT_TRUE (cf (4, 15) <= cf (5, 15));
+  ASSERT_TRUE (cf (5, 15) <= cf (5, 15));
+  ASSERT_FALSE (cf (6, 15) <= cf (5, 15));
+  ASSERT_TRUE (cf (1, 3) <= cf (2, 5));
+  ASSERT_TRUE (cf (1, 12) <= cf (1, 6));
+  ASSERT_TRUE (cf (5, 3) <= cf (5, 3));
+  ASSERT_TRUE (cf (239, 240) <= 1);
+  ASSERT_TRUE (cf (240, 240) <= 1);
+  ASSERT_FALSE (cf (241, 240) <= 1);
+  ASSERT_FALSE (2 <= cf (207, 104));
+  ASSERT_TRUE (2 <= cf (208, 104));
+  ASSERT_TRUE (2 <= cf (209, 104));
 
   ASSERT_TRUE (cf (4, 15) < cf (5, 15));
   ASSERT_FALSE (cf (5, 15) < cf (5, 15));
@@ -28397,6 +28501,9 @@ aarch64_libgcc_floating_mode_supported_p
 
 #undef TARGET_RTX_COSTS
 #define TARGET_RTX_COSTS aarch64_rtx_costs_wrapper
+
+#undef TARGET_INSN_COST
+#define TARGET_INSN_COST aarch64_insn_cost
 
 #undef TARGET_SCALAR_MODE_SUPPORTED_P
 #define TARGET_SCALAR_MODE_SUPPORTED_P aarch64_scalar_mode_supported_p

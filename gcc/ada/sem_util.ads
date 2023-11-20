@@ -1479,6 +1479,10 @@ package Sem_Util is
    function Is_Container_Aggregate (Exp : Node_Id) return Boolean;
    --  Is the given expression a container aggregate?
 
+   function Is_Function_With_Side_Effects (Subp : Entity_Id) return Boolean;
+   --  Return True if Subp is a function with side-effects, ie. it has a
+   --  (direct or inherited) pragma Side_Effects with static value True.
+
    function Is_Newly_Constructed
      (Exp : Node_Id; Context_Requires_NC : Boolean) return Boolean;
    --  Indicates whether a given expression is "newly constructed" (RM 4.4).
@@ -3164,9 +3168,6 @@ package Sem_Util is
    --  Copies the Is_Atomic, Is_Independent and Is_Volatile_Full_Access flags
    --  from sub(type) entity T2 to (sub)type entity T1, as well as Is_Volatile
    --  if T1 is a base type.
-
-   procedure Set_Scope_Is_Transient (V : Boolean := True);
-   --  Set the flag Is_Transient of the current scope
 
    procedure Set_Size_Info (T1, T2 : Entity_Id);
    pragma Inline (Set_Size_Info);

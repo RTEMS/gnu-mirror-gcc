@@ -1000,6 +1000,7 @@ typedef struct
   unsigned omp_declare_target:1;
   unsigned omp_declare_target_link:1;
   ENUM_BITFIELD (gfc_omp_device_type) omp_device_type:2;
+  unsigned omp_allocate:1;
 
   /* Mentioned in OACC DECLARE.  */
   unsigned oacc_declare_create:1;
@@ -1544,6 +1545,8 @@ typedef struct gfc_omp_clauses
 {
   gfc_omp_namelist *lists[OMP_LIST_NUM];
   struct gfc_expr *if_expr;
+  struct gfc_expr *if_exprs[OMP_IF_LAST];
+  struct gfc_expr *self_expr;
   struct gfc_expr *final_expr;
   struct gfc_expr *num_threads;
   struct gfc_expr *chunk_size;
@@ -1560,7 +1563,6 @@ typedef struct gfc_omp_clauses
   struct gfc_expr *priority;
   struct gfc_expr *detach;
   struct gfc_expr *depobj;
-  struct gfc_expr *if_exprs[OMP_IF_LAST];
   struct gfc_expr *dist_chunk_size;
   struct gfc_expr *message;
   struct gfc_omp_assumptions *assume;
@@ -2745,7 +2747,7 @@ typedef struct
   unsigned int c_double : 1;
   unsigned int c_long_double : 1;
   unsigned int c_float128 : 1;
-  /* True if for _Float128 C2X IEC 60559 *f128 APIs should be used
+  /* True if for _Float128 C23 IEC 60559 *f128 APIs should be used
      instead of libquadmath *q APIs.  */
   unsigned int use_iec_60559 : 1;
 }

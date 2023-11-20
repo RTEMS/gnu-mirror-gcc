@@ -1350,9 +1350,7 @@ conversion_warning (location_t loc, tree type, tree expr, tree result)
 	  break;
 
 	if (arith_ops
-	    && global_dc->option_enabled (warnopt,
-					  global_dc->lang_mask,
-					  global_dc->option_state))
+	    && global_dc->option_enabled_p (warnopt))
 	  {
 	    for (int i = 0; i < arith_ops; ++i)
 	      {
@@ -1517,13 +1515,15 @@ match_case_to_enum_1 (tree key, tree type, tree label)
     return;
 
   char buf[WIDE_INT_PRINT_BUFFER_SIZE];
+  wide_int w = wi::to_wide (key);
 
+  gcc_assert (w.get_precision () <= WIDE_INT_MAX_INL_PRECISION);
   if (tree_fits_uhwi_p (key))
-    print_dec (wi::to_wide (key), buf, UNSIGNED);
+    print_dec (w, buf, UNSIGNED);
   else if (tree_fits_shwi_p (key))
-    print_dec (wi::to_wide (key), buf, SIGNED);
+    print_dec (w, buf, SIGNED);
   else
-    print_hex (wi::to_wide (key), buf);
+    print_hex (w, buf);
 
   if (TYPE_NAME (type) == NULL_TREE)
     warning_at (DECL_SOURCE_LOCATION (CASE_LABEL (label)),
@@ -2949,7 +2949,7 @@ warn_for_multistatement_macros (location_t body_loc, location_t next_loc,
   while (linemap_macro_expansion_map_p (guard_map))
     {
       const line_map_macro *mm = linemap_check_macro (guard_map);
-      guard_loc_exp = MACRO_MAP_EXPANSION_POINT_LOCATION (mm);
+      guard_loc_exp = mm->get_expansion_point_location ();
       guard_map = linemap_lookup (line_table, guard_loc_exp);
       if (guard_map == body_map)
 	return;
@@ -3034,7 +3034,7 @@ check_address_or_pointer_of_packed_member (tree type, tree rhs)
 	  rhs = TREE_TYPE (rhs);	/* Pointer type.  */
 	  /* We could be called while processing a template and RHS could be
 	     a functor.  In that case it's a class, not a pointer.  */
-	  if (!POINTER_TYPE_P (rhs))
+	  if (!rhs || !POINTER_TYPE_P (rhs))
 	    return NULL_TREE;
 	  rhs = TREE_TYPE (rhs);	/* Function type.  */
 	  rhstype = TREE_TYPE (rhs);

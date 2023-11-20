@@ -65,6 +65,7 @@
 
   UNSPEC_LOAD_FROM_GOT
   UNSPEC_PCALAU12I
+  UNSPEC_PCALAU12I_GR
   UNSPEC_ORI_L_LO12
   UNSPEC_LUI_L_HI20
   UNSPEC_LUI_H_LO20
@@ -112,6 +113,7 @@
 
 (define_constants
   [(RETURN_ADDR_REGNUM		1)
+   (TP_REGNUM			2)
    (T0_REGNUM			12)
    (T1_REGNUM			13)
    (S0_REGNUM			23)
@@ -398,6 +400,18 @@
    (DI "!TARGET_64BIT && TARGET_DOUBLE_FLOAT")
    (TF "TARGET_64BIT && TARGET_DOUBLE_FLOAT")])
 
+;; A mode for anything with 32 bits or more, and able to be loaded with
+;; the same addressing mode as ld.w.
+(define_mode_iterator LD_AT_LEAST_32_BIT [GPR ANYF])
+
+;; A mode for anything able to be stored with the same addressing mode as
+;; st.w.
+(define_mode_iterator ST_ANY [QHWD ANYF])
+
+;; A mode for anything legal as a input of a div or mod instruction.
+(define_mode_iterator DIV [(DI "TARGET_64BIT")
+			   (SI "!TARGET_64BIT || TARGET_DIV32")])
+
 ;; In GPR templates, a string like "mul.<d>" will expand to "mul.w" in the
 ;; 32-bit version and "mul.d" in the 64-bit version.
 (define_mode_attr d [(SI "w") (DI "d")])
@@ -508,6 +522,8 @@
 
 ;; <su> is like <u>, but the signed form expands to "s" rather than "".
 (define_code_attr su [(sign_extend "s") (zero_extend "u")])
+
+(define_code_attr u_bool [(sign_extend "false") (zero_extend "true")])
 
 ;; <optab> expands to the name of the optab for a particular code.
 (define_code_attr optab [(ashift "ashl")
@@ -902,7 +918,7 @@
 		     (match_operand:GPR 2 "register_operand")))]
   ""
 {
- if (GET_MODE (operands[0]) == SImode && TARGET_64BIT)
+ if (GET_MODE (operands[0]) == SImode && TARGET_64BIT && !TARGET_DIV32)
   {
     rtx reg1 = gen_reg_rtx (DImode);
     rtx reg2 = gen_reg_rtx (DImode);
@@ -922,15 +938,32 @@
 })
 
 (define_insn "*<optab><mode>3"
-  [(set (match_operand:X 0 "register_operand" "=r,&r,&r")
-	(any_div:X (match_operand:X 1 "register_operand" "r,r,0")
-		   (match_operand:X 2 "register_operand" "r,r,r")))]
+  [(set (match_operand:DIV 0 "register_operand" "=r,&r,&r")
+	(any_div:DIV (match_operand:DIV 1 "register_operand" "r,r,0")
+		     (match_operand:DIV 2 "register_operand" "r,r,r")))]
   ""
 {
   return loongarch_output_division ("<insn>.<d><u>\t%0,%1,%2", operands);
 }
   [(set_attr "type" "idiv")
    (set_attr "mode" "<MODE>")
+   (set (attr "enabled")
+      (if_then_else
+	(match_test "!!which_alternative == loongarch_check_zero_div_p()")
+	(const_string "yes")
+	(const_string "no")))])
+
+(define_insn "<optab>si3_extended"
+  [(set (match_operand:DI 0 "register_operand" "=r,&r,&r")
+	(sign_extend
+	  (any_div:SI (match_operand:SI 1 "register_operand" "r,r,0")
+		      (match_operand:SI 2 "register_operand" "r,r,r"))))]
+  "TARGET_64BIT && TARGET_DIV32"
+{
+  return loongarch_output_division ("<insn>.w<u>\t%0,%1,%2", operands);
+}
+  [(set_attr "type" "idiv")
+   (set_attr "mode" "SI")
    (set (attr "enabled")
       (if_then_else
 	(match_test "!!which_alternative == loongarch_check_zero_div_p()")
@@ -945,7 +978,7 @@
 	     (any_div:DI (match_operand:DI 1 "register_operand" "r,r,0")
 			 (match_operand:DI 2 "register_operand" "r,r,r")) 0)]
 	  UNSPEC_FAKE_ANY_DIV)))]
-  "TARGET_64BIT"
+  "TARGET_64BIT && !TARGET_DIV32"
 {
   return loongarch_output_division ("<insn>.w<u>\t%0,%1,%2", operands);
 }
@@ -2150,7 +2183,7 @@
   [(set (match_operand:FCC 0 "register_operand" "=z")
 	(const_int 0))]
   ""
-  "movgr2cf\t%0,$r0")
+  "fcmp.caf.s\t%0,$f0,$f0")
 
 ;; Conditional move instructions.
 
@@ -2245,7 +2278,7 @@
   [(set (match_operand:P 0 "register_operand" "=r")
  (lo_sum:P (match_operand:P 1 "register_operand" " r")
      (match_operand:P 2 "symbolic_operand" "")))]
-  "TARGET_EXPLICIT_RELOCS"
+  ""
   "addi.<d>\t%0,%1,%L2"
   [(set_attr "type" "arith")
    (set_attr "mode" "<MODE>")])
@@ -2255,7 +2288,7 @@
 	(unspec:P [(mem:P (lo_sum:P (match_operand:P 1 "register_operand" "r")
 				    (match_operand:P 2 "symbolic_operand" "")))]
 	UNSPEC_TLS_LOW))]
-  "TARGET_EXPLICIT_RELOCS"
+  ""
   "addi.<d>\t%0,%1,%L2"
   [(set_attr "type" "arith")
    (set_attr "mode" "<MODE>")])
@@ -2273,7 +2306,7 @@
 				(match_operand:P 1 "register_operand" "r")
 				(match_operand:P 2 "symbolic_operand")))]
 	UNSPEC_LOAD_FROM_GOT))]
-  "TARGET_EXPLICIT_RELOCS"
+  ""
   "ld.<d>\t%0,%1,%L2"
   [(set_attr "type" "move")]
 )
@@ -2291,6 +2324,16 @@
   [(set (match_operand:P 0 "register_operand" "=j")
 	(unspec:P [(match_operand:P 1 "symbolic_operand" "")]
 	UNSPEC_PCALAU12I))]
+  ""
+  "pcalau12i\t%0,%%pc_hi20(%1)"
+  [(set_attr "type" "move")])
+
+;; @pcalau12i may be used for sibcall so it has a strict constraint.  This
+;; allows any general register as the operand.
+(define_insn "@pcalau12i_gr<mode>"
+  [(set (match_operand:P 0 "register_operand" "=r")
+       (unspec:P [(match_operand:P 1 "symbolic_operand" "")]
+       UNSPEC_PCALAU12I_GR))]
   ""
   "pcalau12i\t%0,%%pc_hi20(%1)"
   [(set_attr "type" "move")])
@@ -3252,7 +3295,13 @@
 					    XEXP (target, 1),
 					    operands[1]));
   else
-    emit_call_insn (gen_sibcall_internal (target, operands[1]));
+    {
+      rtx call = emit_call_insn (gen_sibcall_internal (target, operands[1]));
+
+      if (TARGET_CMODEL_MEDIUM && !REG_P (target))
+	clobber_reg (&CALL_INSN_FUNCTION_USAGE (call),
+		     gen_rtx_REG (Pmode, T0_REGNUM));
+    }
   DONE;
 })
 
@@ -3260,10 +3309,25 @@
   [(call (mem:SI (match_operand 0 "call_insn_operand" "j,c,b"))
 	 (match_operand 1 "" ""))]
   "SIBLING_CALL_P (insn)"
-  "@
-   jr\t%0
-   b\t%0
-   b\t%%plt(%0)"
+{
+  switch (which_alternative)
+    {
+    case 0:
+      return "jr\t%0";
+    case 1:
+      if (TARGET_CMODEL_MEDIUM)
+	return "pcaddu18i\t$r12,%%call36(%0)\n\tjirl\t$r0,$r12,0";
+      else
+	return "b\t%0";
+    case 2:
+      if (TARGET_CMODEL_MEDIUM)
+	return "pcaddu18i\t$r12,%%call36(%0)\n\tjirl\t$r0,$r12,0";
+      else
+	return "b\t%%plt(%0)";
+    default:
+      gcc_unreachable ();
+    }
+}
   [(set_attr "jirl" "indirect,direct,direct")])
 
 (define_insn "@sibcall_internal_1<mode>"
@@ -3296,9 +3360,17 @@
 							   operands[2],
 							   arg2));
       else
-	emit_call_insn (gen_sibcall_value_multiple_internal (arg1, target,
-							   operands[2],
-							   arg2));
+	{
+	  rtx call
+	    = emit_call_insn (gen_sibcall_value_multiple_internal (arg1,
+								   target,
+								   operands[2],
+								   arg2));
+
+	  if (TARGET_CMODEL_MEDIUM && !REG_P (target))
+	    clobber_reg (&CALL_INSN_FUNCTION_USAGE (call),
+			gen_rtx_REG (Pmode, T0_REGNUM));
+	}
     }
    else
     {
@@ -3312,8 +3384,15 @@
 						  XEXP (target, 1),
 						  operands[2]));
       else
-	emit_call_insn (gen_sibcall_value_internal (operands[0], target,
-						  operands[2]));
+	{
+	  rtx call = emit_call_insn (gen_sibcall_value_internal (operands[0],
+								 target,
+								 operands[2]));
+
+	  if (TARGET_CMODEL_MEDIUM && !REG_P (target))
+	    clobber_reg (&CALL_INSN_FUNCTION_USAGE (call),
+			gen_rtx_REG (Pmode, T0_REGNUM));
+	}
     }
   DONE;
 })
@@ -3323,10 +3402,25 @@
 	(call (mem:SI (match_operand 1 "call_insn_operand" "j,c,b"))
 	      (match_operand 2 "" "")))]
   "SIBLING_CALL_P (insn)"
-  "@
-   jr\t%1
-   b\t%1
-   b\t%%plt(%1)"
+{
+  switch (which_alternative)
+    {
+    case 0:
+      return "jr\t%1";
+    case 1:
+      if (TARGET_CMODEL_MEDIUM)
+	return "pcaddu18i\t$r12,%%call36(%1)\n\tjirl\t$r0,$r12,0";
+      else
+	return "b\t%1";
+    case 2:
+      if (TARGET_CMODEL_MEDIUM)
+	return "pcaddu18i\t$r12,%%call36(%1)\n\tjirl\t$r0,$r12,0";
+      else
+	return "b\t%%plt(%1)";
+    default:
+      gcc_unreachable ();
+    }
+}
   [(set_attr "jirl" "indirect,direct,direct")])
 
 (define_insn "@sibcall_value_internal_1<mode>"
@@ -3346,10 +3440,25 @@
 	(call (mem:SI (match_dup 1))
 	      (match_dup 2)))]
   "SIBLING_CALL_P (insn)"
-  "@
-   jr\t%1
-   b\t%1
-   b\t%%plt(%1)"
+{
+  switch (which_alternative)
+    {
+    case 0:
+      return "jr\t%1";
+    case 1:
+      if (TARGET_CMODEL_MEDIUM)
+	return "pcaddu18i\t$r12,%%call36(%1)\n\tjirl\t$r0,$r12,0";
+      else
+	return "b\t%1";
+    case 2:
+      if (TARGET_CMODEL_MEDIUM)
+	return "pcaddu18i\t$r12,%%call36(%1)\n\tjirl\t$r0,$r12,0";
+      else
+	return "b\t%%plt(%1)";
+    default:
+      gcc_unreachable ();
+    }
+}
   [(set_attr "jirl" "indirect,direct,direct")])
 
 (define_insn "@sibcall_value_multiple_internal_1<mode>"
@@ -3389,10 +3498,25 @@
 	 (match_operand 1 "" ""))
    (clobber (reg:SI RETURN_ADDR_REGNUM))]
   ""
-  "@
-   jirl\t$r1,%0,0
-   bl\t%0
-   bl\t%%plt(%0)"
+{
+  switch (which_alternative)
+    {
+    case 0:
+      return "jirl\t$r1,%0,0";
+    case 1:
+      if (TARGET_CMODEL_MEDIUM)
+	return "pcaddu18i\t$r1,%%call36(%0)\n\tjirl\t$r1,$r1,0";
+      else
+	return "bl\t%0";
+    case 2:
+      if (TARGET_CMODEL_MEDIUM)
+	return "pcaddu18i\t$r1,%%call36(%0)\n\tjirl\t$r1,$r1,0";
+      else
+	return "bl\t%%plt(%0)";
+    default:
+      gcc_unreachable ();
+    }
+}
   [(set_attr "jirl" "indirect,direct,direct")])
 
 (define_insn "@call_internal_1<mode>"
@@ -3451,10 +3575,25 @@
 	      (match_operand 2 "" "")))
    (clobber (reg:SI RETURN_ADDR_REGNUM))]
   ""
-  "@
-   jirl\t$r1,%1,0
-   bl\t%1
-   bl\t%%plt(%1)"
+{
+  switch (which_alternative)
+    {
+    case 0:
+      return "jirl\t$r1,%1,0";
+    case 1:
+      if (TARGET_CMODEL_MEDIUM)
+	return "pcaddu18i\t$r1,%%call36(%1)\n\tjirl\t$r1,$r1,0";
+      else
+	return "bl\t%1";
+    case 2:
+      if (TARGET_CMODEL_MEDIUM)
+	return "pcaddu18i\t$r1,%%call36(%1)\n\tjirl\t$r1,$r1,0";
+      else
+	return "bl\t%%plt(%1)";
+    default:
+      gcc_unreachable ();
+    }
+}
   [(set_attr "jirl" "indirect,direct,direct")])
 
 (define_insn "@call_value_internal_1<mode>"
@@ -3476,10 +3615,25 @@
 	      (match_dup 2)))
    (clobber (reg:SI RETURN_ADDR_REGNUM))]
   ""
-  "@
-   jirl\t$r1,%1,0
-   bl\t%1
-   bl\t%%plt(%1)"
+{
+  switch (which_alternative)
+    {
+    case 0:
+      return "jirl\t$r1,%1,0";
+    case 1:
+      if (TARGET_CMODEL_MEDIUM)
+	return "pcaddu18i\t$r1,%%call36(%1)\n\tjirl\t$r1,$r1,0";
+      else
+	return "bl\t%1";
+    case 2:
+      if (TARGET_CMODEL_MEDIUM)
+	return "pcaddu18i\t$r1,%%call36(%1)\n\tjirl\t$r1,$r1,0";
+      else
+	return "bl\t%%plt(%1)";
+    default:
+      gcc_unreachable ();
+    }
+}
   [(set_attr "jirl" "indirect,direct,direct")])
 
 (define_insn "@call_value_multiple_internal_1<mode>"
@@ -3634,6 +3788,12 @@
   [(set_attr "length" "0")
    (set_attr "type" "ghost")])
 
+;; Named pattern for expanding thread pointer reference.
+(define_expand "get_thread_pointer<mode>"
+  [(set (match_operand:P 0 "register_operand" "=r")
+	(reg:P TP_REGNUM))]
+  "HAVE_AS_TLS"
+  {})
 
 (define_split
   [(match_operand 0 "small_data_pattern")]
@@ -3745,6 +3905,119 @@
   "crcc.w.<size>.w\t%0,%1,%2"
   [(set_attr "type" "unknown")
    (set_attr "mode" "<MODE>")])
+
+;; With normal or medium code models, if the only use of a pc-relative
+;; address is for loading or storing a value, then relying on linker
+;; relaxation is not better than emitting the machine instruction directly.
+;; Even if the la.local pseudo op can be relaxed, we get:
+;;
+;;     pcaddi     $t0, %pcrel_20(x)
+;;     ld.d       $t0, $t0, 0
+;;
+;; There are still two instructions, same as using the machine instructions
+;; and explicit relocs:
+;;
+;;     pcalau12i  $t0, %pc_hi20(x)
+;;     ld.d       $t0, $t0, %pc_lo12(x)
+;;
+;; And if the pseudo op cannot be relaxed, we'll get a worse result (with
+;; 3 instructions).
+(define_peephole2
+  [(set (match_operand:P 0 "register_operand")
+	(match_operand:P 1 "symbolic_pcrel_operand"))
+   (set (match_operand:LD_AT_LEAST_32_BIT 2 "register_operand")
+	(mem:LD_AT_LEAST_32_BIT (match_dup 0)))]
+  "la_opt_explicit_relocs == EXPLICIT_RELOCS_AUTO \
+   && (TARGET_CMODEL_NORMAL || TARGET_CMODEL_MEDIUM) \
+   && (peep2_reg_dead_p (2, operands[0]) \
+       || REGNO (operands[0]) == REGNO (operands[2]))"
+  [(set (match_dup 2)
+	(mem:LD_AT_LEAST_32_BIT (lo_sum:P (match_dup 0) (match_dup 1))))]
+  {
+    emit_insn (gen_pcalau12i_gr<P:mode> (operands[0], operands[1]));
+  })
+
+(define_peephole2
+  [(set (match_operand:P 0 "register_operand")
+	(match_operand:P 1 "symbolic_pcrel_operand"))
+   (set (match_operand:LD_AT_LEAST_32_BIT 2 "register_operand")
+	(mem:LD_AT_LEAST_32_BIT (plus (match_dup 0)
+				(match_operand 3 "const_int_operand"))))]
+  "la_opt_explicit_relocs == EXPLICIT_RELOCS_AUTO \
+   && (TARGET_CMODEL_NORMAL || TARGET_CMODEL_MEDIUM) \
+   && (peep2_reg_dead_p (2, operands[0]) \
+       || REGNO (operands[0]) == REGNO (operands[2]))"
+  [(set (match_dup 2)
+	(mem:LD_AT_LEAST_32_BIT (lo_sum:P (match_dup 0) (match_dup 1))))]
+  {
+    operands[1] = plus_constant (Pmode, operands[1], INTVAL (operands[3]));
+    emit_insn (gen_pcalau12i_gr<P:mode> (operands[0], operands[1]));
+  })
+
+(define_peephole2
+  [(set (match_operand:P 0 "register_operand")
+	(match_operand:P 1 "symbolic_pcrel_operand"))
+   (set (match_operand:GPR 2 "register_operand")
+	(any_extend:GPR (mem:SUBDI (match_dup 0))))]
+  "la_opt_explicit_relocs == EXPLICIT_RELOCS_AUTO \
+   && (TARGET_CMODEL_NORMAL || TARGET_CMODEL_MEDIUM) \
+   && (peep2_reg_dead_p (2, operands[0]) \
+       || REGNO (operands[0]) == REGNO (operands[2]))"
+  [(set (match_dup 2)
+	(any_extend:GPR (mem:SUBDI (lo_sum:P (match_dup 0)
+					     (match_dup 1)))))]
+  {
+    emit_insn (gen_pcalau12i_gr<P:mode> (operands[0], operands[1]));
+  })
+
+(define_peephole2
+  [(set (match_operand:P 0 "register_operand")
+	(match_operand:P 1 "symbolic_pcrel_operand"))
+   (set (match_operand:GPR 2 "register_operand")
+	(any_extend:GPR
+	  (mem:SUBDI (plus (match_dup 0)
+			   (match_operand 3 "const_int_operand")))))]
+  "la_opt_explicit_relocs == EXPLICIT_RELOCS_AUTO \
+   && (TARGET_CMODEL_NORMAL || TARGET_CMODEL_MEDIUM) \
+   && (peep2_reg_dead_p (2, operands[0]) \
+       || REGNO (operands[0]) == REGNO (operands[2]))"
+  [(set (match_dup 2)
+	(any_extend:GPR (mem:SUBDI (lo_sum:P (match_dup 0)
+					     (match_dup 1)))))]
+  {
+    operands[1] = plus_constant (Pmode, operands[1], INTVAL (operands[3]));
+    emit_insn (gen_pcalau12i_gr<P:mode> (operands[0], operands[1]));
+  })
+
+(define_peephole2
+  [(set (match_operand:P 0 "register_operand")
+	(match_operand:P 1 "symbolic_pcrel_operand"))
+   (set (mem:ST_ANY (match_dup 0))
+	(match_operand:ST_ANY 2 "register_operand"))]
+  "la_opt_explicit_relocs == EXPLICIT_RELOCS_AUTO \
+   && (TARGET_CMODEL_NORMAL || TARGET_CMODEL_MEDIUM) \
+   && (peep2_reg_dead_p (2, operands[0])) \
+   && REGNO (operands[0]) != REGNO (operands[2])"
+  [(set (mem:ST_ANY (lo_sum:P (match_dup 0) (match_dup 1))) (match_dup 2))]
+  {
+    emit_insn (gen_pcalau12i_gr<P:mode> (operands[0], operands[1]));
+  })
+
+(define_peephole2
+  [(set (match_operand:P 0 "register_operand")
+	(match_operand:P 1 "symbolic_pcrel_operand"))
+   (set (mem:ST_ANY (plus (match_dup 0)
+			  (match_operand 3 "const_int_operand")))
+	(match_operand:ST_ANY 2 "register_operand"))]
+  "la_opt_explicit_relocs == EXPLICIT_RELOCS_AUTO \
+   && (TARGET_CMODEL_NORMAL || TARGET_CMODEL_MEDIUM) \
+   && (peep2_reg_dead_p (2, operands[0])) \
+   && REGNO (operands[0]) != REGNO (operands[2])"
+  [(set (mem:ST_ANY (lo_sum:P (match_dup 0) (match_dup 1))) (match_dup 2))]
+  {
+    operands[1] = plus_constant (Pmode, operands[1], INTVAL (operands[3]));
+    emit_insn (gen_pcalau12i_gr<P:mode> (operands[0], operands[1]));
+  })
 
 ;; Synchronization instructions.
 

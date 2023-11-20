@@ -304,6 +304,8 @@ enum gomp_map_kind
 
 /* Force host fallback execution.  */
 #define GOACC_FLAG_HOST_FALLBACK	(1 << 0)
+/* Execute on local device (i.e. host multicore CPU).  */
+#define GOACC_FLAG_LOCAL_DEVICE 	(1 << 1)
 
 /* For legacy reasons, in the ABI, the GOACC_FLAGs are encoded as an inverted
    bitmask.  */
@@ -314,13 +316,15 @@ enum gomp_map_kind
 /* Versions of libgomp and device-specific plugins.  GOMP_VERSION
    should be incremented whenever an ABI-incompatible change is introduced
    to the plugin interface defined in libgomp/libgomp.h.  */
-#define GOMP_VERSION	2
+#define GOMP_VERSION	3
 #define GOMP_VERSION_NVIDIA_PTX 1
 #define GOMP_VERSION_GCN 3
 
 #define GOMP_VERSION_PACK(LIB, DEV) (((LIB) << 16) | (DEV))
 #define GOMP_VERSION_LIB(PACK) (((PACK) >> 16) & 0xffff)
 #define GOMP_VERSION_DEV(PACK) ((PACK) & 0xffff)
+
+#define GOMP_VERSION_SUPPORTS_INDIRECT_FUNCS(VER) (GOMP_VERSION_LIB(VER) >= 3)
 
 #define GOMP_DIM_GANG	0
 #define GOMP_DIM_WORKER	1

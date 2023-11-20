@@ -365,6 +365,24 @@ ipa_initialize_node_params (struct cgraph_node *node)
     ipa_populate_param_decls (node, *info->descriptors);
 }
 
+/* Print VAL which is extracted from a jump function to F.  */
+
+static void
+ipa_print_constant_value (FILE *f, tree val)
+{
+  print_generic_expr (f, val);
+
+  /* This is in keeping with values_equal_for_ipcp_p.  */
+  if (TREE_CODE (val) == ADDR_EXPR
+      && (TREE_CODE (TREE_OPERAND (val, 0)) == CONST_DECL
+	  || (TREE_CODE (TREE_OPERAND (val, 0)) == VAR_DECL
+	      && DECL_IN_CONSTANT_POOL (TREE_OPERAND (val, 0)))))
+    {
+      fputs (" -> ", f);
+      print_generic_expr (f, DECL_INITIAL (TREE_OPERAND (val, 0)));
+    }
+}
+
 /* Print the jump functions associated with call graph edge CS to file F.  */
 
 static void
@@ -386,15 +404,8 @@ ipa_print_node_jump_functions_for_edge (FILE *f, struct cgraph_edge *cs)
 	fprintf (f, "UNKNOWN\n");
       else if (type == IPA_JF_CONST)
 	{
-	  tree val = jump_func->value.constant.value;
 	  fprintf (f, "CONST: ");
-	  print_generic_expr (f, val);
-	  if (TREE_CODE (val) == ADDR_EXPR
-	      && TREE_CODE (TREE_OPERAND (val, 0)) == CONST_DECL)
-	    {
-	      fprintf (f, " -> ");
-	      print_generic_expr (f, DECL_INITIAL (TREE_OPERAND (val, 0)));
-	    }
+	  ipa_print_constant_value (f, jump_func->value.constant.value);
 	  fprintf (f, "\n");
 	}
       else if (type == IPA_JF_PASS_THROUGH)
@@ -468,7 +479,7 @@ ipa_print_node_jump_functions_for_edge (FILE *f, struct cgraph_edge *cs)
 	      else if (item->jftype == IPA_JF_CONST)
 		{
 		  fprintf (f, "CONST: ");
-		  print_generic_expr (f, item->value.constant);
+		  ipa_print_constant_value (f, item->value.constant);
 		}
 	      else if (item->jftype == IPA_JF_UNKNOWN)
 		fprintf (f, "UNKNOWN: " HOST_WIDE_INT_PRINT_DEC " bits",
@@ -5299,6 +5310,7 @@ write_ipcp_transformation_info (output_block *ob, cgraph_node *node,
 
       bp = bitpack_create (ob->main_stream);
       bp_pack_value (&bp, av.by_ref, 1);
+      bp_pack_value (&bp, av.killed, 1);
       streamer_write_bitpack (&bp);
     }
 
@@ -5331,6 +5343,7 @@ read_ipcp_transformation_info (lto_input_block *ib, cgraph_node *node,
 
 	  bitpack_d bp = streamer_read_bitpack (ib);
 	  av->by_ref = bp_unpack_value (&bp, 1);
+	  av->killed = bp_unpack_value (&bp, 1);
 	}
     }
 
@@ -5616,7 +5629,9 @@ ipcp_modif_dom_walker::before_dom_children (basic_block bb)
 
 /* If IPA-CP discovered a constant in parameter PARM at OFFSET of a given SIZE
    - whether passed by reference or not is given by BY_REF - return that
-   constant.  Otherwise return NULL_TREE.  */
+   constant.  Otherwise return NULL_TREE.  The is supposed to be used only
+   after clone materialization and transformation is done (because it asserts
+   that killed constants have been pruned). */
 
 tree
 ipcp_get_aggregate_const (struct function *func, tree parm, bool by_ref,
@@ -5634,7 +5649,11 @@ ipcp_get_aggregate_const (struct function *func, tree parm, bool by_ref,
 
   ipa_argagg_value_list avl (ts);
   unsigned unit_offset = bit_offset / BITS_PER_UNIT;
-  tree v = avl.get_value (index, unit_offset, by_ref);
+  const ipa_argagg_value *av = avl.get_elt (index, unit_offset);
+  if (!av || av->by_ref != by_ref)
+    return NULL_TREE;
+  gcc_assert (!av->killed);
+  tree v = av->value;
   if (!v
       || maybe_ne (tree_to_poly_int64 (TYPE_SIZE (TREE_TYPE (v))), bit_size))
     return NULL_TREE;
@@ -5883,6 +5902,11 @@ ipcp_transform_function (struct cgraph_node *node)
   FOR_EACH_VEC_ELT (fbi.bb_infos, i, bi)
     free_ipa_bb_info (bi);
   fbi.bb_infos.release ();
+
+  ts->remove_argaggs_if ([](const ipa_argagg_value &v)
+    {
+      return v.killed;
+    });
 
   vec_free (descriptors);
   if (cfg_changed)

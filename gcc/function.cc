@@ -1943,6 +1943,16 @@ instantiate_decls (tree fndecl)
   vec_free (cfun->local_decls);
 }
 
+/* Return the value of STACK_DYNAMIC_OFFSET for the current function.
+   This is done through a function wrapper so that the macro sees a
+   predictable set of included files.  */
+
+poly_int64
+get_stack_dynamic_offset ()
+{
+  return STACK_DYNAMIC_OFFSET (current_function_decl);
+}
+
 /* Pass through the INSNS of function FNDECL and convert virtual register
    references to hard register references.  */
 
@@ -1954,7 +1964,7 @@ instantiate_virtual_regs (void)
   /* Compute the offsets to use for this function.  */
   in_arg_offset = FIRST_PARM_OFFSET (current_function_decl);
   var_offset = targetm.starting_frame_offset ();
-  dynamic_offset = STACK_DYNAMIC_OFFSET (current_function_decl);
+  dynamic_offset = get_stack_dynamic_offset ();
   out_arg_offset = STACK_POINTER_OFFSET;
 #ifdef FRAME_POINTER_CFA_OFFSET
   cfa_offset = FRAME_POINTER_CFA_OFFSET (current_function_decl);
@@ -6112,6 +6122,8 @@ thread_prologue_and_epilogue_insns (void)
 		  && returnjump_p (BB_END (e->src)))
 		e->flags &= ~EDGE_FALLTHRU;
 	    }
+
+	  find_sub_basic_blocks (BLOCK_FOR_INSN (epilogue_seq));
 	}
       else if (next_active_insn (BB_END (exit_fallthru_edge->src)))
 	{
@@ -6210,6 +6222,8 @@ thread_prologue_and_epilogue_insns (void)
 	  set_insn_locations (seq, epilogue_location);
 
 	  emit_insn_before (seq, insn);
+
+	  find_sub_basic_blocks (BLOCK_FOR_INSN (insn));
 	}
     }
 

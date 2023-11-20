@@ -128,8 +128,11 @@ ALL_DRUNTIME_SOURCES = $(DRUNTIME_DSOURCES) $(DRUNTIME_CSOURCES) \
 toolexeclib_LTLIBRARIES = libgdruntime.la
 libgdruntime_la_SOURCES = $(ALL_DRUNTIME_SOURCES)
 libgdruntime_la_LIBTOOLFLAGS =
+if ENABLE_DARWIN_AT_RPATH
+libgdruntime_darwin_rpath = -Wl,-rpath,@loader_path
+endif
 libgdruntime_la_LDFLAGS = -Wc,-nophoboslib,-dstartfiles,-B../src,-Bgcc \
-    -version-info $(libtool_VERSION)
+    -version-info $(libtool_VERSION) $(libgdruntime_darwin_rpath)
 libgdruntime_la_LIBADD = $(LIBATOMIC) $(LIBBACKTRACE)
 libgdruntime_la_DEPENDENCIES = $(DRTSTUFF)
 # Also override library link commands: This is not strictly
@@ -186,9 +189,9 @@ DRUNTIME_DSOURCES = core/atomic.d core/attribute.d core/bitop.d \
 	core/internal/gc/impl/manual/gc.d core/internal/gc/impl/proto/gc.d \
 	core/internal/gc/os.d core/internal/gc/pooltable.d \
 	core/internal/gc/proxy.d core/internal/hash.d core/internal/lifetime.d \
-	core/internal/moving.d core/internal/parseoptions.d \
-	core/internal/postblit.d core/internal/qsort.d \
-	core/internal/spinlock.d core/internal/string.d \
+	core/internal/moving.d core/internal/newaa.d \
+	core/internal/parseoptions.d core/internal/postblit.d \
+	core/internal/qsort.d core/internal/spinlock.d core/internal/string.d \
 	core/internal/switch_.d core/internal/traits.d core/internal/utf.d \
 	core/internal/util/array.d core/internal/util/math.d core/lifetime.d \
 	core/math.d core/memory.d core/runtime.d core/simd.d \
@@ -258,7 +261,8 @@ DRUNTIME_DSOURCES_ELF = core/sys/elf/package.d
 
 DRUNTIME_DSOURCES_FREEBSD = core/sys/freebsd/config.d \
 	core/sys/freebsd/dlfcn.d core/sys/freebsd/err.d \
-	core/sys/freebsd/execinfo.d core/sys/freebsd/netinet/in_.d \
+	core/sys/freebsd/execinfo.d core/sys/freebsd/ifaddrs.d \
+	core/sys/freebsd/net/if_dl.d core/sys/freebsd/netinet/in_.d \
 	core/sys/freebsd/pthread_np.d core/sys/freebsd/stdlib.d \
 	core/sys/freebsd/string.d core/sys/freebsd/sys/_bitset.d \
 	core/sys/freebsd/sys/_cpuset.d core/sys/freebsd/sys/cdefs.d \
@@ -266,7 +270,8 @@ DRUNTIME_DSOURCES_FREEBSD = core/sys/freebsd/config.d \
 	core/sys/freebsd/sys/elf64.d core/sys/freebsd/sys/elf_common.d \
 	core/sys/freebsd/sys/event.d core/sys/freebsd/sys/link_elf.d \
 	core/sys/freebsd/sys/mman.d core/sys/freebsd/sys/mount.d \
-	core/sys/freebsd/sys/sysctl.d core/sys/freebsd/time.d \
+	core/sys/freebsd/sys/socket.d core/sys/freebsd/sys/sysctl.d \
+	core/sys/freebsd/sys/types.d core/sys/freebsd/time.d \
 	core/sys/freebsd/unistd.d
 
 DRUNTIME_DSOURCES_LINUX = core/sys/linux/config.d \
@@ -275,6 +280,7 @@ DRUNTIME_DSOURCES_LINUX = core/sys/linux/config.d \
 	core/sys/linux/fcntl.d core/sys/linux/fs.d core/sys/linux/ifaddrs.d \
 	core/sys/linux/input.d core/sys/linux/input_event_codes.d \
 	core/sys/linux/io_uring.d core/sys/linux/link.d \
+	core/sys/linux/linux/if_arp.d core/sys/linux/linux/if_packet.d \
 	core/sys/linux/netinet/in_.d core/sys/linux/netinet/tcp.d \
 	core/sys/linux/perf_event.d core/sys/linux/sched.d \
 	core/sys/linux/stdio.d core/sys/linux/string.d \

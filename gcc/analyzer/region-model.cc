@@ -78,6 +78,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "analyzer/checker-event.h"
 #include "analyzer/checker-path.h"
 #include "analyzer/feasible-graph.h"
+#include "analyzer/record-layout.h"
 
 #if ENABLE_ANALYZER
 
@@ -1178,6 +1179,15 @@ region_model::on_assignment (const gassign *assign, region_model_context *ctxt)
 
   const region *lhs_reg = get_lvalue (lhs, ctxt);
 
+  /* Any writes other than to the stack are treated
+     as externally visible.  */
+  if (ctxt)
+    {
+      enum memory_space memspace = lhs_reg->get_memory_space ();
+      if (memspace != MEMSPACE_STACK)
+	ctxt->maybe_did_work ();
+    }
+
   /* Most assignments are handled by:
        set_value (lhs_reg, SVALUE, CTXT)
      for some SVALUE.  */
@@ -1276,6 +1286,8 @@ region_model::on_stmt_pre (const gimple *stmt,
       {
 	const gasm *asm_stmt = as_a <const gasm *> (stmt);
 	on_asm_stmt (asm_stmt, ctxt);
+	if (ctxt)
+	  ctxt->maybe_did_work ();
       }
       break;
 
@@ -1700,7 +1712,11 @@ region_model::on_call_post (const gcall *call,
     }
 
   if (unknown_side_effects)
-    handle_unrecognized_call (call, ctxt);
+    {
+      handle_unrecognized_call (call, ctxt);
+      if (ctxt)
+	ctxt->maybe_did_work ();
+    }
 }
 
 /* Purge state involving SVAL from this region_model, using CTXT
@@ -1781,26 +1797,17 @@ private:
    attribute.  */
 
 void
-region_model::
-check_external_function_for_access_attr (const gcall *call,
-					 tree callee_fndecl,
-					 region_model_context *ctxt) const
+region_model::check_function_attr_access (const gcall *call,
+					  tree callee_fndecl,
+					  region_model_context *ctxt,
+					  rdwr_map &rdwr_idx) const
 {
   gcc_assert (call);
   gcc_assert (callee_fndecl);
   gcc_assert (ctxt);
 
   tree fntype = TREE_TYPE (callee_fndecl);
-  if (!fntype)
-    return;
-
-  if (!TYPE_ATTRIBUTES (fntype))
-    return;
-
-  /* Initialize a map of attribute access specifications for arguments
-     to the function call.  */
-  rdwr_map rdwr_idx;
-  init_attr_rdwr_indices (&rdwr_idx, TYPE_ATTRIBUTES (fntype));
+  gcc_assert (fntype);
 
   unsigned argno = 0;
 
@@ -1854,6 +1861,140 @@ check_external_function_for_access_attr (const gcall *call,
     }
 }
 
+/* Subroutine of region_model::check_function_attr_null_terminated_string_arg,
+   checking one instance of __attribute__((null_terminated_string_arg)).  */
+
+void
+region_model::
+check_one_function_attr_null_terminated_string_arg (const gcall *call,
+						    tree callee_fndecl,
+						    region_model_context *ctxt,
+						    rdwr_map &rdwr_idx,
+						    tree attr)
+{
+  gcc_assert (call);
+  gcc_assert (callee_fndecl);
+  gcc_assert (ctxt);
+  gcc_assert (attr);
+
+  tree arg = TREE_VALUE (attr);
+  if (!arg)
+    return;
+
+  /* Convert from 1-based to 0-based index.  */
+  unsigned int arg_idx = TREE_INT_CST_LOW (TREE_VALUE (arg)) - 1;
+
+  /* If there's also an "access" attribute on the ptr param
+     for reading with a size param specified, then that size
+     limits the size of the possible read from the pointer.  */
+  if (const attr_access* access = rdwr_idx.get (arg_idx))
+    if ((access->mode == access_read_only
+	 || access->mode == access_read_write)
+	&& access->sizarg != UINT_MAX)
+      {
+	call_details cd_checked (call, this, ctxt);
+	const svalue *limit_sval
+	  = cd_checked.get_arg_svalue (access->sizarg);
+	const svalue *ptr_sval
+	  = cd_checked.get_arg_svalue (arg_idx);
+	/* Try reading all of the bytes expressed by the size param,
+	   but without emitting warnings (via a null context).  */
+	const svalue *limited_sval
+	  = read_bytes (deref_rvalue (ptr_sval, NULL_TREE, nullptr),
+			NULL_TREE,
+			limit_sval,
+			nullptr);
+	if (limited_sval->get_kind () == SK_POISONED)
+	  {
+	    /* Reading up to the truncation limit caused issues.
+	       Assume that the string is meant to be terminated
+	       before then, so perform a *checked* check for the
+	       terminator.  */
+	    check_for_null_terminated_string_arg (cd_checked,
+						  arg_idx);
+	  }
+	else
+	  {
+	    /* Reading up to the truncation limit seems OK; repeat
+	       the read, but with checking enabled.  */
+	    read_bytes (deref_rvalue (ptr_sval, NULL_TREE, ctxt),
+			NULL_TREE,
+			limit_sval,
+			ctxt);
+	  }
+	return;
+      }
+
+  /* Otherwise, we don't have an access-attribute limiting the read.
+     Simulate a read up to the null terminator (if any).  */
+
+  call_details cd (call, this, ctxt);
+  check_for_null_terminated_string_arg (cd, arg_idx);
+}
+
+/* Check CALL a call to external function CALLEE_FNDECL for any uses
+   of __attribute__ ((null_terminated_string_arg)), compaining
+   to CTXT about any issues.
+
+   Use RDWR_IDX for tracking uses of __attribute__ ((access, ....).  */
+
+void
+region_model::
+check_function_attr_null_terminated_string_arg (const gcall *call,
+						tree callee_fndecl,
+						region_model_context *ctxt,
+						rdwr_map &rdwr_idx)
+{
+  gcc_assert (call);
+  gcc_assert (callee_fndecl);
+  gcc_assert (ctxt);
+
+  tree fntype = TREE_TYPE (callee_fndecl);
+  gcc_assert (fntype);
+
+  /* A function declaration can specify multiple attribute
+     null_terminated_string_arg, each with one argument.  */
+  for (tree attr = TYPE_ATTRIBUTES (fntype); attr; attr = TREE_CHAIN (attr))
+    {
+      attr = lookup_attribute ("null_terminated_string_arg", attr);
+      if (!attr)
+	return;
+
+      check_one_function_attr_null_terminated_string_arg (call, callee_fndecl,
+							  ctxt, rdwr_idx,
+							  attr);
+    }
+}
+
+/* Check CALL a call to external function CALLEE_FNDECL for any
+   function attributes, complaining to CTXT about any issues.  */
+
+void
+region_model::check_function_attrs (const gcall *call,
+				    tree callee_fndecl,
+				    region_model_context *ctxt)
+{
+  gcc_assert (call);
+  gcc_assert (callee_fndecl);
+  gcc_assert (ctxt);
+
+  tree fntype = TREE_TYPE (callee_fndecl);
+  if (!fntype)
+    return;
+
+  if (!TYPE_ATTRIBUTES (fntype))
+    return;
+
+  /* Initialize a map of attribute access specifications for arguments
+     to the function call.  */
+  rdwr_map rdwr_idx;
+  init_attr_rdwr_indices (&rdwr_idx, TYPE_ATTRIBUTES (fntype));
+
+  check_function_attr_access (call, callee_fndecl, ctxt, rdwr_idx);
+  check_function_attr_null_terminated_string_arg (call, callee_fndecl,
+						  ctxt, rdwr_idx);
+}
+
 /* Handle a call CALL to a function with unknown behavior.
 
    Traverse the regions in this model, determining what regions are
@@ -1870,7 +2011,7 @@ region_model::handle_unrecognized_call (const gcall *call,
   tree fndecl = get_fndecl_for_call (call, ctxt);
 
   if (fndecl && ctxt)
-    check_external_function_for_access_attr (call, fndecl, ctxt);
+    check_function_attrs (call, fndecl, ctxt);
 
   reachable_regions reachable_regs (this);
 
@@ -2110,6 +2251,7 @@ void
 region_model::handle_phi (const gphi *phi,
 			  tree lhs, tree rhs,
 			  const region_model &old_state,
+			  hash_set<const svalue *> &svals_changing_meaning,
 			  region_model_context *ctxt)
 {
   /* For now, don't bother tracking the .MEM SSA names.  */
@@ -2120,6 +2262,10 @@ region_model::handle_phi (const gphi *phi,
 
   const svalue *src_sval = old_state.get_rvalue (rhs, ctxt);
   const region *dst_reg = old_state.get_lvalue (lhs, ctxt);
+
+  const svalue *sval = old_state.get_rvalue (lhs, nullptr);
+  if (sval->get_kind () == SK_WIDENING)
+    svals_changing_meaning.add (sval);
 
   set_value (dst_reg, src_sval, ctxt);
 
@@ -3738,8 +3884,10 @@ region_model::scan_for_null_terminator (const region *reg,
   byte_range bytes_to_read (src_byte_offset, 1);
   const svalue *sval = get_store_bytes (base_reg, bytes_to_read, ctxt);
   tree byte_expr
-    = get_tree_for_byte_offset (expr,
-				src_byte_offset - initial_src_byte_offset);
+    = (expr
+       ? get_tree_for_byte_offset (expr,
+				   src_byte_offset - initial_src_byte_offset)
+       : NULL_TREE);
   check_for_poison (sval, byte_expr, nullptr, ctxt);
   if (base_reg->can_have_initial_svalue_p ())
     {
@@ -3768,14 +3916,14 @@ region_model::scan_for_null_terminator (const region *reg,
    TODO: we should also complain if:
    - the pointer is NULL (or could be).  */
 
-void
+const svalue *
 region_model::check_for_null_terminated_string_arg (const call_details &cd,
-						    unsigned arg_idx)
+						    unsigned arg_idx) const
 {
-  check_for_null_terminated_string_arg (cd,
-					arg_idx,
-					false, /* include_terminator */
-					nullptr); // out_sval
+  return check_for_null_terminated_string_arg (cd,
+					       arg_idx,
+					       false, /* include_terminator */
+					       nullptr); // out_sval
 }
 
 
@@ -3805,7 +3953,7 @@ const svalue *
 region_model::check_for_null_terminated_string_arg (const call_details &cd,
 						    unsigned arg_idx,
 						    bool include_terminator,
-						    const svalue **out_sval)
+						    const svalue **out_sval) const
 {
   class null_terminator_check_event : public custom_event
   {
@@ -4535,6 +4683,14 @@ region_model::add_constraint (tree lhs, enum tree_code op, tree rhs,
   return add_constraint (lhs_sval, op, rhs_sval, ctxt);
 }
 
+static bool
+unusable_in_infinite_loop_constraint_p (const svalue *sval)
+{
+  if (sval->get_kind () == SK_WIDENING)
+    return true;
+  return false;
+}
+
 /* Attempt to add the constraint "LHS OP RHS" to this region_model.
    If it is consistent with existing constraints, add it, and return true.
    Return false if it contradicts existing constraints.
@@ -4546,6 +4702,20 @@ region_model::add_constraint (const svalue *lhs,
 			      const svalue *rhs,
 			      region_model_context *ctxt)
 {
+  const bool checking_for_infinite_loop
+    = ctxt ? ctxt->checking_for_infinite_loop_p () : false;
+
+  if (checking_for_infinite_loop)
+    {
+      if (unusable_in_infinite_loop_constraint_p (lhs)
+	  || unusable_in_infinite_loop_constraint_p (rhs))
+	{
+	  gcc_assert (ctxt);
+	  ctxt->on_unusable_in_infinite_loop ();
+	  return false;
+	}
+    }
+
   tristate t_cond = eval_condition (lhs, op, rhs);
 
   /* If we already have the condition, do nothing.  */
@@ -4556,6 +4726,15 @@ region_model::add_constraint (const svalue *lhs,
      unsatisfiable.  */
   if (t_cond.is_false ())
     return false;
+
+  if (checking_for_infinite_loop)
+    {
+      /* Here, we don't have a definite true/false value, so bail out
+	 when checking for infinite loops.  */
+      gcc_assert (ctxt);
+      ctxt->on_unusable_in_infinite_loop ();
+      return false;
+    }
 
   bool out;
   if (add_constraints_from_binop (lhs, op, rhs, &out, ctxt))
@@ -4900,6 +5079,7 @@ region_model::get_representative_path_var_1 (const region *reg,
     case RK_VAR_ARG:
     case RK_ERRNO:
     case RK_UNKNOWN:
+    case RK_PRIVATE:
       return path_var (NULL_TREE, 0);
     }
 }
@@ -4942,6 +5122,8 @@ region_model::update_for_phis (const supernode *snode,
      are effectively handled simultaneously.  */
   const region_model old_state (*this);
 
+  hash_set<const svalue *> svals_changing_meaning;
+
   for (gphi_iterator gpi = const_cast<supernode *>(snode)->start_phis ();
        !gsi_end_p (gpi); gsi_next (&gpi))
     {
@@ -4951,8 +5133,11 @@ region_model::update_for_phis (const supernode *snode,
       tree lhs = gimple_phi_result (phi);
 
       /* Update next_state based on phi and old_state.  */
-      handle_phi (phi, lhs, src, old_state, ctxt);
+      handle_phi (phi, lhs, src, old_state, svals_changing_meaning, ctxt);
     }
+
+  for (auto iter : svals_changing_meaning)
+    m_constraints->purge_state_involving (iter);
 }
 
 /* Attempt to update this model for taking EDGE (where the last statement
@@ -5119,6 +5304,9 @@ region_model::replay_call_summary (call_summary_replay &r,
   gcc_assert (summary.get_stack_depth () == 1);
 
   m_store.replay_call_summary (r, summary.m_store);
+
+  if (r.get_ctxt ())
+    r.get_ctxt ()->maybe_did_work ();
 
   if (!m_constraints->replay_call_summary (r, *summary.m_constraints))
     return false;
@@ -5681,6 +5869,9 @@ region_model::can_merge_with_p (const region_model &other_model,
 			      *other_model.m_constraints,
 			      out_model->m_constraints);
 
+  for (auto iter : m.m_svals_changing_meaning)
+    out_model->m_constraints->purge_state_involving (iter);
+
   return true;
 }
 
@@ -5986,137 +6177,6 @@ region_model::unset_dynamic_extents (const region *reg)
 {
   m_dynamic_extents.remove (reg);
 }
-
-/* Information of the layout of a RECORD_TYPE, capturing it as a vector
-   of items, where each item is either a field or padding.  */
-
-class record_layout
-{
-public:
-  /* An item within a record; either a field, or padding after a field.  */
-  struct item
-  {
-  public:
-    item (const bit_range &br,
-	  tree field,
-	  bool is_padding)
-    : m_bit_range (br),
-      m_field (field),
-      m_is_padding (is_padding)
-    {
-    }
-
-    bit_offset_t get_start_bit_offset () const
-    {
-      return m_bit_range.get_start_bit_offset ();
-    }
-    bit_offset_t get_next_bit_offset () const
-    {
-      return m_bit_range.get_next_bit_offset ();
-    }
-
-    bool contains_p (bit_offset_t offset) const
-    {
-      return m_bit_range.contains_p (offset);
-    }
-
-    void dump_to_pp (pretty_printer *pp) const
-    {
-      if (m_is_padding)
-	pp_printf (pp, "padding after %qD", m_field);
-      else
-	pp_printf (pp, "%qD", m_field);
-      pp_string (pp, ", ");
-      m_bit_range.dump_to_pp (pp);
-    }
-
-    bit_range m_bit_range;
-    tree m_field;
-    bool m_is_padding;
-  };
-
-  record_layout (tree record_type)
-  {
-    gcc_assert (TREE_CODE (record_type) == RECORD_TYPE);
-
-    for (tree iter = TYPE_FIELDS (record_type); iter != NULL_TREE;
-	 iter = DECL_CHAIN (iter))
-      {
-	if (TREE_CODE (iter) == FIELD_DECL)
-	  {
-	    int iter_field_offset = int_bit_position (iter);
-	    bit_size_t size_in_bits;
-	    if (!int_size_in_bits (TREE_TYPE (iter), &size_in_bits))
-	      size_in_bits = 0;
-
-	    maybe_pad_to (iter_field_offset);
-
-	    /* Add field.  */
-	    m_items.safe_push (item (bit_range (iter_field_offset,
-						size_in_bits),
-				     iter, false));
-	  }
-      }
-
-    /* Add any trailing padding.  */
-    bit_size_t size_in_bits;
-    if (int_size_in_bits (record_type, &size_in_bits))
-      maybe_pad_to (size_in_bits);
-  }
-
-  void dump_to_pp (pretty_printer *pp) const
-  {
-    unsigned i;
-    item *it;
-    FOR_EACH_VEC_ELT (m_items, i, it)
-      {
-	it->dump_to_pp (pp);
-	pp_newline (pp);
-      }
-  }
-
-  DEBUG_FUNCTION void dump () const
-  {
-    pretty_printer pp;
-    pp_format_decoder (&pp) = default_tree_printer;
-    pp.buffer->stream = stderr;
-    dump_to_pp (&pp);
-    pp_flush (&pp);
-  }
-
-  const record_layout::item *get_item_at (bit_offset_t offset) const
-  {
-    unsigned i;
-    item *it;
-    FOR_EACH_VEC_ELT (m_items, i, it)
-      if (it->contains_p (offset))
-	return it;
-    return NULL;
-  }
-
-private:
-  /* Subroutine of ctor.  Add padding item to NEXT_OFFSET if necessary.  */
-
-  void maybe_pad_to (bit_offset_t next_offset)
-  {
-    if (m_items.length () > 0)
-      {
-	const item &last_item = m_items[m_items.length () - 1];
-	bit_offset_t offset_after_last_item
-	  = last_item.get_next_bit_offset ();
-	if (next_offset > offset_after_last_item)
-	  {
-	    bit_size_t padding_size
-	      = next_offset - offset_after_last_item;
-	    m_items.safe_push (item (bit_range (offset_after_last_item,
-						padding_size),
-				     last_item.m_field, true));
-	  }
-      }
-  }
-
-  auto_vec<item> m_items;
-};
 
 /* A subclass of pending_diagnostic for complaining about uninitialized data
    being copied across a trust boundary to an untrusted output
@@ -6661,6 +6721,14 @@ model_merger::mergeable_svalue_p (const svalue *sval) const
 	  return false;
     }
   return true;
+}
+
+/* Mark WIDENING_SVAL as changing meaning during the merge.  */
+
+void
+model_merger::on_widening_reuse (const widening_svalue *widening_sval)
+{
+  m_svals_changing_meaning.add (widening_sval);
 }
 
 } // namespace ana
@@ -8369,7 +8437,6 @@ test_iteration_1 ()
   tree int_0 = build_int_cst (integer_type_node, 0);
   tree int_1 = build_int_cst (integer_type_node, 1);
   tree int_256 = build_int_cst (integer_type_node, 256);
-  tree int_257 = build_int_cst (integer_type_node, 257);
   tree i = build_global_decl ("i", integer_type_node);
 
   test_region_model_context ctxt;
@@ -8431,8 +8498,6 @@ test_iteration_1 ()
   ASSERT_TRUE (model5.can_merge_with_p (model2, point, &model6));
   const svalue *merged_widening = model6.get_rvalue (i, &ctxt);
   ASSERT_EQ (merged_widening->get_kind (), SK_WIDENING);
-
-  ASSERT_CONDITION_TRUE (model6, i, LT_EXPR, int_257);
 }
 
 /* Verify that if we mark a pointer to a malloc-ed region as non-NULL,

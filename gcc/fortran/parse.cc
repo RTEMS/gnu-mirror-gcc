@@ -833,18 +833,18 @@ check_omp_allocate_stmt (locus *loc)
 		      &n->expr->where, gfc_ascii_statement (ST_OMP_ALLOCATE));
 	  return false;
 	}
+      /* Procedure pointers are not allocatable; hence, we do not regard them as
+	 pointers here - and reject them later in gfc_resolve_omp_allocate.  */
       bool alloc_ptr;
       if (n->sym->ts.type == BT_CLASS && n->sym->attr.class_ok)
 	alloc_ptr = (CLASS_DATA (n->sym)->attr.allocatable
 		     || CLASS_DATA (n->sym)->attr.class_pointer);
       else
-	alloc_ptr = (n->sym->attr.allocatable || n->sym->attr.pointer
-		     || n->sym->attr.proc_pointer);
+	alloc_ptr = n->sym->attr.allocatable || n->sym->attr.pointer;
       if (alloc_ptr
 	  || (n->sym->ns && n->sym->ns->proc_name
 	      && (n->sym->ns->proc_name->attr.allocatable
-		  || n->sym->ns->proc_name->attr.pointer
-		  || n->sym->ns->proc_name->attr.proc_pointer)))
+		  || n->sym->ns->proc_name->attr.pointer)))
 	has_allocatable = true;
       else
 	has_non_allocatable = true;
@@ -5133,6 +5133,7 @@ parse_associate (void)
     {
       gfc_symbol* sym;
       gfc_expr *target;
+      int rank;
 
       if (gfc_get_sym_tree (a->name, NULL, &a->st, false))
 	gcc_unreachable ();
@@ -5196,62 +5197,57 @@ parse_associate (void)
 	    }
 	}
 
-      if (target->rank)
+      rank = target->rank;
+      /* Fixup cases where the ranks are mismatched.  */
+      if (sym->ts.type == BT_CLASS && CLASS_DATA (sym))
 	{
-	  int rank = 0;
-	  rank = target->rank;
-	  /* When the rank is greater than zero then sym will be an array.  */
-	  if (sym->ts.type == BT_CLASS && CLASS_DATA (sym))
+	  if ((!CLASS_DATA (sym)->as && rank != 0)
+	       || (CLASS_DATA (sym)->as
+		   && CLASS_DATA (sym)->as->rank != rank))
 	    {
-	      if ((!CLASS_DATA (sym)->as && rank != 0)
-		  || (CLASS_DATA (sym)->as
-		      && CLASS_DATA (sym)->as->rank != rank))
-		{
-		  /* Don't just (re-)set the attr and as in the sym.ts,
-		     because this modifies the target's attr and as.  Copy the
-		     data and do a build_class_symbol.  */
-		  symbol_attribute attr = CLASS_DATA (target)->attr;
-		  int corank = gfc_get_corank (target);
-		  gfc_typespec type;
+	      /* Don't just (re-)set the attr and as in the sym.ts,
+	      because this modifies the target's attr and as.  Copy the
+	      data and do a build_class_symbol.  */
+	      symbol_attribute attr = CLASS_DATA (target)->attr;
+	      int corank = gfc_get_corank (target);
+	      gfc_typespec type;
 
-		  if (rank || corank)
-		    {
-		      as = gfc_get_array_spec ();
-		      as->type = AS_DEFERRED;
-		      as->rank = rank;
-		      as->corank = corank;
-		      attr.dimension = rank ? 1 : 0;
-		      attr.codimension = corank ? 1 : 0;
-		    }
-		  else
-		    {
-		      as = NULL;
-		      attr.dimension = attr.codimension = 0;
-		    }
-		  attr.class_ok = 0;
-		  type = CLASS_DATA (sym)->ts;
-		  if (!gfc_build_class_symbol (&type,
-					       &attr, &as))
-		    gcc_unreachable ();
-		  sym->ts = type;
-		  sym->ts.type = BT_CLASS;
-		  sym->attr.class_ok = 1;
+	      if (rank || corank)
+		{
+		  as = gfc_get_array_spec ();
+		  as->type = AS_DEFERRED;
+		  as->rank = rank;
+		  as->corank = corank;
+		  attr.dimension = rank ? 1 : 0;
+		  attr.codimension = corank ? 1 : 0;
 		}
 	      else
-		sym->attr.class_ok = 1;
+		{
+		  as = NULL;
+		  attr.dimension = attr.codimension = 0;
+		}
+	      attr.class_ok = 0;
+	      type = CLASS_DATA (sym)->ts;
+	      if (!gfc_build_class_symbol (&type, &attr, &as))
+		gcc_unreachable ();
+	      sym->ts = type;
+	      sym->ts.type = BT_CLASS;
+	      sym->attr.class_ok = 1;
 	    }
-	  else if ((!sym->as && rank != 0)
-		   || (sym->as && sym->as->rank != rank))
-	    {
-	      as = gfc_get_array_spec ();
-	      as->type = AS_DEFERRED;
-	      as->rank = rank;
-	      as->corank = gfc_get_corank (target);
-	      sym->as = as;
-	      sym->attr.dimension = 1;
-	      if (as->corank)
-		sym->attr.codimension = 1;
-	    }
+	  else
+	    sym->attr.class_ok = 1;
+	}
+      else if ((!sym->as && rank != 0)
+	       || (sym->as && sym->as->rank != rank))
+	{
+	  as = gfc_get_array_spec ();
+	  as->type = AS_DEFERRED;
+	  as->rank = rank;
+	  as->corank = gfc_get_corank (target);
+	  sym->as = as;
+	  sym->attr.dimension = 1;
+	  if (as->corank)
+	    sym->attr.codimension = 1;
 	}
     }
 
@@ -5814,7 +5810,7 @@ parse_omp_structured_block (gfc_statement omp_st, bool workshare_stmts_only)
 {
   gfc_statement st, omp_end_st, first_st;
   gfc_code *cp, *np;
-  gfc_state_data s;
+  gfc_state_data s, s2;
 
   accept_statement (omp_st);
 
@@ -5915,13 +5911,21 @@ parse_omp_structured_block (gfc_statement omp_st, bool workshare_stmts_only)
       gfc_notify_std (GFC_STD_F2008, "BLOCK construct at %C");
 
       my_ns = gfc_build_block_ns (gfc_current_ns);
-      gfc_current_ns = my_ns;
-      my_parent = my_ns->parent;
-
       new_st.op = EXEC_BLOCK;
       new_st.ext.block.ns = my_ns;
       new_st.ext.block.assoc = NULL;
       accept_statement (ST_BLOCK);
+
+      push_state (&s2, COMP_BLOCK, my_ns->proc_name);
+      gfc_current_ns = my_ns;
+      my_parent = my_ns->parent;
+      if (omp_st == ST_OMP_SECTIONS
+	  || omp_st == ST_OMP_PARALLEL_SECTIONS)
+	{
+	  np = new_level (cp);
+	  np->op = cp->op;
+	}
+
       first_st = next_statement ();
       st = parse_spec (first_st);
     }
@@ -5937,6 +5941,8 @@ parse_omp_structured_block (gfc_statement omp_st, bool workshare_stmts_only)
       case ST_OMP_TEAMS_LOOP:
 	{
 	  gfc_state_data *stk = gfc_state_stack->previous;
+	  if (stk->state == COMP_OMP_STRICTLY_STRUCTURED_BLOCK)
+	    stk = stk->previous;
 	  stk->tail->ext.omp_clauses->target_first_st_is_teams = true;
 	  break;
 	}
@@ -6035,8 +6041,10 @@ parse_omp_structured_block (gfc_statement omp_st, bool workshare_stmts_only)
       else if (block_construct && st == ST_END_BLOCK)
 	{
 	  accept_statement (st);
+	  gfc_current_ns->code = gfc_state_stack->head;
 	  gfc_current_ns = my_parent;
-	  pop_state ();
+	  pop_state ();  /* Inner BLOCK */
+	  pop_state ();  /* Outer COMP_OMP_STRICTLY_STRUCTURED_BLOCK */
 
 	  st = next_statement ();
 	  if (st == omp_end_st)

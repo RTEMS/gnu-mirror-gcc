@@ -57,6 +57,8 @@
 #define EF_AMDGPU_MACH_AMDGCN_GFX908 0x30
 #undef  EF_AMDGPU_MACH_AMDGCN_GFX90a
 #define EF_AMDGPU_MACH_AMDGCN_GFX90a 0x3f
+#undef  EF_AMDGPU_MACH_AMDGCN_GFX1030
+#define EF_AMDGPU_MACH_AMDGCN_GFX1030 0x36
 
 #define EF_AMDGPU_FEATURE_XNACK_V4	0x300  /* Mask.  */
 #define EF_AMDGPU_FEATURE_XNACK_UNSUPPORTED_V4	0x000
@@ -469,6 +471,26 @@ copy_early_debug_info (const char *infile, const char *outfile)
   return true;
 }
 
+/* CDNA2 devices have twice as many VGPRs compared to older devices,
+   but the AVGPRS are allocated from the same pool.  */
+
+static int
+isa_has_combined_avgprs (int isa)
+{
+  switch (isa)
+    {
+    case EF_AMDGPU_MACH_AMDGCN_GFX803:
+    case EF_AMDGPU_MACH_AMDGCN_GFX900:
+    case EF_AMDGPU_MACH_AMDGCN_GFX906:
+    case EF_AMDGPU_MACH_AMDGCN_GFX908:
+    case EF_AMDGPU_MACH_AMDGCN_GFX1030:
+      return false;
+    case EF_AMDGPU_MACH_AMDGCN_GFX90a:
+      return true;
+    }
+  fatal_error (input_location, "unhandled ISA in isa_has_combined_avgprs");
+}
+
 /* Parse an input assembler file, extract the offload tables etc.,
    and output (1) the assembler code, minus the tables (which can contain
    problematic relocations), and (2) a C file with the offload tables
@@ -477,7 +499,8 @@ copy_early_debug_info (const char *infile, const char *outfile)
 static void
 process_asm (FILE *in, FILE *out, FILE *cfile)
 {
-  int fn_count = 0, var_count = 0, dims_count = 0, regcount_count = 0;
+  int fn_count = 0, var_count = 0, ind_fn_count = 0;
+  int dims_count = 0, regcount_count = 0;
   struct obstack fns_os, dims_os, regcounts_os;
   obstack_init (&fns_os);
   obstack_init (&dims_os);
@@ -493,6 +516,7 @@ process_asm (FILE *in, FILE *out, FILE *cfile)
   {
     int sgpr_count;
     int vgpr_count;
+    int avgpr_count;
     char *kernel_name;
   } regcount = { -1, -1, NULL };
 
@@ -506,7 +530,8 @@ process_asm (FILE *in, FILE *out, FILE *cfile)
     { IN_CODE,
       IN_METADATA,
       IN_VARS,
-      IN_FUNCS
+      IN_FUNCS,
+      IN_IND_FUNCS,
     } state = IN_CODE;
   while (fgets (buf, sizeof (buf), in))
     {
@@ -535,6 +560,12 @@ process_asm (FILE *in, FILE *out, FILE *cfile)
 	      }
 	    else if (sscanf (buf, " .vgpr_count: %d\n",
 			     &regcount.vgpr_count) == 1)
+	      {
+		gcc_assert (regcount.kernel_name);
+		break;
+	      }
+	    else if (sscanf (buf, " .agpr_count: %d\n",
+			     &regcount.avgpr_count) == 1)
 	      {
 		gcc_assert (regcount.kernel_name);
 		break;
@@ -568,6 +599,17 @@ process_asm (FILE *in, FILE *out, FILE *cfile)
 	      }
 	    break;
 	  }
+	case IN_IND_FUNCS:
+	  {
+	    char *funcname;
+	    if (sscanf (buf, "\t.8byte\t%ms\n", &funcname))
+	      {
+		fputs (buf, out);
+		ind_fn_count++;
+		continue;
+	      }
+	    break;
+	  }
 	}
 
       char dummy;
@@ -593,6 +635,15 @@ process_asm (FILE *in, FILE *out, FILE *cfile)
 	  fputs ("\t.global .offload_func_table\n"
 		 "\t.type .offload_func_table, @object\n"
 		 ".offload_func_table:\n",
+		 out);
+	}
+      else if (sscanf (buf, " .section .gnu.offload_ind_funcs%c", &dummy) > 0)
+	{
+	  state = IN_IND_FUNCS;
+	  fputs (buf, out);
+	  fputs ("\t.global .offload_ind_func_table\n"
+		 "\t.type .offload_ind_func_table, @object\n"
+		 ".offload_ind_func_table:\n",
 		 out);
 	}
       else if (sscanf (buf, " .amdgpu_metadata%c", &dummy) > 0)
@@ -632,6 +683,7 @@ process_asm (FILE *in, FILE *out, FILE *cfile)
   fprintf (cfile, "#include <stdbool.h>\n\n");
 
   fprintf (cfile, "static const int gcn_num_vars = %d;\n\n", var_count);
+  fprintf (cfile, "static const int gcn_num_ind_funcs = %d;\n\n", ind_fn_count);
 
   /* Dump out function idents.  */
   fprintf (cfile, "static const struct hsa_kernel_description {\n"
@@ -660,6 +712,8 @@ process_asm (FILE *in, FILE *out, FILE *cfile)
 	  {
 	    sgpr_count = regcounts[j].sgpr_count;
 	    vgpr_count = regcounts[j].vgpr_count;
+	    if (isa_has_combined_avgprs (elf_arch))
+	      vgpr_count += regcounts[j].avgpr_count;
 	    break;
 	  }
 
@@ -726,12 +780,14 @@ process_obj (FILE *in, FILE *cfile, uint32_t omp_requires)
 	   "  const struct gcn_image *gcn_image;\n"
 	   "  unsigned kernel_count;\n"
 	   "  const struct hsa_kernel_description *kernel_infos;\n"
+	   "  unsigned ind_func_count;\n"
 	   "  unsigned global_variable_count;\n"
 	   "} gcn_data = {\n"
 	   "  %d,\n"
 	   "  &gcn_image,\n"
 	   "  sizeof (gcn_kernels) / sizeof (gcn_kernels[0]),\n"
 	   "  gcn_kernels,\n"
+	   "  gcn_num_ind_funcs,\n"
 	   "  gcn_num_vars\n"
 	   "};\n\n", omp_requires);
 
@@ -942,6 +998,8 @@ main (int argc, char **argv)
 	elf_arch = EF_AMDGPU_MACH_AMDGCN_GFX908;
       else if (strcmp (argv[i], "-march=gfx90a") == 0)
 	elf_arch = EF_AMDGPU_MACH_AMDGCN_GFX90a;
+      else if (strcmp (argv[i], "-march=gfx1030") == 0)
+	elf_arch = EF_AMDGPU_MACH_AMDGCN_GFX1030;
 #define STR "-mstack-size="
       else if (startswith (argv[i], STR))
 	gcn_stack_size = atoi (argv[i] + strlen (STR));

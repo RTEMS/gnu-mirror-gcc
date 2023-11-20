@@ -1,3 +1,243 @@
+2023-11-19  David Malcolm  <dmalcolm@redhat.com>
+
+	* c-lex.cc: Include "rich-location.h".
+
+2023-11-18  Sebastian Huber  <sebastian.huber@embedded-brains.de>
+
+	* c-cppbuiltin.cc (c_cpp_builtins):  Define
+	__LIBGCC_HAVE_LIBATOMIC for libgcov.
+
+2023-11-18  Sebastian Huber  <sebastian.huber@embedded-brains.de>
+
+	Revert:
+	2021-08-16  Sebastian Huber  <sebastian.huber@embedded-brains.de>
+
+	* c-cppbuiltin.c (c_cpp_builtins): Define
+	__LIBGCC_GCOV_TYPE_SIZE if flag_building_libgcc is true.
+
+2023-11-17  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/107571
+	* c-gimplify.cc (genericize_c_loop): For C++ mark IFN_FALLTHROUGH
+	call at the end of loop body as TREE_NOTHROW.
+
+2023-11-14  Lewis Hyatt  <lhyatt@gmail.com>
+
+	PR pch/9471
+	PR pch/47857
+	* c-opts.cc (c_common_post_options): Set cpp_opts->main_search
+	so libcpp knows it is compiling a header file separately.
+
+2023-11-14  David Malcolm  <dmalcolm@redhat.com>
+
+	* c-warn.cc (conversion_warning): Update call to
+	global_dc->m_option_enabled to use option_enabled_p.
+
+2023-11-14  David Malcolm  <dmalcolm@redhat.com>
+
+	* c-common.cc (c_get_substring_location): Use global_dc's
+	file_cache.
+	* c-format.cc (get_corrected_substring): Likewise.
+	* c-indentation.cc (get_visual_column): Add file_cache param.
+	(get_first_nws_vis_column): Likewise.
+	(detect_intervening_unindent): Likewise.
+	(should_warn_for_misleading_indentation): Use global_dc's
+	file_cache.
+	(assert_get_visual_column_succeeds): Add file_cache param.
+	(ASSERT_GET_VISUAL_COLUMN_SUCCEEDS): Likewise.
+	(assert_get_visual_column_fails): Likewise.
+	(define ASSERT_GET_VISUAL_COLUMN_FAILS): Likewise.
+	(selftest::test_get_visual_column): Create and use a temporary
+	file_cache.
+
+2023-11-14  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/111309
+	* c-common.cc (check_builtin_function_arguments): Handle
+	BUILT_IN_{CLZ,CTZ,CLRSB,FFS,PARITY,POPCOUNT}G.
+	* c-gimplify.cc (c_gimplify_expr): If __builtin_c[lt]zg second
+	argument hasn't been folded into constant yet, transform it to one
+	argument call inside of a COND_EXPR which for first argument 0
+	returns the second argument.
+
+2023-11-11  Martin Uecker  <uecker@tugraz.at>
+
+	PR c/110815
+	PR c/112428
+	* c-attribs.cc (build_attr_access_from_parms): Synthesize
+	nonnull attribute for parameters declared with `static`.
+
+2023-11-09  Florian Weimer  <fweimer@redhat.com>
+
+	* c.opt (Wreturn-mismatch): New.
+
+2023-11-08  Florian Weimer  <fweimer@redhat.com>
+
+	* c.opt (fpermissive): Enable for C and ObjC.
+	* c-opts.cc (c_common_post_options): Enable -fpermissive.
+
+2023-11-07  Joseph Myers  <joseph@codesourcery.com>
+
+	* c-format.h (T2X_UI): Rename to T23_UI.
+	(T2X_UL): Rename to T23_UL.
+	(T2X_ULL): Rename to T23_ULL.
+	(T2X_US): Rename to T23_US.
+	(T2X_UC): Rename to T23_UC.
+	(T2X_ST): Rename to T23_ST.
+	(T2X_UPD): Rename to T23_UPD.
+	(T2X_UIM): Rename to T23_UIM.
+	(T2X_D32): Rename to T23_D32.
+	(T2X_D64): Rename to T23_D64.
+	(T2X_D128): Rename to T23_D128.
+	(T2X_I8): Rename to T23_I8.
+	(T2X_I16): Rename to T23_I16.
+	(T2X_I32): Rename to T23_I32.
+	(T2X_I64): Rename to T23_I64.
+	(T2X_U8): Rename to T23_U8.
+	(T2X_U16): Rename to T23_U16.
+	(T2X_U32): Rename to T23_U32.
+	(T2X_U64): Rename to T23_U64.
+	(T2X_IF8): Rename to T23_IF8.
+	(T2X_IF16): Rename to T23_IF16.
+	(T2X_IF32): Rename to T23_IF32.
+	(T2X_IF64): Rename to T23_IF64.
+	(T2X_UF8): Rename to T23_UF8.
+	(T2X_UF16): Rename to T23_UF16.
+	(T2X_UF32): Rename to T23_UF32.
+	(T2X_UF64): Rename to T23_UF64.
+	* c-format.cc: Update all uses of T2X_* macros to use T23_*.
+
+2023-11-07  Kwok Cheung Yeung  <kcy@codesourcery.com>
+
+	* c-attribs.cc (c_common_attribute_table): Add attribute for
+	indirect functions.
+	* c-pragma.h (enum parma_omp_clause): Add entry for indirect clause.
+
+2023-11-07  Joseph Myers  <joseph@codesourcery.com>
+
+	* c-common.cc (flag_isoc2x): Rename to flag_isoc23.
+	(c_common_reswords): Use D_C23 instead of D_C2X.
+	* c-common.h: Refer throughout to C23 instead of C2X in comments.
+	(D_C2X): Rename to D_C23.
+	(flag_isoc2x): Rename to flag_isoc23.
+	* c-cppbuiltin.cc (builtin_define_float_constants): Use
+	flag_isoc23 instead of flag_isoc2x.  Refer to C23 instead of C2x
+	in comments.
+	* c-format.cc: Use STD_C23 instead of STD_C2X and flag_isoc23
+	instead of flag_isoc2x.  Refer to C23 instead of C2X in comments.
+	* c-format.h: Use STD_C23 instead of STD_C2X.
+	* c-lex.cc: Use warn_c11_c23_compat instead of warn_c11_c2x_compat
+	and flag_isoc23 instead of flag_isoc2x.  Refer to C23 instead of
+	C2X in diagnostics.
+	* c-opts.cc: Use flag_isoc23 instead of flag_isoc2x.  Refer to C23
+	instead of C2X in comments.
+	(set_std_c2x): Rename to set_std_c23.
+	* c.opt (Wc11-c23-compat): Use CPP(cpp_warn_c11_c23_compat)
+	CppReason(CPP_W_C11_C23_COMPAT) Var(warn_c11_c23_compat) instead
+	of CPP(cpp_warn_c11_c2x_compat) CppReason(CPP_W_C11_C2X_COMPAT)
+	Var(warn_c11_c2x_compat).
+
+2023-11-06  Joseph Myers  <joseph@codesourcery.com>
+
+	PR c/107954
+	* c.opt (Wc11-c2x-compat): Rename to Wc11-c23-compat and make into
+	a deprecated alias of Wc11-c23-compat.
+	(std=c2x): Rename to std=c23 and make into a deprecated alias of
+	std=c23.
+	(std=gnu2x): Rename to std=gnu23 and make into a deprecated alias
+	of std=gnu23.
+	(std=iso9899:2024): New option.  Alias of std=c23.
+	* c-lex.cc (interpret_float): Use OPT_Wc11_c23_compat instead of
+	OPT_Wc11_c2x_compat.
+	* c-opts.cc (c_common_handle_option): Use OPT_std_c23 instead of
+	OPT_std_c2x and OPT_std_gnu23 instead of OPT_std_gnu2x.
+
+2023-11-05  Jakub Jelinek  <jakub@redhat.com>
+
+	* c-lex.cc (c_common_has_attribute): Return 1 for omp::directive
+	and omp::sequence with -fopenmp or -fopenmp-simd also for C, not
+	just for C++.  Return 1 for omp::decl with -fopenmp or -fopenmp-simd
+	for both C and C++.
+
+2023-11-04  David Malcolm  <dmalcolm@redhat.com>
+
+	* c-pragma.cc:: (handle_pragma_push_options): Fix missing "GCC" in
+	name of pragma in "junk" message.
+	(handle_pragma_pop_options): Likewise.
+
+2023-11-04  David Malcolm  <dmalcolm@redhat.com>
+
+	* c-common.cc: Update for changes to diagnostic_context.
+	* c-indentation.cc: Likewise.
+	* c-opts.cc: Likewise.
+	* c-warn.cc: Likewise.
+
+2023-11-01  Martin Uecker  <uecker@tugraz.at>
+
+	PR c/71219
+	* c.opt (Walloc-size): New option.
+
+2023-10-31  David Malcolm  <dmalcolm@redhat.com>
+
+	* c-warn.cc (warn_for_multistatement_macros): Update for removal
+	of MACRO_MAP_EXPANSION_POINT_LOCATION.
+
+2023-10-27  Lewis Hyatt  <lhyatt@gmail.com>
+
+	PR preprocessor/87299
+	* c-pragma.cc (init_pragma): Register `#pragma GCC target' and
+	related pragmas in preprocess-only mode, and enable early handling.
+	(c_reset_target_pragmas): New function refactoring code from...
+	(handle_pragma_reset_options): ...here.
+	* c-pragma.h (c_reset_target_pragmas): Declare.
+
+2023-10-26  David Malcolm  <dmalcolm@redhat.com>
+
+	* c-attribs.cc (c_common_attribute_table): Add
+	"null_terminated_string_arg".
+	(handle_null_terminated_string_arg_attribute): New.
+
+2023-10-23  Lewis Hyatt  <lhyatt@gmail.com>
+
+	PR preprocessor/36887
+	* c-opts.cc (c_common_init_options): Pass new extra hash map
+	argument to cpp_create_reader().
+
+2023-10-20  Marek Polacek  <polacek@redhat.com>
+
+	PR c/111884
+	* c-common.cc (c_common_get_alias_set): Return -1 for char8_t only
+	in C++.
+
+2023-10-20  Patrick Palka  <ppalka@redhat.com>
+
+	* c-warn.cc (check_address_or_pointer_of_packed_member): Handle
+	type-dependent callee of CALL_EXPR.
+
+2023-10-20  Alexandre Oliva  <oliva@adacore.com>
+
+	* c-attribs.cc (handle_expected_throw_attribute): New.
+	(c_common_attribute_table): Add expected_throw.
+
+2023-10-19  Lewis Hyatt  <lhyatt@gmail.com>
+
+	PR c++/89038
+	* c-pragma.cc (handle_pragma_diagnostic_impl):  Handle
+	-Wunknown-pragmas during early processing.
+
+2023-10-15  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/111800
+	* c-warn.cc (match_case_to_enum_1): Assert w.get_precision ()
+	is smaller or equal to WIDE_INT_MAX_INL_PRECISION rather than
+	w.get_len () is smaller or equal to WIDE_INT_MAX_INL_ELTS.
+
+2023-10-12  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/102989
+	* c-warn.cc (match_case_to_enum_1): Use wi::to_wide just once instead
+	of 3 times, assert get_len () is smaller than WIDE_INT_MAX_INL_ELTS.
+
 2023-10-02  David Malcolm  <dmalcolm@redhat.com>
 
 	* c-common.cc (maybe_add_include_fixit): Update for renaming of

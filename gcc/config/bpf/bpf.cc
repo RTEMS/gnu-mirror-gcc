@@ -763,13 +763,17 @@ bpf_output_call (rtx target)
   return "";
 }
 
-/* Print register name according to assembly dialect.
-   In normal syntax registers are printed like %rN where N is the
-   register number.
+/* Print register name according to assembly dialect.  In normal
+   syntax registers are printed like %rN where N is the register
+   number.
+
    In pseudoc syntax, the register names do not feature a '%' prefix.
-   Additionally, the code 'w' denotes that the register should be printed
-   as wN instead of rN, where N is the register number, but only when the
-   value stored in the operand OP is 32-bit wide.  */
+   Additionally, the code 'w' denotes that the register should be
+   printed as wN instead of rN, where N is the register number, but
+   only when the value stored in the operand OP is 32-bit wide.
+   Finally, the code 'W' denotes that the register should be printed
+   as wN instead of rN, in all cases, regardless of the mode of the
+   value stored in the operand.  */
 
 static void
 bpf_print_register (FILE *file, rtx op, int code)
@@ -778,7 +782,7 @@ bpf_print_register (FILE *file, rtx op, int code)
     fprintf (file, "%s", reg_names[REGNO (op)]);
   else
     {
-      if (code == 'w' && GET_MODE_SIZE (GET_MODE (op)) <= 4)
+      if (code == 'W' || (code == 'w' && GET_MODE_SIZE (GET_MODE (op)) <= 4))
 	{
 	  if (REGNO (op) == BPF_FP)
 	    fprintf (file, "w10");
@@ -1034,6 +1038,18 @@ bpf_resolve_overloaded_builtin (location_t loc, tree fndecl, void *arglist)
 #undef TARGET_RESOLVE_OVERLOADED_BUILTIN
 #define TARGET_RESOLVE_OVERLOADED_BUILTIN bpf_resolve_overloaded_builtin
 
+static rtx
+bpf_delegitimize_address (rtx rtl)
+{
+  if (GET_CODE (rtl) == UNSPEC
+      && XINT (rtl, 1) == UNSPEC_CORE_RELOC)
+    return XVECEXP (rtl, 0, 0);
+
+  return rtl;
+}
+
+#undef TARGET_DELEGITIMIZE_ADDRESS
+#define TARGET_DELEGITIMIZE_ADDRESS bpf_delegitimize_address
 
 /* Initialize target-specific function library calls.  This is mainly
    used to call library-provided soft-fp operations, since eBPF

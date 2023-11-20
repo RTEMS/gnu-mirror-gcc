@@ -1293,8 +1293,16 @@ scev_dfs::follow_ssa_edge_expr (gimple *at_stmt, tree expr,
 gcond *
 get_loop_exit_condition (const class loop *loop)
 {
+  return get_loop_exit_condition (single_exit (loop));
+}
+
+/* If the statement just before the EXIT_EDGE contains a condition then
+   return the condition, otherwise NULL. */
+
+gcond *
+get_loop_exit_condition (const_edge exit_edge)
+{
   gcond *res = NULL;
-  edge exit_edge = single_exit (loop);
 
   if (dump_file && (dump_flags & TDF_SCEV))
     fprintf (dump_file, "(get_loop_exit_condition \n  ");
@@ -3278,7 +3286,8 @@ simple_iv_with_niters (class loop *wrto_loop, class loop *use_loop,
 
   type = TREE_TYPE (iv->base);
   e = TREE_OPERAND (iv->base, 0);
-  if (TREE_CODE (e) != PLUS_EXPR
+  if (!tree_nop_conversion_p (type, TREE_TYPE (e))
+      || TREE_CODE (e) != PLUS_EXPR
       || TREE_CODE (TREE_OPERAND (e, 1)) != INTEGER_CST
       || !tree_int_cst_equal (iv->step,
 			      fold_convert (type, TREE_OPERAND (e, 1))))
@@ -3344,11 +3353,13 @@ scev_finalize (void)
 }
 
 /* Returns true if the expression EXPR is considered to be too expensive
-   for scev_const_prop.  */
+   for scev_const_prop.  Sets *COND_OVERFLOW_P to true when the
+   expression might contain a sub-expression that is subject to undefined
+   overflow behavior and conditionally evaluated.  */
 
 static bool
-expression_expensive_p (tree expr, hash_map<tree, uint64_t> &cache,
-			uint64_t &cost)
+expression_expensive_p (tree expr, bool *cond_overflow_p,
+			hash_map<tree, uint64_t> &cache, uint64_t &cost)
 {
   enum tree_code code;
 
@@ -3435,7 +3446,7 @@ bitcount_call:
 	}
 
       FOR_EACH_CALL_EXPR_ARG (arg, iter, expr)
-	if (expression_expensive_p (arg, cache, op_cost))
+	if (expression_expensive_p (arg, cond_overflow_p, cache, op_cost))
 	  return true;
       *cache.get (expr) += op_cost;
       cost += op_cost + 1;
@@ -3444,7 +3455,8 @@ bitcount_call:
 
   if (code == COND_EXPR)
     {
-      if (expression_expensive_p (TREE_OPERAND (expr, 0), cache, op_cost)
+      if (expression_expensive_p (TREE_OPERAND (expr, 0), cond_overflow_p,
+				  cache, op_cost)
 	  || (EXPR_P (TREE_OPERAND (expr, 1))
 	      && EXPR_P (TREE_OPERAND (expr, 2)))
 	  /* If either branch has side effects or could trap.  */
@@ -3452,11 +3464,13 @@ bitcount_call:
 	  || generic_expr_could_trap_p (TREE_OPERAND (expr, 1))
 	  || TREE_SIDE_EFFECTS (TREE_OPERAND (expr, 0))
 	  || generic_expr_could_trap_p (TREE_OPERAND (expr, 0))
-	  || expression_expensive_p (TREE_OPERAND (expr, 1),
+	  || expression_expensive_p (TREE_OPERAND (expr, 1), cond_overflow_p,
 				     cache, op_cost)
-	  || expression_expensive_p (TREE_OPERAND (expr, 2),
+	  || expression_expensive_p (TREE_OPERAND (expr, 2), cond_overflow_p,
 				     cache, op_cost))
 	return true;
+      /* Conservatively assume there's overflow for now.  */
+      *cond_overflow_p = true;
       *cache.get (expr) += op_cost;
       cost += op_cost + 1;
       return false;
@@ -3466,12 +3480,14 @@ bitcount_call:
     {
     case tcc_binary:
     case tcc_comparison:
-      if (expression_expensive_p (TREE_OPERAND (expr, 1), cache, op_cost))
+      if (expression_expensive_p (TREE_OPERAND (expr, 1), cond_overflow_p,
+				  cache, op_cost))
 	return true;
 
       /* Fallthru.  */
     case tcc_unary:
-      if (expression_expensive_p (TREE_OPERAND (expr, 0), cache, op_cost))
+      if (expression_expensive_p (TREE_OPERAND (expr, 0), cond_overflow_p,
+				  cache, op_cost))
 	return true;
       *cache.get (expr) += op_cost;
       cost += op_cost + 1;
@@ -3483,11 +3499,12 @@ bitcount_call:
 }
 
 bool
-expression_expensive_p (tree expr)
+expression_expensive_p (tree expr, bool *cond_overflow_p)
 {
   hash_map<tree, uint64_t> cache;
   uint64_t expanded_size = 0;
-  return (expression_expensive_p (expr, cache, expanded_size)
+  *cond_overflow_p = false;
+  return (expression_expensive_p (expr, cond_overflow_p, cache, expanded_size)
 	  || expanded_size > cache.elements ());
 }
 
@@ -3672,6 +3689,9 @@ analyze_and_compute_bitop_with_inv_effect (class loop* loop, tree phidef,
   match_op[0] = gimple_assign_rhs1 (def);
   match_op[1] = gimple_assign_rhs2 (def);
 
+  if (expr_invariant_in_loop_p (loop, match_op[1]))
+    std::swap (match_op[0], match_op[1]);
+
   if (TREE_CODE (match_op[1]) != SSA_NAME
       || !expr_invariant_in_loop_p (loop, match_op[0])
       || !(header_phi = dyn_cast <gphi *> (SSA_NAME_DEF_STMT (match_op[1])))
@@ -3787,6 +3807,7 @@ final_value_replacement_loop (class loop *loop)
 								   niter_num)))
 	def = bit_def;
 
+      bool cond_overflow_p;
       if (!tree_does_not_contain_chrecs (def)
 	  || chrec_contains_symbols_defined_in_loop (def, ex_loop->num)
 	  /* Moving the computation from the loop may prolong life range
@@ -3800,7 +3821,7 @@ final_value_replacement_loop (class loop *loop)
 
 	     he probably knows that n is not large, and does not want it
 	     to be turned into n %= 45.  */
-	  || expression_expensive_p (def))
+	  || expression_expensive_p (def, &cond_overflow_p))
 	{
 	  if (dump_file && (dump_flags & TDF_DETAILS))
 	    {
@@ -3825,44 +3846,39 @@ final_value_replacement_loop (class loop *loop)
       def = unshare_expr (def);
       remove_phi_node (&psi, false);
 
+      /* Create the replacement statements.  */
+      gimple_seq stmts;
+      def = force_gimple_operand (def, &stmts, false, NULL_TREE);
+      gassign *ass = gimple_build_assign (rslt, def);
+      gimple_set_location (ass,
+			   gimple_phi_arg_location (phi, exit->dest_idx));
+      gimple_seq_add_stmt (&stmts, ass);
+
       /* If def's type has undefined overflow and there were folded
 	 casts, rewrite all stmts added for def into arithmetics
 	 with defined overflow behavior.  */
-      if (folded_casts && ANY_INTEGRAL_TYPE_P (TREE_TYPE (def))
-	  && TYPE_OVERFLOW_UNDEFINED (TREE_TYPE (def)))
+      if ((folded_casts
+	   && ANY_INTEGRAL_TYPE_P (TREE_TYPE (def))
+	   && TYPE_OVERFLOW_UNDEFINED (TREE_TYPE (def)))
+	  || cond_overflow_p)
 	{
-	  gimple_seq stmts;
 	  gimple_stmt_iterator gsi2;
-	  def = force_gimple_operand (def, &stmts, true, NULL_TREE);
 	  gsi2 = gsi_start (stmts);
 	  while (!gsi_end_p (gsi2))
 	    {
 	      gimple *stmt = gsi_stmt (gsi2);
-	      gimple_stmt_iterator gsi3 = gsi2;
-	      gsi_next (&gsi2);
-	      gsi_remove (&gsi3, false);
 	      if (is_gimple_assign (stmt)
 		  && arith_code_with_undefined_signed_overflow
-		  (gimple_assign_rhs_code (stmt)))
-		gsi_insert_seq_before (&gsi,
-				       rewrite_to_defined_overflow (stmt),
-				       GSI_SAME_STMT);
-	      else
-		gsi_insert_before (&gsi, stmt, GSI_SAME_STMT);
+		       (gimple_assign_rhs_code (stmt)))
+		rewrite_to_defined_overflow (&gsi2);
+	      gsi_next (&gsi2);
 	    }
 	}
-      else
-	def = force_gimple_operand_gsi (&gsi, def, false, NULL_TREE,
-					true, GSI_SAME_STMT);
-
-      gassign *ass = gimple_build_assign (rslt, def);
-      gimple_set_location (ass,
-			   gimple_phi_arg_location (phi, exit->dest_idx));
-      gsi_insert_before (&gsi, ass, GSI_SAME_STMT);
+      gsi_insert_seq_before (&gsi, stmts, GSI_SAME_STMT);
       if (dump_file)
 	{
 	  fprintf (dump_file, "\n final stmt:\n  ");
-	  print_gimple_stmt (dump_file, ass, 0);
+	  print_gimple_stmt (dump_file, SSA_NAME_DEF_STMT (rslt), 0);
 	  fprintf (dump_file, "\n");
 	}
     }

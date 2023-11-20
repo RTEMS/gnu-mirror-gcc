@@ -25,7 +25,7 @@ import dmd.identifier;
 import dmd.location;
 import dmd.mtype;
 import dmd.common.outbuffer;
-import dmd.root.rootobject;
+import dmd.rootobject;
 import dmd.tokens;
 import dmd.visitor;
 
@@ -55,14 +55,6 @@ extern (C++) class Initializer : ASTNode
     {
         this.loc = loc;
         this.kind = kind;
-    }
-
-    override final const(char)* toChars() const
-    {
-        OutBuffer buf;
-        HdrGenState hgs;
-        .toCBuffer(this, &buf, &hgs);
-        return buf.extractChars();
     }
 
     final inout(ErrorInitializer) isErrorInitializer() inout @nogc nothrow pure

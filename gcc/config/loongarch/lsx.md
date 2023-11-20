@@ -644,15 +644,15 @@
   DONE;
 })
 
-(define_expand "vcond_mask_<ILSX:mode><ILSX:mode>"
-  [(match_operand:ILSX 0 "register_operand")
-   (match_operand:ILSX 1 "reg_or_m1_operand")
-   (match_operand:ILSX 2 "reg_or_0_operand")
-   (match_operand:ILSX 3 "register_operand")]
+(define_expand "vcond_mask_<mode><mode_i>"
+  [(match_operand:LSX 0 "register_operand")
+   (match_operand:LSX 1 "reg_or_m1_operand")
+   (match_operand:LSX 2 "reg_or_0_operand")
+   (match_operand:<VIMODE> 3 "register_operand")]
   "ISA_HAS_LSX"
 {
-  loongarch_expand_vec_cond_mask_expr (<ILSX:MODE>mode,
-				      <ILSX:VIMODE>mode, operands);
+  loongarch_expand_vec_cond_mask_expr (<MODE>mode,
+				       <VIMODE>mode, operands);
   DONE;
 })
 
@@ -1523,7 +1523,7 @@
   "ISA_HAS_LSX"
 {
   if (which_alternative == 1)
-    return "ldi.<lsxfmt>\t%w0,0";
+    return "vldi.<lsxfmt>\t%w0,0";
 
   if (!TARGET_64BIT && (<MODE>mode == V2DImode || <MODE>mode == V2DFmode))
     return "#";
@@ -2873,11 +2873,31 @@
 	  (match_operand:FLSX 1 "register_operand")))
    (set (match_dup 5)
 	(and:FLSX (match_dup 3)
-		  (match_operand:FLSX 2 "register_operand")))
+		  (match_operand:FLSX 2 "reg_or_vector_same_val_operand")))
    (set (match_operand:FLSX 0 "register_operand")
 	(ior:FLSX (match_dup 4) (match_dup 5)))]
   "ISA_HAS_LSX"
 {
+  /* copysign (x, -1) should instead be expanded as setting the sign
+     bit.  */
+  if (!REG_P (operands[2]))
+    {
+      rtx op2_elt = unwrap_const_vec_duplicate (operands[2]);
+      if (GET_CODE (op2_elt) == CONST_DOUBLE
+	  && real_isneg (CONST_DOUBLE_REAL_VALUE (op2_elt)))
+	{
+	  rtx n = GEN_INT (8 * GET_MODE_SIZE (<UNITMODE>mode) - 1);
+	  operands[0] = lowpart_subreg (<VIMODE>mode, operands[0],
+					<MODE>mode);
+	  operands[1] = lowpart_subreg (<VIMODE>mode, operands[1],
+					<MODE>mode);
+	  emit_insn (gen_lsx_vbitseti_<lsxfmt> (operands[0], operands[1],
+						n));
+	  DONE;
+	}
+    }
+
+  operands[2] = force_reg (<MODE>mode, operands[2]);
   operands[3] = loongarch_build_signbit_mask (<MODE>mode, 1, 0);
 
   operands[4] = gen_reg_rtx (<MODE>mode);
@@ -3578,6 +3598,84 @@
   loongarch_expand_vector_reduc (gen_umin<mode>3, tmp, operands[1]);
   emit_insn (gen_vec_extract<mode><unitmode> (operands[0], tmp,
 					      const0_rtx));
+  DONE;
+})
+
+(define_expand "avg<mode>3_ceil"
+  [(match_operand:ILSX_WHB 0 "register_operand")
+   (match_operand:ILSX_WHB 1 "register_operand")
+   (match_operand:ILSX_WHB 2 "register_operand")]
+  "ISA_HAS_LSX"
+{
+  emit_insn (gen_lsx_vavgr_s_<lsxfmt> (operands[0],
+	operands[1], operands[2]));
+  DONE;
+})
+
+(define_expand "uavg<mode>3_ceil"
+  [(match_operand:ILSX_WHB 0 "register_operand")
+   (match_operand:ILSX_WHB 1 "register_operand")
+   (match_operand:ILSX_WHB 2 "register_operand")]
+  "ISA_HAS_LSX"
+{
+  emit_insn (gen_lsx_vavgr_u_<lsxfmt_u> (operands[0],
+	operands[1], operands[2]));
+  DONE;
+})
+
+(define_expand "avg<mode>3_floor"
+  [(match_operand:ILSX_WHB 0 "register_operand")
+   (match_operand:ILSX_WHB 1 "register_operand")
+   (match_operand:ILSX_WHB 2 "register_operand")]
+  "ISA_HAS_LSX"
+{
+  emit_insn (gen_lsx_vavg_s_<lsxfmt> (operands[0],
+	operands[1], operands[2]));
+  DONE;
+})
+
+(define_expand "uavg<mode>3_floor"
+  [(match_operand:ILSX_WHB 0 "register_operand")
+   (match_operand:ILSX_WHB 1 "register_operand")
+   (match_operand:ILSX_WHB 2 "register_operand")]
+  "ISA_HAS_LSX"
+{
+  emit_insn (gen_lsx_vavg_u_<lsxfmt_u> (operands[0],
+	operands[1], operands[2]));
+  DONE;
+})
+
+(define_expand "usadv16qi"
+  [(match_operand:V4SI 0 "register_operand")
+   (match_operand:V16QI 1 "register_operand")
+   (match_operand:V16QI 2 "register_operand")
+   (match_operand:V4SI 3 "register_operand")]
+  "ISA_HAS_LSX"
+{
+  rtx t1 = gen_reg_rtx (V16QImode);
+  rtx t2 = gen_reg_rtx (V8HImode);
+  rtx t3 = gen_reg_rtx (V4SImode);
+  emit_insn (gen_lsx_vabsd_u_bu (t1, operands[1], operands[2]));
+  emit_insn (gen_lsx_vhaddw_h_b (t2, t1, t1));
+  emit_insn (gen_lsx_vhaddw_w_h (t3, t2, t2));
+  emit_insn (gen_addv4si3 (operands[0], t3, operands[3]));
+  DONE;
+})
+
+(define_expand "ssadv16qi"
+  [(match_operand:V4SI 0 "register_operand")
+   (match_operand:V16QI 1 "register_operand")
+   (match_operand:V16QI 2 "register_operand")
+   (match_operand:V4SI 3 "register_operand")]
+  "ISA_HAS_LSX"
+{
+  rtx t1 = gen_reg_rtx (V16QImode);
+  rtx t2 = gen_reg_rtx (V8HImode);
+  rtx t3 = gen_reg_rtx (V4SImode);
+  emit_insn (gen_lsx_vabsd_s_b (t1, operands[1], operands[2]));
+  emit_insn (gen_lsx_vhaddw_h_b (t2, t1, t1));
+  emit_insn (gen_lsx_vhaddw_w_h (t3, t2, t2));
+  emit_insn (gen_addv4si3 (operands[0], t3, operands[3]));
   DONE;
 })
 

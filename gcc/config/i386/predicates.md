@@ -88,7 +88,7 @@
        (match_test "REGNO (op) == AX_REG")))
 
 ;; Return true if op is the flags register.
-(define_predicate "flags_reg_operand"
+(define_special_predicate "flags_reg_operand"
   (and (match_code "reg")
        (match_test "REGNO (op) == FLAGS_REG")))
 
@@ -113,20 +113,6 @@
 	    (match_test "GET_MODE (op) == SImode")
 	    (match_test "GET_MODE (op) == HImode")
 	    (match_test "GET_MODE (op) == QImode"))))
-
-;; Match nonimmediate operand, but exclude non-constant addresses for x86_64.
-(define_predicate "nonimm_x64constmem_operand"
-  (ior (match_operand 0 "register_operand")
-       (and (match_operand 0 "memory_operand")
-	    (ior (not (match_test "TARGET_64BIT"))
-		 (match_test "constant_address_p (XEXP (op, 0))")))))
-
-;; Match general operand, but exclude non-constant addresses for x86_64.
-(define_predicate "general_x64constmem_operand"
-  (ior (match_operand 0 "nonmemory_operand")
-       (and (match_operand 0 "memory_operand")
-	    (ior (not (match_test "TARGET_64BIT"))
-		 (match_test "constant_address_p (XEXP (op, 0))")))))
 
 ;; Match register operands, but include memory operands for TARGET_SSE_MATH.
 (define_predicate "register_ssemem_operand"
@@ -1276,7 +1262,8 @@
   (and (match_code "vec_duplicate")
        (and (match_test "TARGET_AVX512F")
 	    (ior (match_test "TARGET_AVX512VL")
-		 (match_test "GET_MODE_SIZE (GET_MODE (op)) == 64")))
+		 (and (match_test "GET_MODE_SIZE (GET_MODE (op)) == 64")
+		      (match_test "TARGET_EVEX512"))))
        (match_test "VALID_BCST_MODE_P (GET_MODE_INNER (GET_MODE (op)))")
        (match_test "GET_MODE (XEXP (op, 0))
 		    == GET_MODE_INNER (GET_MODE (op))")
@@ -1336,10 +1323,6 @@
 (define_predicate "nonimm_or_0_operand"
   (ior (match_operand 0 "nonimmediate_operand")
        (match_operand 0 "const0_operand")))
-
-(define_predicate "norex_memory_operand"
-  (and (match_operand 0 "memory_operand")
-       (not (match_test "x86_extended_reg_mentioned_p (op)"))))
 
 ;; Return true for RTX codes that force SImode address.
 (define_predicate "SImode_address_operand"
@@ -2259,6 +2242,7 @@
 	  || GET_CODE (SET_SRC (elt)) != UNSPEC_VOLATILE
 	  || GET_MODE (SET_SRC (elt)) != V2DImode
 	  || XVECLEN (SET_SRC (elt), 0) != 1
+	  || !REG_P (XVECEXP (SET_SRC (elt), 0, 0))
 	  || REGNO (XVECEXP (SET_SRC (elt), 0, 0)) != GET_SSE_REGNO (i))
 	return false;
     }

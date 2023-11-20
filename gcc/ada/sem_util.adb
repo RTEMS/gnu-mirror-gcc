@@ -1879,7 +1879,7 @@ package body Sem_Util is
          return False;
       end if;
 
-      return Is_Definite_Subtype (T) and then Is_Limited_View (T);
+      return Is_Definite_Subtype (T) and then Is_Inherently_Limited_Type (T);
    end Build_Default_Subtype_OK;
 
    --------------------------------------------
@@ -6190,7 +6190,7 @@ package body Sem_Util is
       --  In Ada 95, limited types are returned by reference, but not if the
       --  convention is other than Ada.
 
-      elsif Is_Limited_View (Typ)
+      elsif Is_Inherently_Limited_Type (Typ)
         and then not Has_Foreign_Convention (Func)
       then
          Set_Returns_By_Ref (Func);
@@ -10045,7 +10045,7 @@ package body Sem_Util is
            ("value of discriminant & is out of range", Discrim_Value, Discrim);
          Report_Errors := True;
          return;
-      end  if;
+      end if;
 
       --  If we have found the corresponding choice, recursively add its
       --  components to the Into list. The nested components are part of
@@ -10104,7 +10104,7 @@ package body Sem_Util is
       --  formal, or a variable or constant object, then we get the actual
       --  subtype from the referenced entity if one has been built.
 
-      if Nkind (N) = N_Identifier
+      if Nkind (N) in N_Identifier | N_Expanded_Name
         and then
           (Is_Formal (Entity (N))
             or else Ekind (Entity (N)) = E_Constant
@@ -10218,14 +10218,12 @@ package body Sem_Util is
    -------------------------------------
 
    function Get_Actual_Subtype_If_Available (N : Node_Id) return Entity_Id is
-      Typ : constant Entity_Id := Etype (N);
-
    begin
       --  If what we have is an identifier that references a subprogram
       --  formal, or a variable or constant object, then we get the actual
       --  subtype from the referenced entity if one has been built.
 
-      if Nkind (N) = N_Identifier
+      if Nkind (N) in N_Identifier | N_Expanded_Name
         and then
           (Is_Formal (Entity (N))
             or else Ekind (Entity (N)) = E_Constant
@@ -10245,7 +10243,7 @@ package body Sem_Util is
       --  Otherwise the Etype of N is returned unchanged
 
       else
-         return Typ;
+         return Etype (N);
       end if;
    end Get_Actual_Subtype_If_Available;
 
@@ -15327,7 +15325,7 @@ package body Sem_Util is
            --  statement is aliased if its type is immutably limited.
 
            or else (Is_Return_Object (E)
-                     and then Is_Limited_View (Etype (E)))
+                     and then Is_Inherently_Limited_Type (Etype (E)))
 
            --  The current instance of a limited type is aliased, so
            --  we want to allow uses of T'Access in the init proc for
@@ -15336,7 +15334,7 @@ package body Sem_Util is
 
            or else (Is_Formal (E)
                      and then Chars (E) = Name_uInit
-                     and then Is_Limited_View (Etype (E)));
+                     and then Is_Inherently_Limited_Type (Etype (E)));
 
       elsif Nkind (Obj) = N_Selected_Component then
          return Is_Aliased (Entity (Selector_Name (Obj)));
@@ -17509,6 +17507,36 @@ package body Sem_Util is
          return False;
       end if;
    end Is_Fully_Initialized_Variant;
+
+   -----------------------------------
+   -- Is_Function_With_Side_Effects --
+   -----------------------------------
+
+   function Is_Function_With_Side_Effects (Subp : Entity_Id) return Boolean is
+      Arg  : Node_Id;
+      Expr : Node_Id;
+      Prag : constant Node_Id := Get_Pragma (Subp, Pragma_Side_Effects);
+
+   begin
+      --  Extract the value from the Boolean expression (if any)
+
+      if Present (Prag) then
+         Arg := First (Pragma_Argument_Associations (Prag));
+
+         if Present (Arg) then
+            Expr := Get_Pragma_Arg (Arg);
+
+            return Is_True (Expr_Value (Expr));
+
+         --  Otherwise the aspect or pragma defaults to True
+
+         else
+            return True;
+         end if;
+      end if;
+
+      return False;
+   end Is_Function_With_Side_Effects;
 
    ------------------------------------
    -- Is_Generic_Declaration_Or_Body --
@@ -22564,7 +22592,7 @@ package body Sem_Util is
 
       begin
          if Is_Record_Type (Typ)
-           and then not Is_Limited_View (Typ)
+           and then not Is_Inherently_Limited_Type (Typ)
            and then Has_Defaulted_Discriminants (Typ)
          then
             --  Loop through the components, looking for an array whose upper
@@ -23572,11 +23600,6 @@ package body Sem_Util is
                then
                   Set_Chars (Result, Chars (Entity (Result)));
                end if;
-            end if;
-
-            if Has_Aspects (N) then
-               Set_Aspect_Specifications (Result,
-                 Copy_List_With_Replacement (Aspect_Specifications (N)));
             end if;
          end if;
 
@@ -27791,15 +27814,6 @@ package body Sem_Util is
          Set_Is_Volatile          (T1, Is_Volatile (T2));
       end if;
    end Set_Rep_Info;
-
-   ----------------------------
-   -- Set_Scope_Is_Transient --
-   ----------------------------
-
-   procedure Set_Scope_Is_Transient (V : Boolean := True) is
-   begin
-      Scope_Stack.Table (Scope_Stack.Last).Is_Transient := V;
-   end Set_Scope_Is_Transient;
 
    -------------------
    -- Set_Size_Info --

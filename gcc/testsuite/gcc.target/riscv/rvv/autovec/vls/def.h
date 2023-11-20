@@ -213,6 +213,15 @@ typedef double v512df __attribute__ ((vector_size (4096)));
       a[i] = OP (b[i]);                                                        \
   }
 
+#define DEF_OP_V_CVT(PREFIX, NUM, TYPE_IN, TYPE_OUT, OP)                       \
+  void __attribute__ ((noinline, noclone))                                     \
+  PREFIX##_##TYPE_IN##_##TYPE_OUT##_##NUM (TYPE_OUT *restrict a,               \
+					   TYPE_IN *restrict b)                \
+  {                                                                            \
+    for (int i = 0; i < NUM; ++i)                                              \
+      a[i] = OP (b[i]);                                                        \
+  }
+
 #define DEF_CALL_VV(PREFIX, NUM, TYPE, CALL)                                   \
   void __attribute__ ((noinline, noclone))                                     \
   PREFIX##_##TYPE##NUM (TYPE *restrict a, TYPE *restrict b, TYPE *restrict c)  \
@@ -428,8 +437,14 @@ typedef double v512df __attribute__ ((vector_size (4096)));
   void init_##TYPE1##_##TYPE2##_##NUM (VARS##NUM (TYPE2, __VA_ARGS__),         \
 				       TYPE2 *__restrict out)                  \
   {                                                                            \
-    TYPE1 v = {INIT##NUM (__VA_ARGS__)};                                       \
+    TYPE1 v = {__VA_ARGS__};                                                   \
     *(TYPE1 *) out = v;                                                        \
+  }
+
+#define DEF_OP_VV_VA(OP, TYPE1, ...)                                           \
+  TYPE1 test_##OP##_##TYPE1 (TYPE1 a, TYPE1 b)                                 \
+  {                                                                            \
+    return OP (a, b, __VA_ARGS__);                                             \
   }
 
 #define DEF_REPEAT(TYPE1, TYPE2, NUM, ...)                                     \
@@ -823,4 +838,25 @@ typedef double v512df __attribute__ ((vector_size (4096)));
     for (int i = 0; i < NUM; i += 1)                                           \
       a[i] = cond[i] ? (TYPE3) (b[i] >> shift) : a[i];                         \
     return a;                                                                  \
+  }
+
+#define DEF_CONSECUTIVE(TYPE, NUM)                                             \
+  TYPE f##TYPE (TYPE a, TYPE b)                                                \
+  {                                                                            \
+    return __builtin_shufflevector (a, b, MASK_##NUM);                         \
+  }
+
+#define DEF_COMBINE(TYPE1, TYPE2, NUM, ...)                                    \
+  void combine_##TYPE1##_##TYPE2##_##NUM (TYPE2 *out, TYPE2 x, TYPE2 y)        \
+  {                                                                            \
+    v##NUM##TYPE1 v = {__VA_ARGS__};                                           \
+    *(v##NUM##TYPE1 *) out = v;                                                \
+  }
+
+#define DEF_TRAILING(TYPE1, TYPE2, NUM, ...)                                   \
+  void init_##TYPE1##_##TYPE2##_##NUM (TYPE2 var0, TYPE2 var1, TYPE2 var2,     \
+				       TYPE2 var3, TYPE2 *__restrict out)      \
+  {                                                                            \
+    TYPE1 v = {__VA_ARGS__};                                                   \
+    *(TYPE1 *) out = v;                                                        \
   }

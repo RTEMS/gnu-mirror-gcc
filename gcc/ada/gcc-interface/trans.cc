@@ -519,6 +519,7 @@ gigi (Node_Id gnat_root,
 			   ftype, NULL_TREE,
 			   is_default, true, true, true, false, false, NULL,
 			   Empty);
+  set_call_expr_flags (reraise_zcx_decl, ECF_NORETURN | ECF_XTHROW);
 
   /* Dummy objects to materialize "others" and "all others" in the exception
      tables.  These are exported by a-exexpr-gcc.adb, so see this unit for
@@ -721,6 +722,7 @@ build_raise_check (int check, enum exception_info_kind kind)
     = create_subprog_decl (get_identifier (Name_Buffer), NULL_TREE, ftype,
 			   NULL_TREE, is_default, true, true, true, false,
 			   false, NULL, Empty);
+  set_call_expr_flags (result, ECF_NORETURN | ECF_XTHROW);
 
   return result;
 }
@@ -8946,30 +8948,6 @@ gnat_gimplify_expr (tree *expr_p, gimple_seq *pre_p,
 	    else
 	      op = inner;
 	  }
-      break;
-
-    case CALL_EXPR:
-      /* If we are passing a constant fat pointer CONSTRUCTOR, make sure it is
-	 put into static memory; this performs a restricted version of constant
-	 propagation on fat pointers in calls.  But do not do it for strings to
-	 avoid blocking concatenation in the caller when it is inlined.  */
-      for (int i = 0; i < call_expr_nargs (expr); i++)
-	{
-	  tree arg = CALL_EXPR_ARG (expr, i);
-
-	  if (TREE_CODE (arg) == CONSTRUCTOR
-	      && TREE_CONSTANT (arg)
-	      && TYPE_IS_FAT_POINTER_P (TREE_TYPE (arg)))
-	    {
-	      tree t = CONSTRUCTOR_ELT (arg, 0)->value;
-	      if (TREE_CODE (t) == NOP_EXPR)
-		t = TREE_OPERAND (t, 0);
-	      if (TREE_CODE (t) == ADDR_EXPR)
-		t = TREE_OPERAND (t, 0);
-	      if (TREE_CODE (t) != STRING_CST)
-		CALL_EXPR_ARG (expr, i) = tree_output_constant_def (arg);
-	    }
-	}
       break;
 
     case DECL_EXPR:

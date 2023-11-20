@@ -117,6 +117,7 @@ _slp_tree::_slp_tree ()
   SLP_TREE_CHILDREN (this) = vNULL;
   SLP_TREE_LOAD_PERMUTATION (this) = vNULL;
   SLP_TREE_LANE_PERMUTATION (this) = vNULL;
+  SLP_TREE_SIMD_CLONE_INFO (this) = vNULL;
   SLP_TREE_DEF_TYPE (this) = vect_uninitialized_def;
   SLP_TREE_CODE (this) = ERROR_MARK;
   SLP_TREE_VECTYPE (this) = NULL_TREE;
@@ -143,6 +144,7 @@ _slp_tree::~_slp_tree ()
   SLP_TREE_VEC_DEFS (this).release ();
   SLP_TREE_LOAD_PERMUTATION (this).release ();
   SLP_TREE_LANE_PERMUTATION (this).release ();
+  SLP_TREE_SIMD_CLONE_INFO (this).release ();
   if (this->failed)
     free (failed);
 }
@@ -281,10 +283,12 @@ typedef struct _slp_oprnd_info
   vec<tree> ops;
   /* Information about the first statement, its vector def-type, type, the
      operand itself in case it's constant, and an indication if it's a pattern
-     stmt.  */
+     stmt and gather/scatter info.  */
   tree first_op_type;
   enum vect_def_type first_dt;
   bool any_pattern;
+  bool first_gs_p;
+  gather_scatter_info first_gs_info;
 } *slp_oprnd_info;
 
 
@@ -306,6 +310,7 @@ vect_create_oprnd_info (int nops, int group_size)
       oprnd_info->first_dt = vect_uninitialized_def;
       oprnd_info->first_op_type = NULL_TREE;
       oprnd_info->any_pattern = false;
+      oprnd_info->first_gs_p = false;
       oprnds_info.quick_push (oprnd_info);
     }
 
@@ -500,11 +505,24 @@ static const int cond_expr_maps[3][5] = {
   { 4, -2, -1, 1, 2 },
   { 4, -1, -2, 2, 1 }
 };
+static const int arg0_map[] = { 1, 0 };
 static const int arg1_map[] = { 1, 1 };
 static const int arg2_map[] = { 1, 2 };
 static const int arg1_arg4_map[] = { 2, 1, 4 };
 static const int arg3_arg2_map[] = { 2, 3, 2 };
 static const int op1_op0_map[] = { 2, 1, 0 };
+static const int off_map[] = { 1, -3 };
+static const int off_op0_map[] = { 2, -3, 0 };
+static const int off_arg2_map[] = { 2, -3, 2 };
+static const int off_arg3_arg2_map[] = { 3, -3, 3, 2 };
+static const int mask_call_maps[6][7] = {
+  { 1, 1, },
+  { 2, 1, 2, },
+  { 3, 1, 2, 3, },
+  { 4, 1, 2, 3, 4, },
+  { 5, 1, 2, 3, 4, 5, },
+  { 6, 1, 2, 3, 4, 5, 6 },
+};
 
 /* For most SLP statements, there is a one-to-one mapping between
    gimple arguments and child nodes.  If that is not true for STMT,
@@ -514,11 +532,14 @@ static const int op1_op0_map[] = { 2, 1, 0 };
    - for each child node, the index of the argument associated with that node.
      The special index -1 is the first operand of an embedded comparison and
      the special index -2 is the second operand of an embedded comparison.
+     The special indes -3 is the offset of a gather as analyzed by
+     vect_check_gather_scatter.
 
    SWAP is as for vect_get_and_check_slp_defs.  */
 
 static const int *
-vect_get_operand_map (const gimple *stmt, unsigned char swap = 0)
+vect_get_operand_map (const gimple *stmt, bool gather_scatter_p = false,
+		      unsigned char swap = 0)
 {
   if (auto assign = dyn_cast<const gassign *> (stmt))
     {
@@ -528,6 +549,9 @@ vect_get_operand_map (const gimple *stmt, unsigned char swap = 0)
       if (TREE_CODE_CLASS (gimple_assign_rhs_code (assign)) == tcc_comparison
 	  && swap)
 	return op1_op0_map;
+      if (gather_scatter_p)
+	return (TREE_CODE (gimple_assign_lhs (assign)) != SSA_NAME
+		? off_op0_map : off_map);
     }
   gcc_assert (!swap);
   if (auto call = dyn_cast<const gcall *> (stmt))
@@ -536,16 +560,30 @@ vect_get_operand_map (const gimple *stmt, unsigned char swap = 0)
 	switch (gimple_call_internal_fn (call))
 	  {
 	  case IFN_MASK_LOAD:
-	    return arg2_map;
+	    return gather_scatter_p ? off_arg2_map : arg2_map;
 
 	  case IFN_GATHER_LOAD:
 	    return arg1_map;
 
 	  case IFN_MASK_GATHER_LOAD:
+	  case IFN_MASK_LEN_GATHER_LOAD:
 	    return arg1_arg4_map;
 
 	  case IFN_MASK_STORE:
-	    return arg3_arg2_map;
+	    return gather_scatter_p ? off_arg3_arg2_map : arg3_arg2_map;
+
+	  case IFN_MASK_CALL:
+	    {
+	      unsigned nargs = gimple_call_num_args (call);
+	      if (nargs >= 2 && nargs <= 7)
+		return mask_call_maps[nargs-2];
+	      else
+		return nullptr;
+	    }
+
+	  case IFN_CLZ:
+	  case IFN_CTZ:
+	    return arg0_map;
 
 	  default:
 	    break;
@@ -557,9 +595,10 @@ vect_get_operand_map (const gimple *stmt, unsigned char swap = 0)
 /* Return the SLP node child index for operand OP of STMT.  */
 
 int
-vect_slp_child_index_for_operand (const gimple *stmt, int op)
+vect_slp_child_index_for_operand (const gimple *stmt, int op,
+				  bool gather_scatter_p)
 {
-  const int *opmap = vect_get_operand_map (stmt);
+  const int *opmap = vect_get_operand_map (stmt, gather_scatter_p);
   if (!opmap)
     return op;
   for (int i = 1; i < 1 + opmap[0]; ++i)
@@ -590,6 +629,8 @@ vect_get_and_check_slp_defs (vec_info *vinfo, unsigned char swap,
   unsigned int i, number_of_oprnds;
   enum vect_def_type dt = vect_uninitialized_def;
   slp_oprnd_info oprnd_info;
+  gather_scatter_info gs_info;
+  unsigned int gs_op = -1u;
   unsigned int commutative_op = -1U;
   bool first = stmt_num == 0;
 
@@ -599,7 +640,9 @@ vect_get_and_check_slp_defs (vec_info *vinfo, unsigned char swap,
     return -1;
 
   number_of_oprnds = gimple_num_args (stmt_info->stmt);
-  const int *map = vect_get_operand_map (stmt_info->stmt, swap);
+  const int *map
+    = vect_get_operand_map (stmt_info->stmt,
+			    STMT_VINFO_GATHER_SCATTER_P (stmt_info), swap);
   if (map)
     number_of_oprnds = *map++;
   if (gcall *stmt = dyn_cast <gcall *> (stmt_info->stmt))
@@ -621,8 +664,30 @@ vect_get_and_check_slp_defs (vec_info *vinfo, unsigned char swap,
   enum vect_def_type *dts = XALLOCAVEC (enum vect_def_type, number_of_oprnds);
   for (i = 0; i < number_of_oprnds; i++)
     {
+      oprnd_info = (*oprnds_info)[i];
       int opno = map ? map[i] : int (i);
-      if (opno < 0)
+      if (opno == -3)
+	{
+	  gcc_assert (STMT_VINFO_GATHER_SCATTER_P (stmt_info));
+	  if (!is_a <loop_vec_info> (vinfo)
+	      || !vect_check_gather_scatter (stmt_info,
+					     as_a <loop_vec_info> (vinfo),
+					     first ? &oprnd_info->first_gs_info
+					     : &gs_info))
+	    return -1;
+
+	  if (first)
+	    {
+	      oprnd_info->first_gs_p = true;
+	      oprnd = oprnd_info->first_gs_info.offset;
+	    }
+	  else
+	    {
+	      gs_op = i;
+	      oprnd = gs_info.offset;
+	    }
+	}
+      else if (opno < 0)
 	oprnd = TREE_OPERAND (gimple_arg (stmt_info->stmt, 0), -1 - opno);
       else
 	{
@@ -638,8 +703,6 @@ vect_get_and_check_slp_defs (vec_info *vinfo, unsigned char swap,
 	}
       if (TREE_CODE (oprnd) == VIEW_CONVERT_EXPR)
 	oprnd = TREE_OPERAND (oprnd, 0);
-
-      oprnd_info = (*oprnds_info)[i];
 
       stmt_vec_info def_stmt_info;
       if (!vect_is_simple_use (oprnd, vinfo, &dts[i], &def_stmt_info))
@@ -703,9 +766,8 @@ vect_get_and_check_slp_defs (vec_info *vinfo, unsigned char swap,
 	  if ((dt == vect_constant_def
 	       || dt == vect_external_def)
 	      && !GET_MODE_SIZE (vinfo->vector_mode).is_constant ()
-	      && (TREE_CODE (type) == BOOLEAN_TYPE
-		  || !can_duplicate_and_interleave_p (vinfo, stmts.length (),
-						      type)))
+	      && TREE_CODE (type) != BOOLEAN_TYPE
+	      && !can_duplicate_and_interleave_p (vinfo, stmts.length (), type))
 	    {
 	      if (dump_enabled_p ())
 		dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
@@ -771,6 +833,32 @@ vect_get_and_check_slp_defs (vec_info *vinfo, unsigned char swap,
 	    dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
 			     "Build SLP failed: different operand types\n");
 	  return 1;
+	}
+
+      if ((gs_op == i) != oprnd_info->first_gs_p)
+	{
+	  if (dump_enabled_p ())
+	    dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+			     "Build SLP failed: mixed gather and non-gather\n");
+	  return 1;
+	}
+      else if (gs_op == i)
+	{
+	  if (!operand_equal_p (oprnd_info->first_gs_info.base,
+				gs_info.base))
+	    {
+	      if (dump_enabled_p ())
+		dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+				 "Build SLP failed: different gather base\n");
+	      return 1;
+	    }
+	  if (oprnd_info->first_gs_info.scale != gs_info.scale)
+	    {
+	      if (dump_enabled_p ())
+		dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+				 "Build SLP failed: different gather scale\n");
+	      return 1;
+	    }
 	}
 
       /* Not first stmt of the group, check that the def-stmt/s match
@@ -1070,14 +1158,15 @@ vect_build_slp_tree_1 (vec_info *vinfo, unsigned char *swap,
       if (call_stmt)
 	{
 	  combined_fn cfn = gimple_call_combined_fn (call_stmt);
-	  if (cfn != CFN_LAST)
+	  if (cfn != CFN_LAST && cfn != CFN_MASK_CALL)
 	    rhs_code = cfn;
 	  else
 	    rhs_code = CALL_EXPR;
 
 	  if (cfn == CFN_MASK_LOAD
 	      || cfn == CFN_GATHER_LOAD
-	      || cfn == CFN_MASK_GATHER_LOAD)
+	      || cfn == CFN_MASK_GATHER_LOAD
+	      || cfn == CFN_MASK_LEN_GATHER_LOAD)
 	    ldst_p = true;
 	  else if (cfn == CFN_MASK_STORE)
 	    {
@@ -1085,6 +1174,7 @@ vect_build_slp_tree_1 (vec_info *vinfo, unsigned char *swap,
 	      rhs_code = CFN_MASK_STORE;
 	    }
 	  else if ((cfn != CFN_LAST
+		    && cfn != CFN_MASK_CALL
 		    && internal_fn_p (cfn)
 		    && !vectorizable_internal_fn_p (as_internal_fn (cfn)))
 		   || gimple_call_tail_p (call_stmt)
@@ -1215,6 +1305,12 @@ vect_build_slp_tree_1 (vec_info *vinfo, unsigned char *swap,
 			|| rhs_code == INDIRECT_REF
 			|| rhs_code == COMPONENT_REF
 			|| rhs_code == MEM_REF)))
+	      || (ldst_p
+		  && (STMT_VINFO_GROUPED_ACCESS (stmt_info)
+		      != STMT_VINFO_GROUPED_ACCESS (first_stmt_info)))
+	      || (ldst_p
+		  && (STMT_VINFO_GATHER_SCATTER_P (stmt_info)
+		      != STMT_VINFO_GATHER_SCATTER_P (first_stmt_info)))
 	      || first_stmt_ldst_p != ldst_p
 	      || first_stmt_phi_p != phi_p)
 	    {
@@ -1337,12 +1433,13 @@ vect_build_slp_tree_1 (vec_info *vinfo, unsigned char *swap,
 	  if (DR_IS_READ (STMT_VINFO_DATA_REF (stmt_info))
 	      && rhs_code != CFN_GATHER_LOAD
 	      && rhs_code != CFN_MASK_GATHER_LOAD
+	      && rhs_code != CFN_MASK_LEN_GATHER_LOAD
+	      && !STMT_VINFO_GATHER_SCATTER_P (stmt_info)
 	      /* Not grouped loads are handled as externals for BB
 		 vectorization.  For loop vectorization we can handle
 		 splats the same we handle single element interleaving.  */
 	      && (is_a <bb_vec_info> (vinfo)
-		  || stmt_info != first_stmt_info
-		  || STMT_VINFO_GATHER_SCATTER_P (stmt_info)))
+		  || stmt_info != first_stmt_info))
 	    {
 	      /* Not grouped load.  */
 	      if (dump_enabled_p ())
@@ -1760,7 +1857,9 @@ vect_build_slp_tree_2 (vec_info *vinfo, slp_tree node,
     return NULL;
 
   nops = gimple_num_args (stmt_info->stmt);
-  if (const int *map = vect_get_operand_map (stmt_info->stmt))
+  if (const int *map = vect_get_operand_map (stmt_info->stmt,
+					     STMT_VINFO_GATHER_SCATTER_P
+					       (stmt_info)))
     nops = map[0];
 
   /* If the SLP node is a PHI (induction or reduction), terminate
@@ -1837,7 +1936,10 @@ vect_build_slp_tree_2 (vec_info *vinfo, slp_tree node,
       if (gcall *stmt = dyn_cast <gcall *> (stmt_info->stmt))
 	gcc_assert (gimple_call_internal_p (stmt, IFN_MASK_LOAD)
 		    || gimple_call_internal_p (stmt, IFN_GATHER_LOAD)
-		    || gimple_call_internal_p (stmt, IFN_MASK_GATHER_LOAD));
+		    || gimple_call_internal_p (stmt, IFN_MASK_GATHER_LOAD)
+		    || gimple_call_internal_p (stmt, IFN_MASK_LEN_GATHER_LOAD));
+      else if (STMT_VINFO_GATHER_SCATTER_P (stmt_info))
+	gcc_assert (DR_IS_READ (STMT_VINFO_DATA_REF (stmt_info)));
       else
 	{
 	  *max_nunits = this_max_nunits;
@@ -2803,22 +2905,21 @@ vect_gather_slp_loads (vec<slp_tree> &loads, slp_tree node,
   if (!node || visited.add (node))
     return;
 
-  if (SLP_TREE_CHILDREN (node).length () == 0)
+  if (SLP_TREE_DEF_TYPE (node) != vect_internal_def)
+    return;
+
+  if (SLP_TREE_CODE (node) != VEC_PERM_EXPR)
     {
-      if (SLP_TREE_DEF_TYPE (node) != vect_internal_def)
-	return;
-      stmt_vec_info stmt_info = SLP_TREE_SCALAR_STMTS (node)[0];
-      if (STMT_VINFO_GROUPED_ACCESS (stmt_info)
+      stmt_vec_info stmt_info = SLP_TREE_REPRESENTATIVE (node);
+      if (STMT_VINFO_DATA_REF (stmt_info)
 	  && DR_IS_READ (STMT_VINFO_DATA_REF (stmt_info)))
 	loads.safe_push (node);
     }
-  else
-    {
-      unsigned i;
-      slp_tree child;
-      FOR_EACH_VEC_ELT (SLP_TREE_CHILDREN (node), i, child)
-	vect_gather_slp_loads (loads, child, visited);
-    }
+
+  unsigned i;
+  slp_tree child;
+  FOR_EACH_VEC_ELT (SLP_TREE_CHILDREN (node), i, child)
+    vect_gather_slp_loads (loads, child, visited);
 }
 
 
@@ -7556,6 +7657,7 @@ vect_slp_region (vec<basic_block> bbs, vec<data_reference_p> datarefs,
 
 	  bb_vinfo->shared->check_datarefs ();
 
+	  bool force_clear = false;
 	  auto_vec<slp_instance> profitable_subgraphs;
 	  for (slp_instance instance : BB_VINFO_SLP_INSTANCES (bb_vinfo))
 	    {
@@ -7578,15 +7680,17 @@ vect_slp_region (vec<basic_block> bbs, vec<data_reference_p> datarefs,
 
 	      vect_location = saved_vect_location;
 	      if (!dbg_cnt (vect_slp))
-		continue;
+		{
+		  force_clear = true;
+		  continue;
+		}
 
 	      profitable_subgraphs.safe_push (instance);
 	    }
 
 	  /* When we're vectorizing an if-converted loop body make sure
 	     we vectorized all if-converted code.  */
-	  if (!profitable_subgraphs.is_empty ()
-	      && orig_loop)
+	  if ((!profitable_subgraphs.is_empty () || force_clear) && orig_loop)
 	    {
 	      gcc_assert (bb_vinfo->bbs.length () == 1);
 	      for (gimple_stmt_iterator gsi = gsi_start_bb (bb_vinfo->bbs[0]);
@@ -8985,6 +9089,16 @@ vect_schedule_slp_node (vec_info *vinfo,
       /* Emit other stmts after the children vectorized defs which is
 	 earliest possible.  */
       gimple *last_stmt = NULL;
+      if (auto loop_vinfo = dyn_cast <loop_vec_info> (vinfo))
+	if (LOOP_VINFO_FULLY_MASKED_P (loop_vinfo)
+	    || LOOP_VINFO_FULLY_WITH_LENGTH_P (loop_vinfo))
+	  {
+	    /* But avoid scheduling internal defs outside of the loop when
+	       we might have only implicitly tracked loop mask/len defs.  */
+	    gimple_stmt_iterator si
+	      = gsi_after_labels (LOOP_VINFO_LOOP (loop_vinfo)->header);
+	    last_stmt = *si;
+	  }
       bool seen_vector_def = false;
       FOR_EACH_VEC_ELT (SLP_TREE_CHILDREN (node), i, child)
 	if (SLP_TREE_DEF_TYPE (child) == vect_internal_def)

@@ -245,17 +245,23 @@ vrange::dump (FILE *file) const
 void
 irange_bitmask::dump (FILE *file) const
 {
-  char buf[WIDE_INT_PRINT_BUFFER_SIZE];
+  char buf[WIDE_INT_PRINT_BUFFER_SIZE], *p;
   pretty_printer buffer;
 
   pp_needs_newline (&buffer) = true;
   buffer.buffer->stream = file;
   pp_string (&buffer, "MASK ");
-  print_hex (m_mask, buf);
-  pp_string (&buffer, buf);
+  unsigned len_mask, len_val;
+  if (print_hex_buf_size (m_mask, &len_mask)
+      | print_hex_buf_size (m_value, &len_val))
+    p = XALLOCAVEC (char, MAX (len_mask, len_val));
+  else
+    p = buf;
+  print_hex (m_mask, p);
+  pp_string (&buffer, p);
   pp_string (&buffer, " VALUE ");
-  print_hex (m_value, buf);
-  pp_string (&buffer, buf);
+  print_hex (m_value, p);
+  pp_string (&buffer, p);
   pp_flush (&buffer);
 }
 
@@ -1285,6 +1291,45 @@ irange::irange_single_pair_union (const irange &r)
   return true;
 }
 
+// Append R to this range, knowing that R occurs after all of these subranges.
+// Return TRUE as something must have changed.
+
+bool
+irange::union_append (const irange &r)
+{
+  // Check if the first range in R is an immmediate successor to the last
+  // range, ths requiring a merge.
+  signop sign = TYPE_SIGN (m_type);
+  wide_int lb = r.lower_bound ();
+  wide_int ub = upper_bound ();
+  unsigned start = 0;
+  if (widest_int::from (ub, sign) + 1
+      == widest_int::from (lb, sign))
+    {
+      m_base[m_num_ranges * 2 - 1] = r.m_base[1];
+      start = 1;
+    }
+  maybe_resize (m_num_ranges + r.m_num_ranges - start);
+  for ( ; start < r.m_num_ranges; start++)
+    {
+      // Merge the last ranges if it exceeds the maximum size.
+      if (m_num_ranges + 1 > m_max_ranges)
+	{
+	  m_base[m_max_ranges * 2 - 1] = r.m_base[r.m_num_ranges * 2 - 1];
+	  break;
+	}
+      m_base[m_num_ranges * 2] = r.m_base[start * 2];
+      m_base[m_num_ranges * 2 + 1] = r.m_base[start * 2 + 1];
+      m_num_ranges++;
+    }
+
+  if (!union_bitmask (r))
+    normalize_kind ();
+  if (flag_checking)
+    verify_range ();
+  return true;
+}
+
 // Return TRUE if anything changes.
 
 bool
@@ -1316,6 +1361,11 @@ irange::union_ (const vrange &v)
   if (m_num_ranges == 1 && r.m_num_ranges == 1)
     return irange_single_pair_union (r);
 
+  signop sign = TYPE_SIGN (m_type);
+  // Check for an append to the end.
+  if (m_kind == VR_RANGE && wi::gt_p (r.lower_bound (), upper_bound (), sign))
+    return union_append (r);
+
   // If this ranges fully contains R, then we need do nothing.
   if (irange_contains_p (r))
     return union_bitmask (r);
@@ -1334,7 +1384,6 @@ irange::union_ (const vrange &v)
   // [Xi,Yi]..[Xn,Yn]  U  [Xj,Yj]..[Xm,Ym]   -->  [Xk,Yk]..[Xp,Yp]
   auto_vec<wide_int, 20> res (m_num_ranges * 2 + r.m_num_ranges * 2);
   unsigned i = 0, j = 0, k = 0;
-  signop sign = TYPE_SIGN (m_type);
 
   while (i < m_num_ranges * 2 && j < r.m_num_ranges * 2)
     {
@@ -1808,6 +1857,35 @@ irange::get_bitmask_from_range () const
   return irange_bitmask (wi::zero (prec), min | xorv);
 }
 
+// Remove trailing ranges that this bitmask indicates can't exist.
+
+void
+irange_bitmask::adjust_range (irange &r) const
+{
+  if (unknown_p () || r.undefined_p ())
+    return;
+
+  int_range_max range;
+  tree type = r.type ();
+  int prec = TYPE_PRECISION (type);
+  // If there are trailing zeros, create a range representing those bits.
+  gcc_checking_assert (m_mask != 0);
+  int z = wi::ctz (m_mask);
+  if (z)
+    {
+      wide_int ub = (wi::one (prec) << z) - 1;
+      range = int_range<5> (type, wi::zero (prec), ub);
+      // Then remove the specific value these bits contain from the range.
+      wide_int value = m_value & ub;
+      range.intersect (int_range<2> (type, value, value, VR_ANTI_RANGE));
+      // Inverting produces a list of ranges which can be valid.
+      range.invert ();
+      // And finally select R from only those valid values.
+      r.intersect (range);
+      return;
+    }
+}
+
 // If the the mask can be trivially converted to a range, do so and
 // return TRUE.
 
@@ -1953,6 +2031,7 @@ irange::intersect_bitmask (const irange &r)
 
   if (!set_range_from_bitmask ())
     normalize_kind ();
+  m_bitmask.adjust_range (*this);
   if (flag_checking)
     verify_range ();
   return true;

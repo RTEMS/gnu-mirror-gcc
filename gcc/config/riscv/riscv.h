@@ -25,6 +25,8 @@ along with GCC; see the file COPYING3.  If not see
 #include <stdbool.h>
 #include "config/riscv/riscv-opts.h"
 
+#define SWITCHABLE_TARGET 1
+
 /* Target CPU builtins.  */
 #define TARGET_CPU_CPP_BUILTINS() riscv_cpu_cpp_builtins (pfile)
 
@@ -310,7 +312,7 @@ ASM_MISA_SPEC
 
 #define FIXED_REGISTERS							\
 { /* General registers.  */						\
-  1, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,			\
+  1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,			\
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,			\
   /* Floating-point registers.  */					\
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,			\
@@ -328,7 +330,7 @@ ASM_MISA_SPEC
 
 #define CALL_USED_REGISTERS						\
 { /* General registers.  */						\
-  1, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1,			\
+  1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1,			\
   1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1,			\
   /* Floating-point registers.  */					\
   1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1,			\
@@ -372,6 +374,8 @@ ASM_MISA_SPEC
   ((unsigned int) ((int) (REGNO) - GP_REG_FIRST) < GP_REG_NUM)
 #define FP_REG_P(REGNO)  \
   ((unsigned int) ((int) (REGNO) - FP_REG_FIRST) < FP_REG_NUM)
+#define HARDFP_REG_P(REGNO)  \
+  ((REGNO) >= FP_REG_FIRST && (REGNO) <= FP_REG_LAST)
 #define V_REG_P(REGNO)  \
   ((unsigned int) ((int) (REGNO) - V_REG_FIRST) < V_REG_NUM)
 #define VL_REG_P(REGNO) ((REGNO) == VL_REGNUM)
@@ -1054,6 +1058,10 @@ while (0)
 #define ASM_DECLARE_FUNCTION_NAME(STR, NAME, DECL)                             \
   riscv_declare_function_name (STR, NAME, DECL)
 
+#undef ASM_DECLARE_FUNCTION_SIZE
+#define ASM_DECLARE_FUNCTION_SIZE(FILE, FNAME, DECL)                           \
+  riscv_declare_function_size (FILE, FNAME, DECL)
+
 /* Add output .variant_cc directive for specific alias definition.  */
 #undef ASM_OUTPUT_DEF_FROM_DECLS
 #define ASM_OUTPUT_DEF_FROM_DECLS(STR, DECL, TARGET)                           \
@@ -1190,5 +1198,12 @@ extern void riscv_remove_unneeded_save_restore_calls (void);
 /* Mode switching (Lazy code motion) for RVV rounding mode instructions.  */
 #define OPTIMIZE_MODE_SWITCHING(ENTITY) (TARGET_VECTOR)
 #define NUM_MODES_FOR_MODE_SWITCHING {VXRM_MODE_NONE, riscv_vector::FRM_NONE}
+
+/* The size difference between different RVV modes can be up to 64 times.
+   e.g. RVVMF64BI vs RVVMF1BI on zvl512b, which is [1, 1] vs [64, 64].  */
+#define MAX_POLY_VARIANT 64
+
+#define HAVE_POST_MODIFY_DISP TARGET_XTHEADMEMIDX
+#define HAVE_PRE_MODIFY_DISP  TARGET_XTHEADMEMIDX
 
 #endif /* ! GCC_RISCV_H */

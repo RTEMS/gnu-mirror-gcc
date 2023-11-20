@@ -136,6 +136,7 @@ static tree handle_vector_mask_attribute (tree *, tree, tree, int,
 static tree handle_nonnull_attribute (tree *, tree, tree, int, bool *);
 static tree handle_nonstring_attribute (tree *, tree, tree, int, bool *);
 static tree handle_nothrow_attribute (tree *, tree, tree, int, bool *);
+static tree handle_expected_throw_attribute (tree *, tree, tree, int, bool *);
 static tree handle_cleanup_attribute (tree *, tree, tree, int, bool *);
 static tree handle_warn_unused_result_attribute (tree *, tree, tree, int,
 						 bool *);
@@ -177,6 +178,7 @@ static tree handle_signed_bool_precision_attribute (tree *, tree, tree, int,
 						    bool *);
 static tree handle_retain_attribute (tree *, tree, tree, int, bool *);
 static tree handle_fd_arg_attribute (tree *, tree, tree, int, bool *);
+static tree handle_null_terminated_string_arg_attribute (tree *, tree, tree, int, bool *);
 
 /* Helper to define attribute exclusions.  */
 #define ATTR_EXCL(name, function, type, variable)	\
@@ -437,6 +439,8 @@ const struct attribute_spec c_common_attribute_table[] =
 			      handle_nonstring_attribute, NULL },
   { "nothrow",                0, 0, true,  false, false, false,
 			      handle_nothrow_attribute, NULL },
+  { "expected_throw",         0, 0, true,  false, false, false,
+			      handle_expected_throw_attribute, NULL },
   { "may_alias",	      0, 0, false, true, false, false, NULL, NULL },
   { "cleanup",		      1, 1, true, false, false, false,
 			      handle_cleanup_attribute, NULL },
@@ -518,6 +522,8 @@ const struct attribute_spec c_common_attribute_table[] =
 			      handle_omp_declare_target_attribute, NULL },
   { "omp declare target implicit", 0, 0, true, false, false, false,
 			      handle_omp_declare_target_attribute, NULL },
+  { "omp declare target indirect", 0, 0, true, false, false, false,
+			      handle_omp_declare_target_attribute, NULL },
   { "omp declare target host", 0, 0, true, false, false, false,
 			      handle_omp_declare_target_attribute, NULL },
   { "omp declare target nohost", 0, 0, true, false, false, false,
@@ -569,6 +575,8 @@ const struct attribute_spec c_common_attribute_table[] =
             handle_fd_arg_attribute, NULL},
   { "fd_arg_write",       1, 1, false, true, true, false,
             handle_fd_arg_attribute, NULL},         
+  { "null_terminated_string_arg", 1, 1, false, true, true, false,
+			      handle_null_terminated_string_arg_attribute, NULL},
   { NULL,                     0, 0, false, false, false, false, NULL, NULL }
 };
 
@@ -4657,6 +4665,20 @@ handle_fd_arg_attribute (tree *node, tree name, tree args,
   return NULL_TREE;
 }
 
+/* Handle the "null_terminated_string_arg" attribute.  */
+
+static tree
+handle_null_terminated_string_arg_attribute (tree *node, tree name, tree args,
+					     int ARG_UNUSED (flags),
+					     bool *no_add_attrs)
+{
+  if (positional_argument (*node, name, TREE_VALUE (args), POINTER_TYPE))
+    return NULL_TREE;
+
+  *no_add_attrs = true;
+  return NULL_TREE;
+}
+
 /* Handle the "nonstring" variable attribute.  */
 
 static tree
@@ -5327,6 +5349,7 @@ build_attr_access_from_parms (tree parms, bool skip_voidptr)
 	arg2pos.put (arg, argpos);
     }
 
+  tree nnlist = NULL_TREE;
   argpos = 0;
   for (tree arg = parms; arg; arg = TREE_CHAIN (arg), ++argpos)
     {
@@ -5359,6 +5382,11 @@ build_attr_access_from_parms (tree parms, bool skip_voidptr)
       /* The attribute arg spec string.  */
       tree str = TREE_VALUE (argspec);
       const char *s = TREE_STRING_POINTER (str);
+
+      /* Collect the list of nonnull arguments which use "[static ..]".  */
+      if (s != NULL && s[0] == '[' && s[1] == 's')
+	nnlist = tree_cons (NULL_TREE, build_int_cst (integer_type_node,
+						      argpos + 1), nnlist);
 
       /* Create the attribute access string from the arg spec string,
 	 optionally followed by position of the VLA bound argument if
@@ -5427,6 +5455,10 @@ build_attr_access_from_parms (tree parms, bool skip_voidptr)
   if (!spec.length ())
     return NULL_TREE;
 
+  /* If we have nonnull arguments, synthesize an attribute.  */
+  if (nnlist != NULL_TREE)
+    nnlist = build_tree_list (get_identifier ("nonnull"), nnlist);
+
   /* Attribute access takes a two or three arguments.  Wrap VBLIST in
      another list in case it has more nodes than would otherwise fit.  */
   vblist = build_tree_list (NULL_TREE, vblist);
@@ -5437,7 +5469,7 @@ build_attr_access_from_parms (tree parms, bool skip_voidptr)
   tree str = build_string (spec.length (), spec.c_str ());
   tree attrargs = tree_cons (NULL_TREE, str, vblist);
   tree name = get_identifier ("access");
-  return build_tree_list (name, attrargs);
+  return tree_cons (name, attrargs, nnlist);
 }
 
 /* Handle a "nothrow" attribute; arguments as in
@@ -5449,6 +5481,25 @@ handle_nothrow_attribute (tree *node, tree name, tree ARG_UNUSED (args),
 {
   if (TREE_CODE (*node) == FUNCTION_DECL)
     TREE_NOTHROW (*node) = 1;
+  /* ??? TODO: Support types.  */
+  else
+    {
+      warning (OPT_Wattributes, "%qE attribute ignored", name);
+      *no_add_attrs = true;
+    }
+
+  return NULL_TREE;
+}
+
+/* Handle a "nothrow" attribute; arguments as in
+   struct attribute_spec.handler.  */
+
+static tree
+handle_expected_throw_attribute (tree *node, tree name, tree ARG_UNUSED (args),
+				 int ARG_UNUSED (flags), bool *no_add_attrs)
+{
+  if (TREE_CODE (*node) == FUNCTION_DECL)
+    /* No flag to set here.  */;
   /* ??? TODO: Support types.  */
   else
     {

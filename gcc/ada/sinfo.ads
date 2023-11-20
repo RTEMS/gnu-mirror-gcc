@@ -82,12 +82,6 @@ package Sinfo is
    --                 for this purpose, so e.g. in X := (if A then B else C);
    --                 Paren_Count for the right side will be 1.
 
-   --   Comes_From_Check_Or_Contract
-   --                 This flag is present in all N_If_Statement nodes and
-   --                 gets set when an N_If_Statement is generated as part of
-   --                 the expansion of a Check, Assert, or contract-related
-   --                 pragma.
-
    --   Comes_From_Source
    --                 This flag is present in all nodes. It is set if the
    --                 node is built by the scanner or parser, and clear if
@@ -953,6 +947,12 @@ package Sinfo is
    --    attribute definition clause is given, rather than testing this at the
    --    freeze point.
 
+   --  Comes_From_Check_Or_Contract
+   --    This flag is present in all N_If_Statement nodes and
+   --    gets set when an N_If_Statement is generated as part of
+   --    the expansion of a Check, Assert, or contract-related
+   --    pragma.
+
    --  Comes_From_Extended_Return_Statement
    --    Present in N_Simple_Return_Statement nodes. True if this node was
    --    constructed as part of the N_Extended_Return_Statement expansion.
@@ -961,6 +961,20 @@ package Sinfo is
    --    Present in N_Object_Renaming_Declaration nodes. True if this node was
    --    was constructed as part of the expansion of an iterator
    --    specification.
+
+   --  Compare_Type
+   --    Present in N_Op_Compare nodes. Set during resolution to the type of
+   --    the operands. It is used to propagate the type of the operands from
+   --    a N_Op_Compare node in a generic construct to the nodes created from
+   --    it in the various instances, when this type is global to the generic
+   --    construct. Resolution for global types cannot be redone in instances
+   --    because the instantiation can be done out of context, e.g. for bodies,
+   --    and the visibility of global types is incorrect in this case; that is
+   --    why the result of the resolution done in the generic construct needs
+   --    to be available in the instances but, unlike for arithmetic operators,
+   --    the Etype cannot be used to that effect for comparison operators. It
+   --    is also used as the type subject to the Has_Private_View processing on
+   --    the nodes instead of the Etype.
 
    --  Compile_Time_Known_Aggregate
    --    Present in N_Aggregate nodes. Set for aggregates which can be fully
@@ -2809,12 +2823,6 @@ package Sinfo is
       --  fields are defined (and access subprograms declared) in package
       --  Einfo.
 
-      --  Note: N_Defining_Identifier is an extended node whose fields are
-      --  deliberately laid out to match the layout of fields in an ordinary
-      --  N_Identifier node allowing for easy alteration of an identifier
-      --  node into a defining identifier node. For details, see procedure
-      --  Sinfo.CN.Change_Identifier_To_Defining_Identifier.
-
       --  N_Defining_Identifier
       --  Sloc points to identifier
       --  Chars contains the Name_Id for the identifier
@@ -3155,12 +3163,6 @@ package Sinfo is
       --  fields depending on the setting of the Ekind field. These
       --  additional fields are defined (and access subprograms declared)
       --  in package Einfo.
-
-      --  Note: N_Defining_Character_Literal is an extended node whose fields
-      --  are deliberately laid out to match layout of fields in an ordinary
-      --  N_Character_Literal node, allowing for easy alteration of a character
-      --  literal node into a defining character literal node. For details, see
-      --  Sinfo.CN.Change_Character_Literal_To_Defining_Character_Literal.
 
       --  N_Defining_Character_Literal
       --  Sloc points to literal
@@ -4519,31 +4521,37 @@ package Sinfo is
 
       --  N_Op_Eq
       --  Sloc points to =
+      --  Compare_Type
       --  plus fields for binary operator
       --  plus fields for expression
 
       --  N_Op_Ne
       --  Sloc points to /=
+      --  Compare_Type
       --  plus fields for binary operator
       --  plus fields for expression
 
       --  N_Op_Lt
       --  Sloc points to <
+      --  Compare_Type
       --  plus fields for binary operator
       --  plus fields for expression
 
       --  N_Op_Le
       --  Sloc points to <=
+      --  Compare_Type
       --  plus fields for binary operator
       --  plus fields for expression
 
       --  N_Op_Gt
       --  Sloc points to >
+      --  Compare_Type
       --  plus fields for binary operator
       --  plus fields for expression
 
       --  N_Op_Ge
       --  Sloc points to >=
+      --  Compare_Type
       --  plus fields for binary operator
       --  plus fields for expression
 
@@ -5415,13 +5423,6 @@ package Sinfo is
       --  fields depending on the setting of the Ekind field. These
       --  additional fields are defined (and access subprograms declared)
       --  in package Einfo.
-
-      --  Note: N_Defining_Operator_Symbol is an extended node whose fields
-      --  are deliberately laid out to match the layout of fields in an
-      --  ordinary N_Operator_Symbol node allowing for easy alteration of
-      --  an operator symbol node into a defining operator symbol node.
-      --  See Sinfo.CN.Change_Operator_Symbol_To_Defining_Operator_Symbol
-      --  for further details.
 
       --  N_Defining_Operator_Symbol
       --  Sloc points to literal

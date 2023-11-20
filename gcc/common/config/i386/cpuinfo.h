@@ -608,6 +608,20 @@ get_intel_cpu (struct __processor_model *cpu_model,
       cpu_model->__cpu_type = INTEL_COREI7;
       cpu_model->__cpu_subtype = INTEL_COREI7_ARROWLAKE_S;
       break;
+    case 0xdd:
+      /* Clearwater Forest.  */
+      cpu = "clearwaterforest";
+      CHECK___builtin_cpu_is ("clearwaterforest");
+      cpu_model->__cpu_type = INTEL_CLEARWATERFOREST;
+      break;
+    case 0xcc:
+      /* Panther Lake.  */
+      cpu = "pantherlake";
+      CHECK___builtin_cpu_is ("corei7");
+      CHECK___builtin_cpu_is ("pantherlake");
+      cpu_model->__cpu_type = INTEL_COREI7;
+      cpu_model->__cpu_subtype = INTEL_COREI7_PANTHERLAKE;
+      break;
     case 0x17:
     case 0x1d:
       /* Penryn.  */
@@ -648,6 +662,12 @@ get_zhaoxin_cpu (struct __processor_model *cpu_model,
 	  reset_cpu_feature (cpu_model, cpu_features2, FEATURE_AVX);
 	  reset_cpu_feature (cpu_model, cpu_features2, FEATURE_F16C);
 	  cpu_model->__cpu_subtype = ZHAOXIN_FAM7H_LUJIAZUI;
+	}
+     else if (model >= 0x5b)
+	{
+	  cpu = "yongfeng";
+	  CHECK___builtin_cpu_is ("yongfeng");
+	  cpu_model->__cpu_subtype = ZHAOXIN_FAM7H_YONGFENG;
 	}
       break;
     default:
@@ -838,6 +858,8 @@ get_available_features (struct __processor_model *cpu_model,
 	set_feature (FEATURE_IBT);
       if (edx & bit_UINTR)
 	set_feature (FEATURE_UINTR);
+      if (edx & bit_USER_MSR)
+	set_feature (FEATURE_USER_MSR);
       if (amx_usable)
 	{
 	  if (edx & bit_AMX_TILE)
