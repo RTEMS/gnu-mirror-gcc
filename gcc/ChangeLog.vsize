@@ -1,3 +1,17 @@
+==================== Branch work146-vsize, patch #316 ====================
+
+Add -mvector-size-32-vectorize.
+
+2023-11-21  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_option_override_internal): Add
+	-mvector-size-32-vectorize.
+	(rs6000_preferred_simd_mode): Likewise.
+	(rs6000_opt_vars): Likewise.
+	* config/rs6000/rs6000.opt (-mvector-size-32-vectorize): Likewise.
+
 ==================== Branch work146-vsize, patch #315 ====================
 
 Document -mvector-size-32.
