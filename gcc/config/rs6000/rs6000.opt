@@ -609,10 +609,6 @@ mvector-size-32
 Target Var(TARGET_VECTOR_SIZE_32) Init(0) Save
 Generate (do not generate) vector pair instructions for vector_size(32).
 
-mvector-size-32-vectorize
-Target Undocumented Var(TARGET_VECTOR_SIZE_32_VECTORIZE) Init(0) Save
-Use (do not use) vector_size(32) in vectorization.
-
 mrelative-jumptables
 Target Undocumented Var(rs6000_relative_jumptables) Init(1) Save
 
