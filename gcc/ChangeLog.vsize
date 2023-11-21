@@ -1,3 +1,13 @@
+==================== Branch work146-vsize, patch #315 ====================
+
+Document -mvector-size-32.
+
+2023-11-19  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.opt (-mvector-size-32): Document.
+
 ==================== Branch work146-vsize, patch #314 ====================
 
 Add vector_size(32) tests.
