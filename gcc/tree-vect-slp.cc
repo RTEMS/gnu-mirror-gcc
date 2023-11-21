@@ -528,7 +528,6 @@ vect_get_operand_map (const gimple *stmt, unsigned char swap = 0)
 	    return arg1_map;
 
 	  case IFN_MASK_GATHER_LOAD:
-	  case IFN_MASK_LEN_GATHER_LOAD:
 	    return arg1_arg4_map;
 
 	  default:
@@ -1039,17 +1038,9 @@ vect_build_slp_tree_1 (vec_info *vinfo, unsigned char *swap,
 
 	  if (cfn == CFN_MASK_LOAD
 	      || cfn == CFN_GATHER_LOAD
-	      || cfn == CFN_MASK_GATHER_LOAD
-	      || cfn == CFN_MASK_LEN_GATHER_LOAD)
-	    ldst_p = true;
-	  else if (cfn == CFN_MASK_STORE)
-	    {
-	      ldst_p = true;
-	      rhs_code = CFN_MASK_STORE;
-	    }
-	  else if ((cfn != CFN_LAST
-		    && cfn != CFN_MASK_CALL
-		    && internal_fn_p (cfn)
+	      || cfn == CFN_MASK_GATHER_LOAD)
+	    load_p = true;
+	  else if ((internal_fn_p (cfn)
 		    && !vectorizable_internal_fn_p (as_internal_fn (cfn)))
 		   || gimple_call_tail_p (call_stmt)
 		   || gimple_call_noreturn_p (call_stmt)
@@ -1294,14 +1285,7 @@ vect_build_slp_tree_1 (vec_info *vinfo, unsigned char *swap,
 	{
 	  if (load_p
 	      && rhs_code != CFN_GATHER_LOAD
-	      && rhs_code != CFN_MASK_GATHER_LOAD
-	      && rhs_code != CFN_MASK_LEN_GATHER_LOAD
-	      && !STMT_VINFO_GATHER_SCATTER_P (stmt_info)
-	      /* Not grouped loads are handled as externals for BB
-		 vectorization.  For loop vectorization we can handle
-		 splats the same we handle single element interleaving.  */
-	      && (is_a <bb_vec_info> (vinfo)
-		  || stmt_info != first_stmt_info))
+	      && rhs_code != CFN_MASK_GATHER_LOAD)
 	    {
 	      /* Not grouped load.  */
 	      if (dump_enabled_p ())
@@ -1795,10 +1779,7 @@ vect_build_slp_tree_2 (vec_info *vinfo, slp_tree node,
       if (gcall *stmt = dyn_cast <gcall *> (stmt_info->stmt))
 	gcc_assert (gimple_call_internal_p (stmt, IFN_MASK_LOAD)
 		    || gimple_call_internal_p (stmt, IFN_GATHER_LOAD)
-		    || gimple_call_internal_p (stmt, IFN_MASK_GATHER_LOAD)
-		    || gimple_call_internal_p (stmt, IFN_MASK_LEN_GATHER_LOAD));
-      else if (STMT_VINFO_GATHER_SCATTER_P (stmt_info))
-	gcc_assert (DR_IS_READ (STMT_VINFO_DATA_REF (stmt_info)));
+		    || gimple_call_internal_p (stmt, IFN_MASK_GATHER_LOAD));
       else
 	{
 	  *max_nunits = this_max_nunits;
