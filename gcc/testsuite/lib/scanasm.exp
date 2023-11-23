@@ -488,7 +488,7 @@ proc scan-assembler-times { args } {
     set text [read $fd]
     close $fd
 
-    set result_count [llength [regexp -inline -all -- $pattern $text]]
+    set result_count [regexp -all -- $pattern $text]
     if {$result_count == $times} {
 	pass "$testcase scan-assembler-times $pp_pattern $times"
     } else {
