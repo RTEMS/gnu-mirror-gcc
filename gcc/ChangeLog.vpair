@@ -1,4 +1,406 @@
+==================== Branch work149-vpair, patch #500 ====================
+
+<intro for the vector pair built-in patches>
+
+These set of patches add support for using the vector pair load (lxvp, plxvp,
+and lxvpx) instructions and the vector pair store (stxvp, pstxvp, and stxvpx)
+that were introduced with ISA 3.1 on Power10 systems.
+
+With GCC 13, the only place vector pairs (and vector quads) were used were to
+feed into the MMA subsystem.  These patches do not use the MMA subsystem, but
+it gives users a way to write code that is extremely memory bandwidth
+intensive.
+
+There are two main ways to add vector pair support to the GCC compiler:
+built-in functions vs. __attribute__((__vector_size__(32))).
+
+The first method is to add a set of built-in functions that use the vector pair
+type and it allows the user to write loops and such using the vector pair type
+(__vector_pair).  Loads are normally done using the load vector pair
+instructions.  Then the operation is done as a post reload split to do the two
+independent vector operations on the two 128-bit vectors located in the vector
+pair.  When the type is stored, normally a store vector pair instruction is
+used.  By keeping the value within a vector pair through register allocation,
+the compiler does not generate extra move instructions which can slow down the
+loop.
+
+The second method is to add support for the V4DF, V8SF, etc. types.  By doing
+so, you can use the attribute __vector_size__(32)) to declare variables that
+are vector pairs, and the GCC compiler will generate the appropriate code.  I
+implemented a limited prototype of this support, but it has some problems that
+I haven't addressed.  One potential problem with using the 32-byte vector size
+is it can generate worse code for options that aren't covered withe as the
+compiler unpacks things and re-packs them.  The compiler would also generate
+these unpacks and packs if you are generating code for a power9 system.  There
+are a bunch of test cases that fail with my prototype implementation that I
+haven't addressed yet.
+
+After discussions within our group, it was decided that using built-in
+functions is the way to go at this time, and these patches are implement those
+functions.
+
+In terms of benchmarks, I wrote two benchmarks:
+
+   1)	One benchmark is a saxpy type loop: value[i] += (a[i] * b[i]).  That is
+	a loop with 3 loads and a store per loop.
+
+   2)	Another benchmark produces a scalar sun of an entire vector.  This is a
+	loop that just has a single load and no store.
+
+For the saxpy type loop, I get the following general numbers for both float and
+double:
+
+   1)	The vector pair built-in functions are roughly 10% faster than using
+	normal vector processing.
+
+   2)	The vector pair built-in functions are roughly 19-20% faster than if I
+	write the loop using the vector pair loads using the exist built-ins,
+	and then manually split the values and do the arithmetic and single
+	vector stores,
+
+   3)	The vector pair built-in functions are roughly 35-40% faster than if I
+	write the loop using the existing built-ins for both vector pair load
+	and vector pair store.  If I apply the patches that Peter Bergner has
+	been writing for PR target/109116, then it improves the speed of the
+	existing built-ins for assembling and disassembling vector pairs.  In
+	this case, the vector pair built-in functions are 20-25% faster,
+	instead of 35-40% faster.  This is due to the patch eliminating extra
+	vector moves.
+
+Unfortunately, for floating point, doing the sum of the whole vector is slower
+using the new vector pair built-in functions using a simple loop (compared to
+using the existing built-ins for disassembling vector pairs.  If I write more
+complex loops that manually unroll the loop, then the floating point vector
+pair built-in functions become like the integer vector pair integer built-in
+functions.  So there is some amount of tuning that will need to be done.
+
+There are 4 patches within this group of patches.
+
+    1)	The first patch adds vector pair support for 32-bit and 64-bit floating
+	point operations.  The operations provided are absolute value,
+	addition, fused multiply-add, minimu, maximum, multiplication,
+	negation, and subtraction.  I did not add divde or square root because
+	these instructions take long enough to compute that you don't get any
+	advantage of using the vector pair load/store instructions.
+
+    2)	The second patch add vector pair support for 8-bit, 16-bit, 32-bit, and
+	64-bit integer operations.  The operations provided include addition,
+	bitwise and, bitwise inclusive or, bitwise exclusive or, bitwise not,
+	both signed and unsigned minimum/maximu, negation, and subtraction.  I
+	did not add multiply because the PowerPC architecture does not provide
+	single instructions to do integer vector multiply on the whole vector.
+	I could add shifts and rotates, but I didn't think memory intensive
+	code used these operations.
+
+    3)	The third patch adds methods to create vector pair values (zero, splat
+	from a scalar value, and combine two 128-bit vectors), as well as a
+	convenient method to exact one 128-bit vector from a vector pair.
+
+    4)	The fourth patch adds horizontal addition for 32-bit, 64-bit floating
+	point, and 64-bit integers.  I do wonder if there are more horizontal
+	reductions that should be done.
+
+I have built and tested these patches on:
+
+    *	A little endian power10 server using --with-cpu=power10
+    *	A little endian power9 server using --with-cpu=power9
+    *	A big endian power9 server using --with-cpu=power9.
+
+Can I check these patches into the master branch?
+
+====================
+
+Add support for floating point vector pair built-in functions.
+
+This patch adds a series of built-in functions to allow users to write code to
+do a number of simple operations where the loop is done using the __vector_pair
+type.  The __vector_pair type is an opaque type.  These built-in functions keep
+the two 128-bit vectors within the __vector_pair together, and split the
+operation after register allocation.
+
+This patch provides vector pair operations for 32-bit floating point and 64-bit
+floating point.
+
+2023-11-17  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_f32_*): Add vector
+	pair built-in functions for float.
+	(__builtin_vpair_f64_*): Add vector pair built-in functions for double.
+	* config/rs6000/rs6000-protos.h (split_unary_vector_pair): Add
+	declaration.
+	(split_binary_vector_pair): Likewise.
+	(split_fma_vector_pair): Likewise.
+	* config/rs6000/rs6000.cc (split_unary_vector_pair): New helper function
+	for vector pair built-in functions.
+	(split_binary_vector_pair): Likewise.
+	(split_fma_vector_pair): Likewise.
+	* config/rs6000/rs6000.md (toplevel): Include vector-pair.md.
+	* config/rs6000/t-rs6000 (MD_INCLUDES): Add vector-pair.md.
+	* config/rs6000/vector-pair.md: New file.
+	* doc/extend.texi (PowerPC Vector Pair Built-in Functions): Document the
+	floating point and general vector pair built-in functions.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-1.c: New test.
+	* gcc.target/powerpc/vector-pair-2.c: New test.
+	* gcc.target/powerpc/vector-pair-3.c: New test.
+	* gcc.target/powerpc/vector-pair-4.c: New test.
+
+====================
+
+Add support for integer point vector pair built-in functions.
+
+This patch adds a series of built-in functions to allow users to write code to
+do a number of simple operations where the loop is done using the __vector_pair
+type.  The __vector_pair type is an opaque type.  These built-in functions keep
+the two 128-bit vectors within the __vector_pair together, and split the
+operation after register allocation.
+
+This patch provides vector pair operations for 8, 16, 32, and 64-bit integers.
+
+I have built and tested these patches on:
+
+    *	A little endian power10 server using --with-cpu=power10
+    *	A little endian power9 server using --with-cpu=power9
+    *	A big endian power9 server using --with-cpu=power9.
+
+Can I check this patch into the master branch after the preceeding patch is
+checked in?
+
+2023-11-17  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_i8*): Add built-in
+	functions for integer vector pairs.
+	(__builtin_vpair_i16*): Likeise.
+	(__builtin_vpair_i32*): Likeise.
+	(__builtin_vpair_i64*): Likeise.
+	* config/rs6000/vector-pair.md (UNSPEC_VPAIR_V32QI): New unspec.
+	(UNSPEC_VPAIR_V16HI): Likewise.
+	(UNSPEC_VPAIR_V8SI): Likewise.
+	(UNSPEC_VPAIR_V4DI): Likewise.
+	(VP_INT_BINARY): New iterator for integer vector pair.
+	(vp_insn): Add supoort for integer vector pairs.
+	(vp_ireg): New code attribute for integer vector pairs.
+	(vp_ipredicate): Likewise.
+	(VP_INT): New int interator for integer vector pairs.
+	(VP_VEC_MODE): Likewise.
+	(vp_pmode): Likewise.
+	(vp_vmode): Likewise.
+	(vp_neg_reg): New int interator for integer vector pairs.
+	(vpair_neg_<vp_pmode>): Add integer vector pair support insns.
+	(vpair_not_<vp_pmode>2): Likewise.
+	(vpair_<vp_insn>_<vp_pmode>3): Likewise.
+	(vpair_andc_<vp_pmode): Likewise.
+	(*vpair_iorc_<vp_pmode>): Likewise.
+	(vpair_nand_<vp_pmode>_1): Likewise.
+	(vpair_nand_<vp_pmode>_2): Likewise.
+	(vpair_nor_<vp_pmode>_1): Likewise.
+	(vpair_nor_<vp_pmode>_2): Likewise.
+	* doc/extend.texi (PowerPC Vector Pair Built-in Functions): Document the
+	integer vector pair built-in functions.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-5.c: New test.
+	* gcc.target/powerpc/vector-pair-6.c: New test.
+	* gcc.target/powerpc/vector-pair-7.c: New test.
+	* gcc.target/powerpc/vector-pair-8.c: New test.
+
+====================
+
+Add support for initializing and extracting from vector pairs.
+
+This patch adds a series of built-in functions to allow users to write code to
+do a number of simple operations where the loop is done using the __vector_pair
+type.  The __vector_pair type is an opaque type.  These built-in functions keep
+the two 128-bit vectors within the __vector_pair together, and split the
+operation after register allocation.
+
+This patch provides vector pair operations for loading up a vector pair with all
+0's, duplicated (splat) from a scalar type, or combining two vectors in a vector
+pair.  This patch also provides vector pair builtins to extract one vector
+element of a vector pair.
+
+I have built and tested these patches on:
+
+    *	A little endian power10 server using --with-cpu=power10
+    *	A little endian power9 server using --with-cpu=power9
+    *	A big endian power9 server using --with-cpu=power9.
+
+Can I check this patch into the master branch after the preceeding patches have
+been checked in?
+
+2023-11-17  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/predicates.md (mma_assemble_input_operand): Allow any
+	16-byte vector, not just V16QImode.
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_zero): New vector
+	pair initialization built-in functions.
+	(__builtin_vpair_*_assemble): Likeise.
+	(__builtin_vpair_*_splat): Likeise.
+	(__builtin_vpair_*_extract_vector): New vector pair extraction built-in
+	functions.
+	* config/rs6000/vector-pair.md (UNSPEC_VPAIR_V32QI): New unspec.
+	(UNSPEC_VPAIR_V16HI): Likewise.
+	(UNSPEC_VPAIR_V8SI): Likewise.
+	(UNSPEC_VPAIR_V4DI): Likewise.
+	(VP_INT_BINARY): New iterator for integer vector pair.
+	(vp_insn): Add supoort for integer vector pairs.
+	(vp_ireg): New code attribute for integer vector pairs.
+	(vp_ipredicate): Likewise.
+	(VP_INT): New int interator for integer vector pairs.
+	(VP_VEC_MODE): Likewise.
+	(vp_pmode): Likewise.
+	(vp_vmode): Likewise.
+	(vp_neg_reg): New int interator for integer vector pairs.
+	(vpair_neg_<vp_pmode>): Add integer vector pair support insns.
+	(vpair_not_<vp_pmode>2): Likewise.
+	(vpair_<vp_insn>_<vp_pmode>3): Likewise.
+	(vpair_andc_<vp_pmode): Likewise.
+	(vpair_iorc_<vp_pmode>): Likewise.
+	(vpair_nand_<vp_pmode>_1): Likewise.
+	(vpair_nand_<vp_pmode>_2): Likewise.
+	(vpair_nor_<vp_pmode>_1): Likewise.
+	(vpair_nor_<vp_pmode>_2): Likewise.
+	* doc/extend.texi (PowerPC Vector Pair Built-in Functions): Document the
+	integer vector pair built-in functions.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-5.c: New test.
+	* gcc.target/powerpc/vector-pair-6.c: New test.
+	* gcc.target/powerpc/vector-pair-7.c: New test.
+	* gcc.target/powerpc/vector-pair-8.c: New test.
+
+====================
+
+Add support for doing a horizontal add on vector pair elements.
+
+This patch adds a series of built-in functions to allow users to write code to
+do a number of simple operations where the loop is done using the __vector_pair
+type.  The __vector_pair type is an opaque type.  These built-in functions keep
+the two 128-bit vectors within the __vector_pair together, and split the
+operation after register allocation.
+
+This patch provides vector pair built-in functions to do a horizontal add on
+vector pair elements.  Only floating point and 64-bit horizontal adds are
+provided in this patch.
+
+I have built and tested these patches on:
+
+    *	A little endian power10 server using --with-cpu=power10
+    *	A little endian power9 server using --with-cpu=power9
+    *	A big endian power9 server using --with-cpu=power9.
+
+Can I check this patch into the master branch after the preceeding patches have
+been checked in?
+
+2023-11-17  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_f32_add_elements):
+	New built-in function.
+	(__builtin_vpair_f64_add_elements): Likewise.
+	(__builtin_vpair_i64_add_elements): Likewise.
+	(__builtin_vpair_i64u_add_elements): Likewise.
+	* config/rs6000/vector-pair.md (UNSPEC_VPAIR_REDUCE_PLUS_F32): New
+	unspec.
+	(UNSPEC_VPAIR_REDUCE_PLUS_F64): Likewise.
+	(UNSPEC_VPAIR_REDUCE_PLUS_I64): Likewise.
+	(vpair_reduc_plus_scale_v8sf): New insn.
+	(vpair_reduc_plus_scale_v4df): Likewise.
+	(vpair_reduc_plus_scale_v4di): Likewise.
+	* doc/extend.texi (__builtin_vpair_f32_add_elements): Document.
+	(__builtin_vpair_f64_add_elements): Likewise.
+	(__builtin_vpair_i64_add_elements): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-16.c: New test.
+
+====================
+
+Add overloads for __builtin_vpair_assemble.
+
+2023-11-17  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-overloads.def (__builtin_vpair_assemble): Add
+	overloads.
+
+====================
+
+Rename things so it can be combined with the vsize branch.
+
+2023-11-17  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair*): Rename all insn
+	names from VPAIR... to VPAIR_FUNC... to allow building the combined
+	vsubreg branch.
+	* config/rs6000/rs6000-overload.def (__builtin_vpair*): Likewise.
+	* config/rs6000/rs6000.md (toplevel): Include vpair-func.md instead of
+	vector-pair.md.
+	* config/rs6000/t-rs6000: (MD_INCLUDES): Change vector-pair.md to
+	vpair-func.md.
+	* config/rs6000/vpair-func.md: Rename from vector-pair.md to
+	vpair-func.md.  Change all VPAIR names to be VPAIR_FUNC.
+
+==================== Branch work149-vpair, patch #1 (work149 branch) ====================
+
+Add ChangeLog.meissner and REVISION.
+
+2023-11-28  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* REVISION: New file for branch.
+	* ChangeLog.meissner: New file.
+
+gcc/c-family/
+
+	* ChangeLog.meissner: New file.
+
+gcc/c/
+
+	* ChangeLog.meissner: New file.
+
+gcc/cp/
+
+	* ChangeLog.meissner: New file.
+
+gcc/fortran/
+
+	* ChangeLog.meissner: New file.
+
+gcc/testsuite/
+
+	* ChangeLog.meissner: New file.
+
+libgcc/
+
+	* ChangeLog.meissner: New file.
+
 ==================== Branch work149-vpair, baseline ====================
+
+Add ChangeLog.vpair and update REVISION.
+
+2023-11-28  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* ChangeLog.vpair: New file for branch.
+	* REVISION: Update.
 
 2023-11-28   Michael Meissner  <meissner@linux.ibm.com>
 
