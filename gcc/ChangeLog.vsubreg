@@ -1,3 +1,15 @@
+==================== Branch work148-vsubreg, patch #408 ====================
+
+Rename vector-pair.md to vector-size.md.
+
+2023-11-28  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-size.md: Rename from vector-pair.md.
+	* config/rs6000/rs6000.md (toplevel): Likewise.
+	* config/rs6000/t-rs6000 (MD_INCLUDES): Likewise.
+
 ==================== Branch work148-vsubreg, patch #407 ====================
 
 Document -mvector-size-32.
