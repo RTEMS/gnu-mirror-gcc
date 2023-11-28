@@ -1,6 +1,410 @@
+==================== Branch work149-vsize, patch #207 ====================
+
+Rename vector-pair.md to vector-size.md.
+
+2023-11-28  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-size.md: Rename from vector-pair.md.
+	* config/rs6000/rs6000.md (toplevel): Likewise.
+	* config/rs6000/t-rs6000 (MD_INCLUDES): Likewise.
+
+==================== Branch work149-vsize, patch #206 ====================
+
+Add -mvector-size-32-vectorize.
+
+2023-11-21  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_option_override_internal): Add
+	-mvector-size-32-vectorize.
+	(rs6000_preferred_simd_mode): Likewise.
+	(rs6000_opt_vars): Likewise.
+	* config/rs6000/rs6000.opt (-mvector-size-32-vectorize): Likewise.
+
+==================== Branch work149-vsize, patch #205 ====================
+
+Document -mvector-size-32.
+
+2023-11-28  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.opt (-mvector-size-32): Document.
+
+==================== Branch work149-vsize, patch #204 ====================
+
+Add vector_size(32) tests.
+
+The first patch in the vector pair series was previous posted.  This patch
+needs that first patch.  The first patch implemented the basic modes, and it
+allows for initialization of the modes.  In addition, I added some
+optimizations for extracting and setting fields within the vector pair.
+
+The second patch in the vector pair series implemented floating point support.
+
+The third patch in the vector pair series implemented integer point support.
+
+This fourth patch provide new tests to the test suite.
+
+When I test a saxpy type loop (a[i] += (b[i] * c[i])), I generally see a 10%
+improvement over either auto-factorization, or just using the vector types.
+
+I have tested these patches on a little endian power10 system.  With
+-vector-size-32 disabled by default, there are no regressions in the
+test suite.
+
+I have also built and run the tests on both little endian power 9 and big
+endian 9 power systems, and there are no regressions.  Can I check these
+patches into the master branch?
+
+2023-11-28  Michael Meisner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* gcc.target/powerpc/vector-size-32-1.c: New test.
+	* gcc.target/powerpc/vector-size-32-2.c: New test.
+	* gcc.target/powerpc/vector-size-32-3.c: New test.
+	* gcc.target/powerpc/vector-size-32-4.c: New test.
+	* gcc.target/powerpc/vector-size-32-5.c: New test.
+	* gcc.target/powerpc/vector-size-32-6.c: New test.
+	* gcc.target/powerpc/vector-size-32-7.c: New test.
+
+==================== Branch work149-vsize, patch #203 ====================
+
+Add vector_size(32) integer support.
+
+The first patch in the vector pair series was previous posted.  This patch
+needs that first patch.  The first patch implemented the basic modes, and it
+allows for initialization of the modes.  In addition, I added some
+optimizations for extracting and setting fields within the vector pair.
+
+The second patch in the vector pair series implemented floating point support.
+
+The third patch implements the integer vector pair support.  This adds the basic
+support for doing integer operations on vector pairs.  I have implemented most
+of the arithmetic and logical that will be needed in the future when byte
+shuffling will be added.  I did add various combiner insns to fold the logical
+instructions (i.e. ior of not becomes orc).  Since the PowerPC architecture does
+not have negative for vectors of 8/16-bit elements, I have added alternate code
+that creates a 0 and then does a subtract.
+
+The main instructions that are not supported are shift and rotate instructions.
+In addition, if people want to use vector pair support on integer types, it
+might make sense to add support for saturating adds and subtracts, along the
+various specialized instructions (bpermd, etc.).
+
+The fourth patch will provide new tests to the test suite.
+
+When I test a saxpy type loop (a[i] += (b[i] * c[i])), I generally see a 10%
+improvement over either auto-factorization, or just using the vector types.
+
+I have tested these patches on a little endian power10 system.  With
+-vector-size-32 disabled by default, there are no regressions in the
+test suite.
+
+I have also built and run the tests on both little endian power 9 and big
+endian 9 power systems, and there are no regressions.  Can I check these
+patches into the master branch?
+
+2023-11-28  Michael Meisner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-pair.md (VPAIR_INT): New mode iterator.
+	(VPAIR_NEG_VNEG): Likewise.
+	(VPAIR_NEG_SUB): Likewise.
+	(VPAIR_INT_BINARY): New code iterator.
+	(neg<mode>2, VPAIR_NEG_VNEG iterator): New insn.
+	(neg<mode>2, VPAIR_NEG_SUB iterator); Likewise.
+	(<vpair_op><mode>2, VPAIR_LOGICAL_UNARY and VPAIR_INT iterators):
+	Likewise.
+	(<vpair_op><mode>3, VPAIR_LOGICAL_BINARY and VPAIR INT iterator):
+	Likewise.
+	(nor<mode>3_1): Likewise.
+	(nor<mode>3_2): Likewise.
+	(andc<mode>3): Likewise.
+	(eqv<mode>3): Likewise.
+	(nand<mode>3_1): Likewise.
+	(nand<mode>3_2): Likewise.
+	(orc<mode>): Likewise.
+
+==================== Branch work149-vsize, patch #202 ====================
+
+Add vector_size(32) floating point.
+
+The first patch in the vector pair series was previous posted.  This patch
+needs that first patch.  The first patch implemented the basic modes, and it
+allows for initialization of the modes.  In addition, I added some
+optimizations for extracting and setting fields within the vector pair.
+
+This is the second patch in the vector pair series.  It adds the basic support
+to do the normal floating point arithmetic operations like add, subtract, etc.
+I have also put in combine insns to enable combining the fma (fused
+multiply-add) instructions with negation to generate the 4 fma operations on
+the PowerPC.
+
+The third patch will implement the integer vector pair support.
+
+The fourth patch will provide new tests to the test suite.
+
+When I test a saxpy type loop (a[i] += (b[i] * c[i])), I generally see a 10%
+improvement over either auto-factorization, or just using the vector types.
+
+I have tested these patches on a little endian power10 system.  With
+-vector-size-32 disabled by default, there are no regressions in the
+test suite.
+
+I have also built and run the tests on both little endian power 9 and big
+endian 9 power systems, and there are no regressions.  Can I check these
+patches into the master branch?
+
+2023-11-28  Michael Meisner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-protos.h (split_unary_vector_pair): New
+	declaration.
+	(split_binary_vector_pair): Likewise.
+	(split_fma_vector_pair): Likewise.
+	* config/rs6000/rs6000.cc (split_unary_vector_pair): New function.
+	(split_binary_vector_pair): Likewise.
+	(split_fma_vector_pair): Likewise.
+	* config/rs6000/vector-pair.md (VPAIR_FP): New mode iterator.
+	(VPAIR_FP_UNARY): New code iterator.
+	(VPAIR_FP_BINARY): Likewise.
+	(vpair_op): New code attribute.
+	(<vpair_op><mode>2, VPAIR_FP and VPAIR_FP_UNARY iterators): New insns.
+	(sqrtv8sf2): Likewise.
+	(sqrtv4df2): Likewise.
+	(nabs<mode>2): Likewise.
+	(<vpair_op><mode>3, VPAIR_FP and VP_FP_BINARY iterators): Likewise.
+	(divv8sf3): Likewise.
+	(divv4df3): Likewise.
+	(fma<mode>4): Likewise.
+	(fms<mode>4): Likewise.
+	(nfma<mode>4): Likewise.
+	(nfms<mode>4): Likewise.
+	(fma_fpcontract_<mode>4): Likewise.
+	(fms_fpcontract_<mode>4): Likewise.
+	(nfma_fpcontract_<mode>): Likewise.
+	(nfms_fpcontract_<mode>): Likewise.
+
+==================== Branch work149-vsize, patch #201 ====================
+
+Add basic support for vector_size(32).
+
+We have had several users ask us to implement ways of using the Power10 load
+vector pair and store vector pair instructions to give their code a speed up
+due to reduced memory bandwidth.
+
+I had originally posted the following patches:
+
+    *	https://gcc.gnu.org/pipermail/gcc-patches/2023-November/636077.html
+    *	https://gcc.gnu.org/pipermail/gcc-patches/2023-November/636078.html
+    *	https://gcc.gnu.org/pipermail/gcc-patches/2023-November/636083.html
+    *	https://gcc.gnu.org/pipermail/gcc-patches/2023-November/636080.html
+    *	https://gcc.gnu.org/pipermail/gcc-patches/2023-November/636081.html
+
+to add a set of built-in functions that use the PowePC __vector_pair type and
+that provide a set of functions to do basic operations on vector pair.
+
+After I posted these patches, it was decided that it would be better to have a
+new type that is used rather than a bunch of new built-in functions.  Within
+the GCC context, the best way to add this support is to extend the vector modes
+so that V4DFmode, V8SFmode, V4DImode, V8SImode, V16HImode, and V32QImode are
+used.
+
+While in theory you could add a whole new type that isn't a larger size vector,
+my experience with IEEE 128-bit floating point is that GCC really doesn't like
+2 modes that are the same size but have different implementations (such as we
+see with IEEE 128-bit floating point and IBM double-double 128-bit floating
+point).  So I did not consider adding a new mode for using with vector pairs.
+
+My original intention was to just implement V4DFmode and V8SFmode, since the
+primary users asking for vector pair support are people implementing the high
+end math libraries like Eigen and Blas.
+
+However in implementing this code, I discovered that we will need integer
+vector pair support as well as floating point vector pair.  The integer modes
+and types are needed to properly implement byte shuffling and vector
+comparisons which need integer vector pairs.
+
+With the current patches, vector pair support is not enabled by default.  The
+main reason is I have not implemented the support for byte shuffling which
+various tests depend on.
+
+I would also like to implement overloads for the vector built-in functions like
+vec_add, vec_sum, etc. that if you give it a vector pair, it would handle it
+just like if you give a vector type.
+
+In addition, once the various bugs are addressed, I would then implement the
+support so that automatic vectorization would consider using vector pairs
+instead of vectors.
+
+This is the first patch in the series.  It implements the basic modes, and
+it allows for initialization of the modes.  I've added some optimizations for
+extracting and setting fields within the vector pair.
+
+The second patch will implement the floating point vector pair support.
+
+The third patch will implement the integer vector pair support.
+
+The fourth patch will provide new tests to the test suite.
+
+When I test a saxpy type loop (a[i] += (b[i] * c[i])), I generally see a 10%
+improvement over either auto-factorization, or just using the vector types.
+
+I have tested these patches on a little endian power10 system.  With
+-vector-size-32 disabled by default, there are no regressions in the
+test suite.
+
+I have also built and run the tests on both little endian power9 and big
+endian power9 systems, and there are no regressions.  Can I check these
+patches into the master branch?
+
+2023-11-28  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/constraint.md (eV): New constraint.
+	* config/rs6000/predicates.md (cons_0_to_31_operand): New predicate.
+	(easy_vector_constant): Add support for vector pair constants.
+	(easy_vector_pair_constant): New predicate.
+	(mam_assemble_input_operand): Allow other 16-byte vector modes than
+	Immodest.
+	* config/rs6000/rs6000-c.cc (rs6000_cpu_cpp_builtins): Define
+	__VECTOR_SIZE_32__ if -mvector-size-32.
+	* config/rs6000/rs6000-protos.h (vector_pair_to_vector_mode): New
+	declaration.
+	(split_vector_pair_constant): Likewise.
+	(rs6000_expand_vector_pair_init): Likewise.
+	* config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached): Use
+	VECTOR_PAIR_MODE instead of comparing mode to OOmode.
+	(rs6000_modes_tieable_p): Allow various vector pair modes to pair with
+	each other.  Allow 16-byte vectors to pair with vector pair modes.
+	(rs6000_setup_reg_addr_masks): Use VECTOR_PAIR_MODE instead of comparing
+	mode to OOmode.
+	(rs6000_init_hard_regno_mode_ok): Setup vector pair mode basic type
+	information and reload handlers.
+	(rs6000_option_override_internal): Warn if -mvector-pair-32 is used
+	without -mcpu=power10 or -mmma.
+	(vector_pair_to_vector_mode): New function.
+	(split_vector_pair_constant): Likewise.
+	(rs6000_expand_vector_pair_init): Likewise.
+	(reg_offset_addressing_ok_p): Add support for vector pair modes.
+	(rs6000_emit_move): Likewise.
+	(rs6000_preferred_reload_class): Likewise.
+	(altivec_expand_vec_perm_le): Likewise.
+	(rs6000_opt_vars): Add -mvector-size-32 switch.
+	(rs6000_split_multireg_move): Add support for vector pair modes.
+	* config/rs6000/rs6000.h (VECTOR_PAIR_MODE): New macro.
+	* config/rs6000/rs6000.md (wd mode attribute): Add vector pair modes.
+	(RELOAD mode iterator): Likewise.
+	(toplevel): Include vector-pair.md.
+	* config/rs6000/rs6000.opt (-mvector-size-32): New option.
+	* config/rs6000/vector-pair.md: New file.
+	* doc/md.texi (PowerPC constraints): Document the eV constraint.
+
+==================== Branch work149-vsize, patch #1 (from work149 branch) ====================
+
+Power10: Add options to disable load and store vector pair.
+
+This is version 2 of the patch to add -mno-load-vector-pair and
+-mno-store-vector-pair undocumented tuning switches.
+
+The differences between the first version of the patch and this version is that
+I added explicit RTL abi attributes for when the compiler can generate the load
+vector pair and store vector pair instructions.  By having this attribute, the
+movoo insn has separate alternatives for when we generate the instruction and
+when we want to split the instruction into 2 separate vector loads or stores.
+
+In the first version of the patch, I had previously provided built-in functions
+that would always generate load vector pair and store vector pair instructions
+even if these instructions are normally disabled.  I found these built-ins
+weren't specified like the other vector pair built-ins, and I didn't include
+documentation for the built-in functions.  If we want such built-in functions,
+we can add them as a separate patch later.
+
+In addition, since both versions of the patch adds #pragma target and attribute
+support to change the results for individual functions, we can select on a
+function by function basis what the defaults for load/store vector pair is.
+
+The original text for the patch is:
+
+In working on some future patches that involve utilizing vector pair
+instructions, I wanted to be able to tune my program to enable or disable using
+the vector pair load or store operations while still keeping the other
+operations on the vector pair.
+
+This patch adds two undocumented tuning options.  The -mno-load-vector-pair
+option would tell GCC to generate two load vector instructions instead of a
+single load vector pair.  The -mno-store-vector-pair option would tell GCC to
+generate two store vector instructions instead of a single store vector pair.
+
+If either -mno-load-vector-pair is used, GCC will not generate the indexed
+stxvpx instruction.  Similarly if -mno-store-vector-pair is used, GCC will not
+generate the indexed lxvpx instruction.  The reason for this is to enable
+splitting the {,p}lxvp or {,p}stxvp instructions after reload without needing a
+scratch GPR register.
+
+The default for -mcpu=power10 is that both load vector pair and store vector
+pair are enabled.
+
+I added code so that the user code can modify these settings using either a
+'#pragma GCC target' directive or used __attribute__((__target__(...))) in the
+function declaration.
+
+I added tests for the switches, #pragma, and attribute options.
+
+I have built this on both little endian power10 systems and big endian power9
+systems doing the normal bootstrap and test.  There were no regressions in any
+of the tests, and the new tests passed.  Can I check this patch into the master
+branch?
+
+2023-11-28  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (movoo): Add support for -mno-load-vector-pair and
+	-mno-store-vector-pair.
+	* config/rs6000/rs6000-cpus.def (OTHER_POWER10_MASKS): Add support for
+	-mload-vector-pair and -mstore-vector-pair.
+	(POWERPC_MASKS): Likewise.
+	* config/rs6000/rs6000.cc (rs6000_setup_reg_addr_masks): Only allow
+	indexed mode for OOmode if we are generating both load vector pair and
+	store vector pair instructions.
+	(rs6000_option_override_internal): Add support for -mno-load-vector-pair
+	and -mno-store-vector-pair.
+	(rs6000_opt_masks): Likewise.
+	* config/rs6000/rs6000.md (isa attribute): Add lxvp and stxvp
+	attributes.
+	(enabled attribute): Likewise.
+	* config/rs6000/rs6000.opt (-mload-vector-pair): New option.
+	(-mstore-vector-pair): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-attribute.c: New test.
+	* gcc.target/powerpc/vector-pair-pragma.c: New test.
+	* gcc.target/powerpc/vector-pair-switch1.c: New test.
+	* gcc.target/powerpc/vector-pair-switch2.c: New test.
+	* gcc.target/powerpc/vector-pair-switch3.c: New test.
+	* gcc.target/powerpc/vector-pair-switch4.c: New test.
+
 ==================== Branch work149-vsize, baseline ====================
+
+Add ChangeLog.vsize and update REVISION.
+
+2023-11-28  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* ChangeLog.vsize: New file for branch.
+	* REVISION: Update.
 
 2023-11-28   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
-
