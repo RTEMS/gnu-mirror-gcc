@@ -63,7 +63,6 @@ extern void rs6000_expand_float128_convert (rtx, rtx, bool);
 extern void rs6000_expand_vector_init (rtx, rtx);
 extern void rs6000_expand_vector_pair_init (rtx, rtx);
 extern void rs6000_expand_vector_set (rtx, rtx, rtx);
-extern void rs6000_expand_vector_pair_set (rtx, rtx, rtx);
 extern void rs6000_expand_vector_extract (rtx, rtx, rtx);
 extern void rs6000_split_vec_extract_var (rtx, rtx, rtx, rtx, rtx);
 extern rtx rs6000_adjust_vec_address (rtx, rtx, rtx, rtx, machine_mode);

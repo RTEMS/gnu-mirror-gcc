@@ -54,6 +54,9 @@
 
 (define_code_iterator VPAIR_INT_BINARY     [plus minus smin smax umin umax])
 
+;; Iterator for vector pairs with double word elements
+(define_mode_iterator VPAIR_DWORD [V4DI V4DF])
+
 ;; Give the insn name from the opertion
 (define_code_attr vpair_op [(abs   "abs")
 			    (div   "div")
@@ -167,30 +170,61 @@
   DONE;
 })
 
-;; Vector pair set element
-(define_expand "vec_set<mode>"
-  [(match_operand:VPAIR 0 "vsx_register_operand")
-   (match_operand:<VPAIR_ELEMENT> 1 "register_operand")
-   (match_operand 2 "vec_set_index_operand")]
-  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
-{
-  rs6000_expand_vector_pair_set (operands[0], operands[1], operands[2]);
-  DONE;
-})
-
-;; Vector pair extracti element
-(define_insn_and_split "vec_extract<mode><vpair_element_l>"
-  [(set (match_operand:<VPAIR_ELEMENT> 0 "vsx_register_operand" "=wa")
-	(vec_select:<VPAIR_ELEMENT>
-	 (match_operand:VPAIR 1 "vsx_register_operand" "wa")
-	 (parallel [(match_operand:QI 2 "const_int_operand" "n")])))]
+;; Set an element in a vector pair with double word elements.
+(define_insn_and_split "vec_set<mode>"
+  [(set (match_operand:VPAIR_DWORD 0 "vsx_register_operand" "+&wa")
+	(unspec:VPAIR_DWORD
+	 [(match_dup 0)
+	  (match_operand:<VPAIR_ELEMENT> 1 "vsx_register_operand" "wa")
+	  (match_operand 2 "const_0_to_3_operand" "n")]
+	 UNSPEC_VSX_SET))
+   (clobber (match_scratch:<VPAIR_ELEMENT> 3 "=&wa"))]
   "TARGET_MMA && TARGET_VECTOR_SIZE_32"
   "#"
   "&& reload_completed"
   [(const_int 0)]
 {
-  rtx op0 = operands[0];
-  rtx op1 = operands[1];
+  rtx dest = operands[0];
+  rtx value = operands[1];
+  HOST_WIDE_INT elt = INTVAL (operands[2]);
+  rtx tmp = operands[3];
+  machine_mode mode = <MODE>mode;
+  machine_mode vmode = <VPAIR_VECTOR>mode;
+  unsigned vsize = GET_MODE_SIZE (<VPAIR_VECTOR>mode);
+  unsigned reg_num = ((WORDS_BIG_ENDIAN && elt >= vsize)
+		      || (!WORDS_BIG_ENDIAN && elt < vsize));
+	   
+  rtx vreg = simplify_gen_subreg (vmode, dest, mode, reg_num * 16);
+
+  if ((elt & 0x1) == 0)
+    {
+      emit_insn (gen_vsx_extract_<vpair_vector_l> (tmp, vreg, const1_rtx));
+      emit_insn (gen_vsx_concat_<vpair_vector_l> (vreg, value, tmp));
+    }
+  else
+    {
+      emit_insn (gen_vsx_extract_<vpair_vector_l> (tmp, vreg, const0_rtx));
+      emit_insn (gen_vsx_concat_<vpair_vector_l> (vreg, tmp, value));
+    }
+
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "vecperm")])
+
+;; Extract an element in a vector pair with double word elements
+(define_insn_and_split "vec_extract<mode><vpair_element_l>"
+  [(set (match_operand:<VPAIR_ELEMENT> 0 "vsx_register_operand" "=wa")
+	(vec_select:<VPAIR_ELEMENT>
+	 (match_operand:VPAIR_DWORD 1 "vsx_register_operand" "wa")
+	 (parallel [(match_operand 2 "const_0_to_3_operand" "n")])))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  rtx dest = operands[0];
+  rtx vpair = operands[1];
   HOST_WIDE_INT elt = INTVAL (operands[2]);
   machine_mode mode = <MODE>mode;
   machine_mode vmode = <VPAIR_VECTOR>mode;
@@ -198,12 +232,12 @@
   unsigned reg_num = ((WORDS_BIG_ENDIAN && elt >= vsize)
 		      || (!WORDS_BIG_ENDIAN && elt < vsize));
 	   
-  rtx vreg = simplify_gen_subreg (vmode, op1, mode, reg_num * 16);
-  emit_insn (gen_vsx_extract_<vpair_vector_l> (op0, vreg,
-					       GEN_INT (elt % vsize)));
+  rtx vreg = simplify_gen_subreg (vmode, vpair, mode, reg_num * 16);
+  rtx elt_in_vreg = GEN_INT (elt & 0x1);
+  emit_insn (gen_vsx_extract_<vpair_vector_l> (dest, vreg, elt_in_vreg));
   DONE;
 }
-  [(set_attr "type" "veclogical")])
+  [(set_attr "type" "vecperm")])
 
 ;; Assemble a vector pair from two vectors.
 ;;

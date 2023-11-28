@@ -7813,15 +7813,6 @@ rs6000_expand_vector_set (rtx target, rtx val, rtx elt_rtx)
   emit_insn (gen_rtx_SET (target, x));
 }
 
-/* Set field ELT_RTX of vaector pair TARGET to VAL.  */
-
-void
-rs6000_expand_vector_pair_set (rtx target, rtx val, rtx elt_rtx)
-{
-  if (target || val || elt_rtx)
-    gcc_unreachable ();
-}
-
 /* Extract field ELT from VEC into TARGET.  */
 
 void
