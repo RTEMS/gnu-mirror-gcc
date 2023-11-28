@@ -387,7 +387,7 @@ mode_supports_vmx_dform (machine_mode mode)
 /* Return true if we have D-form addressing in VSX registers.  This addressing
    is more limited than normal d-form addressing in that the offset must be
    aligned on a 16-byte boundary.  */
-static inline bool
+bool
 mode_supports_dq_form (machine_mode mode)
 {
   return ((reg_addr[mode].addr_mask[RELOAD_REG_ANY] & RELOAD_REG_QUAD_OFFSET)
@@ -1178,6 +1178,7 @@ static bool rs6000_secondary_reload_move (enum rs6000_reg_type,
 					  secondary_reload_info *,
 					  bool);
 rtl_opt_pass *make_pass_analyze_swaps (gcc::context*);
+rtl_opt_pass *make_pass_analyze_vecload (gcc::context*);
 
 /* Hash table stuff for keeping track of TOC entries.  */
 

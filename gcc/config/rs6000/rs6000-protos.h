@@ -91,6 +91,7 @@ extern int mems_ok_for_quad_peep (rtx, rtx);
 extern bool gpr_or_gpr_p (rtx, rtx);
 extern bool direct_move_p (rtx, rtx);
 extern bool quad_address_p (rtx, machine_mode, bool);
+extern bool mode_supports_dq_form (machine_mode);
 extern bool quad_load_store_p (rtx, rtx);
 extern bool fusion_gpr_load_p (rtx, rtx, rtx, rtx);
 extern void expand_fusion_gpr_load (rtx *);
@@ -344,6 +345,7 @@ class rtl_opt_pass;
 
 extern rtl_opt_pass *make_pass_analyze_swaps (gcc::context *);
 extern rtl_opt_pass *make_pass_pcrel_opt (gcc::context *);
+extern rtl_opt_pass *make_pass_analyze_vecload (gcc::context *);
 extern bool rs6000_sum_of_two_registers_p (const_rtx expr);
 extern bool rs6000_quadword_masked_address_p (const_rtx exp);
 extern rtx rs6000_gen_lvx (enum machine_mode, rtx, rtx);
