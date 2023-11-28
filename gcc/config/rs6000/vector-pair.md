@@ -31,8 +31,33 @@
 ;; integer vector pairs for perumte operations (and eventually compare).
 (define_mode_iterator VPAIR [V32QI V16HI V8SI V4DI V8SF V4DF])
 
+;; Floating point vector pair ops
+(define_mode_iterator VPAIR_FP [V8SF V4DF])
+
+;; Iterator for floating point unary/binary operations.
+(define_code_iterator VPAIR_FP_UNARY  [abs neg])
+(define_code_iterator VPAIR_FP_BINARY [plus minus mult smin smax])
+
 ;; Iterator for vector pairs with double word elements
 (define_mode_iterator VPAIR_DWORD [V4DI V4DF])
+
+;; Give the insn name from the opertion
+(define_code_attr vpair_op [(abs   "abs")
+			    (div   "div")
+			    (and   "and")
+			    (fma   "fma")
+			    (ior   "ior")
+			    (minus "sub")
+			    (mult  "mul")
+			    (neg   "neg")
+			    (not   "one_cmpl")
+			    (plus  "add")
+			    (smin  "smin")
+			    (smax  "smax")
+			    (sqrt  "sqrt")
+			    (umin  "umin")
+			    (umax  "umax")
+			    (xor   "xor")])
 
 ;; Map vector pair mode to vector mode in upper case after the vector pair is
 ;; split to two vectors.
@@ -317,3 +342,288 @@
   emit_insn (gen_vpair_concat_<mode> (op0, tmp, tmp));
   DONE;
 })
+
+;; Vector pair floating point arithmetic unary operations
+(define_insn_and_split "<vpair_op><mode>2"
+  [(set (match_operand:VPAIR_FP 0 "vsx_register_operand" "=wa")
+	(VPAIR_FP_UNARY:VPAIR_FP
+	 (match_operand:VPAIR_FP 1 "vsx_register_operand" "wa")))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_unary_vector_pair (<VPAIR_VECTOR>mode, operands,
+			   gen_<vpair_op><vpair_vector_l>2);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "vecfloat")])
+
+;; Sqrt needs different type attributes between V8SF and V4DF
+(define_insn_and_split "sqrtv8sf2"
+  [(set (match_operand:V8SF 0 "vsx_register_operand" "=wa")
+	(sqrt:V8SF
+	 (match_operand:V8SF 1 "vsx_register_operand" "wa")))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_unary_vector_pair (V4SFmode, operands, gen_sqrtv4sf2);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "vecfdiv")])
+
+(define_insn_and_split "sqrtv4df2"
+  [(set (match_operand:V4DF 0 "vsx_register_operand" "=wa")
+	(sqrt:V4DF
+	 (match_operand:V4DF 1 "vsx_register_operand" "wa")))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_unary_vector_pair (V2DFmode, operands, gen_sqrtv2df2);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "vecdiv")])
+
+;; Optimize negative absolute value (both floating point and integer)
+(define_insn_and_split "nabs<mode>2"
+  [(set (match_operand:VPAIR_FP 0 "vsx_register_operand" "=wa")
+	(neg:VPAIR_FP
+	 (abs:VPAIR_FP
+	  (match_operand:VPAIR_FP 1 "vsx_register_operand" "wa"))))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_unary_vector_pair (<VPAIR_VECTOR>mode, operands,
+			   gen_vsx_nabs<vpair_vector_l>2);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "vecfloat")])
+
+;; Vector pair floating point arithmetic binary operations
+(define_insn_and_split "<vpair_op><mode>3"
+  [(set (match_operand:VPAIR_FP 0 "vsx_register_operand" "=wa")
+	(VPAIR_FP_BINARY:VPAIR_FP
+	 (match_operand:VPAIR_FP 1 "vsx_register_operand" "wa")
+	 (match_operand:VPAIR_FP 2 "vsx_register_operand" "wa")))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_binary_vector_pair (<VPAIR_VECTOR>mode, operands,
+			    gen_<vpair_op><vpair_vector_l>3);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "vecfloat")])
+
+;; Divide needs different type attributes between V8SF and V4DF
+(define_insn_and_split "divv8sf3"
+  [(set (match_operand:V8SF 0 "vsx_register_operand" "=wa")
+	(div:V8SF
+	 (match_operand:V8SF 1 "vsx_register_operand" "wa")
+	 (match_operand:V8SF 2 "vsx_register_operand" "wa")))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_binary_vector_pair (V4SFmode, operands, gen_divv4sf3);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "vecfdiv")])
+
+(define_insn_and_split "divv4df3"
+  [(set (match_operand:V4DF 0 "vsx_register_operand" "=wa")
+	(div:V4DF
+	 (match_operand:V4DF 1 "vsx_register_operand" "wa")
+	 (match_operand:V4DF 2 "vsx_register_operand" "wa")))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_binary_vector_pair (V2DFmode, operands, gen_divv2df3);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "vecdiv")])
+
+;; Vector pair floating point fused multiply-add
+(define_insn_and_split "fma<mode>4"
+  [(set (match_operand:VPAIR_FP 0 "vsx_register_operand" "=wa,wa")
+	(fma:VPAIR_FP
+	 (match_operand:VPAIR_FP 1 "vsx_register_operand" "%wa,wa")
+	 (match_operand:VPAIR_FP 2 "vsx_register_operand" "wa,0")
+	 (match_operand:VPAIR_FP 3 "vsx_register_operand" "0,wa")))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_fma_vector_pair (<VPAIR_VECTOR>mode, operands,
+			 gen_fma<vpair_vector_l>4);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "vecfloat")])
+
+;; Vector pair floating point fused multiply-subtract
+(define_insn_and_split "fms<mode>4"
+  [(set (match_operand:VPAIR_FP 0 "vsx_register_operand" "=wa,wa")
+	(fma:VPAIR_FP
+	 (match_operand:VPAIR_FP 1 "vsx_register_operand" "%wa,wa")
+	 (match_operand:VPAIR_FP 2 "vsx_register_operand" "wa,0")
+	 (neg:VPAIR_FP
+	  (match_operand:VPAIR_FP 3 "vsx_register_operand" "0,wa"))))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_fma_vector_pair (<VPAIR_VECTOR>mode, operands,
+			 gen_fms<vpair_vector_l>4);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "vecfloat")])
+
+;; Vector pair floating point negative fused multiply-add
+(define_insn_and_split "nfma<mode>4"
+  [(set (match_operand:VPAIR_FP 0 "vsx_register_operand" "=wa,wa")
+	(neg:VPAIR_FP
+	 (fma:VPAIR_FP
+	  (match_operand:VPAIR_FP 1 "vsx_register_operand" "%wa,wa")
+	  (match_operand:VPAIR_FP 2 "vsx_register_operand" "wa,0")
+	  (match_operand:VPAIR_FP 3 "vsx_register_operand" "0,wa"))))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_fma_vector_pair (<VPAIR_VECTOR>mode, operands,
+			 gen_nfma<vpair_vector_l>4);
+  DONE;
+}
+  [(set_attr "length" "8")])
+
+;; Vector pair floating point fused negative multiply-subtract
+(define_insn_and_split "nfms<mode>4"
+  [(set (match_operand:VPAIR_FP 0 "vsx_register_operand" "=wa,wa")
+	(neg:VPAIR_FP
+	 (fma:VPAIR_FP
+	  (match_operand:VPAIR_FP 1 "vsx_register_operand" "%wa,wa")
+	  (match_operand:VPAIR_FP 2 "vsx_register_operand" "wa,0")
+	  (neg:VPAIR_FP
+	   (match_operand:VPAIR_FP 3 "vsx_register_operand" "0,wa")))))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_fma_vector_pair (<VPAIR_VECTOR>mode, operands,
+			 gen_nfms<vpair_vector_l>4);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "vecfloat")])
+
+;; Optimize vector pair (a * b) + c into fma (a, b, c)
+(define_insn_and_split "*fma_fpcontract_<mode>4"
+  [(set (match_operand:VPAIR_FP 0 "vsx_register_operand" "=wa,wa")
+	(plus:VPAIR_FP
+	 (mult:VPAIR_FP
+	  (match_operand:VPAIR_FP 1 "vsx_register_operand" "%wa,wa")
+	  (match_operand:VPAIR_FP 2 "vsx_register_operand" "wa,0"))
+	 (match_operand:VPAIR_FP 3 "vsx_register_operand" "0,wa")))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32
+   && flag_fp_contract_mode == FP_CONTRACT_FAST"
+  "#"
+  "&& 1"
+  [(set (match_dup 0)
+	(fma:VPAIR_FP (match_dup 1)
+		      (match_dup 2)
+		      (match_dup 3)))]
+{
+}
+  [(set_attr "length" "8")])
+
+;; Optimize vector pair (a * b) - c into fma (a, b, -c)
+(define_insn_and_split "*fms_fpcontract_<mode>4"
+  [(set (match_operand:VPAIR_FP 0 "vsx_register_operand" "=wa,wa")
+	(minus:VPAIR_FP
+	 (mult:VPAIR_FP
+	  (match_operand:VPAIR_FP 1 "vsx_register_operand" "%wa,wa")
+	  (match_operand:VPAIR_FP 2 "vsx_register_operand" "wa,0"))
+	 (match_operand:VPAIR_FP 3 "vsx_register_operand" "0,wa")))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32
+   && flag_fp_contract_mode == FP_CONTRACT_FAST"
+  "#"
+  "&& 1"
+  [(set (match_dup 0)
+	(fma:VPAIR_FP (match_dup 1)
+		      (match_dup 2)
+		      (neg:VPAIR_FP
+		       (match_dup 3))))]
+{
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "vecfloat")])
+
+;; Optimize vector pair -((a * b) + c) into -fma (a, b, c)
+(define_insn_and_split "*nfma_fpcontract_<mode>4"
+  [(set (match_operand:VPAIR_FP 0 "vsx_register_operand" "=wa,wa")
+	(neg:VPAIR_FP
+	 (plus:VPAIR_FP
+	  (mult:VPAIR_FP
+	   (match_operand:VPAIR_FP 1 "vsx_register_operand" "%wa,wa")
+	   (match_operand:VPAIR_FP 2 "vsx_register_operand" "wa,0"))
+	  (match_operand:VPAIR_FP 3 "vsx_register_operand" "0,wa"))))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32
+   && flag_fp_contract_mode == FP_CONTRACT_FAST"
+  "#"
+  "&& 1"
+  [(set (match_dup 0)
+	(neg:VPAIR_FP
+	 (fma:VPAIR_FP (match_dup 1)
+		       (match_dup 2)
+		       (match_dup 3))))]
+{
+}
+  [(set_attr "length" "8")])
+
+;; Optimize vector pair -((a * b) - c) into -fma (a, b, -c)
+(define_insn_and_split "*nfms_fpcontract_<mode>4"
+  [(set (match_operand:VPAIR_FP 0 "vsx_register_operand" "=wa,wa")
+	(neg:VPAIR_FP
+	 (minus:VPAIR_FP
+	  (mult:VPAIR_FP
+	   (match_operand:VPAIR_FP 1 "vsx_register_operand" "%wa,wa")
+	   (match_operand:VPAIR_FP 2 "vsx_register_operand" "wa,0"))
+	  (match_operand:VPAIR_FP 3 "vsx_register_operand" "0,wa"))))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32
+   && flag_fp_contract_mode == FP_CONTRACT_FAST"
+  "#"
+  "&& 1"
+  [(set (match_dup 0)
+	(neg:VPAIR_FP
+	 (fma:VPAIR_FP (match_dup 1)
+		       (match_dup 2)
+		       (neg:VPAIR_FP
+			(match_dup 3)))))]
+{
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "vecfloat")])
+
