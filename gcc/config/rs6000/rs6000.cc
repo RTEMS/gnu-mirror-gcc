@@ -4494,6 +4494,10 @@ rs6000_option_override_internal (bool global_init_p)
       rs6000_isa_flags &= OPTION_MASK_STORE_VECTOR_PAIR;
     }
 
+  if (TARGET_VECTOR_SIZE_32_VECTORIZE && TARGET_MMA
+      && !OPTION_SET_P (TARGET_VECTOR_SIZE_32))
+      TARGET_VECTOR_SIZE_32 = 1;
+
   if (!TARGET_MMA && TARGET_VECTOR_SIZE_32)
     {
       if (OPTION_SET_P (TARGET_VECTOR_SIZE_32))
@@ -5248,6 +5252,14 @@ rs6000_builtin_vectorization_cost (enum vect_cost_for_stmt type_of_cost,
 static machine_mode
 rs6000_preferred_simd_mode (scalar_mode mode)
 {
+  if (TARGET_MMA && TARGET_VECTOR_SIZE_32 && TARGET_VECTOR_SIZE_32_VECTORIZE)
+    {
+      opt_machine_mode vpmode = mode_for_vector (mode, 32 / GET_MODE_SIZE (mode));
+
+      if (vpmode.exists ())
+	return vpmode.require ();
+    }
+
   opt_machine_mode vmode = mode_for_vector (mode, 16 / GET_MODE_SIZE (mode));
 
   if (vmode.exists () && !VECTOR_MEM_NONE_P (vmode.require ()))
@@ -24798,6 +24810,9 @@ static struct rs6000_opt_var const rs6000_opt_vars[] =
   { "vector-size-32",
     offsetof (struct gcc_options, x_TARGET_VECTOR_SIZE_32),
     offsetof (struct cl_target_option, x_TARGET_VECTOR_SIZE_32), },
+  { "vector-size-32-vectorize",
+    offsetof (struct gcc_options, x_TARGET_VECTOR_SIZE_32_VECTORIZE),
+    offsetof (struct cl_target_option, x_TARGET_VECTOR_SIZE_32_VECTORIZE), },
 };
 
 /* Inner function to handle attribute((target("..."))) and #pragma GCC target
