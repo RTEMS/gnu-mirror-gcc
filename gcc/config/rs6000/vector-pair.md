@@ -120,8 +120,11 @@
 })
 
 (define_insn_and_split "*mov<mode>"
-  [(set (match_operand:VPAIR 0 "nonimmediate_operand" "=wa,wa,ZwO,QwO,wa,wa")
-	(match_operand:VPAIR 1 "input_operand" "ZwO,QwO,wa,wa,wa,j"))]
+  [(set (match_operand:VPAIR 0 "nonimmediate_operand"
+				"=wa, wa,   ZwO, QwO, wa, wa, wa")
+
+	(match_operand:VPAIR 1 "input_operand"
+				"ZwO,  QwO, wa,  wa,  wa, j,  eV"))]
   "TARGET_MMA
    && (gpc_reg_operand (operands[0], <MODE>mode)
        || gpc_reg_operand (operands[1], <MODE>mode))"
@@ -131,6 +134,7 @@
    stxvp%X0 %x1,%0
    #
    #
+   #
    #"
   "&& reload_completed
    && ((MEM_P (operands[0]) && !TARGET_STORE_VECTOR_PAIR)
@@ -138,27 +142,16 @@
        || (!MEM_P (operands[0]) && !MEM_P (operands[1])))"
   [(const_int 0)]
 {
-  rtx op0 = operands[0];
-  rtx op1 = operands[1];
-
-  if (op1 == CONST0_RTX (<MODE>mode))
-    {
-      machine_mode vmode = <VPAIR_VECTOR>mode;
-      rtx op0_reg0 = simplify_gen_subreg (vmode, op0, <MODE>mode, 0);
-      rtx op0_reg1 = simplify_gen_subreg (vmode, op0, <MODE>mode, 16);
-      rtx zero = CONST0_RTX (vmode);
-      emit_move_insn (op0_reg0, zero);
-      emit_move_insn (op0_reg1, zero);
-      DONE;
-    }
-
   rs6000_split_multireg_move (operands[0], operands[1]);
   DONE;
 }
-  [(set_attr "type" "vecload,vecload,vecstore,vecstore,veclogical,vecperm")
-   (set_attr "size" "256")
-   (set_attr "length" "*,8,*,8,8,8")
-   (set_attr "isa" "lxvp,*,stxvp,*,*,*")])
+  [(set_attr "size" "256")
+   (set_attr "type"   "vecload, vecload, vecstore, vecstore, veclogical,
+                       vecperm, vecperm")
+   (set_attr "length" "*,       8,       *,        8,        8,
+                       8,       24")
+   (set_attr "isa"    "lxvp,    *,       stxvp,    *,        *,
+                       *,       *")])
 
 ;; Vector pair initialization
 (define_expand "vec_init<mode><vpair_element_l>"
