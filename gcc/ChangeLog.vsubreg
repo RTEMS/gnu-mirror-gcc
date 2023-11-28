@@ -1,4 +1,438 @@
+==================== Branch work148-vsubreg, patch #407 ====================
+
+Document -mvector-size-32.
+
+2023-11-21  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.opt (-mvector-size-32): Document.
+
+==================== Branch work148-vsubreg, patch #406 ====================
+
+Add more vector pair constants.
+
+2023-11-19  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/constraints.md (eV): New constraint.
+	* config/rs6000/predicates.md (easy_vector_constant): Add support for
+	vector pair constants.
+	(easy_vector_pair_constant): New predicate.
+	* config/rs6000/rs6000-protos.h (vector_pair_to_vector_mode): New
+	declaration.
+	(split_vector_ppair_constant): Likewise.
+	* config/rs6000/rs6000.cc (vector_pair_to_vector_mode): Make global.
+	(split_vector_ppair_constant): Make global.  Rename from
+	rs6000_split_vector_pair_constant.
+	(rs6000_expand_vector_pair_init): Rename split_vector_pair_constant
+	call.
+	(rs6000_split_multireg_move): Likewise.
+	* config/rs6000/vector-pair.md (mov<mode>): Add support for other vector
+	pair constants that can be loaded in 2 instructions.
+	* doc/md.texi (eV constraint): Document
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-size-32-7.c: New test.
+
+==================== Branch work148-vsubreg, patch #405 ====================
+
+Work on vector pair extracts.
+
+2023-11-19  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-pair.md (vec_extract<mode><vpair_element_l>):
+	Rewrite.
+	(vec_extractv8sf): New insn.
+	* config/rs6000/vsx.md (vsx_extract_v4df): Delete.
+	(vsx_extract_v8sf): Delete.
+
+==================== Branch work148-vsubreg, patch #404 ====================
+
+Add set/extract support on vector pairs with double word elements.
+
+2023-11-18  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-protos.h (rs6000_expand_vector_pair_set): Delete.
+	* config/rs6000/rs6000.cc (rs6000_expand_vector_pair_set): Likewise.
+	* config/rs6000/vector-pair.md (vec_set<mode>): Replace with a version
+	that only handles setting double word elements.
+	(vec_extract<mode><vpair_element_l>): Likewise.
+
+==================== Branch work148-vsubreg, patch #403 ====================
+
+Add vector pair add/sub/umin/umax/sqrt/div.
+
+2023-11-18  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-pair.md (VPAIR_INT_BINARY): Add umin/umax.
+	(vpair_op):  Add umin/umax/sqrt.
+	(most insns): Set the type attribute.
+	(sqrtv8sf2): New insn.
+	(sqrtv4df2): Likewise.
+	(divv8sf3): Likewise.
+	(divv4df3): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-size-32-1.c: Add divide.  Adjust counts.
+	* gcc.target/powerpc/vector-size-32-1.c: Likewise.
+
+==================== Branch work148-vsubreg, patch #402 ====================
+
+Add vector_size(32) support.
+
+Slightly modified from the vsize branch to accomidate both vpair and visze.
+
+2023-11-18  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/predicates.md (const_0_to_31_operand): New predicate.
+	(mma_assemble_input_operand): Allow any 16-byte vector type, not just
+	V16QImode.
+	* config/rs6000/rs6000-c.c (rs6000_cpu_cpp_builtins): Define
+	__VECTOR_SIZE_32__ if -mvector-size-32 used.
+	* config/rs6000/rs6000-protos.h (rs6000_expand_vector_pair_init): New
+	declaration.
+	(rs6000_expand_vector_pair_set): Likewise.
+	(split_unary_vector_pair): Likewise.
+	(split_binary_vector_pair): Likewisee.
+	(split_fma_vector_pair): Likewise.
+	* config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached): Add
+	support for -mvector-size-32.
+	(rs6000_hard_regno_mode_ok): Likewise.
+	(rs6000_setup_reg_addr_masks): Likewise.
+	(rs6000_init_hard_regno_mode_ok): Likewise.
+	(rs6000_option_override_internal): Likewise.
+	(rs6000_builtin_vectorization_cost): Likewise.
+	(vector_pair_to_vector_mode): New function.
+	(+rs6000_split_vpair_constan): Likewise.
+	(rs6000_expand_vector_pair_ini): Likewise.
+	(rs6000_expand_vector_pair_set): Likewise.
+	(reg_offset_addressing_ok_p): Likewise.
+	(rs6000_emit_move): Likewise.
+	(altivec_expand_vec_perm_le): Likewise.
+	(rs6000_opt_var): Add -mvector-size-32.
+	(split_unary_vector_pair): New function.
+	(split_binary_vector_pair): Likewise.
+	(split_fma_vector_pai): Likewise.
+	(rs6000_split_multireg_move): Add -mvector-size-32 support.
+	* config/rs6000/rs6000.h (VECTOR_PAIR_MODE): New macro.
+	* config/rs6000/rs6000.md (wd mode attribute): Add vector pair modes.
+	(RELOAD mode iterator): Likewise.
+	(toplevel): Include vector-pair.md.
+	* config/rs6000/rs6000.opt (-mvector-size-32): New option.
+	* config/rs6000/vector-pair.md: New file.
+	* config/rs6000/vsx.md (vsx_extract_v4df): New insn.
+	(vsx_extract_v8sf): Likewise.
+	* doc/invoke.texi (RS/6000 and PowerPC Options): Document
+	-mvector-size-32.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-size-32-1.c: New test.
+	* gcc.target/powerpc/vector-size-32-2.c: Likewise.
+	* gcc.target/powerpc/vector-size-32-3.c: Likewise.
+	* gcc.target/powerpc/vector-size-32-4.c: Likewise.
+	* gcc.target/powerpc/vector-size-32-5.c: Likewise.
+	* gcc.target/powerpc/vector-size-32-6.c: Likewise.
+
+==================== Branch work148-vsubreg, patch #401 ====================
+
+Add support for vector pair built-in functions.
+
+This patch adds a series of built-in functions to allow users to write code to
+do a number of simple operations where the loop is done using the __vector_pair
+type.  The __vector_pair type is an opaque type.  These built-in functions keep
+the two 128-bit vectors within the __vector_pair together, and split the
+operation after register allocation.
+
+2023-11-17  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_f32_*): Add vector
+	pair built-in functions for float.
+	(__builtin_vpair_f64_*): Add vector pair built-in functions for double.
+	* config/rs6000/rs6000-protos.h (split_unary_vector_pair): Add
+	declaration.
+	(split_binary_vector_pair): Likewise.
+	(split_fma_vector_pair): Likewise.
+	* config/rs6000/rs6000.cc (split_unary_vector_pair): New helper function
+	for vector pair built-in functions.
+	(split_binary_vector_pair): Likewise.
+	(split_fma_vector_pair): Likewise.
+	* config/rs6000/rs6000.md (toplevel): Include vector-pair.md.
+	* config/rs6000/t-rs6000 (MD_INCLUDES): Add vector-pair.md.
+	* config/rs6000/vector-pair.md: New file.
+	* doc/extend.texi (PowerPC Vector Pair Built-in Functions): Document the
+	floating point and general vector pair built-in functions.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-1.c: New test.
+	* gcc.target/powerpc/vector-pair-2.c: New test.
+	* gcc.target/powerpc/vector-pair-3.c: New test.
+	* gcc.target/powerpc/vector-pair-4.c: New test.
+
+2023-11-17  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_i8*): Add built-in
+	functions for integer vector pairs.
+	(__builtin_vpair_i16*): Likeise.
+	(__builtin_vpair_i32*): Likeise.
+	(__builtin_vpair_i64*): Likeise.
+	* config/rs6000/vector-pair.md (UNSPEC_VPAIR_V32QI): New unspec.
+	(UNSPEC_VPAIR_V16HI): Likewise.
+	(UNSPEC_VPAIR_V8SI): Likewise.
+	(UNSPEC_VPAIR_V4DI): Likewise.
+	(VP_INT_BINARY): New iterator for integer vector pair.
+	(vp_insn): Add supoort for integer vector pairs.
+	(vp_ireg): New code attribute for integer vector pairs.
+	(vp_ipredicate): Likewise.
+	(VP_INT): New int interator for integer vector pairs.
+	(VP_VEC_MODE): Likewise.
+	(vp_pmode): Likewise.
+	(vp_vmode): Likewise.
+	(vp_neg_reg): New int interator for integer vector pairs.
+	(vpair_neg_<vp_pmode>): Add integer vector pair support insns.
+	(vpair_not_<vp_pmode>2): Likewise.
+	(vpair_<vp_insn>_<vp_pmode>3): Likewise.
+	(vpair_andc_<vp_pmode): Likewise.
+	(*vpair_iorc_<vp_pmode>): Likewise.
+	(vpair_nand_<vp_pmode>_1): Likewise.
+	(vpair_nand_<vp_pmode>_2): Likewise.
+	(vpair_nor_<vp_pmode>_1): Likewise.
+	(vpair_nor_<vp_pmode>_2): Likewise.
+	* doc/extend.texi (PowerPC Vector Pair Built-in Functions): Document the
+	integer vector pair built-in functions.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-5.c: New test.
+	* gcc.target/powerpc/vector-pair-6.c: New test.
+	* gcc.target/powerpc/vector-pair-7.c: New test.
+	* gcc.target/powerpc/vector-pair-8.c: New test.
+
+
+2023-11-17  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/predicates.md (mma_assemble_input_operand): Allow any
+	16-byte vector, not just V16QImode.
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_zero): New vector
+	pair initialization built-in functions.
+	(__builtin_vpair_*_assemble): Likeise.
+	(__builtin_vpair_*_splat): Likeise.
+	(__builtin_vpair_*_extract_vector): New vector pair extraction built-in
+	functions.
+	* config/rs6000/vector-pair.md (UNSPEC_VPAIR_V32QI): New unspec.
+	(UNSPEC_VPAIR_V16HI): Likewise.
+	(UNSPEC_VPAIR_V8SI): Likewise.
+	(UNSPEC_VPAIR_V4DI): Likewise.
+	(VP_INT_BINARY): New iterator for integer vector pair.
+	(vp_insn): Add supoort for integer vector pairs.
+	(vp_ireg): New code attribute for integer vector pairs.
+	(vp_ipredicate): Likewise.
+	(VP_INT): New int interator for integer vector pairs.
+	(VP_VEC_MODE): Likewise.
+	(vp_pmode): Likewise.
+	(vp_vmode): Likewise.
+	(vp_neg_reg): New int interator for integer vector pairs.
+	(vpair_neg_<vp_pmode>): Add integer vector pair support insns.
+	(vpair_not_<vp_pmode>2): Likewise.
+	(vpair_<vp_insn>_<vp_pmode>3): Likewise.
+	(vpair_andc_<vp_pmode): Likewise.
+	(vpair_iorc_<vp_pmode>): Likewise.
+	(vpair_nand_<vp_pmode>_1): Likewise.
+	(vpair_nand_<vp_pmode>_2): Likewise.
+	(vpair_nor_<vp_pmode>_1): Likewise.
+	(vpair_nor_<vp_pmode>_2): Likewise.
+	* doc/extend.texi (PowerPC Vector Pair Built-in Functions): Document the
+	integer vector pair built-in functions.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-5.c: New test.
+	* gcc.target/powerpc/vector-pair-6.c: New test.
+	* gcc.target/powerpc/vector-pair-7.c: New test.
+	* gcc.target/powerpc/vector-pair-8.c: New test.
+
+2023-11-17  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_f32_add_elements):
+	New built-in function.
+	(__builtin_vpair_f64_add_elements): Likewise.
+	(__builtin_vpair_i64_add_elements): Likewise.
+	(__builtin_vpair_i64u_add_elements): Likewise.
+	* config/rs6000/vector-pair.md (UNSPEC_VPAIR_REDUCE_PLUS_F32): New
+	unspec.
+	(UNSPEC_VPAIR_REDUCE_PLUS_F64): Likewise.
+	(UNSPEC_VPAIR_REDUCE_PLUS_I64): Likewise.
+	(vpair_reduc_plus_scale_v8sf): New insn.
+	(vpair_reduc_plus_scale_v4df): Likewise.
+	(vpair_reduc_plus_scale_v4di): Likewise.
+	* doc/extend.texi (__builtin_vpair_f32_add_elements): Document.
+	(__builtin_vpair_f64_add_elements): Likewise.
+	(__builtin_vpair_i64_add_elements): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-16.c: New test.
+
+2023-11-17  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-overloads.def (__builtin_vpair_assemble): Add
+	overloads.
+
+2023-11-17  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair*): Rename all insn
+	names from VPAIR... to VPAIR_FUNC... to allow building the combined
+	vsubreg branch.
+	* config/rs6000/rs6000-overload.def (__builtin_vpair*): Likewise.
+	* config/rs6000/rs6000.md (toplevel): Include vpair-func.md instead of
+	vector-pair.md.
+	* config/rs6000/t-rs6000: (MD_INCLUDES): Change vector-pair.md to
+	vpair-func.md.
+	* config/rs6000/vpair-func.md: Rename from vector-pair.md to
+	vpair-func.md.  Change all VPAIR names to be VPAIR_FUNC.
+
+==================== Branch work148-vsubreg, patch #400 ====================
+
+Peter's patches for subreg support.
+
+2023-11-17  Peter Bergner  <bergner@linux.ibm.com>
+
+gcc/
+
+	PR target/109116
+	* gcc/config/rs6000/rs6000.cc (rs6000_modes_tieable_p): Make OOmode
+	tieable with 128-bit vector modes.
+
+2023-11-17  Peter Bergner  <bergner@linux.ibm.com>
+
+gcc/
+
+	PR target/109116
+	* gcc/config/rs6000/mma.md (vsx_disassemble_pair): Use SUBREG's instead
+	of UNSPEC's.
+	(mma_disassemble_acc): Likewise.
+
+==================== Branch work148-vsubreg, patch #1 (branch work148) ====================
+
+Power10: Add options to disable load and store vector pair.
+
+This is version 2 of the patch to add -mno-load-vector-pair and
+-mno-store-vector-pair undocumented tuning switches.
+
+The differences between the first version of the patch and this version is that
+I added explicit RTL abi attributes for when the compiler can generate the load
+vector pair and store vector pair instructions.  By having this attribute, the
+movoo insn has separate alternatives for when we generate the instruction and
+when we want to split the instruction into 2 separate vector loads or stores.
+
+In the first version of the patch, I had previously provided built-in functions
+that would always generate load vector pair and store vector pair instructions
+even if these instructions are normally disabled.  I found these built-ins
+weren't specified like the other vector pair built-ins, and I didn't include
+documentation for the built-in functions.  If we want such built-in functions,
+we can add them as a separate patch later.
+
+In addition, since both versions of the patch adds #pragma target and attribute
+support to change the results for individual functions, we can select on a
+function by function basis what the defaults for load/store vector pair is.
+
+The original text for the patch is:
+
+In working on some future patches that involve utilizing vector pair
+instructions, I wanted to be able to tune my program to enable or disable using
+the vector pair load or store operations while still keeping the other
+operations on the vector pair.
+
+This patch adds two undocumented tuning options.  The -mno-load-vector-pair
+option would tell GCC to generate two load vector instructions instead of a
+single load vector pair.  The -mno-store-vector-pair option would tell GCC to
+generate two store vector instructions instead of a single store vector pair.
+
+If either -mno-load-vector-pair is used, GCC will not generate the indexed
+stxvpx instruction.  Similarly if -mno-store-vector-pair is used, GCC will not
+generate the indexed lxvpx instruction.  The reason for this is to enable
+splitting the {,p}lxvp or {,p}stxvp instructions after reload without needing a
+scratch GPR register.
+
+The default for -mcpu=power10 is that both load vector pair and store vector
+pair are enabled.
+
+I added code so that the user code can modify these settings using either a
+'#pragma GCC target' directive or used __attribute__((__target__(...))) in the
+function declaration.
+
+I added tests for the switches, #pragma, and attribute options.
+
+I have built this on both little endian power10 systems and big endian power9
+systems doing the normal bootstrap and test.  There were no regressions in any
+of the tests, and the new tests passed.  Can I check this patch into the master
+branch?
+
+2023-11-17  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (movoo): Add support for -mno-load-vector-pair and
+	-mno-store-vector-pair.
+	* config/rs6000/rs6000-cpus.def (OTHER_POWER10_MASKS): Add support for
+	-mload-vector-pair and -mstore-vector-pair.
+	(POWERPC_MASKS): Likewise.
+	* config/rs6000/rs6000.cc (rs6000_setup_reg_addr_masks): Only allow
+	indexed mode for OOmode if we are generating both load vector pair and
+	store vector pair instructions.
+	(rs6000_option_override_internal): Add support for -mno-load-vector-pair
+	and -mno-store-vector-pair.
+	(rs6000_opt_masks): Likewise.
+	* config/rs6000/rs6000.md (isa attribute): Add lxvp and stxvp
+	attributes.
+	(enabled attribute): Likewise.
+	* config/rs6000/rs6000.opt (-mload-vector-pair): New option.
+	(-mstore-vector-pair): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-attribute.c: New test.
+	* gcc.target/powerpc/vector-pair-pragma.c: New test.
+	* gcc.target/powerpc/vector-pair-switch1.c: New test.
+	* gcc.target/powerpc/vector-pair-switch2.c: New test.
+	* gcc.target/powerpc/vector-pair-switch3.c: New test.
+	* gcc.target/powerpc/vector-pair-switch4.c: New test.
+
 ==================== Branch work148-vsubreg, baseline ====================
+
+Add ChangeLog.vsubreg and update REVISION.
+
+2023-11-17  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* ChangeLog.vsubreg: New file for branch.
+	* REVISION: Update.
 
 2023-11-28   Michael Meissner  <meissner@linux.ibm.com>
 
