@@ -327,6 +327,11 @@
   (and (match_code "const_int")
        (match_test "IN_RANGE (INTVAL (op), 0, 15)")))
 
+;; Match op = 0..31
+(define_predicate "const_0_to_31_operand"
+  (and (match_code "const_int")
+       (match_test "IN_RANGE (INTVAL (op), 0, 31)")))
+
 ;; Return 1 if op is a 34-bit constant integer.
 (define_predicate "cint34_operand"
   (match_code "const_int")
@@ -729,6 +734,9 @@
       if (zero_constant (op, mode) || all_ones_constant (op, mode))
 	return true;
 
+      if (VECTOR_PAIR_MODE (mode) && easy_vector_pair_constant (op, mode))
+	return true;
+
       /* Constants that can be generated with ISA 3.1 instructions are
          easy.  */
       vec_const_128bit_type vsx_const;
@@ -757,6 +765,26 @@
     }
 
   return false;
+})
+
+;; Return 1 if the operand is a CONST_VECTOR and can be loaded into a
+;; a pair of vector registers without using memory.
+(define_predicate "easy_vector_pair_constant"
+  (match_code "const_vector")
+{
+  rtx hi_constant, lo_constant;
+  machine_mode vmode;
+
+  if (!TARGET_MMA || !TARGET_VECTOR_SIZE_32 || !VECTOR_PAIR_MODE (mode))
+    return false;
+
+  vmode = vector_pair_to_vector_mode (mode);
+  if (vmode == VOIDmode)
+    return false;
+
+  return (split_vector_pair_constant (op, &hi_constant, &lo_constant)
+	  && easy_vector_constant (hi_constant, vmode)
+	  && easy_vector_constant (lo_constant, vmode));
 })
 
 ;; Same as easy_vector_constant but only for EASY_VECTOR_15_ADD_SELF.
@@ -1301,8 +1329,10 @@
 
 ;; Return 1 if this operand is valid for a MMA assemble accumulator insn.
 (define_special_predicate "mma_assemble_input_operand"
-  (match_test "(mode == V16QImode
+  (match_test "(GET_MODE_SIZE (mode) == 16 && VECTOR_MODE_P (mode)
 		&& (vsx_register_operand (op, mode)
+		    || op == CONST0_RTX (mode)
+		    || vsx_prefixed_constant (op, mode)
 		    || (MEM_P (op)
 			&& (indexed_or_indirect_address (XEXP (op, 0), mode)
 			    || quad_address_p (XEXP (op, 0), mode, false)))))"))
