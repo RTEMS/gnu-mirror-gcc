@@ -38,6 +38,22 @@
 (define_code_iterator VPAIR_FP_UNARY  [abs neg])
 (define_code_iterator VPAIR_FP_BINARY [plus minus mult smin smax])
 
+;; Integer vector pair ops.  We need the basic logical opts to support
+;; permution on little endian systems.
+(define_mode_iterator VPAIR_INT [V32QI V16HI V8SI V4DI])
+
+;; Special iterators for NEG (V4SI and V2DI have vneg{w,d}), while V16QI and
+;; V8HI have to use a subtract from 0.
+(define_mode_iterator VPAIR_NEG_VNEG [V4DI V8SI])
+(define_mode_iterator VPAIR_NEG_SUB [V32QI V16HI])
+
+;; Iterator integer unary/binary operations.  Logical operations can be done on
+;; all VSX registers, while the binary int operators need Altivec registers.
+(define_code_iterator VPAIR_LOGICAL_UNARY  [not])
+(define_code_iterator VPAIR_LOGICAL_BINARY [and ior xor])
+
+(define_code_iterator VPAIR_INT_BINARY     [plus minus smin smax umin umax])
+
 ;; Iterator for vector pairs with double word elements
 (define_mode_iterator VPAIR_DWORD [V4DI V4DF])
 
@@ -626,4 +642,240 @@
 }
   [(set_attr "length" "8")
    (set_attr "type" "vecfloat")])
+
+;; Vector pair negate if we have the VNEGx instruction.
+(define_insn_and_split "neg<mode>2"
+  [(set (match_operand:VPAIR_NEG_VNEG 0 "vsx_register_operand" "=v")
+	(neg:VPAIR_NEG_VNEG
+	 (match_operand:VPAIR_NEG_VNEG 1 "vsx_register_operand" "v")))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_unary_vector_pair (<VPAIR_VECTOR>mode, operands,
+			   gen_neg<vpair_vector_l>2);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "vecfloat")])
 
+;; Vector pair negate if we have to do a subtract from 0
+(define_insn_and_split "neg<mode>2"
+  [(set (match_operand:VPAIR_NEG_SUB 0 "vsx_register_operand" "=v")
+	(neg:VPAIR_NEG_SUB
+	 (match_operand:VPAIR_NEG_SUB 1 "vsx_register_operand" "v")))
+   (clobber (match_scratch:<VPAIR_VECTOR> 2 "=&v"))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  enum machine_mode mode = <VPAIR_VECTOR>mode;
+  rtx tmp = operands[2];
+  unsigned reg0 = reg_or_subregno (operands[0]);
+  unsigned reg1 = reg_or_subregno (operands[1]);
+
+  emit_move_insn (tmp, CONST0_RTX (mode));
+  emit_insn (gen_sub<vpair_vector_l>3 (gen_rtx_REG (mode, reg0),
+				       tmp,
+				       gen_rtx_REG (mode, reg1)));
+
+  emit_insn (gen_sub<vpair_vector_l>3 (gen_rtx_REG (mode, reg0 + 1),
+				       tmp,
+				       gen_rtx_REG (mode, reg1 + 1)));
+
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "vecfloat")])
+
+;; Vector pair logical unary operations.  These operations can use all VSX
+;; registers.
+(define_insn_and_split "<vpair_op><mode>2"
+  [(set (match_operand:VPAIR_INT 0 "vsx_register_operand" "=wa")
+	(VPAIR_LOGICAL_UNARY:VPAIR_INT
+	 (match_operand:VPAIR_INT 1 "vsx_register_operand" "wa")))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_unary_vector_pair (<VPAIR_VECTOR>mode, operands,
+			   gen_<vpair_op><vpair_vector_l>2);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "veclogical")])
+
+;; Vector pair logical binary operations.  These operations can use all VSX
+;; registers.
+(define_insn_and_split "<vpair_op><mode>3"
+  [(set (match_operand:VPAIR_INT 0 "vsx_register_operand" "=wa")
+	(VPAIR_LOGICAL_BINARY:VPAIR_INT
+	 (match_operand:VPAIR_INT 1 "vsx_register_operand" "wa")
+	 (match_operand:VPAIR_INT 2 "vsx_register_operand" "wa")))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_binary_vector_pair (<VPAIR_VECTOR>mode, operands,
+			    gen_<vpair_op><vpair_vector_l>3);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "veclogical")])
+
+;; Vector pair logical binary operations.  These operations require Altivec
+;; registers.
+(define_insn_and_split "<vpair_op><mode>3"
+  [(set (match_operand:VPAIR_INT 0 "vsx_register_operand" "=v")
+	(VPAIR_INT_BINARY:VPAIR_INT
+	 (match_operand:VPAIR_INT 1 "vsx_register_operand" "v")
+	 (match_operand:VPAIR_INT 2 "vsx_register_operand" "v")))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_binary_vector_pair (<VPAIR_VECTOR>mode, operands,
+			    gen_<vpair_op><vpair_vector_l>3);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "vecsimple")])
+
+;; Optiomize vector pair ~(a | b)  or ((~a) & (~b)) to produce xxlnor
+(define_insn_and_split "*nor<mode>3_1"
+  [(set (match_operand:VPAIR_INT 0 "vsx_register_operand" "=wa")
+	(not:VPAIR_INT
+	 (ior:VPAIR_INT
+	  (match_operand:VPAIR_INT 1 "vsx_register_operand" "wa")
+	  (match_operand:VPAIR_INT 2 "vsx_register_operand" "wa"))))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_binary_vector_pair (<VPAIR_VECTOR>mode, operands,
+			    gen_nor<vpair_vector_l>3);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "veclogical")])
+
+(define_insn_and_split "*nor<mode>3_2"
+  [(set (match_operand:VPAIR_INT 0 "vsx_register_operand" "=wa")
+	(and:VPAIR_INT
+	 (not:VPAIR_INT
+	  (match_operand:VPAIR_INT 1 "vsx_register_operand" "wa"))
+	 (not:VPAIR_INT
+	  (match_operand:VPAIR_INT 2 "vsx_register_operand" "wa"))))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_binary_vector_pair (<VPAIR_VECTOR>mode, operands,
+			    gen_nor<vpair_vector_l>3);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "veclogical")])
+
+;; Optimize vector pair (~a) & b to use xxlandc
+(define_insn_and_split "*andc<mode>3"
+  [(set (match_operand:VPAIR_INT 0 "vsx_register_operand" "=wa")
+	(and:VPAIR_INT
+	 (not:VPAIR_INT
+	  (match_operand:VPAIR_INT 1 "vsx_register_operand" "wa"))
+	 (match_operand:VPAIR_INT 2 "vsx_register_operand" "wa")))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_binary_vector_pair (<VPAIR_VECTOR>mode, operands,
+			    gen_andc<vpair_vector_l>3);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "veclogical")])
+
+;; Optimize vector pair ~(a ^ b) to produce xxleqv
+(define_insn_and_split "*eqv<mode>3"
+  [(set (match_operand:VPAIR_INT 0 "vsx_register_operand" "=wa")
+	(not:VPAIR_INT
+	 (xor:VPAIR_INT
+	  (match_operand:VPAIR_INT 1 "vsx_register_operand" "wa")
+	  (match_operand:VPAIR_INT 2 "vsx_register_operand" "wa"))))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_binary_vector_pair (<VPAIR_VECTOR>mode, operands,
+			    gen_nor<vpair_vector_l>3);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "veclogical")])
+
+
+;; Optiomize vector pair ~(a & b) or ((~a) | (~b)) to produce xxlnand
+(define_insn_and_split "*nand<mode>3_1"
+  [(set (match_operand:VPAIR_INT 0 "vsx_register_operand" "=wa")
+	(not:VPAIR_INT
+	 (and:VPAIR_INT
+	  (match_operand:VPAIR_INT 1 "vsx_register_operand" "wa")
+	  (match_operand:VPAIR_INT 2 "vsx_register_operand" "wa"))))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_binary_vector_pair (<VPAIR_VECTOR>mode, operands,
+			    gen_nand<vpair_vector_l>3);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "veclogical")])
+
+(define_insn_and_split "*nand<mode>3_2"
+  [(set (match_operand:VPAIR_INT 0 "vsx_register_operand" "=wa")
+	(ior:VPAIR_INT
+	 (not:VPAIR_INT
+	  (match_operand:VPAIR_INT 1 "vsx_register_operand" "wa"))
+	 (not:VPAIR_INT
+	  (match_operand:VPAIR_INT 2 "vsx_register_operand" "wa"))))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_binary_vector_pair (<VPAIR_VECTOR>mode, operands,
+			    gen_nand<vpair_vector_l>3);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "veclogical")])
+
+;; Optimize vector pair (~a) | b to produce xxlorc
+(define_insn_and_split "*orc<mode>3"
+  [(set (match_operand:VPAIR_INT 0 "vsx_register_operand" "=wa")
+	(ior:VPAIR_INT
+	 (not:VPAIR_INT
+	  (match_operand:VPAIR_INT 1 "vsx_register_operand" "wa"))
+	 (match_operand:VPAIR_INT 2 "vsx_register_operand" "wa")))]
+  "TARGET_MMA && TARGET_VECTOR_SIZE_32"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  split_binary_vector_pair (<VPAIR_VECTOR>mode, operands,
+			    gen_orc<vpair_vector_l>3);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "veclogical")])
