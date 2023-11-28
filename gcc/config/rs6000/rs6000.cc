@@ -7351,7 +7351,7 @@ rs6000_expand_vector_init (rtx target, rtx vals)
 
 /* For a vector pair mode, return the equivalent vector mode or VOIDmode.  */
 
-static machine_mode
+machine_mode
 vector_pair_to_vector_mode (machine_mode mode)
 {
   machine_mode vmode;
@@ -7375,8 +7375,8 @@ vector_pair_to_vector_mode (machine_mode mode)
    pair into 2 separate constants that can be held in a single vector register.
    Return true if we can split the constant.  */
 
-static bool
-rs6000_split_vpair_constant (rtx op, rtx *high, rtx *low)
+bool
+split_vector_pair_constant (rtx op, rtx *high, rtx *low)
 {
   machine_mode vmode = vector_pair_to_vector_mode (GET_MODE (op));
 
@@ -7477,7 +7477,7 @@ rs6000_expand_vector_pair_init (rtx target, rtx vals)
   rtx vals_hi;
   rtx vals_lo;
 
-  rs6000_split_vpair_constant (vals, &vals_hi, &vals_lo);
+  split_vector_pair_constant (vals, &vals_hi, &vals_lo);
 
   rs6000_expand_vector_init (vector_hi, vals_hi);
   rs6000_expand_vector_init (vector_lo, vals_lo);
@@ -27761,7 +27761,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 
   /* Handle vector pair constants.  */
   if (CONST_VECTOR_P (src) && VECTOR_PAIR_MODE (mode) && TARGET_MMA
-      && rs6000_split_vpair_constant (src, &vpair_hi, &vpair_lo)
+      && split_vector_pair_constant (src, &vpair_hi, &vpair_lo)
       && VSX_REGNO_P (reg))
     {
       reg_mode = GET_MODE (vpair_hi);
