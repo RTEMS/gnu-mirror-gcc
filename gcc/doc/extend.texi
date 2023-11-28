@@ -15277,6 +15277,7 @@ instructions, but allow the compiler to schedule those calls.
 * NDS32 Built-in Functions::
 * Nvidia PTX Built-in Functions::
 * Basic PowerPC Built-in Functions::
+* PowerPC Vector Pair Built-in Functions Available on ISA 3.1::
 * PowerPC AltiVec/VSX Built-in Functions::
 * PowerPC Hardware Transactional Memory Built-in Functions::
 * PowerPC Atomic Memory Operation Functions::
@@ -21605,6 +21606,170 @@ int vec_any_le (vector signed __int128, vector signed __int128);
 int vec_any_le (vector unsigned __int128, vector unsigned __int128);
 @end smallexample
 
+
+@node PowerPC Vector Pair Built-in Functions Available on ISA 3.1
+@subsection PowerPC Vector Pair Built-in Functions Available on ISA 3.1
+
+GCC provides functions to speed up processing by using the type
+@code{__vector_pair} to hold two 128-bit vectors on processors that
+support ISA 3.1 (power10).  The @code{__vector_pair} type and the
+vector pair built-in functions require the MMA instruction set
+(@option{-mmma}) to be enabled, which is on by default for
+@option{-mcpu=power10}.
+
+By default, @code{__vector_pair} types are loaded into vectors with a
+single load vector pair instruction.  The processing for the built-in
+function is done as two separate vector instructions on each of the
+two 128-bit vectors stored in the vector pair.  The
+@code{__vector_pair} type is usually stored with a single vector pair
+store instruction.
+
+The following built-in functions are independent on the type of the
+underlying vector:
+
+@smallexample
+__vector_pair __builtin_vpair_zero ();
+@end smallexample
+
+The following built-in functions operate on pairs of
+@code{vector float} values:
+
+@smallexample
+__vector_pair __builtin_vpair_f32_abs (__vector_pair);
+__vector_pair __builtin_vpair_f32_add (__vector_pair, __vector_pair);
+float __builtin_vpair_f32_add_elements (__vector_pair);
+__vector_pair __builtin_vpair_f32_assemble (vector float, vector float);
+vector float __builtin_vpair_f32_extract_vector (__vector_pair, int);
+__vector_pair __builtin_vpair_f32_fma (__vector_pair, __vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f32_max (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f32_min (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f32_mul (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f32_neg (__vector_pair);
+__vector_pair __builtin_vpair_f32_splat (float);
+__vector_pair __builtin_vpair_f32_sub (__vector_pair, __vector_pair);
+@end smallexample
+
+The following built-in functions operate on pairs of
+@code{vector double} values:
+
+@smallexample
+__vector_pair __builtin_vpair_f64_abs (__vector_pair);
+__vector_pair __builtin_vpair_f64_add (__vector_pair, __vector_pair);
+double __builtin_vpair_f64_add_elements (__vector_pair);
+__vector_pair __builtin_vpair_f64_assemble (vector double, vector double);
+vector double __builtin_vpair_f64_extract_vector (__vector_pair, int);
+__vector_pair __builtin_vpair_f64_fma (__vector_pair, __vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f64_mul (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f64_neg (__vector_pair);
+__vector_pair __builtin_vpair_f64_max (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f64_min (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f64_splat (double);
+__vector_pair __builtin_vpair_f64_sub (__vector_pair, __vector_pair);
+@end smallexample
+
+The following built-in functions operate on pairs of
+@code{vector long long} or @code{vector unsigned long long} values:
+
+@smallexample
+__vector_pair __builtin_vpair_i64_add (__vector_pair, __vector_pair);
+long long __builtin_vpair_i64_add_elements (__vector_pair);
+__vector_pair __builtin_vpair_i64_and (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i64_assemble (vector long long,
+                                            vector long long);
+vector long long __builtin_vpair_i64_extract_vector (__vector_pair, int);
+__vector_pair __builtin_vpair_i64_ior (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i64_max (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i64_min (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i64_neg (__vector_pair);
+__vector_pair __builtin_vpair_i64_not (__vector_pair);
+__vector_pair __builtin_vpair_i64_splat (long long);
+__vector_pair __builtin_vpair_i64_sub (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i64_xor (__vector_pair, __vector_pair);
+
+__vector_pair __builtin_vpair_i64u_assemble (vector unsigned long long,
+                                             vector unsigned long long);
+vector unsigned long long __builtin_vpair_i64u_extract_vector (__vector_pair, int);
+__vector_pair __builtin_vpair_i64u_max (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i64u_min (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i64u_splat (unsigned long long);
+@end smallexample
+
+The following built-in functions operate on pairs of
+@code{vector int} or @code{vector unsigned int} values:
+
+@smallexample
+__vector_pair __builtin_vpair_i32_add (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i32_and (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i32_assemble (vector int, vector int);
+vector int __builtin_vpair_i32_extract_vector (__vector_pair, int);
+__vector_pair __builtin_vpair_i32_ior (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i32_neg (__vector_pair);
+__vector_pair __builtin_vpair_i32_not (__vector_pair);
+__vector_pair __builtin_vpair_i32_max (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i32_min (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i32_splat (int);
+__vector_pair __builtin_vpair_i32_sub (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i32_xor (__vector_pair, __vector_pair);
+
+__vector_pair __builtin_vpair_i32u_assemble (vector unsigned int,
+                                             vector unsigned int);
+vector unsigned int __builtin_vpair_i32u_extract_vector (__vector_pair, int);
+__vector_pair __builtin_vpair_i32u_max (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i32u_min (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i32u_splat (unsigned int);
+@end smallexample
+
+The following built-in functions operate on pairs of
+@code{vector short} or @code{vector unsigned short} values:
+
+@smallexample
+__vector_pair __builtin_vpair_i16_add (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i16_and (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i16_assemble (vector short,
+                                            vector short);
+__vector_pair __builtin_vpair_i16_splat (short);
+vector short __builtin_vpair_i16_extract_vector (__vector_pair, int);
+__vector_pair __builtin_vpair_i16_ior (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i16_max (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i16_min (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i16_neg (__vector_pair);
+__vector_pair __builtin_vpair_i16_not (__vector_pair);
+__vector_pair __builtin_vpair_i16_sub (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i16_xor (__vector_pair, __vector_pair);
+
+__vector_pair __builtin_vpair_i16u_assemble (vector unsigned short,
+                                             vector unsigned short);
+vector unsigned short __builtin_vpair_i16u_extract_vector (__vector_pair, int);
+__vector_pair __builtin_vpair_i16u_splat (unsigned short);
+__vector_pair __builtin_vpair_i16u_max (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i16u_min (__vector_pair, __vector_pair);
+@end smallexample
+
+The following built-in functions operate on pairs of
+@code{vector signed char} or @code{vector unsigned char} values:
+
+@smallexample
+__vector_pair __builtin_vpair_i8_add (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i8_and (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i8_assemble (vector signed char,
+                                           vector signed char);
+vector signed char __builtin_vpair_i8_extract_vector (__vector_pair, int);
+__vector_pair __builtin_vpair_i8_splat (signed char);
+__vector_pair __builtin_vpair_i8_ior (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i8_max (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i8_min (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i8_neg (__vector_pair);
+__vector_pair __builtin_vpair_i8_not (__vector_pair);
+__vector_pair __builtin_vpair_i8_sub (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i8_xor (__vector_pair, __vector_pair);
+
+__vector_pair __builtin_vpair_i8u_assemble (vector unsigned char,
+                                            vector unsigned char4);
+vector unsigned char __builtin_vpair_i8u_extract_vector (__vector_pair, int);
+__vector_pair __builtin_vpair_i8_umax (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i8_umin (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_i8u_splat (unsigned char);
+@end smallexample
 
 @node PowerPC Hardware Transactional Memory Built-in Functions
 @subsection PowerPC Hardware Transactional Memory Built-in Functions
