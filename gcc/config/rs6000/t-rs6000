@@ -125,6 +125,7 @@ MD_INCLUDES = $(srcdir)/config/rs6000/rs64.md \
 	$(srcdir)/config/rs6000/darwin.md \
 	$(srcdir)/config/rs6000/sync.md \
 	$(srcdir)/config/rs6000/vector.md \
+	$(srcdir)/config/rs6000/vector-size.md \
 	$(srcdir)/config/rs6000/vsx.md \
 	$(srcdir)/config/rs6000/altivec.md \
 	$(srcdir)/config/rs6000/mma.md \
