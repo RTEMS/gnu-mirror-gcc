@@ -505,7 +505,8 @@ Objective-C and Objective-C++ Dialects}.
 
 @item C and Objective-C-only Warning Options
 @gccoptlist{-Wbad-function-cast  -Wmissing-declarations
--Wmissing-parameter-type -Wmissing-prototypes -Wmissing-variable-declarations
+-Wmissing-parameter-type -Wdeclaration-missing-parameter-type
+-Wmissing-prototypes -Wmissing-variable-declarations
 -Wnested-externs -Wold-style-declaration  -Wold-style-definition
 -Wstrict-prototypes  -Wtraditional  -Wtraditional-conversion
 -Wdeclaration-after-statement  -Wpointer-sign}
@@ -6184,7 +6185,13 @@ only by this flag, but it also downgrades some C and C++ diagnostics
 that have their own flag:
 
 @gccoptlist{
+-Wdeclaration-missing-parameter-type @r{(C and Objective-C only)}
+-Wimplicit-function-declaration @r{(C and Objective-C only)}
+-Wimplicit-int @r{(C and Objective-C only)}
+-Wincompatible-pointer-types @r{(C and Objective-C only)}
+-Wint-conversion @r{(C and Objective-C only)}
 -Wnarrowing @r{(C++)}
+-Wreturn-mismatch @r{(C and Objective-C only)}
 }
 
 The @option{-fpermissive} option is the default for historic C language
@@ -6854,8 +6861,10 @@ This warning is enabled by @option{-Wall} in C++.
 @opindex Wno-implicit-int
 @item -Wno-implicit-int @r{(C and Objective-C only)}
 This option controls warnings when a declaration does not specify a type.
-This warning is enabled by default in C99 and later dialects of C,
-and also by @option{-Wall}.
+This warning is enabled by default, as an error, in C99 and later
+dialects of C, and also by @option{-Wall}.  The error can be downgraded
+to a warning using @option{-fpermissive} (along with certain other
+errors), or for this error alone, with @option{-Wno-error=implicit-int}.
 
 This warning is upgraded to an error by @option{-pedantic-errors}.
 
@@ -6863,8 +6872,11 @@ This warning is upgraded to an error by @option{-pedantic-errors}.
 @opindex Wno-implicit-function-declaration
 @item -Wno-implicit-function-declaration @r{(C and Objective-C only)}
 This option controls warnings when a function is used before being declared.
-This warning is enabled by default in C99 and later dialects of C,
-and also by @option{-Wall}.
+This warning is enabled by default, as an error, in C99 and later
+dialects of C, and also by @option{-Wall}.  The error can be downgraded
+to a warning using @option{-fpermissive} (along with certain other
+errors), or for this error alone, with
+@option{-Wno-error=implicit-function-declaration}.
 
 This warning is upgraded to an error by @option{-pedantic-errors}.
 
@@ -7382,7 +7394,10 @@ Attempting to use the return value of a non-@code{void} function other
 than @code{main} that flows off the end by reaching the closing curly
 brace that terminates the function is undefined.
 
-This warning is specific to C and enabled by default.
+This warning is specific to C and enabled by default.  In C99 and later
+language dialects, it is treated as an error.  It can be downgraded
+to a warning using @option{-fpermissive} (along with other warnings),
+or for just this warning, with @option{-Wno-error=return-mismatch}.
 
 @opindex Wreturn-type
 @opindex Wno-return-type
@@ -8554,6 +8569,11 @@ types.  This warning is for cases not covered by @option{-Wno-pointer-sign},
 which warns for pointer argument passing or assignment with different
 signedness.
 
+By default, in C99 and later dialects of C, GCC treats this issue as an
+error.  The error can be downgraded to a warning using
+@option{-fpermissive} (along with certain other errors), or for this
+error alone, with @option{-Wno-error=incompatible-pointer-types}.
+
 This warning is upgraded to an error by @option{-pedantic-errors}.
 
 @opindex Wno-int-conversion
@@ -8563,6 +8583,11 @@ Do not warn about incompatible integer to pointer and pointer to integer
 conversions.  This warning is about implicit conversions; for explicit
 conversions the warnings @option{-Wno-int-to-pointer-cast} and
 @option{-Wno-pointer-to-int-cast} may be used.
+
+By default, in C99 and later dialects of C, GCC treats this issue as an
+error.  The error can be downgraded to a warning using
+@option{-fpermissive} (along with certain other errors), or for this
+error alone, with @option{-Wno-error=int-conversion}.
 
 This warning is upgraded to an error by @option{-pedantic-errors}.
 
@@ -9734,6 +9759,20 @@ void foo(bar) @{ @}
 @end smallexample
 
 This warning is also enabled by @option{-Wextra}.
+
+@opindex Wno-declaration-missing-parameter-type
+@opindex Wdeclaration-missing-parameter-type
+@item -Wno-declaration-missing-parameter-type @r{(C and Objective-C only)}
+Do not warn if a function declaration contains a parameter name without
+a type.  Such function declarations do not provide a function prototype
+and prevent most type checking in function calls.
+
+This warning is enabled by default.  In C99 and later dialects of C, it
+is treated as an error.  The error can be downgraded to a warning using
+@option{-fpermissive} (along with certain other errors), or for this
+error alone, with @option{-Wno-error=declaration-missing-parameter-type}.
+
+This warning is upgraded to an error by @option{-pedantic-errors}.
 
 @opindex Wmissing-prototypes
 @opindex Wno-missing-prototypes
@@ -20944,7 +20983,7 @@ performance of the code.  Permissible values for this option are:
 @samp{cortex-r82}, @samp{cortex-x1}, @samp{cortex-x1c}, @samp{cortex-x2},
 @samp{cortex-x3}, @samp{cortex-x4}, @samp{cortex-a510}, @samp{cortex-a520},
 @samp{cortex-a710}, @samp{cortex-a715}, @samp{cortex-a720}, @samp{ampere1},
-@samp{ampere1a}, and @samp{native}.
+@samp{ampere1a}, @samp{ampere1b}, and @samp{native}.
 
 The values @samp{cortex-a57.cortex-a53}, @samp{cortex-a72.cortex-a53},
 @samp{cortex-a73.cortex-a35}, @samp{cortex-a73.cortex-a53},

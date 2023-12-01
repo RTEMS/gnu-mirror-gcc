@@ -1,3 +1,9 @@
+2023-11-30  Wilco Dijkstra  <wilco.dijkstra@arm.com>
+
+	PR target/111404
+	* config/aarch64/lse.S (__aarch64_cas16_acq_rel): Execute STLXP using
+	either new value or loaded value.
+
 2010-06-30  Jakub Jelinek  <jakub@redhat.com>
 
 	* config/ia64/lib1funcs.S: Add .note.GNU-stack section on

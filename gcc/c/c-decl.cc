@@ -647,8 +647,6 @@ static tree grokdeclarator (const struct c_declarator *,
 			    bool *, enum deprecated_states);
 static tree grokparms (struct c_arg_info *, bool);
 static void layout_array_type (tree);
-static void warn_defaults_to (location_t, int, const char *, ...)
-    ATTRIBUTE_GCC_DIAG(3,4);
 static const char *header_for_builtin_fn (tree);
 
 /* T is a statement.  Add it to the statement-tree.  This is the
@@ -3493,12 +3491,12 @@ pushdecl (tree x)
 }
 
 
-/* Issue a warning about implicit function declaration.  ID is the function
+/* Issue a permerror about implicit function declaration.  ID is the function
    identifier, OLDDECL is a declaration of the function in a different scope,
    or NULL_TREE.  */
 
 static void
-implicit_decl_warning (location_t loc, tree id, tree olddecl)
+implicit_decl_permerror (location_t loc, tree id, tree olddecl)
 {
   if (!warn_implicit_function_declaration)
     return;
@@ -3515,14 +3513,14 @@ implicit_decl_warning (location_t loc, tree id, tree olddecl)
 	{
 	  gcc_rich_location richloc (loc);
 	  richloc.add_fixit_replace (suggestion);
-	  warned = pedwarn (&richloc, OPT_Wimplicit_function_declaration,
-			    "implicit declaration of function %qE;"
-			    " did you mean %qs?",
-			    id, suggestion);
+	  warned = permerror_opt (&richloc, OPT_Wimplicit_function_declaration,
+				  "implicit declaration of function %qE;"
+				  " did you mean %qs?",
+				  id, suggestion);
 	}
       else
-	warned = pedwarn (loc, OPT_Wimplicit_function_declaration,
-			  "implicit declaration of function %qE", id);
+	warned = permerror_opt (loc, OPT_Wimplicit_function_declaration,
+				"implicit declaration of function %qE", id);
     }
   else if (const char *suggestion = hint.suggestion ())
     {
@@ -3812,7 +3810,7 @@ implicitly_declare (location_t loc, tree functionid)
 	     then recycle the old declaration but with the new type.  */
 	  if (!C_DECL_IMPLICIT (decl))
 	    {
-	      implicit_decl_warning (loc, functionid, decl);
+	      implicit_decl_permerror (loc, functionid, decl);
 	      C_DECL_IMPLICIT (decl) = 1;
 	    }
 	  if (fndecl_built_in_p (decl))
@@ -3865,7 +3863,7 @@ implicitly_declare (location_t loc, tree functionid)
   DECL_EXTERNAL (decl) = 1;
   TREE_PUBLIC (decl) = 1;
   C_DECL_IMPLICIT (decl) = 1;
-  implicit_decl_warning (loc, functionid, 0);
+  implicit_decl_permerror (loc, functionid, 0);
   asmspec_tree = maybe_apply_renaming_pragma (decl, /*asmname=*/NULL);
   if (asmspec_tree)
     set_user_assembler_name (decl, TREE_STRING_POINTER (asmspec_tree));
@@ -6576,23 +6574,6 @@ warn_variable_length_array (tree name, tree size)
     }
 }
 
-/* Print warning about defaulting to int if necessary.  */
-
-static void
-warn_defaults_to (location_t location, int opt, const char *gmsgid, ...)
-{
-  diagnostic_info diagnostic;
-  va_list ap;
-  rich_location richloc (line_table, location);
-
-  va_start (ap, gmsgid);
-  diagnostic_set_info (&diagnostic, gmsgid, &ap, &richloc,
-                       flag_isoc99 ? DK_PEDWARN : DK_WARNING);
-  diagnostic.option_index = opt;
-  diagnostic_report_diagnostic (global_dc, &diagnostic);
-  va_end (ap);
-}
-
 /* Returns the smallest location != UNKNOWN_LOCATION in LOCATIONS,
    considering only those c_declspec_words found in LIST, which
    must be terminated by cdw_number_of_elements.  */
@@ -6870,7 +6851,7 @@ grokdeclarator (const struct c_declarator *declarator,
 
   /* Diagnose defaulting to "int".  */
 
-  if (declspecs->default_int_p && !in_system_header_at (input_location))
+  if (declspecs->default_int_p)
     {
       /* Issue a warning if this is an ISO C 99 program or if
 	 -Wreturn-type and this is a function, or if -Wimplicit;
@@ -6881,12 +6862,12 @@ grokdeclarator (const struct c_declarator *declarator,
       else
 	{
 	  if (name)
-	    warn_defaults_to (loc, OPT_Wimplicit_int,
-			      "type defaults to %<int%> in declaration "
-			      "of %qE", name);
+	    permerror_opt (loc, OPT_Wimplicit_int,
+			   "type defaults to %<int%> in declaration "
+			   "of %qE", name);
 	  else
-	    warn_defaults_to (loc, OPT_Wimplicit_int,
-			      "type defaults to %<int%> in type name");
+	    permerror_opt (loc, OPT_Wimplicit_int,
+			   "type defaults to %<int%> in type name");
 	}
     }
 
@@ -8362,8 +8343,10 @@ grokparms (struct c_arg_info *arg_info, bool funcdef_flag)
     {
       if (!funcdef_flag)
 	{
-	  pedwarn (input_location, 0, "parameter names (without types) in "
-		   "function declaration");
+	  permerror_opt (input_location,
+			 OPT_Wdeclaration_missing_parameter_type,
+			 "parameter names (without types) in "
+			 "function declaration");
 	  arg_info->parms = NULL_TREE;
 	}
       else
@@ -10300,10 +10283,10 @@ start_function (struct c_declspecs *declspecs, struct c_declarator *declarator,
     }
 
   if (warn_about_return_type)
-    warn_defaults_to (loc, flag_isoc99 ? OPT_Wimplicit_int
-			   : (warn_return_type > 0 ? OPT_Wreturn_type
-			      : OPT_Wimplicit_int),
-		      "return type defaults to %<int%>");
+    permerror_opt (loc, flag_isoc99 ? OPT_Wimplicit_int
+		   : (warn_return_type > 0 ? OPT_Wreturn_type
+		      : OPT_Wimplicit_int),
+		   "return type defaults to %<int%>");
 
   /* Make the init_value nonzero so pushdecl knows this is not tentative.
      error_mark_node is replaced below (in pop_scope) with the BLOCK.  */
@@ -10645,9 +10628,9 @@ store_parm_decls_oldstyle (tree fndecl, const struct c_arg_info *arg_info)
 	  warn_if_shadowing (decl);
 
 	  if (flag_isoc99)
-	    pedwarn (DECL_SOURCE_LOCATION (decl),
-		     OPT_Wimplicit_int, "type of %qD defaults to %<int%>",
-		     decl);
+	    permerror_opt (DECL_SOURCE_LOCATION (decl),
+			   OPT_Wimplicit_int, "type of %qD defaults to %<int%>",
+			   decl);
 	  else
 	    warning_at (DECL_SOURCE_LOCATION (decl),
 			OPT_Wmissing_parameter_type,
