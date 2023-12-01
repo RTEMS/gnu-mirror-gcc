@@ -1913,7 +1913,7 @@
         (match_operand:V_VLSI_D 2 "register_operand"         " vr,vr")
 	(match_operand:<VM> 4 "register_operand"         " vm,vm"))
       (match_operand:V_VLSI_D 1 "vector_merge_operand"       " vu, 0")))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && !TARGET_64BIT"
   "vmerge.vxm\t%0,%2,%3,%4"
   [(set_attr "type" "vimerge")
    (set_attr "mode" "<MODE>")])
@@ -2091,7 +2091,7 @@
 	    (sign_extend:<VEL>
 	      (match_operand:<VSUBEL> 3 "register_operand"          " r,  r,  r,  r")))
 	  (match_operand:V_VLSI_D 2 "vector_merge_operand"          "vu,  0, vu,  0")))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && !TARGET_64BIT"
   "@
    vmv.v.x\t%0,%3
    vmv.v.x\t%0,%3
@@ -2674,7 +2674,7 @@
 	        (match_operand:<VSUBEL> 4 "reg_or_0_operand" "rJ,rJ, rJ, rJ")))
 	    (match_operand:V_VLSI_D 3 "register_operand"         "vr,vr, vr, vr"))
 	  (match_operand:V_VLSI_D 2 "vector_merge_operand"       "vu, 0, vu,  0")))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && !TARGET_64BIT"
   "v<insn>.vx\t%0,%3,%z4%p1"
   [(set_attr "type" "<int_binop_insn_type>")
    (set_attr "mode" "<MODE>")])
@@ -2750,7 +2750,7 @@
 	      (sign_extend:<VEL>
 	        (match_operand:<VSUBEL> 4 "reg_or_0_operand" "rJ,rJ, rJ, rJ"))))
 	  (match_operand:V_VLSI_D 2 "vector_merge_operand"       "vu, 0, vu,  0")))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && !TARGET_64BIT"
   "v<insn>.vx\t%0,%3,%z4%p1"
   [(set_attr "type" "<int_binop_insn_type>")
    (set_attr "mode" "<MODE>")])
@@ -2826,7 +2826,7 @@
 	        (match_operand:<VSUBEL> 4 "reg_or_0_operand" "rJ,rJ, rJ, rJ")))
 	    (match_operand:V_VLSI_D 3 "register_operand"         "vr,vr, vr, vr"))
 	  (match_operand:V_VLSI_D 2 "vector_merge_operand"       "vu, 0, vu,  0")))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && !TARGET_64BIT"
   "vrsub.vx\t%0,%3,%z4%p1"
   [(set_attr "type" "vialu")
    (set_attr "mode" "<MODE>")])
@@ -2944,7 +2944,7 @@
 	         (match_operand:<VSUBEL> 4 "reg_or_0_operand" "rJ,rJ, rJ, rJ")))
 	     (match_operand:VFULLI_D 3 "register_operand"     "vr,vr, vr, vr")] VMULH)
 	  (match_operand:VFULLI_D 2 "vector_merge_operand"    "vu, 0, vu,  0")))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && !TARGET_64BIT"
   "vmulh<v_su>.vx\t%0,%3,%z4%p1"
   [(set_attr "type" "vimul")
    (set_attr "mode" "<MODE>")])
@@ -3123,7 +3123,7 @@
 	        (match_operand:VI_D 2 "register_operand"         "vr,vr"))
 	      (match_operand:<VM> 4 "register_operand"           "vm,vm")] UNSPEC_VADC)
 	  (match_operand:VI_D 1 "vector_merge_operand"           "vu, 0")))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && !TARGET_64BIT"
   "vadc.vxm\t%0,%2,%z3,%4"
   [(set_attr "type" "vicalu")
    (set_attr "mode" "<MODE>")
@@ -3207,7 +3207,7 @@
 	            (match_operand:<VSUBEL> 3 "reg_or_0_operand" "rJ,rJ"))))
 	      (match_operand:<VM> 4 "register_operand"           "vm,vm")] UNSPEC_VSBC)
 	  (match_operand:VI_D 1 "vector_merge_operand"           "vu, 0")))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && !TARGET_64BIT"
   "vsbc.vxm\t%0,%2,%z3,%4"
   [(set_attr "type" "vicalu")
    (set_attr "mode" "<MODE>")
@@ -3357,7 +3357,7 @@
 	       (match_operand 5 "const_int_operand"           "  i,   i")
 	       (reg:SI VL_REGNUM)
 	       (reg:SI VTYPE_REGNUM)] UNSPEC_VPREDICATE)] UNSPEC_VMADC))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && !TARGET_64BIT"
   "vmadc.vxm\t%0,%1,%z2,%3"
   [(set_attr "type" "vicalu")
    (set_attr "mode" "<MODE>")
@@ -3427,7 +3427,7 @@
 	       (match_operand 5 "const_int_operand"           "  i,   i")
 	       (reg:SI VL_REGNUM)
 	       (reg:SI VTYPE_REGNUM)] UNSPEC_VPREDICATE)] UNSPEC_VMSBC))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && !TARGET_64BIT"
   "vmsbc.vxm\t%0,%1,%z2,%3"
   [(set_attr "type" "vicalu")
    (set_attr "mode" "<MODE>")
@@ -3568,7 +3568,7 @@
 	       (match_operand 4 "const_int_operand"           "  i,   i")
 	       (reg:SI VL_REGNUM)
 	       (reg:SI VTYPE_REGNUM)] UNSPEC_VPREDICATE)] UNSPEC_OVERFLOW))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && !TARGET_64BIT"
   "vmadc.vx\t%0,%1,%z2"
   [(set_attr "type" "vicalu")
    (set_attr "mode" "<MODE>")
@@ -3635,7 +3635,7 @@
 	       (match_operand 4 "const_int_operand"          "  i,   i")
 	       (reg:SI VL_REGNUM)
 	       (reg:SI VTYPE_REGNUM)] UNSPEC_VPREDICATE)] UNSPEC_OVERFLOW))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && !TARGET_64BIT"
   "vmsbc.vx\t%0,%1,%z2"
   [(set_attr "type" "vicalu")
    (set_attr "mode" "<MODE>")
@@ -4153,7 +4153,7 @@
 	        (match_operand:<VSUBEL> 4 "register_operand" "  r,  r,  r,  r")))
 	    (match_operand:VI_D 3 "register_operand"         " vr, vr, vr, vr"))
 	  (match_operand:VI_D 2 "vector_merge_operand"       " vu,  0, vu,  0")))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && !TARGET_64BIT"
   "v<insn>.vx\t%0,%3,%4%p1"
   [(set_attr "type" "<int_binop_insn_type>")
    (set_attr "mode" "<MODE>")])
@@ -4229,7 +4229,7 @@
 	      (sign_extend:<VEL>
 	        (match_operand:<VSUBEL> 4 "register_operand" "  r,  r,  r,  r"))))
 	  (match_operand:VI_D 2 "vector_merge_operand"       " vu,  0, vu,  0")))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && !TARGET_64BIT"
   "v<insn>.vx\t%0,%3,%4%p1"
   [(set_attr "type" "<int_binop_insn_type>")
    (set_attr "mode" "<MODE>")])
@@ -4377,7 +4377,7 @@
 	     (sign_extend:<VEL>
 	       (match_operand:<VSUBEL> 4 "reg_or_0_operand" " rJ, rJ, rJ, rJ"))] VSAT_ARITH_OP)
 	  (match_operand:VI_D 2 "vector_merge_operand"      " vu,  0, vu,  0")))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && !TARGET_64BIT"
   "v<sat_op>.vx\t%0,%3,%z4%p1"
   [(set_attr "type" "<sat_insn_type>")
    (set_attr "mode" "<MODE>")])
@@ -4985,7 +4985,7 @@
 	        (sign_extend:<VEL>
 	          (match_operand:<VSUBEL> 4 "register_operand" "  r")))])
 	  (match_dup 1)))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && !TARGET_64BIT"
   "vms%B2.vx\t%0,%3,%4,v0.t"
   [(set_attr "type" "vicmp")
    (set_attr "mode" "<MODE>")
@@ -5011,7 +5011,7 @@
 	        (sign_extend:<VEL>
 	          (match_operand:<VSUBEL> 5 "register_operand" "    r,    r")))])
 	  (match_operand:<VM> 2 "vector_merge_operand"         "   vu,    0")))]
-  "TARGET_VECTOR && riscv_vector::cmp_lmul_le_one (<MODE>mode)"
+  "TARGET_VECTOR && riscv_vector::cmp_lmul_le_one (<MODE>mode) && !TARGET_64BIT"
   "vms%B3.vx\t%0,%4,%5%p1"
   [(set_attr "type" "vicmp")
    (set_attr "mode" "<MODE>")])
@@ -5032,7 +5032,7 @@
 	        (sign_extend:<VEL>
 	          (match_operand:<VSUBEL> 5 "register_operand" "    r,    r,    r,    r,    r")))])
 	  (match_operand:<VM> 2 "vector_merge_operand"         "   vu,   vu,    0,   vu,    0")))]
-  "TARGET_VECTOR && riscv_vector::cmp_lmul_gt_one (<MODE>mode)"
+  "TARGET_VECTOR && riscv_vector::cmp_lmul_gt_one (<MODE>mode) && !TARGET_64BIT"
   "vms%B3.vx\t%0,%4,%5%p1"
   [(set_attr "type" "vicmp")
    (set_attr "mode" "<MODE>")])
@@ -5053,7 +5053,7 @@
 	          (match_operand:<VSUBEL> 4 "register_operand"   "  r")))
 	      (match_operand:V_VLSI_D 3 "register_operand"           " vr")])
 	  (match_dup 1)))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && !TARGET_64BIT"
   "vms%B2.vx\t%0,%3,%4,v0.t"
   [(set_attr "type" "vicmp")
    (set_attr "mode" "<MODE>")
@@ -5079,7 +5079,7 @@
 	          (match_operand:<VSUBEL> 5 "register_operand" "    r,    r")))
 	      (match_operand:V_VLSI_D 4 "register_operand"         "   vr,   vr")])
 	  (match_operand:<VM> 2 "vector_merge_operand"         "   vu,    0")))]
-  "TARGET_VECTOR && riscv_vector::cmp_lmul_le_one (<MODE>mode)"
+  "TARGET_VECTOR && riscv_vector::cmp_lmul_le_one (<MODE>mode) && !TARGET_64BIT"
   "vms%B3.vx\t%0,%4,%5%p1"
   [(set_attr "type" "vicmp")
    (set_attr "mode" "<MODE>")])
@@ -5100,7 +5100,7 @@
 	          (match_operand:<VSUBEL> 5 "register_operand" "    r,    r,    r,    r,    r")))
 	      (match_operand:V_VLSI_D 4 "register_operand"         "   vr,    0,    0,   vr,   vr")])
 	  (match_operand:<VM> 2 "vector_merge_operand"         "   vu,   vu,    0,   vu,    0")))]
-  "TARGET_VECTOR && riscv_vector::cmp_lmul_gt_one (<MODE>mode)"
+  "TARGET_VECTOR && riscv_vector::cmp_lmul_gt_one (<MODE>mode) && !TARGET_64BIT"
   "vms%B3.vx\t%0,%4,%5%p1"
   [(set_attr "type" "vicmp")
    (set_attr "mode" "<MODE>")])
@@ -5480,7 +5480,7 @@
 	      (match_operand:V_VLSI_D 3 "register_operand"         "  0,  vr,  0,  vr"))
 	    (match_operand:V_VLSI_D 4 "register_operand"           " vr,  vr, vr,  vr"))
 	  (match_dup 3)))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && !TARGET_64BIT"
   "@
    vmadd.vx\t%0,%2,%4%p1
    vmv.v.v\t%0,%2\;vmadd.vx\t%0,%2,%4%p1
@@ -5513,7 +5513,7 @@
 	      (match_operand:V_VLSI_D 3 "register_operand"         " vr,  vr, vr,  vr"))
 	    (match_operand:V_VLSI_D 4 "register_operand"           "  0,  vr,  0,  vr"))
 	  (match_dup 4)))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && !TARGET_64BIT"
   "@
    vmacc.vx\t%0,%2,%3%p1
    vmv.v.v\t%0,%4\;vmacc.vx\t%0,%2,%3%p1
@@ -5778,7 +5778,7 @@
 	          (match_operand:<VSUBEL> 2 "register_operand" "  r,   r,  r,   r")))
 	      (match_operand:V_VLSI_D 3 "register_operand"         "  0,  vr,  0,  vr")))
 	  (match_dup 3)))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && !TARGET_64BIT"
   "@
    vnmsub.vx\t%0,%2,%4%p1
    vmv.v.v\t%0,%3\;vnmsub.vx\t%0,%2,%4%p1
@@ -5811,7 +5811,7 @@
 	          (match_operand:<VSUBEL> 2 "register_operand" "  r,   r,  r,   r")))
 	      (match_operand:V_VLSI_D 3 "register_operand"         " vr,  vr, vr,  vr")))
 	  (match_dup 4)))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && !TARGET_64BIT"
   "@
    vnmsac.vx\t%0,%2,%3%p1
    vmv.v.v\t%0,%4\;vnmsac.vx\t%0,%2,%3%p1
@@ -8139,7 +8139,7 @@
 	   (match_operand:V_VLSI_D 3 "register_operand"       " vr, vr, vr, vr")
 	   (sign_extend:<VEL>
 	     (match_operand:<VSUBEL> 4 "reg_or_0_operand" " rJ, rJ, rJ, rJ"))] VSLIDES1))]
-  "TARGET_VECTOR"
+  "TARGET_VECTOR && !TARGET_64BIT"
   "vslide<ud>.vx\t%0,%3,%z4%p1"
   [(set_attr "type" "vislide<ud>")
    (set_attr "mode" "<MODE>")])
