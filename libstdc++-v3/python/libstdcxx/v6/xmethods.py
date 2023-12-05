@@ -25,10 +25,22 @@ matcher_name_prefix = 'libstdc++::'
 def get_bool_type():
     return gdb.lookup_type('bool')
 
-
 def get_std_size_type():
     return gdb.lookup_type('std::size_t')
 
+_versioned_namespace = '__8::'
+
+def is_specialization_of(x, template_name):
+    """
+    Test whether a type is a specialization of the named class template.
+    The type can be specified as a string or a gdb.Type object.
+    The template should be the name of a class template as a string,
+    without any 'std' qualification.
+    """
+    if isinstance(x, gdb.Type):
+        x = x.tag
+    template_name = '(%s)?%s' % (_versioned_namespace, template_name)
+    return re.match(r'^std::(__\d::)?%s<.*>$' % template_name, x) is not None
 
 class LibStdCxxXMethod(gdb.xmethod.XMethod):
     def __init__(self, name, worker_class):
@@ -159,7 +171,7 @@ class ArrayMethodsMatcher(gdb.xmethod.XMethodMatcher):
         self.methods = [self._method_dict[m] for m in self._method_dict]
 
     def match(self, class_type, method_name):
-        if not re.match('^std::(__\d+::)?array<.*>$', class_type.tag):
+        if not is_specialization_of(class_type, 'array'):
             return None
         method = self._method_dict.get(method_name)
         if method is None or not method.enabled:
@@ -171,6 +183,7 @@ class ArrayMethodsMatcher(gdb.xmethod.XMethodMatcher):
             return None
         return method.worker_class(value_type, size)
 
+
 # Xmethods for std::deque
 
 
@@ -180,16 +193,23 @@ class DequeWorkerBase(gdb.xmethod.XMethodWorker):
         self._bufsize = 512 // val_type.sizeof or 1
 
     def size(self, obj):
-        first_node = obj['_M_impl']['_M_start']['_M_node']
-        last_node = obj['_M_impl']['_M_finish']['_M_node']
-        cur = obj['_M_impl']['_M_finish']['_M_cur']
-        first = obj['_M_impl']['_M_finish']['_M_first']
-        return (last_node - first_node) * self._bufsize + (cur - first)
+        start = obj['_M_impl']['_M_start']
+        finish = obj['_M_impl']['_M_finish']
+        if start['_M_cur'] == finish['_M_cur']:
+            return 0
+        return (self._bufsize
+                * (finish['_M_node'] - start['_M_node'] - 1)
+                + (finish['_M_cur'] - finish['_M_first'])
+                + (start['_M_last'] - start['_M_cur']))
 
     def index(self, obj, idx):
-        first_node = obj['_M_impl']['_M_start']['_M_node']
-        index_node = first_node + int(idx) // self._bufsize
-        return index_node[0][idx % self._bufsize]
+        start = obj['_M_impl']['_M_start']
+        first_node_size = start['_M_last'] - start['_M_cur']
+        if idx < first_node_size:
+            return start['_M_cur'][idx]
+        idx = idx - first_node_size
+        index_node = start['_M_node'][1 + int(idx) // self._bufsize]
+        return index_node[idx % self._bufsize]
 
 
 class DequeEmptyWorker(DequeWorkerBase):
@@ -284,7 +304,7 @@ class DequeMethodsMatcher(gdb.xmethod.XMethodMatcher):
         self.methods = [self._method_dict[m] for m in self._method_dict]
 
     def match(self, class_type, method_name):
-        if not re.match('^std::(__\d+::)?deque<.*>$', class_type.tag):
+        if not is_specialization_of(class_type, 'deque'):
             return None
         method = self._method_dict.get(method_name)
         if method is None or not method.enabled:
@@ -332,7 +352,7 @@ class ForwardListMethodsMatcher(gdb.xmethod.XMethodMatcher):
         self.methods = [self._method_dict[m] for m in self._method_dict]
 
     def match(self, class_type, method_name):
-        if not re.match('^std::(__\d+::)?forward_list<.*>$', class_type.tag):
+        if not is_specialization_of(class_type, 'forward_list'):
             return None
         method = self._method_dict.get(method_name)
         if method is None or not method.enabled:
@@ -419,7 +439,7 @@ class ListMethodsMatcher(gdb.xmethod.XMethodMatcher):
         self.methods = [self._method_dict[m] for m in self._method_dict]
 
     def match(self, class_type, method_name):
-        if not re.match('^std::(__\d+::)?(__cxx11::)?list<.*>$', class_type.tag):
+        if not is_specialization_of(class_type, '(__cxx11::)?list'):
             return None
         method = self._method_dict.get(method_name)
         if method is None or not method.enabled:
@@ -542,7 +562,7 @@ class VectorMethodsMatcher(gdb.xmethod.XMethodMatcher):
         self.methods = [self._method_dict[m] for m in self._method_dict]
 
     def match(self, class_type, method_name):
-        if not re.match('^std::(__\d+::)?vector<.*>$', class_type.tag):
+        if not is_specialization_of(class_type, 'vector'):
             return None
         method = self._method_dict.get(method_name)
         if method is None or not method.enabled:
@@ -595,7 +615,7 @@ class AssociativeContainerMethodsMatcher(gdb.xmethod.XMethodMatcher):
         self.methods = [self._method_dict[m] for m in self._method_dict]
 
     def match(self, class_type, method_name):
-        if not re.match('^std::(__\d+::)?%s<.*>$' % self._name, class_type.tag):
+        if not is_specialization_of(class_type, self._name):
             return None
         method = self._method_dict.get(method_name)
         if method is None or not method.enabled:
@@ -631,9 +651,9 @@ class UniquePtrGetWorker(gdb.xmethod.XMethodWorker):
     def __call__(self, obj):
         impl_type = obj.dereference().type.fields()[0].type.tag
         # Check for new implementations first:
-        if re.match('^std::(__\d+::)?__uniq_ptr_(data|impl)<.*>$', impl_type):
+        if is_specialization_of(impl_type, '__uniq_ptr_(data|impl)'):
             tuple_member = obj['_M_t']['_M_t']
-        elif re.match('^std::(__\d+::)?tuple<.*>$', impl_type):
+        elif is_specialization_of(impl_type, 'tuple'):
             tuple_member = obj['_M_t']
         else:
             return None
@@ -698,7 +718,7 @@ class UniquePtrMethodsMatcher(gdb.xmethod.XMethodMatcher):
         self.methods = [self._method_dict[m] for m in self._method_dict]
 
     def match(self, class_type, method_name):
-        if not re.match('^std::(__\d+::)?unique_ptr<.*>$', class_type.tag):
+        if not is_specialization_of(class_type, 'unique_ptr'):
             return None
         method = self._method_dict.get(method_name)
         if method is None or not method.enabled:
@@ -772,7 +792,7 @@ class SharedPtrSubscriptWorker(SharedPtrGetWorker):
 
     def __call__(self, obj, index):
         # Check bounds if _elem_type is an array of known bound
-        m = re.match('.*\[(\d+)]$', str(self._elem_type))
+        m = re.match(r'.*\[(\d+)]$', str(self._elem_type))
         if m and index >= int(m.group(1)):
             raise IndexError('shared_ptr<%s> index "%d" should not be >= %d.' %
                              (self._elem_type, int(index), int(m.group(1))))
@@ -827,7 +847,7 @@ class SharedPtrMethodsMatcher(gdb.xmethod.XMethodMatcher):
         self.methods = [self._method_dict[m] for m in self._method_dict]
 
     def match(self, class_type, method_name):
-        if not re.match('^std::(__\d+::)?shared_ptr<.*>$', class_type.tag):
+        if not is_specialization_of(class_type, 'shared_ptr'):
             return None
         method = self._method_dict.get(method_name)
         if method is None or not method.enabled:

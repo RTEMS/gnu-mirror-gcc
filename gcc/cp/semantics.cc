@@ -628,6 +628,17 @@ set_cleanup_locs (tree stmts, location_t loc)
       set_cleanup_locs (stmt, loc);
 }
 
+/* True iff the innermost block scope is a try block.  */
+
+static bool
+at_try_scope ()
+{
+  cp_binding_level *b = current_binding_level;
+  while (b && b->kind == sk_cleanup)
+    b = b->level_chain;
+  return b && b->kind == sk_try;
+}
+
 /* Finish a scope.  */
 
 tree
@@ -635,10 +646,13 @@ do_poplevel (tree stmt_list)
 {
   tree block = NULL;
 
-  maybe_splice_retval_cleanup (stmt_list);
+  bool was_try = at_try_scope ();
 
   if (stmts_are_full_exprs_p ())
     block = poplevel (kept_level_p (), 1, 0);
+
+  /* This needs to come after poplevel merges sk_cleanup statement_lists.  */
+  maybe_splice_retval_cleanup (stmt_list, was_try);
 
   stmt_list = pop_stmt_list (stmt_list);
 
@@ -4895,6 +4909,7 @@ public:
   tree var;
   tree result;
   hash_table<nofree_ptr_hash <tree_node> > visited;
+  bool in_nrv_cleanup;
 };
 
 /* Helper function for walk_tree, used by finalize_nrv below.  */
@@ -4911,14 +4926,50 @@ finalize_nrv_r (tree* tp, int* walk_subtrees, void* data)
     *walk_subtrees = 0;
   /* Change all returns to just refer to the RESULT_DECL; this is a nop,
      but differs from using NULL_TREE in that it indicates that we care
-     about the value of the RESULT_DECL.  */
+     about the value of the RESULT_DECL.  But preserve anything appended
+     by check_return_expr.  */
   else if (TREE_CODE (*tp) == RETURN_EXPR)
-    TREE_OPERAND (*tp, 0) = dp->result;
+    {
+      tree *p = &TREE_OPERAND (*tp, 0);
+      while (TREE_CODE (*p) == COMPOUND_EXPR)
+	p = &TREE_OPERAND (*p, 0);
+      gcc_checking_assert (TREE_CODE (*p) == INIT_EXPR
+			   && TREE_OPERAND (*p, 0) == dp->result);
+      *p = dp->result;
+    }
   /* Change all cleanups for the NRV to only run when an exception is
      thrown.  */
   else if (TREE_CODE (*tp) == CLEANUP_STMT
 	   && CLEANUP_DECL (*tp) == dp->var)
-    CLEANUP_EH_ONLY (*tp) = 1;
+    {
+      dp->in_nrv_cleanup = true;
+      cp_walk_tree (&CLEANUP_BODY (*tp), finalize_nrv_r, data, 0);
+      dp->in_nrv_cleanup = false;
+      cp_walk_tree (&CLEANUP_EXPR (*tp), finalize_nrv_r, data, 0);
+      *walk_subtrees = 0;
+
+      CLEANUP_EH_ONLY (*tp) = true;
+
+      /* If a cleanup might throw, we need to clear current_retval_sentinel on
+	 the exception path so an outer cleanup added by
+	 maybe_splice_retval_cleanup doesn't run.  */
+      if (cp_function_chain->throwing_cleanup)
+	{
+	  tree clear = build2 (MODIFY_EXPR, boolean_type_node,
+			       current_retval_sentinel,
+			       boolean_false_node);
+
+	  /* We're already only on the EH path, just prepend it.  */
+	  tree &exp = CLEANUP_EXPR (*tp);
+	  exp = build2 (COMPOUND_EXPR, void_type_node, clear, exp);
+	}
+    }
+  /* Disable maybe_splice_retval_cleanup within the NRV cleanup scope, we don't
+     want to destroy the retval before the variable goes out of scope.  */
+  else if (TREE_CODE (*tp) == CLEANUP_STMT
+	   && dp->in_nrv_cleanup
+	   && CLEANUP_DECL (*tp) == dp->result)
+    CLEANUP_EXPR (*tp) = void_node;
   /* Replace the DECL_EXPR for the NRV with an initialization of the
      RESULT_DECL, if needed.  */
   else if (TREE_CODE (*tp) == DECL_EXPR
@@ -4974,6 +5025,7 @@ finalize_nrv (tree *tp, tree var, tree result)
 
   data.var = var;
   data.result = result;
+  data.in_nrv_cleanup = false;
   cp_walk_tree (tp, finalize_nrv_r, &data, 0);
 }
 
