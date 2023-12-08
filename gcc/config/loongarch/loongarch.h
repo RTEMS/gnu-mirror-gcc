@@ -288,9 +288,11 @@ along with GCC; see the file COPYING3.  If not see
 /* Define if loading short immediate values into registers sign extends.  */
 #define SHORT_IMMEDIATES_SIGN_EXTEND 1
 
-/* The clz.{w/d} instructions have the natural values at 0.  */
+/* The clz.{w/d}, ctz.{w/d} instructions have the natural values at 0.  */
 
 #define CLZ_DEFINED_VALUE_AT_ZERO(MODE, VALUE) \
+  ((VALUE) = GET_MODE_UNIT_BITSIZE (MODE), 2)
+#define CTZ_DEFINED_VALUE_AT_ZERO(MODE, VALUE) \
   ((VALUE) = GET_MODE_UNIT_BITSIZE (MODE), 2)
 
 /* Standard register usage.  */
@@ -699,6 +701,24 @@ enum reg_class
        ||GET_MODE_SIZE (MODE) == UNITS_PER_LASX_REG)	\
    && (GET_MODE_CLASS (MODE) == MODE_VECTOR_INT		\
        || GET_MODE_CLASS (MODE) == MODE_VECTOR_FLOAT))
+
+#define RECIP_MASK_NONE         0x00
+#define RECIP_MASK_DIV          0x01
+#define RECIP_MASK_SQRT         0x02
+#define RECIP_MASK_RSQRT        0x04
+#define RECIP_MASK_VEC_DIV      0x08
+#define RECIP_MASK_VEC_SQRT     0x10
+#define RECIP_MASK_VEC_RSQRT    0x20
+#define RECIP_MASK_ALL (RECIP_MASK_DIV | RECIP_MASK_SQRT \
+			| RECIP_MASK_RSQRT | RECIP_MASK_VEC_SQRT \
+			| RECIP_MASK_VEC_DIV | RECIP_MASK_VEC_RSQRT)
+
+#define TARGET_RECIP_DIV        ((recip_mask & RECIP_MASK_DIV) != 0 || TARGET_uARCH_LA664)
+#define TARGET_RECIP_SQRT       ((recip_mask & RECIP_MASK_SQRT) != 0 || TARGET_uARCH_LA664)
+#define TARGET_RECIP_RSQRT      ((recip_mask & RECIP_MASK_RSQRT) != 0 || TARGET_uARCH_LA664)
+#define TARGET_RECIP_VEC_DIV    ((recip_mask & RECIP_MASK_VEC_DIV) != 0 || TARGET_uARCH_LA664)
+#define TARGET_RECIP_VEC_SQRT   ((recip_mask & RECIP_MASK_VEC_SQRT) != 0 || TARGET_uARCH_LA664)
+#define TARGET_RECIP_VEC_RSQRT  ((recip_mask & RECIP_MASK_VEC_RSQRT) != 0 || TARGET_uARCH_LA664)
 
 /* 1 if N is a possible register number for function argument passing.
    We have no FP argument registers when soft-float.  */
@@ -1239,8 +1259,3 @@ struct GTY (()) machine_function
 
 #define TARGET_EXPLICIT_RELOCS \
   (la_opt_explicit_relocs == EXPLICIT_RELOCS_ALWAYS)
-
-#define CLZ_DEFINED_VALUE_AT_ZERO(MODE, VALUE) \
-  ((VALUE) = GET_MODE_UNIT_BITSIZE (MODE), 2)
-#define CTZ_DEFINED_VALUE_AT_ZERO(MODE, VALUE) \
-  ((VALUE) = GET_MODE_UNIT_BITSIZE (MODE), 2)

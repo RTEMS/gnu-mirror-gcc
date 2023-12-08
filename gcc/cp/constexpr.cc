@@ -3128,11 +3128,11 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
 	/* OK */;
       else if (!DECL_SAVED_TREE (fun))
 	{
-	  /* When at_eof >= 2, cgraph has started throwing away
+	  /* When at_eof >= 3, cgraph has started throwing away
 	     DECL_SAVED_TREE, so fail quietly.  FIXME we get here because of
 	     late code generation for VEC_INIT_EXPR, which needs to be
 	     completely reconsidered.  */
-	  gcc_assert (at_eof >= 2 && ctx->quiet);
+	  gcc_assert (at_eof >= 3 && ctx->quiet);
 	  *non_constant_p = true;
 	}
       else if (tree copy = get_fundef_copy (new_call.fundef))
@@ -9387,7 +9387,8 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
        available, so we don't bother with switch tracking.  */
     return true;
 
-  if (TREE_THIS_VOLATILE (t) && want_rval)
+  if (TREE_THIS_VOLATILE (t) && want_rval
+      && !FUNC_OR_METHOD_TYPE_P (TREE_TYPE (t)))
     {
       if (flags & tf_error)
 	constexpr_error (loc, fundef_p, "lvalue-to-rvalue conversion of "

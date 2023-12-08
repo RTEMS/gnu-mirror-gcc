@@ -1365,6 +1365,15 @@ gfc_conv_class_to_class (gfc_se *parmse, gfc_expr *e, gfc_typespec class_ts,
       tmp = build3_loc (input_location, COND_EXPR, void_type_node,
 			cond, tmp, tmp2);
       gfc_add_expr_to_block (&parmse->pre, tmp);
+
+      if (!elemental && full_array && copyback)
+	{
+	  tmp2 = build_empty_stmt (input_location);
+	  tmp = gfc_finish_block (&parmse->post);
+	  tmp = build3_loc (input_location, COND_EXPR, void_type_node,
+			    cond, tmp, tmp2);
+	  gfc_add_expr_to_block (&parmse->post, tmp);
+	}
     }
   else
     gfc_add_block_to_block (&parmse->pre, &block);
@@ -2116,10 +2125,24 @@ gfc_conv_missing_dummy (gfc_se * se, gfc_expr * arg, gfc_typespec ts, int kind)
 
   if (ts.type == BT_CHARACTER)
     {
-      tmp = build_int_cst (gfc_charlen_type_node, 0);
-      tmp = fold_build3_loc (input_location, COND_EXPR, gfc_charlen_type_node,
-			     present, se->string_length, tmp);
-      tmp = gfc_evaluate_now (tmp, &se->pre);
+      /* Handle deferred-length dummies that pass the character length by
+	 reference so that the value can be returned.  */
+      if (ts.deferred && INDIRECT_REF_P (se->string_length))
+	{
+	  tmp = gfc_build_addr_expr (NULL_TREE, se->string_length);
+	  tmp = fold_build3_loc (input_location, COND_EXPR, TREE_TYPE (tmp),
+				 present, tmp, null_pointer_node);
+	  tmp = gfc_evaluate_now (tmp, &se->pre);
+	  tmp = build_fold_indirect_ref_loc (input_location, tmp);
+	}
+      else
+	{
+	  tmp = build_int_cst (gfc_charlen_type_node, 0);
+	  tmp = fold_build3_loc (input_location, COND_EXPR,
+				 gfc_charlen_type_node,
+				 present, se->string_length, tmp);
+	  tmp = gfc_evaluate_now (tmp, &se->pre);
+	}
       se->string_length = tmp;
     }
   return;
@@ -7150,8 +7173,6 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
 		  if  (TREE_TYPE(tmp) != pvoid_type_node)
 		    tmp = build_fold_indirect_ref_loc (input_location,
 						       parmse.expr);
-		  if (GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (tmp)))
-		    tmp = gfc_conv_descriptor_data_get (tmp);
 		  tmp = gfc_deallocate_with_status (tmp, NULL_TREE, NULL_TREE,
 						    NULL_TREE, NULL_TREE, true,
 						    e,
@@ -11708,8 +11729,30 @@ alloc_scalar_allocatable_for_assignment (stmtblock_t *block,
 				 builtin_decl_explicit (BUILT_IN_REALLOC),
 				 2, fold_convert (pvoid_type_node, lse.expr),
 				 size_in_bytes);
+      tree omp_cond = NULL_TREE;
+      if (flag_openmp_allocators)
+	{
+	  tree omp_tmp;
+	  omp_cond = gfc_omp_call_is_alloc (lse.expr);
+	  omp_cond = gfc_evaluate_now (omp_cond, block);
+
+	  omp_tmp = builtin_decl_explicit (BUILT_IN_GOMP_REALLOC);
+	  omp_tmp = build_call_expr_loc (input_location, omp_tmp, 4,
+					 fold_convert (pvoid_type_node,
+						       lse.expr), size_in_bytes,
+					 build_zero_cst (ptr_type_node),
+					 build_zero_cst (ptr_type_node));
+	  tmp = build3_loc (input_location, COND_EXPR, TREE_TYPE (tmp),
+			    omp_cond, omp_tmp, tmp);
+	}
       tmp = fold_convert (TREE_TYPE (lse.expr), tmp);
       gfc_add_modify (block, lse.expr, tmp);
+      if (omp_cond)
+	gfc_add_expr_to_block (block,
+			       build3_loc (input_location, COND_EXPR,
+			       void_type_node, omp_cond,
+			       gfc_omp_call_add_alloc (lse.expr),
+			       build_empty_stmt (input_location)));
       tmp = build1_v (LABEL_EXPR, jump_label2);
       gfc_add_expr_to_block (block, tmp);
 

@@ -168,7 +168,7 @@ c_common_option_lang_mask (void)
 /* Diagnostic finalizer for C/C++/Objective-C/Objective-C++.  */
 static void
 c_diagnostic_finalizer (diagnostic_context *context,
-			diagnostic_info *diagnostic,
+			const diagnostic_info *diagnostic,
 			diagnostic_t)
 {
   char *saved_prefix = pp_take_prefix (context->printer);
@@ -532,7 +532,7 @@ c_common_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
       break;
 
     case OPT_fdebug_cpp:
-      cpp_opts->debug = 1;
+      cpp_opts->debug = value;
       break;
 
     case OPT_ftrack_macro_expansion:
@@ -1138,6 +1138,11 @@ c_common_post_options (const char **pfilename)
      work with the standard.  */
   if (cxx_dialect >= cxx20 || flag_concepts_ts)
     flag_concepts = 1;
+
+  /* -fimmediate-escalation has no effect when immediate functions are not
+     supported.  */
+  if (flag_immediate_escalation && cxx_dialect < cxx20)
+    flag_immediate_escalation = 0;
 
   if (num_in_fnames > 1)
     error ("too many filenames given; type %<%s %s%> for usage",

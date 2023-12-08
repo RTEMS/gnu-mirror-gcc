@@ -543,7 +543,7 @@ void expand_tuple_move (rtx *);
 bool expand_block_move (rtx, rtx, rtx);
 machine_mode preferred_simd_mode (scalar_mode);
 machine_mode get_mask_mode (machine_mode);
-void expand_vec_series (rtx, rtx, rtx);
+void expand_vec_series (rtx, rtx, rtx, rtx = 0);
 void expand_vec_init (rtx, rtx);
 void expand_vec_perm (rtx, rtx, rtx, rtx);
 void expand_select_vl (rtx *);
@@ -557,7 +557,8 @@ void expand_cond_unop (unsigned, rtx *);
 void expand_cond_binop (unsigned, rtx *);
 void expand_cond_ternop (unsigned, rtx *);
 void expand_popcount (rtx *);
-void expand_rawmemchr (machine_mode, rtx, rtx, rtx);
+void expand_rawmemchr (machine_mode, rtx, rtx, rtx, bool = false);
+bool expand_strcmp (rtx, rtx, rtx, rtx, unsigned HOST_WIDE_INT, bool);
 void emit_vec_extract (rtx, rtx, poly_int64);
 
 /* Rounding mode bitfield for fixed point VXRM.  */
@@ -606,6 +607,7 @@ enum vlmul_type get_vlmul (rtx_insn *);
 int count_regno_occurrences (rtx_insn *, unsigned int);
 bool imm_avl_p (machine_mode);
 bool can_be_broadcasted_p (rtx);
+bool gather_scatter_valid_offset_p (machine_mode);
 }
 
 /* We classify builtin types into two classes:

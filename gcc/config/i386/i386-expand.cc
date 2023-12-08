@@ -1260,14 +1260,14 @@ ix86_swap_binary_operands_p (enum rtx_code code, machine_mode mode,
   return false;
 }
 
-
 /* Fix up OPERANDS to satisfy ix86_binary_operator_ok.  Return the
    destination to use for the operation.  If different from the true
-   destination in operands[0], a copy operation will be required.  */
+   destination in operands[0], a copy operation will be required except
+   under TARGET_APX_NDD.  */
 
 rtx
 ix86_fixup_binary_operands (enum rtx_code code, machine_mode mode,
-			    rtx operands[])
+			    rtx operands[], bool use_ndd)
 {
   rtx dst = operands[0];
   rtx src1 = operands[1];
@@ -1307,7 +1307,7 @@ ix86_fixup_binary_operands (enum rtx_code code, machine_mode mode,
     src1 = force_reg (mode, src1);
 
   /* Source 1 cannot be a non-matching memory.  */
-  if (MEM_P (src1) && !rtx_equal_p (dst, src1))
+  if (!use_ndd && MEM_P (src1) && !rtx_equal_p (dst, src1))
     src1 = force_reg (mode, src1);
 
   /* Improve address combine.  */
@@ -1326,9 +1326,10 @@ ix86_fixup_binary_operands (enum rtx_code code, machine_mode mode,
 
 void
 ix86_fixup_binary_operands_no_copy (enum rtx_code code,
-				    machine_mode mode, rtx operands[])
+				    machine_mode mode, rtx operands[],
+				    bool use_ndd)
 {
-  rtx dst = ix86_fixup_binary_operands (code, mode, operands);
+  rtx dst = ix86_fixup_binary_operands (code, mode, operands, use_ndd);
   gcc_assert (dst == operands[0]);
 }
 
@@ -1338,11 +1339,11 @@ ix86_fixup_binary_operands_no_copy (enum rtx_code code,
 
 void
 ix86_expand_binary_operator (enum rtx_code code, machine_mode mode,
-			     rtx operands[])
+			     rtx operands[], bool use_ndd)
 {
   rtx src1, src2, dst, op, clob;
 
-  dst = ix86_fixup_binary_operands (code, mode, operands);
+  dst = ix86_fixup_binary_operands (code, mode, operands, use_ndd);
   src1 = operands[1];
   src2 = operands[2];
 
@@ -1352,7 +1353,8 @@ ix86_expand_binary_operator (enum rtx_code code, machine_mode mode,
 
   if (reload_completed
       && code == PLUS
-      && !rtx_equal_p (dst, src1))
+      && !rtx_equal_p (dst, src1)
+      && !use_ndd)
     {
       /* This is going to be an LEA; avoid splitting it later.  */
       emit_insn (op);
@@ -1451,7 +1453,7 @@ ix86_expand_vector_logical_operator (enum rtx_code code, machine_mode mode,
 
 bool
 ix86_binary_operator_ok (enum rtx_code code, machine_mode mode,
-			 rtx operands[3])
+			 rtx operands[3], bool use_ndd)
 {
   rtx dst = operands[0];
   rtx src1 = operands[1];
@@ -1475,7 +1477,7 @@ ix86_binary_operator_ok (enum rtx_code code, machine_mode mode,
     return false;
 
   /* Source 1 cannot be a non-matching memory.  */
-  if (MEM_P (src1) && !rtx_equal_p (dst, src1))
+  if (!use_ndd && MEM_P (src1) && !rtx_equal_p (dst, src1))
     /* Support "andhi/andsi/anddi" as a zero-extending move.  */
     return (code == AND
 	    && (mode == HImode
@@ -1492,7 +1494,7 @@ ix86_binary_operator_ok (enum rtx_code code, machine_mode mode,
 
 void
 ix86_expand_unary_operator (enum rtx_code code, machine_mode mode,
-			    rtx operands[])
+			    rtx operands[], bool use_ndd)
 {
   bool matching_memory = false;
   rtx src, dst, op, clob;
@@ -1511,7 +1513,7 @@ ix86_expand_unary_operator (enum rtx_code code, machine_mode mode,
     }
 
   /* When source operand is memory, destination must match.  */
-  if (MEM_P (src) && !matching_memory)
+  if (!use_ndd && MEM_P (src) && !matching_memory)
     src = force_reg (mode, src);
 
   /* Emit the instruction.  */
@@ -6673,6 +6675,142 @@ ix86_split_lshr (rtx *operands, rtx scratch, machine_mode mode)
       else
 	emit_insn (gen_x86_shift_adj_2
 		   (half_mode, low[0], high[0], operands[2]));
+    }
+}
+
+/* Helper function to split TImode ashl under NDD.  */
+void
+ix86_split_ashl_ndd (rtx *operands, rtx scratch)
+{
+  gcc_assert (TARGET_APX_NDD);
+  int half_width = GET_MODE_BITSIZE (TImode) >> 1;
+
+  rtx low[2], high[2];
+  int count;
+
+  split_double_mode (TImode, operands, 2, low, high);
+  if (CONST_INT_P (operands[2]))
+    {
+      count = INTVAL (operands[2]) & (GET_MODE_BITSIZE (TImode) - 1);
+
+      if (count >= half_width)
+	{
+	  count = count - half_width;
+	  if (count == 0)
+	    {
+	      if (!rtx_equal_p (high[0], low[1]))
+		emit_move_insn (high[0], low[1]);
+	    }
+	  else if (count == 1)
+	    emit_insn (gen_adddi3 (high[0], low[1], low[1]));
+	  else
+	    emit_insn (gen_ashldi3 (high[0], low[1], GEN_INT (count)));
+
+	  ix86_expand_clear (low[0]);
+	}
+      else if (count == 1)
+	{
+	  rtx x3 = gen_rtx_REG (CCCmode, FLAGS_REG);
+	  rtx x4 = gen_rtx_LTU (TImode, x3, const0_rtx);
+	  emit_insn (gen_add3_cc_overflow_1 (DImode, low[0],
+					     low[1], low[1]));
+	  emit_insn (gen_add3_carry (DImode, high[0], high[1], high[1],
+				     x3, x4));
+	}
+      else
+	{
+	  emit_insn (gen_x86_64_shld_ndd (high[0], high[1], low[1],
+					  GEN_INT (count)));
+	  emit_insn (gen_ashldi3 (low[0], low[1], GEN_INT (count)));
+	}
+    }
+  else
+    {
+      emit_insn (gen_x86_64_shld_ndd (high[0], high[1], low[1],
+				      operands[2]));
+      emit_insn (gen_ashldi3 (low[0], low[1], operands[2]));
+      if (TARGET_CMOVE && scratch)
+	{
+	  ix86_expand_clear (scratch);
+	  emit_insn (gen_x86_shift_adj_1
+		     (DImode, high[0], low[0], operands[2], scratch));
+	}
+      else
+	emit_insn (gen_x86_shift_adj_2 (DImode, high[0], low[0], operands[2]));
+    }
+}
+
+/* Helper function to split TImode l/ashr under NDD.  */
+void
+ix86_split_rshift_ndd (enum rtx_code code, rtx *operands, rtx scratch)
+{
+  gcc_assert (TARGET_APX_NDD);
+  int half_width = GET_MODE_BITSIZE (TImode) >> 1;
+  bool ashr_p = code == ASHIFTRT;
+  rtx (*gen_shr)(rtx, rtx, rtx) = ashr_p ? gen_ashrdi3
+					 : gen_lshrdi3;
+
+  rtx low[2], high[2];
+  int count;
+
+  split_double_mode (TImode, operands, 2, low, high);
+  if (CONST_INT_P (operands[2]))
+    {
+      count = INTVAL (operands[2]) & (GET_MODE_BITSIZE (TImode) - 1);
+
+      if (ashr_p && (count == GET_MODE_BITSIZE (TImode) - 1))
+	{
+	  emit_insn (gen_shr (high[0], high[1],
+			      GEN_INT (half_width - 1)));
+	  emit_move_insn (low[0], high[0]);
+	}
+      else if (count >= half_width)
+	{
+	  if (ashr_p)
+	    emit_insn (gen_shr (high[0], high[1],
+				GEN_INT (half_width - 1)));
+	  else
+	    ix86_expand_clear (high[0]);
+
+	  if (count > half_width)
+	    emit_insn (gen_shr (low[0], high[1],
+				GEN_INT (count - half_width)));
+	  else
+	    emit_move_insn (low[0], high[1]);
+	}
+      else
+	{
+	  emit_insn (gen_x86_64_shrd_ndd (low[0], low[1], high[1],
+					  GEN_INT (count)));
+	  emit_insn (gen_shr (high[0], high[1], GEN_INT (count)));
+	}
+    }
+  else
+    {
+      emit_insn (gen_x86_64_shrd_ndd (low[0], low[1], high[1],
+				      operands[2]));
+      emit_insn (gen_shr (high[0], high[1], operands[2]));
+
+      if (TARGET_CMOVE && scratch)
+	{
+	  if (ashr_p)
+	    {
+	      emit_move_insn (scratch, high[0]);
+	      emit_insn (gen_shr (scratch, scratch,
+				  GEN_INT (half_width - 1)));
+	    }
+	  else
+	    ix86_expand_clear (scratch);
+
+	  emit_insn (gen_x86_shift_adj_1
+		     (DImode, low[0], high[0], operands[2], scratch));
+	}
+      else if (ashr_p)
+	emit_insn (gen_x86_shift_adj_3
+		   (DImode, low[0], high[0], operands[2]));
+      else
+	emit_insn (gen_x86_shift_adj_2
+		   (DImode, low[0], high[0], operands[2]));
     }
 }
 

@@ -8607,10 +8607,11 @@ ix86_elim_entry_set_got (rtx reg)
       rtx pat = PATTERN (c_insn);
       if (GET_CODE (pat) == PARALLEL)
 	{
-	  rtx vec = XVECEXP (pat, 0, 0);
-	  if (GET_CODE (vec) == SET
-	      && XINT (XEXP (vec, 1), 1) == UNSPEC_SET_GOT
-	      && REGNO (XEXP (vec, 0)) == REGNO (reg))
+	  rtx set = XVECEXP (pat, 0, 0);
+	  if (GET_CODE (set) == SET
+	      && GET_CODE (SET_SRC (set)) == UNSPEC
+	      && XINT (SET_SRC (set), 1) == UNSPEC_SET_GOT
+	      && REGNO (SET_DEST (set)) == REGNO (reg))
 	    delete_insn (c_insn);
 	}
     }
@@ -16208,11 +16209,12 @@ ix86_dep_by_shift_count (const_rtx set_insn, const_rtx use_insn)
 bool
 ix86_unary_operator_ok (enum rtx_code,
 			machine_mode,
-			rtx operands[2])
+			rtx operands[2],
+			bool use_ndd)
 {
   /* If one of operands is memory, source and destination must match.  */
   if ((MEM_P (operands[0])
-       || MEM_P (operands[1]))
+       || (!use_ndd && MEM_P (operands[1])))
       && ! rtx_equal_p (operands[0], operands[1]))
     return false;
   return true;
@@ -23330,6 +23332,31 @@ x86_evex_reg_mentioned_p (rtx operands[], int nops)
   return false;
 }
 
+/* Return true when rtx operand does not contain any UNSPEC_*POFF related
+   constant to avoid APX_NDD instructions excceed encoding length limit.  */
+bool
+x86_poff_operand_p (rtx operand)
+{
+  if (GET_CODE (operand) == CONST)
+    {
+      rtx op = XEXP (operand, 0);
+      if (GET_CODE (op) == PLUS)
+	op = XEXP (op, 0);
+	
+      if (GET_CODE (op) == UNSPEC)
+	{
+	  int unspec = XINT (op, 1);
+	  return (unspec == UNSPEC_NTPOFF
+		  || unspec == UNSPEC_TPOFF
+		  || unspec == UNSPEC_DTPOFF
+		  || unspec == UNSPEC_GOTTPOFF
+		  || unspec == UNSPEC_GOTNTPOFF
+		  || unspec == UNSPEC_INDNTPOFF);
+	}
+    }
+  return false;
+}
+
 /* If profitable, negate (without causing overflow) integer constant
    of mode MODE at location LOC.  Return true in this case.  */
 bool
@@ -23680,8 +23707,9 @@ static void map_egpr_constraints (vec<const char *> &constraints)
 static rtx_insn *
 ix86_md_asm_adjust (vec<rtx> &outputs, vec<rtx> & /*inputs*/,
 		    vec<machine_mode> & /*input_modes*/,
-		    vec<const char *> &constraints, vec<rtx> &clobbers,
-		    HARD_REG_SET &clobbered_regs, location_t loc)
+		    vec<const char *> &constraints, vec<rtx> &/*uses*/,
+		    vec<rtx> &clobbers, HARD_REG_SET &clobbered_regs,
+		    location_t loc)
 {
   bool saw_asm_flag = false;
 
@@ -24562,14 +24590,33 @@ ix86_noce_conversion_profitable_p (rtx_insn *seq, struct noce_if_info *if_info)
 /* x86-specific vector costs.  */
 class ix86_vector_costs : public vector_costs
 {
-  using vector_costs::vector_costs;
+public:
+  ix86_vector_costs (vec_info *, bool);
 
   unsigned int add_stmt_cost (int count, vect_cost_for_stmt kind,
 			      stmt_vec_info stmt_info, slp_tree node,
 			      tree vectype, int misalign,
 			      vect_cost_model_location where) override;
   void finish_cost (const vector_costs *) override;
+
+private:
+
+  /* Estimate register pressure of the vectorized code.  */
+  void ix86_vect_estimate_reg_pressure ();
+  /* Number of GENERAL_REGS/SSE_REGS used in the vectorizer, it's used for
+     estimation of register pressure.
+     ??? Currently it's only used by vec_construct/scalar_to_vec
+     where we know it's not loaded from memory.  */
+  unsigned m_num_gpr_needed[3];
+  unsigned m_num_sse_needed[3];
 };
+
+ix86_vector_costs::ix86_vector_costs (vec_info* vinfo, bool costing_for_scalar)
+  : vector_costs (vinfo, costing_for_scalar),
+    m_num_gpr_needed (),
+    m_num_sse_needed ()
+{
+}
 
 /* Implement targetm.vectorize.create_costs.  */
 
@@ -24748,8 +24795,7 @@ ix86_vector_costs::add_stmt_cost (int count, vect_cost_for_stmt kind,
     }
   else if ((kind == vec_construct || kind == scalar_to_vec)
 	   && node
-	   && SLP_TREE_DEF_TYPE (node) == vect_external_def
-	   && INTEGRAL_TYPE_P (TREE_TYPE (vectype)))
+	   && SLP_TREE_DEF_TYPE (node) == vect_external_def)
     {
       stmt_cost = ix86_builtin_vectorization_cost (kind, vectype, misalign);
       unsigned i;
@@ -24785,7 +24831,15 @@ ix86_vector_costs::add_stmt_cost (int count, vect_cost_for_stmt kind,
 		  && (gimple_assign_rhs_code (def) != BIT_FIELD_REF
 		      || !VECTOR_TYPE_P (TREE_TYPE
 				(TREE_OPERAND (gimple_assign_rhs1 (def), 0))))))
-	    stmt_cost += ix86_cost->sse_to_integer;
+	    {
+	      if (fp)
+		m_num_sse_needed[where]++;
+	      else
+		{
+		  m_num_gpr_needed[where]++;
+		  stmt_cost += ix86_cost->sse_to_integer;
+		}
+	    }
 	}
       FOR_EACH_VEC_ELT (SLP_TREE_SCALAR_OPS (node), i, op)
 	if (TREE_CODE (op) == SSA_NAME)
@@ -24822,6 +24876,24 @@ ix86_vector_costs::add_stmt_cost (int count, vect_cost_for_stmt kind,
 }
 
 void
+ix86_vector_costs::ix86_vect_estimate_reg_pressure ()
+{
+  unsigned gpr_spill_cost = COSTS_N_INSNS (ix86_cost->int_store [2]) / 2;
+  unsigned sse_spill_cost = COSTS_N_INSNS (ix86_cost->sse_store[0]) / 2;
+
+  /* Any better way to have target available fp registers, currently use SSE_REGS.  */
+  unsigned target_avail_sse = TARGET_64BIT ? (TARGET_AVX512F ? 32 : 16) : 8;
+  for (unsigned i = 0; i != 3; i++)
+    {
+      if (m_num_gpr_needed[i] > target_avail_regs)
+	m_costs[i] += gpr_spill_cost * (m_num_gpr_needed[i] - target_avail_regs);
+      /* Only measure sse registers pressure.  */
+      if (TARGET_SSE && (m_num_sse_needed[i] > target_avail_sse))
+	m_costs[i] += sse_spill_cost * (m_num_sse_needed[i] - target_avail_sse);
+    }
+}
+
+void
 ix86_vector_costs::finish_cost (const vector_costs *scalar_costs)
 {
   loop_vec_info loop_vinfo = dyn_cast<loop_vec_info> (m_vinfo);
@@ -24842,6 +24914,8 @@ ix86_vector_costs::finish_cost (const vector_costs *scalar_costs)
 	      > ceil_log2 (LOOP_VINFO_INT_NITERS (loop_vinfo))))
 	m_costs[vect_body] = INT_MAX;
     }
+
+  ix86_vect_estimate_reg_pressure ();
 
   vector_costs::finish_cost (scalar_costs);
 }
@@ -25967,6 +26041,11 @@ ix86_run_selftests (void)
 } // namespace selftest
 
 #endif /* CHECKING_P */
+
+static const scoped_attribute_specs *const ix86_attribute_table[] =
+{
+  &ix86_gnu_attribute_table
+};
 
 /* Initialize the GCC target structure.  */
 #undef TARGET_RETURN_IN_MEMORY

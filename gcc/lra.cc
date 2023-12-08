@@ -581,9 +581,8 @@ new_insn_reg (rtx_insn *insn, int regno, enum op_type type,
   lra_insn_reg *ir = lra_insn_reg_pool.allocate ();
   ir->type = type;
   ir->biggest_mode = mode;
-  if (NONDEBUG_INSN_P (insn)
-      && partial_subreg_p (lra_reg_info[regno].biggest_mode, mode))
-    lra_reg_info[regno].biggest_mode = mode;
+  if (NONDEBUG_INSN_P (insn))
+    lra_update_biggest_mode (regno, mode);
   ir->subreg_p = subreg_p;
   ir->early_clobber_alts = early_clobber_alts;
   ir->regno = regno;
@@ -769,7 +768,9 @@ check_and_expand_insn_recog_data (int index)
   if (lra_insn_recog_data_len > index)
     return;
   old = lra_insn_recog_data_len;
-  lra_insn_recog_data_len = index * 3 / 2 + 1;
+  lra_insn_recog_data_len = index * 3U / 2;
+  if (lra_insn_recog_data_len <= index)
+    lra_insn_recog_data_len = index + 1;
   lra_insn_recog_data = XRESIZEVEC (lra_insn_recog_data_t,
 				    lra_insn_recog_data,
 				    lra_insn_recog_data_len);

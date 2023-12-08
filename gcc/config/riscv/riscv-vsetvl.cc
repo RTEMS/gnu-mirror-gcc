@@ -596,6 +596,14 @@ extract_single_source (set_info *set)
   return first_insn;
 }
 
+static insn_info *
+extract_single_source (def_info *def)
+{
+  if (!def)
+    return nullptr;
+  return extract_single_source (dyn_cast<set_info *> (def));
+}
+
 static bool
 same_equiv_note_p (set_info *set1, set_info *set2)
 {
@@ -987,11 +995,11 @@ public:
 
     /* Determine the demand info of the RVV insn.  */
     m_max_sew = get_max_int_sew ();
-    unsigned demand_flags = 0;
+    unsigned dflags = 0;
     if (vector_config_insn_p (insn->rtl ()))
       {
-	demand_flags |= demand_flags::DEMAND_AVL_P;
-	demand_flags |= demand_flags::DEMAND_RATIO_P;
+	dflags |= demand_flags::DEMAND_AVL_P;
+	dflags |= demand_flags::DEMAND_RATIO_P;
       }
     else
       {
@@ -1006,39 +1014,39 @@ public:
 		   available.
 		 */
 		if (has_non_zero_avl ())
-		  demand_flags |= demand_flags::DEMAND_NON_ZERO_AVL_P;
+		  dflags |= demand_flags::DEMAND_NON_ZERO_AVL_P;
 		else
-		  demand_flags |= demand_flags::DEMAND_AVL_P;
+		  dflags |= demand_flags::DEMAND_AVL_P;
 	      }
 	    else
-	      demand_flags |= demand_flags::DEMAND_AVL_P;
+	      dflags |= demand_flags::DEMAND_AVL_P;
 	  }
 
 	if (get_attr_ratio (insn->rtl ()) != INVALID_ATTRIBUTE)
-	  demand_flags |= demand_flags::DEMAND_RATIO_P;
+	  dflags |= demand_flags::DEMAND_RATIO_P;
 	else
 	  {
 	    if (scalar_move_insn_p (insn->rtl ()) && m_ta)
 	      {
-		demand_flags |= demand_flags::DEMAND_GE_SEW_P;
+		dflags |= demand_flags::DEMAND_GE_SEW_P;
 		m_max_sew = get_attr_type (insn->rtl ()) == TYPE_VFMOVFV
 			      ? get_max_float_sew ()
 			      : get_max_int_sew ();
 	      }
 	    else
-	      demand_flags |= demand_flags::DEMAND_SEW_P;
+	      dflags |= demand_flags::DEMAND_SEW_P;
 
 	    if (!ignore_vlmul_insn_p (insn->rtl ()))
-	      demand_flags |= demand_flags::DEMAND_LMUL_P;
+	      dflags |= demand_flags::DEMAND_LMUL_P;
 	  }
 
 	if (!m_ta)
-	  demand_flags |= demand_flags::DEMAND_TAIL_POLICY_P;
+	  dflags |= demand_flags::DEMAND_TAIL_POLICY_P;
 	if (!m_ma)
-	  demand_flags |= demand_flags::DEMAND_MASK_POLICY_P;
+	  dflags |= demand_flags::DEMAND_MASK_POLICY_P;
       }
 
-    normalize_demand (demand_flags);
+    normalize_demand (dflags);
 
     /* Optimize AVL from the vsetvl instruction.  */
     insn_info *def_insn = extract_single_source (get_avl_def ());
@@ -2034,7 +2042,7 @@ private:
     gcc_unreachable ();
   }
 
-  bool anticpatable_exp_p (const vsetvl_info &header_info)
+  bool anticipated_exp_p (const vsetvl_info &header_info)
   {
     if (!header_info.has_nonvlmax_reg_avl () && !header_info.has_vl ())
       return true;
@@ -2645,11 +2653,62 @@ pre_vsetvl::compute_lcm_local_properties ()
 		    }
 		}
 
-	      for (const insn_info *insn : bb->real_nondebug_insns ())
+	      for (insn_info *insn : bb->real_nondebug_insns ())
 		{
 		  if (info.has_nonvlmax_reg_avl ()
 		      && find_access (insn->defs (), REGNO (info.get_avl ())))
 		    {
+		      bitmap_clear_bit (m_transp[bb_index], i);
+		      break;
+		    }
+
+		  if (info.has_vl ()
+		      && reg_mentioned_p (info.get_vl (), insn->rtl ()))
+		    {
+		      if (find_access (insn->defs (), REGNO (info.get_vl ())))
+			/* We can't fuse vsetvl into the blocks that modify the
+			   VL operand since successors of such blocks will need
+			   the value of those blocks are defining.
+
+					  bb 4: def a5
+					  /   \
+				  bb 5:use a5  bb 6:vsetvl a5, 5
+
+			   The example above shows that we can't fuse vsetvl
+			   from bb 6 into bb 4 since the successor bb 5 is using
+			   the value defined in bb 4.  */
+			;
+		      else
+			{
+			  /* We can't fuse vsetvl into the blocks that use the
+			     VL operand which has different value from the
+			     vsetvl info.
+
+					    bb 4: def a5
+					      |
+					    bb 5: use a5
+					      |
+					    bb 6: def a5
+					      |
+					    bb 7: use a5
+
+			     The example above shows that we can't fuse vsetvl
+			     from bb 6 into bb 5 since their value is different.
+			   */
+			  resource_info resource
+			    = full_register (REGNO (info.get_vl ()));
+			  def_lookup dl = crtl->ssa->find_def (resource, insn);
+			  def_info *def
+			    = dl.matching_set_or_last_def_of_prev_group ();
+			  insn_info *def_insn = extract_single_source (def);
+			  if (def_insn && vsetvl_insn_p (def_insn->rtl ()))
+			    {
+			      vsetvl_info def_info = vsetvl_info (def_insn);
+			      if (m_dem.compatible_p (def_info, info))
+				continue;
+			    }
+			}
+
 		      bitmap_clear_bit (m_transp[bb_index], i);
 		      break;
 		    }
@@ -2663,7 +2722,7 @@ pre_vsetvl::compute_lcm_local_properties ()
       vsetvl_info &footer_info = block_info.get_exit_info ();
 
       if (header_info.valid_p ()
-	  && (anticpatable_exp_p (header_info) || block_info.full_available))
+	  && (anticipated_exp_p (header_info) || block_info.full_available))
 	bitmap_set_bit (m_antloc[bb_index],
 			get_expr_index (m_exprs, header_info));
 
@@ -2918,6 +2977,13 @@ pre_vsetvl::earliest_fuse_vsetvl_info ()
 	    continue;
 	  if (eg->src == ENTRY_BLOCK_PTR_FOR_FN (cfun)
 	      || eg->dest == EXIT_BLOCK_PTR_FOR_FN (cfun))
+	    continue;
+
+	  /* When multiple set bits in earliest edge, such edge may
+	     have infinite loop in preds or succs or multiple conflict
+	     vsetvl expression which make such edge is unrelated.  We
+	     don't perform fusion for such situation.  */
+	  if (bitmap_count_bits (e) != 1)
 	    continue;
 
 	  vsetvl_block_info &src_block_info = get_block_info (eg->src);

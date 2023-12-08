@@ -1791,7 +1791,7 @@ nvptx_get_drap_rtx (void)
    argument to the next call.  */
 
 static void
-nvptx_call_args (rtx arg, tree fntype)
+nvptx_call_args (cumulative_args_t, rtx arg, tree fntype)
 {
   if (!cfun->machine->doing_call)
     {
@@ -1819,7 +1819,7 @@ nvptx_call_args (rtx arg, tree fntype)
    information we recorded.  */
 
 static void
-nvptx_end_call_args (void)
+nvptx_end_call_args (cumulative_args_t)
 {
   cfun->machine->doing_call = false;
   free_EXPR_LIST_list (&cfun->machine->call_args);
@@ -5834,16 +5834,15 @@ nvptx_handle_shared_attribute (tree *node, tree name, tree ARG_UNUSED (args),
 }
 
 /* Table of valid machine attributes.  */
-static const struct attribute_spec nvptx_attribute_table[] =
+TARGET_GNU_ATTRIBUTES (nvptx_attribute_table,
 {
   /* { name, min_len, max_len, decl_req, type_req, fn_type_req,
        affects_type_identity, handler, exclude } */
   { "kernel", 0, 0, true, false,  false, false, nvptx_handle_kernel_attribute,
     NULL },
   { "shared", 0, 0, true, false,  false, false, nvptx_handle_shared_attribute,
-    NULL },
-  { NULL, 0, 0, false, false, false, false, NULL, NULL }
-};
+    NULL }
+});
 
 /* Limit vector alignments to BIGGEST_ALIGNMENT.  */
 
@@ -7789,6 +7788,9 @@ nvptx_asm_output_def_from_decls (FILE *stream, tree name, tree value)
 
 #undef TARGET_LIBC_HAS_FUNCTION
 #define TARGET_LIBC_HAS_FUNCTION nvptx_libc_has_function
+
+#undef TARGET_HAVE_STRUB_SUPPORT_FOR
+#define TARGET_HAVE_STRUB_SUPPORT_FOR hook_bool_tree_false
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

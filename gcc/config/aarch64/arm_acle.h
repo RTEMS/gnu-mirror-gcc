@@ -314,6 +314,47 @@ __rndrrs (uint64_t *__res)
 
 #pragma GCC pop_options
 
+#define __arm_rsr(__regname) \
+  __builtin_aarch64_rsr (__regname)
+
+#define __arm_rsrp(__regname) \
+  __builtin_aarch64_rsrp (__regname)
+
+#define __arm_rsr64(__regname) \
+  __builtin_aarch64_rsr64 (__regname)
+
+#define __arm_rsrf(__regname) \
+  __builtin_aarch64_rsrf (__regname)
+
+#define __arm_rsrf64(__regname) \
+  __builtin_aarch64_rsrf64 (__regname)
+
+#define __arm_wsr(__regname, __value) \
+  __builtin_aarch64_wsr (__regname, __value)
+
+#define __arm_wsrp(__regname, __value) \
+  __builtin_aarch64_wsrp (__regname, __value)
+
+#define __arm_wsr64(__regname, __value) \
+  __builtin_aarch64_wsr64 (__regname, __value)
+
+#define __arm_wsrf(__regname, __value) \
+  __builtin_aarch64_wsrf (__regname, __value)
+
+#define __arm_wsrf64(__regname, __value) \
+  __builtin_aarch64_wsrf64 (__regname, __value)
+
+#pragma GCC push_options
+#pragma GCC target ("+nothing+d128")
+
+#define __arm_rsr128(__regname) \
+  __builtin_aarch64_rsr128 (__regname)
+
+#define __arm_wsr128(__regname, __value) \
+  __builtin_aarch64_wsr128 (__regname, __value)
+
+#pragma GCC pop_options
+
 #ifdef __cplusplus
 }
 #endif

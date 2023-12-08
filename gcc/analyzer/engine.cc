@@ -474,6 +474,11 @@ public:
     m_new_state->m_checker_states[m_sm_idx]->set_global_state (state);
   }
 
+  void clear_all_per_svalue_state () final override
+  {
+    m_new_state->m_checker_states[m_sm_idx]->clear_all_per_svalue_state ();
+  }
+
   void on_custom_transition (custom_transition *transition) final override
   {
     transition->impl_transition (&m_eg,
@@ -6068,7 +6073,7 @@ dump_analyzer_json (const supergraph &sg,
   toplev_obj->set ("egraph", eg.to_json ());
 
   pretty_printer pp;
-  toplev_obj->print (&pp);
+  toplev_obj->print (&pp, flag_diagnostics_json_formatting);
   pp_formatted_text (&pp);
 
   delete toplev_obj;

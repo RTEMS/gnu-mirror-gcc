@@ -1007,6 +1007,7 @@ namespace views::__adaptor
 
       // Invoke _Adaptor with arguments __r, _M_args... according to the
       // value category of this _Partial object.
+      // TODO: use explicit object functions ("deducing this").
       template<typename _Range>
 	requires __adaptor_invocable<_Adaptor, _Range, const _Args&...>
 	constexpr auto
@@ -1137,6 +1138,7 @@ namespace views::__adaptor
 
       // Invoke _M_rhs(_M_lhs(__r)) according to the value category of this
       // range adaptor closure object.
+      // TODO: use explicit object functions ("deducing this").
       template<typename _Range>
 	requires __pipe_invocable<const _Lhs&, const _Rhs&, _Range>
 	constexpr auto
@@ -9229,26 +9231,6 @@ namespace __detail
 	{ __c.max_size() } -> same_as<decltype(__n)>;
       };
 
-  template<typename _Container, typename _Ref>
-    constexpr bool __container_insertable
-      = requires(_Container& __c, _Ref&& __ref) {
-	typename _Container::value_type;
-	requires (
-	  requires { __c.push_back(std::forward<_Ref>(__ref)); }
-	  || requires { __c.insert(__c.end(), std::forward<_Ref>(__ref)); }
-	);
-      };
-
-  template<typename _Ref, typename _Container>
-    constexpr auto
-    __container_inserter(_Container& __c)
-    {
-      if constexpr (requires { __c.push_back(std::declval<_Ref>()); })
-	return std::back_inserter(__c);
-      else
-	return std::inserter(__c, __c.end());
-    }
-
   template<typename _Cont, typename _Range>
     constexpr bool __toable = requires {
       requires (!input_range<_Cont>
@@ -9301,17 +9283,33 @@ namespace __detail
 			 std::forward<_Args>(__args)...);
 	  else
 	    {
-	      using __detail::__container_insertable;
-	      using __detail::__reservable_container;
 	      using _RefT = range_reference_t<_Rg>;
 	      static_assert(constructible_from<_Cont, _Args...>);
-	      static_assert(__container_insertable<_Cont, _RefT>);
 	      _Cont __c(std::forward<_Args>(__args)...);
-	      if constexpr (sized_range<_Rg> && __reservable_container<_Cont>)
+	      if constexpr (sized_range<_Rg>
+			      && __detail::__reservable_container<_Cont>)
 		__c.reserve(static_cast<range_size_t<_Cont>>(ranges::size(__r)));
-	      auto __ins = __detail::__container_inserter<_RefT>(__c);
-	      for (auto&& __e : __r)
-		*__ins++ = std::forward<decltype(__e)>(__e);
+	      // _GLIBCXX_RESOLVE_LIB_DEFECTS
+	      // 4016. container-insertable checks do not match what
+	      // container-inserter does
+	      auto __it = ranges::begin(__r);
+	      const auto __sent = ranges::end(__r);
+	      while (__it != __sent)
+		{
+		  if constexpr (requires { __c.emplace_back(*__it); })
+		    __c.emplace_back(*__it);
+		  else if constexpr (requires { __c.push_back(*__it); })
+		    __c.push_back(*__it);
+		  else
+		    {
+		      auto __end = __c.end();
+		      if constexpr (requires { __c.emplace(__end, *__it); })
+			__end = __c.emplace(__end, *__it);
+		      else
+			__end = __c.insert(__end, *__it);
+		    }
+		  ++__it;
+		}
 	      return __c;
 	    }
 	}
@@ -9391,58 +9389,15 @@ namespace __detail
 /// @cond undocumented
 namespace __detail
 {
-  template<typename _Cont, typename... _Args>
-    class _ToClosure
-    : public views::__adaptor::_RangeAdaptorClosure<_ToClosure<_Cont, _Args...>>
+  template<typename _Cont>
+    struct _To
     {
-      tuple<decay_t<_Args>...> _M_bound_args;
-
-    public:
-      constexpr
-      _ToClosure(_Args&&... __args)
-      : _M_bound_args(std::forward<_Args>(__args)...)
-      { }
-
-      // TODO: use explicit object functions ("deducing this").
-
-      template<typename _Rg>
+      template<typename _Range, typename... _Args>
 	constexpr auto
-	operator()(_Rg&& __r) &
+	operator()(_Range&& __r, _Args&&... __args) const
 	{
-	  return std::apply([&__r]<typename... _Tp>(_Tp&&... __args) {
-	    return ranges::to<_Cont>(std::forward<_Rg>(__r),
-				     std::forward<_Tp>(__args)...);
-	  }, _M_bound_args);
-	}
-
-      template<typename _Rg>
-	constexpr auto
-	operator()(_Rg&& __r) const &
-	{
-	  return std::apply([&__r]<typename... _Tp>(_Tp&&... __args) {
-	    return ranges::to<_Cont>(std::forward<_Rg>(__r),
-				     std::forward<_Tp>(__args)...);
-	  }, _M_bound_args);
-	}
-
-      template<typename _Rg>
-	constexpr auto
-	operator()(_Rg&& __r) &&
-	{
-	  return std::apply([&__r]<typename... _Tp>(_Tp&&... __args) {
-	    return ranges::to<_Cont>(std::forward<_Rg>(__r),
-				     std::forward<_Tp>(__args)...);
-	  }, std::move(_M_bound_args));
-	}
-
-      template<typename _Rg>
-	constexpr auto
-	operator()(_Rg&& __r) const &&
-	{
-	  return std::apply([&__r]<typename... _Tp>(_Tp&&... __args) {
-	    return ranges::to<_Cont>(std::forward<_Rg>(__r),
-				     std::forward<_Tp>(__args)...);
-	  }, std::move(_M_bound_args));
+	  return ranges::to<_Cont>(std::forward<_Range>(__r),
+				   std::forward<_Args>(__args)...);
 	}
     };
 } // namespace __detail
@@ -9465,65 +9420,26 @@ namespace __detail
    */
   template<typename _Cont, typename... _Args>
     requires (!view<_Cont>)
-    constexpr __detail::_ToClosure<_Cont, _Args...>
+    constexpr auto
     to [[nodiscard]] (_Args&&... __args)
-    { return {std::forward<_Args>(__args)...}; }
+    {
+      using __detail::_To;
+      using views::__adaptor::_Partial;
+      return _Partial<_To<_Cont>, decay_t<_Args>...>{std::forward<_Args>(__args)...};
+    }
 
 /// @cond undocumented
 namespace __detail
 {
-  template<template<typename...> typename _Cont, typename... _Args>
-    class _ToClosure2
-    : public views::__adaptor::_RangeAdaptorClosure<_ToClosure2<_Cont, _Args...>>
+  template<template<typename...> typename _Cont>
+    struct _To2
     {
-      tuple<decay_t<_Args>...> _M_bound_args;
-
-    public:
-      constexpr
-      _ToClosure2(_Args&&... __args)
-      : _M_bound_args(std::forward<_Args>(__args)...)
-      { }
-
-      // TODO: use explicit object functions ("deducing this").
-
-      template<typename _Rg>
+      template<typename _Range, typename... _Args>
 	constexpr auto
-	operator()(_Rg&& __r) &
+	operator()(_Range&& __r, _Args&&... __args) const
 	{
-	  return std::apply([&__r]<typename... _Tp>(_Tp&&... __args) {
-	    return ranges::to<_Cont>(std::forward<_Rg>(__r),
-				     std::forward<_Tp>(__args)...);
-	  }, _M_bound_args);
-	}
-
-      template<typename _Rg>
-	constexpr auto
-	operator()(_Rg&& __r) const &
-	{
-	  return std::apply([&__r]<typename... _Tp>(_Tp&&... __args) {
-	    return ranges::to<_Cont>(std::forward<_Rg>(__r),
-				     std::forward<_Tp>(__args)...);
-	  }, _M_bound_args);
-	}
-
-      template<typename _Rg>
-	constexpr auto
-	operator()(_Rg&& __r) &&
-	{
-	  return std::apply([&__r]<typename... _Tp>(_Tp&&... __args) {
-	    return ranges::to<_Cont>(std::forward<_Rg>(__r),
-				     std::forward<_Tp>(__args)...);
-	  }, std::move(_M_bound_args));
-	}
-
-      template<typename _Rg>
-	constexpr auto
-	operator()(_Rg&& __r) const &&
-	{
-	  return std::apply([&__r]<typename... _Tp>(_Tp&&... __args) {
-	    return ranges::to<_Cont>(std::forward<_Rg>(__r),
-				     std::forward<_Tp>(__args)...);
-	  }, std::move(_M_bound_args));
+	  return ranges::to<_Cont>(std::forward<_Range>(__r),
+				   std::forward<_Args>(__args)...);
 	}
     };
 } // namespace __detail
@@ -9547,9 +9463,13 @@ namespace __detail
    * `r | std::ranges::to<std::vector>(an_allocator)`.
    */
   template<template<typename...> typename _Cont, typename... _Args>
-    constexpr __detail::_ToClosure2<_Cont, _Args...>
+    constexpr auto
     to [[nodiscard]] (_Args&&... __args)
-    { return {std::forward<_Args>(__args)...}; }
+    {
+      using __detail::_To2;
+      using views::__adaptor::_Partial;
+      return _Partial<_To2<_Cont>, decay_t<_Args>...>{std::forward<_Args>(__args)...};
+    }
 
 } // namespace ranges
 #endif // __cpp_lib_ranges_to_container

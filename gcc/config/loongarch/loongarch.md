@@ -59,6 +59,13 @@
   ;; Stack tie
   UNSPEC_TIE
 
+  ;; RSQRT
+  UNSPEC_RSQRT
+  UNSPEC_RSQRTE
+
+  ;; RECIP
+  UNSPEC_RECIPE
+
   ;; CRC
   UNSPEC_CRC
   UNSPEC_CRCC
@@ -220,6 +227,7 @@
 ;; fmadd	floating point multiply-add
 ;; fdiv		floating point divide
 ;; frdiv	floating point reciprocal divide
+;; frecipe      floating point approximate reciprocal
 ;; fabs		floating point absolute value
 ;; flogb	floating point exponent extract
 ;; fneg		floating point negation
@@ -229,6 +237,7 @@
 ;; fscaleb	floating point scale
 ;; fsqrt	floating point square root
 ;; frsqrt       floating point reciprocal square root
+;; frsqrte      floating point approximate reciprocal square root
 ;; multi	multiword sequence (or user asm statements)
 ;; atomic	atomic memory update instruction
 ;; syncloop	memory atomic operation implemented as a sync loop
@@ -238,8 +247,8 @@
   "unknown,branch,jump,call,load,fpload,fpidxload,store,fpstore,fpidxstore,
    prefetch,prefetchx,condmove,mgtf,mftg,const,arith,logical,
    shift,slt,signext,clz,trap,imul,idiv,move,
-   fmove,fadd,fmul,fmadd,fdiv,frdiv,fabs,flogb,fneg,fcmp,fcopysign,fcvt,
-   fscaleb,fsqrt,frsqrt,accext,accmod,multi,atomic,syncloop,nop,ghost,
+   fmove,fadd,fmul,fmadd,fdiv,frdiv,frecipe,fabs,flogb,fneg,fcmp,fcopysign,fcvt,
+   fscaleb,fsqrt,frsqrt,frsqrte,accext,accmod,multi,atomic,syncloop,nop,ghost,
    simd_div,simd_fclass,simd_flog2,simd_fadd,simd_fcvt,simd_fmul,simd_fmadd,
    simd_fdiv,simd_bitins,simd_bitmov,simd_insert,simd_sld,simd_mul,simd_fcmp,
    simd_fexp2,simd_int_arith,simd_bit,simd_shift,simd_splat,simd_fill,
@@ -884,9 +893,21 @@
 ;; Float division and modulus.
 (define_expand "div<mode>3"
   [(set (match_operand:ANYF 0 "register_operand")
-	(div:ANYF (match_operand:ANYF 1 "reg_or_1_operand")
-		  (match_operand:ANYF 2 "register_operand")))]
-  "")
+    (div:ANYF (match_operand:ANYF 1 "reg_or_1_operand")
+	      (match_operand:ANYF 2 "register_operand")))]
+  ""
+{
+  if (<MODE>mode == SFmode
+    && TARGET_RECIP_DIV
+    && optimize_insn_for_speed_p ()
+    && flag_finite_math_only && !flag_trapping_math
+    && flag_unsafe_math_optimizations)
+  {
+    loongarch_emit_swdivsf (operands[0], operands[1],
+	operands[2], SFmode);
+    DONE;
+  }
+})
 
 (define_insn "*div<mode>3"
   [(set (match_operand:ANYF 0 "register_operand" "=f")
@@ -907,6 +928,18 @@
   "frecip.<fmt>\t%0,%2"
   [(set_attr "type" "frdiv")
    (set_attr "mode" "<UNITMODE>")])
+
+;; Approximate Reciprocal Instructions.
+
+(define_insn "loongarch_frecipe_<fmt>"
+  [(set (match_operand:ANYF 0 "register_operand" "=f")
+    (unspec:ANYF [(match_operand:ANYF 1 "register_operand" "f")]
+	     UNSPEC_RECIPE))]
+  "TARGET_FRECIPE"
+  "frecipe.<fmt>\t%0,%1"
+  [(set_attr "type" "frecipe")
+   (set_attr "mode" "<UNITMODE>")
+   (set_attr "insn_count" "1")])
 
 ;; Integer division and modulus.
 (define_expand "<optab><mode>3"
@@ -1105,7 +1138,23 @@
 ;;
 ;;  ....................
 
-(define_insn "sqrt<mode>2"
+(define_expand "sqrt<mode>2"
+  [(set (match_operand:ANYF 0 "register_operand")
+    (sqrt:ANYF (match_operand:ANYF 1 "register_operand")))]
+  ""
+ {
+  if (<MODE>mode == SFmode
+      && TARGET_RECIP_SQRT
+      && flag_unsafe_math_optimizations
+      && !optimize_insn_for_size_p ()
+      && flag_finite_math_only && !flag_trapping_math)
+    {
+      loongarch_emit_swrsqrtsf (operands[0], operands[1], SFmode, 0);
+      DONE;
+    }
+ })
+
+(define_insn "*sqrt<mode>2"
   [(set (match_operand:ANYF 0 "register_operand" "=f")
 	(sqrt:ANYF (match_operand:ANYF 1 "register_operand" "f")))]
   ""
@@ -1114,25 +1163,38 @@
    (set_attr "mode" "<UNITMODE>")
    (set_attr "insn_count" "1")])
 
-(define_insn "*rsqrt<mode>a"
-  [(set (match_operand:ANYF 0 "register_operand" "=f")
-	(div:ANYF (match_operand:ANYF 1 "const_1_operand" "")
-		  (sqrt:ANYF (match_operand:ANYF 2 "register_operand" "f"))))]
-  "flag_unsafe_math_optimizations"
-  "frsqrt.<fmt>\t%0,%2"
-  [(set_attr "type" "frsqrt")
-   (set_attr "mode" "<UNITMODE>")
-   (set_attr "insn_count" "1")])
+(define_expand "rsqrt<mode>2"
+  [(set (match_operand:ANYF 0 "register_operand")
+    (unspec:ANYF [(match_operand:ANYF 1 "register_operand")]
+	   UNSPEC_RSQRT))]
+  "TARGET_HARD_FLOAT"
+{
+   if (<MODE>mode == SFmode && TARGET_RECIP_RSQRT)
+     {
+       loongarch_emit_swrsqrtsf (operands[0], operands[1], SFmode, 1);
+       DONE;
+     }
+})
 
-(define_insn "*rsqrt<mode>b"
+(define_insn "*rsqrt<mode>2"
   [(set (match_operand:ANYF 0 "register_operand" "=f")
-	(sqrt:ANYF (div:ANYF (match_operand:ANYF 1 "const_1_operand" "")
-			     (match_operand:ANYF 2 "register_operand" "f"))))]
-  "flag_unsafe_math_optimizations"
-  "frsqrt.<fmt>\t%0,%2"
+    (unspec:ANYF [(match_operand:ANYF 1 "register_operand" "f")]
+	     UNSPEC_RSQRT))]
+  "TARGET_HARD_FLOAT"
+  "frsqrt.<fmt>\t%0,%1"
   [(set_attr "type" "frsqrt")
-   (set_attr "mode" "<UNITMODE>")
-   (set_attr "insn_count" "1")])
+   (set_attr "mode" "<UNITMODE>")])
+
+;; Approximate Reciprocal Square Root Instructions.
+
+(define_insn "loongarch_frsqrte_<fmt>"
+  [(set (match_operand:ANYF 0 "register_operand" "=f")
+    (unspec:ANYF [(match_operand:ANYF 1 "register_operand" "f")]
+		 UNSPEC_RSQRTE))]
+  "TARGET_FRECIPE"
+  "frsqrte.<fmt>\t%0,%1"
+  [(set_attr "type" "frsqrte")
+   (set_attr "mode" "<UNITMODE>")])
 
 ;;
 ;;  ....................
@@ -1164,6 +1226,23 @@
   "fcopysign.<fmt>\t%0,%1,%2"
   [(set_attr "type" "fcopysign")
    (set_attr "mode" "<UNITMODE>")])
+
+(define_expand "@xorsign<mode>3"
+  [(match_operand:ANYF 0 "register_operand")
+   (match_operand:ANYF 1 "register_operand")
+   (match_operand:ANYF 2 "register_operand")]
+  "ISA_HAS_LSX"
+{
+  machine_mode lsx_mode
+    = <MODE>mode == SFmode ? V4SFmode : V2DFmode;
+  rtx tmp = gen_reg_rtx (lsx_mode);
+  rtx op1 = lowpart_subreg (lsx_mode, operands[1], <MODE>mode);
+  rtx op2 = lowpart_subreg (lsx_mode, operands[2], <MODE>mode);
+  emit_insn (gen_xorsign3 (lsx_mode, tmp, op1, op2));
+  emit_move_insn (operands[0],
+          lowpart_subreg (<MODE>mode, tmp, lsx_mode));
+  DONE;
+})
 
 ;;
 ;;  ....................
@@ -1512,7 +1591,30 @@
    (set_attr "cnv_mode"	"D2S")
    (set_attr "mode" "SF")])
 
-
+;; In vector registers, popcount can be implemented directly through
+;; the vector instruction [X]VPCNT.  For GP registers, we can implement
+;; it through the following method.  Compared with loop implementation
+;; of popcount, the following method has better performance.
+
+;; This attribute used for get connection of scalar mode and corresponding
+;; vector mode.
+(define_mode_attr cntmap [(SI "v4si") (DI "v2di")])
+
+(define_expand "popcount<mode>2"
+  [(set (match_operand:GPR 0 "register_operand")
+	(popcount:GPR (match_operand:GPR 1 "register_operand")))]
+  "ISA_HAS_LSX"
+{
+  rtx in = operands[1];
+  rtx out = operands[0];
+  rtx vreg = <MODE>mode == SImode ? gen_reg_rtx (V4SImode) :
+				    gen_reg_rtx (V2DImode);
+  emit_insn (gen_lsx_vinsgr2vr_<size> (vreg, in, vreg, GEN_INT (1)));
+  emit_insn (gen_popcount<cntmap>2 (vreg, vreg));
+  emit_insn (gen_lsx_vpickve2gr_<size> (out, vreg, GEN_INT (0)));
+  DONE;
+})
+
 ;;
 ;;  ....................
 ;;
@@ -3879,7 +3981,7 @@
 		   (any_extend:SI (match_dup 3)))])]
   "")
 
-
+
 
 (define_mode_iterator QHSD [QI HI SI DI])
 

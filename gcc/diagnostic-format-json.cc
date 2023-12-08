@@ -43,12 +43,12 @@ public:
     m_cur_children_array = nullptr;
   }
   void
-  on_begin_diagnostic (diagnostic_info *) final override
+  on_begin_diagnostic (const diagnostic_info &) final override
   {
     /* No-op.  */
   }
   void
-  on_end_diagnostic (diagnostic_info *diagnostic,
+  on_end_diagnostic (const diagnostic_info &diagnostic,
 		     diagnostic_t orig_diag_kind) final override;
   void on_diagram (const diagnostic_diagram &) final override
   {
@@ -56,11 +56,13 @@ public:
   }
 
 protected:
-  json_output_format (diagnostic_context &context)
+  json_output_format (diagnostic_context &context,
+		      bool formatted)
   : diagnostic_output_format (context),
     m_toplevel_array (new json::array ()),
     m_cur_group (nullptr),
-    m_cur_children_array (nullptr)
+    m_cur_children_array (nullptr),
+    m_formatted (formatted)
   {
   }
 
@@ -68,7 +70,7 @@ protected:
   void
   flush_to_file (FILE *outf)
   {
-    m_toplevel_array->dump (outf);
+    m_toplevel_array->dump (outf, m_formatted);
     fprintf (outf, "\n");
     delete m_toplevel_array;
     m_toplevel_array = nullptr;
@@ -84,6 +86,8 @@ private:
   /* The JSON array for the "children" array within the current diagnostic
      group.  */
   json::array *m_cur_children_array;
+
+  bool m_formatted;
 };
 
 /* Generate a JSON object for LOC.  */
@@ -188,7 +192,7 @@ json_from_metadata (const diagnostic_metadata *metadata)
    within current diagnostic group.  */
 
 void
-json_output_format::on_end_diagnostic (diagnostic_info *diagnostic,
+json_output_format::on_end_diagnostic (const diagnostic_info &diagnostic,
 				       diagnostic_t orig_diag_kind)
 {
   json::object *diag_obj = new json::object ();
@@ -202,7 +206,7 @@ json_output_format::on_end_diagnostic (diagnostic_info *diagnostic,
       "must-not-happen"
     };
     /* Lose the trailing ": ".  */
-    const char *kind_text = diagnostic_kind_text[diagnostic->kind];
+    const char *kind_text = diagnostic_kind_text[diagnostic.kind];
     size_t len = strlen (kind_text);
     gcc_assert (len > 2);
     gcc_assert (kind_text[len - 2] == ':');
@@ -217,15 +221,15 @@ json_output_format::on_end_diagnostic (diagnostic_info *diagnostic,
   diag_obj->set_string ("message", pp_formatted_text (m_context.printer));
   pp_clear_output_area (m_context.printer);
 
-  if (char *option_text = m_context.make_option_name (diagnostic->option_index,
+  if (char *option_text = m_context.make_option_name (diagnostic.option_index,
 						      orig_diag_kind,
-						      diagnostic->kind))
+						      diagnostic.kind))
     {
       diag_obj->set_string ("option", option_text);
       free (option_text);
     }
 
-  if (char *option_url = m_context.make_option_url (diagnostic->option_index))
+  if (char *option_url = m_context.make_option_url (diagnostic.option_index))
     {
       diag_obj->set_string ("option_url", option_url);
       free (option_url);
@@ -249,7 +253,7 @@ json_output_format::on_end_diagnostic (diagnostic_info *diagnostic,
       diag_obj->set_integer ("column-origin", m_context.m_column_origin);
     }
 
-  const rich_location *richloc = diagnostic->richloc;
+  const rich_location *richloc = diagnostic.richloc;
 
   json::array *loc_array = new json::array ();
   diag_obj->set ("locations", loc_array);
@@ -280,9 +284,9 @@ json_output_format::on_end_diagnostic (diagnostic_info *diagnostic,
      TODO: inlining information
      TODO: macro expansion information.  */
 
-  if (diagnostic->metadata)
+  if (diagnostic.metadata)
     {
-      json::object *metadata_obj = json_from_metadata (diagnostic->metadata);
+      json::object *metadata_obj = json_from_metadata (diagnostic.metadata);
       diag_obj->set ("metadata", metadata_obj);
     }
 
@@ -301,8 +305,9 @@ json_output_format::on_end_diagnostic (diagnostic_info *diagnostic,
 class json_stderr_output_format : public json_output_format
 {
 public:
-  json_stderr_output_format (diagnostic_context &context)
-  : json_output_format (context)
+  json_stderr_output_format (diagnostic_context &context,
+			     bool formatted)
+    : json_output_format (context, formatted)
   {
   }
   ~json_stderr_output_format ()
@@ -315,8 +320,9 @@ class json_file_output_format : public json_output_format
 {
 public:
   json_file_output_format (diagnostic_context &context,
+			   bool formatted,
 			   const char *base_file_name)
-  : json_output_format (context),
+  : json_output_format (context, formatted),
     m_base_file_name (xstrdup (base_file_name))
   {
   }
@@ -367,10 +373,12 @@ diagnostic_output_format_init_json (diagnostic_context *context)
 /* Populate CONTEXT in preparation for JSON output to stderr.  */
 
 void
-diagnostic_output_format_init_json_stderr (diagnostic_context *context)
+diagnostic_output_format_init_json_stderr (diagnostic_context *context,
+					   bool formatted)
 {
   diagnostic_output_format_init_json (context);
-  context->set_output_format (new json_stderr_output_format (*context));
+  context->set_output_format (new json_stderr_output_format (*context,
+							     formatted));
 }
 
 /* Populate CONTEXT in preparation for JSON output to a file named
@@ -378,10 +386,12 @@ diagnostic_output_format_init_json_stderr (diagnostic_context *context)
 
 void
 diagnostic_output_format_init_json_file (diagnostic_context *context,
+					 bool formatted,
 					 const char *base_file_name)
 {
   diagnostic_output_format_init_json (context);
   context->set_output_format (new json_file_output_format (*context,
+							   formatted,
 							   base_file_name));
 }
 

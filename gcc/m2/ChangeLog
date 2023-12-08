@@ -1,3 +1,53 @@
+2023-12-07  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/112893
+	* gm2-compiler/M2Base.mod (Ass): Extend array to include proc row
+	and column.  Allow PIM to assign cardinal variables to address
+	variables.
+	(Expr): Ditto.
+	(Comp): Ditto.
+	* gm2-compiler/M2Check.mod (getSType): New procedure function.
+	Replace all occurances of GetSType with getSType.
+	* gm2-compiler/M2GenGCC.mod (CodeParam): Rewrite format specifier
+	error message.
+	* gm2-compiler/M2Quads.mod (CheckProcTypeAndProcedure): Add tokno
+	parameter.
+	* gm2-compiler/M2Range.def (InitTypesParameterCheck): Add tokno
+	parameter.
+	(InitParameterRangeCheck): Add tokno parameter.
+	Remove EXPORT QUALIFIED list.
+	(InitParameterRangeCheck): Add tokno parameter.
+	* gm2-compiler/M2Range.mod (InitTypesParameterCheck): Add tokno
+	parameter and pass tokno to PutRangeParam.
+	(InitParameterRangeCheck): Add tokno parameter and pass tokno to
+	PutRangeParam.
+	(PutRangeParam): Add tokno parameter and assign to tokenNo.
+	(FoldTypeParam): Rewrite format string.
+
+2023-12-06  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* lang.opt (-isysroot): New.
+
+2023-12-05  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/112865
+	* gm2-compiler/M2Quads.mod (BuildReFunction): Use
+	GetDType to retrieve the type of the operand when
+	converting the complex type to its scalar equivalent.
+	(BuildImFunction): Use GetDType to retrieve the type of the
+	operand when converting the complex type to its scalar
+	equivalent.
+
+2023-12-05  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	* mc/mc.flex [__GNUC__]: Define alloca as __builtin_alloca.
+	(handleDate): Use strchr instead of index.
+
+2023-12-04  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/112825
+	* tools-src/makeSystem: Change all occurrences of -c to -S.
+
 2023-11-01  Gaius Mulley  <gaiusmod2@gmail.com>
 
 	PR modula2/102989

@@ -1579,6 +1579,7 @@ typedef struct gfc_omp_clauses
   unsigned grainsize_strict:1, num_tasks_strict:1, compare:1, weak:1;
   unsigned non_rectangular:1, order_concurrent:1;
   unsigned contains_teams_construct:1, target_first_st_is_teams:1;
+  unsigned contained_in_target_construct:1;
   ENUM_BITFIELD (gfc_omp_sched_kind) sched_kind:3;
   ENUM_BITFIELD (gfc_omp_device_type) device_type:2;
   ENUM_BITFIELD (gfc_omp_memorder) memorder:3;
@@ -4008,6 +4009,9 @@ bool gfc_may_be_finalized (gfc_typespec);
 #define IS_POINTER(sym) \
 	(sym->ts.type == BT_CLASS && sym->attr.class_ok && CLASS_DATA (sym) \
 	 ? CLASS_DATA (sym)->attr.class_pointer : sym->attr.pointer)
+#define IS_PROC_POINTER(sym) \
+	(sym->ts.type == BT_CLASS && sym->attr.class_ok && CLASS_DATA (sym) \
+	 ? CLASS_DATA (sym)->attr.proc_pointer : sym->attr.proc_pointer)
 
 /* frontend-passes.cc */
 

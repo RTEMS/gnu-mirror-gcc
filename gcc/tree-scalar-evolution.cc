@@ -2050,6 +2050,30 @@ analyze_scalar_evolution (class loop *loop, tree var)
   return res;
 }
 
+/* If CHREC doesn't overflow, set the nonwrapping flag.  */
+
+void record_nonwrapping_chrec (tree chrec)
+{
+  CHREC_NOWRAP(chrec) = 1;
+
+  if (dump_file && (dump_flags & TDF_SCEV))
+    {
+      fprintf (dump_file, "(record_nonwrapping_chrec: ");
+      print_generic_expr (dump_file, chrec);
+      fprintf (dump_file, ")\n");
+    }
+}
+
+/* Return true if CHREC's nonwrapping flag is set.  */
+
+bool nonwrapping_chrec_p (tree chrec)
+{
+  if (!chrec || TREE_CODE(chrec) != POLYNOMIAL_CHREC)
+    return false;
+
+  return CHREC_NOWRAP(chrec);
+}
+
 /* Analyzes and returns the scalar evolution of VAR address in LOOP.  */
 
 static tree
@@ -3739,7 +3763,6 @@ final_value_replacement_loop (class loop *loop)
     split_loop_exit_edge (exit);
 
   /* Set stmt insertion pointer.  All stmts are inserted before this point.  */
-  gimple_stmt_iterator gsi = gsi_after_labels (exit->dest);
 
   class loop *ex_loop
     = superloop_at_depth (loop,
@@ -3847,13 +3870,10 @@ final_value_replacement_loop (class loop *loop)
       def = unshare_expr (def);
       remove_phi_node (&psi, false);
 
-      /* Propagate constants immediately.  */
+      /* Propagate constants immediately, but leave an unused initialization
+	 around to avoid invalidating the SCEV cache.  */
       if (CONSTANT_CLASS_P (def))
-	{
-	  replace_uses_by (rslt, def);
-	  release_ssa_name (rslt);
-	  continue;
-	}
+	replace_uses_by (rslt, def);
 
       /* Create the replacement statements.  */
       gimple_seq stmts;
@@ -3883,6 +3903,7 @@ final_value_replacement_loop (class loop *loop)
 	      gsi_next (&gsi2);
 	    }
 	}
+      gimple_stmt_iterator gsi = gsi_after_labels (exit->dest);
       gsi_insert_seq_before (&gsi, stmts, GSI_SAME_STMT);
       if (dump_file)
 	{

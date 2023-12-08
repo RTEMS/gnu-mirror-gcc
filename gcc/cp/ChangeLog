@@ -1,3 +1,159 @@
+2023-12-06  David Malcolm  <dmalcolm@redhat.com>
+
+	* cp-tree.h (cxx_print_error_function): Make diagnostic_info param
+	const.
+	* error.cc (cxx_print_error_function): Likewise.
+	(cp_diagnostic_starter): Likewise.
+	(cp_print_error_function): Likewise.
+
+2023-12-06  Jason Merrill  <jason@redhat.com>
+
+	DR 532
+	PR c++/53499
+	* pt.cc (more_specialized_fn): Fix object parameter handling.
+
+2023-12-05  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/112795
+	* cp-tree.h (cp_check_pragma_unroll): Declare.
+	* semantics.cc (cp_check_pragma_unroll): New function.
+	* parser.cc (cp_parser_pragma_unroll): Use cp_check_pragma_unroll.
+	* pt.cc (tsubst_expr) <case ANNOTATE_EXPR>: Likewise.
+	(tsubst_stmt) <case RANGE_FOR_STMT>: Likwsie.
+
+2023-12-05  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* tree.cc (cxx_gnu_attribute_table): Add extra braces to work
+	around PR 16333 in older compilers.
+
+2023-12-05  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/110734
+	* parser.cc (cp_parser_block_declaration): Implement C++ DR 2262
+	- Attributes for asm-definition.  Call cp_parser_asm_definition
+	even if RID_ASM token is only seen after sequence of standard
+	attributes.
+	(cp_parser_asm_definition): Parse standard attributes before
+	RID_ASM token and warn for them with -Wattributes.
+
+2023-12-05  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/107687
+	PR c++/110997
+	* call.cc (in_immediate_context): No longer static.
+	* constexpr.cc (cxx_eval_call_expression): Adjust assert.
+	* cp-gimplify.cc (deferred_escalating_exprs): New vec.
+	(remember_escalating_expr): New.
+	(enum fold_flags): Remove ff_fold_immediate.
+	(immediate_escalating_function_p): New.
+	(unchecked_immediate_escalating_function_p): New.
+	(promote_function_to_consteval): New.
+	(cp_fold_immediate): Move above.  Return non-null if any errors were
+	emitted.
+	(maybe_explain_promoted_consteval): New.
+	(cp_gimplify_expr) <case CALL_EXPR>: Assert we've handled all
+	immediate invocations.
+	(taking_address_of_imm_fn_error): New.
+	(cp_fold_immediate_r): Merge ADDR_EXPR and PTRMEM_CST cases.  Implement
+	P2564 - promoting functions to consteval.
+	<case CALL_EXPR>: Implement P2564 - promoting functions to consteval.
+	(cp_fold_r): If an expression turns into a CALL_EXPR after cp_fold,
+	call cp_fold_immediate_r on the CALL_EXPR.
+	(cp_fold_function): Set DECL_ESCALATION_CHECKED_P if
+	deferred_escalating_exprs does not contain current_function_decl.
+	(process_and_check_pending_immediate_escalating_fns): New.
+	* cp-tree.h (struct lang_decl_fn): Add escalated_p bit-field.
+	(DECL_ESCALATION_CHECKED_P): New.
+	(immediate_invocation_p): Declare.
+	(process_pending_immediate_escalating_fns): Likewise.
+	* decl2.cc (c_parse_final_cleanups): Set at_eof to 2 after all
+	templates have been instantiated; and to 3 at the end of the function.
+	Call process_pending_immediate_escalating_fns.
+	* error.cc (dump_template_bindings): Check at_eof against an updated
+	value.
+	* module.cc (trees_out::lang_decl_bools): Stream escalated_p.
+	(trees_in::lang_decl_bools): Likewise.
+	* pt.cc (push_tinst_level_loc): Set at_eof to 3, not 2.
+	* typeck.cc (cp_build_addr_expr_1): Don't check
+	DECL_IMMEDIATE_FUNCTION_P.
+
+2023-12-04  Jason Merrill  <jason@redhat.com>
+
+	* constexpr.cc (potential_constant_expression_1): Fix
+	check for loading volatile lvalue.
+
+2023-12-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/112795
+	* cp-tree.h (cp_convert_range_for): Change UNROLL type from
+	unsigned short to tree.
+	(finish_while_stmt_cond, finish_do_stmt, finish_for_cond): Likewise.
+	* parser.cc (cp_parser_statement): Pass NULL_TREE rather than 0 to
+	cp_parser_iteration_statement UNROLL argument.
+	(cp_parser_for, cp_parser_c_for): Change UNROLL type from
+	unsigned short to tree.
+	(cp_parser_range_for): Likewise.  Set RANGE_FOR_UNROLL to just UNROLL
+	rather than build_int_cst from it.
+	(cp_convert_range_for, cp_parser_iteration_statement): Change UNROLL
+	type from unsigned short to tree.
+	(cp_parser_omp_loop_nest): Pass NULL_TREE rather than 0 to
+	cp_parser_range_for UNROLL argument.
+	(cp_parser_pragma_unroll): Return tree rather than unsigned short.
+	If parsed expression is type dependent, just return it, don't diagnose
+	issues with value if it is value dependent.
+	(cp_parser_pragma): Change UNROLL type from unsigned short to tree.
+	* semantics.cc (finish_while_stmt_cond): Change UNROLL type from
+	unsigned short to tree.  Build ANNOTATE_EXPR with UNROLL as its last
+	operand rather than build_int_cst from it.
+	(finish_do_stmt, finish_for_cond): Likewise.
+	* pt.cc (tsubst_stmt) <case RANGE_FOR_STMT>: Change UNROLL type from
+	unsigned short to tree and set it to RECUR on RANGE_FOR_UNROLL (t).
+	(tsubst_expr) <case ANNOTATE_EXPR>: For annot_expr_unroll_kind repeat
+	checks on UNROLL value from cp_parser_pragma_unroll.
+
+2023-12-02  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* cp-tree.h (cxx_attribute_table): Delete.
+	(cxx_gnu_attribute_table, std_attribute_table): Declare.
+	* cp-objcp-common.h (LANG_HOOKS_COMMON_ATTRIBUTE_TABLE): Delete.
+	(LANG_HOOKS_FORMAT_ATTRIBUTE_TABLE): Delete.
+	(cp_objcp_attribute_table): New table.
+	(LANG_HOOKS_ATTRIBUTE_TABLE): Redefine.
+	* tree.cc (cxx_attribute_table): Replace with...
+	(cxx_gnu_attributes, cxx_gnu_attribute_table): ...these globals.
+	(std_attribute_table): Change type to scoped_attribute_specs, using...
+	(std_attributes): ...this as the underlying array.
+	(init_tree): Remove call to register_scoped_attributes.
+
+2023-12-01  Jason Merrill  <jason@redhat.com>
+
+	* mangle.cc (write_type): Mangle placeholder as its template.
+
+2023-12-01  Jason Merrill  <jason@redhat.com>
+
+	* cp-tree.h (TEMPLATE_ARGS_TYPE_CONSTRAINT_P): New.
+	(get_concept_check_template): Declare.
+	* constraint.cc (combine_constraint_expressions)
+	(finish_shorthand_constraint): Use UNKNOWN_LOCATION.
+	* pt.cc (convert_generic_types_to_packs): Likewise.
+	* mangle.cc (write_constraint_expression)
+	(write_tparms_constraints, write_type_constraint)
+	(template_parm_natural_p, write_requirement)
+	(write_requires_expr): New.
+	(write_encoding): Mangle trailing requires-clause.
+	(write_name): Pass parms to write_template_args.
+	(write_template_param_decl): Factor out from...
+	(write_closure_template_head): ...here.
+	(write_template_args): Mangle non-natural parms
+	and requires-clause.
+	(write_expression): Handle REQUIRES_EXPR.
+
+2023-12-01  Jason Merrill  <jason@redhat.com>
+
+	* semantics.cc (finish_non_static_data_member)
+	(finish_decltype_type, capture_decltype):
+	Handle deduced closure parameter.
+
 2023-11-30  Marek Polacek  <polacek@redhat.com>
 
 	PR c++/112744

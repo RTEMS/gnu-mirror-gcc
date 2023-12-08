@@ -2624,7 +2624,7 @@ bitint_large_huge::lower_mergeable_stmt (gimple *stmt, tree_code &cmp_code,
 	{
 	  if (kind == bitint_prec_large || (i == 0 && bo_bit != 0))
 	    idx = size_int (start + i);
-	  else if (i == cnt - 1)
+	  else if (i == cnt - 1 && (rem != 0))
 	    idx = size_int (end);
 	  else if (i == (bo_bit != 0))
 	    idx = create_loop (size_int (start + i), &idx_next);
@@ -3911,15 +3911,18 @@ bitint_large_huge::lower_addsub_overflow (tree obj, gimple *stmt)
 
   tree type0 = TREE_TYPE (arg0);
   tree type1 = TREE_TYPE (arg1);
-  if (TYPE_PRECISION (type0) < prec3)
+  int prec5 = prec3;
+  if (bitint_precision_kind (prec5) < bitint_prec_large)
+    prec5 = MAX (TYPE_PRECISION (type0), TYPE_PRECISION (type1));
+  if (TYPE_PRECISION (type0) < prec5)
     {
-      type0 = build_bitint_type (prec3, TYPE_UNSIGNED (type0));
+      type0 = build_bitint_type (prec5, TYPE_UNSIGNED (type0));
       if (TREE_CODE (arg0) == INTEGER_CST)
 	arg0 = fold_convert (type0, arg0);
     }
-  if (TYPE_PRECISION (type1) < prec3)
+  if (TYPE_PRECISION (type1) < prec5)
     {
-      type1 = build_bitint_type (prec3, TYPE_UNSIGNED (type1));
+      type1 = build_bitint_type (prec5, TYPE_UNSIGNED (type1));
       if (TREE_CODE (arg1) == INTEGER_CST)
 	arg1 = fold_convert (type1, arg1);
     }
@@ -5986,10 +5989,11 @@ gimple_lower_bitint (void)
 		    {
 		      if (TREE_CODE (TREE_TYPE (rhs1)) != BITINT_TYPE
 			  || (bitint_precision_kind (TREE_TYPE (rhs1))
-			      < bitint_prec_large)
-			  || (TYPE_PRECISION (TREE_TYPE (rhs1))
-			      >= TYPE_PRECISION (TREE_TYPE (s)))
-			  || mergeable_op (SSA_NAME_DEF_STMT (s)))
+			      < bitint_prec_large))
+			continue;
+		      if ((TYPE_PRECISION (TREE_TYPE (rhs1))
+			   >= TYPE_PRECISION (TREE_TYPE (s)))
+			  && mergeable_op (use_stmt))
 			continue;
 		      /* Prevent merging a widening non-mergeable cast
 			 on result of some narrower mergeable op
@@ -6008,7 +6012,9 @@ gimple_lower_bitint (void)
 			  || !mergeable_op (SSA_NAME_DEF_STMT (rhs1))
 			  || gimple_store_p (use_stmt))
 			continue;
-		      if (gimple_assign_cast_p (SSA_NAME_DEF_STMT (rhs1)))
+		      if ((TYPE_PRECISION (TREE_TYPE (rhs1))
+			   < TYPE_PRECISION (TREE_TYPE (s)))
+			  && gimple_assign_cast_p (SSA_NAME_DEF_STMT (rhs1)))
 			{
 			  /* Another exception is if the widening cast is
 			     from mergeable same precision cast from something
@@ -6326,27 +6332,9 @@ gimple_lower_bitint (void)
 	      tree type = NULL_TREE;
 	      /* Middle _BitInt(N) is rewritten to casts to INTEGER_TYPEs
 		 with the same precision and back.  */
-	      if (tree lhs = gimple_get_lhs (stmt))
-		if (TREE_CODE (TREE_TYPE (lhs)) == BITINT_TYPE
-		    && (bitint_precision_kind (TREE_TYPE (lhs))
-			== bitint_prec_middle))
-		  {
-		    int prec = TYPE_PRECISION (TREE_TYPE (lhs));
-		    int uns = TYPE_UNSIGNED (TREE_TYPE (lhs));
-		    type = build_nonstandard_integer_type (prec, uns);
-		    tree lhs2 = make_ssa_name (type);
-		    gimple *g = gimple_build_assign (lhs, NOP_EXPR, lhs2);
-		    if (stmt_ends_bb_p (stmt))
-		      {
-			edge e = find_fallthru_edge (gsi_bb (gsi)->succs);
-			gsi_insert_on_edge_immediate (e, g);
-		      }
-		    else
-		      gsi_insert_after (&gsi, g, GSI_SAME_STMT);
-		    gimple_set_lhs (stmt, lhs2);
-		  }
 	      unsigned int nops = gimple_num_ops (stmt);
-	      for (unsigned int i = 0; i < nops; ++i)
+	      for (unsigned int i = is_gimple_assign (stmt) ? 1 : 0;
+		   i < nops; ++i)
 		if (tree op = gimple_op (stmt, i))
 		  {
 		    tree nop = maybe_cast_middle_bitint (&gsi, op, type);
@@ -6372,6 +6360,25 @@ gimple_lower_bitint (void)
 			  = maybe_cast_middle_bitint (&gsi, CASE_HIGH (op),
 						      type);
 		      }
+		  }
+	      if (tree lhs = gimple_get_lhs (stmt))
+		if (TREE_CODE (TREE_TYPE (lhs)) == BITINT_TYPE
+		    && (bitint_precision_kind (TREE_TYPE (lhs))
+			== bitint_prec_middle))
+		  {
+		    int prec = TYPE_PRECISION (TREE_TYPE (lhs));
+		    int uns = TYPE_UNSIGNED (TREE_TYPE (lhs));
+		    type = build_nonstandard_integer_type (prec, uns);
+		    tree lhs2 = make_ssa_name (type);
+		    gimple_set_lhs (stmt, lhs2);
+		    gimple *g = gimple_build_assign (lhs, NOP_EXPR, lhs2);
+		    if (stmt_ends_bb_p (stmt))
+		      {
+			edge e = find_fallthru_edge (gsi_bb (gsi)->succs);
+			gsi_insert_on_edge_immediate (e, g);
+		      }
+		    else
+		      gsi_insert_after (&gsi, g, GSI_SAME_STMT);
 		  }
 	      update_stmt (stmt);
 	      continue;

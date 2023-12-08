@@ -1302,6 +1302,13 @@ proc check_stack_check_available { stack_kind } {
     } "$stack_opt"]
 }
 
+# Return 1 if the target supports stack scrubbing.
+proc check_effective_target_strub {} {
+    return [check_no_compiler_messages strub assembly {
+	void __attribute__ ((__strub__)) fn (void) {}
+    } ""]
+}
+
 # Return 1 if compilation with -freorder-blocks-and-partition is error-free
 # for trivial code, 0 otherwise.  As some targets (ARM for example) only
 # warn when -fprofile-use is also supplied we test that combination too.
@@ -1822,55 +1829,6 @@ proc check_linker_plugin_available { } {
      int main() { return 0; }
   } "-flto -fuse-linker-plugin"]
 }
-
-# Return 1 if the we can build a vector example with proper -march flags
-# and the current target can execute it, 0 otherwise.  Cache the result.
-
-proc check_effective_target_riscv_vector_hw { } {
-
-    return [check_runtime riscv_vector_hw32 {
-        int main (void)
-        {
-            asm ("vsetivli zero,8,e16,m1,ta,ma");
-            asm ("vadd.vv v8,v8,v16" : : : "v8");
-            return 0;
-        }
-    } ""] || [check_runtime riscv_vector_hw64 {
-        int main (void)
-        {
-            asm ("vsetivli zero,8,e16,m1,ta,ma");
-            asm ("vadd.vv v8,v8,v16" : : : "v8");
-            return 0;
-        }
-    } ""]
-}
-
-# Return 1 if the we can build a Zvfh vector example with proper -march flags
-# and the current target can execute it, 0 otherwise.  Cache the result.
-
-proc check_effective_target_riscv_zvfh_hw { } {
-    if ![check_effective_target_riscv_vector_hw] then {
-        return 0
-    }
-
-    return [check_runtime riscv_zvfh_hw32 {
-        int main (void)
-        {
-            asm ("vsetivli zero,8,e16,m1,ta,ma");
-            asm ("vfadd.vv v8,v8,v16" : : : "v8");
-            return 0;
-        }
-    } "-march=rv32gcv_zvfh -mabi=ilp32d"]
-    || [check_runtime riscv_zvfh_hw64 {
-        int main (void)
-        {
-            asm ("vsetivli zero,8,e16,m1,ta,ma");
-            asm ("vfadd.vv v8,v8,v16" : : : "v8");
-            return 0;
-        }
-    } "-march=rv64gcv_zvfh -mabi=lp64d"]
-}
-
 
 # Return 1 if the target is RV32, 0 otherwise.  Cache the result.
 
@@ -4432,6 +4390,30 @@ proc aarch64_sve_bits { } {
 
 	regsub {.*bits = ([^;]*);.*} $output {\1} bits
 	expr { $bits }
+    }]
+}
+
+# Return 1 if this is an AArch64 target that generates instructions for SME.
+proc check_effective_target_aarch64_sme { } {
+    if { ![istarget aarch64*-*-*] } {
+	return 0
+    }
+    return [check_no_compiler_messages aarch64_sme assembly {
+	#if !defined (__ARM_FEATURE_SME)
+	#error FOO
+	#endif
+    }]
+}
+
+# Return 1 if this is an AArch64 target that generates instructions for SME.
+proc check_effective_target_aarch64_sme2 { } {
+    if { ![istarget aarch64*-*-*] } {
+	return 0
+    }
+    return [check_no_compiler_messages aarch64_sme2 assembly {
+	#if !defined (__ARM_FEATURE_SME2)
+	#error FOO
+	#endif
     }]
 }
 
@@ -11587,7 +11569,7 @@ proc check_vect_support_and_set_flags { } {
     } elseif [istarget amdgcn-*-*] {
         set dg-do-what-default run
     } elseif [istarget riscv64-*-*] {
-	if [check_effective_target_riscv_vector_hw] {
+	if [check_effective_target_riscv_v] {
 	    lappend DEFAULT_VECTCFLAGS "--param" "riscv-vector-abi"
 	    set dg-do-what-default run
 	} else {
@@ -11664,7 +11646,8 @@ proc check_effective_target_aarch64_tiny { } {
 # various architecture extensions via the .arch_extension pseudo-op.
 
 foreach { aarch64_ext } { "fp" "simd" "crypto" "crc" "lse" "dotprod" "sve"
-			  "i8mm" "f32mm" "f64mm" "bf16" "sb" "sve2" "ls64" } {
+			  "i8mm" "f32mm" "f64mm" "bf16" "sb" "sve2" "ls64"
+			  "sme" "sme-i16i64" "sme2" } {
     eval [string map [list FUNC $aarch64_ext] {
 	proc check_effective_target_aarch64_asm_FUNC_ok { } {
 	  if { [istarget aarch64*-*-*] } {

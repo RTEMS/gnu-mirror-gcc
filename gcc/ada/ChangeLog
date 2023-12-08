@@ -1,3 +1,40 @@
+2023-12-06  Alexandre Oliva  <oliva@adacore.com>
+
+	* gcc-interface/trans.cc: Include ipa-strub.h.
+	(gigi): Make internal decls for targets of compiler-generated
+	calls strub-callable too.
+	(build_raise_check): Likewise.
+	* gcc-interface/utils.cc: Include ipa-strub.h.
+	(handle_strub_attribute): New.
+	(gnat_internal_attribute_table): Add strub.
+
+2023-12-05  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc-interface/utils.cc (gnat_internal_attribute_table): Add extra
+	braces to work around PR 16333 in older compilers.
+
+2023-12-05  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	* adaint.c: Include <signal.h>.
+	* expect.c: Include <string.h>.
+
+2023-12-02  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc-interface/gigi.h (gnat_internal_attribute_table): Change
+	type to scoped_attribute_specs.
+	* gcc-interface/utils.cc (gnat_internal_attribute_table): Likewise,
+	using...
+	(gnat_internal_attributes): ...this as the underlying array.
+	* gcc-interface/misc.cc (gnat_attribute_table): New global.
+	(LANG_HOOKS_ATTRIBUTE_TABLE): Use it.
+
+2023-12-01  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	* adaint.c [__APPLE__]: Include <signal.h>, <sys/time.h>.
+	* terminals.c [!_WIN32]: Include <signal.h>.
+	[__APPLE__]: Include <util.h>.
+	Fix typos.
+
 2023-11-30  Eric Botcazou  <ebotcazou@adacore.com>
 
 	* checks.ads (Apply_Predicate_Check): Add Deref boolean parameter.

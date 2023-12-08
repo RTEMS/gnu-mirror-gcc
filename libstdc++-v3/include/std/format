@@ -1815,9 +1815,11 @@ namespace __format
 	    return _M_f.format(__u, __fc);
 	}
 
+#if __cpp_lib_format_ranges
       constexpr void
       set_debug_format() noexcept
       { _M_f._M_spec._M_type = __format::_Pres_esc; }
+#endif
 
     private:
       __format::__formatter_int<wchar_t> _M_f;
@@ -1843,7 +1845,9 @@ namespace __format
 	format(_CharT* __u, basic_format_context<_Out, _CharT>& __fc) const
 	{ return _M_f.format(__u, __fc); }
 
+#if __cpp_lib_format_ranges
       constexpr void set_debug_format() noexcept { _M_f.set_debug_format(); }
+#endif
 
     private:
       __format::__formatter_str<_CharT> _M_f;
@@ -1866,7 +1870,9 @@ namespace __format
 	       basic_format_context<_Out, _CharT>& __fc) const
 	{ return _M_f.format(__u, __fc); }
 
+#if __cpp_lib_format_ranges
       constexpr void set_debug_format() noexcept { _M_f.set_debug_format(); }
+#endif
 
     private:
       __format::__formatter_str<_CharT> _M_f;
@@ -1888,7 +1894,9 @@ namespace __format
 	       basic_format_context<_Out, _CharT>& __fc) const
 	{ return _M_f.format({__u, _Nm}, __fc); }
 
+#if __cpp_lib_format_ranges
       constexpr void set_debug_format() noexcept { _M_f.set_debug_format(); }
+#endif
 
     private:
       __format::__formatter_str<_CharT> _M_f;
@@ -2801,7 +2809,6 @@ namespace __format
     requires same_as<iter_value_t<_OutIter>, _CharT>
     class _Iter_sink<_CharT, _OutIter> : public _Sink<_CharT>
     {
-      using uint64_t = __UINTPTR_TYPE__;
       _OutIter _M_first;
       iter_difference_t<_OutIter> _M_max = -1;
     protected:
@@ -2875,7 +2882,7 @@ namespace __format
 	  return {__ptr, __bytes / sizeof(_CharT)};
 #endif
 	// Avoid forming a pointer to a different memory page.
-	uint64_t __off = reinterpret_cast<uint64_t>(__ptr) % 1024;
+	const auto __off = reinterpret_cast<__UINTPTR_TYPE__>(__ptr) % 1024;
 	__n = (1024 - __off) / sizeof(_CharT);
 	if (__n > 0) [[likely]]
 	  return {__ptr, static_cast<size_t>(__n)};

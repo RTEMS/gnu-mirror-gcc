@@ -1,3 +1,76 @@
+2023-12-07  Alexandre Oliva  <oliva@adacore.com>
+
+	* region-model.cc (has_nondefault_case_for_value_p): Take
+	enumerate type as a parameter.
+	(region_model::apply_constraints_for_gswitch): Cope with
+	integral promotion type casts.
+
+2023-12-07  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/103546
+	PR analyzer/112850
+	* analyzer.opt (-param=analyzer-max-svalue-depth=): Increase from
+	12 to 18.
+	(Wanalyzer-symbol-too-complex): New.
+	* diagnostic-manager.cc
+	(null_assignment_sm_context::clear_all_per_svalue_state): New.
+	* engine.cc (impl_sm_context::clear_all_per_svalue_state): New.
+	* program-state.cc (sm_state_map::clear_all_per_svalue_state):
+	New.
+	* program-state.h (sm_state_map::clear_all_per_svalue_state): New
+	decl.
+	* region-model-manager.cc
+	(region_model_manager::reject_if_too_complex): Add
+	-Wanalyzer-symbol-too-complex.
+	* sm-taint.cc (taint_state_machine::on_condition): Handle
+	comparisons against UNKNOWN.
+	* sm.h (sm_context::clear_all_per_svalue_state): New.
+
+2023-12-06  David Malcolm  <dmalcolm@redhat.com>
+
+	* engine.cc (dump_analyzer_json): Use
+	flag_diagnostics_json_formatting.
+
+2023-12-01  David Malcolm  <dmalcolm@redhat.com>
+
+	* analyzer.h (class saved_diagnostic): New forward decl.
+	* bounds-checking.cc: Update for changes to
+	pending_diagnostic::emit.
+	* call-details.cc: Likewise.
+	* diagnostic-manager.cc: Include "diagnostic-format-sarif.h".
+	(saved_diagnostic::maybe_add_sarif_properties): New.
+	(class pending_diagnostic_metadata): New.
+	(diagnostic_manager::emit_saved_diagnostic): Create a
+	pending_diagnostic_metadata and a diagnostic_emission_context.
+	Pass the latter to the pending_diagnostic::emit vfunc.
+	* diagnostic-manager.h
+	(saved_diagnostic::maybe_add_sarif_properties): New decl.
+	* engine.cc: Update for changes to pending_diagnostic::emit.
+	* infinite-loop.cc: Likewise.
+	* infinite-recursion.cc: Likewise.
+	* kf-analyzer.cc: Likewise.
+	* kf.cc: Likewise.
+	* pending-diagnostic.cc
+	(diagnostic_emission_context::get_pending_diagnostic): New.
+	(diagnostic_emission_context::warn): New.
+	(diagnostic_emission_context::inform): New.
+	* pending-diagnostic.h (class diagnostic_emission_context): New.
+	(pending_diagnostic::emit): Update params.
+	(pending_diagnostic::maybe_add_sarif_properties): New vfunc.
+	* region.cc: Don't include "diagnostic-metadata.h".
+	* region-model.cc: Include "diagnostic-format-sarif.h".  Update
+	for changes to pending_diagnostic::emit.
+	(exposure_through_uninit_copy::maybe_add_sarif_properties): New.
+	* sm-fd.cc: Update for changes to pending_diagnostic::emit.
+	* sm-file.cc: Likewise.
+	* sm-malloc.cc: Likewise.
+	* sm-pattern-test.cc: Likewise.
+	* sm-sensitive.cc: Likewise.
+	* sm-signal.cc: Likewise.
+	* sm-taint.cc: Likewise.
+	* store.cc: Don't include "diagnostic-metadata.h".
+	* varargs.cc: Update for changes to pending_diagnostic::emit.
+
 2023-11-19  David Malcolm  <dmalcolm@redhat.com>
 
 	* analyzer.h: Include "rich-location.h".
