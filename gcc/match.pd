@@ -1895,16 +1895,22 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
      tem4 = (unsigned long) tem3;
      tem5 = ptr1 + tem4;
    and produce
-     tem5 = ptr2;  */
+     tem5 = ptr2;
+
+  N.B. this transformation isn't safe for capabilities, as we'd change
+  provenance from @0 to @1.  We could instead transform to
+  REPLACE_ADDRESS_VALUE (@0, (convert @1)), but for now we just punt
+  in the capability case.  */
 (simplify
   (pointer_plus @0 (convert?@2 (minus@3 (convert @1) (convert @0))))
   /* Conditionally look through a sign-changing conversion.  */
   (if (TYPE_PRECISION (TREE_TYPE (@2)) == TYPE_PRECISION (TREE_TYPE (@3))
+       && !capability_type_p (type)
        && ((GIMPLE && useless_type_conversion_p (type, TREE_TYPE (@1)))
 	    || (GENERIC && type == TREE_TYPE (@1))))
    @1))
-/* MORELLO Can not just convert @1 since we would then be using the metadata
-   from @1 rather than from @0.  */
+/* Likewise, we can't just convert @1 since we would then be using the
+   metadata from @1 rather than from @0.  */
 (simplify
   (pointer_plus @0 (convert?@2 (pointer_diff@3 @1 @@0)))
   (if (TYPE_PRECISION (TREE_TYPE (@2)) >= TYPE_PRECISION (TREE_TYPE (@3))
