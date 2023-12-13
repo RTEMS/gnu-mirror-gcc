@@ -247,11 +247,9 @@
    (set (match_dup 2) (match_dup 3))]
 {
   rtx op0 = operands[0];
-  unsigned offset_hi = (WORDS_BIG_ENDIAN) ? 0 : 16;
-  unsigned offset_lo = (WORDS_BIG_ENDIAN) ? 16 : 0;
 
-  operands[1] = simplify_gen_subreg (V2DImode, op0, OOmode, offset_hi);
-  operands[2] = simplify_gen_subreg (V2DImode, op0, OOmode, offset_lo);
+  operands[1] = simplify_gen_subreg (V2DImode, op0, OOmode, 0);
+  operands[2] = simplify_gen_subreg (V2DImode, op0, OOmode, 16);
   operands[3] = CONST0_RTX (V2DImode);
 }
   [(set_attr "length" "8")
@@ -334,7 +332,7 @@
   rtx op0 = operands[0];
   rtx op1 = operands[1];
   unsigned offset_hi = (WORDS_BIG_ENDIAN) ? 0 : 16;
-  unsigned offset_lo = (WORDS_BIG_ENDIAN) ? 16 : 0;
+  unsigned offset_lo = 16 - offset_hi;
   rtx op0_vector_hi = simplify_gen_subreg (<MODE>mode, op0, OOmode, offset_hi);
   rtx op0_vector_lo = simplify_gen_subreg (<MODE>mode, op0, OOmode, offset_lo);
 
@@ -369,22 +367,20 @@
    (set (match_dup 4) (match_dup 5))]
 {
   machine_mode vmode = <VPAIR_VECMODE>mode;
-  unsigned offset_hi = (WORDS_BIG_ENDIAN) ? 0 : 16;
-  unsigned offset_lo = (WORDS_BIG_ENDIAN) ? 16 : 0;
 
   rtx op0 = operands[0];
-  rtx op0_hi = simplify_gen_subreg (vmode, op0, OOmode, offset_hi);
-  rtx op0_lo = simplify_gen_subreg (vmode, op0, OOmode, offset_lo);
+  rtx op0_a = simplify_gen_subreg (vmode, op0, OOmode, 0);
+  rtx op0_b = simplify_gen_subreg (vmode, op0, OOmode, 16);
 
   rtx op1 = operands[1];
-  rtx op1_hi = simplify_gen_subreg (vmode, op1, OOmode, offset_hi);
-  rtx op1_lo = simplify_gen_subreg (vmode, op1, OOmode, offset_lo);
+  rtx op1_a = simplify_gen_subreg (vmode, op1, OOmode, 0);
+  rtx op1_b = simplify_gen_subreg (vmode, op1, OOmode, 16);
 
-  operands[2] = op0_hi;
-  operands[3] = gen_rtx_<VPAIR_OP> (vmode, op1_hi);
+  operands[2] = op0_a;
+  operands[3] = gen_rtx_<VPAIR_OP> (vmode, op1_a);
 
-  operands[4] = op0_lo;
-  operands[5] = gen_rtx_<VPAIR_OP> (vmode, op1_lo);
+  operands[4] = op0_b;
+  operands[5] = gen_rtx_<VPAIR_OP> (vmode, op1_b);
 }
   [(set_attr "length" "8")
    (set_attr "type" "<vpair_type>")])
@@ -404,22 +400,20 @@
    (set (match_dup 4) (match_dup 5))]
 {
   machine_mode vmode = <VPAIR_VECMODE>mode;
-  unsigned offset_hi = (WORDS_BIG_ENDIAN) ? 0 : 16;
-  unsigned offset_lo = (WORDS_BIG_ENDIAN) ? 16 : 0;
 
   rtx op0 = operands[0];
-  rtx op0_hi = simplify_gen_subreg (vmode, op0, OOmode, offset_hi);
-  rtx op0_lo = simplify_gen_subreg (vmode, op0, OOmode, offset_lo);
+  rtx op0_a = simplify_gen_subreg (vmode, op0, OOmode, 0);
+  rtx op0_b = simplify_gen_subreg (vmode, op0, OOmode, 16);
 
   rtx op1 = operands[1];
-  rtx op1_hi = simplify_gen_subreg (vmode, op1, OOmode, offset_hi);
-  rtx op1_lo = simplify_gen_subreg (vmode, op1, OOmode, offset_lo);
+  rtx op1_a = simplify_gen_subreg (vmode, op1, OOmode, 0);
+  rtx op1_b = simplify_gen_subreg (vmode, op1, OOmode, 16);
 
-  operands[2] = op0_hi;
-  operands[3] = gen_rtx_NEG (vmode, gen_rtx_ABS (vmode, op1_hi));
+  operands[2] = op0_a;
+  operands[3] = gen_rtx_NEG (vmode, gen_rtx_ABS (vmode, op1_a));
 
-  operands[4] = op0_lo;
-  operands[5] = gen_rtx_NEG (vmode, gen_rtx_ABS (vmode, op1_lo));
+  operands[4] = op0_b;
+  operands[5] = gen_rtx_NEG (vmode, gen_rtx_ABS (vmode, op1_b));
 }
   [(set_attr "length" "8")
    (set_attr "type" "<vpair_type>")])
@@ -438,26 +432,24 @@
    (set (match_dup 5) (match_dup 6))]
 {
   machine_mode vmode = <VPAIR_VECMODE>mode;
-  unsigned offset_hi = (WORDS_BIG_ENDIAN) ? 0 : 16;
-  unsigned offset_lo = (WORDS_BIG_ENDIAN) ? 16 : 0;
 
   rtx op0 = operands[0];
-  rtx op0_hi = simplify_gen_subreg (vmode, op0, OOmode, offset_hi);
-  rtx op0_lo = simplify_gen_subreg (vmode, op0, OOmode, offset_lo);
+  rtx op0_a = simplify_gen_subreg (vmode, op0, OOmode, 0);
+  rtx op0_b = simplify_gen_subreg (vmode, op0, OOmode, 16);
 
   rtx op1 = operands[1];
-  rtx op1_hi = simplify_gen_subreg (vmode, op1, OOmode, offset_hi);
-  rtx op1_lo = simplify_gen_subreg (vmode, op1, OOmode, offset_lo);
+  rtx op1_a = simplify_gen_subreg (vmode, op1, OOmode, 0);
+  rtx op1_b = simplify_gen_subreg (vmode, op1, OOmode, 16);
 
   rtx op2 = operands[2];
-  rtx op2_hi = simplify_gen_subreg (vmode, op2, OOmode, offset_hi);
-  rtx op2_lo = simplify_gen_subreg (vmode, op2, OOmode, offset_lo);
+  rtx op2_a = simplify_gen_subreg (vmode, op2, OOmode, 0);
+  rtx op2_b = simplify_gen_subreg (vmode, op2, OOmode, 16);
 
-  operands[3] = op0_hi;
-  operands[4] = gen_rtx_<VPAIR_OP> (vmode, op1_hi, op2_hi);
+  operands[3] = op0_a;
+  operands[4] = gen_rtx_<VPAIR_OP> (vmode, op1_a, op2_a);
 
-  operands[5] = op0_lo;
-  operands[6] = gen_rtx_<VPAIR_OP> (vmode, op1_lo, op2_lo);
+  operands[5] = op0_b;
+  operands[6] = gen_rtx_<VPAIR_OP> (vmode, op1_b, op2_b);
 }
   [(set_attr "length" "8")
    (set_attr "type" "<vpair_type>")])
@@ -483,7 +475,7 @@
 }
   [(set_attr "length" "8")
    (set_attr "type" "<vpair_type>")])
-
+
 ;; Vector pair floating point FMA operations
 (define_insn_and_split "vpair_fma_<vpair_vpmode>4"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
@@ -499,30 +491,28 @@
    (set (match_dup 6) (match_dup 7))]
 {
   machine_mode vmode = <VPAIR_VECMODE>mode;
-  unsigned offset_hi = (WORDS_BIG_ENDIAN) ? 0 : 16;
-  unsigned offset_lo = (WORDS_BIG_ENDIAN) ? 16 : 0;
 
   rtx op0 = operands[0];
-  rtx op0_hi = simplify_gen_subreg (vmode, op0, OOmode, offset_hi);
-  rtx op0_lo = simplify_gen_subreg (vmode, op0, OOmode, offset_lo);
+  rtx op0_a = simplify_gen_subreg (vmode, op0, OOmode, 0);
+  rtx op0_b = simplify_gen_subreg (vmode, op0, OOmode, 16);
 
   rtx op1 = operands[1];
-  rtx op1_hi = simplify_gen_subreg (vmode, op1, OOmode, offset_hi);
-  rtx op1_lo = simplify_gen_subreg (vmode, op1, OOmode, offset_lo);
+  rtx op1_a = simplify_gen_subreg (vmode, op1, OOmode, 0);
+  rtx op1_b = simplify_gen_subreg (vmode, op1, OOmode, 16);
 
   rtx op2 = operands[2];
-  rtx op2_hi = simplify_gen_subreg (vmode, op2, OOmode, offset_hi);
-  rtx op2_lo = simplify_gen_subreg (vmode, op2, OOmode, offset_lo);
+  rtx op2_a = simplify_gen_subreg (vmode, op2, OOmode, 0);
+  rtx op2_b = simplify_gen_subreg (vmode, op2, OOmode, 16);
 
   rtx op3 = operands[3];
-  rtx op3_hi = simplify_gen_subreg (vmode, op3, OOmode, offset_hi);
-  rtx op3_lo = simplify_gen_subreg (vmode, op3, OOmode, offset_lo);
+  rtx op3_a = simplify_gen_subreg (vmode, op3, OOmode, 0);
+  rtx op3_b = simplify_gen_subreg (vmode, op3, OOmode, 16);
 
-  operands[4] = op0_hi;
-  operands[5] = gen_rtx_FMA (vmode, op1_hi, op2_hi, op3_hi);
+  operands[4] = op0_a;
+  operands[5] = gen_rtx_FMA (vmode, op1_a, op2_a, op3_a);
 
-  operands[6] = op0_lo;
-  operands[7] = gen_rtx_FMA (vmode, op1_lo, op2_lo, op3_lo);
+  operands[6] = op0_b;
+  operands[7] = gen_rtx_FMA (vmode, op1_b, op2_b, op3_b);
 }
   [(set_attr "length" "8")
    (set_attr "type" "<vpair_type>")])
@@ -543,32 +533,30 @@
    (set (match_dup 6) (match_dup 7))]
 {
   machine_mode vmode = <VPAIR_VECMODE>mode;
-  unsigned offset_hi = (WORDS_BIG_ENDIAN) ? 0 : 16;
-  unsigned offset_lo = (WORDS_BIG_ENDIAN) ? 16 : 0;
 
   rtx op0 = operands[0];
-  rtx op0_hi = simplify_gen_subreg (vmode, op0, OOmode, offset_hi);
-  rtx op0_lo = simplify_gen_subreg (vmode, op0, OOmode, offset_lo);
+  rtx op0_a = simplify_gen_subreg (vmode, op0, OOmode, 0);
+  rtx op0_b = simplify_gen_subreg (vmode, op0, OOmode, 16);
 
   rtx op1 = operands[1];
-  rtx op1_hi = simplify_gen_subreg (vmode, op1, OOmode, offset_hi);
-  rtx op1_lo = simplify_gen_subreg (vmode, op1, OOmode, offset_lo);
+  rtx op1_a = simplify_gen_subreg (vmode, op1, OOmode, 0);
+  rtx op1_b = simplify_gen_subreg (vmode, op1, OOmode, 16);
 
   rtx op2 = operands[2];
-  rtx op2_hi = simplify_gen_subreg (vmode, op2, OOmode, offset_hi);
-  rtx op2_lo = simplify_gen_subreg (vmode, op2, OOmode, offset_lo);
+  rtx op2_a = simplify_gen_subreg (vmode, op2, OOmode, 0);
+  rtx op2_b = simplify_gen_subreg (vmode, op2, OOmode, 16);
 
   rtx op3 = operands[3];
-  rtx op3_hi = gen_rtx_NEG (vmode,
-			    simplify_gen_subreg (vmode, op3, OOmode, offset_hi));
-  rtx op3_lo = gen_rtx_NEG (vmode,
-			    simplify_gen_subreg (vmode, op3, OOmode, offset_lo));
+  rtx op3_a = gen_rtx_NEG (vmode,
+			   simplify_gen_subreg (vmode, op3, OOmode, 0));
+  rtx op3_b = gen_rtx_NEG (vmode,
+			   simplify_gen_subreg (vmode, op3, OOmode, 16));
 
-  operands[4] = op0_hi;
-  operands[5] = gen_rtx_FMA (vmode, op1_hi, op2_hi, op3_hi);
+  operands[4] = op0_a;
+  operands[5] = gen_rtx_FMA (vmode, op1_a, op2_a, op3_a);
 
-  operands[6] = op0_lo;
-  operands[7] = gen_rtx_FMA (vmode, op1_lo, op2_lo, op3_lo);
+  operands[6] = op0_b;
+  operands[7] = gen_rtx_FMA (vmode, op1_b, op2_b, op3_b);
 }
   [(set_attr "length" "8")
    (set_attr "type" "<vpair_type>")])
@@ -589,32 +577,30 @@
    (set (match_dup 6) (match_dup 7))]
 {
   machine_mode vmode = <VPAIR_VECMODE>mode;
-  unsigned offset_hi = (WORDS_BIG_ENDIAN) ? 0 : 16;
-  unsigned offset_lo = (WORDS_BIG_ENDIAN) ? 16 : 0;
 
   rtx op0 = operands[0];
-  rtx op0_hi = simplify_gen_subreg (vmode, op0, OOmode, offset_hi);
-  rtx op0_lo = simplify_gen_subreg (vmode, op0, OOmode, offset_lo);
+  rtx op0_a = simplify_gen_subreg (vmode, op0, OOmode, 0);
+  rtx op0_b = simplify_gen_subreg (vmode, op0, OOmode, 16);
 
   rtx op1 = operands[1];
-  rtx op1_hi = simplify_gen_subreg (vmode, op1, OOmode, offset_hi);
-  rtx op1_lo = simplify_gen_subreg (vmode, op1, OOmode, offset_lo);
+  rtx op1_a = simplify_gen_subreg (vmode, op1, OOmode, 0);
+  rtx op1_b = simplify_gen_subreg (vmode, op1, OOmode, 16);
 
   rtx op2 = operands[2];
-  rtx op2_hi = simplify_gen_subreg (vmode, op2, OOmode, offset_hi);
-  rtx op2_lo = simplify_gen_subreg (vmode, op2, OOmode, offset_lo);
+  rtx op2_a = simplify_gen_subreg (vmode, op2, OOmode, 0);
+  rtx op2_b = simplify_gen_subreg (vmode, op2, OOmode, 16);
 
   rtx op3 = operands[3];
-  rtx op3_hi = simplify_gen_subreg (vmode, op3, OOmode, offset_hi);
-  rtx op3_lo = simplify_gen_subreg (vmode, op3, OOmode, offset_lo);
+  rtx op3_a = simplify_gen_subreg (vmode, op3, OOmode, 0);
+  rtx op3_b = simplify_gen_subreg (vmode, op3, OOmode, 16);
 
-  operands[4] = op0_hi;
+  operands[4] = op0_a;
   operands[5] = gen_rtx_NEG (vmode,
-			     gen_rtx_FMA (vmode, op1_hi, op2_hi, op3_hi));
+			     gen_rtx_FMA (vmode, op1_a, op2_a, op3_a));
 
-  operands[6] = op0_lo;
+  operands[6] = op0_b;
   operands[7] = gen_rtx_NEG (vmode,
-			     gen_rtx_FMA (vmode, op1_lo, op2_lo, op3_lo));
+			     gen_rtx_FMA (vmode, op1_b, op2_b, op3_b));
 }
   [(set_attr "length" "8")
    (set_attr "type" "<vpair_type>")])
@@ -637,34 +623,32 @@
    (set (match_dup 6) (match_dup 7))]
 {
   machine_mode vmode = <VPAIR_VECMODE>mode;
-  unsigned offset_hi = (WORDS_BIG_ENDIAN) ? 0 : 16;
-  unsigned offset_lo = (WORDS_BIG_ENDIAN) ? 16 : 0;
 
   rtx op0 = operands[0];
-  rtx op0_hi = simplify_gen_subreg (vmode, op0, OOmode, offset_hi);
-  rtx op0_lo = simplify_gen_subreg (vmode, op0, OOmode, offset_lo);
+  rtx op0_a = simplify_gen_subreg (vmode, op0, OOmode, 0);
+  rtx op0_b = simplify_gen_subreg (vmode, op0, OOmode, 16);
 
   rtx op1 = operands[1];
-  rtx op1_hi = simplify_gen_subreg (vmode, op1, OOmode, offset_hi);
-  rtx op1_lo = simplify_gen_subreg (vmode, op1, OOmode, offset_lo);
+  rtx op1_a = simplify_gen_subreg (vmode, op1, OOmode, 0);
+  rtx op1_b = simplify_gen_subreg (vmode, op1, OOmode, 16);
 
   rtx op2 = operands[2];
-  rtx op2_hi = simplify_gen_subreg (vmode, op2, OOmode, offset_hi);
-  rtx op2_lo = simplify_gen_subreg (vmode, op2, OOmode, offset_lo);
+  rtx op2_a = simplify_gen_subreg (vmode, op2, OOmode, 0);
+  rtx op2_b = simplify_gen_subreg (vmode, op2, OOmode, 16);
 
   rtx op3 = operands[3];
-  rtx op3_hi = gen_rtx_NEG (vmode,
-			    simplify_gen_subreg (vmode, op3, OOmode, offset_hi));
-  rtx op3_lo = gen_rtx_NEG (vmode,
-			    simplify_gen_subreg (vmode, op3, OOmode, offset_lo));
+  rtx op3_a = gen_rtx_NEG (vmode,
+			   simplify_gen_subreg (vmode, op3, OOmode, 0));
+  rtx op3_b = gen_rtx_NEG (vmode,
+			   simplify_gen_subreg (vmode, op3, OOmode, 16));
 
-  operands[4] = op0_hi;
+  operands[4] = op0_a;
   operands[5] = gen_rtx_NEG (vmode,
-			     gen_rtx_FMA (vmode, op1_hi, op2_hi, op3_hi));
+			     gen_rtx_FMA (vmode, op1_a, op2_a, op3_a));
 
-  operands[6] = op0_lo;
+  operands[6] = op0_b;
   operands[7] = gen_rtx_NEG (vmode,
-			     gen_rtx_FMA (vmode, op1_lo, op2_lo, op3_lo));
+			     gen_rtx_FMA (vmode, op1_b, op2_b, op3_b));
 }
   [(set_attr "length" "8")
    (set_attr "type" "<vpair_type>")])
