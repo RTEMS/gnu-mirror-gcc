@@ -1,3 +1,14 @@
+==================== Branch work150-vpair, patch #204 ====================
+
+Simplify register split code.
+
+2023-12-13  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-pair.md: Simplify the code for register
+	splitting.
+
 ==================== Branch work150-vpair, patch #203 ====================
 
 Add vector pair tests.
