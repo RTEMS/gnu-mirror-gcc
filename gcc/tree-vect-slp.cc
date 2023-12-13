@@ -8292,6 +8292,38 @@ get_tree_def (tree name, bool single_use_only)
   return dyn_cast <gassign *> (def_stmt);
 }
 
+static bool
+get_perm_def (tree name, gassign **perm, gassign **def)
+{
+  gassign *stmt1 = get_tree_def(name, false);
+
+  if (!stmt1)
+    return false;
+
+  gassign *stmt2 = stmt1;
+
+  /* Look through a view convert if it doesn't change the vector's shape.  */
+  if (gimple_assign_rhs_code (stmt1) == VIEW_CONVERT_EXPR) {
+    tree vc = gimple_assign_rhs1(stmt1);
+    if (element_precision (TREE_TYPE (vc))
+	== element_precision (TREE_TYPE (TREE_OPERAND (vc, 0))))
+      stmt2 = get_tree_def (TREE_OPERAND (gimple_assign_rhs1 (stmt1), 0),
+			    false);
+    else
+      return false;
+  }
+
+  if (!stmt2)
+    return false;
+
+  if (gimple_assign_rhs_code (stmt2) != VEC_PERM_EXPR)
+    return false;
+
+  *perm = stmt2;
+  *def = (stmt1 != stmt2) ? stmt1 : stmt2;
+  return true;
+}
+
 /* Helper function for vect_slp_optimize_permutes.  Return true if STMT is an
    expression of the form:
 
@@ -8310,9 +8342,7 @@ recognise_perm_binop_perm_pattern (gassign *stmt,
 				   gassign **bop1_out, gassign **bop2_out,
 				   gassign **perm1_out, gassign **perm2_out)
 {
-  enum tree_code code = gimple_assign_rhs_code (stmt);
-
-  if (code != VEC_PERM_EXPR)
+  if (gimple_assign_rhs_code (stmt) != VEC_PERM_EXPR)
     return false;
 
   gassign *bop1, *bop2;
@@ -8510,6 +8540,168 @@ vect_slp_optimize_permutes (function *fun)
 	gsi_insert_before (&gsi_stmt1, src1_2, GSI_SAME_STMT);
 	gsi_insert_before (&gsi_stmt1, bop1_1, GSI_SAME_STMT);
 	gsi_insert_before (&gsi_stmt1, bop1_2, GSI_SAME_STMT);
+      }
+
+  /* Try to identify:
+
+       P1 = VEC_PERM<A, B>(MASK_1)
+       P2 = VEC_PERM<A, B>(MASK_2)
+       P1 = VIEW_CONVERT<...>(P1) ?
+       P2 = VIEW_CONVERT<...>(P2) ?
+       R1 = VEC_PERM<P1, P2>(MASK_3)
+       R2 = VEC_PERM<P1, P2>(MASK_4)
+       ...
+       RN = VEC_PERM<P1, P2>(MASK_M)
+
+     and convert it to:
+
+       R1 = VEC_PERM<A, B>(NEW_MASK_1)
+       R2 = VEC_PERM<A, B>(NEW_MASK_2)
+       ...
+       RN = VEC_PERM<A, B>(NEW_MASK_N)
+
+     if possible.  */
+  FOR_EACH_BB_FN (bb, fun)
+    for (gimple_stmt_iterator gsi = gsi_start_bb (bb); !gsi_end_p (gsi);
+	 gsi_next (&gsi))
+      {
+	gassign *stmt = dyn_cast <gassign *> (gsi_stmt (gsi));
+
+	if (!stmt
+	    || gimple_assign_rhs_code (stmt) != VEC_PERM_EXPR
+	    || !VECTOR_CST_NELTS (gimple_assign_rhs3 (stmt)).is_constant ())
+	  continue;
+
+	/* STMT corresponds to R1 so we look at the definitions of STMT's
+	   rhs 1 and 2 to find P1 and P2.  */
+	gassign *perms[2];
+	gassign *defs[2];
+	if (!get_perm_def(gimple_assign_rhs1 (stmt), &perms[0], &defs[0])
+	    || !get_perm_def(gimple_assign_rhs2 (stmt), &perms[1], &defs[1])
+	    || defs[0] == defs[1])
+	  continue;
+
+	if (gimple_assign_rhs1 (perms[0]) != gimple_assign_rhs1 (perms[1])
+	    || gimple_assign_rhs2 (perms[0]) != gimple_assign_rhs2 (perms[1])
+	    || !VECTOR_CST_NELTS (gimple_assign_rhs3 (perms[0])).is_constant ()
+	    || !VECTOR_CST_NELTS (gimple_assign_rhs3 (perms[1])).is_constant ())
+	  continue;
+
+	auto_vec<gimple *, 8> all_perms;
+	all_perms.safe_push (stmt);
+
+	tree def0_name = gimple_assign_lhs (defs[0]);
+	tree def1_name = gimple_assign_lhs (defs[1]);
+	bool only_same_perms = true;
+	imm_use_iterator imm_iter;
+	use_operand_p use_p;
+	/* Check if all uses are also permutes.  Otherwise it's not obvious
+	   that folding is an improvement.  */
+	for (int i = 0; i < 2; i++)
+	  FOR_EACH_IMM_USE_FAST (use_p, imm_iter, gimple_assign_lhs (defs[i]))
+	    {
+	      gimple *use = USE_STMT (use_p);
+	      if (!is_a <gassign *> (use)
+		  || gimple_bb (use) != bb
+		  || gimple_assign_rhs_code (use) != VEC_PERM_EXPR
+		  || (gimple_assign_rhs1 (use) != def0_name
+		      && gimple_assign_rhs1 (use) != def1_name)
+		  || (gimple_assign_rhs2 (use) != def0_name
+		      && gimple_assign_rhs2 (use) != def1_name)
+		  || !VECTOR_CST_NELTS (gimple_assign_rhs3 (use))
+			.is_constant ())
+		{
+		  only_same_perms = false;
+		  break;
+		}
+
+	      all_perms.safe_push (use);
+	    }
+
+	if (!only_same_perms)
+	  continue;
+
+	unsigned i;
+	gimple *iter;
+
+	FOR_EACH_VEC_ELT (all_perms, i, iter)
+	  {
+	    gassign *perm = dyn_cast <gassign *> (iter);
+
+	    /* Check if we have already processed this permutation.  */
+	    if (gimple_assign_rhs1 (perm) != def0_name
+		&& gimple_assign_rhs1 (perm) != def1_name)
+	      continue;
+
+	    tree mask = gimple_assign_rhs3 (perm);
+	    unsigned HOST_WIDE_INT nelts
+	      = VECTOR_CST_NELTS (mask).to_constant ();
+	    vec_perm_builder sel (nelts, nelts, 1);
+
+	    gassign *src1 = perms[gimple_assign_rhs1 (perm) == def1_name];
+	    tree mask1 = gimple_assign_rhs3 (src1);
+	    gassign *src2 = perms[gimple_assign_rhs2 (perm) == def1_name];
+	    tree mask2 = gimple_assign_rhs3 (src2);
+
+	    for (unsigned HOST_WIDE_INT i = 0; i < nelts; i++)
+	      {
+		tree val = VECTOR_CST_ELT (mask, i);
+		unsigned HOST_WIDE_INT lane
+		  = TREE_INT_CST_LOW (val) & (2 * nelts - 1);
+		unsigned HOST_WIDE_INT new_lane;
+
+		if (lane < nelts)
+		  new_lane = TREE_INT_CST_LOW (VECTOR_CST_ELT (mask1, lane));
+		else
+		  new_lane = TREE_INT_CST_LOW (VECTOR_CST_ELT (mask2,
+							       lane - nelts));
+
+		sel.quick_push (new_lane);
+	      }
+
+	    vec_perm_indices indices (sel, 2, nelts);
+	    tree vectype = TREE_TYPE (gimple_assign_lhs (perm));
+	    if (!can_vec_perm_const_p (TYPE_MODE (vectype),
+				       TYPE_MODE (vectype), indices))
+	      continue;
+
+	    gimple_stmt_iterator gsi_r = gsi_for_stmt (perm);
+	    tree new_mask = vect_gen_perm_mask_checked (vectype, indices);
+	    gimple* perm_replacement;
+	    bool has_view_convert = defs[0] != perms[0];
+
+	    if (has_view_convert)
+	      {
+		tree new_perm_lhs
+		  = make_ssa_name (TREE_TYPE (gimple_assign_lhs (perms[0])));
+
+		gimple* new_perm
+		  = gimple_build_assign (new_perm_lhs, VEC_PERM_EXPR,
+					 gimple_assign_rhs1 (perms[0]),
+					 gimple_assign_rhs2 (perms[0]),
+					 new_mask);
+
+		gsi_insert_before (&gsi_r, new_perm, GSI_SAME_STMT);
+
+		perm_replacement
+		  = gimple_build_assign (gimple_assign_lhs (perm),
+					 VIEW_CONVERT_EXPR,
+					 build1 (VIEW_CONVERT_EXPR,
+						 vectype, new_perm_lhs));
+	      }
+	    else
+	      perm_replacement
+		= gimple_build_assign (gimple_assign_lhs (perm), VEC_PERM_EXPR,
+				       gimple_assign_rhs1 (perms[0]),
+				       gimple_assign_rhs2 (perms[0]),
+				       new_mask);
+
+	    /* temporary solution for not re-processing these statements.  */
+	    gimple_assign_set_rhs1 (perm, gimple_assign_rhs1 (perms[0]));
+	    gimple_assign_set_rhs2 (perm, gimple_assign_rhs2 (perms[0]));
+
+	    gsi_replace (&gsi_r, perm_replacement, false);
+	  }
       }
 }
 
