@@ -1,3 +1,16 @@
+==================== Branch work150-vpair, patch #203 ====================
+
+Add vector pair tests.
+
+2023-12-13  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-1.c: New test.
+	* gcc.target/powerpc/vector-pair-2.c: Likewise.
+	* gcc.target/powerpc/vector-pair-3.c: Likewise.
+	* gcc.target/powerpc/vector-pair-4.c: Likewise.
+
 ==================== Branch work150-vpair, patch #202 ====================
 
 Add __builtin_vpair_f*_assemble.
