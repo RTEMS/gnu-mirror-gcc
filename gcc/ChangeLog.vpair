@@ -1,3 +1,24 @@
+==================== Branch work150-vpair, patch #202 ====================
+
+Add __builtin_vpair_f*_assemble.
+
+2023-12-13  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_f32_assemble): New
+	built-in function.
+	(__builtin_vpair_f64_assemble): Likewise.
+	* config/rs6000/vector-pair.md (UNSPEC_VPAIR_ASSEMBLE): New unspec.
+	(VPAIR_ELEMENT): Rename from VPAIR_SPLAT_ELEMENT.
+	(VPAIR_VECTOR): Rename from VPAIR_SPLAT_VECTOR.
+	(vpair_ele_to_vec_lc): Delete.
+	(vpair_vec_to_vpair_lc): New mode attribute.
+	(vpair_assemble_<vpair_vec_to_vpair_lc): New insns.
+	(vpair_splat_<vpair_ele_to_vpair_lc>): Rename iterators.
+	(vpair_splat_<vpair_vec_to_vpair_lc>_internal): Rename from
+	vpair_splat_<mode>_internal.
+
 ==================== Branch work150-vpair, patch #201 ====================
 
 Add initial vector pair built-in function support.
