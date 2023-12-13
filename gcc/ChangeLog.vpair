@@ -1,3 +1,17 @@
+==================== Branch work150-vpair, patch #201 ====================
+
+Add initial vector pair built-in function support.
+
+2023-12-13  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair*): Add new built-in
+	functions.
+	* config/rs6000/rs6000.md (toplevel): Include vector-pair.md.
+	* config/rs6000/t-rs6000 (MD_INCLUDES): Add vector-pair.md.
+	* config/rs6000/vector-pair.md: New file.
+
 ==================== Branch work150-vpair, patch #200 (vsubreg150 patch #300) ====================
 
 Peter's patches for subreg support.
