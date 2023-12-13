@@ -30,6 +30,7 @@
 ;; SUBREG, because SUBREG tends to generate extra moves.
 (define_c_enum "unspec"
   [UNSPEC_VPAIR_ZERO
+   UNSPEC_VPAIR_ASSEMBLE
    UNSPEC_VPAIR_SPLAT
    UNSPEC_VPAIR_ABS_V4DF
    UNSPEC_VPAIR_ABS_V8SF
@@ -216,23 +217,23 @@
 		 [(UNSPEC_VPAIR_MULT_V4DF "UNSPEC_VPAIR_NEG_V4DF")
 		  (UNSPEC_VPAIR_MULT_V8SF "UNSPEC_VPAIR_NEG_V8SF")])
 
-;; Iterator for vector pair splat support.
-(define_mode_iterator VPAIR_SPLAT_ELEMENT [DF SF])
+;; Iterator for base element for supported vector pair operations.
+(define_mode_iterator VPAIR_ELEMENT [DF SF])
 
-;; Iterator for vector pair splat support.
-(define_mode_iterator VPAIR_SPLAT_VECTOR [V2DF V4SF])
+;; Iterator for vector element for supported vector pair operations.
+(define_mode_iterator VPAIR_VECTOR [V2DF V4SF])
 
 ;; Map element mode to vector mode
 (define_mode_attr VPAIR_ELE_TO_VEC [(DF "V2DF")
 				    (SF "V4SF")])
 
-;; Map element mode to vector mode in lower case
-(define_mode_attr vpair_ele_to_vec_lc [(DF "v2df")
-				       (SF "v4sf")])
-
 ;; Map element mode to vector pair mode in lower case
 (define_mode_attr vpair_ele_to_vpair_lc [(DF "v4df")
 					 (SF "v8sf")])
+
+;; Map vector mode to vector pair mode in lower case
+(define_mode_attr vpair_vec_to_vpair_lc [(V2DF "v4df")
+					 (V4SF "v8sf")])
 
 
 ;; Initialize a vector pair to 0
@@ -256,11 +257,43 @@
   [(set_attr "length" "8")
    (set_attr "type" "vecperm")])
 
+;; Assemble a vector pair from two vectors.  Unlike
+;; __builtin_mma_assemble_pair, this function produces a vector pair output
+;; directly and uses the vectors as inputs, instead of taking an array.  The
+;; first argument is the high vector (which on little endian systems is stored
+;; in the second vector of the vector pair).  We have two variants, based on
+;; the endian to favor getting one of the results in the correct register.
+;;
+;; We issue a clobber of the vector pair so this insn can be split before
+;; register allocation.
+
+(define_insn_and_split "vpair_assemble_<vpair_vec_to_vpair_lc>"
+  [(set (match_operand:OO 0 "vsx_register_operand" "=&wa")
+	(unspec:OO
+	 [(match_operand:VPAIR_VECTOR 1 "input_operand" "mwa")
+	  (match_operand:VPAIR_VECTOR 2 "input_operand" "mwa")]
+	 UNSPEC_VPAIR_ASSEMBLE))]
+  "TARGET_MMA"
+  "#"
+  "&& 1"
+  [(clobber (match_dup 0))
+   (set (match_dup 3) (match_dup 1))
+   (set (match_dup 4) (match_dup 2))]
+{
+  rtx dest = operands[0];
+  unsigned hi_offset = (WORDS_BIG_ENDIAN) ? 0 : 16;
+  unsigned lo_offset = 16 - hi_offset;
+
+  operands[3] = simplify_gen_subreg (<MODE>mode, dest, OOmode, hi_offset);
+  operands[4] = simplify_gen_subreg (<MODE>mode, dest, OOmode, lo_offset);
+}
+  [(set_attr "length" "8")])
+
 ;; Create a vector pair with a value splat'ed (duplicated) to all of the
 ;; elements.
 (define_expand "vpair_splat_<vpair_ele_to_vpair_lc>"
   [(use (match_operand:OO 0 "vsx_register_operand"))
-   (use (match_operand:VPAIR_SPLAT_ELEMENT 1 "input_operand"))]
+   (use (match_operand:VPAIR_ELEMENT 1 "input_operand"))]
   "TARGET_MMA"
 {
   rtx op0 = operands[0];
@@ -281,17 +314,17 @@
     RTVEC_ELT (elements, i) = copy_rtx (op1);
 
   rs6000_expand_vector_init (vec, gen_rtx_PARALLEL (vector_mode, elements));
-  emit_insn (gen_vpair_splat_<vpair_ele_to_vec_lc>_internal (op0, vec));
+  emit_insn (gen_vpair_splat_<vpair_ele_to_vpair_lc>_internal (op0, vec));
   DONE;
 })
 
 ;; Inner splat support.  Operand1 is the vector splat created above.  Allow
 ;; operand 1 to overlap with the output registers to eliminate one move
 ;; instruction.
-(define_insn_and_split "vpair_splat_<mode>_internal"
+(define_insn_and_split "vpair_splat_<vpair_vec_to_vpair_lc>_internal"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
 	(unspec:OO
-	 [(match_operand:VPAIR_SPLAT_VECTOR 1 "vsx_register_operand" "0,wa")]
+	 [(match_operand:VPAIR_VECTOR 1 "vsx_register_operand" "0,wa")]
 	 UNSPEC_VPAIR_SPLAT))]
   "TARGET_MMA"
   "#"
@@ -322,7 +355,6 @@
 }
   [(set_attr "length" "*,8")
    (set_attr "type" "vecmove")])
-
 
 ;; Vector pair floating point unary operations
 (define_insn_and_split "vpair_<vpair_stdname>_<vpair_vpmode>2"
