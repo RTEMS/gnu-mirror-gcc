@@ -1,3 +1,15 @@
+==================== Branch work150-vpair, patch #206 ====================
+
+Change some names.
+
+2023-12-14  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-pair.md (VPAIR_VEC_MODE): Rename from
+	VPAIR_VECMODE.  Change users.
+	(vpair_vp_mode_lc): Rename from vpair_vp_mode.  Change users.
+
 ==================== Branch work150-vpair, patch #205 ====================
 
 Add vpair extract vector.
