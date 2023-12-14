@@ -32,6 +32,7 @@
   [UNSPEC_VPAIR_ZERO
    UNSPEC_VPAIR_ASSEMBLE
    UNSPEC_VPAIR_SPLAT
+   UNSPEC_VPAIR_EXTRACT_VECTOR
    UNSPEC_VPAIR_ABS_V4DF
    UNSPEC_VPAIR_ABS_V8SF
    UNSPEC_VPAIR_FMA_V4DF
@@ -353,6 +354,67 @@
 }
   [(set_attr "length" "*,8")
    (set_attr "type" "vecmove")])
+
+;; Extract one of the two 128-bit vectors from a vector pair.
+(define_insn_and_split "vpair_extract_vector_<vpair_vec_to_vpair_lc>"
+  [(set (match_operand:VPAIR_VECTOR 0 "vsx_register_operand" "=wa")
+	(unspec:VPAIR_VECTOR
+	 [(match_operand:OO 1 "vsx_register_operand" "wa")
+	  (match_operand 2 "const_0_to_1_operand" "n")]
+	 UNSPEC_VPAIR_EXTRACT_VECTOR))]
+  "TARGET_MMA"
+  "#"
+  "&& 1"
+  [(set (match_dup 0) (match_dup 3))]
+{
+  rtx src = operands[1];
+  machine_mode mode = <MODE>mode;
+  unsigned reg_num = UINTVAL (operands[2]);
+  if (!WORDS_BIG_ENDIAN)
+    reg_num = 1 - reg_num;
+	   
+  operands[3] = simplify_gen_subreg (mode, src, OOmode, reg_num * 16);
+}
+  [(set_attr "type" "vecmove")])
+
+;; Optimize extracting a 128-bit vector from a vector pair, if the vector pair
+;; is in memory.
+(define_insn_and_split "*vpair_extract_vector_<vpair_vec_to_vpair_lc>_load"
+  [(set (match_operand:VPAIR_VECTOR 0 "vsx_register_operand" "=wa")
+	(unspec:VPAIR_VECTOR
+	 [(match_operand:OO 1 "offsettable_mem_operand" "o")
+	  (match_operand 2 "const_0_to_1_operand" "n")]
+	 UNSPEC_VPAIR_EXTRACT_VECTOR))]
+  "TARGET_MMA"
+  "#"
+  "&& 1"
+  [(set (match_dup 0) (match_dup 3))]
+{
+  operands[3] = adjust_address (operands[1], <MODE>mode,
+				16 * INTVAL (operands[2]));
+}
+  [(set_attr "type" "vecload")])
+
+(define_insn_and_split "*vpair_extract_vector_<vpair_vec_to_vpair_lc>_store"
+  [(set (match_operand:VPAIR_VECTOR 0 "memory_operand" "=m")
+	(unspec:VPAIR_VECTOR
+	 [(match_operand:OO 1 "vsx_register_operand" "wa")
+	  (match_operand 2 "const_0_to_1_operand" "n")]
+	 UNSPEC_VPAIR_EXTRACT_VECTOR))]
+  "TARGET_MMA"
+  "#"
+  "&& 1"
+  [(set (match_dup 0) (match_dup 3))]
+{
+  rtx src = operands[1];
+  machine_mode mode = <MODE>mode;
+  unsigned reg_num = UINTVAL (operands[2]);
+  if (!WORDS_BIG_ENDIAN)
+    reg_num = 1 - reg_num;
+	   
+  operands[3] = simplify_gen_subreg (mode, src, OOmode, reg_num * 16);
+}
+  [(set_attr "type" "vecstore")])
 
 ;; Vector pair floating point unary operations
 (define_insn_and_split "vpair_<vpair_stdname>_<vpair_vpmode>2"
