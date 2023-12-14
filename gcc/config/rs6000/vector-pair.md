@@ -269,8 +269,8 @@
 (define_insn_and_split "vpair_assemble_<vpair_vec_to_vpair_lc>"
   [(set (match_operand:OO 0 "vsx_register_operand" "=&wa")
 	(unspec:OO
-	 [(match_operand:VPAIR_VECTOR 1 "input_operand" "mwa")
-	  (match_operand:VPAIR_VECTOR 2 "input_operand" "mwa")]
+	 [(match_operand:VPAIR_VECTOR 1 "input_operand" "mwaeP")
+	  (match_operand:VPAIR_VECTOR 2 "input_operand" "mwaeP")]
 	 UNSPEC_VPAIR_ASSEMBLE))]
   "TARGET_MMA"
   "#"
@@ -332,22 +332,20 @@
 {
   rtx op0 = operands[0];
   rtx op1 = operands[1];
-  unsigned offset_hi = (WORDS_BIG_ENDIAN) ? 0 : 16;
-  unsigned offset_lo = 16 - offset_hi;
-  rtx op0_vector_hi = simplify_gen_subreg (<MODE>mode, op0, OOmode, offset_hi);
-  rtx op0_vector_lo = simplify_gen_subreg (<MODE>mode, op0, OOmode, offset_lo);
+  rtx op0_a = simplify_gen_subreg (<MODE>mode, op0, OOmode, 0);
+  rtx op0_b = simplify_gen_subreg (<MODE>mode, op0, OOmode, 16);
 
   /* Check if the input is one of the output registers.  */
-  if (rtx_equal_p (op0_vector_hi, op1))
-    emit_move_insn (op0_vector_lo, op1);
+  if (rtx_equal_p (op0_a, op1))
+    emit_move_insn (op0_b, op1);
 
-  else if (rtx_equal_p (op0_vector_lo, op1))
-    emit_move_insn (op0_vector_hi, op1);
+  else if (rtx_equal_p (op0_b, op1))
+    emit_move_insn (op0_a, op1);
 
   else
     {
-      emit_move_insn (op0_vector_hi, op1);
-      emit_move_insn (op0_vector_lo, op1);
+      emit_move_insn (op0_a, op1);
+      emit_move_insn (op0_b, op1);
     }
 
   DONE;
@@ -376,45 +374,6 @@
   operands[3] = simplify_gen_subreg (mode, src, OOmode, reg_num * 16);
 }
   [(set_attr "type" "vecmove")])
-
-;; Optimize extracting a 128-bit vector from a vector pair, if the vector pair
-;; is in memory.
-(define_insn_and_split "*vpair_extract_vector_<vpair_vec_to_vpair_lc>_load"
-  [(set (match_operand:VPAIR_VECTOR 0 "vsx_register_operand" "=wa")
-	(unspec:VPAIR_VECTOR
-	 [(match_operand:OO 1 "offsettable_mem_operand" "o")
-	  (match_operand 2 "const_0_to_1_operand" "n")]
-	 UNSPEC_VPAIR_EXTRACT_VECTOR))]
-  "TARGET_MMA"
-  "#"
-  "&& 1"
-  [(set (match_dup 0) (match_dup 3))]
-{
-  operands[3] = adjust_address (operands[1], <MODE>mode,
-				16 * INTVAL (operands[2]));
-}
-  [(set_attr "type" "vecload")])
-
-(define_insn_and_split "*vpair_extract_vector_<vpair_vec_to_vpair_lc>_store"
-  [(set (match_operand:VPAIR_VECTOR 0 "memory_operand" "=m")
-	(unspec:VPAIR_VECTOR
-	 [(match_operand:OO 1 "vsx_register_operand" "wa")
-	  (match_operand 2 "const_0_to_1_operand" "n")]
-	 UNSPEC_VPAIR_EXTRACT_VECTOR))]
-  "TARGET_MMA"
-  "#"
-  "&& 1"
-  [(set (match_dup 0) (match_dup 3))]
-{
-  rtx src = operands[1];
-  machine_mode mode = <MODE>mode;
-  unsigned reg_num = UINTVAL (operands[2]);
-  if (!WORDS_BIG_ENDIAN)
-    reg_num = 1 - reg_num;
-	   
-  operands[3] = simplify_gen_subreg (mode, src, OOmode, reg_num * 16);
-}
-  [(set_attr "type" "vecstore")])
 
 ;; Vector pair floating point unary operations
 (define_insn_and_split "vpair_<vpair_stdname>_<vpair_vp_mode_lc>2"
@@ -425,24 +384,11 @@
   "TARGET_MMA"
   "#"
   "&& reload_completed"
-  [(set (match_dup 2) (match_dup 3))
-   (set (match_dup 4) (match_dup 5))]
+  [(const_int 0)]
 {
-  machine_mode vmode = <VPAIR_VEC_MODE>mode;
-
-  rtx op0 = operands[0];
-  rtx op0_a = simplify_gen_subreg (vmode, op0, OOmode, 0);
-  rtx op0_b = simplify_gen_subreg (vmode, op0, OOmode, 16);
-
-  rtx op1 = operands[1];
-  rtx op1_a = simplify_gen_subreg (vmode, op1, OOmode, 0);
-  rtx op1_b = simplify_gen_subreg (vmode, op1, OOmode, 16);
-
-  operands[2] = op0_a;
-  operands[3] = gen_rtx_<VPAIR_OP> (vmode, op1_a);
-
-  operands[4] = op0_b;
-  operands[5] = gen_rtx_<VPAIR_OP> (vmode, op1_b);
+  vpair_split_unary (operands, <VPAIR_VEC_MODE>mode, <VPAIR_OP>,
+		     VPAIR_SPLIT_NO_EXTRA_ACTION);
+  DONE;
 }
   [(set_attr "length" "8")
    (set_attr "type" "<vpair_type>")])
@@ -458,24 +404,10 @@
   "TARGET_MMA"
   "#"
   "&& reload_completed"
-  [(set (match_dup 2) (match_dup 3))
-   (set (match_dup 4) (match_dup 5))]
+  [(const_int 0)]
 {
-  machine_mode vmode = <VPAIR_VEC_MODE>mode;
-
-  rtx op0 = operands[0];
-  rtx op0_a = simplify_gen_subreg (vmode, op0, OOmode, 0);
-  rtx op0_b = simplify_gen_subreg (vmode, op0, OOmode, 16);
-
-  rtx op1 = operands[1];
-  rtx op1_a = simplify_gen_subreg (vmode, op1, OOmode, 0);
-  rtx op1_b = simplify_gen_subreg (vmode, op1, OOmode, 16);
-
-  operands[2] = op0_a;
-  operands[3] = gen_rtx_NEG (vmode, gen_rtx_ABS (vmode, op1_a));
-
-  operands[4] = op0_b;
-  operands[5] = gen_rtx_NEG (vmode, gen_rtx_ABS (vmode, op1_b));
+  vpair_split_unary (operands, <VPAIR_VEC_MODE>mode, ABS, VPAIR_SPLIT_NABS);
+  DONE;
 }
   [(set_attr "length" "8")
    (set_attr "type" "<vpair_type>")])
@@ -490,28 +422,10 @@
   "TARGET_MMA"
   "#"
   "&& reload_completed"
-  [(set (match_dup 3) (match_dup 4))
-   (set (match_dup 5) (match_dup 6))]
+  [(const_int 0)]
 {
-  machine_mode vmode = <VPAIR_VEC_MODE>mode;
-
-  rtx op0 = operands[0];
-  rtx op0_a = simplify_gen_subreg (vmode, op0, OOmode, 0);
-  rtx op0_b = simplify_gen_subreg (vmode, op0, OOmode, 16);
-
-  rtx op1 = operands[1];
-  rtx op1_a = simplify_gen_subreg (vmode, op1, OOmode, 0);
-  rtx op1_b = simplify_gen_subreg (vmode, op1, OOmode, 16);
-
-  rtx op2 = operands[2];
-  rtx op2_a = simplify_gen_subreg (vmode, op2, OOmode, 0);
-  rtx op2_b = simplify_gen_subreg (vmode, op2, OOmode, 16);
-
-  operands[3] = op0_a;
-  operands[4] = gen_rtx_<VPAIR_OP> (vmode, op1_a, op2_a);
-
-  operands[5] = op0_b;
-  operands[6] = gen_rtx_<VPAIR_OP> (vmode, op1_b, op2_b);
+  vpair_split_binary (operands, <VPAIR_VEC_MODE>mode, <VPAIR_OP>);
+  DONE;
 }
   [(set_attr "length" "8")
    (set_attr "type" "<vpair_type>")])
@@ -549,32 +463,10 @@
   "TARGET_MMA"
   "#"
   "&& reload_completed"
-  [(set (match_dup 4) (match_dup 5))
-   (set (match_dup 6) (match_dup 7))]
+  [(const_int 0)]
 {
-  machine_mode vmode = <VPAIR_VEC_MODE>mode;
-
-  rtx op0 = operands[0];
-  rtx op0_a = simplify_gen_subreg (vmode, op0, OOmode, 0);
-  rtx op0_b = simplify_gen_subreg (vmode, op0, OOmode, 16);
-
-  rtx op1 = operands[1];
-  rtx op1_a = simplify_gen_subreg (vmode, op1, OOmode, 0);
-  rtx op1_b = simplify_gen_subreg (vmode, op1, OOmode, 16);
-
-  rtx op2 = operands[2];
-  rtx op2_a = simplify_gen_subreg (vmode, op2, OOmode, 0);
-  rtx op2_b = simplify_gen_subreg (vmode, op2, OOmode, 16);
-
-  rtx op3 = operands[3];
-  rtx op3_a = simplify_gen_subreg (vmode, op3, OOmode, 0);
-  rtx op3_b = simplify_gen_subreg (vmode, op3, OOmode, 16);
-
-  operands[4] = op0_a;
-  operands[5] = gen_rtx_FMA (vmode, op1_a, op2_a, op3_a);
-
-  operands[6] = op0_b;
-  operands[7] = gen_rtx_FMA (vmode, op1_b, op2_b, op3_b);
+  vpair_split_fma (operands, <VPAIR_VEC_MODE>mode, FMA, VPAIR_SPLIT_FMA);
+  DONE;
 }
   [(set_attr "length" "8")
    (set_attr "type" "<vpair_type>")])
@@ -591,34 +483,10 @@
   "TARGET_MMA"
   "#"
   "&& reload_completed"
-  [(set (match_dup 4) (match_dup 5))
-   (set (match_dup 6) (match_dup 7))]
+  [(const_int 0)]
 {
-  machine_mode vmode = <VPAIR_VEC_MODE>mode;
-
-  rtx op0 = operands[0];
-  rtx op0_a = simplify_gen_subreg (vmode, op0, OOmode, 0);
-  rtx op0_b = simplify_gen_subreg (vmode, op0, OOmode, 16);
-
-  rtx op1 = operands[1];
-  rtx op1_a = simplify_gen_subreg (vmode, op1, OOmode, 0);
-  rtx op1_b = simplify_gen_subreg (vmode, op1, OOmode, 16);
-
-  rtx op2 = operands[2];
-  rtx op2_a = simplify_gen_subreg (vmode, op2, OOmode, 0);
-  rtx op2_b = simplify_gen_subreg (vmode, op2, OOmode, 16);
-
-  rtx op3 = operands[3];
-  rtx op3_a = gen_rtx_NEG (vmode,
-			   simplify_gen_subreg (vmode, op3, OOmode, 0));
-  rtx op3_b = gen_rtx_NEG (vmode,
-			   simplify_gen_subreg (vmode, op3, OOmode, 16));
-
-  operands[4] = op0_a;
-  operands[5] = gen_rtx_FMA (vmode, op1_a, op2_a, op3_a);
-
-  operands[6] = op0_b;
-  operands[7] = gen_rtx_FMA (vmode, op1_b, op2_b, op3_b);
+  vpair_split_fma (operands, <VPAIR_VEC_MODE>mode, FMA, VPAIR_SPLIT_FMS);
+  DONE;
 }
   [(set_attr "length" "8")
    (set_attr "type" "<vpair_type>")])
@@ -635,34 +503,10 @@
   "TARGET_MMA"
   "#"
   "&& reload_completed"
-  [(set (match_dup 4) (match_dup 5))
-   (set (match_dup 6) (match_dup 7))]
+  [(const_int 0)]
 {
-  machine_mode vmode = <VPAIR_VEC_MODE>mode;
-
-  rtx op0 = operands[0];
-  rtx op0_a = simplify_gen_subreg (vmode, op0, OOmode, 0);
-  rtx op0_b = simplify_gen_subreg (vmode, op0, OOmode, 16);
-
-  rtx op1 = operands[1];
-  rtx op1_a = simplify_gen_subreg (vmode, op1, OOmode, 0);
-  rtx op1_b = simplify_gen_subreg (vmode, op1, OOmode, 16);
-
-  rtx op2 = operands[2];
-  rtx op2_a = simplify_gen_subreg (vmode, op2, OOmode, 0);
-  rtx op2_b = simplify_gen_subreg (vmode, op2, OOmode, 16);
-
-  rtx op3 = operands[3];
-  rtx op3_a = simplify_gen_subreg (vmode, op3, OOmode, 0);
-  rtx op3_b = simplify_gen_subreg (vmode, op3, OOmode, 16);
-
-  operands[4] = op0_a;
-  operands[5] = gen_rtx_NEG (vmode,
-			     gen_rtx_FMA (vmode, op1_a, op2_a, op3_a));
-
-  operands[6] = op0_b;
-  operands[7] = gen_rtx_NEG (vmode,
-			     gen_rtx_FMA (vmode, op1_b, op2_b, op3_b));
+  vpair_split_fma (operands, <VPAIR_VEC_MODE>mode, FMA, VPAIR_SPLIT_NFMA);
+  DONE;
 }
   [(set_attr "length" "8")
    (set_attr "type" "<vpair_type>")])
@@ -681,36 +525,10 @@
   "TARGET_MMA"
   "#"
   "&& reload_completed"
-  [(set (match_dup 4) (match_dup 5))
-   (set (match_dup 6) (match_dup 7))]
+  [(const_int 0)]
 {
-  machine_mode vmode = <VPAIR_VEC_MODE>mode;
-
-  rtx op0 = operands[0];
-  rtx op0_a = simplify_gen_subreg (vmode, op0, OOmode, 0);
-  rtx op0_b = simplify_gen_subreg (vmode, op0, OOmode, 16);
-
-  rtx op1 = operands[1];
-  rtx op1_a = simplify_gen_subreg (vmode, op1, OOmode, 0);
-  rtx op1_b = simplify_gen_subreg (vmode, op1, OOmode, 16);
-
-  rtx op2 = operands[2];
-  rtx op2_a = simplify_gen_subreg (vmode, op2, OOmode, 0);
-  rtx op2_b = simplify_gen_subreg (vmode, op2, OOmode, 16);
-
-  rtx op3 = operands[3];
-  rtx op3_a = gen_rtx_NEG (vmode,
-			   simplify_gen_subreg (vmode, op3, OOmode, 0));
-  rtx op3_b = gen_rtx_NEG (vmode,
-			   simplify_gen_subreg (vmode, op3, OOmode, 16));
-
-  operands[4] = op0_a;
-  operands[5] = gen_rtx_NEG (vmode,
-			     gen_rtx_FMA (vmode, op1_a, op2_a, op3_a));
-
-  operands[6] = op0_b;
-  operands[7] = gen_rtx_NEG (vmode,
-			     gen_rtx_FMA (vmode, op1_b, op2_b, op3_b));
+  vpair_split_fma (operands, <VPAIR_VEC_MODE>mode, FMA, VPAIR_SPLIT_NFMS);
+  DONE;
 }
   [(set_attr "length" "8")
    (set_attr "type" "<vpair_type>")])

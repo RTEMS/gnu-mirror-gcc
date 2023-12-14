@@ -29368,6 +29368,136 @@ rs6000_opaque_type_invalid_use_p (gimple *stmt)
   return false;
 }
 
+
+/* Split vector pair unary operations.  */
+
+void
+vpair_split_unary (rtx operands[],		/* Dest, src.  */
+		   machine_mode vmode,		/* Mode for the vectors.  */
+		   enum rtx_code code,		/* Operator code.  */
+		   enum vpair_split action)	/* Action to take.  */
+{
+  rtx op0 = operands[0];
+  rtx op0_a = simplify_gen_subreg (vmode, op0, OOmode, 0);
+  rtx op0_b = simplify_gen_subreg (vmode, op0, OOmode, 16);
+
+  rtx op1 = operands[1];
+  rtx op1_a = simplify_gen_subreg (vmode, op1, OOmode, 0);
+  rtx op1_b = simplify_gen_subreg (vmode, op1, OOmode, 16);
+
+  rtx operation_a = gen_rtx_fmt_e (code, vmode, op1_a);
+  rtx operation_b = gen_rtx_fmt_e (code, vmode, op1_b);
+
+  switch (action)
+    {
+    case VPAIR_SPLIT_NO_EXTRA_ACTION:
+      break;
+
+    case VPAIR_SPLIT_NABS:
+      operation_a = gen_rtx_NEG (vmode, operation_a);
+      operation_b = gen_rtx_NEG (vmode, operation_b);
+      break;
+
+    default:
+      gcc_unreachable ();
+    }
+
+  emit_insn (gen_rtx_SET (op0_a, operation_a));
+  emit_insn (gen_rtx_SET (op0_b, operation_b));
+  return;
+}
+
+/* Split vector pair binary operations.  */
+
+void
+vpair_split_binary (rtx operands[],		/* Dest, src.  */
+		    machine_mode vmode,		/* Mode for the vectors.  */
+		    enum rtx_code code)		/* Operator code.  */
+{
+  rtx op0 = operands[0];
+  rtx op0_a = simplify_gen_subreg (vmode, op0, OOmode, 0);
+  rtx op0_b = simplify_gen_subreg (vmode, op0, OOmode, 16);
+
+  rtx op1 = operands[1];
+  rtx op1_a = simplify_gen_subreg (vmode, op1, OOmode, 0);
+  rtx op1_b = simplify_gen_subreg (vmode, op1, OOmode, 16);
+
+  rtx op2 = operands[2];
+  rtx op2_a = simplify_gen_subreg (vmode, op2, OOmode, 0);
+  rtx op2_b = simplify_gen_subreg (vmode, op2, OOmode, 16);
+
+  rtx operation_a = gen_rtx_fmt_ee (code, vmode, op1_a, op2_a);
+  rtx operation_b = gen_rtx_fmt_ee (code, vmode, op1_b, op2_b);
+
+  emit_insn (gen_rtx_SET (op0_a, operation_a));
+  emit_insn (gen_rtx_SET (op0_b, operation_b));
+  return;
+}
+
+/* Split vector pair fma operations.  */
+
+void
+vpair_split_fma (rtx operands[],		/* Dest, src.  */
+		 machine_mode vmode,		/* Mode for the vectors.  */
+		 enum rtx_code code,		/* Operator code.  */
+		 enum vpair_split action)	/* Action to take.  */
+{
+  rtx op0 = operands[0];
+  rtx op0_a = simplify_gen_subreg (vmode, op0, OOmode, 0);
+  rtx op0_b = simplify_gen_subreg (vmode, op0, OOmode, 16);
+
+  rtx op1 = operands[1];
+  rtx op1_a = simplify_gen_subreg (vmode, op1, OOmode, 0);
+  rtx op1_b = simplify_gen_subreg (vmode, op1, OOmode, 16);
+
+  rtx op2 = operands[2];
+  rtx op2_a = simplify_gen_subreg (vmode, op2, OOmode, 0);
+  rtx op2_b = simplify_gen_subreg (vmode, op2, OOmode, 16);
+
+  rtx op3 = operands[3];
+  rtx op3_a = simplify_gen_subreg (vmode, op3, OOmode, 0);
+  rtx op3_b = simplify_gen_subreg (vmode, op3, OOmode, 16);
+
+  switch (action)
+    {
+    case VPAIR_SPLIT_FMA:
+    case VPAIR_SPLIT_NFMA:
+      break;
+
+    case VPAIR_SPLIT_FMS:
+    case VPAIR_SPLIT_NFMS:
+      op3_a = gen_rtx_NEG (vmode, op3_a);
+      op3_b = gen_rtx_NEG (vmode, op3_b);
+      break;
+
+    default:
+      gcc_unreachable ();
+    }
+
+  rtx operation_a = gen_rtx_fmt_eee (code, vmode, op1_a, op2_a, op3_a);
+  rtx operation_b = gen_rtx_fmt_eee (code, vmode, op1_b, op2_b, op3_b);
+
+  switch (action)
+    {
+    case VPAIR_SPLIT_FMA:
+    case VPAIR_SPLIT_FMS:
+      break;
+
+    case VPAIR_SPLIT_NFMA:
+    case VPAIR_SPLIT_NFMS:
+      operation_a = gen_rtx_NEG (vmode, operation_a);
+      operation_b = gen_rtx_NEG (vmode, operation_b);
+      break;
+
+    default:
+      gcc_unreachable ();
+    }
+
+  emit_insn (gen_rtx_SET (op0_a, operation_a));
+  emit_insn (gen_rtx_SET (op0_b, operation_b));
+  return;
+}
+
 struct gcc_target targetm = TARGET_INITIALIZER;
 
 #include "gt-rs6000.h"
