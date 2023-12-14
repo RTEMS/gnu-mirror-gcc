@@ -1,3 +1,22 @@
+==================== Branch work150-vpair, patch #205 ====================
+
+Add vpair extract vector.
+
+2023-12-14  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def
+	(__builtin_vpair_f32_extract_vector): New built-in function.
+	(__builtin_vpair_f64_extract_vector): Likewise.
+	* config/rs6000/vector-pair.md (UNSPEC_VPAIR_EXTRACT_VECTOR): New
+	unspec.
+	(vpair_extract_vector_<vpair_vec_to_vpair_lc>): New insns.
+	(vpair_extract_vector_<vpair_vec_to_vpair_lc>_load): Likewise.
+	(vpair_extract_vector_<vpair_vec_to_vpair_lc>_stor): Likewise.
+	* doc/extend.texi (PowerPC Vector Pair Built-in Functions): Document the
+	vector pair built-in functions.
+
 ==================== Branch work150-vpair, patch #204 ====================
 
 Simplify register split code.
