@@ -1,3 +1,22 @@
+==================== Branch work150-vpair, patch #207 ====================
+
+Move vpair splits to rs6000.cc; Allow vpair assemble to load constants.
+
+2023-12-14  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-protos.h (vpair_split): New enumeration.
+	(vpair_split_unary): New declaration.
+	(vpair_split_binary): Likewise.
+	(vpair_split_fma): Likewise.
+	* config/rs6000/rs6000.cc (vpair_split_unary): New function.
+	(vpair_split_binary): Likewise.
+	(vpair_split_fma): Likewise.
+	* config/rs6000/vector-pair.md: Change unary, binary, and fma splitters
+	after register allocation to call vpair_split_unary, vpair_split_binary,
+	and vpair_split_
+
 ==================== Branch work150-vpair, patch #206 ====================
 
 Change some names.
