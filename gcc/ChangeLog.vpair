@@ -1,3 +1,16 @@
+==================== Branch work150-vpair, patch #208 ====================
+
+Check vector pair mode sizes before splitting.
+
+2023-12-14  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (vpair_split_unary): Make sure vector pair
+	operands are 32 bytes before splitting.
+	(vpair_split_binary): Likewise.
+	(vpair_split_fma): Likewise.
+
 ==================== Branch work150-vpair, patch #207 ====================
 
 Move vpair splits to rs6000.cc; Allow vpair assemble to load constants.
