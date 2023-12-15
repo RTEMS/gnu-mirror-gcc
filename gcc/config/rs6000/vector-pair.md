@@ -30,9 +30,7 @@
 ;; SUBREG, because SUBREG tends to generate extra moves.
 (define_c_enum "unspec"
   [UNSPEC_VPAIR_ZERO
-   UNSPEC_VPAIR_ASSEMBLE
    UNSPEC_VPAIR_SPLAT
-   UNSPEC_VPAIR_EXTRACT_VECTOR
    UNSPEC_VPAIR_ABS_V4DF
    UNSPEC_VPAIR_ABS_V8SF
    UNSPEC_VPAIR_FMA_V4DF
@@ -256,38 +254,6 @@
   [(set_attr "length" "8")
    (set_attr "type" "vecperm")])
 
-;; Assemble a vector pair from two vectors.  Unlike
-;; __builtin_mma_assemble_pair, this function produces a vector pair output
-;; directly and uses the vectors as inputs, instead of taking an array.  The
-;; first argument is the high vector (which on little endian systems is stored
-;; in the second vector of the vector pair).  We have two variants, based on
-;; the endian to favor getting one of the results in the correct register.
-;;
-;; We issue a clobber of the vector pair so this insn can be split before
-;; register allocation.
-
-(define_insn_and_split "vpair_assemble_<vpair_vec_to_vpair_lc>"
-  [(set (match_operand:OO 0 "vsx_register_operand" "=&wa")
-	(unspec:OO
-	 [(match_operand:VPAIR_VECTOR 1 "input_operand" "mwaeP")
-	  (match_operand:VPAIR_VECTOR 2 "input_operand" "mwaeP")]
-	 UNSPEC_VPAIR_ASSEMBLE))]
-  "TARGET_MMA"
-  "#"
-  "&& 1"
-  [(clobber (match_dup 0))
-   (set (match_dup 3) (match_dup 1))
-   (set (match_dup 4) (match_dup 2))]
-{
-  rtx dest = operands[0];
-  unsigned hi_offset = (WORDS_BIG_ENDIAN) ? 0 : 16;
-  unsigned lo_offset = 16 - hi_offset;
-
-  operands[3] = simplify_gen_subreg (<MODE>mode, dest, OOmode, hi_offset);
-  operands[4] = simplify_gen_subreg (<MODE>mode, dest, OOmode, lo_offset);
-}
-  [(set_attr "length" "8")])
-
 ;; Create a vector pair with a value splat'ed (duplicated) to all of the
 ;; elements.
 (define_expand "vpair_splat_<vpair_ele_to_vpair_lc>"
@@ -352,28 +318,6 @@
 }
   [(set_attr "length" "*,8")
    (set_attr "type" "vecmove")])
-
-;; Extract one of the two 128-bit vectors from a vector pair.
-(define_insn_and_split "vpair_extract_vector_<vpair_vec_to_vpair_lc>"
-  [(set (match_operand:VPAIR_VECTOR 0 "vsx_register_operand" "=wa")
-	(unspec:VPAIR_VECTOR
-	 [(match_operand:OO 1 "vsx_register_operand" "wa")
-	  (match_operand 2 "const_0_to_1_operand" "n")]
-	 UNSPEC_VPAIR_EXTRACT_VECTOR))]
-  "TARGET_MMA"
-  "#"
-  "&& 1"
-  [(set (match_dup 0) (match_dup 3))]
-{
-  rtx src = operands[1];
-  machine_mode mode = <MODE>mode;
-  unsigned reg_num = UINTVAL (operands[2]);
-  if (!WORDS_BIG_ENDIAN)
-    reg_num = 1 - reg_num;
-	   
-  operands[3] = simplify_gen_subreg (mode, src, OOmode, reg_num * 16);
-}
-  [(set_attr "type" "vecmove")])
 
 ;; Vector pair floating point unary operations
 (define_insn_and_split "vpair_<vpair_stdname>_<vpair_vp_mode_lc>2"
