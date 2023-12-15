@@ -1,3 +1,23 @@
+==================== Branch work150-vpair, patch #209 ====================
+
+Remove assemble and extract vection builtins
+
+2023-12-15  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_f32_assemble):
+	Delete.
+	(__builtin_vpair_f32_extract_vector): Likewise.
+	(__builtin_vpair_f64_assemble): Likewise.
+	(__builtin_vpair_f64_extract_vector): Likewise.
+	* config/rs6000/vector-pair.md (UNSPEC_VPAIR_ASSEMBLE): Likewise.
+	(UNSPEC_VPAIR_EXTRACT_VECTOR): Likewise.
+	(vpair_assemble_<vpair_vec_to_vpair_lc): Likewise.
+	(vpair_extract_vector_<vpair_vec_to_vpair_lc): Likewise.
+	* doc/extend.texi (PowerPC Vector Pair Built-in Functions): Delete
+	extract vector and assemble built-ins.
+
 ==================== Branch work150-vpair, patch #208 ====================
 
 Check vector pair mode sizes before splitting.
