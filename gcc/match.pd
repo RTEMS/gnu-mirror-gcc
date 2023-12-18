@@ -3376,19 +3376,19 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
       int inside_ptr = POINTER_TYPE_P (inside_type);
       int inside_float = FLOAT_TYPE_P (inside_type);
       int inside_vec = VECTOR_TYPE_P (inside_type);
-      unsigned int inside_prec = TYPE_PRECISION (inside_type);
+      unsigned int inside_prec = element_precision (inside_type);
       int inside_unsignedp = TYPE_UNSIGNED (inside_type);
       int inter_int = INTEGRAL_TYPE_P (inter_type);
       int inter_ptr = POINTER_TYPE_P (inter_type);
       int inter_float = FLOAT_TYPE_P (inter_type);
       int inter_vec = VECTOR_TYPE_P (inter_type);
-      unsigned int inter_prec = TYPE_PRECISION (inter_type);
+      unsigned int inter_prec = element_precision (inter_type);
       int inter_unsignedp = TYPE_UNSIGNED (inter_type);
       int final_int = INTEGRAL_TYPE_P (type);
       int final_ptr = POINTER_TYPE_P (type);
       int final_float = FLOAT_TYPE_P (type);
       int final_vec = VECTOR_TYPE_P (type);
-      unsigned int final_prec = TYPE_PRECISION (type);
+      unsigned int final_prec = element_precision (type);
       int final_unsignedp = TYPE_UNSIGNED (type);
     }
    (switch
@@ -3675,6 +3675,10 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 /* (v ? w : 0) ? a : b is just (v & w) ? a : b
    Currently disabled after pass lvec because ARM understands
    VEC_COND_EXPR<v==w,-1,0> but not a plain v==w fed to BIT_IOR_EXPR.  */
+#if GIMPLE
+/* These can only be done in gimple as fold likes to convert:
+   (CMP) & N into (CMP) ? N : 0
+   and we try to match the same pattern again and again. */
 (simplify
  (vec_cond (vec_cond:s @0 @3 integer_zerop) @1 @2)
  (if (optimize_vectors_before_lowering_p () && types_match (@0, @3))
@@ -3709,6 +3713,7 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
  (vec_cond @0 @3 (vec_cond:s @1 @2 @3))
  (if (optimize_vectors_before_lowering_p () && types_match (@0, @1))
   (vec_cond (bit_and (bit_not @0) @1) @2 @3)))
+#endif
 
 /* Canonicalize mask ? { 0, ... } : { -1, ...} to ~mask if the mask
    types are compatible.  */

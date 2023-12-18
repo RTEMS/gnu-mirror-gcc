@@ -1,3 +1,79 @@
+2023-12-01  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-11-26  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/111880
+	* resolve.c (resolve_common_vars): Do not call gfc_add_in_common
+	for symbols that are USE associated or used in a submodule.
+
+2023-10-21  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-10-17  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/111837
+	* frontend-passes.c (traverse_io_block): Dependency check of loop
+	nest shall be triangular, not banded.
+
+2023-08-06  Steve Kargl  <kargl@gcc.gnu.org>
+
+	Backported from master:
+	2022-12-18  Steve Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/107397
+	* decl.c (add_init_expr_to_sym): Add check with new error message.
+
+2023-08-05  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+
+	Backported from master:
+	2023-01-29  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+
+	PR fortran/103506
+	* parse.c (parse_module): Remove use of a bool error value
+	that prevented proper setting of the namespace pointer.
+
+2023-07-20  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-07-17  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/95947
+	PR fortran/110658
+	* trans-expr.c (gfc_conv_procedure_call): For intrinsic procedures
+	whose result characteristics depends on the first argument and which
+	can be of type character, the character length will not be deferred.
+
+2023-07-14  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-07-11  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/110288
+	* symbol.c (gfc_copy_formal_args_intr): When deriving the formal
+	argument attributes from the actual ones for intrinsic procedure
+	calls, take special care of CHARACTER arguments that we do not
+	wrongly treat them formally as deferred-length.
+
+2023-07-08  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-07-08  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/110585
+	* arith.c (gfc_compare_expr): Handle equality comparison of constant
+	complex gfc_expr arguments.
+
+2023-06-09  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-06-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR fortran/96024
+	* primary.c (gfc_convert_to_structure_constructor): Only do
+	constant string ctor length verification and truncation/padding
+	if constant length has INTEGER type.
+
 2023-06-04  Steve Kargl  <kargl@gcc.gnu.org>
 
 	Backported from master:
