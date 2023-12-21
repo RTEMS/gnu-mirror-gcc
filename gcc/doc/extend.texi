@@ -23714,6 +23714,13 @@ The @code{nfma} built-in is a combination of @code{neg} of the
 The @code{nfms} built-in is a combination of @code{neg} of the
 @code{fms} built-in.
 
+The following built-in function is independent on the type of the
+underlying vector:
+
+@smallexample
+__vector_pair __builtin_vpair_zero ();
+@end smallexample
+
 The following built-in functions operate on pairs of
 @code{vector float} values:
 
