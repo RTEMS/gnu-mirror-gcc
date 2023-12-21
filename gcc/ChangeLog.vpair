@@ -16,6 +16,15 @@ gcc/
 	(vpair_nfms_<vpair_modename>_merge): Likewise.
 	(vpair_nfms_<vpair_modename>_merge2): Likewise.
 
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-7.c: New test.
+	* gcc.target/powerpc/vector-pair-8.c: Likewise.
+	* gcc.target/powerpc/vector-pair-9.c: Likewise.
+	* gcc.target/powerpc/vector-pair-10.c: Likewise.
+	* gcc.target/powerpc/vector-pair-11.c: Likewise.
+	* gcc.target/powerpc/vector-pair-12xs.c: Likewise.
+
 ==================== Branch work150-vpair, patch #223 ====================
 
 Add vector pair init and splat.
@@ -46,7 +55,7 @@ gcc/testsuite/
 
 Add support for vector pair fma operations.
 
-2023-12-20  Michael Meissner  <meissner@linux.ibm.com>
+2023-12-21  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -64,6 +73,8 @@ gcc/
 	* config/rs6000/rs6000.cc (vpair_split_fma): New function to split
 	vector pair FMA operations.
 	* config/rs6000/vector-pair.md (UNSPEC_VPAIR_FMA): New unspec.
+	(vpair_stdname): Add UNSPEC_VPAIR_FMA.
+	(VPAIR_OP): Likewise.
 	(vpair_fma_<vpair_modename>4): New insns.
 	(vpair_fms_<vpair_modename>4): Likewise.
 	(vpair_nfma_<vpair_modename>4): Likewise.
@@ -80,7 +91,7 @@ gcc/testsuite/
 
 Add support for vector pair unary and binary operations.
 
-2023-12-20  Michael Meissner  <meissner@linux.ibm.com>
+2023-12-21  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
