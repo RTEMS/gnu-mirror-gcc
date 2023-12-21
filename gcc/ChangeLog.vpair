@@ -23,7 +23,7 @@ gcc/testsuite/
 	* gcc.target/powerpc/vector-pair-9.c: Likewise.
 	* gcc.target/powerpc/vector-pair-10.c: Likewise.
 	* gcc.target/powerpc/vector-pair-11.c: Likewise.
-	* gcc.target/powerpc/vector-pair-12xs.c: Likewise.
+	* gcc.target/powerpc/vector-pair-12.c: Likewise.
 
 ==================== Branch work150-vpair, patch #223 ====================
 
