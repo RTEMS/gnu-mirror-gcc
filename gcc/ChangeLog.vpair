@@ -1,165 +1,22 @@
-==================== Branch work150-vpair, patch #209 ====================
+==================== Branch work150-vpair, patch #209 was reverted ====================
 
-Remove assemble and extract vection builtins
+==================== Branch work150-vpair, patch #208 was reverted ====================
 
-2023-12-15  Michael Meissner  <meissner@linux.ibm.com>
+==================== Branch work150-vpair, patch #207 was reverted ====================
 
-gcc/
+==================== Branch work150-vpair, patch #206 was reverted ====================
 
-	* config/rs6000/rs6000-builtins.def (__builtin_vpair_f32_assemble):
-	Delete.
-	(__builtin_vpair_f32_extract_vector): Likewise.
-	(__builtin_vpair_f64_assemble): Likewise.
-	(__builtin_vpair_f64_extract_vector): Likewise.
-	* config/rs6000/vector-pair.md (UNSPEC_VPAIR_ASSEMBLE): Likewise.
-	(UNSPEC_VPAIR_EXTRACT_VECTOR): Likewise.
-	(vpair_assemble_<vpair_vec_to_vpair_lc): Likewise.
-	(vpair_extract_vector_<vpair_vec_to_vpair_lc): Likewise.
-	* doc/extend.texi (PowerPC Vector Pair Built-in Functions): Delete
-	extract vector and assemble built-ins.
+==================== Branch work150-vpair, patch #205 was reverted ====================
 
-==================== Branch work150-vpair, patch #208 ====================
+==================== Branch work150-vpair, patch #204 was reverted ====================
 
-Check vector pair mode sizes before splitting.
+==================== Branch work150-vpair, patch #203 was reverted ====================
 
-2023-12-14  Michael Meissner  <meissner@linux.ibm.com>
+==================== Branch work150-vpair, patch #202 was reverted ====================
 
-gcc/
+==================== Branch work150-vpair, patch #201 was reverted ====================
 
-	* config/rs6000/rs6000.cc (vpair_split_unary): Make sure vector pair
-	operands are 32 bytes before splitting.
-	(vpair_split_binary): Likewise.
-	(vpair_split_fma): Likewise.
-
-==================== Branch work150-vpair, patch #207 ====================
-
-Move vpair splits to rs6000.cc; Allow vpair assemble to load constants.
-
-2023-12-14  Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/rs6000-protos.h (vpair_split): New enumeration.
-	(vpair_split_unary): New declaration.
-	(vpair_split_binary): Likewise.
-	(vpair_split_fma): Likewise.
-	* config/rs6000/rs6000.cc (vpair_split_unary): New function.
-	(vpair_split_binary): Likewise.
-	(vpair_split_fma): Likewise.
-	* config/rs6000/vector-pair.md: Change unary, binary, and fma splitters
-	after register allocation to call vpair_split_unary, vpair_split_binary,
-	and vpair_split_
-
-==================== Branch work150-vpair, patch #206 ====================
-
-Change some names.
-
-2023-12-14  Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/vector-pair.md (VPAIR_VEC_MODE): Rename from
-	VPAIR_VECMODE.  Change users.
-	(vpair_vp_mode_lc): Rename from vpair_vp_mode.  Change users.
-
-==================== Branch work150-vpair, patch #205 ====================
-
-Add vpair extract vector.
-
-2023-12-14  Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/rs6000-builtins.def
-	(__builtin_vpair_f32_extract_vector): New built-in function.
-	(__builtin_vpair_f64_extract_vector): Likewise.
-	* config/rs6000/vector-pair.md (UNSPEC_VPAIR_EXTRACT_VECTOR): New
-	unspec.
-	(vpair_extract_vector_<vpair_vec_to_vpair_lc>): New insns.
-	(vpair_extract_vector_<vpair_vec_to_vpair_lc>_load): Likewise.
-	(vpair_extract_vector_<vpair_vec_to_vpair_lc>_stor): Likewise.
-	* doc/extend.texi (PowerPC Vector Pair Built-in Functions): Document the
-	vector pair built-in functions.
-
-==================== Branch work150-vpair, patch #204 ====================
-
-Simplify register split code.
-
-2023-12-13  Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/vector-pair.md: Simplify the code for register
-	splitting.
-
-==================== Branch work150-vpair, patch #203 ====================
-
-Add vector pair tests.
-
-2023-12-13  Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/testsuite/
-
-	* gcc.target/powerpc/vector-pair-1.c: New test.
-	* gcc.target/powerpc/vector-pair-2.c: Likewise.
-	* gcc.target/powerpc/vector-pair-3.c: Likewise.
-	* gcc.target/powerpc/vector-pair-4.c: Likewise.
-
-==================== Branch work150-vpair, patch #202 ====================
-
-Add __builtin_vpair_f*_assemble.
-
-2023-12-13  Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/rs6000-builtins.def (__builtin_vpair_f32_assemble): New
-	built-in function.
-	(__builtin_vpair_f64_assemble): Likewise.
-	* config/rs6000/vector-pair.md (UNSPEC_VPAIR_ASSEMBLE): New unspec.
-	(VPAIR_ELEMENT): Rename from VPAIR_SPLAT_ELEMENT.
-	(VPAIR_VECTOR): Rename from VPAIR_SPLAT_VECTOR.
-	(vpair_ele_to_vec_lc): Delete.
-	(vpair_vec_to_vpair_lc): New mode attribute.
-	(vpair_assemble_<vpair_vec_to_vpair_lc): New insns.
-	(vpair_splat_<vpair_ele_to_vpair_lc>): Rename iterators.
-	(vpair_splat_<vpair_vec_to_vpair_lc>_internal): Rename from
-	vpair_splat_<mode>_internal.
-
-==================== Branch work150-vpair, patch #201 ====================
-
-Add initial vector pair built-in function support.
-
-2023-12-13  Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/rs6000-builtins.def (__builtin_vpair*): Add new built-in
-	functions.
-	* config/rs6000/rs6000.md (toplevel): Include vector-pair.md.
-	* config/rs6000/t-rs6000 (MD_INCLUDES): Add vector-pair.md.
-	* config/rs6000/vector-pair.md: New file.
-
-==================== Branch work150-vpair, patch #200 (vsubreg150 patch #300) ====================
-
-Peter's patches for subreg support.
-
-2023-12-12  Peter Bergner  <bergner@linux.ibm.com>
-
-gcc/
-
-	PR target/109116
-	* gcc/config/rs6000/rs6000.cc (rs6000_modes_tieable_p): Make OOmode
-	tieable with 128-bit vector modes.
-
-2023-12-12  Peter Bergner  <bergner@linux.ibm.com>
-
-gcc/
-
-	PR target/109116
-	* gcc/config/rs6000/mma.md (vsx_disassemble_pair): Use SUBREG's instead
-	of UNSPEC's.
-	(mma_disassemble_acc): Likewise.
+==================== Branch work150-vpair, patch #200 was reverted ====================
 
 ==================== Branch work150-vpair, baseline ====================
 
