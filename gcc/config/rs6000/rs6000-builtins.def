@@ -4142,6 +4142,12 @@
   v256 __builtin_vpair_f32_div (v256, v256);
     VPAIR_F32_DIV vpair_div_v8sf3 {mma}
 
+  v256 __builtin_vpair_f32_fma (v256, v256, v256);
+    VPAIR_F32_FMA vpair_fma_v8sf4 {mma}
+
+  v256 __builtin_vpair_f32_fms (v256, v256, v256);
+    VPAIR_F32_FMS vpair_fms_v8sf4 {mma}
+
   v256 __builtin_vpair_f32_max (v256, v256);
     VPAIR_F32_MAX vpair_smax_v8sf3 {mma}
 
@@ -4157,6 +4163,12 @@
   v256 __builtin_vpair_f32_neg (v256);
     VPAIR_F32_NEG vpair_neg_v8sf2 {mma}
 
+  v256 __builtin_vpair_f32_nfma (v256, v256, v256);
+    VPAIR_F32_NFMA vpair_nfma_v8sf4 {mma}
+
+  v256 __builtin_vpair_f32_nfms (v256, v256, v256);
+    VPAIR_F32_NFMS vpair_nfms_v8sf4 {mma}
+
   v256 __builtin_vpair_f32_sub (v256, v256);
     VPAIR_F32_SUB vpair_sub_v8sf3 {mma}
 
@@ -4169,6 +4181,12 @@
 
   v256 __builtin_vpair_f64_div (v256, v256);
     VPAIR_F64_DIV vpair_div_v4df3 {mma}
+
+  v256 __builtin_vpair_f64_fma (v256, v256, v256);
+    VPAIR_F64_FMA vpair_fma_v4df4 {mma}
+
+  v256 __builtin_vpair_f64_fms (v256, v256, v256);
+    VPAIR_F64_FMS vpair_fms_v4df4 {mma}
 
   v256 __builtin_vpair_f64_max (v256, v256);
     VPAIR_F64_MAX vpair_smax_v4df3 {mma}
@@ -4184,6 +4202,12 @@
 
   v256 __builtin_vpair_f64_neg (v256);
     VPAIR_F64_NEG vpair_neg_v4df2 {mma}
+
+  v256 __builtin_vpair_f64_nfma (v256, v256, v256);
+    VPAIR_F64_NFMA vpair_nfma_v4df4 {mma}
+
+  v256 __builtin_vpair_f64_nfms (v256, v256, v256);
+    VPAIR_F64_NFMS vpair_nfms_v4df4 {mma}
 
   v256 __builtin_vpair_f64_sub (v256, v256);
     VPAIR_F64_SUB vpair_sub_v4df3 {mma}

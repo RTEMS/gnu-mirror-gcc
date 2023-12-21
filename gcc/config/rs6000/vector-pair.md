@@ -32,6 +32,7 @@
 (define_c_enum "unspec"
   [UNSPEC_VPAIR_ABS
    UNSPEC_VPAIR_DIV
+   UNSPEC_VPAIR_FMA
    UNSPEC_VPAIR_MINUS
    UNSPEC_VPAIR_MULT
    UNSPEC_VPAIR_NEG
@@ -158,3 +159,96 @@
    (set (attr "type") (if_then_else (match_test "<VPAIR_OP> == DIV")
 				    (const_string "<vpair_divtype>")
 				    (const_string "<vpair_type>")))])
+
+;; Vector pair fused-multiply (FMA) operations.  The last argument in the
+;; UNSPEC is a CONST_INT which identifies what the scalar element is.
+(define_insn_and_split "vpair_fma_<vpair_modename>4"
+  [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
+	(unspec:OO
+	 [(match_operand:OO 1 "vsx_register_operand" "%wa,wa")
+	  (match_operand:OO 2 "vsx_register_operand" "wa,0")
+	  (match_operand:OO 3 "vsx_register_operand" "0,wa")
+	  (const_int VPAIR_FP_ELEMENT)]
+	 UNSPEC_VPAIR_FMA))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  vpair_split_fma (operands, <VPAIR_VMODE>mode, VPAIR_SPLIT_FMA);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "<vpair_type>")])
+
+;; Vector pair fused multiply-subtract
+(define_insn_and_split "vpair_fms_<vpair_modename>4"
+  [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
+	(unspec:OO
+	 [(match_operand:OO 1 "vsx_register_operand" "%wa,wa")
+	  (match_operand:OO 2 "vsx_register_operand" "wa,0")
+	  (unspec:OO
+	   [(match_operand:OO 3 "vsx_register_operand" "0,wa")
+	    (const_int VPAIR_FP_ELEMENT)]
+	   UNSPEC_VPAIR_NEG)
+	  (const_int VPAIR_FP_ELEMENT)]
+	 UNSPEC_VPAIR_FMA))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  vpair_split_fma (operands, <VPAIR_VMODE>mode, VPAIR_SPLIT_FMS);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "<vpair_type>")])
+
+;; Vector pair negate fused multiply-add
+(define_insn_and_split "vpair_nfma_<vpair_modename>4"
+  [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
+	(unspec:OO
+	 [(unspec:OO
+	   [(match_operand:OO 1 "vsx_register_operand" "%wa,wa")
+	    (match_operand:OO 2 "vsx_register_operand" "wa,0")
+	    (match_operand:OO 3 "vsx_register_operand" "0,wa")
+	    (const_int VPAIR_FP_ELEMENT)]
+	   UNSPEC_VPAIR_FMA)
+	  (const_int VPAIR_FP_ELEMENT)]
+	 UNSPEC_VPAIR_NEG))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  vpair_split_fma (operands, <VPAIR_VMODE>mode, VPAIR_SPLIT_NFMA);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "<vpair_type>")])
+
+;; Vector pair fused multiply-subtract
+(define_insn_and_split "vpair_nfms_<vpair_modename>4"
+  [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
+	(unspec:OO
+	 [(unspec:OO
+	   [(match_operand:OO 1 "vsx_register_operand" "%wa,wa")
+	    (match_operand:OO 2 "vsx_register_operand" "wa,0")
+	    (unspec:OO
+	     [(match_operand:OO 3 "vsx_register_operand" "0,wa")
+	      (const_int VPAIR_FP_ELEMENT)]
+	     UNSPEC_VPAIR_NEG)
+	    (const_int VPAIR_FP_ELEMENT)]
+	   UNSPEC_VPAIR_FMA)
+	  (const_int VPAIR_FP_ELEMENT)]
+	 UNSPEC_VPAIR_NEG))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  vpair_split_fma (operands, <VPAIR_VMODE>mode, VPAIR_SPLIT_NFMS);
+  DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "<vpair_type>")])
