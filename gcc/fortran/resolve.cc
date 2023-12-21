@@ -5669,7 +5669,7 @@ gfc_expression_rank (gfc_expr *e)
       if (ref->type != REF_ARRAY)
 	continue;
 
-      if (ref->u.ar.type == AR_FULL)
+      if (ref->u.ar.type == AR_FULL && ref->u.ar.as)
 	{
 	  rank = ref->u.ar.as->rank;
 	  break;
@@ -16101,6 +16101,11 @@ resolve_symbol (gfc_symbol *sym)
       formal_arg_flag = saved_formal_arg_flag;
       specification_expr = saved_specification_expr;
     }
+
+  /* For a CLASS-valued function with a result variable, affirm that it has
+     been resolved also when looking at the symbol 'sym'.  */
+  if (mp_flag && sym->ts.type == BT_CLASS && sym->result->attr.class_ok)
+    sym->attr.class_ok = sym->result->attr.class_ok;
 
   if (sym->ts.type == BT_CLASS && sym->attr.class_ok && sym->ts.u.derived
       && CLASS_DATA (sym))

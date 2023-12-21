@@ -656,7 +656,8 @@ extern void finish_decl (tree, location_t, tree, tree, tree);
 extern tree finish_enum (tree, tree, tree);
 extern void finish_function (location_t = input_location);
 extern tree finish_struct (location_t, tree, tree, tree,
-			   class c_struct_parse_info *);
+			   class c_struct_parse_info *,
+			   tree *expr = NULL);
 extern tree c_simulate_enum_decl (location_t, const char *,
 				  vec<string_int_pair> *);
 extern tree c_simulate_record_decl (location_t, const char *,
@@ -682,7 +683,8 @@ extern void c_warn_unused_attributes (tree);
 extern tree c_warn_type_attributes (tree);
 extern void shadow_tag (const struct c_declspecs *);
 extern void shadow_tag_warned (const struct c_declspecs *, int);
-extern tree start_enum (location_t, struct c_enum_contents *, tree, tree);
+extern tree start_enum (location_t, struct c_enum_contents *, tree, tree,
+			bool potential_nesting_p);
 extern bool start_function (struct c_declspecs *, struct c_declarator *, tree);
 extern tree start_decl (struct c_declarator *, struct c_declspecs *, bool,
 			tree, bool = true, location_t * = NULL);
@@ -756,6 +758,8 @@ extern tree c_objc_common_truthvalue_conversion (location_t, tree);
 extern tree require_complete_type (location_t, tree);
 extern bool same_translation_unit_p (const_tree, const_tree);
 extern int comptypes (tree, tree);
+extern bool comptypes_same_p (tree, tree);
+extern bool comptypes_equiv_p (tree, tree);
 extern int comptypes_check_different_types (tree, tree, bool *);
 extern int comptypes_check_enum_int (tree, tree, bool *);
 extern bool c_mark_addressable (tree, bool = false);

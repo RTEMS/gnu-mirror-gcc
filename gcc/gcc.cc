@@ -5008,7 +5008,7 @@ process_command (unsigned int decoded_options_count,
     {
       if (!any_link_options_p && !static_p)
 	{
-#ifdef HAVE_LD_PIE
+#if defined HAVE_LD_PIE && defined LD_PIE_SPEC
 	  save_switch (LD_PIE_SPEC, 0, NULL, /*validated=*/true, /*known=*/false);
 #endif
 	  /* These are passed straight down to collect2 so we have to break
@@ -11368,6 +11368,7 @@ driver::finalize ()
   input_from_pipe = 0;
   suffix_subst = NULL;
 
+  XDELETEVEC (mdswitches);
   mdswitches = NULL;
   n_mdswitches = 0;
 

@@ -1,3 +1,249 @@
+2023-12-18  Patrick Palka  <ppalka@redhat.com>
+
+	PR libstdc++/112802
+	PR libstdc++/113068
+	* include/std/ranges (__detail::_To::operator()): Add constraints.
+	(__detail::_To2::operator()): Likewise.
+	* testsuite/std/ranges/conv/1.cc (test_sfinae): New test.
+	(test_composition): New test.
+
+2023-12-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	* src/c++23/print.cc (__open_terminal(FILE*)): Avoid fileno
+	macro.
+
+2023-12-16  H.J. Lu  <hjl.tools@gmail.com>
+
+	* config/abi/post/x86_64-linux-gnu/x32/baseline_symbols.txt:
+	Updated.
+
+2023-12-16  Ken Matsui  <kmatsui@gcc.gnu.org>
+
+	* include/std/type_traits (remove_pointer): Use __remove_pointer
+	built-in trait.
+
+2023-12-16  Ken Matsui  <kmatsui@gcc.gnu.org>
+
+	* include/std/type_traits (is_object): Use __is_object built-in
+	trait.
+	(is_object_v): Likewise.
+
+2023-12-16  Ken Matsui  <kmatsui@gcc.gnu.org>
+
+	* include/std/type_traits (is_function): Use __is_function
+	built-in trait.
+	(is_function_v): Likewise. Optimize its implementation.  Move
+	this under is_const_v as this depends on is_const_v.
+
+2023-12-16  Ken Matsui  <kmatsui@gcc.gnu.org>
+
+	* include/std/type_traits (is_reference): Use __is_reference
+	built-in trait.
+	(is_reference_v): Likewise.
+
+2023-12-16  Ken Matsui  <kmatsui@gcc.gnu.org>
+
+	* include/std/type_traits (is_member_object_pointer): Use
+	__is_member_object_pointer built-in trait.
+	(is_member_object_pointer_v): Likewise.
+
+2023-12-16  Ken Matsui  <kmatsui@gcc.gnu.org>
+
+	* include/std/type_traits (is_member_function_pointer): Use
+	__is_member_function_pointer built-in trait.
+	(is_member_function_pointer_v): Likewise.
+
+2023-12-16  Ken Matsui  <kmatsui@gcc.gnu.org>
+
+	* include/std/type_traits (is_member_pointer): Use
+	__is_member_pointer built-in trait.
+	(is_member_pointer_v): Likewise.
+
+2023-12-16  Ken Matsui  <kmatsui@gcc.gnu.org>
+
+	* include/std/type_traits (is_scoped_enum): Use
+	__is_scoped_enum built-in trait.
+	(is_scoped_enum_v): Likewise.
+
+2023-12-16  Ken Matsui  <kmatsui@gcc.gnu.org>
+
+	* include/std/type_traits (is_bounded_array_v): Use
+	__is_bounded_array built-in trait.
+
+2023-12-16  Ken Matsui  <kmatsui@gcc.gnu.org>
+
+	* include/std/type_traits (is_array): Use __is_array built-in
+	trait.
+	(is_array_v): Likewise.
+
+2023-12-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	* src/c++23/print.cc (__write_to_terminal) [_WIN32]: If handle
+	does not refer to the console then just write to it using normal
+	file I/O.
+	* testsuite/27_io/print/2.cc (as_printed_to_terminal): Print
+	error message on failure.
+	(test_utf16_transcoding): Adjust for as_printed_to_terminal
+	modifying its argument.
+
+2023-12-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/ostream (vprint_unicode) [_WIN32]: Use RAII guard.
+	(vprint_unicode) [!_WIN32]: Just call vprint_nonunicode.
+	* include/std/print (vprint_unicode) [!_WIN32]: Likewise.
+
+2023-12-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/ostream (vprint_nonunicode, vprint_unicode): Do
+	not insert padding.
+	* testsuite/27_io/basic_ostream/print/1.cc: Adjust expected
+	behaviour.
+
+2023-12-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/107760
+	* include/Makefile.am: Add new header.
+	* include/Makefile.in: Regenerate.
+	* include/bits/version.def (__cpp_lib_print): Define.
+	* include/bits/version.h: Regenerate.
+	* include/std/format (__literal_encoding_is_utf8): New function.
+	(_Seq_sink::view()): New member function.
+	* include/std/ostream (vprintf_nonunicode, vprintf_unicode)
+	(print, println): New functions.
+	* include/std/print: New file.
+	* src/c++23/Makefile.am: Add new source file.
+	* src/c++23/Makefile.in: Regenerate.
+	* src/c++23/print.cc: New file.
+	* testsuite/27_io/basic_ostream/print/1.cc: New test.
+	* testsuite/27_io/print/1.cc: New test.
+	* testsuite/27_io/print/2.cc: New test.
+
+2023-12-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	* acinclude.m4 (GLIBCXX_CHECK_FILEBUF_NATIVE_HANDLES): Add
+	missing header to configure test. Check correct variable.
+	* config/io/basic_file_stdio.cc (__basic_file<char>::native_handle):
+	Fix typo.
+	* configure: Regenerate.
+	* testsuite/27_io/basic_filebuf/native_handle/char/1.cc: Do not
+	call CloseHandle on the native handle.
+	* testsuite/27_io/basic_filebuf/native_handle/wchar_t/1.cc:
+	Likewise.
+
+2023-12-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/format (_Seq_sink): Fix missing argument in
+	discarded statement. Add comments, likely/unlikely attributes
+	and debug assertions as sanity checks.
+
+2023-12-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/27_io/objects/char/2.cc: Use dg-output.
+	* testsuite/27_io/objects/wchar_t/2.cc: Use dg-output.
+
+2023-12-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/chrono_io.h (__formatter_chrono::_M_S): Fix order
+	of arguments to std::format_to.
+	* testsuite/20_util/duration/io.cc: Test subsecond duration with
+	floating-point rep.
+
+2023-12-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/109536
+	* include/bits/c++config (__glibcxx_constexpr_assert): Remove
+	macro.
+	* include/bits/stl_algobase.h (__niter_base, __copy_move_a)
+	(__copy_move_backward_a, __fill_a, __fill_n_a, __equal_aux)
+	(__lexicographical_compare_aux): Add constexpr to overloads for
+	debug mode iterators.
+	* include/debug/helper_functions.h (__unsafe): Add constexpr.
+	* include/debug/macros.h (_GLIBCXX_DEBUG_VERIFY_COND_AT): Remove
+	macro, folding it into ...
+	(_GLIBCXX_DEBUG_VERIFY_AT_F): ... here. Do not use
+	__glibcxx_constexpr_assert.
+	* include/debug/safe_base.h (_Safe_iterator_base): Add constexpr
+	to some member functions. Omit attaching, detaching and checking
+	operations during constant evaluation.
+	* include/debug/safe_container.h (_Safe_container): Likewise.
+	* include/debug/safe_iterator.h (_Safe_iterator): Likewise.
+	* include/debug/safe_iterator.tcc (__niter_base, __copy_move_a)
+	(__copy_move_backward_a, __fill_a, __fill_n_a, __equal_aux)
+	(__lexicographical_compare_aux): Add constexpr.
+	* include/debug/vector (_Safe_vector, vector): Add constexpr.
+	Omit safe iterator operations during constant evaluation.
+	* testsuite/23_containers/vector/bool/capacity/constexpr.cc:
+	Remove dg-xfail-if for debug mode.
+	* testsuite/23_containers/vector/bool/cmp_c++20.cc: Likewise.
+	* testsuite/23_containers/vector/bool/cons/constexpr.cc:
+	Likewise.
+	* testsuite/23_containers/vector/bool/element_access/1.cc:
+	Likewise.
+	* testsuite/23_containers/vector/bool/element_access/constexpr.cc:
+	Likewise.
+	* testsuite/23_containers/vector/bool/modifiers/assign/constexpr.cc:
+	Likewise.
+	* testsuite/23_containers/vector/bool/modifiers/constexpr.cc:
+	Likewise.
+	* testsuite/23_containers/vector/bool/modifiers/swap/constexpr.cc:
+	Likewise.
+	* testsuite/23_containers/vector/capacity/constexpr.cc:
+	Likewise.
+	* testsuite/23_containers/vector/cmp_c++20.cc: Likewise.
+	* testsuite/23_containers/vector/cons/constexpr.cc: Likewise.
+	* testsuite/23_containers/vector/data_access/constexpr.cc:
+	Likewise.
+	* testsuite/23_containers/vector/element_access/constexpr.cc:
+	Likewise.
+	* testsuite/23_containers/vector/modifiers/assign/constexpr.cc:
+	Likewise.
+	* testsuite/23_containers/vector/modifiers/constexpr.cc:
+	Likewise.
+	* testsuite/23_containers/vector/modifiers/swap/constexpr.cc:
+	Likewise.
+	* testsuite/23_containers/vector/cons/destructible_debug_neg.cc:
+	Adjust dg-error line number.
+
+2023-12-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/chrono_io.h (__formatter_chrono::_M_C_y_Y): Do
+	not round century down for %Y formats.
+
+2023-12-12  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/format (__do_vformat_to): Handle char separately
+	from other integral types.
+	* testsuite/std/format/functions/format.cc: Check for expected
+	output for char and bool arguments.
+	* testsuite/std/format/string.cc: Check that 0 filling is
+	rejected for character and string formats.
+
+2023-12-12  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/chrono_io.h (__formatter_chrono::_M_C_y_Y): Fix
+	rounding for negative centuries.
+	* testsuite/std/time/year/io.cc: Check %C for negative years.
+
+2023-12-12  Jonathan Wakely  <jwakely@redhat.com>
+
+	* src/c++11/Makefile.am: Remove redundant -std=gnu++11 flags.
+	* src/c++11/Makefile.in: Regenerate.
+
+2023-12-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/111826
+	* include/bits/version.def (format): Update value.
+	* include/bits/version.h: Regenerate.
+	* testsuite/std/format/functions/format.cc:
+
+2023-12-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/112876
+	* include/std/ranges (ranges::to): Do not try to use an iterator
+	returned by the container's emplace or insert member functions.
+	* testsuite/std/ranges/conv/1.cc (Cont4::emplace, Cont4::insert):
+	Use the iterator parameter. Do not return an iterator.
+
 2023-12-07  Patrick Palka  <ppalka@redhat.com>
 
 	* include/std/ranges (__detail::_ToClosure): Replace with ...

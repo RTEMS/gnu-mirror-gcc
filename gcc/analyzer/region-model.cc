@@ -211,6 +211,31 @@ region_to_value_map::dump (bool simple) const
   pp_flush (&pp);
 }
 
+/* Generate a JSON value for this region_to_value_map.
+   This is intended for debugging the analyzer rather than
+   serialization.  */
+
+json::object *
+region_to_value_map::to_json () const
+{
+  json::object *map_obj = new json::object ();
+
+  auto_vec<const region *> regs;
+  for (iterator iter = begin (); iter != end (); ++iter)
+    regs.safe_push ((*iter).first);
+  regs.qsort (region::cmp_ptr_ptr);
+
+  unsigned i;
+  const region *reg;
+  FOR_EACH_VEC_ELT (regs, i, reg)
+    {
+      label_text reg_desc = reg->get_desc ();
+      const svalue *sval = *get (reg);
+      map_obj->set (reg_desc.get (), sval->to_json ());
+    }
+
+  return map_obj;
+}
 
 /* Attempt to merge THIS with OTHER, writing the result
    to OUT.
@@ -427,6 +452,22 @@ DEBUG_FUNCTION void
 region_model::debug () const
 {
   dump (true);
+}
+
+/* Generate a JSON value for this region_model.
+   This is intended for debugging the analyzer rather than
+   serialization.  */
+
+json::object *
+region_model::to_json () const
+{
+  json::object *model_obj = new json::object ();
+  model_obj->set ("store", m_store.to_json ());
+  model_obj->set ("constraints", m_constraints->to_json ());
+  if (m_current_frame)
+    model_obj->set ("current_frame", m_current_frame->to_json ());
+  model_obj->set ("dynamic_extents", m_dynamic_extents.to_json ());
+  return model_obj;
 }
 
 /* Assert that this object is valid.  */
@@ -6576,22 +6617,33 @@ private:
 static bool
 contains_uninit_p (const svalue *sval)
 {
-  struct uninit_finder : public visitor
-  {
-  public:
-    uninit_finder () : m_found_uninit (false) {}
-    void visit_poisoned_svalue (const poisoned_svalue *sval)
+  switch (sval->get_kind ())
     {
-      if (sval->get_poison_kind () == POISON_KIND_UNINIT)
-	m_found_uninit = true;
+    default:
+      return false;
+    case SK_POISONED:
+      {
+	const poisoned_svalue *psval
+	  = as_a <const poisoned_svalue *> (sval);
+	return psval->get_poison_kind () == POISON_KIND_UNINIT;
+      }
+    case SK_COMPOUND:
+      {
+	const compound_svalue *compound_sval
+	  = as_a <const compound_svalue *> (sval);
+
+	for (auto iter : *compound_sval)
+	  {
+	    const svalue *sval = iter.second;
+	    if (const poisoned_svalue *psval
+		= sval->dyn_cast_poisoned_svalue ())
+	      if (psval->get_poison_kind () == POISON_KIND_UNINIT)
+		return true;
+	  }
+
+	return false;
+      }
     }
-    bool m_found_uninit;
-  };
-
-  uninit_finder v;
-  sval->accept (&v);
-
-  return v.m_found_uninit;
 }
 
 /* Function for use by plugins when simulating writing data through a

@@ -433,6 +433,7 @@ public:
   bool single_step_npatterns_p () const;
   bool npatterns_all_equal_p () const;
   bool interleaved_stepped_npatterns_p () const;
+  bool npatterns_vid_diff_repeated_p () const;
 
   machine_mode new_mode () const { return m_new_mode; }
   scalar_mode inner_mode () const { return m_inner_mode; }
@@ -666,6 +667,43 @@ rvv_builder::single_step_npatterns_p () const
       if (maybe_ne (step, diff1) || maybe_ne (step, diff2))
 	return false;
     }
+  return true;
+}
+
+/* Return true if the diff between const vector and vid sequence
+   is repeated. For example as below cases:
+   The diff means the const vector - vid.
+     CASE 1:
+     CONST VECTOR: {3, 2, 1, 0, 7, 6, 5, 4, ... }
+     VID         : {0, 1, 2, 3, 4, 5, 6, 7, ... }
+     DIFF(MINUS) : {3, 1,-1,-3, 3, 1,-1,-3, ... }
+     The diff sequence {3, 1,-1,-3} is repeated in the npattern and
+     return TRUE for case 1.
+
+     CASE 2:
+     CONST VECTOR: {-4, 4,-3, 5,-2, 6,-1, 7, ...}
+     VID         : { 0, 1, 2, 3, 4, 5, 6, 7, ... }
+     DIFF(MINUS) : {-4, 3,-5,-2,-6, 1,-7, 0, ... }
+     The diff sequence {-4, 3} is not repated in the npattern and
+     return FALSE for case 2.  */
+bool
+rvv_builder::npatterns_vid_diff_repeated_p () const
+{
+  if (nelts_per_pattern () != 3)
+    return false;
+  else if (npatterns () == 0)
+    return false;
+
+  for (unsigned i = 0; i < npatterns (); i++)
+    {
+      poly_int64 diff_0 = rtx_to_poly_int64 (elt (i)) - i;
+      poly_int64 diff_1
+	= rtx_to_poly_int64 (elt (npatterns () + i)) - npatterns () - i;
+
+      if (maybe_ne (diff_0, diff_1))
+	return false;
+    }
+
   return true;
 }
 
@@ -1257,24 +1295,65 @@ expand_const_vector (rtx target, rtx src)
 	  else
 	    {
 	      /* Generate the variable-length vector following this rule:
-		 { a, b, a, b, a + step, b + step, a + step*2, b + step*2, ...}
-		   E.g. { 3, 2, 1, 0, 7, 6, 5, 4, ... } */
-	      /* Step 2: Generate diff = TARGET - VID:
-		 { 3-0, 2-1, 1-2, 0-3, 7-4, 6-5, 5-6, 4-7, ... }*/
-	      rvv_builder v (builder.mode (), builder.npatterns (), 1);
-	      for (unsigned int i = 0; i < v.npatterns (); ++i)
+		{ a, b, a + step, b + step, a + step*2, b + step*2, ... }  */
+
+	      if (builder.npatterns_vid_diff_repeated_p ())
 		{
-		  /* Calculate the diff between the target sequence and
-		     vid sequence.  The elt (i) can be either const_int or
-		     const_poly_int. */
-		  poly_int64 diff = rtx_to_poly_int64 (builder.elt (i)) - i;
-		  v.quick_push (gen_int_mode (diff, v.inner_mode ()));
+		  /* Case 1: For example as below:
+		     {3, 2, 1, 0, 7, 6, 5, 4, 11, 10, 9, 8... }
+		     We have 3 - 0 = 3 equals 7 - 4 = 3, the sequence is
+		     repeated as below after minus vid.
+		     {3, 1, -1, -3, 3, 1, -1, -3...}
+		     Then we can simplify the diff code gen to at most
+		     npatterns().  */
+		  rvv_builder v (builder.mode (), builder.npatterns (), 1);
+
+		  /* Step 1: Generate diff = TARGET - VID.  */
+		  for (unsigned int i = 0; i < v.npatterns (); ++i)
+		    {
+		     poly_int64 diff = rtx_to_poly_int64 (builder.elt (i)) - i;
+		     v.quick_push (gen_int_mode (diff, v.inner_mode ()));
+		    }
+
+		  /* Step 2: Generate result = VID + diff.  */
+		  rtx vec = v.build ();
+		  rtx add_ops[] = {target, vid, vec};
+		  emit_vlmax_insn (code_for_pred (PLUS, builder.mode ()),
+				   BINARY_OP, add_ops);
 		}
-	      /* Step 2: Generate result = VID + diff.  */
-	      rtx vec = v.build ();
-	      rtx add_ops[] = {target, vid, vec};
-	      emit_vlmax_insn (code_for_pred (PLUS, builder.mode ()),
-				BINARY_OP, add_ops);
+	      else
+		{
+		  /* Case 2: For example as below:
+		     { -4, 4, -4 + 1, 4 + 1, -4 + 2, 4 + 2, -4 + 3, 4 + 3, ... }
+		   */
+		  rvv_builder v (builder.mode (), builder.npatterns (), 1);
+
+		  /* Step 1: Generate { a, b, a, b, ... }  */
+		  for (unsigned int i = 0; i < v.npatterns (); ++i)
+		    v.quick_push (builder.elt (i));
+		  rtx new_base = v.build ();
+
+		  /* Step 2: Generate tmp = VID >> LOG2 (NPATTERNS).  */
+		  rtx shift_count
+		    = gen_int_mode (exact_log2 (builder.npatterns ()),
+				    builder.inner_mode ());
+		  rtx tmp = expand_simple_binop (builder.mode (), LSHIFTRT,
+						 vid, shift_count, NULL_RTX,
+						 false, OPTAB_DIRECT);
+
+		  /* Step 3: Generate tmp2 = tmp * step.  */
+		  rtx tmp2 = gen_reg_rtx (builder.mode ());
+		  rtx step
+		    = simplify_binary_operation (MINUS, builder.inner_mode (),
+						 builder.elt (v.npatterns()),
+						 builder.elt (0));
+		  expand_vec_series (tmp2, const0_rtx, step, tmp);
+
+		  /* Step 4: Generate target = tmp2 + new_base.  */
+		  rtx add_ops[] = {target, tmp2, new_base};
+		  emit_vlmax_insn (code_for_pred (PLUS, builder.mode ()),
+				   BINARY_OP, add_ops);
+		}
 	    }
 	}
       else if (builder.interleaved_stepped_npatterns_p ())
@@ -1331,7 +1410,7 @@ expand_const_vector (rtx target, rtx src)
 		  rtx tmp2 = gen_reg_rtx (new_mode);
 		  base2 = gen_int_mode (rtx_to_poly_int64 (base2), new_smode);
 		  expand_vec_series (tmp2, base2,
-				     gen_int_mode (step1, new_smode));
+				     gen_int_mode (step2, new_smode));
 		  rtx shifted_tmp2 = expand_simple_binop (
 		    new_mode, ASHIFT, tmp2,
 		    gen_int_mode (builder.inner_bits_size (), Pmode), NULL_RTX,
@@ -1378,14 +1457,17 @@ expand_const_vector (rtx target, rtx src)
 	     { base0, base1, base1 + step, base1 + step * 2, ... }  */
 	  rtx base0 = builder.elt (0);
 	  rtx base1 = builder.elt (1);
-	  rtx step = builder.elt (2);
+	  rtx base2 = builder.elt (2);
+
+	  rtx step = simplify_binary_operation (MINUS, builder.inner_mode (),
+						base2, base1);
+
 	  /* Step 1 - { base1, base1 + step, base1 + step * 2, ... }  */
 	  rtx tmp = gen_reg_rtx (mode);
 	  expand_vec_series (tmp, base1, step);
 	  /* Step 2 - { base0, base1, base1 + step, base1 + step * 2, ... }  */
-	  scalar_mode elem_mode = GET_MODE_INNER (mode);
 	  if (!rtx_equal_p (base0, const0_rtx))
-	    base0 = force_reg (elem_mode, base0);
+	    base0 = force_reg (builder.inner_mode (), base0);
 
 	  insn_code icode = optab_handler (vec_shl_insert_optab, mode);
 	  gcc_assert (icode != CODE_FOR_nothing);
@@ -2920,6 +3002,39 @@ struct expand_vec_perm_d
   bool testing_p;
 };
 
+/* Return the appropriate index mode for gather instructions.  */
+opt_machine_mode
+get_gather_index_mode (struct expand_vec_perm_d *d)
+{
+  machine_mode sel_mode = related_int_vector_mode (d->vmode).require ();
+  poly_uint64 nunits = GET_MODE_NUNITS (d->vmode);
+
+  if (GET_MODE_INNER (d->vmode) == QImode)
+    {
+      if (nunits.is_constant ())
+	{
+	  /* If indice is LMUL8 CONST_VECTOR and any element value
+	     exceed the range of 0 ~ 255, Forbid such permutation
+	     since we need vector HI mode to hold such indice and
+	     we don't have it.  */
+	  if (!d->perm.all_in_range_p (0, 255)
+	      && !get_vector_mode (HImode, nunits).exists (&sel_mode))
+	    return opt_machine_mode ();
+	}
+      else
+	{
+	  /* Permuting two SEW8 variable-length vectors need vrgatherei16.vv.
+	     Otherwise, it could overflow the index range.  */
+	  if (!get_vector_mode (HImode, nunits).exists (&sel_mode))
+	    return opt_machine_mode ();
+	}
+    }
+  else if (riscv_get_v_regno_alignment (sel_mode) > 1
+	   && GET_MODE_INNER (sel_mode) != HImode)
+    sel_mode = get_vector_mode (HImode, nunits).require ();
+  return sel_mode;
+}
+
 /* Recognize the patterns that we can use merge operation to shuffle the
    vectors. The value of Each element (index i) in selector can only be
    either i or nunits + i.  We will check the pattern is actually monotonic.
@@ -2951,20 +3066,63 @@ shuffle_merge_patterns (struct expand_vec_perm_d *d)
 	&& !d->perm.series_p (i, n_patterns, vec_len + i, n_patterns))
       return false;
 
+  /* We need to use precomputed mask for such situation and such mask
+     can only be computed in compile-time known size modes.  */
+  bool indices_fit_selector_p
+    = GET_MODE_BITSIZE (GET_MODE_INNER (vmode)) > 8 || known_lt (vec_len, 256);
+  if (!indices_fit_selector_p && !vec_len.is_constant ())
+    return false;
+
   if (d->testing_p)
     return true;
 
   machine_mode mask_mode = get_mask_mode (vmode);
   rtx mask = gen_reg_rtx (mask_mode);
 
-  rtx sel = vec_perm_indices_to_rtx (sel_mode, d->perm);
+  if (indices_fit_selector_p)
+    {
+      /* MASK = SELECTOR < NUNTIS ? 1 : 0.  */
+      rtx sel = vec_perm_indices_to_rtx (sel_mode, d->perm);
+      rtx x = gen_int_mode (vec_len, GET_MODE_INNER (sel_mode));
+      insn_code icode = code_for_pred_cmp_scalar (sel_mode);
+      rtx cmp = gen_rtx_fmt_ee (LTU, mask_mode, sel, x);
+      rtx ops[] = {mask, cmp, sel, x};
+      emit_vlmax_insn (icode, COMPARE_OP, ops);
+    }
+  else
+    {
+      /* For EEW8 and NUNITS may be larger than 255, we can't use vmsltu
+	 directly to generate the selector mask, instead, we can only use
+	 precomputed mask.
 
-  /* MASK = SELECTOR < NUNTIS ? 1 : 0.  */
-  rtx x = gen_int_mode (vec_len, GET_MODE_INNER (sel_mode));
-  insn_code icode = code_for_pred_cmp_scalar (sel_mode);
-  rtx cmp = gen_rtx_fmt_ee (LTU, mask_mode, sel, x);
-  rtx ops[] = {mask, cmp, sel, x};
-  emit_vlmax_insn (icode, COMPARE_OP, ops);
+	 E.g. selector = <0, 257, 2, 259> for EEW8 vector with NUNITS = 256, we
+	 don't have a QImode scalar register to hold larger than 255.
+	 We also cannot hold that in a vector QImode register if LMUL = 8, and,
+	 since there is no larger HI mode vector we cannot create a larger
+	 selector.
+
+	 As the mask is a simple {0, 1, ...} pattern and the length is known we
+	 can store it in a scalar register and broadcast it to a mask register.
+       */
+      gcc_assert (vec_len.is_constant ());
+      int size = CEIL (GET_MODE_NUNITS (mask_mode).to_constant (), 8);
+      machine_mode mode = get_vector_mode (QImode, size).require ();
+      rtx tmp = gen_reg_rtx (mode);
+      rvv_builder v (mode, 1, size);
+      for (int i = 0; i < vec_len.to_constant () / 8; i++)
+	{
+	  uint8_t value = 0;
+	  for (int j = 0; j < 8; j++)
+	    {
+	      int index = i * 8 + j;
+	      if (known_lt (d->perm[index], 256))
+		value |= 1 << j;
+	    }
+	  v.quick_push (gen_int_mode (value, QImode));
+	}
+      emit_move_insn (tmp, v.build ());
+      emit_move_insn (mask, gen_lowpart (mask_mode, tmp));
+    }
 
   /* TARGET = MASK ? OP0 : OP1.  */
   /* swap op0 and op1 since the order is opposite to pred_merge.  */
@@ -3384,7 +3542,7 @@ shuffle_extract_and_slide1up_patterns (struct expand_vec_perm_d *d)
   /* Extract the last element of the first vector.  */
   scalar_mode smode = GET_MODE_INNER (d->vmode);
   rtx tmp = gen_reg_rtx (smode);
-  emit_vec_extract (tmp, d->op0, nunits - 1);
+  emit_vec_extract (tmp, d->op0, gen_int_mode (nunits - 1, Pmode));
 
   /* Insert the scalar into element 0.  */
   unsigned int unspec
@@ -3395,41 +3553,81 @@ shuffle_extract_and_slide1up_patterns (struct expand_vec_perm_d *d)
   return true;
 }
 
+static bool
+shuffle_series_patterns (struct expand_vec_perm_d *d)
+{
+  if (!d->one_vector_p || d->perm.encoding ().npatterns () != 1)
+    return false;
+
+  poly_int64 el1 = d->perm[0];
+  poly_int64 el2 = d->perm[1];
+  poly_int64 el3 = d->perm[2];
+
+  poly_int64 step1 = el2 - el1;
+  poly_int64 step2 = el3 - el2;
+
+  bool need_insert = false;
+  bool have_series = false;
+
+  /* Check for a full series.  */
+  if (known_ne (step1, 0) && d->perm.series_p (0, 1, el1, step1))
+    have_series = true;
+
+  /* Check for a series starting at the second element.  */
+  else if (known_ne (step2, 0) && d->perm.series_p (1, 1, el2, step2))
+    {
+      have_series = true;
+      need_insert = true;
+    }
+
+  if (!have_series)
+    return false;
+
+  /* Disable shuffle if we can't find an appropriate integer index mode for
+     gather.  */
+  machine_mode sel_mode;
+  if (!get_gather_index_mode (d).exists (&sel_mode))
+    return false;
+
+  /* Success! */
+  if (d->testing_p)
+    return true;
+
+  /* Create the series.  */
+  machine_mode eltmode = Pmode;
+  rtx series = gen_reg_rtx (sel_mode);
+  expand_vec_series (series, gen_int_mode (need_insert ? el2 : el1, eltmode),
+		     gen_int_mode (need_insert ? step2 : step1, eltmode));
+
+  /* Insert the remaining element if necessary.  */
+  if (need_insert)
+    {
+      insn_code icode = code_for_pred_slide (UNSPEC_VSLIDE1UP, sel_mode);
+      rtx ops[]
+	= {series, series, gen_int_mode (el1, GET_MODE_INNER (sel_mode))};
+      emit_vlmax_insn (icode, BINARY_OP, ops);
+    }
+
+  emit_vlmax_gather_insn (d->target, d->op0, series);
+
+  return true;
+}
+
 /* Recognize the pattern that can be shuffled by generic approach.  */
 
 static bool
 shuffle_generic_patterns (struct expand_vec_perm_d *d)
 {
-  machine_mode sel_mode = related_int_vector_mode (d->vmode).require ();
-  poly_uint64 nunits = GET_MODE_NUNITS (d->vmode);
+  machine_mode sel_mode;
 
   /* We don't enable SLP for non-power of 2 NPATTERNS.  */
   if (!pow2p_hwi (d->perm.encoding().npatterns ()))
     return false;
 
-  if (GET_MODE_INNER (d->vmode) == QImode)
-    {
-      if (nunits.is_constant ())
-	{
-	  /* If indice is LMUL8 CONST_VECTOR and any element value
-	     exceed the range of 0 ~ 255, Forbid such permutation
-	     since we need vector HI mode to hold such indice and
-	     we don't have it.  */
-	  if (!d->perm.all_in_range_p (0, 255)
-	      && !get_vector_mode (HImode, nunits).exists (&sel_mode))
-	    return false;
-	}
-      else
-	{
-	  /* Permuting two SEW8 variable-length vectors need vrgatherei16.vv.
-	     Otherwise, it could overflow the index range.  */
-	  if (!get_vector_mode (HImode, nunits).exists (&sel_mode))
-	    return false;
-	}
-    }
-  else if (riscv_get_v_regno_alignment (sel_mode) > 1
-	   && GET_MODE_INNER (sel_mode) != HImode)
-    sel_mode = get_vector_mode (HImode, nunits).require ();
+  /* Disable shuffle if we can't find an appropriate integer index mode for
+     gather.  */
+  if (!get_gather_index_mode (d).exists (&sel_mode))
+    return false;
 
   /* Success! */
   if (d->testing_p)
@@ -3474,6 +3672,8 @@ expand_vec_perm_const_1 (struct expand_vec_perm_d *d)
 	  if (shuffle_bswap_pattern (d))
 	    return true;
 	  if (shuffle_extract_and_slide1up_patterns (d))
+	    return true;
+	  if (shuffle_series_patterns (d))
 	    return true;
 	  if (shuffle_generic_patterns (d))
 	    return true;
@@ -3550,6 +3750,16 @@ void
 expand_select_vl (rtx *ops)
 {
   poly_int64 nunits = rtx_to_poly_int64 (ops[2]);
+  if (CONST_INT_P (ops[1]) && known_le (INTVAL (ops[1]), nunits))
+    {
+      /* If length is known <= VF, we just use the length directly instead
+	 of using vsetvli.
+
+	 E.g. _255 = .SELECT_VL (3, POLY_INT_CST [4, 4]);
+	 We move 3 into _255 intead of using explicit vsetvl.  */
+      emit_move_insn (ops[0], ops[1]);
+      return;
+    }
   /* We arbitrary picked QImode as inner scalar mode to get vector mode.
      since vsetvl only demand ratio. We let VSETVL PASS to optimize it.  */
   scalar_int_mode mode = QImode;
@@ -4809,9 +5019,8 @@ can_be_broadcasted_p (rtx op)
   return can_create_pseudo_p () && nonmemory_operand (op, mode);
 }
 
-/* Helper function to emit vec_extract_optab.  */
 void
-emit_vec_extract (rtx target, rtx src, poly_int64 index)
+emit_vec_extract (rtx target, rtx src, rtx index)
 {
   machine_mode vmode = GET_MODE (src);
   machine_mode smode = GET_MODE (target);
@@ -4822,10 +5031,13 @@ emit_vec_extract (rtx target, rtx src, poly_int64 index)
   create_output_operand (&ops[0], target, smode);
   ops[0].target = 1;
   create_input_operand (&ops[1], src, vmode);
-  if (index.is_constant ())
-    create_integer_operand (&ops[2], index);
+
+  poly_int64 val;
+  if (poly_int_rtx_p (index, &val))
+    create_integer_operand (&ops[2], val);
   else
-    create_input_operand (&ops[2], gen_int_mode (index, Pmode), Pmode);
+    create_input_operand (&ops[2], index, Pmode);
+
   expand_insn (icode, 3, ops);
   if (ops[0].value != target)
     emit_move_insn (target, ops[0].value);
@@ -4847,6 +5059,53 @@ gather_scatter_valid_offset_p (machine_mode mode)
   if (!get_vector_mode (Pmode, GET_MODE_NUNITS (mode)).exists ())
     return false;
   return true;
+}
+
+/* Implement TARGET_ESTIMATED_POLY_VALUE.
+   Look into the tuning structure for an estimate.
+   KIND specifies the type of requested estimate: min, max or likely.
+   For cores with a known VLA width all three estimates are the same.
+   For generic VLA tuning we want to distinguish the maximum estimate from
+   the minimum and likely ones.
+   The likely estimate is the same as the minimum in that case to give a
+   conservative behavior of auto-vectorizing with VLA when it is a win
+   even for VLA vectorization.
+   When VLA width information is available VAL.coeffs[1] is multiplied by
+   the number of VLA chunks over the initial VLS bits.  */
+HOST_WIDE_INT
+estimated_poly_value (poly_int64 val, unsigned int kind)
+{
+  unsigned int width_source
+    = BITS_PER_RISCV_VECTOR.is_constant ()
+	? (unsigned int) BITS_PER_RISCV_VECTOR.to_constant ()
+	: (unsigned int) RVV_SCALABLE;
+
+  /* If there is no core-specific information then the minimum and likely
+     values are based on TARGET_MIN_VLEN vectors and the maximum is based on
+     the architectural maximum of 65536 bits.  */
+  unsigned int min_vlen_bytes = TARGET_MIN_VLEN / 8 - 1;
+  if (width_source == RVV_SCALABLE)
+    switch (kind)
+      {
+      case POLY_VALUE_MIN:
+      case POLY_VALUE_LIKELY:
+	return val.coeffs[0];
+
+      case POLY_VALUE_MAX:
+	return val.coeffs[0] + val.coeffs[1] * min_vlen_bytes;
+      }
+
+  /* Allow BITS_PER_RISCV_VECTOR to be a bitmask of different VL, treating the
+     lowest as likely.  This could be made more general if future -mtune
+     options need it to be.  */
+  if (kind == POLY_VALUE_MAX)
+    width_source = 1 << floor_log2 (width_source);
+  else
+    width_source = least_bit_hwi (width_source);
+
+  /* If the core provides width information, use that.  */
+  HOST_WIDE_INT over_min_vlen = width_source - TARGET_MIN_VLEN;
+  return val.coeffs[0] + val.coeffs[1] * over_min_vlen / TARGET_MIN_VLEN;
 }
 
 } // namespace riscv_vector

@@ -105,6 +105,8 @@ static void store_parm_decls (tree);
 static void initialize_local_var (tree, tree);
 static void expand_static_init (tree, tree);
 static location_t smallest_type_location (const cp_decl_specifier_seq*);
+static bool identify_goto (tree, location_t, const location_t *,
+			   diagnostic_t, bool);
 
 /* The following symbols are subsumed in the cp_global_trees array, and
    listed here individually for documentation purposes.
@@ -179,6 +181,9 @@ struct GTY((chain_next ("%h.next"))) named_label_use_entry {
      or the inner scope popped.  These are the decls that will *not* be
      skipped when jumping to the label.  */
   tree names_in_scope;
+  /* If the use is a possible destination of a computed goto, a vec of decls
+     that aren't destroyed, filled in by poplevel_named_label_1.  */
+  vec<tree,va_gc> *computed_goto;
   /* The location of the goto, for error reporting.  */
   location_t o_goto_locus;
   /* True if an OpenMP structured block scope has been closed since
@@ -215,6 +220,10 @@ struct GTY((for_user)) named_label_entry {
 
   /* A list of uses of the label, before the label is defined.  */
   named_label_use_entry *uses;
+
+  /* True if we've seen &&label.  Appalently we can't use TREE_ADDRESSABLE for
+     this, it has a more specific meaning for LABEL_DECL.  */
+  bool addressed;
 
   /* The following bits are set after the label is defined, and are
      updated as scopes are popped.  They indicate that a jump to the
@@ -561,6 +570,12 @@ poplevel_named_label_1 (named_label_entry **slot, cp_binding_level *bl)
       for (use = ent->uses; use ; use = use->next)
 	if (use->binding_level == bl)
 	  {
+	    if (auto &cg = use->computed_goto)
+	      for (tree d = use->names_in_scope; d; d = DECL_CHAIN (d))
+		if (TREE_CODE (d) == VAR_DECL && !TREE_STATIC (d)
+		    && TYPE_HAS_NONTRIVIAL_DESTRUCTOR (TREE_TYPE (d)))
+		  vec_safe_push (cg, d);
+
 	    use->binding_level = obl;
 	    use->names_in_scope = obl->names;
 	    if (bl->kind == sk_omp)
@@ -3617,6 +3632,15 @@ lookup_label (tree id)
   return ent ? ent->label_decl : NULL_TREE;
 }
 
+/* Remember that we've seen &&ID.  */
+
+void
+mark_label_addressed (tree id)
+{
+  named_label_entry *ent = lookup_label_1 (id, false);
+  ent->addressed = true;
+}
+
 tree
 declare_local_label (tree id)
 {
@@ -3649,26 +3673,35 @@ decl_jump_unsafe (tree decl)
 
 static bool
 identify_goto (tree decl, location_t loc, const location_t *locus,
-	       diagnostic_t diag_kind)
+	       diagnostic_t diag_kind, bool computed)
 {
+  if (computed)
+    diag_kind = DK_WARNING;
   bool complained
     = emit_diagnostic (diag_kind, loc, 0,
 		       decl ? G_("jump to label %qD")
 		       : G_("jump to case label"), decl);
   if (complained && locus)
-    inform (*locus, "  from here");
+    {
+      if (computed)
+	inform (*locus, "  as a possible target of computed goto");
+      else
+	inform (*locus, "  from here");
+    }
   return complained;
 }
 
 /* Check that a single previously seen jump to a newly defined label
    is OK.  DECL is the LABEL_DECL or 0; LEVEL is the binding_level for
    the jump context; NAMES are the names in scope in LEVEL at the jump
-   context; LOCUS is the source position of the jump or 0.  Returns
+   context; LOCUS is the source position of the jump or 0.  COMPUTED
+   is a vec of decls if the jump is a computed goto.  Returns
    true if all is well.  */
 
 static bool
 check_previous_goto_1 (tree decl, cp_binding_level* level, tree names,
-		       bool exited_omp, const location_t *locus)
+		       bool exited_omp, const location_t *locus,
+		       vec<tree,va_gc> *computed)
 {
   cp_binding_level *b;
   bool complained = false;
@@ -3678,7 +3711,8 @@ check_previous_goto_1 (tree decl, cp_binding_level* level, tree names,
 
   if (exited_omp)
     {
-      complained = identify_goto (decl, input_location, locus, DK_ERROR);
+      complained = identify_goto (decl, input_location, locus, DK_ERROR,
+				  computed);
       if (complained)
 	inform (input_location, "  exits OpenMP structured block");
       saw_omp = true;
@@ -3699,8 +3733,9 @@ check_previous_goto_1 (tree decl, cp_binding_level* level, tree names,
 
 	  if (!identified)
 	    {
-	      complained = identify_goto (decl, input_location, locus, DK_ERROR);
-	      identified = 1;
+	      complained = identify_goto (decl, input_location, locus, DK_ERROR,
+					  computed);
+	      identified = 2;
 	    }
 	  if (complained)
 	    inform (DECL_SOURCE_LOCATION (new_decls),
@@ -3766,11 +3801,23 @@ check_previous_goto_1 (tree decl, cp_binding_level* level, tree names,
       if (inf)
 	{
 	  if (identified < 2)
-	    complained = identify_goto (decl, input_location, locus, DK_ERROR);
+	    complained = identify_goto (decl, input_location, locus, DK_ERROR,
+					computed);
 	  identified = 2;
 	  if (complained)
 	    inform (loc, inf);
 	}
+    }
+
+  if (!vec_safe_is_empty (computed))
+    {
+      if (!identified)
+	complained = identify_goto (decl, input_location, locus, DK_ERROR,
+				    computed);
+      identified = 2;
+      if (complained)
+	for (tree d : computed)
+	  inform (DECL_SOURCE_LOCATION (d), "  does not destroy %qD", d);
     }
 
   return !identified;
@@ -3781,30 +3828,23 @@ check_previous_goto (tree decl, struct named_label_use_entry *use)
 {
   check_previous_goto_1 (decl, use->binding_level,
 			 use->names_in_scope, use->in_omp_scope,
-			 &use->o_goto_locus);
+			 &use->o_goto_locus, use->computed_goto);
 }
 
 static bool
 check_switch_goto (cp_binding_level* level)
 {
-  return check_previous_goto_1 (NULL_TREE, level, level->names, false, NULL);
+  return check_previous_goto_1 (NULL_TREE, level, level->names,
+				false, NULL, nullptr);
 }
 
-/* Check that a new jump to a label DECL is OK.  Called by
-   finish_goto_stmt.  */
+/* Check that a new jump to a label ENT is OK.  COMPUTED is true
+   if this is a possible target of a computed goto.  */
 
 void
-check_goto (tree decl)
+check_goto_1 (named_label_entry *ent, bool computed)
 {
-  /* We can't know where a computed goto is jumping.
-     So we assume that it's OK.  */
-  if (TREE_CODE (decl) != LABEL_DECL)
-    return;
-
-  hashval_t hash = IDENTIFIER_HASH_VALUE (DECL_NAME (decl));
-  named_label_entry **slot
-    = named_labels->find_slot_with_hash (DECL_NAME (decl), hash, NO_INSERT);
-  named_label_entry *ent = *slot;
+  tree decl = ent->label_decl;
 
   /* If the label hasn't been defined yet, defer checking.  */
   if (! DECL_INITIAL (decl))
@@ -3821,6 +3861,7 @@ check_goto (tree decl)
       new_use->names_in_scope = current_binding_level->names;
       new_use->o_goto_locus = input_location;
       new_use->in_omp_scope = false;
+      new_use->computed_goto = computed ? make_tree_vector () : nullptr;
 
       new_use->next = ent->uses;
       ent->uses = new_use;
@@ -3843,7 +3884,7 @@ check_goto (tree decl)
 	  || ent->in_omp_scope || ent->in_stmt_expr)
 	diag_kind = DK_ERROR;
       complained = identify_goto (decl, DECL_SOURCE_LOCATION (decl),
-				  &input_location, diag_kind);
+				  &input_location, diag_kind, computed);
       identified = 1 + (diag_kind == DK_ERROR);
     }
 
@@ -3857,7 +3898,7 @@ check_goto (tree decl)
 	  if (identified == 1)
 	    {
 	      complained = identify_goto (decl, DECL_SOURCE_LOCATION (decl),
-					  &input_location, DK_ERROR);
+					  &input_location, DK_ERROR, computed);
 	      identified = 2;
 	    }
 	  if (complained)
@@ -3901,7 +3942,8 @@ check_goto (tree decl)
 	      {
 		complained = identify_goto (decl,
 					    DECL_SOURCE_LOCATION (decl),
-					    &input_location, DK_ERROR);
+					    &input_location, DK_ERROR,
+					    computed);
 		identified = 2;
 	      }
 	    if (complained)
@@ -3909,6 +3951,64 @@ check_goto (tree decl)
 	    break;
 	  }
       }
+
+  /* Warn if a computed goto might involve a local variable going out of scope
+     without being cleaned up.  */
+  if (computed)
+    {
+      auto level = ent->binding_level;
+      auto names = ent->names_in_scope;
+      for (auto b = current_binding_level; ; b = b->level_chain)
+	{
+	  tree end = b == level ? names : NULL_TREE;
+	  for (tree d = b->names; d != end; d = DECL_CHAIN (d))
+	    {
+	      if (TREE_CODE (d) == VAR_DECL && !TREE_STATIC (d)
+		  && TYPE_HAS_NONTRIVIAL_DESTRUCTOR (TREE_TYPE (d)))
+		{
+		  complained = identify_goto (decl, DECL_SOURCE_LOCATION (decl),
+					      &input_location, DK_ERROR,
+					      computed);
+		  if (complained)
+		    inform (DECL_SOURCE_LOCATION (d),
+			    "  does not destroy %qD", d);
+		}
+	    }
+	  if (b == level)
+	    break;
+	}
+    }
+}
+
+/* Check that a new jump to a label DECL is OK.  Called by
+   finish_goto_stmt.  */
+
+void
+check_goto (tree decl)
+{
+  if (!named_labels)
+    return;
+  if (TREE_CODE (decl) != LABEL_DECL)
+    {
+      /* We don't know where a computed goto is jumping,
+	 so check all addressable labels.  */
+      for (auto iter = named_labels->begin ();
+	   iter != named_labels->end ();
+	   ++iter)
+	{
+	  auto ent = *iter;
+	  if (ent->addressed)
+	    check_goto_1 (ent, true);
+	}
+    }
+  else
+    {
+      hashval_t hash = IDENTIFIER_HASH_VALUE (DECL_NAME (decl));
+      named_label_entry **slot
+	= named_labels->find_slot_with_hash (DECL_NAME (decl), hash, NO_INSERT);
+      named_label_entry *ent = *slot;
+      check_goto_1 (ent, false);
+    }
 }
 
 /* Check that a return is ok wrt OpenMP structured blocks.
@@ -8097,12 +8197,13 @@ omp_declare_variant_finalize_one (tree decl, tree attr)
     }
 
   tree ctx = TREE_VALUE (TREE_VALUE (attr));
-  tree simd = omp_get_context_selector (ctx, "construct", "simd");
+  tree simd = omp_get_context_selector (ctx, OMP_TRAIT_SET_CONSTRUCT,
+					OMP_TRAIT_CONSTRUCT_SIMD);
   if (simd)
     {
       TREE_VALUE (simd)
 	= c_omp_declare_simd_clauses_to_numbers (DECL_ARGUMENTS (decl),
-						 TREE_VALUE (simd));
+						 OMP_TS_PROPERTIES (simd));
       /* FIXME, adjusting simd args unimplemented.  */
       return true;
     }
@@ -8195,7 +8296,8 @@ omp_declare_variant_finalize_one (tree decl, tree attr)
 	}
       else
 	{
-	  tree construct = omp_get_context_selector (ctx, "construct", NULL);
+	  tree construct
+	    = omp_get_context_selector_list (ctx, OMP_TRAIT_SET_CONSTRUCT);
 	  omp_mark_declare_variant (match_loc, variant, construct);
 	  if (!omp_context_selector_matches (ctx))
 	    return true;
@@ -13058,7 +13160,8 @@ grokdeclarator (const cp_declarator *declarator,
       && !diagnose_misapplied_contracts (declspecs->std_attributes))
     {
       location_t attr_loc = declspecs->locations[ds_std_attribute];
-      if (warning_at (attr_loc, OPT_Wattributes, "attribute ignored"))
+      if (any_nonignored_attribute_p (declspecs->std_attributes)
+	  && warning_at (attr_loc, OPT_Wattributes, "attribute ignored"))
 	inform (attr_loc, "an attribute that appertains to a type-specifier "
 		"is ignored");
     }
@@ -14202,6 +14305,7 @@ grokdeclarator (const cp_declarator *declarator,
       tree auto_node = type_uses_auto (type);
       if (auto_node && !(cxx_dialect >= cxx17 && template_parm_flag))
 	{
+	  bool err_p = true;
 	  if (cxx_dialect >= cxx14)
 	    {
 	      if (decl_context == PARM && AUTO_IS_DECLTYPE (auto_node))
@@ -14220,13 +14324,21 @@ grokdeclarator (const cp_declarator *declarator,
 			    "abbreviated function template");
 		  inform (DECL_SOURCE_LOCATION (c), "%qD declared here", c);
 		}
-	      else
+	      else if (decl_context == CATCHPARM || template_parm_flag)
 		error_at (typespec_loc,
 			  "%<auto%> parameter not permitted in this context");
+	      else
+		/* Do not issue an error while tentatively parsing a function
+		   parameter: for T t(auto(a), 42);, when we just saw the 1st
+		   parameter, we don't know yet that this construct won't be
+		   a function declaration.  Defer the checking to
+		   cp_parser_parameter_declaration_clause.  */
+		err_p = false;
 	    }
 	  else
 	    error_at (typespec_loc, "parameter declared %<auto%>");
-	  type = error_mark_node;
+	  if (err_p)
+	    type = error_mark_node;
 	}
 
       /* A parameter declared as an array of T is really a pointer to T.
@@ -17400,7 +17512,7 @@ implicit_default_ctor_p (tree fn)
    storage is dead when we enter the constructor or leave the destructor.  */
 
 static tree
-build_clobber_this ()
+build_clobber_this (clobber_kind kind)
 {
   /* Clobbering an empty base is pointless, and harmful if its one byte
      TYPE_SIZE overlays real data.  */
@@ -17416,7 +17528,7 @@ build_clobber_this ()
   if (!vbases)
     ctype = CLASSTYPE_AS_BASE (ctype);
 
-  tree clobber = build_clobber (ctype);
+  tree clobber = build_clobber (ctype, kind);
 
   tree thisref = current_class_ref;
   if (ctype != current_class_type)
@@ -17835,7 +17947,7 @@ start_preparsed_function (tree decl1, tree attrs, int flags)
 	 because part of the initialization might happen before we enter the
 	 constructor, via AGGR_INIT_ZERO_FIRST (c++/68006).  */
       && !implicit_default_ctor_p (decl1))
-    finish_expr_stmt (build_clobber_this ());
+    finish_expr_stmt (build_clobber_this (CLOBBER_OBJECT_BEGIN));
 
   if (!processing_template_decl
       && DECL_CONSTRUCTOR_P (decl1)
@@ -18073,7 +18185,8 @@ begin_destructor_body (void)
 	    finish_decl_cleanup (NULL_TREE, stmt);
 	  }
 	else
-	  finish_decl_cleanup (NULL_TREE, build_clobber_this ());
+	  finish_decl_cleanup (NULL_TREE,
+			       build_clobber_this (CLOBBER_OBJECT_END));
       }
 
       /* And insert cleanups for our bases and members so that they

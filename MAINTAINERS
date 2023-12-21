@@ -182,6 +182,7 @@ libgo			Ian Lance Taylor	<ian@airs.com>
 libgomp			Jakub Jelinek		<jakub@redhat.com>
 libgomp			Tobias Burnus		<tobias@codesourcery.com>
 libgomp (OpenACC)	Thomas Schwinge		<thomas@codesourcery.com>
+libgrust		All Rust front end maintainers
 libiberty		Ian Lance Taylor	<ian@airs.com>
 libitm			Torvald Riegel		<triegel@redhat.com>
 libobjc			Nicola Pero		<nicola.pero@meta-innovation.com>
@@ -471,6 +472,7 @@ Dominique d'Humieres				<dhumieres.dominique@free.fr>
 Andy Hutchinson					<hutchinsonandy@aim.com>
 Joel Hutton					<joel.hutton@arm.com>
 Lewis Hyatt					<lhyatt@gmail.com>
+Paul Iannetta					<piannetta@kalrayinc.com>
 Roland Illig					<roland.illig@gmx.de>
 Meador Inge					<meadori@codesourcery.com>
 Bernardo Innocenti				<bernie@develer.com>
@@ -705,6 +707,7 @@ Marcel Vollweiler				<marcel@codesourcery.com>
 Ville Voutilainen				<ville.voutilainen@gmail.com>
 Nenad Vukicevic					<nenad@intrepid.com>
 Feng Wang					<fengwang@nudt.edu.cn>
+Feng Wang					<wangfeng@eswincomputing.com>
 Hongyu Wang					<hongyu.wang@intel.com>
 Jiong Wang					<jiong.wang@arm.com>
 Stephen M. Webb					<stephen.webb@bregmasoft.com>

@@ -28,6 +28,7 @@ along with GCC; see the file COPYING3.  If not see
    the unspec enum in riscv.md, subsequent to UNSPEC_ADDRESS_FIRST.  */
 enum riscv_symbol_type {
   SYMBOL_ABSOLUTE,
+  SYMBOL_FORCE_TO_MEM,
   SYMBOL_PCREL,
   SYMBOL_GOT_DISP,
   SYMBOL_TLS,
@@ -129,6 +130,7 @@ extern void riscv_asm_output_alias (FILE *, const tree, const tree);
 extern void riscv_asm_output_external (FILE *, const tree, const char *);
 extern bool
 riscv_zcmp_valid_stack_adj_bytes_p (HOST_WIDE_INT, int);
+extern void riscv_legitimize_poly_move (machine_mode, rtx, rtx, rtx);
 
 #ifdef RTX_CODE
 extern void riscv_expand_int_scc (rtx, enum rtx_code, rtx, rtx, bool *invert_ptr = 0);
@@ -199,6 +201,82 @@ struct riscv_cpu_info {
 };
 
 extern const riscv_cpu_info *riscv_find_cpu (const char *);
+
+/* Common vector costs in any kind of vectorization (e.g VLA and VLS).  */
+struct common_vector_cost
+{
+  /* Cost of any integer vector operation, excluding the ones handled
+     specially below.  */
+  const int int_stmt_cost;
+
+  /* Cost of any fp vector operation, excluding the ones handled
+     specially below.  */
+  const int fp_stmt_cost;
+
+  /* Gather/scatter vectorization cost.  */
+  const int gather_load_cost;
+  const int scatter_store_cost;
+
+  /* Cost of a vector-to-scalar operation.  */
+  const int vec_to_scalar_cost;
+
+  /* Cost of a scalar-to-vector operation.  */
+  const int scalar_to_vec_cost;
+
+  /* Cost of a permute operation.  */
+  const int permute_cost;
+
+  /* Cost of an aligned vector load.  */
+  const int align_load_cost;
+
+  /* Cost of an aligned vector store.  */
+  const int align_store_cost;
+
+  /* Cost of an unaligned vector load.  */
+  const int unalign_load_cost;
+
+  /* Cost of an unaligned vector store.  */
+  const int unalign_store_cost;
+};
+
+/* scalable vectorization (VLA) specific cost.  */
+struct scalable_vector_cost : common_vector_cost
+{
+  CONSTEXPR scalable_vector_cost (const common_vector_cost &base)
+    : common_vector_cost (base)
+  {}
+
+  /* TODO: We will need more other kinds of vector cost for VLA.
+     E.g. fold_left reduction cost, lanes load/store cost, ..., etc.  */
+};
+
+/* Cost for vector insn classes.  */
+struct cpu_vector_cost
+{
+  /* Cost of any integer scalar operation, excluding load and store.  */
+  const int scalar_int_stmt_cost;
+
+  /* Cost of any fp scalar operation, excluding load and store.  */
+  const int scalar_fp_stmt_cost;
+
+  /* Cost of a scalar load.  */
+  const int scalar_load_cost;
+
+  /* Cost of a scalar store.  */
+  const int scalar_store_cost;
+
+  /* Cost of a taken branch.  */
+  const int cond_taken_branch_cost;
+
+  /* Cost of a not-taken branch.  */
+  const int cond_not_taken_branch_cost;
+
+  /* Cost of an VLS modes operations.  */
+  const common_vector_cost *vls;
+
+  /* Cost of an VLA modes operations.  */
+  const scalable_vector_cost *vla;
+};
 
 /* Routines implemented in riscv-selftests.cc.  */
 #if CHECKING_P
@@ -559,7 +637,7 @@ void expand_cond_ternop (unsigned, rtx *);
 void expand_popcount (rtx *);
 void expand_rawmemchr (machine_mode, rtx, rtx, rtx, bool = false);
 bool expand_strcmp (rtx, rtx, rtx, rtx, unsigned HOST_WIDE_INT, bool);
-void emit_vec_extract (rtx, rtx, poly_int64);
+void emit_vec_extract (rtx, rtx, rtx);
 
 /* Rounding mode bitfield for fixed point VXRM.  */
 enum fixed_point_rounding_mode
@@ -608,6 +686,7 @@ int count_regno_occurrences (rtx_insn *, unsigned int);
 bool imm_avl_p (machine_mode);
 bool can_be_broadcasted_p (rtx);
 bool gather_scatter_valid_offset_p (machine_mode);
+HOST_WIDE_INT estimated_poly_value (poly_int64, unsigned int);
 }
 
 /* We classify builtin types into two classes:

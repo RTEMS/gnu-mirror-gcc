@@ -236,19 +236,19 @@ struct Cont4
   template<typename T>
     requires (Kind <= Emplace)
     && requires(C& c, T&& t) { c.emplace(c.end(), std::forward<T>(t)); }
-    typename C::iterator
-    emplace(typename C::iterator, T&& t)
+    void
+    emplace(typename C::iterator pos, T&& t)
     {
       kind = Emplace;
-      return c.emplace(c.end(), std::forward<T>(t));
+      c.emplace(pos, std::forward<T>(t));
     }
 
   template<typename T>
-    typename C::iterator
-    insert(typename C::iterator, T&& t)
+    void
+    insert(typename C::iterator pos, T&& t)
     {
       kind = Insert;
-      return c.insert(c.end(), std::forward<T>(t));
+      c.insert(pos, std::forward<T>(t));
     }
 
   // Required to satisfy reservable-container
@@ -448,6 +448,24 @@ test_constexpr()
   static_assert(x == 6);
 }
 
+void
+test_sfinae()
+{
+  // PR libstdc++/112802
+  [](auto x) {
+    static_assert(!requires { std::ranges::to<std::vector<int>>()(x); });
+    static_assert(!requires { std::ranges::to<std::vector>()(x); });
+  }(0);
+}
+
+void
+test_composition()
+{
+  // PR libstdc++/113068
+  auto adaptor = std::ranges::to<std::string>() | std::ranges::to<std::string>();
+  auto str = adaptor(" ");
+}
+
 int main()
 {
   test_p1206r7_examples();
@@ -460,4 +478,6 @@ int main()
   test_lwg3984();
   test_nodiscard();
   test_constexpr();
+  test_sfinae();
+  test_composition();
 }

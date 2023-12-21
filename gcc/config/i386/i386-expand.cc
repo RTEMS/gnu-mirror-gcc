@@ -289,12 +289,18 @@ ix86_broadcast (HOST_WIDE_INT v, unsigned int width,
 
 /* Convert the CONST_WIDE_INT operand OP to broadcast in MODE.  */
 
-static rtx
+rtx
 ix86_convert_const_wide_int_to_broadcast (machine_mode mode, rtx op)
 {
   /* Don't use integer vector broadcast if we can't move from GPR to SSE
      register directly.  */
   if (!TARGET_INTER_UNIT_MOVES_TO_VEC)
+    return nullptr;
+
+  unsigned int msize = GET_MODE_SIZE (mode);
+
+  /* Only optimized for vpbroadcast[bwsd]/vbroadcastss with xmm/ymm/zmm.  */
+  if (msize != 16 && msize != 32 && msize != 64)
     return nullptr;
 
   /* Convert CONST_WIDE_INT to a non-standard SSE constant integer
@@ -309,18 +315,23 @@ ix86_convert_const_wide_int_to_broadcast (machine_mode mode, rtx op)
   HOST_WIDE_INT val = CONST_WIDE_INT_ELT (op, 0);
   HOST_WIDE_INT val_broadcast;
   scalar_int_mode broadcast_mode;
-  if (TARGET_AVX2
+  /* vpbroadcastb zmm requires TARGET_AVX512BW.  */
+  if ((msize == 64 ? TARGET_AVX512BW : TARGET_AVX2)
       && ix86_broadcast (val, GET_MODE_BITSIZE (QImode),
 			 val_broadcast))
     broadcast_mode = QImode;
-  else if (TARGET_AVX2
+  else if ((msize == 64 ? TARGET_AVX512BW : TARGET_AVX2)
 	   && ix86_broadcast (val, GET_MODE_BITSIZE (HImode),
 			      val_broadcast))
     broadcast_mode = HImode;
-  else if (ix86_broadcast (val, GET_MODE_BITSIZE (SImode),
+  /* vbroadcasts[sd] only support memory operand w/o AVX2.
+     When msize == 16, pshufs is used for vec_duplicate.
+     when msize == 64, vpbroadcastd is used, and TARGET_AVX512F must be existed.  */
+  else if ((msize != 32 || TARGET_AVX2)
+	   && ix86_broadcast (val, GET_MODE_BITSIZE (SImode),
 			   val_broadcast))
     broadcast_mode = SImode;
-  else if (TARGET_64BIT
+  else if (TARGET_64BIT && (msize != 32 || TARGET_AVX2)
 	   && ix86_broadcast (val, GET_MODE_BITSIZE (DImode),
 			      val_broadcast))
     broadcast_mode = DImode;
@@ -530,14 +541,6 @@ ix86_expand_move (machine_mode mode, rtx operands[])
 		  return;
 		}
 	    }
-	  else if (CONST_WIDE_INT_P (op1)
-		   && GET_MODE_SIZE (mode) >= 16)
-	    {
-	      rtx tmp = ix86_convert_const_wide_int_to_broadcast
-		(GET_MODE (op0), op1);
-	      if (tmp != nullptr)
-		op1 = tmp;
-	    }
 	}
     }
 
@@ -596,23 +599,17 @@ ix86_broadcast_from_constant (machine_mode mode, rtx op)
       && INTEGRAL_MODE_P (mode))
     return nullptr;
 
+  unsigned int msize = GET_MODE_SIZE (mode);
+  unsigned int inner_size = GET_MODE_SIZE (GET_MODE_INNER ((mode)));
+
   /* Convert CONST_VECTOR to a non-standard SSE constant integer
      broadcast only if vector broadcast is available.  */
-  if (!(TARGET_AVX2
-	|| (TARGET_AVX
-	    && (GET_MODE_INNER (mode) == SImode
-		|| GET_MODE_INNER (mode) == DImode))
-	|| FLOAT_MODE_P (mode))
-      || standard_sse_constant_p (op, mode))
+  if (standard_sse_constant_p (op, mode))
     return nullptr;
 
-  /* Don't broadcast from a 64-bit integer constant in 32-bit mode.
-     We can still put 64-bit integer constant in memory when
-     avx512 embed broadcast is available.  */
-  if (GET_MODE_INNER (mode) == DImode && !TARGET_64BIT
-      && (!TARGET_AVX512F
-	  || (GET_MODE_SIZE (mode) == 64 && !TARGET_EVEX512)
-	  || (GET_MODE_SIZE (mode) < 64 && !TARGET_AVX512VL)))
+  /* vpbroadcast[b,w] is available under TARGET_AVX2.
+     or TARGET_AVX512BW for zmm.  */
+  if (inner_size < 4 && !(msize == 64 ? TARGET_AVX512BW : TARGET_AVX2))
     return nullptr;
 
   if (GET_MODE_INNER (mode) == TImode)
@@ -710,7 +707,14 @@ ix86_expand_vector_move (machine_mode mode, rtx operands[])
 	     constant or scalar mem.  */
 	  op1 = gen_reg_rtx (mode);
 	  if (FLOAT_MODE_P (mode)
-	      || (!TARGET_64BIT && GET_MODE_INNER (mode) == DImode))
+	      || (!TARGET_64BIT && GET_MODE_INNER (mode) == DImode)
+	      /* vbroadcastss/vbroadcastsd only supports memory operand
+		 w/o AVX2, force them into memory to avoid spill to
+		 memory.  */
+	      || (GET_MODE_SIZE (mode) == 32
+		  && (GET_MODE_INNER (mode) == DImode
+		      || GET_MODE_INNER (mode) == SImode)
+		  && !TARGET_AVX2))
 	    first = force_const_mem (GET_MODE_INNER (mode), first);
 	  bool ok = ix86_expand_vector_init_duplicate (false, mode,
 						       op1, first);
@@ -6311,18 +6315,15 @@ ix86_split_long_move (rtx operands[])
 	}
     }
 
-  /* If optimizing for size, attempt to locally unCSE nonzero constants.  */
-  if (optimize_insn_for_size_p ())
-    {
-      for (j = 0; j < nparts - 1; j++)
-	if (CONST_INT_P (operands[6 + j])
-	    && operands[6 + j] != const0_rtx
-	    && REG_P (operands[2 + j]))
-	  for (i = j; i < nparts - 1; i++)
-	    if (CONST_INT_P (operands[7 + i])
-		&& INTVAL (operands[7 + i]) == INTVAL (operands[6 + j]))
-	      operands[7 + i] = operands[2 + j];
-    }
+  /* Attempt to locally unCSE nonzero constants.  */
+  for (j = 0; j < nparts - 1; j++)
+    if (CONST_INT_P (operands[6 + j])
+	&& operands[6 + j] != const0_rtx
+	&& REG_P (operands[2 + j]))
+      for (i = j; i < nparts - 1; i++)
+	if (CONST_INT_P (operands[7 + i])
+	    && INTVAL (operands[7 + i]) == INTVAL (operands[6 + j]))
+	  operands[7 + i] = operands[2 + j];
 
   for (i = 0; i < nparts; i++)
     emit_move_insn (operands[2 + i], operands[6 + i]);

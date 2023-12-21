@@ -806,6 +806,7 @@
     UNSPEC_FTSMUL	; Used in aarch64-sve.md.
     UNSPEC_FTSSEL	; Used in aarch64-sve.md.
     UNSPEC_SMATMUL	; Used in aarch64-sve.md.
+    UNSPEC_SET_NEONQ	; Used in aarch64-sve.md.
     UNSPEC_UMATMUL	; Used in aarch64-sve.md.
     UNSPEC_USMATMUL	; Used in aarch64-sve.md.
     UNSPEC_TRN1Q	; Used in aarch64-sve.md.
@@ -1616,6 +1617,9 @@
 			(V2SI "V4SI")  (V2SF "V4SF")
 			(SI   "V2SI")  (SF   "V2SF")
 			(DI   "V2DI")  (DF   "V2DF")])
+
+;; Load/store pair mode.
+(define_mode_attr VPAIR [(SI "V2x4QI") (DI "V2x8QI")])
 
 ;; Register suffix for double-length mode.
 (define_mode_attr Vdtype [(V4HF "8h") (V2SF "4s")])

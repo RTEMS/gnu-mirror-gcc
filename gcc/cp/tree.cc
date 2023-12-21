@@ -689,6 +689,7 @@ build_aggr_init_expr (tree type, tree init)
       CALL_EXPR_OPERATOR_SYNTAX (rval) = CALL_EXPR_OPERATOR_SYNTAX (init);
       CALL_EXPR_ORDERED_ARGS (rval) = CALL_EXPR_ORDERED_ARGS (init);
       CALL_EXPR_REVERSE_ARGS (rval) = CALL_EXPR_REVERSE_ARGS (init);
+      SET_EXPR_LOCATION (rval, EXPR_LOCATION (init));
     }
   else
     rval = init;
@@ -3169,6 +3170,9 @@ bot_manip (tree* tp, int* walk_subtrees, void* data_)
       if (TREE_OPERAND (u, 1) == error_mark_node)
 	return error_mark_node;
 
+      if (data.clear_location)
+	SET_EXPR_LOCATION (u, input_location);
+
       /* Replace the old expression with the new version.  */
       *tp = u;
       /* We don't have to go below this point; the recursive call to
@@ -4127,7 +4131,7 @@ cp_tree_equal (tree t1, tree t2)
     case TREE_VEC:
       /* These are template args.  Really we should be getting the
 	 caller to do this as it knows it to be true.  */
-      if (!comp_template_args (t1, t2, NULL, NULL, false))
+      if (!comp_template_args (t1, t2))
 	return false;
       return true;
 

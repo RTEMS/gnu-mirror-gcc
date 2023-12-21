@@ -315,7 +315,7 @@ void
 free_attr_data ()
 {
   for (auto x : ignored_attributes_table)
-    delete[] x;
+    delete x;
   ignored_attributes_table.release ();
 }
 
@@ -584,6 +584,19 @@ attribute_ignored_p (const attribute_spec *const as)
   return as->max_length == -2;
 }
 
+/* Return true if the ATTRS chain contains at least one attribute which
+   is not ignored.  */
+
+bool
+any_nonignored_attribute_p (tree attrs)
+{
+  for (tree attr = attrs; attr; attr = TREE_CHAIN (attr))
+    if (!attribute_ignored_p (attr))
+      return true;
+
+  return false;
+}
+
 /* See whether LIST contains at least one instance of attribute ATTR
    (possibly with different arguments).  Return the first such attribute
    if so, otherwise return null.  */
@@ -662,7 +675,8 @@ decl_attributes (tree *node, tree attributes, int flags,
      options to the attribute((target(...))) list.  */
   if (TREE_CODE (*node) == FUNCTION_DECL
       && current_target_pragma
-      && targetm.target_option.valid_attribute_p (*node, NULL_TREE,
+      && targetm.target_option.valid_attribute_p (*node,
+						  get_identifier ("target"),
 						  current_target_pragma, 0))
     {
       tree cur_attr = lookup_attribute ("target", attributes);
@@ -1263,8 +1277,9 @@ make_dispatcher_decl (const tree decl)
   return func_decl;  
 }
 
-/* Returns true if decl is multi-versioned and DECL is the default function,
-   that is it is not tagged with target specific optimization.  */
+/* Returns true if DECL is multi-versioned using the target attribute, and this
+   is the default version.  This function can only be used for targets that do
+   not support the "target_version" attribute.  */
 
 bool
 is_function_default_version (const tree decl)

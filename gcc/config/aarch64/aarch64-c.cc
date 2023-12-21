@@ -188,7 +188,7 @@ aarch64_update_cpp_builtins (cpp_reader *pfile)
   aarch64_def_or_undef (TARGET_ILP32, "_ILP32", pfile);
   aarch64_def_or_undef (TARGET_ILP32, "__ILP32__", pfile);
 
-  aarch64_def_or_undef (TARGET_CRYPTO, "__ARM_FEATURE_CRYPTO", pfile);
+  aarch64_def_or_undef (TARGET_AES && TARGET_SHA2, "__ARM_FEATURE_CRYPTO", pfile);
   aarch64_def_or_undef (TARGET_SIMD_RDMA, "__ARM_FEATURE_QRDMX", pfile);
   aarch64_def_or_undef (TARGET_SVE, "__ARM_FEATURE_SVE", pfile);
   cpp_undef (pfile, "__ARM_FEATURE_SVE_BITS");
@@ -351,6 +351,8 @@ aarch64_pragma_aarch64 (cpp_reader *)
     handle_arm_neon_h ();
   else if (strcmp (name, "arm_acle.h") == 0)
     handle_arm_acle_h ();
+  else if (strcmp (name, "arm_neon_sve_bridge.h") == 0)
+    aarch64_sve::handle_arm_neon_sve_bridge_h ();
   else
     error ("unknown %<#pragma GCC aarch64%> option %qs", name);
 }

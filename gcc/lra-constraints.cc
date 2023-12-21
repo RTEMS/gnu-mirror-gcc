@@ -261,6 +261,13 @@ enough_allocatable_hard_regs_p (enum reg_class reg_class,
   return false;
 }
 
+/* True if C is a non-empty register class that has too few registers
+   to be safely used as a reload target class.	*/
+#define SMALL_REGISTER_CLASS_P(C)		\
+  (ira_class_hard_regs_num [(C)] == 1		\
+   || (ira_class_hard_regs_num [(C)] >= 1	\
+       && targetm.class_likely_spilled_p (C)))
+
 /* Return true if REG satisfies (or will satisfy) reg class constraint
    CL.  Use elimination first if REG is a hard register.  If REG is a
    reload pseudo created by this constraints pass, assume that it will
@@ -318,7 +325,11 @@ in_class_p (rtx reg, enum reg_class cl, enum reg_class *new_class,
       common_class = ira_reg_class_subset[rclass][cl];
       if (new_class != NULL)
 	*new_class = common_class;
-      return enough_allocatable_hard_regs_p (common_class, reg_mode);
+      return (enough_allocatable_hard_regs_p (common_class, reg_mode)
+	      /* Do not permit reload insn operand matching (new_class == NULL
+		 case) if the new class is too small.  */
+	      && (new_class != NULL || common_class == rclass
+		  || !SMALL_REGISTER_CLASS_P (common_class)));
     }
 }
 
@@ -922,13 +933,6 @@ operands_match_p (rtx x, rtx y, int y_hard_regno)
    && GET_CODE (X) != HIGH			\
    && GET_MODE_SIZE (MODE).is_constant ()	\
    && !targetm.cannot_force_const_mem (MODE, X))
-
-/* True if C is a non-empty register class that has too few registers
-   to be safely used as a reload target class.	*/
-#define SMALL_REGISTER_CLASS_P(C)		\
-  (ira_class_hard_regs_num [(C)] == 1		\
-   || (ira_class_hard_regs_num [(C)] >= 1	\
-       && targetm.class_likely_spilled_p (C)))
 
 /* If REG is a reload pseudo, try to make its class satisfying CL.  */
 static void
@@ -2631,7 +2635,7 @@ process_alt_operands (int only_alternative)
 				    hard_regno[nop]))))
 			win = true;
 		      else if (hard_regno[nop] < 0
-			       && in_class_p (op, this_alternative, NULL))
+			       && in_class_p (op, this_alternative, NULL, true))
 			win = true;
 		    }
 		  break;
@@ -2675,7 +2679,7 @@ process_alt_operands (int only_alternative)
 			  reject++;
 			}
 		      if (in_class_p (operand_reg[nop],
-				      this_costly_alternative, NULL))
+				      this_costly_alternative, NULL, true))
 			{
 			  if (lra_dump_file != NULL)
 			    fprintf
@@ -3951,133 +3955,36 @@ process_address (int nop, bool check_only_p,
   return res;
 }
 
+/* Override the generic address_reload_context in order to
+   control the creation of reload pseudos.  */
+class lra_autoinc_reload_context : public address_reload_context
+{
+  machine_mode mode;
+  enum reg_class rclass;
+
+public:
+  lra_autoinc_reload_context (machine_mode mode, enum reg_class new_rclass)
+    : mode (mode), rclass (new_rclass) {}
+
+  rtx get_reload_reg () const override final
+  {
+    return lra_create_new_reg (mode, NULL_RTX, rclass, NULL, "INC/DEC result");
+  }
+};
+
 /* Emit insns to reload VALUE into a new register.  VALUE is an
    auto-increment or auto-decrement RTX whose operand is a register or
    memory location; so reloading involves incrementing that location.
-   IN is either identical to VALUE, or some cheaper place to reload
-   value being incremented/decremented from.
 
    INC_AMOUNT is the number to increment or decrement by (always
    positive and ignored for POST_MODIFY/PRE_MODIFY).
 
-   Return pseudo containing the result.	 */
+   Return a pseudo containing the result.  */
 static rtx
-emit_inc (enum reg_class new_rclass, rtx in, rtx value, poly_int64 inc_amount)
+emit_inc (enum reg_class new_rclass, rtx value, poly_int64 inc_amount)
 {
-  /* REG or MEM to be copied and incremented.  */
-  rtx incloc = XEXP (value, 0);
-  /* Nonzero if increment after copying.  */
-  int post = (GET_CODE (value) == POST_DEC || GET_CODE (value) == POST_INC
-	      || GET_CODE (value) == POST_MODIFY);
-  rtx_insn *last;
-  rtx inc;
-  rtx_insn *add_insn;
-  int code;
-  rtx real_in = in == value ? incloc : in;
-  rtx result;
-  bool plus_p = true;
-
-  if (GET_CODE (value) == PRE_MODIFY || GET_CODE (value) == POST_MODIFY)
-    {
-      lra_assert (GET_CODE (XEXP (value, 1)) == PLUS
-		  || GET_CODE (XEXP (value, 1)) == MINUS);
-      lra_assert (rtx_equal_p (XEXP (XEXP (value, 1), 0), XEXP (value, 0)));
-      plus_p = GET_CODE (XEXP (value, 1)) == PLUS;
-      inc = XEXP (XEXP (value, 1), 1);
-    }
-  else
-    {
-      if (GET_CODE (value) == PRE_DEC || GET_CODE (value) == POST_DEC)
-	inc_amount = -inc_amount;
-
-      inc = gen_int_mode (inc_amount, GET_MODE (value));
-    }
-
-  if (! post && REG_P (incloc))
-    result = incloc;
-  else
-    result = lra_create_new_reg (GET_MODE (value), value, new_rclass, NULL,
-				 "INC/DEC result");
-
-  if (real_in != result)
-    {
-      /* First copy the location to the result register.  */
-      lra_assert (REG_P (result));
-      emit_insn (gen_move_insn (result, real_in));
-    }
-
-  /* We suppose that there are insns to add/sub with the constant
-     increment permitted in {PRE/POST)_{DEC/INC/MODIFY}.  At least the
-     old reload worked with this assumption.  If the assumption
-     becomes wrong, we should use approach in function
-     base_plus_disp_to_reg.  */
-  if (in == value)
-    {
-      /* See if we can directly increment INCLOC.  */
-      last = get_last_insn ();
-      add_insn = emit_insn (plus_p
-			    ? gen_add2_insn (incloc, inc)
-			    : gen_sub2_insn (incloc, inc));
-
-      code = recog_memoized (add_insn);
-      if (code >= 0)
-	{
-	  if (! post && result != incloc)
-	    emit_insn (gen_move_insn (result, incloc));
-	  return result;
-	}
-      delete_insns_since (last);
-    }
-
-  /* If couldn't do the increment directly, must increment in RESULT.
-     The way we do this depends on whether this is pre- or
-     post-increment.  For pre-increment, copy INCLOC to the reload
-     register, increment it there, then save back.  */
-  if (! post)
-    {
-      if (real_in != result)
-	emit_insn (gen_move_insn (result, real_in));
-      if (plus_p)
-	emit_insn (gen_add2_insn (result, inc));
-      else
-	emit_insn (gen_sub2_insn (result, inc));
-      if (result != incloc)
-	emit_insn (gen_move_insn (incloc, result));
-    }
-  else
-    {
-      /* Post-increment.
-
-	 Because this might be a jump insn or a compare, and because
-	 RESULT may not be available after the insn in an input
-	 reload, we must do the incrementing before the insn being
-	 reloaded for.
-
-	 We have already copied IN to RESULT.  Increment the copy in
-	 RESULT, save that back, then decrement RESULT so it has
-	 the original value.  */
-      if (plus_p)
-	emit_insn (gen_add2_insn (result, inc));
-      else
-	emit_insn (gen_sub2_insn (result, inc));
-      emit_insn (gen_move_insn (incloc, result));
-      /* Restore non-modified value for the result.  We prefer this
-	 way because it does not require an additional hard
-	 register.  */
-      if (plus_p)
-	{
-	  poly_int64 offset;
-	  if (poly_int_rtx_p (inc, &offset))
-	    emit_insn (gen_add2_insn (result,
-				      gen_int_mode (-offset,
-						    GET_MODE (result))));
-	  else
-	    emit_insn (gen_sub2_insn (result, inc));
-	}
-      else
-	emit_insn (gen_add2_insn (result, inc));
-    }
-  return result;
+  lra_autoinc_reload_context context (GET_MODE (value), new_rclass);
+  return context.emit_autoinc (value, inc_amount);
 }
 
 /* Return true if the current move insn does not need processing as we
@@ -4485,7 +4392,7 @@ curr_insn_transform (bool check_only_p)
 
 	if (REG_P (reg) && (regno = REGNO (reg)) >= FIRST_PSEUDO_REGISTER)
 	  {
-	    bool ok_p = in_class_p (reg, goal_alt[i], &new_class);
+	    bool ok_p = in_class_p (reg, goal_alt[i], &new_class, true);
 
 	    if (new_class != NO_REGS && get_reg_class (regno) != new_class)
 	      {
@@ -4669,7 +4576,7 @@ curr_insn_transform (bool check_only_p)
 	  rclass = base_reg_class (GET_MODE (op), MEM_ADDR_SPACE (op),
 				   MEM, SCRATCH, curr_insn);
 	  if (GET_RTX_CLASS (code) == RTX_AUTOINC)
-	    new_reg = emit_inc (rclass, *loc, *loc,
+	    new_reg = emit_inc (rclass, *loc,
 				/* This value does not matter for MODIFY.  */
 				GET_MODE_SIZE (GET_MODE (op)));
 	  else if (get_reload_reg (OP_IN, Pmode, *loc, rclass,

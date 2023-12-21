@@ -48,6 +48,7 @@
 #include "attribs.h"
 #include "gimple-fold.h"
 #include "builtins.h"
+#include "aarch64-builtins.h"
 
 #define v8qi_UP  E_V8QImode
 #define v8di_UP  E_V8DImode
@@ -184,46 +185,7 @@
 #define SIMD_INTR_QUAL(suffix) QUAL_##suffix
 #define SIMD_INTR_LENGTH_CHAR(length) LENGTH_##length
 
-
 #define SIMD_MAX_BUILTIN_ARGS 5
-
-enum aarch64_type_qualifiers
-{
-  /* T foo.  */
-  qualifier_none = 0x0,
-  /* unsigned T foo.  */
-  qualifier_unsigned = 0x1, /* 1 << 0  */
-  /* const T foo.  */
-  qualifier_const = 0x2, /* 1 << 1  */
-  /* T *foo.  */
-  qualifier_pointer = 0x4, /* 1 << 2  */
-  /* Used when expanding arguments if an operand could
-     be an immediate.  */
-  qualifier_immediate = 0x8, /* 1 << 3  */
-  qualifier_maybe_immediate = 0x10, /* 1 << 4  */
-  /* void foo (...).  */
-  qualifier_void = 0x20, /* 1 << 5  */
-  /* 1 << 6 is now unused */
-  /* Some builtins should use the T_*mode* encoded in a simd_builtin_datum
-     rather than using the type of the operand.  */
-  qualifier_map_mode = 0x80, /* 1 << 7  */
-  /* qualifier_pointer | qualifier_map_mode  */
-  qualifier_pointer_map_mode = 0x84,
-  /* qualifier_const | qualifier_pointer | qualifier_map_mode  */
-  qualifier_const_pointer_map_mode = 0x86,
-  /* Polynomial types.  */
-  qualifier_poly = 0x100,
-  /* Lane indices - must be in range, and flipped for bigendian.  */
-  qualifier_lane_index = 0x200,
-  /* Lane indices for single lane structure loads and stores.  */
-  qualifier_struct_load_store_lane_index = 0x400,
-  /* Lane indices selected in pairs. - must be in range, and flipped for
-     bigendian.  */
-  qualifier_lane_pair_index = 0x800,
-  /* Lane indices selected in quadtuplets. - must be in range, and flipped for
-     bigendian.  */
-  qualifier_lane_quadtup_index = 0x1000,
-};
 
 /* Flags that describe what a function might do.  */
 const unsigned int FLAG_NONE = 0U;
@@ -822,6 +784,10 @@ enum aarch64_builtins
   AARCH64_WSRF,
   AARCH64_WSRF64,
   AARCH64_WSR128,
+  AARCH64_PLD,
+  AARCH64_PLDX,
+  AARCH64_PLI,
+  AARCH64_PLIX,
   AARCH64_BUILTIN_MAX
 };
 
@@ -897,47 +863,9 @@ const char *aarch64_scalar_builtin_types[] = {
   NULL
 };
 
-#define ENTRY(E, M, Q, G) E,
-enum aarch64_simd_type
-{
-#include "aarch64-simd-builtin-types.def"
-  ARM_NEON_H_TYPES_LAST
-};
-#undef ENTRY
-
-struct GTY(()) aarch64_simd_type_info
-{
-  enum aarch64_simd_type type;
-
-  /* Internal type name.  */
-  const char *name;
-
-  /* Internal type name(mangled).  The mangled names conform to the
-     AAPCS64 (see "Procedure Call Standard for the ARM 64-bit Architecture",
-     Appendix A).  To qualify for emission with the mangled names defined in
-     that document, a vector type must not only be of the correct mode but also
-     be of the correct internal AdvSIMD vector type (e.g. __Int8x8_t); these
-     types are registered by aarch64_init_simd_builtin_types ().  In other
-     words, vector types defined in other ways e.g. via vector_size attribute
-     will get default mangled names.  */
-  const char *mangle;
-
-  /* Internal type.  */
-  tree itype;
-
-  /* Element type.  */
-  tree eltype;
-
-  /* Machine mode the internal type maps to.  */
-  enum machine_mode mode;
-
-  /* Qualifiers.  */
-  enum aarch64_type_qualifiers q;
-};
-
 #define ENTRY(E, M, Q, G)  \
   {E, "__" #E, #G "__" #E, NULL_TREE, NULL_TREE, E_##M##mode, qualifier_##Q},
-static GTY(()) struct aarch64_simd_type_info aarch64_simd_types [] = {
+GTY(()) struct aarch64_simd_type_info aarch64_simd_types [] = {
 #include "aarch64-simd-builtin-types.def"
 };
 #undef ENTRY
@@ -1878,7 +1806,34 @@ aarch64_init_rwsr_builtins (void)
     = build_function_type_list (void_type_node, const_char_ptr_type,
 				uint128_type_node, NULL);
   AARCH64_INIT_RWSR_BUILTINS_DECL (WSR128, wsr128, fntype);
+}
 
+/* Add builtins for data and instrution prefetch.  */
+static void
+aarch64_init_prefetch_builtin (void)
+{
+#define AARCH64_INIT_PREFETCH_BUILTIN(INDEX, N)				\
+  aarch64_builtin_decls[INDEX] =					\
+    aarch64_general_add_builtin ("__builtin_aarch64_" N, ftype, INDEX)
+
+  tree ftype;
+  tree cv_argtype;
+  cv_argtype = build_qualified_type (void_type_node, TYPE_QUAL_CONST
+						     | TYPE_QUAL_VOLATILE);
+  cv_argtype = build_pointer_type (cv_argtype);
+
+  ftype = build_function_type_list (void_type_node, cv_argtype, NULL);
+  AARCH64_INIT_PREFETCH_BUILTIN (AARCH64_PLD, "pld");
+  AARCH64_INIT_PREFETCH_BUILTIN (AARCH64_PLI, "pli");
+
+  ftype = build_function_type_list (void_type_node, unsigned_type_node,
+				    unsigned_type_node, unsigned_type_node,
+				    cv_argtype, NULL);
+  AARCH64_INIT_PREFETCH_BUILTIN (AARCH64_PLDX, "pldx");
+
+  ftype = build_function_type_list (void_type_node, unsigned_type_node,
+				    unsigned_type_node, cv_argtype, NULL);
+  AARCH64_INIT_PREFETCH_BUILTIN (AARCH64_PLIX, "plix");
 }
 
 /* Initialize the memory tagging extension (MTE) builtins.  */
@@ -2103,6 +2058,7 @@ aarch64_general_init_builtins (void)
   aarch64_init_data_intrinsics ();
 
   aarch64_init_rwsr_builtins ();
+  aarch64_init_prefetch_builtin ();
 
   tree ftype_jcvt
     = build_function_type_list (intSI_type_node, double_type_node, NULL);
@@ -2839,6 +2795,93 @@ aarch64_expand_rwsr_builtin (tree exp, rtx target, int fcode)
     }
 }
 
+/* Ensure argument ARGNO in EXP represents a const-type argument in the range
+   [MINVAL, MAXVAL).  */
+static HOST_WIDE_INT
+require_const_argument (tree exp, unsigned int argno, HOST_WIDE_INT minval,
+			HOST_WIDE_INT maxval)
+{
+  maxval--;
+  tree arg = CALL_EXPR_ARG (exp, argno);
+  if (TREE_CODE (arg) != INTEGER_CST)
+      error_at (EXPR_LOCATION (exp), "Constant-type argument expected");
+
+  auto argval = wi::to_widest (arg);
+
+  if (argval < minval || argval > maxval)
+    error_at (EXPR_LOCATION (exp),
+	      "argument %d must be a constant immediate "
+	      "in range [%wd,%wd]", argno + 1, minval, maxval);
+
+  HOST_WIDE_INT retval = argval.to_shwi ();
+  return retval;
+}
+
+
+/* Expand a prefetch builtin EXP.  */
+void
+aarch64_expand_prefetch_builtin (tree exp, int fcode)
+{
+  int kind_id = -1;
+  int level_id = -1;
+  int rettn_id = -1;
+  char prfop[11];
+  class expand_operand ops[2];
+
+  static const char *kind_s[] = {"PLD", "PST", "PLI"};
+  static const char *level_s[] = {"L1", "L2", "L3", "SLC"};
+  static const char *rettn_s[] = {"KEEP", "STRM"};
+
+  /* Each of the four prefetch builtins takes a different number of arguments,
+     but proceeds to call the PRFM insn which requires 4 pieces of information
+     to be fully defined.  Where one of these takes less than 4 arguments, set
+     sensible defaults.  */
+  switch (fcode)
+    {
+    case AARCH64_PLDX:
+      break;
+    case AARCH64_PLIX:
+      kind_id = 2;
+      break;
+    case AARCH64_PLI:
+    case AARCH64_PLD:
+      kind_id  = (fcode == AARCH64_PLD) ? 0 : 2;
+      level_id = 0;
+      rettn_id = 0;
+      break;
+    default:
+      gcc_unreachable ();
+    }
+
+  /* Any -1 id variable is to be user-supplied.  Here we fill these in and run
+     bounds checks on them.  "PLI" is used only implicitly by AARCH64_PLI &
+     AARCH64_PLIX, never explicitly.  */
+  int argno = 0;
+  if (kind_id < 0)
+    kind_id = require_const_argument (exp, argno++, 0, ARRAY_SIZE (kind_s) - 1);
+  if (level_id < 0)
+    level_id = require_const_argument (exp, argno++, 0, ARRAY_SIZE (level_s));
+  if (rettn_id < 0)
+    rettn_id = require_const_argument (exp, argno++, 0, ARRAY_SIZE (rettn_s));
+  rtx address = expand_expr (CALL_EXPR_ARG (exp, argno), NULL_RTX, Pmode,
+			     EXPAND_NORMAL);
+
+  if (seen_error ())
+    return;
+
+  sprintf (prfop, "%s%s%s", kind_s[kind_id],
+			    level_s[level_id],
+			    rettn_s[rettn_id]);
+
+  rtx const_str = rtx_alloc (CONST_STRING);
+  PUT_CODE (const_str, CONST_STRING);
+  XSTR (const_str, 0) = ggc_strdup (prfop);
+
+  create_fixed_operand (&ops[0], const_str);
+  create_address_operand (&ops[1], address);
+  maybe_expand_insn (CODE_FOR_aarch64_pldx, 2, ops);
+}
+
 /* Expand an expression EXP that calls a MEMTAG built-in FCODE
    with result going to TARGET.  */
 static rtx
@@ -3085,6 +3128,12 @@ aarch64_general_expand_builtin (unsigned int fcode, tree exp, rtx target,
     case AARCH64_WSRF64:
     case AARCH64_WSR128:
       return aarch64_expand_rwsr_builtin (exp, target, fcode);
+    case AARCH64_PLD:
+    case AARCH64_PLDX:
+    case AARCH64_PLI:
+    case AARCH64_PLIX:
+      aarch64_expand_prefetch_builtin (exp, fcode);
+      return target;
     }
 
   if (fcode >= AARCH64_SIMD_BUILTIN_BASE && fcode <= AARCH64_SIMD_BUILTIN_MAX)

@@ -5136,7 +5136,7 @@ parse_associate (void)
   gfc_current_ns = my_ns;
   for (a = new_st.ext.block.assoc; a; a = a->next)
     {
-      gfc_symbol* sym;
+      gfc_symbol *sym, *tsym;
       gfc_expr *target;
       int rank;
 
@@ -5199,6 +5199,16 @@ parse_associate (void)
 	    {
 	      sym->ts.type = BT_DERIVED;
 	      sym->ts.u.derived = derived;
+	    }
+	  else if (target->symtree && (tsym = target->symtree->n.sym))
+	    {
+	      sym->ts = tsym->result ? tsym->result->ts : tsym->ts;
+	      if (sym->ts.type == BT_CLASS)
+		{
+		  if (CLASS_DATA (sym)->as)
+		    target->rank = CLASS_DATA (sym)->as->rank;
+		  sym->attr.class_ok = 1;
+		}
 	    }
 	}
 
@@ -7274,9 +7284,17 @@ done:
       omp_requires_mask
 	= (enum omp_requires) (omp_requires_mask | OMP_MEMORY_ORDER_ACQ_REL);
       break;
+    case OMP_REQ_ATOMIC_MEM_ORDER_ACQUIRE:
+      omp_requires_mask
+	= (enum omp_requires) (omp_requires_mask | OMP_MEMORY_ORDER_ACQUIRE);
+      break;
     case OMP_REQ_ATOMIC_MEM_ORDER_RELAXED:
       omp_requires_mask
 	= (enum omp_requires) (omp_requires_mask | OMP_MEMORY_ORDER_RELAXED);
+      break;
+    case OMP_REQ_ATOMIC_MEM_ORDER_RELEASE:
+      omp_requires_mask
+	= (enum omp_requires) (omp_requires_mask | OMP_MEMORY_ORDER_RELEASE);
       break;
     }
 

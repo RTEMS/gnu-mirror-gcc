@@ -1,3 +1,2777 @@
+2023-12-20  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	PR target/113087
+	* gcc.target/riscv/rvv/autovec/pr113087-2.c: New test.
+
+2023-12-20  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	PR target/113087
+	* gcc.target/riscv/rvv/autovec/pr113087-1.c: New test.
+
+2023-12-20  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR rtl-optimization/111702
+	* gcc.dg/rtl/aarch64/pr111702.c: New test.
+
+2023-12-20  Kuan-Lin Chen  <rufus@andestech.com>
+
+	* gcc.target/riscv/large-model.c: New test.
+
+2023-12-20  Jason Merrill  <jason@redhat.com>
+
+	PR c++/113088
+	PR c++/33799
+	* g++.dg/eh/return2.C: New test.
+
+2023-12-20  Jason Merrill  <jason@redhat.com>
+
+	PR c++/103185
+	* g++.dg/cpp1z/array-prvalue2.C: New test.
+	* g++.dg/cpp1z/eval-order3.C: Test swapped operands.
+
+2023-12-20  Andre Vieira  <andre.simoesdiasvieira@arm.com>
+
+	* gcc.target/aarch64/pr112787.c: New test.
+
+2023-12-20  Xi Ruoyao  <xry111@xry111.site>
+
+	PR target/113033
+	* gcc.target/loongarch/pr113033.c: New test.
+
+2023-12-20  Xi Ruoyao  <xry111@xry111.site>
+
+	PR target/113034
+	* gcc.target/loongarch/vfcmp-f.c: New test.
+	* gcc.target/loongarch/vfcmp-d.c: New test.
+	* gcc.target/loongarch/xvfcmp-f.c: New test.
+	* gcc.target/loongarch/xvfcmp-d.c: New test.
+	* gcc.target/loongarch/vector/lasx/lasx-vcond-2.c: Scan for cune
+	instead of cne.
+	* gcc.target/loongarch/vector/lsx/lsx-vcond-2.c: Likewise.
+
+2023-12-20  demin.han  <demin.han@starfivetech.com>
+
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul2-7.c: Moved to...
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul4-10.c: ...here.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul4-4.c: Moved to...
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul8-11.c: ...here.
+
+2023-12-20  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/112941
+	* gcc.dg/bitint-55.c: New test.
+
+2023-12-20  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc.dg/Walloc-size-4.c: New test.
+	* gcc.dg/Walloc-size-5.c: New test.
+	* gcc.dg/Wcalloc-transposed-args-1.c: New test.
+
+2023-12-20  Alex Coplan  <alex.coplan@arm.com>
+
+	PR target/113062
+	* gcc.dg/pr113062.c: New test.
+
+2023-12-20  Pan Li  <pan2.li@intel.com>
+
+	* gcc.target/riscv/rvv/autovec/bug-7.c: New test.
+
+2023-12-20  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* gcc.target/riscv/rvv/autovec/bug-8.c: New test.
+
+2023-12-20  Alexandre Oliva  <oliva@adacore.com>
+
+	PR rtl-optimization/113002
+	* gcc.dg/vect/pr113002.c: New.
+
+2023-12-20  Alexandre Oliva  <oliva@adacore.com>
+
+	* gcc.dg/torture/inline-mem-cmp-1.c: Copy timeout factor from
+	mem-cmp-1.c.
+	* gcc.dg/torture/inline-mem-cpy-1.c: Likewise.
+
+2023-12-20  Haochen Jiang  <haochen.jiang@intel.com>
+
+	* gcc.target/i386/avx10_1-6.c: Remove check for errors.
+	* gcc.target/i386/noevex512-2.c: Diito.
+
+2023-12-20  Siddhesh Poyarekar  <siddhesh@gotplt.org>
+
+	PR tree-optimization/113012
+	* gcc.dg/ubsan/pr113012.c: New test case.
+
+2023-12-19  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/113063
+	* g++.dg/cpp2a/spaceship-synth16.C: New test.
+
+2023-12-19  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/102420
+	* g++.dg/cpp0x/constexpr-memfn2.C: New test.
+
+2023-12-19  Sandra Loosemore  <sandra@codesourcery.com>
+
+	* c-c++-common/gomp/declare-variant-2.c: Don't expect error on
+	"acquire" and "release".
+	* gfortran.dg/gomp/declare-variant-2a.f90: Likewise.
+
+2023-12-19  Sandra Loosemore  <sandra@codesourcery.com>
+
+	* c-c++-common/gomp/declare-variant-1.c: Expect warning on
+	unknown selectors.
+	* c-c++-common/gomp/declare-variant-2.c: Likewise.  Also adjust
+	messages for score errors.
+	* c-c++-common/gomp/declare-variant-no-score.c: New.
+	* gfortran.dg/gomp/declare-variant-1.f90: Expect warning on
+	unknown selectors.
+	* gfortran.dg/gomp/declare-variant-2.f90: Likewise.  Also adjust
+	messages for score errors.
+	* gfortran.dg/gomp/declare-variant-no-score.f90: New.
+
+2023-12-19  David Faust  <david.faust@oracle.com>
+
+	PR debug/111735
+	* gcc.dg/debug/btf/btf-forward-2.c: New test.
+
+2023-12-19  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/90679
+	* g++.dg/cpp0x/alias-decl-75a.C: New test.
+	* g++.dg/cpp0x/alias-decl-75b.C: New test.
+
+2023-12-19  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/90679
+	* g++.dg/cpp0x/alias-decl-76.C: New test.
+
+2023-12-19  Marc Poulhiès  <poulhies@adacore.com>
+
+	* g++.target/i386/excess-precision-12.C: call std::abort instead of abort.
+
+2023-12-19  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* gcc.dg/vect/bb-slp-cond-1.c: Adapt for RISC-V.
+
+2023-12-19  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/113080
+	* gcc.dg/tree-ssa/sccp-3.c: New testcase.
+
+2023-12-19  Roger Sayle  <roger@nextmovesoftware.com>
+
+	* gcc.target/i386/movti-2.c: New test case.
+	* gcc.target/i386/movti-3.c: Likewise.
+
+2023-12-19  Thomas Schwinge  <thomas@codesourcery.com>
+
+	PR c++/90868
+	* c-c++-common/goacc/declare-1.c: Adjust.
+	* c-c++-common/goacc/declare-2.c: Likewise.
+
+2023-12-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/112816
+	* gcc.target/i386/sse2-pr112816-2.c: New test.
+
+2023-12-19  Alex Coplan  <alex.coplan@arm.com>
+
+	PR target/113061
+	* gfortran.dg/PR113061.f90: New test.
+
+2023-12-19  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-10.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-11.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-12.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-13.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-14.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-15.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-16.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-2.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-3.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-4.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-5.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-6.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-7.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-8.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-9.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_prop-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_prop-2.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-10.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-100.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-101.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-102.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-103.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-104.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-105.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-106.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-107.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-108.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-109.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-11.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-12.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-13.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-14.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-15.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-16.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-17.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-18.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-19.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-2.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-20.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-21.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-22.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-23.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-24.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-25.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-26.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-27.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-28.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-29.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-3.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-30.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-31.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-32.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-33.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-34.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-35.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-36.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-37.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-38.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-39.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-4.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-40.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-41.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-42.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-43.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-44.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-45.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-46.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-47.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-48.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-49.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-5.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-50.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-51.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-52.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-53.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-54.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-55.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-56.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-57.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-58.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-59.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-6.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-60.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-61.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-62.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-63.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-64.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-65.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-66.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-67.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-68.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-69.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-7.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-70.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-71.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-72.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-73.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-74.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-75.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-76.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-77.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-78.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-79.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-8.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-80.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-81.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-82.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-83.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-84.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-85.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-86.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-87.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-88.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-89.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-9.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-90.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-91.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-92.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-93.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-94.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-95.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-96.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-97.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-98.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-99.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/dump-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/ffload-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/ffload-2.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/ffload-3.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/ffload-5.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/ffload-6.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/ffload-7.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_bb_prop-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_bb_prop-10.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_bb_prop-11.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_bb_prop-12.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_bb_prop-13.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_bb_prop-2.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_bb_prop-3.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_bb_prop-4.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_bb_prop-5.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_bb_prop-6.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_bb_prop-7.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_bb_prop-8.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_bb_prop-9.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_conflict-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_conflict-2.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_conflict-3.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_conflict-4.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_conflict-5.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-10.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-11.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-12.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-13.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-14.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-15.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-16.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-17.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-2.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-3.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-4.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-5.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-6.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-7.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-8.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-9.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_switch-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_switch-2.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_switch-3.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_switch-4.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_switch-5.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_switch-6.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_switch-7.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_switch-8.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/imm_switch-9.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/pr108270.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/pr109399.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/pr109547.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/pr109615.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/pr109743-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/pr109743-2.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/pr109743-3.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/pr109743-4.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/pr109748.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/pr109773-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/pr109773-2.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/pr109974.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/pr111037-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/pr111037-2.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/pr111037-3.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/pr111037-4.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/pr111234.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/pr111255.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/pr111927.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/pr111947.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/pr112092-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/pr112092-2.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/pr112713-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/pr112713-2.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/pr112776.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/pr112813-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/pr112929-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/pr112988-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-10.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-11.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-12.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-13.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-14.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-15.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-16.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-17.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-18.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-19.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-2.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-20.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-21.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-22.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-23.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-24.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-25.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-26.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-27.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-28.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-29.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-3.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-30.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-31.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-32.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-33.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-34.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-35.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-36.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-37.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-38.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-39.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-4.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-40.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-41.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-42.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-43.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-44.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-45.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-46.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-5.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-6.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-7.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-8.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-9.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-10.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-11.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-12.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-13.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-14.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-15.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-16.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-17.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-18.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-19.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-2.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-20.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-21.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-22.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-23.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-24.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-25.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-26.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-27.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-28.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-3.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-4.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-5.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-6.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-7.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-8.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-9.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_call-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_call-2.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_call-3.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_call-4.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_complex_loop-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_complex_loop-2.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_conflict-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_conflict-10.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_conflict-11.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_conflict-12.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_conflict-13.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_conflict-2.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_conflict-3.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_conflict-4.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_conflict-5.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_conflict-6.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_conflict-7.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_conflict-8.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_conflict-9.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-10.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-11.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-12.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-13.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-14.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-15.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-16.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-17.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-18.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-19.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-2.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-20.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-21.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-22.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-23.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-24.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-25.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-26.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-27.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-28.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-3.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-4.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-5.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-6.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-7.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-8.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-9.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-10.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-11.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-12.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-13.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-14.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-15.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-16.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-17.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-18.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-19.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-2.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-20.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-21.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-22.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-23.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-24.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-25.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-26.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-27.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-28.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-3.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-4.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-5.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-6.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-7.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-8.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-9.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-10.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-11.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-12.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-13.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-14.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-15.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-16.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-17.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-18.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-19.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-2.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-3.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-4.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-5.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-6.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-7.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-8.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-9.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_vtype-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_vtype-2.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_vtype-3.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_vtype-4.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_vtype-5.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_vtype-6.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_vtype-7.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_vtype-8.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-10.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-11.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-12.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-13.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-14.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-15.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-16.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-2.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-3.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-4.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-5.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-6.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-7.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-8.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-9.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-10.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-11.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-12.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-13.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-14.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-15.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-16.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-17.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-18.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-19.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-2.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-20.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-21.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-22.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-23.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-24.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-3.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-4.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-5.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-6.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-7.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-8.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-9.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl_bug-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl_bug-2.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl_int.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-1.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-10.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-11.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-12.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-13.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-14.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-15.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-16.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-17.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-18.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-19.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-2.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-20.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-3.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-4.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-5.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-6.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-7.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-8.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-9.c: Force scalable vector.
+	* gcc.target/riscv/rvv/vsetvl/wredsum_vlmax.c: Force scalable vector.
+
+2023-12-19  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul2-7.c: Adapt test.
+
+2023-12-19  xuli  <xuli1@eswincomputing.com>
+
+	* gcc.target/riscv/rvv/base/cpymem-1.c: Fix checks under medany.
+	* gcc.target/riscv/rvv/base/cpymem-strategy-3.c: Fix checks.
+	* gcc.target/riscv/rvv/base/cpymem-strategy-4.c: Ditto.
+
+2023-12-19  Jiufu Guo  <guojiufu@linux.ibm.com>
+
+	PR rtl-optimization/112525
+	PR target/30271
+	* gcc.target/powerpc/pr112525.c: New test.
+	* gcc.target/powerpc/pr30271.c: New test.
+
+2023-12-19  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* lib/target-supports.exp: Remove 256/512/1024 vectors.
+
+2023-12-19  xuli  <xuli1@eswincomputing.com>
+
+	* gcc.target/riscv/rvv/base/cpymem-2.c: Fix checks.
+
+2023-12-18  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/96580
+	* gfortran.dg/date_and_time_2.f90: New test.
+	* gfortran.dg/date_and_time_3.f90: New test.
+	* gfortran.dg/date_and_time_4.f90: New test.
+
+2023-12-18  Andreas Krebbel  <krebbel@linux.ibm.com>
+
+	* gcc.target/s390/unaligned-2.c: New test.
+
+2023-12-18  Pan Li  <pan2.li@intel.com>
+
+	* gcc.target/riscv/rvv/base/pr112432-42.c: Moved to...
+	* gcc.target/riscv/rvv/base/pr112431-42.c: ...here.
+
+2023-12-18  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	PR target/112432
+	* gcc.target/riscv/rvv/base/pr112432-42.c: New test.
+
+2023-12-18  Richard Biener  <rguenther@suse.de>
+
+	PR c/111975
+	* gcc.dg/gimplefe-52.c: New testcase.
+
+2023-12-18  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* lib/target-supports.exp: Add RV32.
+
+2023-12-18  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* gcc.target/riscv/rvv/autovec/bug-4.c: New test.
+	* gcc.target/riscv/rvv/autovec/bug-5.c: New test.
+	* gcc.target/riscv/rvv/autovec/bug-6.c: New test.
+
+2023-12-18  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/113013
+	* gcc.dg/pr113013.c: New test.
+
+2023-12-18  Jakub Jelinek  <jakub@redhat.com>
+
+	* g++.dg/abi/abi-tag25a.C: Expect second dg-warning only for c++14
+	and later.
+
+2023-12-18  xuli  <xuli1@eswincomputing.com>
+
+	* gcc.target/riscv/rvv/base/cpymem-1.c: Fix checks.
+
+2023-12-18  xuli  <xuli1@eswincomputing.com>
+
+	* gcc.target/riscv/rvv/autovec/bug-2.c: New test.
+
+2023-12-18  Pan Li  <pan2.li@intel.com>
+
+	* gcc.target/riscv/rvv/autovec/bug-3.c: New test.
+
+2023-12-17  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/97592
+	* gfortran.dg/contiguous_15.f90: New test.
+
+2023-12-17  Xi Ruoyao  <xry111@xry111.site>
+
+	PR target/112936
+	* gcc.target/loongarch/mul-const-reduction.c: New test.
+
+2023-12-16  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/106363
+	* g++.dg/modules/pr106363_a.C: New test.
+	* g++.dg/modules/pr106363_b.C: New test.
+
+2023-12-16  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/112792
+	* c-c++-common/analyzer/out-of-bounds-pr112792.c: New test.
+
+2023-12-16  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/112459
+	* gfortran.dg/pr112459.f90: New test.
+
+2023-12-16  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/112834
+	PR fortran/111853
+	* gfortran.dg/associate_63.f90 : New test.
+	* gfortran.dg/pr111853.f90 : New test.
+
+2023-12-16  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/113031
+	* g++.dg/cpp0x/pr113031.C: New test.
+
+2023-12-16  Andrew Carlotti  <andrew.carlotti@arm.com>
+
+	* gcc.target/aarch64/options_set_17.c: Reorder expected flags.
+	* gcc.target/aarch64/cpunative/native_cpu_0.c: Ditto.
+	* gcc.target/aarch64/cpunative/native_cpu_13.c: Ditto.
+	* gcc.target/aarch64/cpunative/native_cpu_16.c: Ditto.
+	* gcc.target/aarch64/cpunative/native_cpu_17.c: Ditto.
+	* gcc.target/aarch64/cpunative/native_cpu_18.c: Ditto.
+	* gcc.target/aarch64/cpunative/native_cpu_19.c: Ditto.
+	* gcc.target/aarch64/cpunative/native_cpu_20.c: Ditto.
+	* gcc.target/aarch64/cpunative/native_cpu_21.c: Ditto.
+	* gcc.target/aarch64/cpunative/native_cpu_22.c: Ditto.
+	* gcc.target/aarch64/cpunative/native_cpu_6.c: Ditto.
+	* gcc.target/aarch64/cpunative/native_cpu_7.c: Ditto.
+
+2023-12-16  Andrew Carlotti  <andrew.carlotti@arm.com>
+
+	* g++.target/i386/mvc2.C:
+	* g++.target/i386/mvc3.C:
+
+2023-12-16  Andrew Carlotti  <andrew.carlotti@arm.com>
+
+	* gcc.target/aarch64/options_set_28.c: New test.
+
+2023-12-16  Andrew Carlotti  <andrew.carlotti@arm.com>
+
+	* gcc.target/aarch64/options_set_4.c: Add terminating newline.
+	* gcc.target/aarch64/options_set_27.c: New test.
+
+2023-12-15  Mary Bennett  <mary.bennett@embecosm.com>
+
+	* gcc.target/riscv/cv-elw-elw-compile-1.c: Create test for cv.elw.
+	* lib/target-supports.exp: Add proc for the XCVelw extension.
+
+2023-12-15  Patrick O'Neill  <patrick@rivosinc.com>
+
+	* gcc.target/riscv/rvv/autovec/partial/pr112773.c: Add
+	-fno-vect-cost-model.
+
+2023-12-15  Jeff Law  <jlaw@ventanamicro.com>
+
+	PR target/110201
+	* gcc.target/riscv/zknd32.c: Verify diagnostics are issued for
+	invalid builtin arguments.
+	* gcc.target/riscv/zknd64.c: Likewise.
+	* gcc.target/riscv/zkne32.c: Likewise.
+	* gcc.target/riscv/zkne64.c: Likewise.
+	* gcc.target/riscv/zksed32.c: Likewise.
+	* gcc.target/riscv/zksed64.c: Likewise.
+	* gcc.target/riscv/zknd32-2.c: New test
+	* gcc.target/riscv/zknd64-2.c: Likewise.
+	* gcc.target/riscv/zkne32-2.c: Likewise.
+	* gcc.target/riscv/zkne64-2.c: Likewise.
+	* gcc.target/riscv/zksed32-2.c: Likewise.
+	* gcc.target/riscv/zksed64-2.c: Likewise.
+	Co-authored-by: Liao Shihua <shihua@iscas.ac.cn>
+
+2023-12-15  Alex Coplan  <alex.coplan@arm.com>
+
+	* g++.target/aarch64/pr103147-10.C: Add -fno-schedule-insns{,2}
+	to dg-options.
+	* gcc.target/aarch64/pr103147-10.c: Likewise.
+
+2023-12-15  Alex Coplan  <alex.coplan@arm.com>
+
+	* gcc.target/aarch64/sve/pcs/stack_clash_1_128.c: Allow ldp/stp saves
+	of SVE registers.
+	* gcc.target/aarch64/sve/pcs/struct_3_128.c: Likewise.
+
+2023-12-15  Alex Coplan  <alex.coplan@arm.com>
+
+	* gcc.target/aarch64/auto-init-padding-1.c: Add -O to options,
+	adjust test to work with optimizations enabled.
+	* gcc.target/aarch64/auto-init-padding-2.c: Add -O to options.
+	* gcc.target/aarch64/auto-init-padding-3.c: Add -O to options,
+	adjust test to work with optimizations enabled.
+	* gcc.target/aarch64/auto-init-padding-4.c: Likewise.
+	* gcc.target/aarch64/auto-init-padding-9.c: Likewise.
+
+2023-12-15  Xiao Zeng  <zengxiao@eswincomputing.com>
+
+	* gcc.target/riscv/arch-31.c: New test.
+	* gcc.target/riscv/arch-32.c: New test.
+	* gcc.target/riscv/predef-32.c: New test.
+	* gcc.target/riscv/predef-33.c: New test.
+
+2023-12-15  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/112946
+	* gm2/iso/fail/badassignment.mod: New test.
+	* gm2/iso/fail/badexpression.mod: New test.
+	* gm2/iso/fail/badexpression2.mod: New test.
+
+2023-12-15  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/70435
+	PR c++/88061
+	* g++.dg/ext/attr-section1.C: New test.
+	* g++.dg/ext/attr-section1a.C: New test.
+	* g++.dg/ext/attr-section2.C: New test.
+	* g++.dg/ext/attr-section2a.C: New test.
+	* g++.dg/ext/attr-section2b.C: New test.
+
+2023-12-15  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/109715
+	* g++.dg/abi/abi-tag25.C: New test.
+	* g++.dg/abi/abi-tag25a.C: New test.
+
+2023-12-15  Andre Vieira  <andre.simoesdiasvieira@arm.com>
+
+	* gcc.dg/gomp/pr87887-1.c: Fixed test.
+	* gcc.dg/gomp/pr89246-1.c: Likewise.
+	* gcc.dg/gomp/simd-clones-2.c: Likewise.
+
+2023-12-15  Wilco Dijkstra  <wilco.dijkstra@arm.com>
+
+	* gcc.target/aarch64/memmove.c: Add new test.
+	* gcc.target/aarch64/memmove2.c: Likewise.
+
+2023-12-15  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* gcc.target/riscv/rvv/autovec/bug-1.c: New test.
+
+2023-12-15  Alex Coplan  <alex.coplan@arm.com>
+
+	PR target/112906
+	* gcc.target/aarch64/sve/acle/general/pr112906.c: New test.
+
+2023-12-15  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* gcc.dg/pr110279-2.c: Don't '#include <stdio.h>'.  Remove
+	'__attribute_noinline__'.
+
+2023-12-15  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/113024
+	* gcc.dg/tree-ssa/pr113024.c: New test.
+
+2023-12-15  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/113003
+	* gcc.dg/bitint-54.c: New test.
+
+2023-12-15  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* gcc.target/riscv/rvv/autovec/partial/slp-1.c: Remove xfail of M2.
+	* gcc.target/riscv/rvv/autovec/partial/slp-16.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/partial/slp-3.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/partial/slp-5.c: Ditto.
+
+2023-12-15  Hongyu Wang  <hongyu.wang@intel.com>
+
+	* gcc.target/i386/pr112943.c: Require dfp.
+
+2023-12-15  Hongyu Wang  <hongyu.wang@intel.com>
+
+	PR target/112824
+	* gcc.target/i386/pieces-memset-45.c: Remove
+	-mprefer-vector-width=256.
+	* g++.target/i386/pr112824-1.C: New test.
+
+2023-12-15  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* gcc.target/riscv/rvv/vsetvl/pr112988-1.c: Adapt test.
+
+2023-12-15  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	PR target/112387
+	* gcc.dg/vect/costmodel/riscv/rvv/pr112387.c: Moved to...
+	* gcc.dg/vect/costmodel/riscv/rvv/pr112387-1.c: ...here.
+	* gcc.dg/vect/costmodel/riscv/rvv/pr112387-2.c: New test.
+
+2023-12-15  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	PR target/111153
+	* gcc.dg/vect/costmodel/riscv/rvv/pr111153.c: Moved to...
+	* gcc.dg/vect/costmodel/riscv/rvv/pr11153-2.c: ...here.
+	* gcc.dg/vect/costmodel/riscv/rvv/pr111153-1.c: New test.
+
+2023-12-14  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/96395
+	* c-c++-common/analyzer/analyzer-decls.h: New header.
+	* gcc.dg/analyzer/20020129-1.c: Move to...
+	* c-c++-common/analyzer/20020129-1.c: ...here.
+	* gcc.dg/analyzer/SARD-tc117-basic-00001-min.c: Move to...
+	* c-c++-common/analyzer/SARD-tc117-basic-00001-min.c: ...here.
+	* gcc.dg/analyzer/SARD-tc249-basic-00034-min.c: Move to...
+	* c-c++-common/analyzer/SARD-tc249-basic-00034-min.c: ...here.
+	* gcc.dg/analyzer/abort.c: Move to...
+	* c-c++-common/analyzer/abort.c: ...here.
+	* gcc.dg/analyzer/aliasing-1.c: Move to...
+	* c-c++-common/analyzer/aliasing-1.c: ...here.
+	* gcc.dg/analyzer/aliasing-2.c: Move to...
+	* c-c++-common/analyzer/aliasing-2.c: ...here.
+	* gcc.dg/analyzer/alloca-leak.c: Move to...
+	* c-c++-common/analyzer/alloca-leak.c: ...here.
+	* gcc.dg/analyzer/analyzer-debugging-fns-1.c: Move to...
+	* c-c++-common/analyzer/analyzer-debugging-fns-1.c: ...here.
+	* gcc.dg/analyzer/analyzer-verbosity-2a.c: Move to...
+	* c-c++-common/analyzer/analyzer-verbosity-2a.c: ...here.
+	* gcc.dg/analyzer/analyzer-verbosity-3a.c: Move to...
+	* c-c++-common/analyzer/analyzer-verbosity-3a.c: ...here.
+	* gcc.dg/analyzer/asm-x86-1.c: Move to...
+	* c-c++-common/analyzer/asm-x86-1.c: ...here.
+	* gcc.dg/analyzer/attr-alloc_size-3.c: Move to...
+	* c-c++-common/analyzer/attr-alloc_size-3.c: ...here.
+	* gcc.dg/analyzer/attr-const-1.c: Move to...
+	* c-c++-common/analyzer/attr-const-1.c: ...here.
+	* gcc.dg/analyzer/attr-const-2.c: Move to...
+	* c-c++-common/analyzer/attr-const-2.c: ...here.
+	* gcc.dg/analyzer/attr-const-3.c: Move to...
+	* c-c++-common/analyzer/attr-const-3.c: ...here.
+	* gcc.dg/analyzer/attr-malloc-2.c: Move to...
+	* c-c++-common/analyzer/attr-malloc-2.c: ...here.
+	* gcc.dg/analyzer/attr-malloc-4.c: Move to...
+	* c-c++-common/analyzer/attr-malloc-4.c: ...here.
+	* gcc.dg/analyzer/attr-malloc-5.c: Move to...
+	* c-c++-common/analyzer/attr-malloc-5.c: ...here.
+	* gcc.dg/analyzer/attr-malloc-misuses.c: Move to...
+	* c-c++-common/analyzer/attr-malloc-misuses.c: ...here.
+	* gcc.dg/analyzer/attr-tainted_args-misuses.c: Move to...
+	* c-c++-common/analyzer/attr-tainted_args-misuses.c: ...here.
+	* gcc.dg/analyzer/bzip2-arg-parse-1.c: Move to...
+	* c-c++-common/analyzer/bzip2-arg-parse-1.c: ...here.
+	* gcc.dg/analyzer/call-summaries-1.c: Move to...
+	* c-c++-common/analyzer/call-summaries-1.c: ...here.
+	* gcc.dg/analyzer/call-summaries-3.c: Move to...
+	* c-c++-common/analyzer/call-summaries-3.c: ...here.
+	* gcc.dg/analyzer/call-summaries-asm-x86.c: Move to...
+	* c-c++-common/analyzer/call-summaries-asm-x86.c: ...here.
+	* gcc.dg/analyzer/callbacks-1.c: Move to...
+	* c-c++-common/analyzer/callbacks-1.c: ...here.
+	* gcc.dg/analyzer/callbacks-2.c: Move to...
+	* c-c++-common/analyzer/callbacks-2.c: ...here.
+	* gcc.dg/analyzer/callbacks-3.c: Move to...
+	* c-c++-common/analyzer/callbacks-3.c: ...here.
+	* gcc.dg/analyzer/capacity-2.c: Move to...
+	* c-c++-common/analyzer/capacity-2.c: ...here.
+	* gcc.dg/analyzer/capacity-3.c: Move to...
+	* c-c++-common/analyzer/capacity-3.c: ...here.
+	* gcc.dg/analyzer/casts-1.c: Move to...
+	* c-c++-common/analyzer/casts-1.c: ...here.
+	* gcc.dg/analyzer/casts-2.c: Move to...
+	* c-c++-common/analyzer/casts-2.c: ...here.
+	* gcc.dg/analyzer/clobbers-1.c: Move to...
+	* c-c++-common/analyzer/clobbers-1.c: ...here.
+	* gcc.dg/analyzer/compound-assignment-4.c: Move to...
+	* c-c++-common/analyzer/compound-assignment-4.c: ...here.
+	* gcc.dg/analyzer/data-model-12.c: Move to...
+	* c-c++-common/analyzer/data-model-12.c: ...here.
+	* gcc.dg/analyzer/data-model-14.c: Move to...
+	* c-c++-common/analyzer/data-model-14.c: ...here.
+	* gcc.dg/analyzer/data-model-18.c: Move to...
+	* c-c++-common/analyzer/data-model-18.c: ...here.
+	* gcc.dg/analyzer/data-model-2.c: Move to...
+	* c-c++-common/analyzer/data-model-2.c: ...here.
+	* gcc.dg/analyzer/data-model-20.c: Move to...
+	* c-c++-common/analyzer/data-model-20.c: ...here.
+	* gcc.dg/analyzer/data-model-21.c: Move to...
+	* c-c++-common/analyzer/data-model-21.c: ...here.
+	* gcc.dg/analyzer/data-model-22.c: Move to...
+	* c-c++-common/analyzer/data-model-22.c: ...here.
+	* gcc.dg/analyzer/data-model-4.c: Move to...
+	* c-c++-common/analyzer/data-model-4.c: ...here.
+	* gcc.dg/analyzer/data-model-5d.c: Move to...
+	* c-c++-common/analyzer/data-model-5d.c: ...here.
+	* gcc.dg/analyzer/data-model-8.c: Move to...
+	* c-c++-common/analyzer/data-model-8.c: ...here.
+	* gcc.dg/analyzer/data-model-path-1.c: Move to...
+	* c-c++-common/analyzer/data-model-path-1.c: ...here.
+	* gcc.dg/analyzer/deref-before-check-2.c: Move to...
+	* c-c++-common/analyzer/deref-before-check-2.c: ...here.
+	* gcc.dg/analyzer/deref-before-check-macro-pr108745.c: Move to...
+	* c-c++-common/analyzer/deref-before-check-macro-pr108745.c: ...here.
+	* gcc.dg/analyzer/deref-before-check-qemu-qtest_rsp_args.c: Move to...
+	* c-c++-common/analyzer/deref-before-check-qemu-qtest_rsp_args.c:
+	...here.
+	* gcc.dg/analyzer/disabling.c: Move to...
+	* c-c++-common/analyzer/disabling.c: ...here.
+	* gcc.dg/analyzer/dump-state.c: Move to...
+	* c-c++-common/analyzer/dump-state.c: ...here.
+	* gcc.dg/analyzer/edges-2.c: Move to...
+	* c-c++-common/analyzer/edges-2.c: ...here.
+	* gcc.dg/analyzer/equivalence.c: Move to...
+	* c-c++-common/analyzer/equivalence.c: ...here.
+	* gcc.dg/analyzer/errno-1.c: Move to...
+	* c-c++-common/analyzer/errno-1.c: ...here.
+	* gcc.dg/analyzer/errno-___errno.c: Move to...
+	* c-c++-common/analyzer/errno-___errno.c: ...here.
+	* gcc.dg/analyzer/errno-__error.c: Move to...
+	* c-c++-common/analyzer/errno-__error.c: ...here.
+	* gcc.dg/analyzer/errno-global-var.c: Move to...
+	* c-c++-common/analyzer/errno-global-var.c: ...here.
+	* gcc.dg/analyzer/errno-pr107777.c: Move to...
+	* c-c++-common/analyzer/errno-pr107777.c: ...here.
+	* gcc.dg/analyzer/error-3.c: Move to...
+	* c-c++-common/analyzer/error-3.c: ...here.
+	* gcc.dg/analyzer/error-uninit.c: Move to...
+	* c-c++-common/analyzer/error-uninit.c: ...here.
+	* gcc.dg/analyzer/factorial.c: Move to...
+	* c-c++-common/analyzer/factorial.c: ...here.
+	* gcc.dg/analyzer/fd-1.c: Move to...
+	* c-c++-common/analyzer/fd-1.c: ...here.
+	* gcc.dg/analyzer/fd-2.c: Move to...
+	* c-c++-common/analyzer/fd-2.c: ...here.
+	* gcc.dg/analyzer/fd-3.c: Move to...
+	* c-c++-common/analyzer/fd-3.c: ...here.
+	* gcc.dg/analyzer/fd-bind-pr107928.c: Move to...
+	* c-c++-common/analyzer/fd-bind-pr107928.c: ...here.
+	* gcc.dg/analyzer/fd-connect-pr107928.c: Move to...
+	* c-c++-common/analyzer/fd-connect-pr107928.c: ...here.
+	* gcc.dg/analyzer/fd-glibc-byte-stream-socket.c: Move to...
+	* c-c++-common/analyzer/fd-glibc-byte-stream-socket.c: ...here.
+	* gcc.dg/analyzer/fd-manpage-getaddrinfo-client.c: Move to...
+	* c-c++-common/analyzer/fd-manpage-getaddrinfo-client.c: ...here.
+	* gcc.dg/analyzer/fd-mappage-getaddrinfo-server.c: Move to...
+	* c-c++-common/analyzer/fd-mappage-getaddrinfo-server.c: ...here.
+	* gcc.dg/analyzer/fd-meaning.c: Move to...
+	* c-c++-common/analyzer/fd-meaning.c: ...here.
+	* gcc.dg/analyzer/fd-socket-meaning.c: Move to...
+	* c-c++-common/analyzer/fd-socket-meaning.c: ...here.
+	* gcc.dg/analyzer/fd-symbolic-socket.c: Move to...
+	* c-c++-common/analyzer/fd-symbolic-socket.c: ...here.
+	* gcc.dg/analyzer/fd-uninit-1.c: Move to...
+	* c-c++-common/analyzer/fd-uninit-1.c: ...here.
+	* gcc.dg/analyzer/feasibility-1.c: Move to...
+	* c-c++-common/analyzer/feasibility-1.c: ...here.
+	* gcc.dg/analyzer/feasibility-2.c: Move to...
+	* c-c++-common/analyzer/feasibility-2.c: ...here.
+	* gcc.dg/analyzer/feasibility-4.c: Move to...
+	* c-c++-common/analyzer/feasibility-4.c: ...here.
+	* gcc.dg/analyzer/feasibility-pr107948.c: Move to...
+	* c-c++-common/analyzer/feasibility-pr107948.c: ...here.
+	* gcc.dg/analyzer/ferror-1.c: Move to...
+	* c-c++-common/analyzer/ferror-1.c: ...here.
+	* gcc.dg/analyzer/fibonacci.c: Move to...
+	* c-c++-common/analyzer/fibonacci.c: ...here.
+	* gcc.dg/analyzer/file-1.c: Move to...
+	* c-c++-common/analyzer/file-1.c: ...here.
+	* gcc.dg/analyzer/file-3.c: Move to...
+	* c-c++-common/analyzer/file-3.c: ...here.
+	* gcc.dg/analyzer/file-meaning-1.c: Move to...
+	* c-c++-common/analyzer/file-meaning-1.c: ...here.
+	* gcc.dg/analyzer/malloc-ipa-10.c: Move to...
+	* c-c++-common/analyzer/malloc-ipa-10.c: ...here.
+	* gcc.dg/analyzer/malloc-ipa-12.c: Move to...
+	* c-c++-common/analyzer/malloc-ipa-12.c: ...here.
+	* gcc.dg/analyzer/malloc-ipa-13a.c: Move to...
+	* c-c++-common/analyzer/malloc-ipa-13a.c: ...here.
+	* gcc.dg/analyzer/malloc-ipa-9.c: Move to...
+	* c-c++-common/analyzer/malloc-ipa-9.c: ...here.
+	* gcc.dg/analyzer/malloc-many-paths-1.c: Move to...
+	* c-c++-common/analyzer/malloc-many-paths-1.c: ...here.
+	* gcc.dg/analyzer/malloc-many-paths-3.c: Move to...
+	* c-c++-common/analyzer/malloc-many-paths-3.c: ...here.
+	* gcc.dg/analyzer/malloc-meaning-1.c: Move to...
+	* c-c++-common/analyzer/malloc-meaning-1.c: ...here.
+	* gcc.dg/analyzer/malloc-paths-1.c: Move to...
+	* c-c++-common/analyzer/malloc-paths-1.c: ...here.
+	* gcc.dg/analyzer/malloc-paths-2.c: Move to...
+	* c-c++-common/analyzer/malloc-paths-2.c: ...here.
+	* gcc.dg/analyzer/malloc-paths-3.c: Move to...
+	* c-c++-common/analyzer/malloc-paths-3.c: ...here.
+	* gcc.dg/analyzer/malloc-paths-4.c: Move to...
+	* c-c++-common/analyzer/malloc-paths-4.c: ...here.
+	* gcc.dg/analyzer/malloc-paths-5.c: Move to...
+	* c-c++-common/analyzer/malloc-paths-5.c: ...here.
+	* gcc.dg/analyzer/malloc-paths-6.c: Move to...
+	* c-c++-common/analyzer/malloc-paths-6.c: ...here.
+	* gcc.dg/analyzer/malloc-paths-7.c: Move to...
+	* c-c++-common/analyzer/malloc-paths-7.c: ...here.
+	* gcc.dg/analyzer/malloc-paths-8.c: Move to...
+	* c-c++-common/analyzer/malloc-paths-8.c: ...here.
+	* gcc.dg/analyzer/malloc-sarif-1.c: Move to...
+	* c-c++-common/analyzer/malloc-sarif-1.c: ...here.
+	* gcc.dg/analyzer/malloc-vs-local-1a.c: Move to...
+	* c-c++-common/analyzer/malloc-vs-local-1a.c: ...here.
+	* gcc.dg/analyzer/malloc-vs-local-1b.c: Move to...
+	* c-c++-common/analyzer/malloc-vs-local-1b.c: ...here.
+	* gcc.dg/analyzer/malloc-vs-local-2.c: Move to...
+	* c-c++-common/analyzer/malloc-vs-local-2.c: ...here.
+	* gcc.dg/analyzer/malloc-vs-local-3.c: Move to...
+	* c-c++-common/analyzer/malloc-vs-local-3.c: ...here.
+	* gcc.dg/analyzer/many-disabled-diagnostics.c: Move to...
+	* c-c++-common/analyzer/many-disabled-diagnostics.c: ...here.
+	* gcc.dg/analyzer/many-unused-locals.c: Move to...
+	* c-c++-common/analyzer/many-unused-locals.c: ...here.
+	* gcc.dg/analyzer/memcpy-pr107882.c: Move to...
+	* c-c++-common/analyzer/memcpy-pr107882.c: ...here.
+	* gcc.dg/analyzer/memset-1.c: Move to...
+	* c-c++-common/analyzer/memset-1.c: ...here.
+	* gcc.dg/analyzer/memset-2.c: Move to...
+	* c-c++-common/analyzer/memset-2.c: ...here.
+	* gcc.dg/analyzer/named-constants-via-macros-2.c: Move to...
+	* c-c++-common/analyzer/named-constants-via-macros-2.c: ...here.
+	* gcc.dg/analyzer/named-constants-via-macros-3.c: Move to...
+	* c-c++-common/analyzer/named-constants-via-macros-3.c: ...here.
+	* gcc.dg/analyzer/named-constants-via-macros-4.c: Move to...
+	* c-c++-common/analyzer/named-constants-via-macros-4.c: ...here.
+	* gcc.dg/analyzer/named-constants-via-macros-empty.c: Move to...
+	* c-c++-common/analyzer/named-constants-via-macros-empty.c: ...here.
+	* gcc.dg/analyzer/named-constants-via-macros-traditional.c: Move to...
+	* c-c++-common/analyzer/named-constants-via-macros-traditional.c:
+	...here.
+	* gcc.dg/analyzer/named-constants-via-macros-undef.c: Move to...
+	* c-c++-common/analyzer/named-constants-via-macros-undef.c: ...here.
+	* gcc.dg/analyzer/omp-parallel-for-1.c: Move to...
+	* c-c++-common/analyzer/omp-parallel-for-1.c: ...here.
+	* gcc.dg/analyzer/omp-parallel-for-get-min.c: Move to...
+	* c-c++-common/analyzer/omp-parallel-for-get-min.c: ...here.
+	* gcc.dg/analyzer/out-of-bounds-3.c: Move to...
+	* c-c++-common/analyzer/out-of-bounds-3.c: ...here.
+	* gcc.dg/analyzer/out-of-bounds-coreutils.c: Move to...
+	* c-c++-common/analyzer/out-of-bounds-coreutils.c: ...here.
+	* gcc.dg/analyzer/out-of-bounds-curl.c: Move to...
+	* c-c++-common/analyzer/out-of-bounds-curl.c: ...here.
+	* gcc.dg/analyzer/out-of-bounds-diagram-1-json.c: Move to...
+	* c-c++-common/analyzer/out-of-bounds-diagram-1-json.c: ...here.
+	* gcc.dg/analyzer/out-of-bounds-diagram-1-sarif.c: Move to...
+	* c-c++-common/analyzer/out-of-bounds-diagram-1-sarif.c: ...here.
+	* gcc.dg/analyzer/out-of-bounds-pr110387.c: Move to...
+	* c-c++-common/analyzer/out-of-bounds-pr110387.c: ...here.
+	* gcc.dg/analyzer/out-of-bounds-read-char-arr.c: Move to...
+	* c-c++-common/analyzer/out-of-bounds-read-char-arr.c: ...here.
+	* gcc.dg/analyzer/out-of-bounds-read-int-arr.c: Move to...
+	* c-c++-common/analyzer/out-of-bounds-read-int-arr.c: ...here.
+	* gcc.dg/analyzer/out-of-bounds-read-struct-arr.c: Move to...
+	* c-c++-common/analyzer/out-of-bounds-read-struct-arr.c: ...here.
+	* gcc.dg/analyzer/out-of-bounds-write-char-arr.c: Move to...
+	* c-c++-common/analyzer/out-of-bounds-write-char-arr.c: ...here.
+	* gcc.dg/analyzer/out-of-bounds-write-int-arr.c: Move to...
+	* c-c++-common/analyzer/out-of-bounds-write-int-arr.c: ...here.
+	* gcc.dg/analyzer/out-of-bounds-write-struct-arr.c: Move to...
+	* c-c++-common/analyzer/out-of-bounds-write-struct-arr.c: ...here.
+	* gcc.dg/analyzer/params-2.c: Move to...
+	* c-c++-common/analyzer/params-2.c: ...here.
+	* gcc.dg/analyzer/paths-1.c: Move to...
+	* c-c++-common/analyzer/paths-1.c: ...here.
+	* gcc.dg/analyzer/paths-1a.c: Move to...
+	* c-c++-common/analyzer/paths-1a.c: ...here.
+	* gcc.dg/analyzer/paths-2.c: Move to...
+	* c-c++-common/analyzer/paths-2.c: ...here.
+	* gcc.dg/analyzer/paths-3.c: Move to...
+	* c-c++-common/analyzer/paths-3.c: ...here.
+	* gcc.dg/analyzer/paths-4.c: Move to...
+	* c-c++-common/analyzer/paths-4.c: ...here.
+	* gcc.dg/analyzer/paths-5.c: Move to...
+	* c-c++-common/analyzer/paths-5.c: ...here.
+	* gcc.dg/analyzer/paths-6.c: Move to...
+	* c-c++-common/analyzer/paths-6.c: ...here.
+	* gcc.dg/analyzer/paths-7.c: Move to...
+	* c-c++-common/analyzer/paths-7.c: ...here.
+	* gcc.dg/analyzer/paths-8.c: Move to...
+	* c-c++-common/analyzer/paths-8.c: ...here.
+	* gcc.dg/analyzer/pattern-test-1.c: Move to...
+	* c-c++-common/analyzer/pattern-test-1.c: ...here.
+	* gcc.dg/analyzer/pipe-pr107486.c: Move to...
+	* c-c++-common/analyzer/pipe-pr107486.c: ...here.
+	* gcc.dg/analyzer/pointer-merging.c: Move to...
+	* c-c++-common/analyzer/pointer-merging.c: ...here.
+	* gcc.dg/analyzer/pr100546.c: Move to...
+	* c-c++-common/analyzer/pr100546.c: ...here.
+	* gcc.dg/analyzer/pr101503.c: Move to...
+	* c-c++-common/analyzer/pr101503.c: ...here.
+	* gcc.dg/analyzer/pr101570.c: Move to...
+	* c-c++-common/analyzer/pr101570.c: ...here.
+	* gcc.dg/analyzer/pr101721.c: Move to...
+	* c-c++-common/analyzer/pr101721.c: ...here.
+	* gcc.dg/analyzer/pr102692-2.c: Move to...
+	* c-c++-common/analyzer/pr102692-2.c: ...here.
+	* gcc.dg/analyzer/pr102695.c: Move to...
+	* c-c++-common/analyzer/pr102695.c: ...here.
+	* gcc.dg/analyzer/pr103217-3.c: Move to...
+	* c-c++-common/analyzer/pr103217-3.c: ...here.
+	* gcc.dg/analyzer/pr103217-4.c: Move to...
+	* c-c++-common/analyzer/pr103217-4.c: ...here.
+	* gcc.dg/analyzer/pr103217-5.c: Move to...
+	* c-c++-common/analyzer/pr103217-5.c: ...here.
+	* gcc.dg/analyzer/pr104089.c: Move to...
+	* c-c++-common/analyzer/pr104089.c: ...here.
+	* gcc.dg/analyzer/pr104308.c: Move to...
+	* c-c++-common/analyzer/pr104308.c: ...here.
+	* gcc.dg/analyzer/pr104452.c: Move to...
+	* c-c++-common/analyzer/pr104452.c: ...here.
+	* gcc.dg/analyzer/pr104524.c: Move to...
+	* c-c++-common/analyzer/pr104524.c: ...here.
+	* gcc.dg/analyzer/pr104560-2.c: Move to...
+	* c-c++-common/analyzer/pr104560-2.c: ...here.
+	* gcc.dg/analyzer/pr105087-1.c: Move to...
+	* c-c++-common/analyzer/pr105087-1.c: ...here.
+	* gcc.dg/analyzer/pr105087-2.c: Move to...
+	* c-c++-common/analyzer/pr105087-2.c: ...here.
+	* gcc.dg/analyzer/pr105252.c: Move to...
+	* c-c++-common/analyzer/pr105252.c: ...here.
+	* gcc.dg/analyzer/pr106394.c: Move to...
+	* c-c++-common/analyzer/pr106394.c: ...here.
+	* gcc.dg/analyzer/pr106539.c: Move to...
+	* c-c++-common/analyzer/pr106539.c: ...here.
+	* gcc.dg/analyzer/pr106845.c: Move to...
+	* c-c++-common/analyzer/pr106845.c: ...here.
+	* gcc.dg/analyzer/pr109439.c: Move to...
+	* c-c++-common/analyzer/pr109439.c: ...here.
+	* gcc.dg/analyzer/pr110455.c: Move to...
+	* c-c++-common/analyzer/pr110455.c: ...here.
+	* gcc.dg/analyzer/pr93032-mztools-simplified.c: Move to...
+	* c-c++-common/analyzer/pr93032-mztools-simplified.c: ...here.
+	* gcc.dg/analyzer/pr93290.c: Move to...
+	* c-c++-common/analyzer/pr93290.c: ...here.
+	* gcc.dg/analyzer/pr93352.c: Move to...
+	* c-c++-common/analyzer/pr93352.c: ...here.
+	* gcc.dg/analyzer/pr93355-localealias-feasibility-3.c: Move to...
+	* c-c++-common/analyzer/pr93355-localealias-feasibility-3.c: ...here.
+	* gcc.dg/analyzer/pr93355-localealias-simplified.c: Move to...
+	* c-c++-common/analyzer/pr93355-localealias-simplified.c: ...here.
+	* gcc.dg/analyzer/pr93546.c: Move to...
+	* c-c++-common/analyzer/pr93546.c: ...here.
+	* gcc.dg/analyzer/pr93547.c: Move to...
+	* c-c++-common/analyzer/pr93547.c: ...here.
+	* gcc.dg/analyzer/pr93669.c: Move to...
+	* c-c++-common/analyzer/pr93669.c: ...here.
+	* gcc.dg/analyzer/pr93938.c: Move to...
+	* c-c++-common/analyzer/pr93938.c: ...here.
+	* gcc.dg/analyzer/pr94047.c: Move to...
+	* c-c++-common/analyzer/pr94047.c: ...here.
+	* gcc.dg/analyzer/pr94099.c: Move to...
+	* c-c++-common/analyzer/pr94099.c: ...here.
+	* gcc.dg/analyzer/pr94105.c: Move to...
+	* c-c++-common/analyzer/pr94105.c: ...here.
+	* gcc.dg/analyzer/pr94362-2.c: Move to...
+	* c-c++-common/analyzer/pr94362-2.c: ...here.
+	* gcc.dg/analyzer/pr94399.c: Move to...
+	* c-c++-common/analyzer/pr94399.c: ...here.
+	* gcc.dg/analyzer/pr94447.c: Move to...
+	* c-c++-common/analyzer/pr94447.c: ...here.
+	* gcc.dg/analyzer/pr94639.c: Move to...
+	* c-c++-common/analyzer/pr94639.c: ...here.
+	* gcc.dg/analyzer/pr94640.c: Move to...
+	* c-c++-common/analyzer/pr94640.c: ...here.
+	* gcc.dg/analyzer/pr94732.c: Move to...
+	* c-c++-common/analyzer/pr94732.c: ...here.
+	* gcc.dg/analyzer/pr94851-1.c: Move to...
+	* c-c++-common/analyzer/pr94851-1.c: ...here.
+	* gcc.dg/analyzer/pr94851-2.c: Move to...
+	* c-c++-common/analyzer/pr94851-2.c: ...here.
+	* gcc.dg/analyzer/pr94851-3.c: Move to...
+	* c-c++-common/analyzer/pr94851-3.c: ...here.
+	* gcc.dg/analyzer/pr94851-4.c: Move to...
+	* c-c++-common/analyzer/pr94851-4.c: ...here.
+	* gcc.dg/analyzer/pr95026.c: Move to...
+	* c-c++-common/analyzer/pr95026.c: ...here.
+	* gcc.dg/analyzer/pr96598.c: Move to...
+	* c-c++-common/analyzer/pr96598.c: ...here.
+	* gcc.dg/analyzer/pr96611.c: Move to...
+	* c-c++-common/analyzer/pr96611.c: ...here.
+	* gcc.dg/analyzer/pr96644.c: Move to...
+	* c-c++-common/analyzer/pr96644.c: ...here.
+	* gcc.dg/analyzer/pr96646.c: Move to...
+	* c-c++-common/analyzer/pr96646.c: ...here.
+	* gcc.dg/analyzer/pr96648.c: Move to...
+	* c-c++-common/analyzer/pr96648.c: ...here.
+	* gcc.dg/analyzer/pr96650-1-notrans.c: Move to...
+	* c-c++-common/analyzer/pr96650-1-notrans.c: ...here.
+	* gcc.dg/analyzer/pr96650-1-trans.c: Move to...
+	* c-c++-common/analyzer/pr96650-1-trans.c: ...here.
+	* gcc.dg/analyzer/pr96650-2-notrans.c: Move to...
+	* c-c++-common/analyzer/pr96650-2-notrans.c: ...here.
+	* gcc.dg/analyzer/pr96650-2-trans.c: Move to...
+	* c-c++-common/analyzer/pr96650-2-trans.c: ...here.
+	* gcc.dg/analyzer/pr96651-1.c: Move to...
+	* c-c++-common/analyzer/pr96651-1.c: ...here.
+	* gcc.dg/analyzer/pr96699.c: Move to...
+	* c-c++-common/analyzer/pr96699.c: ...here.
+	* gcc.dg/analyzer/pr96705.c: Move to...
+	* c-c++-common/analyzer/pr96705.c: ...here.
+	* gcc.dg/analyzer/pr96713.c: Move to...
+	* c-c++-common/analyzer/pr96713.c: ...here.
+	* gcc.dg/analyzer/pr96764.c: Move to...
+	* c-c++-common/analyzer/pr96764.c: ...here.
+	* gcc.dg/analyzer/pr96777.c: Move to...
+	* c-c++-common/analyzer/pr96777.c: ...here.
+	* gcc.dg/analyzer/pr96860-2.c: Move to...
+	* c-c++-common/analyzer/pr96860-2.c: ...here.
+	* gcc.dg/analyzer/pr97029.c: Move to...
+	* c-c++-common/analyzer/pr97029.c: ...here.
+	* gcc.dg/analyzer/pr97072.c: Move to...
+	* c-c++-common/analyzer/pr97072.c: ...here.
+	* gcc.dg/analyzer/pr97130.c: Move to...
+	* c-c++-common/analyzer/pr97130.c: ...here.
+	* gcc.dg/analyzer/pr97233.c: Move to...
+	* c-c++-common/analyzer/pr97233.c: ...here.
+	* gcc.dg/analyzer/pr97514.c: Move to...
+	* c-c++-common/analyzer/pr97514.c: ...here.
+	* gcc.dg/analyzer/pr97608.c: Move to...
+	* c-c++-common/analyzer/pr97608.c: ...here.
+	* gcc.dg/analyzer/pr97668.c: Move to...
+	* c-c++-common/analyzer/pr97668.c: ...here.
+	* gcc.dg/analyzer/pr98073.c: Move to...
+	* c-c++-common/analyzer/pr98073.c: ...here.
+	* gcc.dg/analyzer/pr98575-1.c: Move to...
+	* c-c++-common/analyzer/pr98575-1.c: ...here.
+	* gcc.dg/analyzer/pr98580-a.c: Move to...
+	* c-c++-common/analyzer/pr98580-a.c: ...here.
+	* gcc.dg/analyzer/pr98580-b.c: Move to...
+	* c-c++-common/analyzer/pr98580-b.c: ...here.
+	* gcc.dg/analyzer/pr98918.c: Move to...
+	* c-c++-common/analyzer/pr98918.c: ...here.
+	* gcc.dg/analyzer/pr99044-2.c: Move to...
+	* c-c++-common/analyzer/pr99044-2.c: ...here.
+	* gcc.dg/analyzer/pr99716-2.c: Move to...
+	* c-c++-common/analyzer/pr99716-2.c: ...here.
+	* gcc.dg/analyzer/pr99716-3.c: Move to...
+	* c-c++-common/analyzer/pr99716-3.c: ...here.
+	* gcc.dg/analyzer/pr99906.c: Move to...
+	* c-c++-common/analyzer/pr99906.c: ...here.
+	* gcc.dg/analyzer/pragma-1.c: Move to...
+	* c-c++-common/analyzer/pragma-1.c: ...here.
+	* gcc.dg/analyzer/pragma-2.c: Move to...
+	* c-c++-common/analyzer/pragma-2.c: ...here.
+	* gcc.dg/analyzer/refcounting-1.c: Move to...
+	* c-c++-common/analyzer/refcounting-1.c: ...here.
+	* gcc.dg/analyzer/rhbz1878600.c: Move to...
+	* c-c++-common/analyzer/rhbz1878600.c: ...here.
+	* gcc.dg/analyzer/sarif-pr107366.c: Move to...
+	* c-c++-common/analyzer/sarif-pr107366.c: ...here.
+	* gcc.dg/analyzer/setjmp-pr109094.c: Move to...
+	* c-c++-common/analyzer/setjmp-pr109094.c: ...here.
+	* gcc.dg/analyzer/sock-2.c: Move to...
+	* c-c++-common/analyzer/sock-2.c: ...here.
+	* gcc.dg/analyzer/stale-frame-1.c: Move to...
+	* c-c++-common/analyzer/stale-frame-1.c: ...here.
+	* gcc.dg/analyzer/stdarg-sentinel-1.c: Move to...
+	* c-c++-common/analyzer/stdarg-sentinel-1.c: ...here.
+	* gcc.dg/analyzer/stdarg-types-2.c: Move to...
+	* c-c++-common/analyzer/stdarg-types-2.c: ...here.
+	* gcc.dg/analyzer/stdarg-types-3.c: Move to...
+	* c-c++-common/analyzer/stdarg-types-3.c: ...here.
+	* gcc.dg/analyzer/stdarg-types-4.c: Move to...
+	* c-c++-common/analyzer/stdarg-types-4.c: ...here.
+	* gcc.dg/analyzer/strcpy-2.c: Move to...
+	* c-c++-common/analyzer/strcpy-2.c: ...here.
+	* gcc.dg/analyzer/strndup-1.c: Move to...
+	* c-c++-common/analyzer/strndup-1.c: ...here.
+	* gcc.dg/analyzer/switch-wrong-enum.c: Move to...
+	* c-c++-common/analyzer/switch-wrong-enum.c: ...here.
+	* gcc.dg/analyzer/symbolic-1.c: Move to...
+	* c-c++-common/analyzer/symbolic-1.c: ...here.
+	* gcc.dg/analyzer/symbolic-2.c: Move to...
+	* c-c++-common/analyzer/symbolic-2.c: ...here.
+	* gcc.dg/analyzer/symbolic-3.c: Move to...
+	* c-c++-common/analyzer/symbolic-3.c: ...here.
+	* gcc.dg/analyzer/symbolic-4.c: Move to...
+	* c-c++-common/analyzer/symbolic-4.c: ...here.
+	* gcc.dg/analyzer/symbolic-5.c: Move to...
+	* c-c++-common/analyzer/symbolic-5.c: ...here.
+	* gcc.dg/analyzer/symbolic-6.c: Move to...
+	* c-c++-common/analyzer/symbolic-6.c: ...here.
+	* gcc.dg/analyzer/symbolic-7.c: Move to...
+	* c-c++-common/analyzer/symbolic-7.c: ...here.
+	* gcc.dg/analyzer/symbolic-8.c: Move to...
+	* c-c++-common/analyzer/symbolic-8.c: ...here.
+	* gcc.dg/analyzer/symbolic-gt-1.c: Move to...
+	* c-c++-common/analyzer/symbolic-gt-1.c: ...here.
+	* gcc.dg/analyzer/taint-alloc-3.c: Move to...
+	* c-c++-common/analyzer/taint-alloc-3.c: ...here.
+	* gcc.dg/analyzer/taint-assert-BUG_ON.c: Move to...
+	* c-c++-common/analyzer/taint-assert-BUG_ON.c: ...here.
+	* gcc.dg/analyzer/taint-divisor-2.c: Move to...
+	* c-c++-common/analyzer/taint-divisor-2.c: ...here.
+	* gcc.dg/analyzer/taint-merger.c: Move to...
+	* c-c++-common/analyzer/taint-merger.c: ...here.
+	* gcc.dg/analyzer/taint-realloc.c: Move to...
+	* c-c++-common/analyzer/taint-realloc.c: ...here.
+	* gcc.dg/analyzer/uninit-1.c: Move to...
+	* c-c++-common/analyzer/uninit-1.c: ...here.
+	* gcc.dg/analyzer/uninit-2.c: Move to...
+	* c-c++-common/analyzer/uninit-2.c: ...here.
+	* gcc.dg/analyzer/uninit-3.c: Move to...
+	* c-c++-common/analyzer/uninit-3.c: ...here.
+	* gcc.dg/analyzer/uninit-6.c: Move to...
+	* c-c++-common/analyzer/uninit-6.c: ...here.
+	* gcc.dg/analyzer/uninit-6b.c: Move to...
+	* c-c++-common/analyzer/uninit-6b.c: ...here.
+	* gcc.dg/analyzer/uninit-8.c: Move to...
+	* c-c++-common/analyzer/uninit-8.c: ...here.
+	* gcc.dg/analyzer/uninit-pr104576.c: Move to...
+	* c-c++-common/analyzer/uninit-pr104576.c: ...here.
+	* gcc.dg/analyzer/uninit-pr106204.c: Move to...
+	* c-c++-common/analyzer/uninit-pr106204.c: ...here.
+	* gcc.dg/analyzer/uninit-pr108704.c: Move to...
+	* c-c++-common/analyzer/uninit-pr108704.c: ...here.
+	* gcc.dg/analyzer/uninit-pr108806-qemu.c: Move to...
+	* c-c++-common/analyzer/uninit-pr108806-qemu.c: ...here.
+	* gcc.dg/analyzer/uninit-pr108968-register.c: Move to...
+	* c-c++-common/analyzer/uninit-pr108968-register.c: ...here.
+	* gcc.dg/analyzer/uninit-pr94713.c: Move to...
+	* c-c++-common/analyzer/uninit-pr94713.c: ...here.
+	* gcc.dg/analyzer/uninit-pr94714.c: Move to...
+	* c-c++-common/analyzer/uninit-pr94714.c: ...here.
+	* gcc.dg/analyzer/unknown-fns-2.c: Move to...
+	* c-c++-common/analyzer/unknown-fns-2.c: ...here.
+	* gcc.dg/analyzer/unknown-fns-3.c: Move to...
+	* c-c++-common/analyzer/unknown-fns-3.c: ...here.
+	* gcc.dg/analyzer/unknown-fns-4.c: Move to...
+	* c-c++-common/analyzer/unknown-fns-4.c: ...here.
+	* gcc.dg/analyzer/unused-local-1.c: Move to...
+	* c-c++-common/analyzer/unused-local-1.c: ...here.
+	* gcc.dg/analyzer/use-after-free-2.c: Move to...
+	* c-c++-common/analyzer/use-after-free-2.c: ...here.
+	* gcc.dg/analyzer/use-after-free-3.c: Move to...
+	* c-c++-common/analyzer/use-after-free-3.c: ...here.
+	* gcc.dg/analyzer/vsnprintf-1.c: Move to...
+	* c-c++-common/analyzer/vsnprintf-1.c: ...here.
+	* gcc.dg/analyzer/zlib-1.c: Move to...
+	* c-c++-common/analyzer/zlib-1.c: ...here.
+	* gcc.dg/analyzer/zlib-2.c: Move to...
+	* c-c++-common/analyzer/zlib-2.c: ...here.
+	* gcc.dg/analyzer/zlib-4.c: Move to...
+	* c-c++-common/analyzer/zlib-4.c: ...here.
+	* gcc.dg/analyzer/zlib-5.c: Move to...
+	* c-c++-common/analyzer/zlib-5.c: ...here.
+
+2023-12-14  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/112482
+	* g++.dg/cpp23/auto-fncast15.C: New test.
+
+2023-12-14  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	PR middle-end/111260
+	* gcc.c-torture/compile/condmove-1.c: New test.
+
+2023-12-14  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/112869
+	* g++.dg/template/sizeof18.C: New test.
+
+2023-12-14  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* gcc.dg/vect/vect-simd-clone-1.c: Update GCN 'dg-warning's.
+	* gcc.dg/vect/vect-simd-clone-2.c: Likewise.
+	* gcc.dg/vect/vect-simd-clone-3.c: Likewise.
+	* gcc.dg/vect/vect-simd-clone-4.c: Likewise.
+	* gcc.dg/vect/vect-simd-clone-5.c: Likewise.
+	* gcc.dg/vect/vect-simd-clone-8.c: Likewise.
+
+2023-12-14  Di Zhao  <dizhao@os.amperecomputing.com>
+
+	PR tree-optimization/110279
+	* gcc.dg/pr110279-2.c: New test.
+
+2023-12-14  Marek Polacek  <polacek@redhat.com>
+
+	* g++.dg/cpp1z/class-deduction67.C: Correct dg-error target.
+
+2023-12-14  Robin Dapp  <rdapp@ventanamicro.com>
+
+	* gcc.target/riscv/rvv/autovec/pr112999.c: New test.
+
+2023-12-14  Robin Dapp  <rdapp@ventanamicro.com>
+
+	* gcc.target/riscv/rvv/autovec/partial/pr112773.c: New test.
+
+2023-12-14  Patrick Palka  <ppalka@redhat.com>
+
+	* g++.dg/cpp1z/class-deduction67.C: Accept in C++23 mode.
+	* g++.dg/cpp23/class-deduction-inherited1.C: New test.
+	* g++.dg/cpp23/class-deduction-inherited2.C: New test.
+	* g++.dg/cpp23/class-deduction-inherited3.C: New test.
+	* g++.dg/cpp23/class-deduction-inherited4.C: New test.
+
+2023-12-14  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/112793
+	* g++.dg/vect/pr112793.cc: New testcase.
+
+2023-12-14  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.target/aarch64/sve/accumulators_1.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/create2_1.c: Allow the moves to
+	be in any order.
+	* gcc.target/aarch64/sve/acle/asm/create3_1.c: Likewise.
+	* gcc.target/aarch64/sve/acle/asm/create4_1.c: Likewise.
+
+2023-12-14  Alexandre Oliva  <oliva@adacore.com>
+
+	PR middle-end/112938
+	* gcc.dg/strub-internal-volatile.c: Check indirection of
+	volatile args.
+
+2023-12-14  Alexandre Oliva  <oliva@adacore.com>
+
+	PR middle-end/112938
+	* gcc.dg/strub-internal-volatile.c: New.
+
+2023-12-14  Jeff Law  <jlaw@ventanamicro.com>
+
+	* gcc.target/m68k/pr63347.c: Call __builtin_abort and __builtin_exit
+	instead of abort and exit.
+
+2023-12-14  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/112994
+	* gcc.dg/tree-ssa/pr112994-2.c: New test.
+
+2023-12-14  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/112994
+	* gcc.dg/tree-ssa/pr112994-1.c: New test.
+
+2023-12-14  Filip Kastl  <fkastl@suse.cz>
+
+	* gcc.dg/sccopy-1.c: New test.
+
+2023-12-14  liuhongt  <hongtao.liu@intel.com>
+
+	* gcc.target/i386/pr100865-7a.c: Adjust testcase.
+	* gcc.target/i386/pr100865-7c.c: Ditto.
+	* gcc.target/i386/pr112992.c: New test.
+
+2023-12-14  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	PR target/112387
+	* gcc.dg/vect/costmodel/riscv/rvv/pr112387.c: New test.
+
+2023-12-14  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/110640
+	* gcc.dg/torture/pr110640.c: New testcase.
+
+2023-12-14  Jakub Jelinek  <jakub@redhat.com>
+
+	* c-c++-common/gomp/target-enter-data-1.c: Match also sizeof bar on
+	32-bit targets - 8 bytes - rather than just 16 bytes.
+
+2023-12-14  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/112904
+	* g++.target/i386/pr112904.C: Add dg-do compile, dg-options -mxop
+	and for ia32 also dg-additional-options -mmmx.
+
+2023-12-14  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	PR target/111153
+	* gcc.dg/vect/costmodel/riscv/rvv/pr111153.c: New test.
+
+2023-12-14  Jeff Law  <jlaw@ventanamicro.com>
+
+	* gcc.c-torture/execute/20001229-1.c: Prototype syscall().
+
+2023-12-13  Marek Polacek  <polacek@redhat.com>
+
+	* g++.dg/cpp0x/constexpr-ex1.C: Adjust expected diagnostic line.
+
+2023-12-13  Richard Ball  <richard.ball@arm.com>
+
+	* gcc.target/aarch64/sve/acle/asm/test_sve_acle.h: Add include
+	arm_neon_sve_bridge header file
+	* gcc.dg/torture/neon-sve-bridge.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/dup_neonq_bf16.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/dup_neonq_f16.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/dup_neonq_f32.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/dup_neonq_f64.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/dup_neonq_s16.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/dup_neonq_s32.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/dup_neonq_s64.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/dup_neonq_s8.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/dup_neonq_u16.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/dup_neonq_u32.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/dup_neonq_u64.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/dup_neonq_u8.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/get_neonq_bf16.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/get_neonq_f16.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/get_neonq_f32.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/get_neonq_f64.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/get_neonq_s16.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/get_neonq_s32.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/get_neonq_s64.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/get_neonq_s8.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/get_neonq_u16.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/get_neonq_u32.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/get_neonq_u64.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/get_neonq_u8.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/set_neonq_bf16.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/set_neonq_f16.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/set_neonq_f32.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/set_neonq_f64.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/set_neonq_s16.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/set_neonq_s32.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/set_neonq_s64.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/set_neonq_s8.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/set_neonq_u16.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/set_neonq_u32.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/set_neonq_u64.c: New test.
+	* gcc.target/aarch64/sve/acle/asm/set_neonq_u8.c: New test.
+	* gcc.target/aarch64/sve/acle/general-c/dup_neonq_1.c: New test.
+	* gcc.target/aarch64/sve/acle/general-c/get_neonq_1.c: New test.
+	* gcc.target/aarch64/sve/acle/general-c/set_neonq_1.c: New test.
+
+2023-12-13  Patrick Palka  <ppalka@redhat.com>
+
+	* g++.dg/overload/error6.C: Pass -fdiagnostics-all-candidates.
+	* g++.dg/cpp0x/deleted16.C: New test.
+	* g++.dg/cpp0x/deleted16a.C: New test.
+	* g++.dg/overload/error6a.C: New test.
+
+2023-12-13  Patrick Palka  <ppalka@redhat.com>
+
+	* g++.dg/diagnostic/param-type-mismatch-2.C: Rename template
+	function test_7 that (maybe accidentally) shares the same name
+	as its non-template callee.
+	* g++.dg/overload/error6.C: New test.
+
+2023-12-13  Patrick Palka  <ppalka@redhat.com>
+
+	* g++.dg/overload/error5.C: New test.
+
+2023-12-13  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/99186
+	PR c++/104867
+	* g++.dg/cpp1z/nontype-auto23.C: New test.
+	* g++.dg/cpp1z/nontype-auto24.C: New test.
+
+2023-12-13  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/93740
+	* g++.dg/template/ptrmem34.C: New test.
+
+2023-12-13  Jason Merrill  <jason@redhat.com>
+
+	* c-c++-common/Waddress-of-packed-member-1.c: Don't expect
+	a warning on the cast cases.
+	* c-c++-common/pr51628-35.c: Use -Wcast-align=strict.
+	* g++.dg/warn/Waddress-of-packed-member3.C: Likewise.
+	* gcc.dg/pr88928.c: Likewise.
+	* gcc.dg/pr51628-20.c: Removed.
+	* gcc.dg/pr51628-21.c: Removed.
+	* gcc.dg/pr51628-25.c: Removed.
+
+2023-12-13  Julian Brown  <julian@codesourcery.com>
+
+	* gfortran.dg/goacc/enter-exit-data-2.f90: New test.
+	* gfortran.dg/goacc/finalize-1.f: Adjust scan output.
+	* gfortran.dg/gomp/map-9.f90: Adjust scan output.
+	* gfortran.dg/gomp/map-subarray-2.f90: New test.
+	* gfortran.dg/gomp/map-subarray.f90: New test.
+	* gfortran.dg/gomp/target-enter-exit-data.f90: New test.
+
+2023-12-13  Julian Brown  <julian@codesourcery.com>
+
+	* c-c++-common/gomp/clauses-2.c: Fix error output.
+	* c-c++-common/gomp/target-implicit-map-2.c: Adjust scan output.
+	* c-c++-common/gomp/target-50.c: Adjust scan output.
+	* c-c++-common/gomp/target-enter-data-1.c: Adjust scan output.
+	* g++.dg/gomp/static-component-1.C: New test.
+	* gcc.dg/gomp/target-3.c: Adjust scan output.
+	* gfortran.dg/gomp/map-9.f90: Adjust scan output.
+
+2023-12-13  Jason Merrill  <jason@redhat.com>
+
+	PR c++/96997
+	* g++.dg/debug/cleanup2.C: New test.
+
+2023-12-13  Jason Merrill  <jason@redhat.com>
+
+	Revert:
+	2023-12-13  Jason Merrill  <jason@redhat.com>
+
+	* g++.dg/pr112822.C: Require C++17.
+
+2023-12-13  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/112921
+	* gm2/iso/run/pass/shorttest.mod: New test.
+
+2023-12-13  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/71093
+	* g++.dg/cpp1y/constexpr-lifetime1.C: Improve error message.
+	* g++.dg/cpp1y/constexpr-lifetime2.C: Likewise.
+	* g++.dg/cpp1y/constexpr-lifetime3.C: Likewise.
+	* g++.dg/cpp1y/constexpr-lifetime4.C: Likewise.
+	* g++.dg/cpp2a/bitfield2.C: Likewise.
+	* g++.dg/cpp2a/constexpr-new3.C: Likewise. New check.
+	* g++.dg/cpp1y/constexpr-lifetime7.C: New test.
+	* g++.dg/cpp2a/constexpr-lifetime1.C: New test.
+	* g++.dg/cpp2a/constexpr-lifetime2.C: New test.
+
+2023-12-13  Jason Merrill  <jason@redhat.com>
+
+	PR c++/108243
+	* g++.dg/cpp2a/consteval-prop6.C: Adjust diagnostic.
+	* g++.dg/opt/is_constant_evaluated3.C: Remove xfails.
+
+2023-12-13  Jason Merrill  <jason@redhat.com>
+
+	* g++.dg/cpp1y/constexpr-nsdmi7b.C: Adjust line.
+	* g++.dg/template/copy1.C: Likewise.
+
+2023-12-13  Jason Merrill  <jason@redhat.com>
+
+	* g++.dg/pr112822.C: Require C++17.
+
+2023-12-13  Andrew Carlotti  <andrew.carlotti@arm.com>
+
+	* gcc.target/aarch64/cpunative/native_cpu_18.c: Add \+nopauth\n
+	* gcc.target/aarch64/options_set_7.c: Add \+crc\n
+	* gcc.target/aarch64/options_set_8.c: Add \+crc\+nodotprod\n
+	* gcc.target/aarch64/cpunative/native_cpu_0.c: Add \n
+	* gcc.target/aarch64/cpunative/native_cpu_1.c: Ditto.
+	* gcc.target/aarch64/cpunative/native_cpu_2.c: Ditto.
+	* gcc.target/aarch64/cpunative/native_cpu_3.c: Ditto.
+	* gcc.target/aarch64/cpunative/native_cpu_4.c: Ditto.
+	* gcc.target/aarch64/cpunative/native_cpu_5.c: Ditto.
+	* gcc.target/aarch64/cpunative/native_cpu_6.c: Ditto.
+	* gcc.target/aarch64/cpunative/native_cpu_7.c: Ditto.
+	* gcc.target/aarch64/cpunative/native_cpu_8.c: Ditto.
+	* gcc.target/aarch64/cpunative/native_cpu_9.c: Ditto.
+	* gcc.target/aarch64/cpunative/native_cpu_10.c: Ditto.
+	* gcc.target/aarch64/cpunative/native_cpu_11.c: Ditto.
+	* gcc.target/aarch64/cpunative/native_cpu_12.c: Ditto.
+	* gcc.target/aarch64/cpunative/native_cpu_13.c: Ditto.
+	* gcc.target/aarch64/cpunative/native_cpu_14.c: Ditto.
+	* gcc.target/aarch64/cpunative/native_cpu_15.c: Ditto.
+	* gcc.target/aarch64/cpunative/native_cpu_16.c: Ditto.
+	* gcc.target/aarch64/cpunative/native_cpu_17.c: Ditto.
+	* gcc.target/aarch64/options_set_1.c: Ditto.
+	* gcc.target/aarch64/options_set_2.c: Ditto.
+	* gcc.target/aarch64/options_set_3.c: Ditto.
+	* gcc.target/aarch64/options_set_5.c: Ditto.
+	* gcc.target/aarch64/options_set_6.c: Ditto.
+	* gcc.target/aarch64/options_set_9.c: Ditto.
+	* gcc.target/aarch64/options_set_11.c: Ditto.
+	* gcc.target/aarch64/options_set_12.c: Ditto.
+	* gcc.target/aarch64/options_set_13.c: Ditto.
+	* gcc.target/aarch64/options_set_14.c: Ditto.
+	* gcc.target/aarch64/options_set_15.c: Ditto.
+	* gcc.target/aarch64/options_set_16.c: Ditto.
+	* gcc.target/aarch64/options_set_17.c: Ditto.
+	* gcc.target/aarch64/options_set_18.c: Ditto.
+	* gcc.target/aarch64/options_set_19.c: Ditto.
+	* gcc.target/aarch64/options_set_20.c: Ditto.
+	* gcc.target/aarch64/options_set_21.c: Ditto.
+	* gcc.target/aarch64/options_set_22.c: Ditto.
+	* gcc.target/aarch64/options_set_23.c: Ditto.
+	* gcc.target/aarch64/options_set_24.c: Ditto.
+	* gcc.target/aarch64/options_set_25.c: Ditto.
+	* gcc.target/aarch64/options_set_26.c: Ditto.
+
+2023-12-13  Peter Bergner  <bergner@linux.ibm.com>
+
+	PR tree-optimization/112822
+	* g++.dg/pr112822.C: Add dg-do compile target c++17 directive.
+
+2023-12-13  Pan Li  <pan2.li@intel.com>
+
+	PR target/112929
+	PR target/112988
+	* gcc.target/riscv/rvv/vsetvl/pr112929.c: Moved to...
+	* gcc.target/riscv/rvv/vsetvl/pr112929-1.c: ...here.
+	* gcc.target/riscv/rvv/vsetvl/pr112988.c: Moved to...
+	* gcc.target/riscv/rvv/vsetvl/pr112988-1.c: ...here.
+	* gcc.target/riscv/rvv/vsetvl/pr112929-2.c: New test.
+	* gcc.target/riscv/rvv/vsetvl/pr112988-2.c: New test.
+
+2023-12-13  Andrew Carlotti  <andrew.carlotti@arm.com>
+
+	* g++.target/aarch64/sve/aarch64-ssve.exp:
+
+2023-12-13  Roger Sayle  <roger@nextmovesoftware.com>
+	    Jeff Law  <jlaw@ventanamicro.com>
+
+	* gcc.target/arc/extvsi-1.c: New test case.
+	* gcc.target/arc/extvsi-2.c: Likewise.
+
+2023-12-13  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	PR target/112929
+	PR target/112988
+	* gcc.target/riscv/rvv/vsetvl/pr112929.c: New test.
+	* gcc.target/riscv/rvv/vsetvl/pr112988.c: New test.
+
+2023-12-13  demin.han  <demin.han@starfivetech.com>
+
+	* gcc.dg/vect/costmodel/riscv/rvv/riscv_vector.h: New file.
+
+2023-12-13  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	PR target/111317
+	* gcc.dg/vect/costmodel/riscv/rvv/pr111317.c: New test.
+
+2023-12-13  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/112940
+	* gcc.dg/bitint-53.c: New test.
+
+2023-12-13  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/112962
+	* gcc.target/i386/pr112962.c: New test.
+
+2023-12-13  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/112991
+	PR tree-optimization/112961
+	* gcc.dg/torture/pr112991.c: New testcase.
+
+2023-12-13  Victor Do Nascimento  <victor.donascimento@arm.com>
+
+	* gcc.target/aarch64/builtin_pld_pli.c: New.
+	* gcc.target/aarch64/builtin_pld_pli_illegal.c: New.
+
+2023-12-13  Haochen Jiang  <haochen.jiang@intel.com>
+
+	* gcc.target/i386/pr110790-2.c: Change scan-assembler from shrq
+	to shr\[qx\].
+
+2023-12-13  Jiufu Guo  <guojiufu@linux.ibm.com>
+
+	* gcc.target/powerpc/const-build-1.c: New test.
+
+2023-12-12  Jason Merrill  <jason@redhat.com>
+	    Jason Xu  <rxu@DRWHoldings.com>
+
+	* g++.dg/ext/attr-hotness.C: Add member templates.
+
+2023-12-12  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* gcc.target/riscv/rvv/autovec/pr111313.c: Adapt test.
+	* gcc.target/riscv/rvv/autovec/vls/shift-3.c: Ditto.
+	* gcc.dg/vect/costmodel/riscv/rvv/vla_vs_vls-1.c: New test.
+	* gcc.dg/vect/costmodel/riscv/rvv/vla_vs_vls-10.c: New test.
+	* gcc.dg/vect/costmodel/riscv/rvv/vla_vs_vls-11.c: New test.
+	* gcc.dg/vect/costmodel/riscv/rvv/vla_vs_vls-12.c: New test.
+	* gcc.dg/vect/costmodel/riscv/rvv/vla_vs_vls-2.c: New test.
+	* gcc.dg/vect/costmodel/riscv/rvv/vla_vs_vls-3.c: New test.
+	* gcc.dg/vect/costmodel/riscv/rvv/vla_vs_vls-4.c: New test.
+	* gcc.dg/vect/costmodel/riscv/rvv/vla_vs_vls-5.c: New test.
+	* gcc.dg/vect/costmodel/riscv/rvv/vla_vs_vls-6.c: New test.
+	* gcc.dg/vect/costmodel/riscv/rvv/vla_vs_vls-7.c: New test.
+	* gcc.dg/vect/costmodel/riscv/rvv/vla_vs_vls-8.c: New test.
+	* gcc.dg/vect/costmodel/riscv/rvv/vla_vs_vls-9.c: New test.
+
+2023-12-12  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul-mixed-1.c: Adapt test.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul1-3.c: Adapt test.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul1-6.c: Adapt test.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul2-1.c: Adapt test.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul2-2.c: Adapt test.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul2-3.c: Adapt test.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul2-4.c: Adapt test.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul2-5.c: Adapt test.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul2-6.c: Adapt test.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul4-1.c: Adapt test.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul4-2.c: Adapt test.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul4-3.c: Adapt test.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul4-4.c: Adapt test.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul4-5.c: Adapt test.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul4-6.c: Adapt test.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul4-7.c: Adapt test.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul4-8.c: Adapt test.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul4-9.c: Adapt test.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul8-1.c: Adapt test.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul8-10.c: Adapt test.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul8-2.c: Adapt test.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul8-3.c: Adapt test.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul8-4.c: Adapt test.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul8-5.c: Adapt test.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul8-6.c: Adapt test.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul8-7.c: Adapt test.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul8-8.c: Adapt test.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul8-9.c: Adapt test.
+	* gcc.dg/vect/costmodel/riscv/rvv/pr111848.c: Adapt test.
+
+2023-12-12  Peter Bergner  <bergner@linux.ibm.com>
+
+	PR tree-optimization/112822
+	* g++.dg/pr112822.C: New test.
+
+2023-12-12  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/112984
+	* gm2/switches/pedantic/pass/hello.mod: New test.
+	* gm2/switches/pedantic/pass/switches-pedantic-pass.exp: New test.
+
+2023-12-12  Xi Ruoyao  <xry111@xry111.site>
+
+	* gcc.target/loongarch/vect-ftint-no-inexact.c (xfail): Remove.
+
+2023-12-12  Jason Merrill  <jason@redhat.com>
+
+	* g++.dg/ext/is_nothrow_constructible8.C: Require C++14.
+
+2023-12-12  Jason Merrill  <jason@redhat.com>
+	    Nathaniel Shead   <nathanieloshead@gmail.com>
+
+	* gcc.dg/pr87052.c: Adjust expected CLOBBER output.
+
+2023-12-12  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	* gcc.target/aarch64/branch-protection-attr.c: Update.
+	* gcc.target/aarch64/branch-protection-option.c: Update.
+
+2023-12-12  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/112736
+	* gcc.dg/torture/pr112736.c: New testcase.
+
+2023-12-12  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/112961
+	* g++.dg/vect/pr112961.cc: New testcase.
+
+2023-12-12  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc.dg/gomp/pr87887-1.c: Add missing comment argument to dg-warning.
+	* gcc.dg/gomp/pr89246-1.c: Likewise.
+	* gcc.dg/gomp/simd-clones-2.c: Add missing " after dump name.
+
+2023-12-12  Xi Ruoyao  <xry111@xry111.site>
+
+	PR middle-end/107723
+	* gcc.dg/torture/builtin-fp-int-inexact-trunc.c: New test.
+
+2023-12-12  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.target/aarch64/prfm_imm_offset_2.c: Add dg-options.
+
+2023-12-12  Pan Li  <pan2.li@intel.com>
+
+	* gcc.target/riscv/rvv/autovec/binop/vcompress-avlprop-1.c: New test.
+
+2023-12-12  Xi Ruoyao  <xry111@xry111.site>
+
+	* gcc.target/loongarch/attr-model-3.c: New test.
+	* gcc.target/loongarch/attr-model-4.c: New test.
+	* gcc.target/loongarch/func-call-extreme-3.c: New test.
+	* gcc.target/loongarch/func-call-extreme-4.c: New test.
+
+2023-12-12  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/112939
+	* gcc.dg/pr112939.c: New testcase.
+
+2023-12-12  liuhongt  <hongtao.liu@intel.com>
+
+	* gcc.target/i386/pr112891.c: New test.
+	* gcc.target/i386/pr112891-2.c: New test.
+
+2023-12-12  Hongyu Wang  <hongyu.wang@intel.com>
+
+	PR target/112943
+	* gcc.target/i386/pr112943.c: New test.
+
+2023-12-12  David Malcolm  <dmalcolm@redhat.com>
+
+	* gcc.dg/plugin/plugin.exp: Add taint-modulus.c to
+	analyzer_kernel_plugin.c tests.
+	* gcc.dg/plugin/taint-modulus.c: New test.
+
+2023-12-12  Yang Yujie  <yangyujie@loongson.cn>
+
+	* gcc.target/loongarch/eh_return-normal-return.c: New test.
+
+2023-12-11  Jakub Jelinek  <jakub@redhat.com>
+
+	* c-c++-common/strub-O2fni.c: Add -fno-stack-protector to dg-options.
+	* c-c++-common/strub-O3fni.c: Likewise.
+	* c-c++-common/strub-Os.c: Likewise.
+	* c-c++-common/strub-Og.c: Likewise.
+
+2023-12-11  Martin Uecker  <uecker@tugraz.at>
+
+	PR c/112488
+	* gcc.dg/pr112488-1.c: New test.
+	* gcc.dg/pr112488-2.c: New test.
+	* gcc.dg/pr112898.c: New test.
+	* gcc.misc-tests/gcov-pr85350.c: Adapt.
+
+2023-12-11  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.target/aarch64/prfm_imm_offset_2.c: New test.
+
+2023-12-11  Jason Merrill  <jason@redhat.com>
+
+	* g++.dg/cpp2a/concepts-explicit-inst1.C: Specify ABI v18.
+	* g++.dg/cpp2a/concepts-explicit-inst1a.C: New test.
+
+2023-12-11  Alexandre Oliva  <oliva@adacore.com>
+
+	PR middle-end/112784
+	* gcc.target/i386/avx512cd-inline-stringops-pr112784.c: New.
+
+2023-12-11  Alexandre Oliva  <oliva@adacore.com>
+
+	PR target/112778
+	* gcc.dg/inline-mem-cmp-pr112778.c: New.
+
+2023-12-11  Alexandre Oliva  <oliva@adacore.com>
+
+	PR target/112804
+	* gcc.target/aarch64/inline-mem-set-pr112804.c: New.
+
+2023-12-11  Roger Sayle  <roger@nextmovesoftware.com>
+
+	PR rtl-optimization/112380
+	* gcc.dg/pr112380.c: New test case.
+
+2023-12-11  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	PR testsuite/112297
+	* gcc.target/i386/pr100936.c: Require nonpic target.
+
+2023-12-11  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/63378
+	* g++.dg/template/fnspec3.C: New test.
+
+2023-12-11  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	* gcc.dg/tree-ssa/pr110637-1.c: New test.
+	* gcc.dg/tree-ssa/pr110637-2.c: New test.
+	* gcc.dg/tree-ssa/pr110637-3.c: New test.
+	* gcc.dg/tree-ssa/pr111972-1.c: New test.
+	* gcc.dg/tree-ssa/pr69270.c: Update testcase.
+	* gcc.target/i386/pr110790-2.c: Update testcase.
+	* gcc.dg/fold-even-1.c: Removed.
+
+2023-12-11  Andre Vieira  <andre.simoesdiasvieira@arm.com>
+
+	* lib/target-supports.exp: Add aarch64 targets to vect_simd_clones.
+	* c-c++-common/gomp/declare-variant-14.c: Adapt test for aarch64.
+	* c-c++-common/gomp/pr60823-1.c: Likewise.
+	* c-c++-common/gomp/pr60823-2.c: Likewise.
+	* c-c++-common/gomp/pr60823-3.c: Likewise.
+	* g++.dg/gomp/attrs-10.C: Likewise.
+	* g++.dg/gomp/declare-simd-1.C: Likewise.
+	* g++.dg/gomp/declare-simd-3.C: Likewise.
+	* g++.dg/gomp/declare-simd-4.C: Likewise.
+	* g++.dg/gomp/declare-simd-7.C: Likewise.
+	* g++.dg/gomp/declare-simd-8.C: Likewise.
+	* g++.dg/gomp/pr88182.C: Likewise.
+	* gcc.dg/declare-simd.c: Likewise.
+	* gcc.dg/gomp/declare-simd-1.c: Likewise.
+	* gcc.dg/gomp/declare-simd-3.c: Likewise.
+	* gcc.dg/gomp/pr87887-1.c: Likewise.
+	* gcc.dg/gomp/pr87895-1.c: Likewise.
+	* gcc.dg/gomp/pr89246-1.c: Likewise.
+	* gcc.dg/gomp/pr99542.c: Likewise.
+	* gcc.dg/gomp/simd-clones-2.c: Likewise.
+	* gcc.dg/vect/vect-simd-clone-1.c: Likewise.
+	* gcc.dg/vect/vect-simd-clone-2.c: Likewise.
+	* gcc.dg/vect/vect-simd-clone-4.c: Likewise.
+	* gcc.dg/vect/vect-simd-clone-5.c: Likewise.
+	* gcc.dg/vect/vect-simd-clone-6.c: Likewise.
+	* gcc.dg/vect/vect-simd-clone-7.c: Likewise.
+	* gcc.dg/vect/vect-simd-clone-8.c: Likewise.
+	* gfortran.dg/gomp/declare-simd-2.f90: Likewise.
+	* gfortran.dg/gomp/declare-simd-coarray-lib.f90: Likewise.
+	* gfortran.dg/gomp/declare-variant-14.f90: Likewise.
+	* gfortran.dg/gomp/pr79154-1.f90: Likewise.
+	* gfortran.dg/gomp/pr83977.f90: Likewise.
+	* gcc.target/aarch64/declare-simd-1.c: New file.
+	* gcc.target/aarch64/declare-simd-2.c: New file.
+
+2023-12-11  Patrick Palka  <ppalka@redhat.com>
+
+	* g++.dg/modules/concept-8.h: New test.
+	* g++.dg/modules/concept-8_a.H: New test.
+	* g++.dg/modules/concept-8_b.C: New test.
+
+2023-12-11  Robin Dapp  <rdapp@ventanamicro.com>
+
+	* gcc.target/riscv/rvv/autovec/builtin/strcmp-run.c: Adjust test
+	expectation and target selector.
+	* gcc.target/riscv/rvv/autovec/builtin/strlen-run.c: Adjust
+	target selector.
+	* gcc.target/riscv/rvv/autovec/builtin/strncmp-run.c: Ditto.
+
+2023-12-11  Tobias Burnus  <tobias@codesourcery.com>
+
+	* c-c++-common/gomp/requires-3.c: Update for now valid code.
+	* gfortran.dg/gomp/requires-3.f90: Likewise.
+	* gfortran.dg/gomp/requires-2.f90: Update dg-error.
+	* gfortran.dg/gomp/requires-5.f90: Likewise.
+	* c-c++-common/gomp/requires-5.c: New test.
+	* c-c++-common/gomp/requires-6.c: New test.
+	* c-c++-common/gomp/requires-7.c: New test.
+	* c-c++-common/gomp/requires-8.c: New test.
+	* gfortran.dg/gomp/requires-10.f90: New test.
+	* gfortran.dg/gomp/requires-11.f90: New test.
+
+2023-12-11  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* gcc.target/riscv/rvv/vsetvl/vsetvl_bug-2.c: New test.
+
+2023-12-11  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* gcc.target/riscv/rvv/autovec/pr110950.c: Adapt test.
+
+2023-12-11  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	* c-c++-common/asan/memcmp-1.c: Adjust pattern on darwin.
+
+2023-12-11  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* gcc.target/riscv/rvv/vsetvl/avl_use_bug-1.c: Moved to...
+	* gcc.target/riscv/rvv/vsetvl/vsetvl_bug-1.c: ...here.
+
+2023-12-11  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	* gcc.target/i386/pr112445.c: Require dfp.
+
+2023-12-11  liuhongt  <hongtao.liu@intel.com>
+
+	* gcc.target/i386/avx512vl-blendv-3.c: New test.
+	* gcc.target/i386/blendv-3.c: New test.
+
+2023-12-11  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	* gcc.target/i386/libcall-1.c: Skip on darwin.
+
+2023-12-11  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	PR target/112431
+	* gcc.target/riscv/rvv/base/pr112431-39.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-40.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-41.c: New test.
+
+2023-12-11  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* gcc.target/riscv/rvv/vsetvl/avl_use_bug-1.c: New test.
+
+2023-12-11  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* gcc.target/riscv/rvv/base/poly-selftest-1.c: New test.
+
+2023-12-11  Fei Gao  <gaofei@eswincomputing.com>
+	    Xiao Zeng <zengxiao@eswincomputing.com>
+
+	* gcc.target/riscv/zicond_ifcvt_opt.c: Add TCs for AND.
+
+2023-12-11  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/96090
+	PR c++/100470
+	* g++.dg/cpp0x/noexcept81.C: New test.
+	* g++.dg/ext/is_nothrow_constructible7.C: New test.
+	* g++.dg/ext/is_nothrow_constructible8.C: New test.
+
+2023-12-11  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/104234
+	PR c++/112580
+	* g++.dg/modules/pr104234.C: New test.
+
+2023-12-11  liuhongt  <hongtao.liu@intel.com>
+
+	* g++.target/i386/pr112904.C: New test.
+
+2023-12-11  Haochen Gui  <guihaoc@gcc.gnu.org>
+
+	PR target/112707
+	* gcc.target/powerpc/pr112707.h: New.
+	* gcc.target/powerpc/pr112707-2.c: New.
+	* gcc.target/powerpc/pr112707-3.c: New.
+	* gcc.target/powerpc/pr88558-p7.c: Check fctid on ilp32 and
+	has_arch_ppc64 as it's now guarded by powerpc64.
+	* gcc.target/powerpc/pr88558-p8.c: Likewise.
+	* gfortran.dg/nint_p7.f90: Add powerpc64 target requirement as
+	lround<mode>di2 is now guarded by powerpc64.
+
+2023-12-11  Haochen Gui  <guihaoc@gcc.gnu.org>
+
+	PR target/112707
+	* gcc.target/powerpc/pr112707-1.c: New.
+
+2023-12-10  Fei Gao  <gaofei@eswincomputing.com>
+	    Xiao Zeng <zengxiao@eswincomputing.com>
+
+	* gcc.target/riscv/zicond_ifcvt_opt.c: Add tests for shift like op.
+
+2023-12-10  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.target/aarch64/sme2/acle-asm/uzp_bf16_x2.c: XFAIL z0_z23 tests
+	for big-endian.
+	* gcc.target/aarch64/sme2/acle-asm/uzp_f16_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/uzp_f32_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/uzp_f64_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/uzp_s16_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/uzp_s32_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/uzp_s64_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/uzp_s8_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/uzp_u16_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/uzp_u32_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/uzp_u64_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/uzp_u8_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/uzpq_bf16_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/uzpq_f16_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/uzpq_f32_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/uzpq_f64_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/uzpq_s16_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/uzpq_s32_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/uzpq_s64_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/uzpq_s8_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/uzpq_u16_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/uzpq_u32_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/uzpq_u64_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/uzpq_u8_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/zip_bf16_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/zip_f16_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/zip_f32_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/zip_f64_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/zip_s16_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/zip_s32_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/zip_s64_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/zip_s8_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/zip_u16_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/zip_u32_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/zip_u64_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/zip_u8_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/zipq_bf16_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/zipq_f16_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/zipq_f32_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/zipq_f64_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/zipq_s16_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/zipq_s32_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/zipq_s64_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/zipq_s8_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/zipq_u16_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/zipq_u32_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/zipq_u64_x2.c: Likewise.
+	* gcc.target/aarch64/sme2/acle-asm/zipq_u8_x2.c: Likewise.
+
+2023-12-10  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.target/aarch64/sme/call_sm_switch_5.c: Restrict tests that
+	contain Z8-Z23 saves to little-endian.
+	* gcc.target/aarch64/sme/call_sm_switch_8.c: Likewise.
+	* gcc.target/aarch64/sme/locally_streaming_1.c: Likewise.
+
+2023-12-10  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.target/aarch64/sme/call_sm_switch_1.c: Add -funwind-tables.
+	* gcc.target/aarch64/sme/call_sm_switch_3.c: Likewise.
+	* gcc.target/aarch64/sme/call_sm_switch_5.c: Likewise.
+
+2023-12-10  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/111503
+	* gfortran.dg/contiguous_14.f90: New test.
+
+2023-12-10  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/105543
+	* gfortran.dg/contiguous_13.f90: New test.
+
+2023-12-10  Ken Matsui  <kmatsui@gcc.gnu.org>
+
+	* g++.dg/ext/has-builtin-1.C: Test existence of __remove_pointer.
+	* g++.dg/ext/remove_pointer.C: New test.
+
+2023-12-10  Ken Matsui  <kmatsui@gcc.gnu.org>
+
+	* g++.dg/ext/has-builtin-1.C: Test existence of __is_object.
+	* g++.dg/ext/is_object.C: New test.
+
+2023-12-10  Ken Matsui  <kmatsui@gcc.gnu.org>
+
+	* g++.dg/ext/has-builtin-1.C: Test existence of __is_function.
+	* g++.dg/ext/is_function.C: New test.
+
+2023-12-10  Ken Matsui  <kmatsui@gcc.gnu.org>
+
+	* g++.dg/ext/has-builtin-1.C: Test existence of __is_reference.
+	* g++.dg/ext/is_reference.C: New test.
+
+2023-12-10  Ken Matsui  <kmatsui@gcc.gnu.org>
+
+	* g++.dg/ext/has-builtin-1.C: Test existence of
+	__is_member_object_pointer.
+	* g++.dg/ext/is_member_object_pointer.C: New test.
+
+2023-12-10  Ken Matsui  <kmatsui@gcc.gnu.org>
+
+	* g++.dg/ext/has-builtin-1.C: Test existence of
+	__is_member_function_pointer.
+	* g++.dg/ext/is_member_function_pointer.C: New test.
+
+2023-12-10  Ken Matsui  <kmatsui@gcc.gnu.org>
+
+	* g++.dg/ext/has-builtin-1.C: Test existence of
+	__is_member_pointer.
+	* g++.dg/ext/is_member_pointer.C: New test.
+
+2023-12-10  Ken Matsui  <kmatsui@gcc.gnu.org>
+
+	* g++.dg/ext/has-builtin-1.C: Test existence of __is_scoped_enum.
+	* g++.dg/ext/is_scoped_enum.C: New test.
+
+2023-12-10  Ken Matsui  <kmatsui@gcc.gnu.org>
+
+	* g++.dg/ext/has-builtin-1.C: Test existence of
+	__is_bounded_array.
+	* g++.dg/ext/is_bounded_array.C: New test.
+
+2023-12-10  Ken Matsui  <kmatsui@gcc.gnu.org>
+
+	* g++.dg/ext/has-builtin-1.C: Test existence of __is_array.
+	* g++.dg/ext/is_array.C: New test.
+
+2023-12-10  Ken Matsui  <kmatsui@gcc.gnu.org>
+
+	* g++.dg/ext/has-builtin-1.C: Sort built-in traits alphabetically.
+
+2023-12-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/112887
+	* gcc.dg/pr112887.c: New test.
+
+2023-12-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/112924
+	* gcc.dg/pr112924.c: New test.
+
+2023-12-09  Jakub Jelinek  <jakub@redhat.com>
+
+	* g++.dg/warn/Wno-attributes-1.C: New test.
+
+2023-12-09  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	PR target/112932
+	* gcc.target/riscv/rvv/autovec/vls/misalign-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/pr112932.c: New test.
+
+2023-12-09  Hans-Peter Nilsson  <hp@axis.com>
+
+	PR testsuite/112786
+	* gcc.dg/tree-ssa/scev-3.c, gcc.dg/tree-ssa/scev-4.c,
+	gcc.dg/tree-ssa/scev-5.c: Remove.
+
+2023-12-08  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/83167
+	* g++.dg/cpp0x/lambda/lambda-decltype4.C: New test.
+
+2023-12-08  David Malcolm  <dmalcolm@redhat.com>
+
+	* c-c++-common/analyzer/taint-modulus-1.c: New test.
+
+2023-12-08  David Malcolm  <dmalcolm@redhat.com>
+
+	* gcc.dg/plugin/infoleak-uninit-size-1.c: New test.
+	* gcc.dg/plugin/infoleak-uninit-size-2.c: New test.
+	* gcc.dg/plugin/plugin.exp: Add the new tests.
+
+2023-12-08  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	PR rtl-optimization/112875
+	* gcc.target/i386/pr112875.c: New test.
+
+2023-12-08  Jakub Jelinek  <jakub@redhat.com>
+
+	* g++.dg/cpp0x/gen-attrs-79.C: New test.
+
+2023-12-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR sanitizer/112727
+	* c-c++-common/ubsan/pr112727.c: New test.
+
+2023-12-08  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/88848
+	* g++.dg/inherit/multiple2.C: New test.
+
+2023-12-08  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/112658
+	PR c++/94264
+	* g++.dg/cpp0x/initlist-array20.C: New test.
+
+2023-12-08  Robin Dapp  <rdapp@ventanamicro.com>
+
+	* gcc.target/riscv/rvv/autovec/builtin/strcmp-run.c: New test.
+	* gcc.target/riscv/rvv/autovec/builtin/strcmp.c: New test.
+	* gcc.target/riscv/rvv/autovec/builtin/strncmp-run.c: New test.
+	* gcc.target/riscv/rvv/autovec/builtin/strncmp.c: New test.
+
+2023-12-08  Robin Dapp  <rdapp@ventanamicro.com>
+
+	* gcc.target/riscv/rvv/autovec/builtin/strlen-run.c: New test.
+	* gcc.target/riscv/rvv/autovec/builtin/strlen.c: New test.
+
+2023-12-08  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.target/aarch64/sme/strided_2.c: New test.
+
+2023-12-08  Richard Earnshaw  <rearnsha@arm.com>
+
+	Revert:
+	2023-12-08  Ezra Sitorus  <ezra.sitorus@arm.com>
+
+	* gcc.target/arm/simd/vld1q_base_xN_1.c: Add new test.
+	* gcc.target/arm/simd/vld1q_bf16_xN_1.c: Add new test.
+	* gcc.target/arm/simd/vld1q_fp16_xN_1.c: Add new test.
+	* gcc.target/arm/simd/vld1q_p64_xN_1.c: Add new test.
+
+2023-12-08  Richard Earnshaw  <rearnsha@arm.com>
+
+	Revert:
+	2023-12-08  Ezra Sitorus  <ezra.sitorus@arm.com>
+
+	* gcc.target/arm/simd/vld1q_base_xN_1.c: Add new tests.
+	* gcc.target/arm/simd/vld1q_bf16_xN_1.c: Add new tests.
+	* gcc.target/arm/simd/vld1q_fp16_xN_1.c: Add new tests.
+	* gcc.target/arm/simd/vld1q_p64_xN_1.c: Add new tests.
+
+2023-12-08  Richard Earnshaw  <rearnsha@arm.com>
+
+	Revert:
+	2023-12-08  Ezra Sitorus  <ezra.sitorus@arm.com>
+
+	* gcc.target/arm/simd/vld1q_base_xN_1.c: Add new tests.
+	* gcc.target/arm/simd/vld1q_bf16_xN_1.c: Add new tests.
+	* gcc.target/arm/simd/vld1q_fp16_xN_1.c: Add new tests.
+	* gcc.target/arm/simd/vld1q_p64_xN_1.c: Add new tests.
+
+2023-12-08  Richard Earnshaw  <rearnsha@arm.com>
+
+	Revert:
+	2023-12-08  Ezra Sitorus  <ezra.sitorus@arm.com>
+
+	* gcc.target/arm/simd/vst1_base_xN_1.c: Add new tests.
+	* gcc.target/arm/simd/vst1_bf16_xN_1.c: Add new tests.
+	* gcc.target/arm/simd/vst1_fp16_xN_1.c: Add new tests.
+	* gcc.target/arm/simd/vst1_p64_xN_1.c: Add new tests.
+
+2023-12-08  Richard Earnshaw  <rearnsha@arm.com>
+
+	Revert:
+	2023-12-08  Ezra Sitorus  <ezra.sitorus@arm.com>
+
+	* gcc.target/arm/simd/vst1_base_xN_1.c: Add new test.
+	* gcc.target/arm/simd/vst1_bf16_xN_1.c: Add new test.
+	* gcc.target/arm/simd/vst1_fp16_xN_1.c: Add new test.
+	* gcc.target/arm/simd/vst1_p64_xN_1.c: Add new test.
+
+2023-12-08  Richard Earnshaw  <rearnsha@arm.com>
+
+	Revert:
+	2023-12-08  Ezra Sitorus  <ezra.sitorus@arm.com>
+
+	* gcc.target/arm/simd/vst1_base_xN_1.c: Add new test.
+	* gcc.target/arm/simd/vst1_bf16_xN_1.c: Add new test.
+	* gcc.target/arm/simd/vst1_fp16_xN_1.c: Add new test.
+	* gcc.target/arm/simd/vst1_p64_xN_1.c: Add new test.
+
+2023-12-08  Richard Earnshaw  <rearnsha@arm.com>
+
+	Revert:
+	2023-12-08  Ezra Sitorus  <ezra.sitorus@arm.com>
+
+	* gcc.target/arm/simd/vst1q_base_xN_1.c: Add new tests.
+	* gcc.target/arm/simd/vst1q_bf16_xN_1.c: Add new tests.
+	* gcc.target/arm/simd/vst1q_fp16_xN_1.c: Add new tests.
+	* gcc.target/arm/simd/vst1q_p64_xN_1.c: Add new tests.
+
+2023-12-08  Richard Earnshaw  <rearnsha@arm.com>
+
+	Revert:
+	2023-12-08  Ezra Sitorus  <ezra.sitorus@arm.com>
+
+	* gcc.target/arm/simd/vst1q_base_xN_1.c: Add new tests.
+	* gcc.target/arm/simd/vst1q_bf16_xN_1.c: Add new tests.
+	* gcc.target/arm/simd/vst1q_fp16_xN_1.c: Add new tests.
+	* gcc.target/arm/simd/vst1q_p64_xN_1.c: Add new tests.
+
+2023-12-08  Richard Earnshaw  <rearnsha@arm.com>
+
+	Revert:
+	2023-12-08  Ezra Sitorus  <ezra.sitorus@arm.com>
+
+	* gcc.target/arm/simd/vst1q_base_xN_1.c: Add new tests.
+	* gcc.target/arm/simd/vst1q_bf16_xN_1.c: Add new tests.
+	* gcc.target/arm/simd/vst1q_fp16_xN_1.c: Add new tests.
+	* gcc.target/arm/simd/vst1q_p64_xN_1.c: Add new tests.
+
+2023-12-08  Richard Earnshaw  <rearnsha@arm.com>
+
+	Revert:
+	2023-12-08  Ezra Sitorus  <ezra.sitorus@arm.com>
+
+	* gcc.target/arm/simd/vld1_base_xN_1.c: Add new tests.
+	* gcc.target/arm/simd/vld1_bf16_xN_1.c: Add new tests.
+	* gcc.target/arm/simd/vld1_fp16_xN_1.c: Add new tests.
+	* gcc.target/arm/simd/vld1_p64_xN_1.c: Add new tests.
+
+2023-12-08  Richard Earnshaw  <rearnsha@arm.com>
+
+	Revert:
+	2023-12-08  Ezra Sitorus  <ezra.sitorus@arm.com>
+
+	* gcc.target/arm/simd/vld1_base_xN_1.c: Add new tests.
+	* gcc.target/arm/simd/vld1_bf16_xN_1.c: Add new tests.
+	* gcc.target/arm/simd/vld1_fp16_xN_1.c: Add new tests.
+	* gcc.target/arm/simd/vld1_p64_xN_1.c: Add new tests.
+
+2023-12-08  Richard Earnshaw  <rearnsha@arm.com>
+
+	Revert:
+	2023-12-08  Ezra Sitorus  <ezra.sitorus@arm.com>
+
+	* gcc.target/arm/simd/vld1_base_xN_1.c: Add new tests.
+	* gcc.target/arm/simd/vld1_bf16_xN_1.c: Add new tests.
+	* gcc.target/arm/simd/vld1_fp16_xN_1.c: Add new tests.
+	* gcc.target/arm/simd/vld1_p64_xN_1.c: Add new tests.
+
+2023-12-08  Tobias Burnus  <tobias@codesourcery.com>
+
+	* gfortran.dg/gomp/allocate-14.f90: Add coarray and
+	not-listed tests.
+	* gfortran.dg/gomp/allocate-5.f90: Remove sorry dg-message.
+	* gfortran.dg/bind_c_array_params_2.f90: Update expected
+	dump for dtype '.version=0'.
+	* gfortran.dg/gomp/allocate-16.f90: New test.
+	* gfortran.dg/gomp/allocators-3.f90: New test.
+	* gfortran.dg/gomp/allocators-4.f90: New test.
+
+2023-12-08  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/112909
+	* gcc.dg/uninit-pr112909.c: New testcase.
+
+2023-12-08  Marc Poulhiès  <poulhies@adacore.com>
+
+	Revert:
+	2023-12-07  Marc Poulhiès  <poulhies@adacore.com>
+
+	* gcc.dg/vect/vect-ifcvt-18.c: Add dep on avx_runtime.
+	* gcc.dg/vect/vect-simd-clone-16f.c: Likewise.
+	* gcc.dg/vect/vect-simd-clone-18f.c: Likewise.
+
+2023-12-08  Jiahao Xu  <xujiahao@loongson.cn>
+
+	* gcc.target/loongarch/pr112476-3.c: New test.
+	* gcc.target/loongarch/pr112476-4.c: New test.
+
+2023-12-08  Jiahao Xu  <xujiahao@loongson.cn>
+
+	PR target/112611
+	* gcc.target/loongarch/vector/lasx/lasx-xvshuf_b.c: Sure index less than 64.
+	* gcc.target/loongarch/vector/lsx/lsx-vshuf.c: Ditto.
+
+2023-12-08  Jiahao Xu  <xujiahao@loongson.cn>
+
+	* gcc.target/loongarch/divf.c: New test.
+	* gcc.target/loongarch/recip-divf.c: New test.
+	* gcc.target/loongarch/recip-sqrtf.c: New test.
+	* gcc.target/loongarch/sqrtf.c: New test.
+	* gcc.target/loongarch/vector/lasx/lasx-divf.c: New test.
+	* gcc.target/loongarch/vector/lasx/lasx-recip-divf.c: New test.
+	* gcc.target/loongarch/vector/lasx/lasx-recip-sqrtf.c: New test.
+	* gcc.target/loongarch/vector/lasx/lasx-recip.c: New test.
+	* gcc.target/loongarch/vector/lasx/lasx-sqrtf.c: New test.
+	* gcc.target/loongarch/vector/lsx/lsx-divf.c: New test.
+	* gcc.target/loongarch/vector/lsx/lsx-recip-divf.c: New test.
+	* gcc.target/loongarch/vector/lsx/lsx-recip-sqrtf.c: New test.
+	* gcc.target/loongarch/vector/lsx/lsx-recip.c: New test.
+	* gcc.target/loongarch/vector/lsx/lsx-sqrtf.c: New test.
+
+2023-12-08  Jiahao Xu  <xujiahao@loongson.cn>
+
+	* gcc.target/loongarch/vector/lasx/lasx-rsqrt.c: New test.
+	* gcc.target/loongarch/vector/lsx/lsx-rsqrt.c: New test.
+
+2023-12-08  Jiahao Xu  <xujiahao@loongson.cn>
+
+	* gcc.target/loongarch/larch-frecipe-builtin.c: New test.
+	* gcc.target/loongarch/vector/lasx/lasx-frecipe-builtin.c: New test.
+	* gcc.target/loongarch/vector/lsx/lsx-frecipe-builtin.c: New test.
+
+2023-12-08  Pan Li  <pan2.li@intel.com>
+
+	* gcc.target/riscv/rvv/autovec/unop/math-lroundf16-rv64-ice-1.c: New test.
+
+2023-12-08  Jiahao Xu  <xujiahao@loongson.cn>
+
+	* gcc.target/loongarch/vector/lasx/lasx-xorsign-run.c: New test.
+	* gcc.target/loongarch/vector/lasx/lasx-xorsign.c: New test.
+	* gcc.target/loongarch/vector/lsx/lsx-xorsign-run.c: New test.
+	* gcc.target/loongarch/vector/lsx/lsx-xorsign.c: New test.
+	* gcc.target/loongarch/xorsign-run.c: New test.
+	* gcc.target/loongarch/xorsign.c: New test.
+
+2023-12-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/112902
+	* gcc.dg/bitint-52.c: New test.
+
+2023-12-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/112901
+	* gcc.dg/bitint-51.c: New test.
+
+2023-12-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/112411
+	* gcc.dg/params/blocksort-part.c: Add dg-skip-if for
+	--param min-nondebug-insn-uid=1073741824.
+
+2023-12-08  Haochen Jiang  <haochen.jiang@intel.com>
+
+	* g++.dg/other/i386-2.C: Adjust testcases.
+	* g++.dg/other/i386-3.C: Ditto.
+	* g++.dg/pr80481.C: Ditto.
+	* gcc.dg/pr71279.c: Ditto.
+	* gcc.target/i386/avx5124fmadd-v4fmaddps-1.c: Ditto.
+	* gcc.target/i386/avx5124fmadd-v4fmaddps-2.c: Ditto.
+	* gcc.target/i386/avx5124fmadd-v4fmaddss-1.c: Ditto.
+	* gcc.target/i386/avx5124fmadd-v4fnmaddps-1.c: Ditto.
+	* gcc.target/i386/avx5124fmadd-v4fnmaddps-2.c: Ditto.
+	* gcc.target/i386/avx5124fmadd-v4fnmaddss-1.c: Ditto.
+	* gcc.target/i386/avx5124vnniw-vp4dpwssd-1.c: Ditto.
+	* gcc.target/i386/avx5124vnniw-vp4dpwssd-2.c: Ditto.
+	* gcc.target/i386/avx5124vnniw-vp4dpwssds-1.c: Ditto.
+	* gcc.target/i386/avx5124vnniw-vp4dpwssds-2.c: Ditto.
+	* gcc.target/i386/avx512er-vexp2pd-1.c: Ditto.
+	* gcc.target/i386/avx512er-vexp2pd-2.c: Ditto.
+	* gcc.target/i386/avx512er-vexp2ps-1.c: Ditto.
+	* gcc.target/i386/avx512er-vexp2ps-2.c: Ditto.
+	* gcc.target/i386/avx512er-vrcp28pd-1.c: Ditto.
+	* gcc.target/i386/avx512er-vrcp28pd-2.c: Ditto.
+	* gcc.target/i386/avx512er-vrcp28ps-1.c: Ditto.
+	* gcc.target/i386/avx512er-vrcp28ps-2.c: Ditto.
+	* gcc.target/i386/avx512er-vrcp28ps-3.c: Ditto.
+	* gcc.target/i386/avx512er-vrcp28ps-4.c: Ditto.
+	* gcc.target/i386/avx512er-vrcp28sd-1.c: Ditto.
+	* gcc.target/i386/avx512er-vrcp28sd-2.c: Ditto.
+	* gcc.target/i386/avx512er-vrcp28ss-1.c: Ditto.
+	* gcc.target/i386/avx512er-vrcp28ss-2.c: Ditto.
+	* gcc.target/i386/avx512er-vrsqrt28pd-1.c: Ditto.
+	* gcc.target/i386/avx512er-vrsqrt28pd-2.c: Ditto.
+	* gcc.target/i386/avx512er-vrsqrt28ps-1.c: Ditto.
+	* gcc.target/i386/avx512er-vrsqrt28ps-2.c: Ditto.
+	* gcc.target/i386/avx512er-vrsqrt28ps-3.c: Ditto.
+	* gcc.target/i386/avx512er-vrsqrt28ps-4.c: Ditto.
+	* gcc.target/i386/avx512er-vrsqrt28ps-5.c: Ditto.
+	* gcc.target/i386/avx512er-vrsqrt28ps-6.c: Ditto.
+	* gcc.target/i386/avx512er-vrsqrt28sd-1.c: Ditto.
+	* gcc.target/i386/avx512er-vrsqrt28sd-2.c: Ditto.
+	* gcc.target/i386/avx512er-vrsqrt28ss-1.c: Ditto.
+	* gcc.target/i386/avx512er-vrsqrt28ss-2.c: Ditto.
+	* gcc.target/i386/avx512f-gather-1.c: Ditto.
+	* gcc.target/i386/avx512f-gather-2.c: Ditto.
+	* gcc.target/i386/avx512f-gather-3.c: Ditto.
+	* gcc.target/i386/avx512f-gather-4.c: Ditto.
+	* gcc.target/i386/avx512f-gather-5.c: Ditto.
+	* gcc.target/i386/avx512f-i32gatherd512-1.c: Ditto.
+	* gcc.target/i386/avx512f-i32gatherd512-2.c: Ditto.
+	* gcc.target/i386/avx512f-i32gatherpd512-1.c: Ditto.
+	* gcc.target/i386/avx512f-i32gatherpd512-2.c: Ditto.
+	* gcc.target/i386/avx512f-i32gatherps512-1.c: Ditto.
+	* gcc.target/i386/avx512f-vect-perm-1.c: Ditto.
+	* gcc.target/i386/avx512f-vect-perm-2.c: Ditto.
+	* gcc.target/i386/avx512pf-vgatherpf0dpd-1.c: Ditto.
+	* gcc.target/i386/avx512pf-vgatherpf0dps-1.c: Ditto.
+	* gcc.target/i386/avx512pf-vgatherpf0qpd-1.c: Ditto.
+	* gcc.target/i386/avx512pf-vgatherpf0qps-1.c: Ditto.
+	* gcc.target/i386/avx512pf-vgatherpf1dpd-1.c: Ditto.
+	* gcc.target/i386/avx512pf-vgatherpf1dps-1.c: Ditto.
+	* gcc.target/i386/avx512pf-vgatherpf1qpd-1.c: Ditto.
+	* gcc.target/i386/avx512pf-vgatherpf1qps-1.c: Ditto.
+	* gcc.target/i386/avx512pf-vscatterpf0dpd-1.c: Ditto.
+	* gcc.target/i386/avx512pf-vscatterpf0dps-1.c: Ditto.
+	* gcc.target/i386/avx512pf-vscatterpf0qpd-1.c: Ditto.
+	* gcc.target/i386/avx512pf-vscatterpf0qps-1.c: Ditto.
+	* gcc.target/i386/avx512pf-vscatterpf1dpd-1.c: Ditto.
+	* gcc.target/i386/avx512pf-vscatterpf1dps-1.c: Ditto.
+	* gcc.target/i386/avx512pf-vscatterpf1qpd-1.c: Ditto.
+	* gcc.target/i386/avx512pf-vscatterpf1qps-1.c: Ditto.
+	* gcc.target/i386/funcspec-56.inc: Ditto.
+	* gcc.target/i386/pr103404.c: Ditto.
+	* gcc.target/i386/pr104448.c: Ditto.
+	* gcc.target/i386/pr107934.c: Ditto.
+	* gcc.target/i386/pr64387.c: Ditto.
+	* gcc.target/i386/pr70728.c: Ditto.
+	* gcc.target/i386/pr71346.c: Ditto.
+	* gcc.target/i386/pr82941-2.c: Ditto.
+	* gcc.target/i386/pr82942-1.c: Ditto.
+	* gcc.target/i386/pr82942-2.c: Ditto.
+	* gcc.target/i386/pr82990-1.c: Ditto.
+	* gcc.target/i386/pr82990-3.c: Ditto.
+	* gcc.target/i386/pr82990-4.c: Ditto.
+	* gcc.target/i386/pr82990-6.c: Ditto.
+	* gcc.target/i386/pr88713-3.c: Ditto.
+	* gcc.target/i386/pr89523-5.c: Ditto.
+	* gcc.target/i386/pr89523-6.c: Ditto.
+	* gcc.target/i386/pr91033.c: Ditto.
+	* gcc.target/i386/pr94561.c: Ditto.
+	* gcc.target/i386/prefetchwt1-1.c: Ditto.
+	* gcc.target/i386/sse-12.c: Ditto.
+	* gcc.target/i386/sse-13.c: Ditto.
+	* gcc.target/i386/sse-14.c: Ditto.
+	* gcc.target/i386/sse-26.c: Ditto.
+	* gcc.target/i386/pr69471-3.c: Removed.
+
+2023-12-08  Hao Liu  <hliu@os.amperecomputing.com>
+
+	* gcc.dg/tree-ssa/scev-16.c: New test.
+
+2023-12-08  Fei Gao  <gaofei@eswincomputing.com>
+
+	* gcc.target/riscv/zicond_ifcvt_opt.c: New file.
+
+2023-12-08  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/112889
+	* c-c++-common/analyzer/ice-pr112889.c: New test.
+
 2023-12-07  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
 
 	* gcc.target/riscv/rvv/autovec/slp-interleave-1.c: New test.

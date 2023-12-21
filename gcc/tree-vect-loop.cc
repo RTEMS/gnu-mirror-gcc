@@ -4870,10 +4870,19 @@ vect_estimate_min_profitable_iters (loop_vec_info loop_vinfo,
 	    if (partial_load_store_bias != 0)
 	      body_stmts += 1;
 
-	    /* Each may need two MINs and one MINUS to update lengths in body
-	       for next iteration.  */
+	    unsigned int length_update_cost = 0;
+	    if (LOOP_VINFO_USING_DECREMENTING_IV_P (loop_vinfo))
+	      /* For decrement IV style, Each only need a single SELECT_VL
+		 or MIN since beginning to calculate the number of elements
+		 need to be processed in current iteration.  */
+	      length_update_cost = 1;
+	    else
+	      /* For increment IV stype, Each may need two MINs and one MINUS to
+		 update lengths in body for next iteration.  */
+	      length_update_cost = 3;
+
 	    if (need_iterate_p)
-	      body_stmts += 3 * num_vectors;
+	      body_stmts += length_update_cost * num_vectors;
 	  }
 
       (void) add_stmt_cost (target_cost_data, prologue_stmts,

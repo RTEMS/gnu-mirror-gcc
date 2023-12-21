@@ -125,6 +125,11 @@
    (T1_REGNUM			13)
    (S0_REGNUM			23)
 
+   ;; Return path styles
+   (NORMAL_RETURN		0)
+   (SIBCALL_RETURN		1)
+   (EXCEPTION_RETURN		2)
+
    ;; PIC long branch sequences are never longer than 100 bytes.
    (MAX_PIC_BRANCH_LENGTH	100)
 ])
@@ -2869,6 +2874,18 @@
   [(set_attr "type" "arith")
    (set_attr "mode" "<MODE>")])
 
+(define_insn "alslsi3_extend"
+  [(set (match_operand:DI 0 "register_operand" "=r")
+	(sign_extend:DI
+	  (plus:SI
+	    (ashift:SI (match_operand:SI 1 "register_operand" "r")
+		       (match_operand 2 "const_immalsl_operand" ""))
+	    (match_operand:SI 3 "register_operand" "r"))))]
+  ""
+  "alsl.w\t%0,%1,%3,%2"
+  [(set_attr "type" "arith")
+   (set_attr "mode" "SI")])
+
 
 
 ;; Reverse the order of bytes of operand 1 and store the result in operand 0.
@@ -3276,7 +3293,7 @@
   [(const_int 2)]
   ""
 {
-  loongarch_expand_epilogue (false);
+  loongarch_expand_epilogue (NORMAL_RETURN);
   DONE;
 })
 
@@ -3284,7 +3301,7 @@
   [(const_int 2)]
   ""
 {
-  loongarch_expand_epilogue (true);
+  loongarch_expand_epilogue (SIBCALL_RETURN);
   DONE;
 })
 
@@ -3341,6 +3358,20 @@
     emit_insn (gen_eh_set_ra_di (operands[0]));
   else
     emit_insn (gen_eh_set_ra_si (operands[0]));
+
+  emit_jump_insn (gen_eh_return_internal ());
+  emit_barrier ();
+  DONE;
+})
+
+(define_insn_and_split "eh_return_internal"
+  [(eh_return)]
+  ""
+  "#"
+  "epilogue_completed"
+  [(const_int 0)]
+{
+  loongarch_expand_epilogue (EXCEPTION_RETURN);
   DONE;
 })
 

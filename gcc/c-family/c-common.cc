@@ -560,13 +560,6 @@ const struct c_common_resword c_common_reswords[] =
   { "wchar_t",		RID_WCHAR,	D_CXXONLY },
   { "while",		RID_WHILE,	0 },
 
-#define DEFTRAIT(TCC, CODE, NAME, ARITY) \
-  { NAME,		RID_##CODE,	D_CXXONLY },
-#include "cp/cp-trait.def"
-#undef DEFTRAIT
-  /* An alias for __is_same.  */
-  { "__is_same_as",	RID_IS_SAME,	D_CXXONLY },
-
   /* C++ transactional memory.  */
   { "synchronized",	RID_SYNCHRONIZED, D_CXX_OBJC | D_TRANSMEM },
   { "atomic_noexcept",	RID_ATOMIC_NOEXCEPT, D_CXXONLY | D_TRANSMEM },
@@ -7644,7 +7637,7 @@ get_atomic_generic_size (location_t loc, tree function,
 		return 0;
 	      }
 	    else
-	      pedwarn (loc, OPT_Wincompatible_pointer_types, "argument %d "
+	      pedwarn (loc, OPT_Wdiscarded_qualifiers, "argument %d "
 		       "of %qE discards %<const%> qualifier", x + 1,
 		       function);
 	  }
@@ -7658,7 +7651,7 @@ get_atomic_generic_size (location_t loc, tree function,
 		return 0;
 	      }
 	    else
-	      pedwarn (loc, OPT_Wincompatible_pointer_types, "argument %d "
+	      pedwarn (loc, OPT_Wdiscarded_qualifiers, "argument %d "
 		       "of %qE discards %<volatile%> qualifier", x + 1,
 		       function);
 	  }

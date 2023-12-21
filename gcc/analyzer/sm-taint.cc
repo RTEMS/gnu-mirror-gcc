@@ -830,13 +830,13 @@ private:
 /* taint_state_machine's ctor.  */
 
 taint_state_machine::taint_state_machine (logger *logger)
-: state_machine ("taint", logger)
+: state_machine ("taint", logger),
+  m_tainted (add_state ("tainted")),
+  m_has_lb (add_state ("has_lb")),
+  m_has_ub (add_state ("has_ub")),
+  m_stop (add_state ("stop")),
+  m_tainted_control_flow (add_state ("tainted-control-flow"))
 {
-  m_tainted = add_state ("tainted");
-  m_has_lb = add_state ("has_lb");
-  m_has_ub = add_state ("has_ub");
-  m_stop = add_state ("stop");
-  m_tainted_control_flow = add_state ("tainted-control-flow");
 }
 
 state_machine::state_t
@@ -891,11 +891,18 @@ taint_state_machine::alt_get_inherited_state (const sm_state_map &map,
 	  case MULT_EXPR:
 	  case POINTER_PLUS_EXPR:
 	  case TRUNC_DIV_EXPR:
-	  case TRUNC_MOD_EXPR:
 	    {
 	      state_t arg0_state = map.get_state (arg0, ext_state);
 	      state_t arg1_state = map.get_state (arg1, ext_state);
 	      return combine_states (arg0_state, arg1_state);
+	    }
+	    break;
+
+	  case TRUNC_MOD_EXPR:
+	    {
+	      /* The left-hand side of X % Y can be sanitized by
+		 the operation.  */
+	      return map.get_state (arg1, ext_state);
 	    }
 	    break;
 

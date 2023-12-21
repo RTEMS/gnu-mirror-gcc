@@ -974,6 +974,9 @@ dump_omp_clause (pretty_printer *pp, tree clause, int spc, dump_flags_t flags)
 	case GOMP_MAP_STRUCT:
 	  pp_string (pp, "struct");
 	  break;
+	case GOMP_MAP_STRUCT_UNORD:
+	  pp_string (pp, "struct_unord");
+	  break;
 	case GOMP_MAP_ALWAYS_POINTER:
 	  pp_string (pp, "always_pointer");
 	  break;
@@ -1050,6 +1053,15 @@ dump_omp_clause (pretty_printer *pp, tree clause, int spc, dump_flags_t flags)
 	    case GOMP_MAP_ATTACH_ZERO_LENGTH_ARRAY_SECTION:
 	      pp_string (pp, " [bias: ");
 	      break;
+	    case GOMP_MAP_RELEASE:
+	    case GOMP_MAP_DELETE:
+	      if (OMP_CLAUSE_CODE (clause) == OMP_CLAUSE_MAP
+		  && OMP_CLAUSE_RELEASE_DESCRIPTOR (clause))
+		{
+		  pp_string (pp, " [pointer set, len: ");
+		  break;
+		}
+	      /* Fallthrough.  */
 	    default:
 	      pp_string (pp, " [len: ");
 	      break;
@@ -1675,7 +1687,9 @@ dump_omp_atomic_memory_order (pretty_printer *pp, enum omp_memory_order mo)
 static void
 dump_mem_ref (pretty_printer *pp, tree node, int spc, dump_flags_t flags)
 {
-  if (TREE_CODE (node) == MEM_REF && (flags & TDF_GIMPLE))
+  if ((TREE_CODE (node) == MEM_REF
+       || TREE_CODE (node) == TARGET_MEM_REF)
+      && (flags & TDF_GIMPLE))
     {
       pp_string (pp, "__MEM <");
       dump_generic_node (pp, TREE_TYPE (node),
@@ -1703,6 +1717,26 @@ dump_mem_ref (pretty_printer *pp, tree node, int spc, dump_flags_t flags)
 	  pp_string (pp, " + ");
 	  dump_generic_node (pp, TREE_OPERAND (node, 1),
 			     spc, flags | TDF_SLIM, false);
+	}
+      if (TREE_CODE (node) == TARGET_MEM_REF)
+	{
+	  if (TREE_OPERAND (node, 2))
+	    {
+	      /* INDEX * STEP  */
+	      pp_string (pp, " + ");
+	      dump_generic_node (pp, TREE_OPERAND (node, 2),
+				 spc, flags | TDF_SLIM, false);
+	      pp_string (pp, " * ");
+	      dump_generic_node (pp, TREE_OPERAND (node, 3),
+				 spc, flags | TDF_SLIM, false);
+	    }
+	  if (TREE_OPERAND (node, 4))
+	    {
+	      /* INDEX2  */
+	      pp_string (pp, " + ");
+	      dump_generic_node (pp, TREE_OPERAND (node, 4),
+				 spc, flags | TDF_SLIM, false);
+	    }
 	}
       pp_right_paren (pp);
     }
@@ -1968,7 +2002,9 @@ dump_generic_node (pretty_printer *pp, tree node, int spc, dump_flags_t flags,
 	  }
 	else if (tclass == tcc_type)
 	  {
-	    if (TYPE_NAME (node))
+	    if ((flags & TDF_GIMPLE) && node == sizetype)
+	      pp_string (pp, "__SIZETYPE__");
+	    else if (TYPE_NAME (node))
 	      {
 		if (TREE_CODE (TYPE_NAME (node)) == IDENTIFIER_NODE)
 		  pp_tree_identifier (pp, TYPE_NAME (node));
@@ -1980,11 +2016,22 @@ dump_generic_node (pretty_printer *pp, tree node, int spc, dump_flags_t flags,
 	      }
 	    else if (TREE_CODE (node) == VECTOR_TYPE)
 	      {
-		pp_string (pp, "vector");
-		pp_left_paren (pp);
-		pp_wide_integer (pp, TYPE_VECTOR_SUBPARTS (node));
-		pp_string (pp, ") ");
-		dump_generic_node (pp, TREE_TYPE (node), spc, flags, false);
+		if (flags & TDF_GIMPLE)
+		  {
+		    dump_generic_node (pp, TREE_TYPE (node), spc, flags, false);
+		    pp_string (pp, " [[gnu::vector_size(");
+		    pp_wide_integer
+		      (pp, tree_to_poly_uint64 (TYPE_SIZE_UNIT (node)));
+		    pp_string (pp, ")]]");
+		  }
+		else
+		  {
+		    pp_string (pp, "vector");
+		    pp_left_paren (pp);
+		    pp_wide_integer (pp, TYPE_VECTOR_SUBPARTS (node));
+		    pp_string (pp, ") ");
+		    dump_generic_node (pp, TREE_TYPE (node), spc, flags, false);
+		  }
 	      }
 	    else if (TREE_CODE (node) == INTEGER_TYPE)
 	      {
@@ -2624,8 +2671,23 @@ dump_generic_node (pretty_printer *pp, tree node, int spc, dump_flags_t flags,
 	if (TREE_CLOBBER_P (node))
 	  {
 	    pp_string (pp, "CLOBBER");
-	    if (CLOBBER_KIND (node) == CLOBBER_EOL)
-	      pp_string (pp, "(eol)");
+	    switch (CLOBBER_KIND (node))
+	      {
+	      case CLOBBER_STORAGE_BEGIN:
+		pp_string (pp, "(bos)");
+		break;
+	      case CLOBBER_STORAGE_END:
+		pp_string (pp, "(eos)");
+		break;
+	      case CLOBBER_OBJECT_BEGIN:
+		pp_string (pp, "(bob)");
+		break;
+	      case CLOBBER_OBJECT_END:
+		pp_string (pp, "(eob)");
+		break;
+	      default:
+		break;
+	      }
 	  }
 	else if (TREE_CODE (TREE_TYPE (node)) == RECORD_TYPE
 		 || TREE_CODE (TREE_TYPE (node)) == UNION_TYPE)

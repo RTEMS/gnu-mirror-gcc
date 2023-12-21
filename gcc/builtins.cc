@@ -1403,8 +1403,24 @@ get_memory_rtx (tree exp, tree len)
 
 /* Built-in functions to perform an untyped call and return.  */
 
+/* Wrapper that implicitly applies a delta when getting or setting the
+   enclosed value.  */
+template <typename T>
+class delta_type
+{
+  T &value; T const delta;
+public:
+  delta_type (T &val, T dlt) : value (val), delta (dlt) {}
+  operator T () const { return value + delta; }
+  T operator = (T val) const { value = val - delta; return val; }
+};
+
+#define saved_apply_args_size \
+  (delta_type<int> (this_target_builtins->x_apply_args_size_plus_one, -1))
 #define apply_args_mode \
   (this_target_builtins->x_apply_args_mode)
+#define saved_apply_result_size \
+  (delta_type<int> (this_target_builtins->x_apply_result_size_plus_one, -1))
 #define apply_result_mode \
   (this_target_builtins->x_apply_result_mode)
 
@@ -1414,7 +1430,7 @@ get_memory_rtx (tree exp, tree len)
 static int
 apply_args_size (void)
 {
-  static int size = -1;
+  int size = saved_apply_args_size;
   int align;
   unsigned int regno;
 
@@ -1447,6 +1463,8 @@ apply_args_size (void)
 	  }
 	else
 	  apply_args_mode[regno] = as_a <fixed_size_mode> (VOIDmode);
+
+      saved_apply_args_size = size;
     }
   return size;
 }
@@ -1457,7 +1475,7 @@ apply_args_size (void)
 static int
 apply_result_size (void)
 {
-  static int size = -1;
+  int size = saved_apply_result_size;
   int align, regno;
 
   /* The values computed by this function never change.  */
@@ -1489,6 +1507,8 @@ apply_result_size (void)
 #ifdef APPLY_RESULT_SIZE
       size = APPLY_RESULT_SIZE;
 #endif
+
+      saved_apply_result_size = size;
     }
   return size;
 }
@@ -4284,6 +4304,40 @@ expand_builtin_memset (tree exp, rtx target, machine_mode mode)
   return expand_builtin_memset_args (dest, val, len, target, mode, exp);
 }
 
+/* Check that store_by_pieces allows BITS + LEN (so that we don't
+   expand something too unreasonably long), and every power of 2 in
+   BITS.  It is assumed that LEN has already been tested by
+   itself.  */
+static bool
+can_store_by_multiple_pieces (unsigned HOST_WIDE_INT bits,
+			      by_pieces_constfn constfun,
+			      void *constfundata, unsigned int align,
+			      bool memsetp,
+			      unsigned HOST_WIDE_INT len)
+{
+  if (bits
+      && !can_store_by_pieces (bits + len, constfun, constfundata,
+			       align, memsetp))
+    return false;
+
+  /* BITS set are expected to be generally in the low range and
+     contiguous.  We do NOT want to repeat the test above in case BITS
+     has a single bit set, so we terminate the loop when BITS == BIT.
+     In the unlikely case that BITS has the MSB set, also terminate in
+     case BIT gets shifted out.  */
+  for (unsigned HOST_WIDE_INT bit = 1; bit < bits && bit; bit <<= 1)
+    {
+      if ((bits & bit) == 0)
+	continue;
+
+      if (!can_store_by_pieces (bit, constfun, constfundata,
+				align, memsetp))
+	return false;
+    }
+
+  return true;
+}
+
 /* Try to store VAL (or, if NULL_RTX, VALC) in LEN bytes starting at TO.
    Return TRUE if successful, FALSE otherwise.  TO is assumed to be
    aligned at an ALIGN-bits boundary.  LEN must be a multiple of
@@ -4341,7 +4395,11 @@ try_store_by_multiple_pieces (rtx to, rtx len, unsigned int ctz_len,
   else
     /* Huh, max_len < min_len?  Punt.  See pr100843.c.  */
     return false;
-  if (min_len >= blksize)
+  if (min_len >= blksize
+      /* ??? Maybe try smaller fixed-prefix blksizes before
+	 punting?  */
+      && can_store_by_pieces (blksize, builtin_memset_read_str,
+			      &valc, align, true))
     {
       min_len -= blksize;
       min_bits = floor_log2 (min_len);
@@ -4367,8 +4425,9 @@ try_store_by_multiple_pieces (rtx to, rtx len, unsigned int ctz_len,
      happen because of the way max_bits and blksize are related, but
      it doesn't hurt to test.  */
   if (blksize > xlenest
-      || !can_store_by_pieces (xlenest, builtin_memset_read_str,
-			       &valc, align, true))
+      || !can_store_by_multiple_pieces (xlenest - blksize,
+					builtin_memset_read_str,
+					&valc, align, true, blksize))
     {
       if (!(flag_inline_stringops & ILSOP_MEMSET))
 	return false;
@@ -4386,17 +4445,17 @@ try_store_by_multiple_pieces (rtx to, rtx len, unsigned int ctz_len,
 	     of overflow.  */
 	  if (max_bits < orig_max_bits
 	      && xlenest + blksize >= xlenest
-	      && can_store_by_pieces (xlenest + blksize,
-				      builtin_memset_read_str,
-				      &valc, align, true))
+	      && can_store_by_multiple_pieces (xlenest,
+					       builtin_memset_read_str,
+					       &valc, align, true, blksize))
 	    {
 	      max_loop = true;
 	      break;
 	    }
 	  if (blksize
-	      && can_store_by_pieces (xlenest,
-				      builtin_memset_read_str,
-				      &valc, align, true))
+	      && can_store_by_multiple_pieces (xlenest,
+					       builtin_memset_read_str,
+					       &valc, align, true, 0))
 	    {
 	      max_len += blksize;
 	      min_len += blksize;
@@ -4432,10 +4491,6 @@ try_store_by_multiple_pieces (rtx to, rtx len, unsigned int ctz_len,
       if (max_len >> max_bits > min_len >> max_bits)
 	tst_bits = max_bits;
     }
-  /* ??? Do we have to check that all powers of two lengths from
-     max_bits down to ctz_len pass can_store_by_pieces?  As in, could
-     it possibly be that xlenest passes while smaller power-of-two
-     sizes don't?  */
 
   by_pieces_constfn constfun;
   void *constfundata;
@@ -4519,7 +4574,7 @@ try_store_by_multiple_pieces (rtx to, rtx len, unsigned int ctz_len,
 	  to = change_address (to, QImode, 0);
 	  emit_move_insn (to, val);
 	  if (update_needed)
-	    next_ptr = plus_constant (ptr_mode, ptr, blksize);
+	    next_ptr = plus_constant (GET_MODE (ptr), ptr, blksize);
 	}
       else
 	{
@@ -5392,8 +5447,38 @@ expand_builtin_frame_address (tree fndecl, tree exp)
 static rtx
 expand_builtin_stack_address ()
 {
-  return convert_to_mode (ptr_mode, copy_to_reg (stack_pointer_rtx),
-			  STACK_UNSIGNED);
+  rtx ret = convert_to_mode (ptr_mode, copy_to_reg (stack_pointer_rtx),
+			     STACK_UNSIGNED);
+
+  /* Unbias the stack pointer, bringing it to the boundary between the
+     stack area claimed by the active function calling this builtin,
+     and stack ranges that could get clobbered if it called another
+     function.  It should NOT encompass any stack red zone, that is
+     used in leaf functions.
+
+     On SPARC, the register save area is *not* considered active or
+     used by the active function, but rather as akin to the area in
+     which call-preserved registers are saved by callees.  This
+     enables __strub_leave to clear what would otherwise overlap with
+     its own register save area.
+
+     If the address is computed too high or too low, parts of a stack
+     range that should be scrubbed may be left unscrubbed, scrubbing
+     may corrupt active portions of the stack frame, and stack ranges
+     may be doubly-scrubbed by caller and callee.
+
+     In order for it to be just right, the area delimited by
+     @code{__builtin_stack_address} and @code{__builtin_frame_address
+     (0)} should encompass caller's registers saved by the function,
+     local on-stack variables and @code{alloca} stack areas.
+     Accumulated outgoing on-stack arguments, preallocated as part of
+     a function's own prologue, are to be regarded as part of the
+     (caller) function's active area as well, whereas those pushed or
+     allocated temporarily for a call are regarded as part of the
+     callee's stack range, rather than the caller's.  */
+  ret = plus_constant (ptr_mode, ret, STACK_POINTER_OFFSET);
+
+  return force_reg (ptr_mode, ret);
 }
 
 /* Expand a call to builtin function __builtin_strub_enter.  */
