@@ -23,7 +23,7 @@ gcc/testsuite/
 	* gcc.target/powerpc/vector-pair-9.c: Likewise.
 	* gcc.target/powerpc/vector-pair-10.c: Likewise.
 	* gcc.target/powerpc/vector-pair-11.c: Likewise.
-	* gcc.target/powerpc/vector-pair-12xs.c: Likewise.
+	* gcc.target/powerpc/vector-pair-12.c: Likewise.
 
 2023-12-21  Michael Meissner  <meissner@linux.ibm.com>
 
