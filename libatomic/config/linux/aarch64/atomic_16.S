@@ -751,6 +751,7 @@ ALIAS (libat_test_and_set_16, LSE2, CORE)
 #define FEATURE_1_AND 0xc0000000
 #define FEATURE_1_BTI 1
 #define FEATURE_1_PAC 2
+#define FEATURE_1_GCS 4
 
 /* Supported features based on the code generation options.  */
 #if defined(__ARM_FEATURE_BTI_DEFAULT)
@@ -763,6 +764,12 @@ ALIAS (libat_test_and_set_16, LSE2, CORE)
 # define PAC_FLAG FEATURE_1_PAC
 #else
 # define PAC_FLAG 0
+#endif
+
+#if __ARM_FEATURE_GCS_DEFAULT
+# define GCS_FLAG FEATURE_1_GCS
+#else
+# define GCS_FLAG 0
 #endif
 
 /* Add a NT_GNU_PROPERTY_TYPE_0 note.  */
@@ -783,6 +790,6 @@ ALIAS (libat_test_and_set_16, LSE2, CORE)
 
 /* Add GNU property note if built with branch protection.  */
 # if (BTI_FLAG|PAC_FLAG) != 0
-GNU_PROPERTY (FEATURE_1_AND, BTI_FLAG|PAC_FLAG)
+GNU_PROPERTY (FEATURE_1_AND, BTI_FLAG|PAC_FLAG|GCS_FLAG)
 # endif
 #endif
