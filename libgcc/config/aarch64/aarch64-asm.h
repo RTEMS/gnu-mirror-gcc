@@ -38,6 +38,7 @@
 #define FEATURE_1_AND 0xc0000000
 #define FEATURE_1_BTI 1
 #define FEATURE_1_PAC 2
+#define FEATURE_1_GCS 4
 
 /* Supported features based on the code generation options.  */
 #if defined(__ARM_FEATURE_BTI_DEFAULT)
@@ -56,6 +57,12 @@
 # define PAC_FLAG 0
 # define PACIASP
 # define AUTIASP
+#endif
+
+#if __ARM_FEATURE_GCS_DEFAULT
+# define GCS_FLAG FEATURE_1_GCS
+#else
+# define GCS_FLAG 0
 #endif
 
 #ifdef __ELF__
@@ -88,8 +95,8 @@
 .previous
 
 /* Add GNU property note if built with branch protection.  */
-# if (BTI_FLAG|PAC_FLAG) != 0
-GNU_PROPERTY (FEATURE_1_AND, BTI_FLAG|PAC_FLAG)
+# if (BTI_FLAG|PAC_FLAG|GCS_FLAG) != 0
+GNU_PROPERTY (FEATURE_1_AND, BTI_FLAG|PAC_FLAG|GCS_FLAG)
 # endif
 #endif
 
