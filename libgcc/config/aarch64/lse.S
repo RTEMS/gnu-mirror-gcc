@@ -85,6 +85,8 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 # error
 #endif
 
+#undef L
+
 #if MODEL == 1
 # define SUFF  _relax
 # define A
