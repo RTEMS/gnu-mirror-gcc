@@ -60,7 +60,7 @@ enum loongarch_symbol_type {
 extern rtx loongarch_emit_move (rtx, rtx);
 extern HOST_WIDE_INT loongarch_initial_elimination_offset (int, int);
 extern void loongarch_expand_prologue (void);
-extern void loongarch_expand_epilogue (bool);
+extern void loongarch_expand_epilogue (int);
 extern bool loongarch_can_use_return_insn (void);
 
 extern bool loongarch_symbolic_constant_p (rtx, enum loongarch_symbol_type *);
@@ -205,6 +205,7 @@ extern void loongarch_register_frame_header_opt (void);
 extern void loongarch_expand_vec_cond_expr (machine_mode, machine_mode, rtx *);
 extern void loongarch_expand_vec_cond_mask_expr (machine_mode, machine_mode,
 						 rtx *);
+extern void loongarch_expand_vec_widen_hilo (rtx, rtx, rtx, bool, bool, const char *);
 
 /* Routines implemented in loongarch-c.c.  */
 void loongarch_cpu_cpp_builtins (cpp_reader *);
@@ -219,4 +220,7 @@ extern rtx loongarch_gen_const_int_vector_shuffle (machine_mode, int);
 extern tree loongarch_build_builtin_va_list (void);
 
 extern rtx loongarch_build_signbit_mask (machine_mode, bool, bool);
+extern void loongarch_emit_swrsqrtsf (rtx, rtx, machine_mode, bool);
+extern void loongarch_emit_swdivsf (rtx, rtx, rtx, machine_mode);
+extern bool loongarch_explicit_relocs_p (enum loongarch_symbol_type);
 #endif /* ! GCC_LOONGARCH_PROTOS_H */

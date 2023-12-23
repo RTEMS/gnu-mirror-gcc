@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-options "-march=rv32gcv -mabi=ilp32 --param riscv-autovec-preference=scalable -fselective-scheduling -fdump-tree-vect-details" } */
+/* { dg-options "-march=rv32gcv -mabi=ilp32 -O3 -ftree-vectorize --param riscv-autovec-lmul=dynamic -fselective-scheduling -fdump-tree-vect-details" } */
 
 #include <stdint-gcc.h>
 
@@ -31,6 +31,6 @@ foo (uint8_t *restrict a, uint8_t *restrict b, int n)
 /* { dg-final { scan-assembler {e8,m4} } } */
 /* { dg-final { scan-assembler-times {csrr} 1 } } */
 /* { dg-final { scan-tree-dump-not "Maximum lmul = 8" "vect" } } */
-/* { dg-final { scan-tree-dump-times "Maximum lmul = 4" 1 "vect" } } */
+/* { dg-final { scan-tree-dump "Maximum lmul = 4" "vect" } } */
 /* { dg-final { scan-tree-dump-not "Maximum lmul = 2" "vect" } } */
 /* { dg-final { scan-tree-dump-not "Maximum lmul = 1" "vect" } } */

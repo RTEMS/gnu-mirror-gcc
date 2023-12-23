@@ -2461,6 +2461,10 @@ contains_pointers_p (tree type)
    it all the way to final.  See PR 17982 for further discussion.  */
 static GTY(()) tree pending_assemble_externals;
 
+/* A similar list of pending libcall symbols.  We only want to declare
+   symbols that are actually used in the final assembly.  */
+static GTY(()) rtx pending_libcall_symbols;
+
 #ifdef ASM_OUTPUT_EXTERNAL
 /* Some targets delay some output to final using TARGET_ASM_FILE_END.
    As a result, assemble_external can be called after the list of externals
@@ -2520,8 +2524,17 @@ process_pending_assemble_externals (void)
   for (list = pending_assemble_externals; list; list = TREE_CHAIN (list))
     assemble_external_real (TREE_VALUE (list));
 
+  for (rtx list = pending_libcall_symbols; list; list = XEXP (list, 1))
+    {
+      rtx symbol = XEXP (list, 0);
+      tree id = get_identifier (XSTR (symbol, 0));
+      if (TREE_SYMBOL_REFERENCED (id))
+	targetm.asm_out.external_libcall (symbol);
+    }
+
   pending_assemble_externals = 0;
   pending_assemble_externals_processed = true;
+  pending_libcall_symbols = NULL_RTX;
   delete pending_assemble_externals_set;
 #endif
 }
@@ -2594,8 +2607,17 @@ assemble_external_libcall (rtx fun)
   /* Declare library function name external when first used, if nec.  */
   if (! SYMBOL_REF_USED (fun))
     {
+#ifdef ASM_OUTPUT_EXTERNAL
+      gcc_assert (!pending_assemble_externals_processed);
+#endif
       SYMBOL_REF_USED (fun) = 1;
-      targetm.asm_out.external_libcall (fun);
+      /* Make sure the libcall symbol is in the symtab so any
+         reference to it will mark its tree node as referenced, via
+         assemble_name_resolve.  These are eventually emitted, if
+         used, in process_pending_assemble_externals. */
+      get_identifier (XSTR (fun, 0));
+      pending_libcall_symbols = gen_rtx_EXPR_LIST (VOIDmode, fun,
+						   pending_libcall_symbols);
     }
 }
 
@@ -4300,6 +4322,8 @@ output_constant_pool_contents (struct rtx_constant_pool *pool)
     if (desc->mark < 0)
       {
 #ifdef ASM_OUTPUT_DEF
+	gcc_checking_assert (TARGET_SUPPORTS_ALIASES);
+
 	const char *name = XSTR (desc->sym, 0);
 	char label[256];
 	char buffer[256 + 32];
@@ -5291,7 +5315,8 @@ output_constant (tree exp, unsigned HOST_WIDE_INT size, unsigned int align,
 	  tree type = TREE_TYPE (exp);
 	  bool ok = targetm.c.bitint_type_info (TYPE_PRECISION (type), &info);
 	  gcc_assert (ok);
-	  scalar_int_mode limb_mode = as_a <scalar_int_mode> (info.limb_mode);
+	  scalar_int_mode limb_mode
+	    = as_a <scalar_int_mode> (info.abi_limb_mode);
 	  if (TYPE_PRECISION (type) <= GET_MODE_PRECISION (limb_mode))
 	    {
 	      cst = expand_expr (exp, NULL_RTX, VOIDmode, EXPAND_INITIALIZER);
@@ -6280,6 +6305,10 @@ do_assemble_alias (tree decl, tree target)
 		  IDENTIFIER_POINTER (id),
 		  IDENTIFIER_POINTER (target));
 # endif
+  /* If symbol aliases aren't actually supported...  */
+  if (!TARGET_SUPPORTS_ALIASES)
+    /* ..., 'ASM_OUTPUT_DEF{,_FROM_DECLS}' better have raised an error.  */
+    gcc_checking_assert (seen_error ());
 #elif defined (ASM_OUTPUT_WEAK_ALIAS) || defined (ASM_WEAKEN_DECL)
   {
     const char *name;
@@ -6349,9 +6378,8 @@ assemble_alias (tree decl, tree target)
       if (TREE_PUBLIC (decl))
 	error ("%qs symbol %q+D must have static linkage", "weakref", decl);
     }
-  else
+  else if (!TARGET_SUPPORTS_ALIASES)
     {
-#if !defined (ASM_OUTPUT_DEF)
 # if !defined(ASM_OUTPUT_WEAK_ALIAS) && !defined (ASM_WEAKEN_DECL)
       error_at (DECL_SOURCE_LOCATION (decl),
 		"alias definitions not supported in this configuration");
@@ -6372,7 +6400,7 @@ assemble_alias (tree decl, tree target)
 	  return;
 	}
 # endif
-#endif
+      gcc_unreachable ();
     }
   TREE_USED (decl) = 1;
 
@@ -7461,6 +7489,8 @@ default_strip_name_encoding (const char *str)
 void
 default_asm_output_anchor (rtx symbol)
 {
+  gcc_checking_assert (TARGET_SUPPORTS_ALIASES);
+
   char buffer[100];
 
   sprintf (buffer, "*. + " HOST_WIDE_INT_PRINT_DEC,

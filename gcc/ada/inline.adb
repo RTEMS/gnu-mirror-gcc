@@ -2908,7 +2908,7 @@ package body Inline is
          else
             Push_Scope (Scop);
             Expand_Cleanup_Actions (Decl);
-            End_Scope;
+            Pop_Scope;
          end if;
 
          Next_Elmt (Elmt);
@@ -3629,16 +3629,9 @@ package body Inline is
       function Process_Formals_In_Aspects
         (N : Node_Id) return Traverse_Result
       is
-         A : Node_Id;
-
       begin
-         if Has_Aspects (N) then
-            A := First (Aspect_Specifications (N));
-            while Present (A) loop
-               Replace_Formals (Expression (A));
-
-               Next (A);
-            end loop;
+         if Nkind (N) = N_Aspect_Specification then
+            Replace_Formals (Expression (N));
          end if;
          return OK;
       end Process_Formals_In_Aspects;
@@ -3733,7 +3726,7 @@ package body Inline is
             Insert_After (Parent (Entity (N)), Blk);
 
          --  If the context is an assignment, and the left-hand side is free of
-         --  side-effects, the replacement is also safe.
+         --  side effects, the replacement is also safe.
 
          elsif Nkind (Parent (N)) = N_Assignment_Statement
            and then

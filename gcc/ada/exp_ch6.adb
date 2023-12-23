@@ -194,6 +194,10 @@ package body Exp_Ch6 is
    --  the activation Chain. Note: Master_Actual can be Empty, but only if
    --  there are no tasks.
 
+   function Build_Flag_For_Function (Func_Id : Entity_Id) return Entity_Id;
+   --  Generate code to declare a boolean flag initialized to False in the
+   --  function Func_Id and return the entity for the flag.
+
    function Caller_Known_Size
      (Func_Call   : Node_Id;
       Result_Subt : Entity_Id) return Boolean;
@@ -908,6 +912,53 @@ package body Exp_Ch6 is
          raise Program_Error;
       end if;
    end BIP_Suffix_Kind;
+
+   -----------------------------
+   -- Build_Flag_For_Function --
+   -----------------------------
+
+   function Build_Flag_For_Function (Func_Id : Entity_Id) return Entity_Id is
+      Flag_Decl : Node_Id;
+      Flag_Id   : Entity_Id;
+      Func_Bod  : Node_Id;
+      Loc       : Source_Ptr;
+
+   begin
+      --  Recover the function body
+
+      Func_Bod := Unit_Declaration_Node (Func_Id);
+
+      if Nkind (Func_Bod) = N_Subprogram_Declaration then
+         Func_Bod := Parent (Parent (Corresponding_Body (Func_Bod)));
+      end if;
+
+      if Nkind (Func_Bod) = N_Function_Specification then
+         Func_Bod := Parent (Func_Bod); -- one more level for child units
+      end if;
+
+      pragma Assert (Nkind (Func_Bod) = N_Subprogram_Body);
+
+      Loc := Sloc (Func_Bod);
+
+      --  Create a flag to track the function state
+
+      Flag_Id := Make_Temporary (Loc, 'F');
+
+      --  Insert the flag at the beginning of the function declarations,
+      --  generate:
+      --    Fnn : Boolean := False;
+
+      Flag_Decl :=
+        Make_Object_Declaration (Loc,
+          Defining_Identifier => Flag_Id,
+            Object_Definition => New_Occurrence_Of (Standard_Boolean, Loc),
+            Expression        => New_Occurrence_Of (Standard_False, Loc));
+
+      Prepend_To (Declarations (Func_Bod), Flag_Decl);
+      Analyze (Flag_Decl);
+
+      return Flag_Id;
+   end Build_Flag_For_Function;
 
    ---------------------------
    -- Build_In_Place_Formal --
@@ -4630,7 +4681,7 @@ package body Exp_Ch6 is
             --  It may be possible that we are re-expanding an already
             --  expanded call when are are dealing with dispatching ???
 
-            if not Present (Parameter_Associations (Call_Node))
+            if No (Parameter_Associations (Call_Node))
               or else Nkind (Last (Parameter_Associations (Call_Node)))
                         /= N_Parameter_Association
               or else not Is_Accessibility_Actual
@@ -5390,29 +5441,6 @@ package body Exp_Ch6 is
    is
       Par : constant Node_Id := Parent (N);
 
-      function Is_Element_Reference (N : Node_Id) return Boolean;
-      --  Determine whether node N denotes a reference to an Ada 2012 container
-      --  element.
-
-      --------------------------
-      -- Is_Element_Reference --
-      --------------------------
-
-      function Is_Element_Reference (N : Node_Id) return Boolean is
-         Ref : constant Node_Id := Original_Node (N);
-
-      begin
-         --  Analysis marks an element reference by setting the generalized
-         --  indexing attribute of an indexed component before the component
-         --  is rewritten into a function call.
-
-         return
-           Nkind (Ref) = N_Indexed_Component
-             and then Present (Generalized_Indexing (Ref));
-      end Is_Element_Reference;
-
-   --  Start of processing for Expand_Ctrl_Function_Call
-
    begin
       --  Optimization: if the returned value is returned again, then no need
       --  to copy/readjust/finalize, we can just pass the value through (see
@@ -5449,30 +5477,15 @@ package body Exp_Ch6 is
 
       Set_Analyzed (N);
 
-      --  Apply the transformation, unless it was already applied manually
+      --  Apply the transformation unless it was already applied earlier. This
+      --  may happen because Remove_Side_Effects can be called during semantic
+      --  analysis, for example from Build_Actual_Subtype_Of_Component. It is
+      --  crucial to avoid creating a reference of reference here, because it
+      --  would not be subsequently recognized by the Is_Finalizable_Transient
+      --  and Requires_Cleanup_Actions predicates.
 
       if Nkind (Par) /= N_Reference then
          Remove_Side_Effects (N);
-      end if;
-
-      --  The side effect removal of the function call produced a temporary.
-      --  When the context is a case expression, if expression, or expression
-      --  with actions, the lifetime of the temporary must be extended to match
-      --  that of the context. Otherwise the function result will be finalized
-      --  too early and affect the result of the expression. To prevent this
-      --  unwanted effect, the temporary should not be considered for clean up
-      --  actions by the general finalization machinery.
-
-      --  Exception to this rule are references to Ada 2012 container elements.
-      --  Such references must be finalized at the end of each iteration of the
-      --  related quantified expression, otherwise the container will remain
-      --  busy.
-
-      if Nkind (N) = N_Explicit_Dereference
-        and then Within_Case_Or_If_Expression (N)
-        and then not Is_Element_Reference (N)
-      then
-         Set_Is_Ignored_Transient (Entity (Prefix (N)));
       end if;
    end Expand_Ctrl_Function_Call;
 
@@ -5615,49 +5628,14 @@ package body Exp_Ch6 is
       --  perform the appropriate cleanup should it fail to return. The state
       --  of the function itself is tracked through a flag which is coupled
       --  with the scope finalizer. There is one flag per each return object
-      --  in case of multiple returns.
+      --  in case of multiple extended returns. Note that the flag has already
+      --  been created if the extended return contains a nested return.
 
-      if Needs_Finalization (Etype (Ret_Obj_Id)) then
-         declare
-            Flag_Decl : Node_Id;
-            Flag_Id   : Entity_Id;
-            Func_Bod  : Node_Id;
-
-         begin
-            --  Recover the function body
-
-            Func_Bod := Unit_Declaration_Node (Func_Id);
-
-            if Nkind (Func_Bod) = N_Subprogram_Declaration then
-               Func_Bod := Parent (Parent (Corresponding_Body (Func_Bod)));
-            end if;
-
-            if Nkind (Func_Bod) = N_Function_Specification then
-               Func_Bod := Parent (Func_Bod); -- one more level for child units
-            end if;
-
-            pragma Assert (Nkind (Func_Bod) = N_Subprogram_Body);
-
-            --  Create a flag to track the function state
-
-            Flag_Id := Make_Temporary (Loc, 'F');
-            Set_Status_Flag_Or_Transient_Decl (Ret_Obj_Id, Flag_Id);
-
-            --  Insert the flag at the beginning of the function declarations,
-            --  generate:
-            --    Fnn : Boolean := False;
-
-            Flag_Decl :=
-              Make_Object_Declaration (Loc,
-                Defining_Identifier => Flag_Id,
-                  Object_Definition =>
-                    New_Occurrence_Of (Standard_Boolean, Loc),
-                  Expression        =>
-                    New_Occurrence_Of (Standard_False, Loc));
-
-            Prepend_To (Declarations (Func_Bod), Flag_Decl);
-            Analyze (Flag_Decl);
-         end;
+      if Needs_Finalization (Etype (Ret_Obj_Id))
+        and then No (Status_Flag_Or_Transient_Decl (Ret_Obj_Id))
+      then
+         Set_Status_Flag_Or_Transient_Decl
+           (Ret_Obj_Id, Build_Flag_For_Function (Func_Id));
       end if;
 
       --  Build a simple_return_statement that returns the return object when
@@ -5722,6 +5700,8 @@ package body Exp_Ch6 is
                            Status_Flag_Or_Transient_Decl (Ret_Obj_Id);
 
             begin
+               pragma Assert (Present (Flag_Id));
+
                --  Generate:
                --    Fnn := True;
 
@@ -6387,14 +6367,44 @@ package body Exp_Ch6 is
       --  return of the previously declared return object.
 
       elsif Kind = E_Return_Statement then
-         Rewrite (N,
-           Make_Simple_Return_Statement (Loc,
-             Expression =>
-               New_Occurrence_Of (First_Entity (Scope_Id), Loc)));
-         Set_Comes_From_Extended_Return_Statement (N);
-         Set_Return_Statement_Entity (N, Scope_Id);
-         Expand_Simple_Function_Return (N);
-         return;
+         declare
+            Ret_Obj_Id : constant Entity_Id := First_Entity (Scope_Id);
+
+            Flag_Id : Entity_Id;
+
+         begin
+            --  Apply the same processing as Expand_N_Extended_Return_Statement
+            --  if the returned object needs finalization actions. Note that we
+            --  are invoked before Expand_N_Extended_Return_Statement but there
+            --  may be multiple nested returns within the extended one.
+
+            if Needs_Finalization (Etype (Ret_Obj_Id)) then
+               if Present (Status_Flag_Or_Transient_Decl (Ret_Obj_Id)) then
+                  Flag_Id := Status_Flag_Or_Transient_Decl (Ret_Obj_Id);
+               else
+                  Flag_Id :=
+                    Build_Flag_For_Function (Return_Applies_To (Scope_Id));
+                  Set_Status_Flag_Or_Transient_Decl (Ret_Obj_Id, Flag_Id);
+               end if;
+
+               --  Generate:
+               --    Fnn := True;
+
+               Insert_Action (N,
+                 Make_Assignment_Statement (Loc,
+                   Name       =>
+                     New_Occurrence_Of (Flag_Id, Loc),
+                   Expression => New_Occurrence_Of (Standard_True, Loc)));
+            end if;
+
+            Rewrite (N,
+              Make_Simple_Return_Statement (Loc,
+                Expression => New_Occurrence_Of (Ret_Obj_Id, Loc)));
+            Set_Comes_From_Extended_Return_Statement (N);
+            Set_Return_Statement_Entity (N, Scope_Id);
+            Expand_Simple_Function_Return (N);
+            return;
+         end;
       end if;
 
       pragma Assert (Is_Entry (Scope_Id));
@@ -6913,7 +6923,7 @@ package body Exp_Ch6 is
             Set_Enclosing_Sec_Stack_Return (N);
          end if;
 
-      elsif Is_Limited_View (R_Type) then
+      elsif Is_Inherently_Limited_Type (R_Type) then
          null;
 
       --  No copy needed for thunks returning interface type objects since
@@ -8219,7 +8229,7 @@ package body Exp_Ch6 is
       --  of a function with a limited interface result, where the function
       --  may return objects of nonlimited descendants.
 
-      return Is_Limited_View (Typ)
+      return Is_Inherently_Limited_Type (Typ)
         and then Ada_Version >= Ada_2005
         and then not Debug_Flag_Dot_L;
    end Is_Build_In_Place_Result_Type;
@@ -10121,6 +10131,7 @@ package body Exp_Ch6 is
                return Skip;
 
             when N_Abstract_Subprogram_Declaration
+               | N_Aspect_Specification
                | N_At_Clause
                | N_Call_Marker
                | N_Empty

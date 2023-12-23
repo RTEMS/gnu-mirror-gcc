@@ -49,8 +49,12 @@ libssp_la_SOURCES = \
 	vsnprintf-chk.c vsprintf-chk.c
 libssp_la_LIBADD = 
 libssp_la_DEPENDENCIES = $(version_dep) $(libssp_la_LIBADD)
+if ENABLE_DARWIN_AT_RPATH
+libssp_darwin_rpath = -Wc,-nodefaultrpaths
+libssp_darwin_rpath += -Wl,-rpath,@loader_path
+endif
 libssp_la_LDFLAGS = -version-info `grep -v '^\#' $(srcdir)/libtool-version` \
-		    $(version_arg) $(lt_host_flags)
+		    $(version_arg) $(lt_host_flags) $(libssp_darwin_rpath)
 
 libssp_nonshared_la_SOURCES = \
 	ssp-local.c
@@ -73,6 +77,7 @@ AM_MAKEFLAGS = \
 	"CXXFLAGS=$(CXXFLAGS)" \
 	"CFLAGS_FOR_BUILD=$(CFLAGS_FOR_BUILD)" \
 	"CFLAGS_FOR_TARGET=$(CFLAGS_FOR_TARGET)" \
+	"EXPECT=$(EXPECT)" \
 	"INSTALL=$(INSTALL)" \
 	"INSTALL_DATA=$(INSTALL_DATA)" \
 	"INSTALL_PROGRAM=$(INSTALL_PROGRAM)" \

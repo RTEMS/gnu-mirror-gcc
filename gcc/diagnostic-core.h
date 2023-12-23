@@ -105,9 +105,10 @@ extern bool pedwarn (rich_location *, int, const char *, ...)
 extern bool permerror (location_t, const char *, ...) ATTRIBUTE_GCC_DIAG(2,3);
 extern bool permerror (rich_location *, const char *,
 				   ...) ATTRIBUTE_GCC_DIAG(2,3);
-extern bool permerror (location_t, int, const char *, ...) ATTRIBUTE_GCC_DIAG(3,4);
-extern bool permerror (rich_location *, int, const char *,
-		       ...) ATTRIBUTE_GCC_DIAG(3,4);
+extern bool permerror_opt (location_t, int, const char *, ...)
+  ATTRIBUTE_GCC_DIAG(3,4);
+extern bool permerror_opt (rich_location *, int, const char *,
+			   ...) ATTRIBUTE_GCC_DIAG(3,4);
 extern void sorry (const char *, ...) ATTRIBUTE_GCC_DIAG(1,2);
 extern void sorry_at (location_t, const char *, ...) ATTRIBUTE_GCC_DIAG(2,3);
 extern void inform (location_t, const char *, ...) ATTRIBUTE_GCC_DIAG(2,3);
@@ -122,6 +123,12 @@ extern bool emit_diagnostic (diagnostic_t, rich_location *, int,
 			     const char *, ...) ATTRIBUTE_GCC_DIAG(4,5);
 extern bool emit_diagnostic_valist (diagnostic_t, location_t, int, const char *,
 				    va_list *) ATTRIBUTE_GCC_DIAG (4,0);
+extern bool emit_diagnostic_valist (diagnostic_t,
+				    rich_location *,
+				    const diagnostic_metadata *,
+				    int,
+				    const char *,
+				    va_list *) ATTRIBUTE_GCC_DIAG (5,0);
 extern bool seen_error (void);
 
 #ifdef BUFSIZ

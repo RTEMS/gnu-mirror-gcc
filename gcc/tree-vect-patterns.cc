@@ -128,6 +128,7 @@ vect_init_pattern_stmt (vec_info *vinfo, gimple *pattern_stmt,
   STMT_VINFO_RELATED_STMT (pattern_stmt_info) = orig_stmt_info;
   STMT_VINFO_DEF_TYPE (pattern_stmt_info)
     = STMT_VINFO_DEF_TYPE (orig_stmt_info);
+  STMT_VINFO_TYPE (pattern_stmt_info) = STMT_VINFO_TYPE (orig_stmt_info);
   if (!STMT_VINFO_VECTYPE (pattern_stmt_info))
     {
       gcc_assert (!vectype
@@ -1817,7 +1818,7 @@ vect_recog_ctz_ffs_pattern (vec_info *vinfo, stmt_vec_info stmt_vinfo,
   tree new_var;
   internal_fn ifn = IFN_LAST, ifnnew = IFN_LAST;
   bool defined_at_zero = true, defined_at_zero_new = false;
-  int val = 0, val_new = 0;
+  int val = 0, val_new = 0, val_cmp = 0;
   int prec;
   int sub = 0, add = 0;
   location_t loc;
@@ -1825,7 +1826,8 @@ vect_recog_ctz_ffs_pattern (vec_info *vinfo, stmt_vec_info stmt_vinfo,
   if (!is_gimple_call (call_stmt))
     return NULL;
 
-  if (gimple_call_num_args (call_stmt) != 1)
+  if (gimple_call_num_args (call_stmt) != 1
+      && gimple_call_num_args (call_stmt) != 2)
     return NULL;
 
   rhs_oprnd = gimple_call_arg (call_stmt, 0);
@@ -1845,9 +1847,10 @@ vect_recog_ctz_ffs_pattern (vec_info *vinfo, stmt_vec_info stmt_vinfo,
     CASE_CFN_CTZ:
       ifn = IFN_CTZ;
       if (!gimple_call_internal_p (call_stmt)
-	  || CTZ_DEFINED_VALUE_AT_ZERO (SCALAR_INT_TYPE_MODE (rhs_type),
-					val) != 2)
+	  || gimple_call_num_args (call_stmt) != 2)
 	defined_at_zero = false;
+      else
+	val = tree_to_shwi (gimple_call_arg (call_stmt, 1));
       break;
     CASE_CFN_FFS:
       ifn = IFN_FFS;
@@ -1906,6 +1909,7 @@ vect_recog_ctz_ffs_pattern (vec_info *vinfo, stmt_vec_info stmt_vinfo,
 
   vect_pattern_detected ("vec_recog_ctz_ffs_pattern", call_stmt);
 
+  val_cmp = val_new;
   if ((ifnnew == IFN_CLZ
        && defined_at_zero
        && defined_at_zero_new
@@ -1917,7 +1921,7 @@ vect_recog_ctz_ffs_pattern (vec_info *vinfo, stmt_vec_info stmt_vinfo,
 	 .CTZ (X) = .POPCOUNT ((X - 1) & ~X).  */
       if (ifnnew == IFN_CLZ)
 	sub = prec;
-      val_new = prec;
+      val_cmp = prec;
 
       if (!TYPE_UNSIGNED (rhs_type))
 	{
@@ -1954,7 +1958,7 @@ vect_recog_ctz_ffs_pattern (vec_info *vinfo, stmt_vec_info stmt_vinfo,
       /* .CTZ (X) = (PREC - 1) - .CLZ (X & -X)
 	 .FFS (X) = PREC - .CLZ (X & -X).  */
       sub = prec - (ifn == IFN_CTZ);
-      val_new = sub - val_new;
+      val_cmp = sub - val_new;
 
       tree neg = vect_recog_temp_ssa_var (rhs_type, NULL);
       pattern_stmt = gimple_build_assign (neg, NEGATE_EXPR, rhs_oprnd);
@@ -1973,7 +1977,7 @@ vect_recog_ctz_ffs_pattern (vec_info *vinfo, stmt_vec_info stmt_vinfo,
       /* .CTZ (X) = PREC - .POPCOUNT (X | -X)
 	 .FFS (X) = (PREC + 1) - .POPCOUNT (X | -X).  */
       sub = prec + (ifn == IFN_FFS);
-      val_new = sub;
+      val_cmp = sub;
 
       tree neg = vect_recog_temp_ssa_var (rhs_type, NULL);
       pattern_stmt = gimple_build_assign (neg, NEGATE_EXPR, rhs_oprnd);
@@ -1991,12 +1995,18 @@ vect_recog_ctz_ffs_pattern (vec_info *vinfo, stmt_vec_info stmt_vinfo,
     {
       /* .FFS (X) = .CTZ (X) + 1.  */
       add = 1;
-      val_new++;
+      val_cmp++;
     }
 
   /* Create B = .IFNNEW (A).  */
   new_var = vect_recog_temp_ssa_var (lhs_type, NULL);
-  pattern_stmt = gimple_build_call_internal (ifnnew, 1, rhs_oprnd);
+  if ((ifnnew == IFN_CLZ || ifnnew == IFN_CTZ) && defined_at_zero_new)
+    pattern_stmt
+      = gimple_build_call_internal (ifnnew, 2, rhs_oprnd,
+				    build_int_cst (integer_type_node,
+						   val_new));
+  else
+    pattern_stmt = gimple_build_call_internal (ifnnew, 1, rhs_oprnd);
   gimple_call_set_lhs (pattern_stmt, new_var);
   gimple_set_location (pattern_stmt, loc);
   *type_out = vec_type;
@@ -2022,7 +2032,7 @@ vect_recog_ctz_ffs_pattern (vec_info *vinfo, stmt_vec_info stmt_vinfo,
     }
 
   if (defined_at_zero
-      && (!defined_at_zero_new || val != val_new))
+      && (!defined_at_zero_new || val != val_cmp))
     {
       append_pattern_def_seq (vinfo, stmt_vinfo, pattern_stmt, vec_type);
       tree ret_var = vect_recog_temp_ssa_var (lhs_type, NULL);
@@ -2142,7 +2152,8 @@ vect_recog_popcount_clz_ctz_ffs_pattern (vec_info *vinfo,
       return NULL;
     }
 
-  if (gimple_call_num_args (call_stmt) != 1)
+  if (gimple_call_num_args (call_stmt) != 1
+      && gimple_call_num_args (call_stmt) != 2)
     return NULL;
 
   rhs_oprnd = gimple_call_arg (call_stmt, 0);
@@ -2180,17 +2191,14 @@ vect_recog_popcount_clz_ctz_ffs_pattern (vec_info *vinfo,
 	  return NULL;
 	addend = (TYPE_PRECISION (TREE_TYPE (rhs_oprnd))
 		  - TYPE_PRECISION (lhs_type));
-	if (gimple_call_internal_p (call_stmt))
+	if (gimple_call_internal_p (call_stmt)
+	    && gimple_call_num_args (call_stmt) == 2)
 	  {
 	    int val1, val2;
-	    int d1
-	      = CLZ_DEFINED_VALUE_AT_ZERO
-		  (SCALAR_INT_TYPE_MODE (TREE_TYPE (rhs_oprnd)), val1);
+	    val1 = tree_to_shwi (gimple_call_arg (call_stmt, 1));
 	    int d2
 	      = CLZ_DEFINED_VALUE_AT_ZERO (SCALAR_INT_TYPE_MODE (lhs_type),
 					   val2);
-	    if (d1 != 2)
-	      break;
 	    if (d2 != 2 || val1 != val2 + addend)
 	      return NULL;
 	  }
@@ -2199,17 +2207,14 @@ vect_recog_popcount_clz_ctz_ffs_pattern (vec_info *vinfo,
 	/* ctzll (x) == ctz (x) for unsigned or signed x != 0, so ok
 	   if it is undefined at zero or if it matches also for the
 	   defined value there.  */
-	if (gimple_call_internal_p (call_stmt))
+	if (gimple_call_internal_p (call_stmt)
+	    && gimple_call_num_args (call_stmt) == 2)
 	  {
 	    int val1, val2;
-	    int d1
-	      = CTZ_DEFINED_VALUE_AT_ZERO
-		  (SCALAR_INT_TYPE_MODE (TREE_TYPE (rhs_oprnd)), val1);
+	    val1 = tree_to_shwi (gimple_call_arg (call_stmt, 1));
 	    int d2
 	      = CTZ_DEFINED_VALUE_AT_ZERO (SCALAR_INT_TYPE_MODE (lhs_type),
 					   val2);
-	    if (d1 != 2)
-	      break;
 	    if (d2 != 2 || val1 != val2)
 	      return NULL;
 	  }
@@ -2259,7 +2264,20 @@ vect_recog_popcount_clz_ctz_ffs_pattern (vec_info *vinfo,
 
   /* Create B = .POPCOUNT (A).  */
   new_var = vect_recog_temp_ssa_var (lhs_type, NULL);
-  pattern_stmt = gimple_build_call_internal (ifn, 1, unprom_diff.op);
+  tree arg2 = NULL_TREE;
+  int val;
+  if (ifn == IFN_CLZ
+      && CLZ_DEFINED_VALUE_AT_ZERO (SCALAR_INT_TYPE_MODE (lhs_type),
+				    val) == 2)
+    arg2 = build_int_cst (integer_type_node, val);
+  else if (ifn == IFN_CTZ
+	   && CTZ_DEFINED_VALUE_AT_ZERO (SCALAR_INT_TYPE_MODE (lhs_type),
+					 val) == 2)
+    arg2 = build_int_cst (integer_type_node, val);
+  if (arg2)
+    pattern_stmt = gimple_build_call_internal (ifn, 2, unprom_diff.op, arg2);
+  else
+    pattern_stmt = gimple_build_call_internal (ifn, 1, unprom_diff.op);
   gimple_call_set_lhs (pattern_stmt, new_var);
   gimple_set_location (pattern_stmt, gimple_location (last_stmt));
   *type_out = vec_type;
@@ -2539,6 +2557,10 @@ vect_recog_widen_sum_pattern (vec_info *vinfo,
    bf_value = BIT_FIELD_REF (container, bitsize, bitpos);
    result = (type_out) bf_value;
 
+   or
+
+   if (BIT_FIELD_REF (container, bitsize, bitpos) `cmp` <constant>)
+
    where type_out is a non-bitfield type, that is to say, it's precision matches
    2^(TYPE_SIZE(type_out) - (TYPE_UNSIGNED (type_out) ? 1 : 2)).
 
@@ -2547,6 +2569,10 @@ vect_recog_widen_sum_pattern (vec_info *vinfo,
    * STMT_VINFO: The stmt from which the pattern search begins.
    here it starts with:
    result = (type_out) bf_value;
+
+   or
+
+   if (BIT_FIELD_REF (container, bitsize, bitpos) `cmp` <constant>)
 
    Output:
 
@@ -2589,33 +2615,45 @@ vect_recog_widen_sum_pattern (vec_info *vinfo,
 
    The shifting is always optional depending on whether bitpos != 0.
 
+   When the original bitfield was inside a gcond then an new gcond is also
+   generated with the newly `result` as the operand to the comparison.
+
 */
 
 static gimple *
 vect_recog_bitfield_ref_pattern (vec_info *vinfo, stmt_vec_info stmt_info,
 				 tree *type_out)
 {
-  gassign *first_stmt = dyn_cast <gassign *> (stmt_info->stmt);
-
-  if (!first_stmt)
-    return NULL;
-
-  gassign *bf_stmt;
-  if (CONVERT_EXPR_CODE_P (gimple_assign_rhs_code (first_stmt))
-      && TREE_CODE (gimple_assign_rhs1 (first_stmt)) == SSA_NAME)
+  gimple *bf_stmt = NULL;
+  tree lhs = NULL_TREE;
+  tree ret_type = NULL_TREE;
+  gimple *stmt = STMT_VINFO_STMT (stmt_info);
+  if (gcond *cond_stmt = dyn_cast <gcond *> (stmt))
     {
-      gimple *second_stmt
-	= SSA_NAME_DEF_STMT (gimple_assign_rhs1 (first_stmt));
-      bf_stmt = dyn_cast <gassign *> (second_stmt);
-      if (!bf_stmt
-	  || gimple_assign_rhs_code (bf_stmt) != BIT_FIELD_REF)
+      tree op = gimple_cond_lhs (cond_stmt);
+      if (TREE_CODE (op) != SSA_NAME)
+	return NULL;
+      bf_stmt = dyn_cast <gassign *> (SSA_NAME_DEF_STMT (op));
+      if (TREE_CODE (gimple_cond_rhs (cond_stmt)) != INTEGER_CST)
 	return NULL;
     }
-  else
+  else if (is_gimple_assign (stmt)
+	   && CONVERT_EXPR_CODE_P (gimple_assign_rhs_code (stmt))
+	   && TREE_CODE (gimple_assign_rhs1 (stmt)) == SSA_NAME)
+    {
+      gimple *second_stmt = SSA_NAME_DEF_STMT (gimple_assign_rhs1 (stmt));
+      bf_stmt = dyn_cast <gassign *> (second_stmt);
+      lhs = gimple_assign_lhs (stmt);
+      ret_type = TREE_TYPE (lhs);
+    }
+
+  if (!bf_stmt
+      || gimple_assign_rhs_code (bf_stmt) != BIT_FIELD_REF)
     return NULL;
 
   tree bf_ref = gimple_assign_rhs1 (bf_stmt);
   tree container = TREE_OPERAND (bf_ref, 0);
+  ret_type = ret_type ? ret_type : TREE_TYPE (container);
 
   if (!bit_field_offset (bf_ref).is_constant ()
       || !bit_field_size (bf_ref).is_constant ()
@@ -2629,8 +2667,6 @@ vect_recog_bitfield_ref_pattern (vec_info *vinfo, stmt_vec_info stmt_info,
 
   gimple *use_stmt, *pattern_stmt;
   use_operand_p use_p;
-  tree ret = gimple_assign_lhs (first_stmt);
-  tree ret_type = TREE_TYPE (ret);
   bool shift_first = true;
   tree container_type = TREE_TYPE (container);
   tree vectype = get_vectype_for_scalar_type (vinfo, container_type);
@@ -2675,7 +2711,7 @@ vect_recog_bitfield_ref_pattern (vec_info *vinfo, stmt_vec_info stmt_info,
   /* If the only use of the result of this BIT_FIELD_REF + CONVERT is a
      PLUS_EXPR then do the shift last as some targets can combine the shift and
      add into a single instruction.  */
-  if (single_imm_use (gimple_assign_lhs (first_stmt), &use_p, &use_stmt))
+  if (lhs && single_imm_use (lhs, &use_p, &use_stmt))
     {
       if (gimple_code (use_stmt) == GIMPLE_ASSIGN
 	  && gimple_assign_rhs_code (use_stmt) == PLUS_EXPR)
@@ -2746,6 +2782,19 @@ vect_recog_bitfield_ref_pattern (vec_info *vinfo, stmt_vec_info stmt_info,
       pattern_stmt
 	= gimple_build_assign (vect_recog_temp_ssa_var (ret_type),
 			       NOP_EXPR, result);
+    }
+
+  if (!lhs)
+    {
+      append_pattern_def_seq (vinfo, stmt_info, pattern_stmt, vectype);
+      gcond *cond_stmt = dyn_cast <gcond *> (stmt_info->stmt);
+      tree cond_cst = gimple_cond_rhs (cond_stmt);
+      pattern_stmt
+	= gimple_build_cond (gimple_cond_code (cond_stmt),
+			     gimple_get_lhs (pattern_stmt),
+			     fold_convert (ret_type, cond_cst),
+			     gimple_cond_true_label (cond_stmt),
+			     gimple_cond_false_label (cond_stmt));
     }
 
   *type_out = STMT_VINFO_VECTYPE (stmt_info);
@@ -5781,7 +5830,8 @@ vect_recog_mask_conversion_pattern (vec_info *vinfo,
   tree rhs1_op0 = NULL_TREE, rhs1_op1 = NULL_TREE;
   tree rhs1_op0_type = NULL_TREE, rhs1_op1_type = NULL_TREE;
 
-  /* Check for MASK_LOAD ans MASK_STORE calls requiring mask conversion.  */
+  /* Check for MASK_LOAD and MASK_STORE as well as COND_OP calls requiring mask
+     conversion.  */
   if (is_gimple_call (last_stmt)
       && gimple_call_internal_p (last_stmt))
     {
@@ -5793,6 +5843,7 @@ vect_recog_mask_conversion_pattern (vec_info *vinfo,
 	return NULL;
 
       bool store_p = internal_store_fn_p (ifn);
+      bool load_p = internal_store_fn_p (ifn);
       if (store_p)
 	{
 	  int rhs_index = internal_fn_stored_value_index (ifn);
@@ -5807,15 +5858,21 @@ vect_recog_mask_conversion_pattern (vec_info *vinfo,
 	  vectype1 = get_vectype_for_scalar_type (vinfo, TREE_TYPE (lhs));
 	}
 
+      if (!vectype1)
+	return NULL;
+
       tree mask_arg = gimple_call_arg (last_stmt, mask_argno);
       tree mask_arg_type = integer_type_for_mask (mask_arg, vinfo);
-      if (!mask_arg_type)
-	return NULL;
-      vectype2 = get_mask_type_for_scalar_type (vinfo, mask_arg_type);
+      if (mask_arg_type)
+	{
+	  vectype2 = get_mask_type_for_scalar_type (vinfo, mask_arg_type);
 
-      if (!vectype1 || !vectype2
-	  || known_eq (TYPE_VECTOR_SUBPARTS (vectype1),
-		       TYPE_VECTOR_SUBPARTS (vectype2)))
+	  if (!vectype2
+	      || known_eq (TYPE_VECTOR_SUBPARTS (vectype1),
+			   TYPE_VECTOR_SUBPARTS (vectype2)))
+	    return NULL;
+	}
+      else if (store_p || load_p)
 	return NULL;
 
       tmp = build_mask_conversion (vinfo, mask_arg, vectype1, stmt_vinfo);
@@ -5834,7 +5891,9 @@ vect_recog_mask_conversion_pattern (vec_info *vinfo,
 	  lhs = vect_recog_temp_ssa_var (TREE_TYPE (lhs), NULL);
 	  gimple_call_set_lhs (pattern_stmt, lhs);
 	}
-      gimple_call_set_nothrow (pattern_stmt, true);
+
+      if (load_p || store_p)
+	gimple_call_set_nothrow (pattern_stmt, true);
 
       pattern_stmt_info = vinfo->add_stmt (pattern_stmt);
       if (STMT_VINFO_DATA_REF (stmt_vinfo))

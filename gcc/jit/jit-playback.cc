@@ -3512,8 +3512,8 @@ add_error_va (location *loc, const char *fmt, va_list ap)
 
 void
 playback::context::
-add_diagnostic (struct diagnostic_context *diag_context,
-		struct diagnostic_info *diagnostic)
+add_diagnostic (diagnostic_context *diag_context,
+		const diagnostic_info &diagnostic)
 {
   /* At this point the text has been formatted into the pretty-printer's
      output buffer.  */
@@ -3526,7 +3526,7 @@ add_diagnostic (struct diagnostic_context *diag_context,
      from the file/line/column since any playback location instances
      may have been garbage-collected away by now, so instead we create
      another recording::location directly.  */
-  location_t gcc_loc = diagnostic_location (diagnostic);
+  location_t gcc_loc = diagnostic_location (&diagnostic);
   recording::location *rec_loc = NULL;
   if (gcc_loc)
     {
