@@ -1023,7 +1023,8 @@ c_cpp_builtins (cpp_reader *pfile)
 	{
 	  /* Set feature test macros for C++17.  */
 	  cpp_define (pfile, "__cpp_unicode_characters=201411L");
-	  cpp_define (pfile, "__cpp_static_assert=201411L");
+	  if (cxx_dialect <= cxx23)
+	    cpp_define (pfile, "__cpp_static_assert=201411L");
 	  cpp_define (pfile, "__cpp_namespace_attributes=201411L");
 	  cpp_define (pfile, "__cpp_enumerator_attributes=201411L");
 	  cpp_define (pfile, "__cpp_nested_namespace_definitions=201411L");
@@ -1058,7 +1059,7 @@ c_cpp_builtins (cpp_reader *pfile)
 	    cpp_define (pfile, "__cpp_constexpr=202002L");
 	  cpp_define (pfile, "__cpp_constexpr_in_decltype=201711L");
 	  cpp_define (pfile, "__cpp_conditional_explicit=201806L");
-	  cpp_define (pfile, "__cpp_consteval=201811L");
+	  cpp_define (pfile, "__cpp_consteval=202211L");
 	  cpp_define (pfile, "__cpp_constinit=201907L");
 	  cpp_define (pfile, "__cpp_deduction_guides=201907L");
 	  cpp_define (pfile, "__cpp_nontype_template_args=201911L");
@@ -1086,6 +1087,8 @@ c_cpp_builtins (cpp_reader *pfile)
 	{
 	  /* Set feature test macros for C++26.  */
 	  cpp_define (pfile, "__cpp_constexpr=202306L");
+	  cpp_define (pfile, "__cpp_static_assert=202306L");
+	  cpp_define (pfile, "__cpp_placeholder_variables=202306L");
 	}
       if (flag_concepts)
         {
@@ -1567,8 +1570,8 @@ c_cpp_builtins (cpp_reader *pfile)
       /* For libgcov.  */
       builtin_define_with_int_value ("__LIBGCC_VTABLE_USES_DESCRIPTORS__",
 				     TARGET_VTABLE_USES_DESCRIPTORS);
-      builtin_define_with_int_value ("__LIBGCC_GCOV_TYPE_SIZE",
-				     targetm.gcov_type_size());
+      builtin_define_with_int_value ("__LIBGCC_HAVE_LIBATOMIC",
+				     targetm.have_libatomic);
     }
 
   /* For use in assembly language.  */

@@ -35,11 +35,6 @@
 
 #pragma GCC system_header
 
-#define __glibcxx_want_tuple_element_t
-#define __glibcxx_want_integer_sequence
-#define __glibcxx_want_ranges_zip
-#include <bits/version.h>
-
 #if __cplusplus >= 201103L
 
 #include <type_traits>
@@ -135,7 +130,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 // _GLIBCXX_RESOLVE_LIB_DEFECTS
 // 3378. tuple_size_v/tuple_element_t should be available when
 //       tuple_size/tuple_element are
-#ifdef __cpp_lib_tuple_element_t // C++ >= 14
+#ifdef __glibcxx_tuple_element_t // C++ >= 14
   template<size_t __i, typename _Tp>
     using tuple_element_t = typename tuple_element<__i, _Tp>::type;
 #endif
@@ -160,12 +155,15 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 #endif
     };
 
-#ifdef __cpp_lib_integer_sequence // C++ >= 14
+#ifdef __glibcxx_integer_sequence // C++ >= 14
 
   /// Class template integer_sequence
   template<typename _Tp, _Tp... _Idx>
     struct integer_sequence
     {
+#if __cplusplus >= 202002L
+      static_assert(is_integral_v<_Tp>);
+#endif
       typedef _Tp value_type;
       static constexpr size_t size() noexcept { return sizeof...(_Idx); }
     };
@@ -190,7 +188,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   /// Alias template index_sequence_for
   template<typename... _Types>
     using index_sequence_for = make_index_sequence<sizeof...(_Types)>;
-#endif // __cpp_lib_integer_sequence
+#endif // __glibcxx_integer_sequence
 
 #if __cplusplus >= 201703L
 

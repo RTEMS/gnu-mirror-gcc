@@ -101,8 +101,10 @@ static void print_instantiation_partial_context (diagnostic_context *,
 						 struct tinst_level *,
 						 location_t);
 static void maybe_print_constraint_context (diagnostic_context *);
-static void cp_diagnostic_starter (diagnostic_context *, diagnostic_info *);
-static void cp_print_error_function (diagnostic_context *, diagnostic_info *);
+static void cp_diagnostic_starter (diagnostic_context *,
+				   const diagnostic_info *);
+static void cp_print_error_function (diagnostic_context *,
+				     const diagnostic_info *);
 
 static bool cp_printer (pretty_printer *, text_info *, const char *,
 			int, bool, bool, bool, bool *, const char **);
@@ -478,7 +480,7 @@ dump_template_bindings (cxx_pretty_printer *pp, tree parms, tree args,
 
   /* Don't try to do this once cgraph starts throwing away front-end
      information.  */
-  if (at_eof >= 2)
+  if (at_eof >= 3)
     return;
 
   FOR_EACH_VEC_SAFE_ELT (typenames, i, t)
@@ -3530,7 +3532,7 @@ eh_spec_to_string (tree p, int /*v*/)
 /* Langhook for print_error_function.  */
 void
 cxx_print_error_function (diagnostic_context *context, const char *file,
-			  diagnostic_info *diagnostic)
+			  const diagnostic_info *diagnostic)
 {
   char *prefix;
   if (file)
@@ -3544,7 +3546,7 @@ cxx_print_error_function (diagnostic_context *context, const char *file,
 
 static void
 cp_diagnostic_starter (diagnostic_context *context,
-		       diagnostic_info *diagnostic)
+		       const diagnostic_info *diagnostic)
 {
   diagnostic_report_current_module (context, diagnostic_location (diagnostic));
   cp_print_error_function (context, diagnostic);
@@ -3559,7 +3561,7 @@ cp_diagnostic_starter (diagnostic_context *context,
    a diagnostic message.  Called from cp_diagnostic_starter.  */
 static void
 cp_print_error_function (diagnostic_context *context,
-			 diagnostic_info *diagnostic)
+			 const diagnostic_info *diagnostic)
 {
   /* If we are in an instantiation context, current_function_decl is likely
      to be wrong, so just rely on print_instantiation_full_context.  */

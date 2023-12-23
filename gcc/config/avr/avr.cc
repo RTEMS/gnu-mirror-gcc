@@ -10442,7 +10442,7 @@ avr_eval_addr_attrib (rtx x)
 
 
 /* AVR attributes.  */
-static const struct attribute_spec avr_attribute_table[] =
+TARGET_GNU_ATTRIBUTES (avr_attribute_table,
 {
   /* { name, min_len, max_len, decl_req, type_req, fn_type_req,
        affects_type_identity, handler, exclude } */
@@ -10467,9 +10467,8 @@ static const struct attribute_spec avr_attribute_table[] =
   { "address",   1, 1, true, false, false,  false,
     avr_handle_addr_attribute, NULL },
   { "absdata",   0, 0, true, false, false,  false,
-    avr_handle_absdata_attribute, NULL },
-  { NULL,        0, 0, false, false, false, false, NULL, NULL }
-};
+    avr_handle_absdata_attribute, NULL }
+});
 
 
 /* Return true if we support address space AS for the architecture in effect
@@ -10873,7 +10872,12 @@ avr_asm_init_sections (void)
 static void
 avr_asm_named_section (const char *name, unsigned int flags, tree decl)
 {
-  if (flags & AVR_SECTION_PROGMEM)
+  if (flags & AVR_SECTION_PROGMEM
+      // Only use section .progmem*.data if there is no attribute section.
+      && ! (decl
+	    && DECL_SECTION_NAME (decl)
+	    && symtab_node::get (decl)
+	    && ! symtab_node::get (decl)->implicit_section))
     {
       addr_space_t as = (flags & AVR_SECTION_PROGMEM) / SECTION_MACH_DEP;
       const char *old_prefix = ".rodata";
@@ -10942,6 +10946,7 @@ avr_section_type_flags (tree decl, const char *name, int reloc)
       flags |= as * SECTION_MACH_DEP;
       flags &= ~SECTION_WRITE;
       flags &= ~SECTION_BSS;
+      flags &= ~SECTION_NOTYPE;
     }
 
   return flags;
@@ -15080,6 +15085,7 @@ static rtx_insn *
 avr_md_asm_adjust (vec<rtx> &/*outputs*/, vec<rtx> &/*inputs*/,
                    vec<machine_mode> & /*input_modes*/,
                    vec<const char *> &/*constraints*/,
+		   vec<rtx> &/*uses*/,
                    vec<rtx> &clobbers, HARD_REG_SET &clobbered_regs,
 		   location_t /*loc*/)
 {
@@ -15302,6 +15308,12 @@ avr_float_lib_compare_returns_bool (machine_mode mode, enum rtx_code)
 
 #undef  TARGET_CANONICALIZE_COMPARISON
 #define TARGET_CANONICALIZE_COMPARISON avr_canonicalize_comparison
+
+/* According to the opening comment in PR86772, the following applies:
+  "If the port does not (and never will in the future) need to mitigate
+   against unsafe speculation."  */
+#undef  TARGET_HAVE_SPECULATION_SAFE_VALUE
+#define TARGET_HAVE_SPECULATION_SAFE_VALUE speculation_safe_value_not_needed
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

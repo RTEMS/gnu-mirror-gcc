@@ -3468,30 +3468,28 @@ ifcvt_can_hoist (class loop *loop, edge pe, gimple *stmt)
 static void
 ifcvt_hoist_invariants (class loop *loop, edge pe)
 {
+  /* Only hoist from the now unconditionally executed part of the loop.  */
+  basic_block bb = loop->header;
   gimple_stmt_iterator hoist_gsi = {};
-  unsigned int num_blocks = loop->num_nodes;
-  basic_block *body = get_loop_body (loop);
-  for (unsigned int i = 0; i < num_blocks; ++i)
-    for (gimple_stmt_iterator gsi = gsi_start_bb (body[i]); !gsi_end_p (gsi);)
-      {
-	gimple *stmt = gsi_stmt (gsi);
-	if (ifcvt_can_hoist (loop, pe, stmt))
-	  {
-	    /* Once we've hoisted one statement, insert other statements
-	       after it.  */
-	    gsi_remove (&gsi, false);
-	    if (hoist_gsi.ptr)
-	      gsi_insert_after (&hoist_gsi, stmt, GSI_NEW_STMT);
-	    else
-	      {
-		gsi_insert_on_edge_immediate (pe, stmt);
-		hoist_gsi = gsi_for_stmt (stmt);
-	      }
-	    continue;
-	  }
-	gsi_next (&gsi);
-      }
-  free (body);
+  for (gimple_stmt_iterator gsi = gsi_start_bb (bb); !gsi_end_p (gsi);)
+    {
+      gimple *stmt = gsi_stmt (gsi);
+      if (ifcvt_can_hoist (loop, pe, stmt))
+	{
+	  /* Once we've hoisted one statement, insert other statements
+	     after it.  */
+	  gsi_remove (&gsi, false);
+	  if (hoist_gsi.ptr)
+	    gsi_insert_after (&hoist_gsi, stmt, GSI_NEW_STMT);
+	  else
+	    {
+	      gsi_insert_on_edge_immediate (pe, stmt);
+	      hoist_gsi = gsi_for_stmt (stmt);
+	    }
+	  continue;
+	}
+      gsi_next (&gsi);
+    }
 }
 
 /* Returns the DECL_FIELD_BIT_OFFSET of the bitfield accesse in stmt iff its
@@ -3893,6 +3891,12 @@ tree_if_conversion (class loop *loop, vec<gimple *> *preds)
       combine_blocks (loop, loop_versioned);
     }
 
+  std::pair <tree, tree> *name_pair;
+  unsigned ssa_names_idx;
+  FOR_EACH_VEC_ELT (redundant_ssa_names, ssa_names_idx, name_pair)
+    replace_uses_by (name_pair->first, name_pair->second);
+  redundant_ssa_names.release ();
+
   /* Perform local CSE, this esp. helps the vectorizer analysis if loads
      and stores are involved.  CSE only the loop body, not the entry
      PHIs, those are to be kept in sync with the non-if-converted copy.
@@ -3900,15 +3904,8 @@ tree_if_conversion (class loop *loop, vec<gimple *> *preds)
   exit_bbs = BITMAP_ALLOC (NULL);
   for (edge exit : get_loop_exit_edges (loop))
     bitmap_set_bit (exit_bbs, exit->dest->index);
-  bitmap_set_bit (exit_bbs, loop->latch->index);
-
-  std::pair <tree, tree> *name_pair;
-  unsigned ssa_names_idx;
-  FOR_EACH_VEC_ELT (redundant_ssa_names, ssa_names_idx, name_pair)
-    replace_uses_by (name_pair->first, name_pair->second);
-  redundant_ssa_names.release ();
-
-  todo |= do_rpo_vn (cfun, loop_preheader_edge (loop), exit_bbs);
+  todo |= do_rpo_vn (cfun, loop_preheader_edge (loop), exit_bbs,
+		     false, true, true);
 
   /* Delete dead predicate computations.  */
   ifcvt_local_dce (loop);

@@ -187,44 +187,6 @@ static tree arc_handle_secure_attribute (tree *, tree, tree, int, bool *);
 static tree arc_handle_uncached_attribute (tree *, tree, tree, int, bool *);
 static tree arc_handle_aux_attribute (tree *, tree, tree, int, bool *);
 
-/* Initialized arc_attribute_table to NULL since arc doesnot have any
-   machine specific supported attributes.  */
-const struct attribute_spec arc_attribute_table[] =
-{
- /* { name, min_len, max_len, decl_req, type_req, fn_type_req,
-      affects_type_identity, handler, exclude } */
-  { "interrupt", 1, 1, true, false, false, true,
-    arc_handle_interrupt_attribute, NULL },
-  /* Function calls made to this symbol must be done indirectly, because
-     it may lie outside of the 21/25 bit addressing range of a normal function
-     call.  */
-  { "long_call",    0, 0, false, true,  true,  false, NULL, NULL },
-  /* Whereas these functions are always known to reside within the 25 bit
-     addressing range of unconditionalized bl.  */
-  { "medium_call",   0, 0, false, true,  true, false, NULL, NULL },
-  /* And these functions are always known to reside within the 21 bit
-     addressing range of blcc.  */
-  { "short_call",   0, 0, false, true,  true,  false, NULL, NULL },
-  /* Function which are not having the prologue and epilogue generated
-     by the compiler.  */
-  { "naked", 0, 0, true, false, false,  false, arc_handle_fndecl_attribute,
-    NULL },
-  /* Functions calls made using jli instruction.  The pointer in JLI
-     table is found latter.  */
-  { "jli_always",    0, 0, false, true,  true, false,  NULL, NULL },
-  /* Functions calls made using jli instruction.  The pointer in JLI
-     table is given as input parameter.  */
-  { "jli_fixed",    1, 1, false, true,  true, false, arc_handle_jli_attribute,
-    NULL },
-  /* Call a function using secure-mode.  */
-  { "secure_call",  1, 1, false, true, true, false, arc_handle_secure_attribute,
-    NULL },
-   /* Bypass caches using .di flag.  */
-  { "uncached", 0, 0, false, true, false, false, arc_handle_uncached_attribute,
-    NULL },
-  { "aux", 0, 1, true, false, false, false, arc_handle_aux_attribute, NULL },
-  { NULL, 0, 0, false, false, false, false, NULL, NULL }
-};
 static int arc_comp_type_attributes (const_tree, const_tree);
 static void arc_file_start (void);
 static void arc_internal_label (FILE *, const char *, unsigned long);
@@ -643,6 +605,9 @@ static rtx arc_legitimize_address_0 (rtx, rtx, machine_mode mode);
 #undef  TARGET_EXPAND_BUILTIN
 #define TARGET_EXPAND_BUILTIN arc_expand_builtin
 
+#undef  TARGET_FOLD_BUILTIN
+#define TARGET_FOLD_BUILTIN arc_fold_builtin
+
 #undef  TARGET_BUILTIN_DECL
 #define TARGET_BUILTIN_DECL arc_builtin_decl
 
@@ -769,6 +734,42 @@ static rtx arc_legitimize_address_0 (rtx, rtx, machine_mode mode);
 #define TARGET_WARN_FUNC_RETURN arc_warn_func_return
 
 #include "target-def.h"
+
+TARGET_GNU_ATTRIBUTES (arc_attribute_table,
+{
+ /* { name, min_len, max_len, decl_req, type_req, fn_type_req,
+      affects_type_identity, handler, exclude } */
+  { "interrupt", 1, 1, true, false, false, true,
+    arc_handle_interrupt_attribute, NULL },
+  /* Function calls made to this symbol must be done indirectly, because
+     it may lie outside of the 21/25 bit addressing range of a normal function
+     call.  */
+  { "long_call",    0, 0, false, true,  true,  false, NULL, NULL },
+  /* Whereas these functions are always known to reside within the 25 bit
+     addressing range of unconditionalized bl.  */
+  { "medium_call",   0, 0, false, true,  true, false, NULL, NULL },
+  /* And these functions are always known to reside within the 21 bit
+     addressing range of blcc.  */
+  { "short_call",   0, 0, false, true,  true,  false, NULL, NULL },
+  /* Function which are not having the prologue and epilogue generated
+     by the compiler.  */
+  { "naked", 0, 0, true, false, false,  false, arc_handle_fndecl_attribute,
+    NULL },
+  /* Functions calls made using jli instruction.  The pointer in JLI
+     table is found latter.  */
+  { "jli_always",    0, 0, false, true,  true, false,  NULL, NULL },
+  /* Functions calls made using jli instruction.  The pointer in JLI
+     table is given as input parameter.  */
+  { "jli_fixed",    1, 1, false, true,  true, false, arc_handle_jli_attribute,
+    NULL },
+  /* Call a function using secure-mode.  */
+  { "secure_call",  1, 1, false, true, true, false, arc_handle_secure_attribute,
+    NULL },
+   /* Bypass caches using .di flag.  */
+  { "uncached", 0, 0, false, true, false, false, arc_handle_uncached_attribute,
+    NULL },
+  { "aux", 0, 1, true, false, false, false, arc_handle_aux_attribute, NULL }
+});
 
 #undef TARGET_ASM_ALIGNED_HI_OP
 #define TARGET_ASM_ALIGNED_HI_OP "\t.hword\t"
@@ -7046,6 +7047,46 @@ arc_expand_builtin (tree exp,
     return target;
   else
     return const0_rtx;
+}
+
+/* Implement TARGET_FOLD_BUILTIN.  */
+
+static tree
+arc_fold_builtin (tree fndecl, int n_args ATTRIBUTE_UNUSED, tree *arg,
+                  bool ignore ATTRIBUTE_UNUSED)
+{
+  unsigned int fcode = DECL_MD_FUNCTION_CODE (fndecl);
+
+  switch (fcode)
+    {
+    default:
+      break;
+
+    case ARC_BUILTIN_SWAP:
+      return fold_build2 (LROTATE_EXPR, integer_type_node, arg[0],
+                          build_int_cst (integer_type_node, 16));
+
+    case ARC_BUILTIN_NORM:
+      if (TREE_CODE (arg[0]) == INTEGER_CST
+	  && !TREE_OVERFLOW (arg[0]))
+	{
+	  wide_int arg0 = wi::to_wide (arg[0], 32);
+	  wide_int result = wi::shwi (wi::clrsb (arg0), 32);
+	  return wide_int_to_tree (integer_type_node, result);
+	}
+      break;
+
+    case ARC_BUILTIN_NORMW:
+      if (TREE_CODE (arg[0]) == INTEGER_CST
+	  && !TREE_OVERFLOW (arg[0]))
+	{
+	  wide_int arg0 = wi::to_wide (arg[0], 16);
+	  wide_int result = wi::shwi (wi::clrsb (arg0), 32);
+	  return wide_int_to_tree (integer_type_node, result);
+	}
+      break;
+    }
+  return NULL_TREE;
 }
 
 /* Returns true if the operands[opno] is a valid compile-time constant to be

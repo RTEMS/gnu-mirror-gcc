@@ -1002,7 +1002,7 @@ remap_dependence_clique (copy_body_data *id, unsigned short clique)
       /* Clique 1 is reserved for local ones set by PTA.  */
       if (cfun->last_clique == 0)
 	cfun->last_clique = 1;
-      newc = ++cfun->last_clique;
+      newc = get_new_clique (cfun);
     }
   return newc;
 }
@@ -3562,7 +3562,11 @@ setup_one_parameter (copy_body_data *id, tree p, tree value, tree fn,
      it.  */
   if (optimize && gimple_in_ssa_p (cfun) && !def && is_gimple_reg (p))
     {
-      gcc_assert (!value || !TREE_SIDE_EFFECTS (value));
+      /* When there's a gross type mismatch between the passed value
+	 and the declared argument type drop it on the floor and do
+	 not bother to insert a debug bind.  */
+      if (value && !is_gimple_reg_type (TREE_TYPE (value)))
+	return NULL;
       return insert_init_debug_bind (id, bb, var, rhs, NULL);
     }
 
@@ -4094,17 +4098,16 @@ inline_forbidden_p (tree fndecl)
 static bool
 function_attribute_inlinable_p (const_tree fndecl)
 {
-  if (targetm.attribute_table)
+  for (auto scoped_attributes : targetm.attribute_table)
     {
       const_tree a;
 
       for (a = DECL_ATTRIBUTES (fndecl); a; a = TREE_CHAIN (a))
 	{
 	  const_tree name = get_attribute_name (a);
-	  int i;
 
-	  for (i = 0; targetm.attribute_table[i].name != NULL; i++)
-	    if (is_attribute_p (targetm.attribute_table[i].name, name))
+	  for (const attribute_spec &attribute : scoped_attributes->attributes)
+	    if (is_attribute_p (attribute.name, name))
 	      return targetm.function_attribute_inlinable_p (fndecl);
 	}
     }
@@ -5133,7 +5136,8 @@ expand_call_inline (basic_block bb, gimple *stmt, copy_body_data *id,
 	      && !is_gimple_reg (*varp)
 	      && !(id->debug_map && id->debug_map->get (p)))
 	    {
-	      tree clobber = build_clobber (TREE_TYPE (*varp), CLOBBER_EOL);
+	      tree clobber = build_clobber (TREE_TYPE (*varp),
+					    CLOBBER_STORAGE_END);
 	      gimple *clobber_stmt;
 	      clobber_stmt = gimple_build_assign (*varp, clobber);
 	      gimple_set_location (clobber_stmt, gimple_location (stmt));
@@ -5143,7 +5147,10 @@ expand_call_inline (basic_block bb, gimple *stmt, copy_body_data *id,
 
   /* Reset the escaped solution.  */
   if (cfun->gimple_df)
-    pt_solution_reset (&cfun->gimple_df->escaped);
+    {
+      pt_solution_reset (&cfun->gimple_df->escaped);
+      pt_solution_reset (&cfun->gimple_df->escaped_return);
+    }
 
   /* Add new automatic variables to IFN_GOMP_SIMT_ENTER arguments.  */
   if (id->dst_simt_vars && id->dst_simt_vars->length () > 0)
@@ -5202,7 +5209,8 @@ expand_call_inline (basic_block bb, gimple *stmt, copy_body_data *id,
 	  && !is_gimple_reg (id->retvar)
 	  && !stmt_ends_bb_p (stmt))
 	{
-	  tree clobber = build_clobber (TREE_TYPE (id->retvar), CLOBBER_EOL);
+	  tree clobber = build_clobber (TREE_TYPE (id->retvar),
+					CLOBBER_STORAGE_END);
 	  gimple *clobber_stmt;
 	  clobber_stmt = gimple_build_assign (id->retvar, clobber);
 	  gimple_set_location (clobber_stmt, gimple_location (old_stmt));

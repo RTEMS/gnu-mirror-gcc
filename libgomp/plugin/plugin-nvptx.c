@@ -341,6 +341,11 @@ struct ptx_device
 
 static struct ptx_device **ptx_devices;
 
+/* OpenMP kernels reserve a small amount of ".shared" space for use by
+   omp_alloc.  The size is configured using GOMP_NVPTX_LOWLAT_POOL, but the
+   default is set here.  */
+static unsigned lowlat_pool_size = 8 * 1024;
+
 static inline struct nvptx_thread *
 nvptx_thread (void)
 {
@@ -1219,6 +1224,22 @@ GOMP_OFFLOAD_init_device (int n)
       instantiated_devices++;
     }
 
+  const char *var_name = "GOMP_NVPTX_LOWLAT_POOL";
+  const char *env_var = secure_getenv (var_name);
+  notify_var (var_name, env_var);
+
+  if (env_var != NULL)
+    {
+      char *endptr;
+      unsigned long val = strtoul (env_var, &endptr, 10);
+      if (endptr == NULL || *endptr != '\0'
+	  || errno == ERANGE || errno == EINVAL
+	  || val > UINT_MAX)
+	GOMP_PLUGIN_error ("Error parsing %s", var_name);
+      else
+	lowlat_pool_size = val;
+    }
+
   pthread_mutex_unlock (&ptx_dev_lock);
 
   return dev != NULL;
@@ -1886,6 +1907,35 @@ GOMP_OFFLOAD_memcpy2d (int dst_ord, int src_ord, size_t dim1_size,
   data.srcXInBytes = src_offset1_size;
   data.srcY = src_offset0_len;
 
+  if (data.srcXInBytes != 0 || data.srcY != 0)
+    {
+      /* Adjust origin to the actual array data, else the CUDA 2D memory
+	 copy API calls below may fail to validate source/dest pointers
+	 correctly (especially for Fortran where the "virtual origin" of an
+	 array is often outside the stored data).  */
+      if (src_ord == -1)
+	data.srcHost = (const void *) ((const char *) data.srcHost
+				      + data.srcY * data.srcPitch
+				      + data.srcXInBytes);
+      else
+	data.srcDevice += data.srcY * data.srcPitch + data.srcXInBytes;
+      data.srcXInBytes = 0;
+      data.srcY = 0;
+    }
+
+  if (data.dstXInBytes != 0 || data.dstY != 0)
+    {
+      /* As above.  */
+      if (dst_ord == -1)
+	data.dstHost = (void *) ((char *) data.dstHost
+				 + data.dstY * data.dstPitch
+				 + data.dstXInBytes);
+      else
+	data.dstDevice += data.dstY * data.dstPitch + data.dstXInBytes;
+      data.dstXInBytes = 0;
+      data.dstY = 0;
+    }
+
   CUresult res = CUDA_CALL_NOCHECK (cuMemcpy2D, &data);
   if (res == CUDA_ERROR_INVALID_VALUE)
     /* If pitch > CU_DEVICE_ATTRIBUTE_MAX_PITCH or for device-to-device
@@ -1953,6 +2003,44 @@ GOMP_OFFLOAD_memcpy3d (int dst_ord, int src_ord, size_t dim2_size,
   data.srcXInBytes = src_offset2_size;
   data.srcY = src_offset1_len;
   data.srcZ = src_offset0_len;
+
+  if (data.srcXInBytes != 0 || data.srcY != 0 || data.srcZ != 0)
+    {
+      /* Adjust origin to the actual array data, else the CUDA 3D memory
+	 copy API call below may fail to validate source/dest pointers
+	 correctly (especially for Fortran where the "virtual origin" of an
+	 array is often outside the stored data).  */
+      if (src_ord == -1)
+	data.srcHost
+	  = (const void *) ((const char *) data.srcHost
+			    + (data.srcZ * data.srcHeight + data.srcY)
+			      * data.srcPitch
+			    + data.srcXInBytes);
+      else
+	data.srcDevice
+	  += (data.srcZ * data.srcHeight + data.srcY) * data.srcPitch
+	     + data.srcXInBytes;
+      data.srcXInBytes = 0;
+      data.srcY = 0;
+      data.srcZ = 0;
+    }
+
+  if (data.dstXInBytes != 0 || data.dstY != 0 || data.dstZ != 0)
+    {
+      /* As above.  */
+      if (dst_ord == -1)
+	data.dstHost = (void *) ((char *) data.dstHost
+				 + (data.dstZ * data.dstHeight + data.dstY)
+				   * data.dstPitch
+				 + data.dstXInBytes);
+      else
+	data.dstDevice
+	  += (data.dstZ * data.dstHeight + data.dstY) * data.dstPitch
+	     + data.dstXInBytes;
+      data.dstXInBytes = 0;
+      data.dstY = 0;
+      data.dstZ = 0;
+    }
 
   CUDA_CALL (cuMemcpy3D, &data);
   return true;
@@ -2178,7 +2266,7 @@ GOMP_OFFLOAD_run (int ord, void *tgt_fn, void *tgt_vars, void **args)
 		     " [(teams: %u), 1, 1] [(lanes: 32), (threads: %u), 1]\n",
 		     __FUNCTION__, fn_name, teams, threads);
   r = CUDA_CALL_NOCHECK (cuLaunchKernel, function, teams, 1, 1,
-			 32, threads, 1, 0, NULL, NULL, config);
+			 32, threads, 1, lowlat_pool_size, NULL, NULL, config);
   if (r != CUDA_SUCCESS)
     GOMP_PLUGIN_fatal ("cuLaunchKernel error: %s", cuda_error (r));
   if (reverse_offload)

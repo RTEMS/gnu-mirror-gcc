@@ -1269,7 +1269,54 @@
 ;; 		      (pc)))]
 ;;   "")
 
-;; Various ways to extract a single bit bitfield and sign extend it
+;; This is a signed bitfield extraction starting at bit 0
+;; It's usually faster than using shifts, but not always,
+;; particularly on the H8/S and H8/SX variants.
+(define_insn_and_split "*extvsi_n_0"
+  [(set (match_operand:SI 0 "register_operand" "=r")
+	(sign_extract:SI (match_operand:SI 1 "register_operand" "0")
+			 (match_operand 2 "const_int_operand")
+			 (const_int 0)))]
+  "INTVAL (operands[2]) > 1
+   && INTVAL (operands[2]) < (TARGET_H8300S ? 26 - TARGET_H8300SX : 29)
+   && (!TARGET_H8300SX || (INTVAL (operands[2]) != 24 && INTVAL (operands[2]) != 17))"
+  "#"
+  "&& reload_completed"
+[(parallel [(set (match_dup 0) (and:SI (match_dup 0) (match_dup 3)))
+	    (clobber (reg:CC CC_REG))])
+ (parallel [(set (match_dup 0) (xor:SI (match_dup 0) (match_dup 4)))
+	    (clobber (reg:CC CC_REG))])
+ (parallel [(set (match_dup 0) (minus:SI (match_dup 0) (match_dup 4)))
+	    (clobber (reg:CC CC_REG))])]
+{
+  int tmp = INTVAL (operands[2]);
+  operands[3] = GEN_INT (~(HOST_WIDE_INT_M1U << tmp));
+  operands[4] = GEN_INT (HOST_WIDE_INT_1U << (tmp - 1));
+})
+
+(define_insn_and_split "*extvsi_n_n"
+  [(set (match_operand:SI 0 "register_operand" "=r")
+	(sign_extract:SI (match_operand:SI 1 "register_operand" "0")
+			 (match_operand 2 "const_int_operand")
+			 (match_operand 3 "const_int_operand")))]
+  "(!h8300_shift_needs_scratch_p (INTVAL (operands[3]), SImode, LSHIFTRT)
+    && use_extvsi (INTVAL (operands[2]), INTVAL (operands[3])))"
+  "#"
+  "&& reload_completed"
+[(parallel [(set (match_dup 0) (lshiftrt:SI (match_dup 0) (match_dup 3)))
+	    (clobber (reg:CC CC_REG))])
+ (parallel [(set (match_dup 0) (and:SI (match_dup 0) (match_dup 4)))
+	    (clobber (reg:CC CC_REG))])
+ (parallel [(set (match_dup 0) (xor:SI (match_dup 0) (match_dup 5)))
+	    (clobber (reg:CC CC_REG))])
+ (parallel [(set (match_dup 0) (minus:SI (match_dup 0) (match_dup 5)))
+	    (clobber (reg:CC CC_REG))])]
+{
+  int tmp = INTVAL (operands[2]);
+  operands[4] = gen_int_mode (~(HOST_WIDE_INT_M1U << tmp), SImode);
+  operands[5] = gen_int_mode (HOST_WIDE_INT_1U << (tmp - 1), SImode);
+})
+
 ;;
 ;; Testing showed this only triggering with SImode, probably because
 ;; of how insv/extv are defined.
@@ -1278,7 +1325,7 @@
 	(sign_extract:SI (match_operand:QHSI 1 "register_operand" "0")
 			 (const_int 1)
 			 (match_operand 2 "immediate_operand")))]
-  ""
+  "!TARGET_H8300SX"
   "#"
   "&& reload_completed"
   [(parallel [(set (match_dup 0)
@@ -1291,7 +1338,7 @@
 			 (const_int 1)
 			 (match_operand 2 "immediate_operand")))
    (clobber (reg:CC CC_REG))]
-  ""
+  "!TARGET_H8300SX"
 {
   int position = INTVAL (operands[2]);
 
@@ -1357,5 +1404,71 @@
   /* Now the bit we want is in C, emit the generalized sequence
      to get that bit into the destination, properly extended.  */
   return "subx\t%s0,%s0\;exts.w %T0\;exts.l %0";
+}
+  [(set (attr "length") (symbol_ref "INTVAL (operands[2]) >= 16 ? 10 : 8"))])
+
+;; For shift counts >= 16 we can always do better than the
+;; generic sequences.  Other patterns handle smaller counts.
+(define_insn_and_split ""
+  [(set (match_operand:SI 0 "register_operand" "=r")
+	(and:SI (lshiftrt:SI (match_operand:SI 1 "register_operand" "0")
+			     (match_operand 2 "immediate_operand" "n"))
+		(const_int 1)))]
+  "!TARGET_H8300SX && INTVAL (operands[2]) >= 16"
+  "#"
+  "&& reload_completed"
+  [(parallel [(set (match_dup 0) (and:SI (lshiftrt:SI (match_dup 0) (match_dup 2))
+					 (const_int 1)))
+	      (clobber (reg:CC CC_REG))])])
+
+(define_insn ""
+  [(set (match_operand:SI 0 "register_operand" "=r")
+	(and:SI (lshiftrt:SI (match_operand:SI 1 "register_operand" "0")
+			     (match_operand 2 "immediate_operand" "n"))
+		(const_int 1)))
+   (clobber (reg:CC CC_REG))]
+  "!TARGET_H8300SX && INTVAL (operands[2]) >= 16"
+{
+  int position = INTVAL (operands[2]);
+
+  /* If the bit we want is the highest bit we can just rotate it into position
+     and mask off everything else.  */
+  if (position == 31)
+    {
+      output_asm_insn ("rotl.l\t%0", operands);
+      return "and.l\t#1,%0";
+    }
+
+  /* Special case for H8/S.  Similar to bit 31.  */
+  if (position == 30 && TARGET_H8300S)
+    return "rotl.l\t#2,%0\;and.l\t#1,%0";
+
+  if (position <= 30 && position >= 17)
+    {
+      /* Shift 16 bits, without worrying about extensions.  */
+      output_asm_insn ("mov.w\t%e1,%f0", operands);
+
+      /* Get the bit we want into C.  */
+      operands[2] = GEN_INT (position % 8);
+      if (position >= 24)
+	output_asm_insn ("bld\t%2,%t0", operands);
+      else
+	output_asm_insn ("bld\t%2,%s0", operands);
+
+      /* xor + rotate to clear the destination, then rotate
+	 the C into position.  */
+      return "xor.l\t%0,%0\;rotxl.l\t%0";
+    }
+
+  if (position == 16)
+    {
+      /* Shift 16 bits, without worrying about extensions.  */
+      output_asm_insn ("mov.w\t%e1,%f0", operands);
+
+      /* And finally, mask out everything we don't want.  */
+      return "and.l\t#1,%0";
+    }
+
+  gcc_unreachable ();
 }
   [(set_attr "length" "10")])

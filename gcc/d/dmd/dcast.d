@@ -38,6 +38,7 @@ import dmd.init;
 import dmd.intrange;
 import dmd.mtype;
 import dmd.opover;
+import dmd.optimize;
 import dmd.root.ctfloat;
 import dmd.common.outbuffer;
 import dmd.root.rmem;
@@ -67,7 +68,6 @@ Expression implicitCastTo(Expression e, Scope* sc, Type t)
     Expression visit(Expression e)
     {
         // printf("Expression.implicitCastTo(%s of type %s) => %s\n", e.toChars(), e.type.toChars(), t.toChars());
-
         if (const match = (sc && sc.flags & SCOPE.Cfile) ? e.cimplicitConvTo(t) : e.implicitConvTo(t))
         {
             // no need for an extra cast when matching is exact
@@ -801,8 +801,8 @@ extern(C++) MATCH implicitConvTo(Expression e, Type t)
 
             return result;
         }
-        else if (tb.ty == Tvector && (typeb.ty == Tarray || typeb.ty == Tsarray))
-        {
+        else if (tb.ty == Tvector && (typeb.ty == Tarray || typeb.ty == Tsarray || typeb.ty == Tpointer))
+        {   // Tpointer because ImportC eagerly converts Tsarray to Tpointer
             result = MATCH.exact;
             // Convert array literal to vector type
             TypeVector tv = tb.isTypeVector();
@@ -1486,6 +1486,10 @@ MATCH cimplicitConvTo(Expression e, Type t)
 
     if (tb.equals(typeb))
         return MATCH.exact;
+
+    if (tb.isTypeVector() || typeb.isTypeVector())
+        return implicitConvTo(e, t);    // permissive checking doesn't apply to vectors
+
     if ((typeb.isintegral() || typeb.isfloating()) &&
         (tb.isintegral() || tb.isfloating()))
         return MATCH.convert;
@@ -1630,6 +1634,13 @@ Expression castTo(Expression e, Scope* sc, Type t, Type att = null)
         }
         else if (tob.ty == Tvector && t1b.ty != Tvector)
         {
+            if (t1b.ty == Tsarray)
+            {
+                // Casting static array to vector with same size, e.g. `cast(int4) int[4]`
+                if (t1b.size(e.loc) != tob.size(e.loc))
+                    goto Lfail;
+                return new VectorExp(e.loc, e, tob).expressionSemantic(sc);
+            }
             //printf("test1 e = %s, e.type = %s, tob = %s\n", e.toChars(), e.type.toChars(), tob.toChars());
             TypeVector tv = tob.isTypeVector();
             Expression result = new CastExp(e.loc, e, tv.elementType());
@@ -2290,9 +2301,10 @@ Expression castTo(Expression e, Scope* sc, Type t, Type att = null)
                 ae.type = tp;
             }
         }
-        else if (tb.ty == Tvector && (typeb.ty == Tarray || typeb.ty == Tsarray))
+        else if (tb.ty == Tvector && (typeb.ty == Tarray || typeb.ty == Tsarray || typeb.ty == Tpointer))
         {
             // Convert array literal to vector type
+            // The Tpointer case comes from C eagerly converting Tsarray to Tpointer
             TypeVector tv = tb.isTypeVector();
             TypeSArray tbase = tv.basetype.isTypeSArray();
             assert(tbase.ty == Tsarray);

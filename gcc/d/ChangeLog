@@ -1,3 +1,56 @@
+2023-12-16  Andrew Carlotti  <andrew.carlotti@arm.com>
+
+	* d-attribs.cc (attr_target_exclusions): Make
+	target/target_clones exclusion target-dependent.
+	(attr_target_clones_exclusions): Ditto.
+
+2023-12-11  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	* Make-lang.in (D_FRONTEND_OBJS): Rename d/common-string.o to
+	d/common-smallbuffer.o.
+	* dmd/MERGE: Merge upstream dmd 2bbf64907c.
+	* dmd/VERSION: Bump version to v2.106.0.
+	* modules.cc (layout_moduleinfo_fields): Update for new front-end
+	interface.
+	(layout_moduleinfo): Likewise.
+
+2023-12-05  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* d-attribs.cc (d_langhook_common_attribute_table): Add extra braces
+	to work around PR 16333 in older compilers.
+	(d_langhook_gnu_attribute_table): Likewise.
+
+2023-12-02  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* d-tree.h (d_langhook_attribute_table): Replace with...
+	(d_langhook_gnu_attribute_table): ...this.
+	(d_langhook_common_attribute_table): Change type to
+	scoped_attribute_specs.
+	* d-attribs.cc (d_langhook_common_attribute_table): Change type to
+	scoped_attribute_specs, using...
+	(d_langhook_common_attributes): ...this as the underlying array.
+	(d_langhook_attribute_table): Replace with...
+	(d_langhook_gnu_attributes, d_langhook_gnu_attribute_table): ...these
+	new globals.
+	(uda_attribute_p): Update accordingly, and update for new
+	targetm.attribute_table type.
+	* d-lang.cc (d_langhook_attribute_table): New global.
+	(LANG_HOOKS_COMMON_ATTRIBUTE_TABLE): Delete.
+
+2023-11-21  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	* dmd/MERGE: Merge upstream dmd ff57fec515.
+	* dmd/VERSION: Bump version to v2.106.0-rc.1.
+	* expr.cc (ExprVisitor::visit (CatAssignExp *)): Update for new
+	front-end interface.
+	(ExprVisitor::visit (NewExp *)): Likewise.
+	* runtime.def (NEWARRAYMTX): Remove.
+	(NEWARRAYMITX): Remove.
+
+2023-11-21  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	* dmd/MERGE: Merge upstream dmd 65a3da148c.
+
 2023-11-02  Iain Buclaw  <ibuclaw@gdcproject.org>
 
 	* dmd/MERGE: Merge upstream dmd 643b1261bb.

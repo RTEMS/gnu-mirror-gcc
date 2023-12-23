@@ -332,7 +332,7 @@ C ObjC C++ ObjC++ Var(warn_alloca) Warning
 Warn on any use of alloca.
 
 Walloc-size
-C ObjC Var(warn_alloc_size) Warning LangEnabledBy(C ObjC, Wextra)
+C ObjC C++ ObjC++ Var(warn_alloc_size) Warning LangEnabledBy(C ObjC C++ ObjC++, Wextra)
 Warn when allocating insufficient storage for the target type of the assigned pointer.
 
 Walloc-size-larger-than=
@@ -498,6 +498,14 @@ Wc++23-extensions
 C++ ObjC++ Var(warn_cxx23_extensions) Warning Init(1)
 Warn about C++23 constructs in code compiled with an older standard.
 
+Wc++26-extensions
+C++ ObjC++ Var(warn_cxx26_extensions) Warning Init(1)
+Warn about C++26 constructs in code compiled with an older standard.
+
+Wcalloc-transposed-args
+C ObjC C++ ObjC++ Var(warn_calloc_transposed_args) Warning LangEnabledBy(C ObjC C++ ObjC++,Wextra)
+Warn about suspicious calls to calloc-like functions where sizeof expression is the earlier size argument and not the latter.
+
 Wcast-function-type
 C ObjC C++ ObjC++ Var(warn_cast_function_type) Warning EnabledBy(Wextra)
 Warn about casts between incompatible function types.
@@ -590,6 +598,10 @@ Warn about __TIME__, __DATE__ and __TIMESTAMP__ usage.
 Wdeclaration-after-statement
 C ObjC Var(warn_declaration_after_statement) Init(-1) Warning
 Warn when a declaration is found after a statement.
+
+Wdeclaration-missing-parameter-type
+C ObjC Var(warn_declaration_missing_parameter) Warning Init(1)
+Warn for missing parameter types in function declarations.
 
 Wdelete-incomplete
 C++ ObjC++ Var(warn_delete_incomplete) Init(1) Warning
@@ -1171,6 +1183,10 @@ Wopenacc-parallelism
 C C++ Var(warn_openacc_parallelism) Warning
 Warn about potentially suboptimal choices related to OpenACC parallelism.
 
+Wopenmp
+C ObjC C++ ObjC++ Warning Var(warn_openmp) Init(1)
+Warn about suspicious OpenMP code.
+
 Wopenmp-simd
 C C++ Var(warn_openmp_simd) Warning LangEnabledBy(C C++,Wall)
 Warn if a simd directive is overridden by the vectorizer cost model.
@@ -1270,6 +1286,10 @@ Warn about uses of register storage specifier.
 Wreorder
 C++ ObjC++ Var(warn_reorder) Warning LangEnabledBy(C++ ObjC++,Wall)
 Warn when the compiler reorders code.
+
+Wreturn-mismatch
+C ObjC Var(warn_return_mismatch) Warning Init(1)
+Warn whenever void-returning functions return a non-void expressions, or a return expression is missing in a function not returning void.
 
 Wreturn-type
 C ObjC C++ ObjC++ Var(warn_return_type) Warning LangEnabledBy(C ObjC C++ ObjC++,Wall) Init(-1)
@@ -1789,6 +1809,10 @@ fdiagnostics-show-template-tree
 C++ ObjC++ Var(flag_diagnostics_show_template_tree) Init(0)
 Print hierarchical comparisons when template types are mismatched.
 
+fdiagnostics-all-candidates
+C++ ObjC++ Var(flag_diagnostics_all_candidates)
+Note all candidates during overload resolution failure.
+
 fdirectives-only
 C ObjC C++ ObjC++
 Preprocess directives only.
@@ -1881,6 +1905,10 @@ Assume normal C execution environment.
 fhuge-objects
 C++ ObjC++ WarnRemoved
 No longer supported.
+
+fimmediate-escalation
+C++ ObjC++ Var(flag_immediate_escalation) Init(1)
+Implement P2564 for consteval propagation.
 
 fimplement-inlines
 C++ ObjC++ Var(flag_implement_inlines) Init(1)

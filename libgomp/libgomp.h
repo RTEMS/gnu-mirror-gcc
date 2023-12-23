@@ -114,9 +114,6 @@ extern void gomp_aligned_free (void *);
 #ifdef __AMDGCN__
 #include "libgomp-gcn.h"
 /* The arena is initialized in config/gcn/team.c.  */
-#define TEAM_ARENA_START 16  /* LDS offset of free pointer.  */
-#define TEAM_ARENA_FREE  24  /* LDS offset of free pointer.  */
-#define TEAM_ARENA_END   32  /* LDS offset of end pointer.  */
 
 static inline void * __attribute__((malloc))
 team_malloc (size_t size)
@@ -1272,6 +1269,7 @@ reverse_splay_compare (reverse_splay_tree_key x, reverse_splay_tree_key y)
 }
 
 #define splay_tree_prefix reverse
+#define splay_tree_static
 #include "splay-tree.h"
 
 /* Indirect target function splay-tree handling.  */

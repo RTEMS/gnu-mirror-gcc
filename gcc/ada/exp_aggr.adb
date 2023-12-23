@@ -1936,7 +1936,7 @@ package body Exp_Aggr is
 
       Aggr_Low  : constant Node_Id := Duplicate_Subexpr_No_Checks (Aggr_L);
       Aggr_High : constant Node_Id := Duplicate_Subexpr_No_Checks (Aggr_H);
-      --  After Duplicate_Subexpr these are side-effect free
+      --  After Duplicate_Subexpr these are side-effect-free
 
       Assoc  : Node_Id;
       Choice : Node_Id;
@@ -4294,15 +4294,9 @@ package body Exp_Aggr is
          return;
       end if;
 
-      --  Otherwise, if a transient scope is required, create it now. If we
-      --  are within an initialization procedure do not create such, because
-      --  the target of the assignment must not be declared within a local
-      --  block, and because cleanup will take place on return from the
-      --  initialization procedure.
+      --  Otherwise, if a transient scope is required, create it now
 
-      --  Should the condition be more restrictive ???
-
-      if Requires_Transient_Scope (Typ) and then not Inside_Init_Proc then
+      if Requires_Transient_Scope (Typ) then
          Establish_Transient_Scope (N, Manage_Sec_Stack => False);
       end if;
 
@@ -5243,7 +5237,7 @@ package body Exp_Aggr is
          --  The bounds of the aggregate for this dimension
 
          Ind_Typ : constant Entity_Id := Aggr_Index_Typ (Dim);
-         --  The index type for this dimension.xxx
+         --  The index type for this dimension.
 
          Cond  : Node_Id;
          Assoc : Node_Id;
@@ -6323,7 +6317,7 @@ package body Exp_Aggr is
            and then No_Ctrl_Actions (Parent_Node)
          then
             Mutate_Ekind (Tmp, E_Variable);
-            Set_Is_Ignored_Transient (Tmp);
+            Set_Is_Ignored_For_Finalization (Tmp);
          end if;
 
          Insert_Action (N, Tmp_Decl);
@@ -6990,8 +6984,14 @@ package body Exp_Aggr is
                   Parameter_Associations =>
                     New_List (
                       Make_Integer_Literal (Loc, 1),
-                      New_Occurrence_Of
-                        (Defining_Identifier (Siz_Decl), Loc))));
+                      Make_Type_Conversion (Loc,
+                        Subtype_Mark =>
+                          New_Occurrence_Of
+                            (Etype (First_Formal (Entity (New_Indexed_Subp))),
+                             Loc),
+                        Expression => New_Occurrence_Of
+                                        (Defining_Identifier (Siz_Decl),
+                                         Loc)))));
          end if;
 
          Append (Init_Stat, Aggr_Code);
@@ -7344,6 +7344,12 @@ package body Exp_Aggr is
       --  choices that are ranges, subtype indications, subtype names, and
       --  iterated component associations.
 
+      function Make_Array_Delta_Assignment_LHS
+        (Choice : Node_Id; Temp : Entity_Id) return Node_Id;
+      --  Generate the LHS for the assignment associated with one
+      --  component association. This can be more complex than just an
+      --  indexed component in the case of a deep delta aggregate.
+
       -------------------
       -- Generate_Loop --
       -------------------
@@ -7379,6 +7385,60 @@ package body Exp_Aggr is
                   Expression => New_Copy_Tree (Expression (Assoc)))),
               End_Label       => Empty);
       end Generate_Loop;
+
+      function Make_Array_Delta_Assignment_LHS
+        (Choice : Node_Id; Temp : Entity_Id) return Node_Id
+      is
+         function Make_Delta_Choice_LHS
+           (Choice      : Node_Id;
+            Deep_Choice : Boolean) return Node_Id;
+         --  Recursively (but recursion only in deep delta aggregate case)
+         --  build up the LHS by successively applying selectors.
+
+         ---------------------------
+         -- Make_Delta_Choice_LHS --
+         ---------------------------
+
+         function Make_Delta_Choice_LHS
+           (Choice      : Node_Id;
+            Deep_Choice : Boolean) return Node_Id
+         is
+         begin
+            if not Deep_Choice
+              or else Is_Root_Prefix_Of_Deep_Choice (Choice)
+            then
+               return Make_Indexed_Component (Sloc (Choice),
+                        Prefix      => New_Occurrence_Of (Temp, Loc),
+                        Expressions => New_List (New_Copy_Tree (Choice)));
+
+            else
+               --  a deep delta aggregate choice
+               pragma Assert (All_Extensions_Allowed);
+
+               declare
+                  --  recursively get name for prefix
+                  LHS_Prefix : constant Node_Id
+                    := Make_Delta_Choice_LHS (Prefix (Choice), Deep_Choice);
+               begin
+                  if Nkind (Choice) = N_Indexed_Component then
+                     return Make_Indexed_Component (Sloc (Choice),
+                        Prefix      => LHS_Prefix,
+                        Expressions => New_Copy_List (Expressions (Choice)));
+                  else
+                     return Make_Selected_Component (Sloc (Choice),
+                              Prefix        => LHS_Prefix,
+                              Selector_Name =>
+                                Make_Identifier
+                                  (Sloc (Choice),
+                                   Chars (Selector_Name (Choice))));
+                  end if;
+               end;
+            end if;
+         end Make_Delta_Choice_LHS;
+      begin
+         return Make_Delta_Choice_LHS
+           (Choice, Is_Deep_Choice (Choice, Etype (N)));
+      end Make_Array_Delta_Assignment_LHS;
 
       --  Local variables
 
@@ -7416,9 +7476,7 @@ package body Exp_Aggr is
                   Append_To (Deltas,
                     Make_Assignment_Statement (Sloc (Choice),
                       Name       =>
-                        Make_Indexed_Component (Sloc (Choice),
-                          Prefix      => New_Occurrence_Of (Temp, Loc),
-                          Expressions => New_List (New_Copy_Tree (Choice))),
+                        Make_Array_Delta_Assignment_LHS (Choice, Temp),
                       Expression => New_Copy_Tree (Expression (Assoc))));
                end if;
 
@@ -7443,6 +7501,43 @@ package body Exp_Aggr is
       Assoc  : Node_Id;
       Choice : Node_Id;
 
+      function Make_Record_Delta_Assignment_LHS
+        (Selector : Node_Id) return Node_Id;
+      --  Generate the LHS for an assignment to a component (or subcomponent
+      --  if -gnatX specified) of the result object.
+
+      --------------------------------------
+      -- Make_Record_Delta_Assignment_LHS --
+      --------------------------------------
+
+      function Make_Record_Delta_Assignment_LHS
+        (Selector : Node_Id) return Node_Id
+      is
+      begin
+         if Nkind (Selector) = N_Selected_Component then
+            --  a deep delta aggregate, requires -gnatX0
+            return
+              Make_Selected_Component
+                (Sloc (Choice),
+                 Prefix        => Make_Record_Delta_Assignment_LHS
+                                    (Prefix (Selector)),
+                 Selector_Name =>
+                   Make_Identifier (Loc, Chars (Selector_Name (Selector))));
+         elsif Nkind (Selector) = N_Indexed_Component then
+            --  a deep delta aggregate, requires -gnatX0
+            return
+              Make_Indexed_Component
+                (Sloc (Choice),
+                 Prefix        => Make_Record_Delta_Assignment_LHS
+                                    (Prefix (Selector)),
+                 Expressions   => Expressions (Selector));
+         else
+            return Make_Selected_Component
+                    (Sloc (Choice),
+                     Prefix        => New_Occurrence_Of (Temp, Loc),
+                     Selector_Name => Make_Identifier (Loc, Chars (Selector)));
+         end if;
+      end Make_Record_Delta_Assignment_LHS;
    begin
       Assoc := First (Component_Associations (N));
 
@@ -7451,10 +7546,7 @@ package body Exp_Aggr is
          while Present (Choice) loop
             Append_To (Deltas,
               Make_Assignment_Statement (Sloc (Choice),
-                Name       =>
-                  Make_Selected_Component (Sloc (Choice),
-                    Prefix        => New_Occurrence_Of (Temp, Loc),
-                    Selector_Name => Make_Identifier (Loc, Chars (Choice))),
+                Name       => Make_Record_Delta_Assignment_LHS (Choice),
                 Expression => New_Copy_Tree (Expression (Assoc))));
             Next (Choice);
          end loop;
@@ -8417,9 +8509,18 @@ package body Exp_Aggr is
          Set_No_Ctrl_Actions (Init_Stmt);
 
          if Tagged_Type_Expansion and then Is_Tagged_Type (Comp_Typ) then
-            Append_To (Blk_Stmts,
-              Make_Tag_Assignment_From_Type
-                (Loc, New_Copy_Tree (Comp), Underlying_Type (Comp_Typ)));
+            declare
+               Typ : Entity_Id := Underlying_Type (Comp_Typ);
+
+            begin
+               if Is_Concurrent_Type (Typ) then
+                  Typ := Corresponding_Record_Type (Typ);
+               end if;
+
+               Append_To (Blk_Stmts,
+                 Make_Tag_Assignment_From_Type
+                   (Loc, New_Copy_Tree (Comp), Typ));
+            end;
          end if;
       end if;
 

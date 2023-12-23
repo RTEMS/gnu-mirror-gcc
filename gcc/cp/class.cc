@@ -5053,6 +5053,8 @@ build_clone (tree fn, tree name, bool need_vtt_parm_p,
       clone = copy_fndecl_with_name (fn, name, ERROR_MARK,
 				     need_vtt_parm_p, omit_inherited_parms_p);
       DECL_CLONED_FUNCTION (clone) = fn;
+
+      maybe_prepare_return_this (clone);
     }
 
   /* Remember where this function came from.  */
@@ -6962,7 +6964,8 @@ layout_class_type (tree t, tree *virtuals_p)
 	     check_bitfield_decl eventually sets DECL_SIZE (field)
 	     to that width.  */
 	  && (DECL_SIZE (field) == NULL_TREE
-	      || integer_zerop (DECL_SIZE (field))))
+	      || integer_zerop (DECL_SIZE (field)))
+	  && TREE_TYPE (field) != error_mark_node)
 	SET_DECL_FIELD_CXX_ZERO_WIDTH_BIT_FIELD (field, 1);
       check_non_pod_aggregate (field);
     }
@@ -7802,8 +7805,8 @@ propagate_class_warmth_attribute (tree t)
 
   if (class_has_cold_attr || class_has_hot_attr)
     for (tree f = TYPE_FIELDS (t); f; f = DECL_CHAIN (f))
-      if (TREE_CODE (f) == FUNCTION_DECL)
-	maybe_propagate_warmth_attributes (f, t);
+      if (DECL_DECLARES_FUNCTION_P (f))
+	maybe_propagate_warmth_attributes (STRIP_TEMPLATE (f), t);
 }
 
 tree

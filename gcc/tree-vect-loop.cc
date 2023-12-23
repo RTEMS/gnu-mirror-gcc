@@ -1462,7 +1462,10 @@ vect_verify_full_masking_avx512 (loop_vec_info loop_vinfo)
       if (!mask_type)
 	continue;
 
-      if (TYPE_PRECISION (TREE_TYPE (mask_type)) != 1)
+      /* For now vect_get_loop_mask only supports integer mode masks
+	 when we need to split it.  */
+      if (GET_MODE_CLASS (TYPE_MODE (mask_type)) != MODE_INT
+	  || TYPE_PRECISION (TREE_TYPE (mask_type)) != 1)
 	{
 	  ok = false;
 	  break;
@@ -2654,6 +2657,19 @@ vect_determine_partial_vectors_and_peeling (loop_vec_info loop_vinfo)
     = (!LOOP_VINFO_USING_PARTIAL_VECTORS_P (loop_vinfo)
        && need_peeling_or_partial_vectors_p);
 
+  /* We set LOOP_VINFO_USING_SELECT_VL_P as true before loop vectorization
+     analysis that we don't know whether the loop is vectorized by partial
+     vectors (More details see tree-vect-loop-manip.cc).
+
+     However, SELECT_VL vectorizaton style should only applied on partial
+     vectorization since SELECT_VL is the GIMPLE IR that calculates the
+     number of elements to be process for each iteration.
+
+     After loop vectorization analysis, Clear LOOP_VINFO_USING_SELECT_VL_P
+     if it is not partial vectorized loop.  */
+  if (!LOOP_VINFO_USING_PARTIAL_VECTORS_P (loop_vinfo))
+    LOOP_VINFO_USING_SELECT_VL_P (loop_vinfo) = false;
+
   return opt_result::success ();
 }
 
@@ -2801,9 +2817,6 @@ vect_analyze_loop_2 (loop_vec_info loop_vinfo, bool &fatal,
 			 "can't determine vectorization factor.\n");
       return ok;
     }
-  if (max_vf != MAX_VECTORIZATION_FACTOR
-      && maybe_lt (max_vf, LOOP_VINFO_VECT_FACTOR (loop_vinfo)))
-    return opt_result::failure_at (vect_location, "bad data dependence.\n");
 
   /* Compute the scalar iteration cost.  */
   vect_compute_single_scalar_iteration_cost (loop_vinfo);
@@ -2864,6 +2877,10 @@ start_over:
       dump_printf (MSG_NOTE, ", niters = %wd\n",
 		   LOOP_VINFO_INT_NITERS (loop_vinfo));
     }
+
+  if (max_vf != MAX_VECTORIZATION_FACTOR
+      && maybe_lt (max_vf, LOOP_VINFO_VECT_FACTOR (loop_vinfo)))
+    return opt_result::failure_at (vect_location, "bad data dependence.\n");
 
   loop_vinfo->vector_costs = init_cost (loop_vinfo, false);
 
@@ -3553,6 +3570,10 @@ vect_analyze_loop (class loop *loop, vec_info_shared *shared)
 	 analysis are done under the assumptions.  */
       loop_constraint_set (loop, LOOP_C_FINITE);
     }
+  else
+    /* Clear the existing niter information to make sure the nonwrapping flag
+       will be calculated and set propriately.  */
+    free_numbers_of_iterations_estimates (loop);
 
   auto_vector_modes vector_modes;
   /* Autodetect first vector size we try.  */
@@ -4102,9 +4123,9 @@ pop:
 	/* In case of a COND_OP (mask, op1, op2, op1) reduction we might have
 	   op1 twice (once as definition, once as else) in the same operation.
 	   Allow this.  */
-	  if (cond_fn_p)
+	  if (cond_fn_p && op_use_stmt == use_stmt)
 	    {
-	      gcall *call = dyn_cast<gcall *> (use_stmt);
+	      gcall *call = as_a<gcall *> (use_stmt);
 	      unsigned else_pos
 		= internal_fn_else_index (internal_fn (op.code));
 
@@ -4849,10 +4870,19 @@ vect_estimate_min_profitable_iters (loop_vec_info loop_vinfo,
 	    if (partial_load_store_bias != 0)
 	      body_stmts += 1;
 
-	    /* Each may need two MINs and one MINUS to update lengths in body
-	       for next iteration.  */
+	    unsigned int length_update_cost = 0;
+	    if (LOOP_VINFO_USING_DECREMENTING_IV_P (loop_vinfo))
+	      /* For decrement IV style, Each only need a single SELECT_VL
+		 or MIN since beginning to calculate the number of elements
+		 need to be processed in current iteration.  */
+	      length_update_cost = 1;
+	    else
+	      /* For increment IV stype, Each may need two MINs and one MINUS to
+		 update lengths in body for next iteration.  */
+	      length_update_cost = 3;
+
 	    if (need_iterate_p)
-	      body_stmts += 3 * num_vectors;
+	      body_stmts += length_update_cost * num_vectors;
 	  }
 
       (void) add_stmt_cost (target_cost_data, prologue_stmts,
@@ -7054,7 +7084,7 @@ vectorize_fold_left_reduction (loop_vec_info loop_vinfo,
     op0 = ops[1 - reduc_index];
   else
     {
-      op0 = ops[2];
+      op0 = ops[2 + (1 - reduc_index)];
       opmask = ops[0];
       gcc_assert (!slp_node);
     }
@@ -7084,7 +7114,7 @@ vectorize_fold_left_reduction (loop_vec_info loop_vinfo,
 					 opmask, &vec_opmask);
     }
 
-  gimple *sdef = scalar_dest_def_info->stmt;
+  gimple *sdef = vect_orig_stmt (scalar_dest_def_info)->stmt;
   tree scalar_dest = gimple_get_lhs (sdef);
   tree scalar_type = TREE_TYPE (scalar_dest);
   tree reduc_var = gimple_phi_result (reduc_def_stmt);
@@ -7368,7 +7398,6 @@ vectorizable_reduction (loop_vec_info loop_vinfo,
 			stmt_vector_for_cost *cost_vec)
 {
   tree vectype_in = NULL_TREE;
-  tree vectype_op[3] = { NULL_TREE, NULL_TREE, NULL_TREE };
   class loop *loop = LOOP_VINFO_LOOP (loop_vinfo);
   enum vect_def_type cond_reduc_dt = vect_unknown_def_type;
   stmt_vec_info cond_stmt_vinfo = NULL;
@@ -7600,6 +7629,7 @@ vectorizable_reduction (loop_vec_info loop_vinfo,
      assumption is not true: we use reduc_index to record the index of the
      reduction variable.  */
   slp_tree *slp_op = XALLOCAVEC (slp_tree, op.num_ops);
+  tree *vectype_op = XALLOCAVEC (tree, op.num_ops);
   /* We need to skip an extra operand for COND_EXPRs with embedded
      comparison.  */
   unsigned opno_adjust = 0;
@@ -8439,7 +8469,9 @@ vect_transform_reduction (loop_vec_info loop_vinfo,
       gcc_assert (code == IFN_COND_ADD || code == IFN_COND_SUB
 		  || code == IFN_COND_MUL || code == IFN_COND_AND
 		  || code == IFN_COND_IOR || code == IFN_COND_XOR);
-      gcc_assert (op.num_ops == 4 && (op.ops[1] == op.ops[3]));
+      gcc_assert (op.num_ops == 4
+		  && (op.ops[reduc_index]
+		      == op.ops[internal_fn_else_index ((internal_fn) code)]));
     }
 
   bool masked_loop_p = LOOP_VINFO_FULLY_MASKED_P (loop_vinfo);
@@ -8467,15 +8499,30 @@ vect_transform_reduction (loop_vec_info loop_vinfo,
 
   /* Get NCOPIES vector definitions for all operands except the reduction
      definition.  */
-  vect_get_vec_defs (loop_vinfo, stmt_info, slp_node, ncopies,
-		     single_defuse_cycle && reduc_index == 0
-		     ? NULL_TREE : op.ops[0], &vec_oprnds0,
-		     single_defuse_cycle && reduc_index == 1
-		     ? NULL_TREE : op.ops[1], &vec_oprnds1,
-		     op.num_ops == 4
-		     || (op.num_ops == 3
-			 && !(single_defuse_cycle && reduc_index == 2))
-		     ? op.ops[2] : NULL_TREE, &vec_oprnds2);
+  if (!cond_fn_p)
+    {
+      vect_get_vec_defs (loop_vinfo, stmt_info, slp_node, ncopies,
+			 single_defuse_cycle && reduc_index == 0
+			 ? NULL_TREE : op.ops[0], &vec_oprnds0,
+			 single_defuse_cycle && reduc_index == 1
+			 ? NULL_TREE : op.ops[1], &vec_oprnds1,
+			 op.num_ops == 3
+			 && !(single_defuse_cycle && reduc_index == 2)
+			 ? op.ops[2] : NULL_TREE, &vec_oprnds2);
+    }
+  else
+    {
+      /* For a conditional operation pass the truth type as mask
+	 vectype.  */
+      gcc_assert (single_defuse_cycle
+		  && (reduc_index == 1 || reduc_index == 2));
+      vect_get_vec_defs (loop_vinfo, stmt_info, slp_node, ncopies,
+			 op.ops[0], truth_type_for (vectype_in), &vec_oprnds0,
+			 reduc_index == 1 ? NULL_TREE : op.ops[1],
+			 NULL_TREE, &vec_oprnds1,
+			 reduc_index == 2 ? NULL_TREE : op.ops[2],
+			 NULL_TREE, &vec_oprnds2);
+    }
 
   /* For single def-use cycles get one copy of the vectorized reduction
      definition.  */
@@ -9566,9 +9613,16 @@ vectorizable_nonlinear_induction (loop_vec_info loop_vinfo,
 
   if (TREE_CODE (init_expr) == INTEGER_CST)
     init_expr = fold_convert (TREE_TYPE (vectype), init_expr);
-  else
-    gcc_assert (tree_nop_conversion_p (TREE_TYPE (vectype),
-				       TREE_TYPE (init_expr)));
+  else if (!tree_nop_conversion_p (TREE_TYPE (vectype), TREE_TYPE (init_expr)))
+    {
+      /* INIT_EXPR could be a bit_field, bail out for such case.  */
+      if (dump_enabled_p ())
+	dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+			 "nonlinear induction vectorization failed:"
+			 " component type of vectype is not a nop conversion"
+			 " from type of init_expr.\n");
+      return false;
+    }
 
   switch (induction_type)
     {
@@ -10303,10 +10357,36 @@ vectorizable_induction (loop_vec_info loop_vinfo,
 
 
   /* Create the vector that holds the step of the induction.  */
+  gimple_stmt_iterator *step_iv_si = NULL;
   if (nested_in_vect_loop)
     /* iv_loop is nested in the loop to be vectorized. Generate:
        vec_step = [S, S, S, S]  */
     new_name = step_expr;
+  else if (LOOP_VINFO_USING_SELECT_VL_P (loop_vinfo))
+    {
+      /* When we're using loop_len produced by SELEC_VL, the non-final
+	 iterations are not always processing VF elements.  So vectorize
+	 induction variable instead of
+
+	   _21 = vect_vec_iv_.6_22 + { VF, ... };
+
+	 We should generate:
+
+	   _35 = .SELECT_VL (ivtmp_33, VF);
+	   vect_cst__22 = [vec_duplicate_expr] _35;
+	   _21 = vect_vec_iv_.6_22 + vect_cst__22;  */
+      gcc_assert (!slp_node);
+      gimple_seq seq = NULL;
+      vec_loop_lens *lens = &LOOP_VINFO_LENS (loop_vinfo);
+      tree len = vect_get_loop_len (loop_vinfo, NULL, lens, 1, vectype, 0, 0);
+      expr = force_gimple_operand (fold_convert (TREE_TYPE (step_expr),
+						 unshare_expr (len)),
+				   &seq, true, NULL_TREE);
+      new_name = gimple_build (&seq, MULT_EXPR, TREE_TYPE (step_expr), expr,
+			       step_expr);
+      gsi_insert_seq_before (&si, seq, GSI_SAME_STMT);
+      step_iv_si = &si;
+    }
   else
     {
       /* iv_loop is the loop to be vectorized. Generate:
@@ -10333,7 +10413,7 @@ vectorizable_induction (loop_vec_info loop_vinfo,
 	      || TREE_CODE (new_name) == SSA_NAME);
   new_vec = build_vector_from_val (step_vectype, t);
   vec_step = vect_init_vector (loop_vinfo, stmt_info,
-			       new_vec, step_vectype, NULL);
+			       new_vec, step_vectype, step_iv_si);
 
 
   /* Create the following def-use cycle:
@@ -10379,6 +10459,8 @@ vectorizable_induction (loop_vec_info loop_vinfo,
       gimple_seq seq = NULL;
       /* FORNOW. This restriction should be relaxed.  */
       gcc_assert (!nested_in_vect_loop);
+      /* We expect LOOP_VINFO_USING_SELECT_VL_P to be false if ncopies > 1.  */
+      gcc_assert (!LOOP_VINFO_USING_SELECT_VL_P (loop_vinfo));
 
       /* Create the vector that holds the step of the induction.  */
       if (SCALAR_FLOAT_TYPE_P (TREE_TYPE (step_expr)))
@@ -11297,7 +11379,16 @@ vect_transform_loop_stmt (loop_vec_info loop_vinfo, stmt_vec_info stmt_info,
 
   if (!STMT_VINFO_RELEVANT_P (stmt_info)
       && !STMT_VINFO_LIVE_P (stmt_info))
-    return false;
+    {
+      if (is_gimple_call (stmt_info->stmt)
+	  && gimple_call_internal_p (stmt_info->stmt, IFN_MASK_CALL))
+	{
+	  gcc_assert (!gimple_call_lhs (stmt_info->stmt));
+	  *seen_store = stmt_info;
+	  return false;
+	}
+      return false;
+    }
 
   if (STMT_VINFO_VECTYPE (stmt_info))
     {

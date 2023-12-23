@@ -36,40 +36,6 @@
 #include "regs.h"
 #include "riscv-protos.h"
 
-/* If MEM is in the form of "base+offset", extract the two parts
-   of address and set to BASE and OFFSET, otherwise return false
-   after clearing BASE and OFFSET.  */
-
-static bool
-extract_base_offset_in_addr (rtx mem, rtx *base, rtx *offset)
-{
-  rtx addr;
-
-  gcc_assert (MEM_P (mem));
-
-  addr = XEXP (mem, 0);
-
-  if (REG_P (addr))
-    {
-      *base = addr;
-      *offset = const0_rtx;
-      return true;
-    }
-
-  if (GET_CODE (addr) == PLUS
-      && REG_P (XEXP (addr, 0)) && CONST_INT_P (XEXP (addr, 1)))
-    {
-      *base = XEXP (addr, 0);
-      *offset = XEXP (addr, 1);
-      return true;
-    }
-
-  *base = NULL_RTX;
-  *offset = NULL_RTX;
-
-  return false;
-}
-
 /* If X is a PLUS of a CONST_INT, return the two terms in *BASE_PTR
    and *OFFSET_PTR.  Return X in *BASE_PTR and 0 in *OFFSET_PTR otherwise.  */
 
@@ -637,7 +603,8 @@ th_memidx_classify_address_index (struct riscv_address_info *info, rtx x,
 {
   /* Ensure that the mode is supported.  */
   if (!(TARGET_XTHEADMEMIDX && is_memidx_mode (mode))
-      && !(TARGET_XTHEADFMEMIDX && is_fmemidx_mode (mode)))
+      && !(TARGET_XTHEADMEMIDX
+	   && TARGET_XTHEADFMEMIDX && is_fmemidx_mode (mode)))
     return false;
 
   if (GET_CODE (x) != PLUS)

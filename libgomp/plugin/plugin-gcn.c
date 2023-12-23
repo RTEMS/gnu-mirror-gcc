@@ -550,6 +550,7 @@ static size_t gcn_kernel_heap_size = DEFAULT_GCN_HEAP_SIZE;
 
 static int team_arena_size = DEFAULT_TEAM_ARENA_SIZE;
 static int stack_size = DEFAULT_GCN_STACK_SIZE;
+static int lowlat_size = -1;
 
 /* Flag to decide whether print to stderr information about what is going on.
    Set in init_debug depending on environment variables.  */
@@ -1016,8 +1017,8 @@ print_kernel_dispatch (struct kernel_dispatch *dispatch, unsigned indent)
   fprintf (stderr, "%*sobject: %lu\n", indent, "", dispatch->object);
   fprintf (stderr, "%*sprivate_segment_size: %u\n", indent, "",
 	   dispatch->private_segment_size);
-  fprintf (stderr, "%*sgroup_segment_size: %u\n", indent, "",
-	   dispatch->group_segment_size);
+  fprintf (stderr, "%*sgroup_segment_size: %u (low-latency pool)\n", indent,
+	   "", dispatch->group_segment_size);
   fprintf (stderr, "\n");
 }
 
@@ -1088,6 +1089,10 @@ init_environment_variables (void)
       if (tmp)
 	stack_size = tmp;;
     }
+
+  const char *lowlat = secure_getenv ("GOMP_GCN_LOWLAT_POOL");
+  if (lowlat)
+    lowlat_size = atoi (lowlat);
 }
 
 /* Return malloc'd string with name of SYMBOL.  */
@@ -1702,6 +1707,25 @@ isa_code(const char *isa) {
   return -1;
 }
 
+/* CDNA2 devices have twice as many VGPRs compared to older devices.  */
+
+static int
+max_isa_vgprs (int isa)
+{
+  switch (isa)
+    {
+    case EF_AMDGPU_MACH_AMDGCN_GFX803:
+    case EF_AMDGPU_MACH_AMDGCN_GFX900:
+    case EF_AMDGPU_MACH_AMDGCN_GFX906:
+    case EF_AMDGPU_MACH_AMDGCN_GFX908:
+    case EF_AMDGPU_MACH_AMDGCN_GFX1030:
+      return 256;
+    case EF_AMDGPU_MACH_AMDGCN_GFX90a:
+      return 512;
+    }
+  GOMP_PLUGIN_fatal ("unhandled ISA in max_isa_vgprs");
+}
+
 /* }}}  */
 /* {{{ Run  */
 
@@ -1911,7 +1935,25 @@ create_kernel_dispatch (struct kernel_info *kernel, int num_teams,
 
   shadow->signal = sync_signal.handle;
   shadow->private_segment_size = kernel->private_segment_size;
-  shadow->group_segment_size = kernel->group_segment_size;
+
+  if (lowlat_size < 0)
+    {
+      /* Divide the LDS between the number of running teams.
+	 Allocate not less than is defined in the kernel metadata.  */
+      int teams_per_cu = num_teams / get_cu_count (agent);
+      int LDS_per_team = (teams_per_cu ? 65536 / teams_per_cu : 65536);
+      shadow->group_segment_size
+	= (kernel->group_segment_size > LDS_per_team
+	   ? kernel->group_segment_size
+	   : LDS_per_team);;
+    }
+  else if (lowlat_size < GCN_LOWLAT_HEAP+8)
+    /* Ensure that there's space for the OpenMP libgomp data.  */
+    shadow->group_segment_size = GCN_LOWLAT_HEAP+8;
+  else
+    shadow->group_segment_size = (lowlat_size > 65536
+				  ? 65536
+				  : lowlat_size);
 
   /* We expect kernels to request a single pointer, explicitly, and the
      rest of struct kernargs, implicitly.  If they request anything else
@@ -2143,6 +2185,7 @@ run_kernel (struct kernel_info *kernel, void *vars,
 	    struct GOMP_kernel_launch_attributes *kla,
 	    struct goacc_asyncqueue *aq, bool module_locked)
 {
+  struct agent_info *agent = kernel->agent;
   GCN_DEBUG ("SGPRs: %d, VGPRs: %d\n", kernel->description->sgpr_count,
 	     kernel->description->vpgr_count);
 
@@ -2150,8 +2193,9 @@ run_kernel (struct kernel_info *kernel, void *vars,
      VGPRs available to run the kernels together.  */
   if (kla->ndim == 3 && kernel->description->vpgr_count > 0)
     {
+      int max_vgprs = max_isa_vgprs (agent->device_isa);
       int granulated_vgprs = (kernel->description->vpgr_count + 3) & ~3;
-      int max_threads = (256 / granulated_vgprs) * 4;
+      int max_threads = (max_vgprs / granulated_vgprs) * 4;
       if (kla->gdims[2] > max_threads)
 	{
 	  GCN_WARNING ("Too many VGPRs required to support %d threads/workers"
@@ -2188,7 +2232,6 @@ run_kernel (struct kernel_info *kernel, void *vars,
   DEBUG_PRINT ("]\n");
   DEBUG_FLUSH ();
 
-  struct agent_info *agent = kernel->agent;
   if (!module_locked && pthread_rwlock_rdlock (&agent->module_rwlock))
     GOMP_PLUGIN_fatal ("Unable to read-lock a GCN agent rwlock");
 
@@ -2270,9 +2313,9 @@ run_kernel (struct kernel_info *kernel, void *vars,
       print_kernel_dispatch (shadow, 2);
     }
 
-  packet->private_segment_size = kernel->private_segment_size;
-  packet->group_segment_size = kernel->group_segment_size;
-  packet->kernel_object = kernel->object;
+  packet->private_segment_size = shadow->private_segment_size;
+  packet->group_segment_size = shadow->group_segment_size;
+  packet->kernel_object = shadow->object;
   packet->kernarg_address = shadow->kernarg_address;
   hsa_signal_t s;
   s.handle = shadow->signal;

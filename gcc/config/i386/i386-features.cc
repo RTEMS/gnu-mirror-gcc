@@ -90,6 +90,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "dwarf2out.h"
 #include "i386-builtins.h"
 #include "i386-features.h"
+#include "i386-expand.h"
 
 const char * const xlogue_layout::STUB_BASE_NAMES[XLOGUE_STUB_COUNT] = {
   "savms64",
@@ -1853,14 +1854,25 @@ timode_scalar_chain::convert_insn (rtx_insn *insn)
 	{
 	  /* Since there are no instructions to store 128-bit constant,
 	     temporary register usage is required.  */
+	  bool use_move;
 	  start_sequence ();
-	  src = gen_rtx_CONST_VECTOR (V1TImode, gen_rtvec (1, src));
-	  src = validize_mem (force_const_mem (V1TImode, src));
+	  tmp = ix86_convert_const_wide_int_to_broadcast (TImode, src);
+	  if (tmp)
+	    {
+	      src = lowpart_subreg (V1TImode, tmp, TImode);
+	      use_move = true;
+	    }
+	  else
+	    {
+	      src = gen_rtx_CONST_VECTOR (V1TImode, gen_rtvec (1, src));
+	      src = validize_mem (force_const_mem (V1TImode, src));
+	      use_move = MEM_P (dst);
+	    }
 	  rtx_insn *seq = get_insns ();
 	  end_sequence ();
 	  if (seq)
 	    emit_insn_before (seq, insn);
-	  if (MEM_P (dst))
+	  if (use_move)
 	    {
 	      tmp = gen_reg_rtx (V1TImode);
 	      emit_insn_before (gen_rtx_SET (tmp, src), insn);
@@ -2627,10 +2639,11 @@ convert_scalars_to_vector (bool timode_p)
 static unsigned int
 rest_of_handle_insert_vzeroupper (void)
 {
-  /* vzeroupper instructions are inserted immediately after reload to
-     account for possible spills from 256bit or 512bit registers.  The pass
-     reuses mode switching infrastructure by re-running mode insertion
-     pass, so disable entities that have already been processed.  */
+  /* vzeroupper instructions are inserted immediately after reload and
+     postreload_cse to clean up after it a little bit to account for possible
+     spills from 256bit or 512bit registers.  The pass reuses mode switching
+     infrastructure by re-running mode insertion pass, so disable entities
+     that have already been processed.  */
   for (int i = 0; i < MAX_386_ENTITIES; i++)
     ix86_optimize_mode_switching[i] = 0;
 

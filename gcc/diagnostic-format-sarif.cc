@@ -48,7 +48,7 @@ public:
   {}
 
   void add_notification_for_ice (diagnostic_context *context,
-				 diagnostic_info *diagnostic,
+				 const diagnostic_info &diagnostic,
 				 sarif_builder *builder);
   void prepare_to_flush (diagnostic_context *context);
 
@@ -67,7 +67,7 @@ public:
 
   void
   on_nested_diagnostic (diagnostic_context *context,
-			diagnostic_info *diagnostic,
+			const diagnostic_info &diagnostic,
 			diagnostic_t orig_diag_kind,
 			sarif_builder *builder);
   void on_diagram (diagnostic_context *context,
@@ -90,7 +90,7 @@ class sarif_ice_notification : public sarif_object
 {
 public:
   sarif_ice_notification (diagnostic_context *context,
-			  diagnostic_info *diagnostic,
+			  const diagnostic_info &diagnostic,
 			  sarif_builder *builder);
 };
 
@@ -157,9 +157,11 @@ private:
 class sarif_builder
 {
 public:
-  sarif_builder (diagnostic_context *context);
+  sarif_builder (diagnostic_context *context,
+		 bool formatted);
 
-  void end_diagnostic (diagnostic_context *context, diagnostic_info *diagnostic,
+  void end_diagnostic (diagnostic_context *context,
+		       const diagnostic_info &diagnostic,
 		       diagnostic_t orig_diag_kind);
   void emit_diagram (diagnostic_context *context,
 		     const diagnostic_diagram &diagram);
@@ -167,7 +169,7 @@ public:
 
   void flush_to_file (FILE *outf);
 
-  json::array *make_locations_arr (diagnostic_info *diagnostic);
+  json::array *make_locations_arr (const diagnostic_info &diagnostic);
   json::object *make_location_object (const rich_location &rich_loc,
 				      const logical_location *logical_loc);
   json::object *make_message_object (const char *msg) const;
@@ -177,7 +179,7 @@ public:
 
 private:
   sarif_result *make_result_object (diagnostic_context *context,
-				    diagnostic_info *diagnostic,
+				    const diagnostic_info &diagnostic,
 				    diagnostic_t orig_diag_kind);
   void set_any_logical_locs_arr (json::object *location_obj,
 				 const logical_location *logical_loc);
@@ -208,7 +210,7 @@ private:
   json::object *make_tool_component_reference_object_for_cwe () const;
   json::object *
   make_reporting_descriptor_object_for_warning (diagnostic_context *context,
-						diagnostic_info *diagnostic,
+						const diagnostic_info &diagnostic,
 						diagnostic_t orig_diag_kind,
 						const char *option_text);
   json::object *make_reporting_descriptor_object_for_cwe_id (int cwe_id) const;
@@ -249,6 +251,8 @@ private:
   hash_set <int_hash <int, 0, 1> > m_cwe_id_set;
 
   int m_tabstop;
+
+  bool m_formatted;
 };
 
 /* class sarif_object : public json::object.  */
@@ -275,7 +279,7 @@ sarif_object::get_or_create_properties ()
 
 void
 sarif_invocation::add_notification_for_ice (diagnostic_context *context,
-					    diagnostic_info *diagnostic,
+					    const diagnostic_info &diagnostic,
 					    sarif_builder *builder)
 {
   m_success = false;
@@ -289,7 +293,7 @@ void
 sarif_invocation::prepare_to_flush (diagnostic_context *context)
 {
   /* "executionSuccessful" property (SARIF v2.1.0 section 3.20.14).  */
-  set ("executionSuccessful", new json::literal (m_success));
+  set_bool ("executionSuccessful", m_success);
 
   /* "toolExecutionNotifications" property (SARIF v2.1.0 section 3.20.21).  */
   set ("toolExecutionNotifications", m_notifications_arr);
@@ -310,7 +314,7 @@ sarif_invocation::prepare_to_flush (diagnostic_context *context)
 
 void
 sarif_result::on_nested_diagnostic (diagnostic_context *context,
-				    diagnostic_info *diagnostic,
+				    const diagnostic_info &diagnostic,
 				    diagnostic_t /*orig_diag_kind*/,
 				    sarif_builder *builder)
 {
@@ -318,7 +322,7 @@ sarif_result::on_nested_diagnostic (diagnostic_context *context,
      sometimes these will related to current_function_decl, but
      often they won't.  */
   json::object *location_obj
-    = builder->make_location_object (*diagnostic->richloc, NULL);
+    = builder->make_location_object (*diagnostic.richloc, NULL);
   json::object *message_obj
     = builder->make_message_object (pp_formatted_text (context->printer));
   pp_clear_output_area (context->printer);
@@ -366,7 +370,7 @@ sarif_result::add_related_location (json::object *location_obj)
    DIAGNOSTIC is an internal compiler error.  */
 
 sarif_ice_notification::sarif_ice_notification (diagnostic_context *context,
-						diagnostic_info *diagnostic,
+						const diagnostic_info &diagnostic,
 						sarif_builder *builder)
 {
   /* "locations" property (SARIF v2.1.0 section 3.58.4).  */
@@ -380,7 +384,7 @@ sarif_ice_notification::sarif_ice_notification (diagnostic_context *context,
   set ("message", message_obj);
 
   /* "level" property (SARIF v2.1.0 section 3.58.6).  */
-  set ("level", new json::string ("error"));
+  set_string ("level", "error");
 }
 
 /* class sarif_thread_flow : public sarif_object.  */
@@ -389,7 +393,7 @@ sarif_thread_flow::sarif_thread_flow (const diagnostic_thread &thread)
 {
   /* "id" property (SARIF v2.1.0 section 3.37.2).  */
   label_text name (thread.get_name (false));
-  set ("id", new json::string (name.get ()));
+  set_string ("id", name.get ());
 
   /* "locations" property (SARIF v2.1.0 section 3.37.6).  */
   m_locations_arr = new json::array ();
@@ -400,7 +404,8 @@ sarif_thread_flow::sarif_thread_flow (const diagnostic_thread &thread)
 
 /* sarif_builder's ctor.  */
 
-sarif_builder::sarif_builder (diagnostic_context *context)
+sarif_builder::sarif_builder (diagnostic_context *context,
+			      bool formatted)
 : m_context (context),
   m_invocation_obj (new sarif_invocation ()),
   m_results_array (new json::array ()),
@@ -408,7 +413,8 @@ sarif_builder::sarif_builder (diagnostic_context *context)
   m_seen_any_relative_paths (false),
   m_rule_id_set (),
   m_rules_arr (new json::array ()),
-  m_tabstop (context->m_tabstop)
+  m_tabstop (context->m_tabstop),
+  m_formatted (formatted)
 {
 }
 
@@ -416,10 +422,10 @@ sarif_builder::sarif_builder (diagnostic_context *context)
 
 void
 sarif_builder::end_diagnostic (diagnostic_context *context,
-			       diagnostic_info *diagnostic,
+			       const diagnostic_info &diagnostic,
 			       diagnostic_t orig_diag_kind)
 {
-  if (diagnostic->kind == DK_ICE || diagnostic->kind == DK_ICE_NOBT)
+  if (diagnostic.kind == DK_ICE || diagnostic.kind == DK_ICE_NOBT)
     {
       m_invocation_obj->add_notification_for_ice (context, diagnostic, this);
       return;
@@ -471,7 +477,7 @@ sarif_builder::flush_to_file (FILE *outf)
 {
   m_invocation_obj->prepare_to_flush (m_context);
   json::object *top = make_top_level_object (m_invocation_obj, m_results_array);
-  top->dump (outf);
+  top->dump (outf, m_formatted);
   m_invocation_obj = NULL;
   m_results_array = NULL;
   fprintf (outf, "\n");
@@ -528,7 +534,7 @@ make_rule_id_for_diagnostic_kind (diagnostic_t diag_kind)
 
 sarif_result *
 sarif_builder::make_result_object (diagnostic_context *context,
-				   diagnostic_info *diagnostic,
+				   const diagnostic_info &diagnostic,
 				   diagnostic_t orig_diag_kind)
 {
   sarif_result *result_obj = new sarif_result ();
@@ -536,12 +542,12 @@ sarif_builder::make_result_object (diagnostic_context *context,
   /* "ruleId" property (SARIF v2.1.0 section 3.27.5).  */
   /* Ideally we'd have an option_name for these.  */
   if (char *option_text
-	= context->m_option_name (context, diagnostic->option_index,
-				  orig_diag_kind, diagnostic->kind))
+	= context->make_option_name (diagnostic.option_index,
+				     orig_diag_kind, diagnostic.kind))
     {
       /* Lazily create reportingDescriptor objects for and add to m_rules_arr.
 	 Set ruleId referencing them.  */
-      result_obj->set ("ruleId", new json::string (option_text));
+      result_obj->set_string ("ruleId", option_text);
       if (m_rule_id_set.contains (option_text))
 	free (option_text);
       else
@@ -565,24 +571,28 @@ sarif_builder::make_result_object (diagnostic_context *context,
 	 has a ruleId.
 	 We don't bother creating reportingDescriptor objects for these.  */
       char *rule_id = make_rule_id_for_diagnostic_kind (orig_diag_kind);
-      result_obj->set ("ruleId", new json::string (rule_id));
+      result_obj->set_string ("ruleId", rule_id);
       free (rule_id);
     }
 
-  /* "taxa" property (SARIF v2.1.0 section 3.27.8).  */
-  if (diagnostic->metadata)
-    if (int cwe_id = diagnostic->metadata->get_cwe ())
-      {
-	json::array *taxa_arr = new json::array ();
-	json::object *cwe_id_obj
-	  = make_reporting_descriptor_reference_object_for_cwe_id (cwe_id);
-	taxa_arr->append (cwe_id_obj);
-	result_obj->set ("taxa", taxa_arr);
-      }
+  if (diagnostic.metadata)
+    {
+      /* "taxa" property (SARIF v2.1.0 section 3.27.8).  */
+      if (int cwe_id = diagnostic.metadata->get_cwe ())
+	{
+	  json::array *taxa_arr = new json::array ();
+	  json::object *cwe_id_obj
+	    = make_reporting_descriptor_reference_object_for_cwe_id (cwe_id);
+	  taxa_arr->append (cwe_id_obj);
+	  result_obj->set ("taxa", taxa_arr);
+	}
+
+      diagnostic.metadata->maybe_add_sarif_properties (*result_obj);
+    }
 
   /* "level" property (SARIF v2.1.0 section 3.27.10).  */
-  if (const char *sarif_level = maybe_get_sarif_level (diagnostic->kind))
-    result_obj->set ("level", new json::string (sarif_level));
+  if (const char *sarif_level = maybe_get_sarif_level (diagnostic.kind))
+    result_obj->set_string ("level", sarif_level);
 
   /* "message" property (SARIF v2.1.0 section 3.27.11).  */
   json::object *message_obj
@@ -595,7 +605,7 @@ sarif_builder::make_result_object (diagnostic_context *context,
   result_obj->set ("locations", locations_arr);
 
   /* "codeFlows" property (SARIF v2.1.0 section 3.27.18).  */
-  if (const diagnostic_path *path = diagnostic->richloc->get_path ())
+  if (const diagnostic_path *path = diagnostic.richloc->get_path ())
     {
       json::array *code_flows_arr = new json::array ();
       json::object *code_flow_obj = make_code_flow_object (*path);
@@ -608,7 +618,7 @@ sarif_builder::make_result_object (diagnostic_context *context,
      group.  */
 
   /* "fixes" property (SARIF v2.1.0 section 3.27.30).  */
-  const rich_location *richloc = diagnostic->richloc;
+  const rich_location *richloc = diagnostic.richloc;
   if (richloc->get_num_fixit_hints ())
     {
       json::array *fix_arr = new json::array ();
@@ -626,28 +636,23 @@ sarif_builder::make_result_object (diagnostic_context *context,
 json::object *
 sarif_builder::
 make_reporting_descriptor_object_for_warning (diagnostic_context *context,
-					      diagnostic_info *diagnostic,
+					      const diagnostic_info &diagnostic,
 					      diagnostic_t /*orig_diag_kind*/,
 					      const char *option_text)
 {
   json::object *reporting_desc = new json::object ();
 
   /* "id" property (SARIF v2.1.0 section 3.49.3).  */
-  reporting_desc->set ("id", new json::string (option_text));
+  reporting_desc->set_string ("id", option_text);
 
   /* We don't implement "name" property (SARIF v2.1.0 section 3.49.7), since
      it seems redundant compared to "id".  */
 
   /* "helpUri" property (SARIF v2.1.0 section 3.49.12).  */
-  if (context->m_get_option_url)
+  if (char *option_url = context->make_option_url (diagnostic.option_index))
     {
-      char *option_url
-	= context->m_get_option_url (context, diagnostic->option_index);
-      if (option_url)
-	{
-	  reporting_desc->set ("helpUri", new json::string (option_url));
-	  free (option_url);
-	}
+      reporting_desc->set_string ("helpUri", option_url);
+      free (option_url);
     }
 
   return reporting_desc;
@@ -665,13 +670,13 @@ sarif_builder::make_reporting_descriptor_object_for_cwe_id (int cwe_id) const
   {
     pretty_printer pp;
     pp_printf (&pp, "%i", cwe_id);
-    reporting_desc->set ("id", new json::string (pp_formatted_text (&pp)));
+    reporting_desc->set_string ("id", pp_formatted_text (&pp));
   }
 
   /* "helpUri" property (SARIF v2.1.0 section 3.49.12).  */
   {
     char *url = get_cwe_url (cwe_id);
-    reporting_desc->set ("helpUri", new json::string (url));
+    reporting_desc->set_string ("helpUri", url);
     free (url);
   }
 
@@ -692,7 +697,7 @@ make_reporting_descriptor_reference_object_for_cwe_id (int cwe_id)
   {
     pretty_printer pp;
     pp_printf (&pp, "%i", cwe_id);
-    desc_ref_obj->set ("id", new json::string (pp_formatted_text (&pp)));
+    desc_ref_obj->set_string ("id", pp_formatted_text (&pp));
   }
 
   /* "toolComponent" property (SARIF v2.1.0 section 3.52.7).  */
@@ -716,7 +721,7 @@ make_tool_component_reference_object_for_cwe () const
   json::object *comp_ref_obj = new json::object ();
 
   /* "name" property  (SARIF v2.1.0 section 3.54.3).  */
-  comp_ref_obj->set ("name", new json::string ("cwe"));
+  comp_ref_obj->set_string ("name", "cwe");
 
   return comp_ref_obj;
 }
@@ -726,7 +731,7 @@ make_tool_component_reference_object_for_cwe () const
    - a "notification" object (SARIF v2.1.0 section 3.58.4).  */
 
 json::array *
-sarif_builder::make_locations_arr (diagnostic_info *diagnostic)
+sarif_builder::make_locations_arr (const diagnostic_info &diagnostic)
 {
   json::array *locations_arr = new json::array ();
   const logical_location *logical_loc = NULL;
@@ -734,7 +739,7 @@ sarif_builder::make_locations_arr (diagnostic_info *diagnostic)
     logical_loc = client_data_hooks->get_current_logical_location ();
 
   json::object *location_obj
-    = make_location_object (*diagnostic->richloc, logical_loc);
+    = make_location_object (*diagnostic.richloc, logical_loc);
   locations_arr->append (location_obj);
   return locations_arr;
 }
@@ -858,13 +863,13 @@ sarif_builder::make_artifact_location_object (const char *filename)
   json::object *artifact_loc_obj = new json::object ();
 
   /* "uri" property (SARIF v2.1.0 section 3.4.3).  */
-  artifact_loc_obj->set ("uri", new json::string (filename));
+  artifact_loc_obj->set_string ("uri", filename);
 
   if (filename[0] != '/')
     {
       /* If we have a relative path, set the "uriBaseId" property
 	 (SARIF v2.1.0 section 3.4.4).  */
-      artifact_loc_obj->set ("uriBaseId", new json::string (PWD_PROPERTY_NAME));
+      artifact_loc_obj->set_string ("uriBaseId", PWD_PROPERTY_NAME);
       m_seen_any_relative_paths = true;
     }
 
@@ -908,7 +913,7 @@ sarif_builder::make_artifact_location_object_for_pwd () const
     {
       gcc_assert (strlen (pwd) > 0);
       gcc_assert (pwd[strlen (pwd) - 1] == '/');
-      artifact_loc_obj->set ("uri", new json::string (pwd));
+      artifact_loc_obj->set_string ("uri", pwd);
       free (pwd);
     }
 
@@ -921,7 +926,8 @@ int
 sarif_builder::get_sarif_column (expanded_location exploc) const
 {
   cpp_char_column_policy policy (m_tabstop, cpp_wcwidth);
-  return location_compute_display_column (exploc, policy);
+  return location_compute_display_column (m_context->get_file_cache (),
+					  exploc, policy);
 }
 
 /* Make a region object (SARIF v2.1.0 section 3.30) for LOC,
@@ -950,21 +956,20 @@ sarif_builder::maybe_make_region_object (location_t loc) const
   json::object *region_obj = new json::object ();
 
   /* "startLine" property (SARIF v2.1.0 section 3.30.5) */
-  region_obj->set ("startLine", new json::integer_number (exploc_start.line));
+  region_obj->set_integer ("startLine", exploc_start.line);
 
   /* "startColumn" property (SARIF v2.1.0 section 3.30.6) */
-  region_obj->set ("startColumn",
-		   new json::integer_number (get_sarif_column (exploc_start)));
+  region_obj->set_integer ("startColumn", get_sarif_column (exploc_start));
 
   /* "endLine" property (SARIF v2.1.0 section 3.30.7) */
   if (exploc_finish.line != exploc_start.line)
-    region_obj->set ("endLine", new json::integer_number (exploc_finish.line));
+    region_obj->set_integer ("endLine", exploc_finish.line);
 
   /* "endColumn" property (SARIF v2.1.0 section 3.30.8).
      This expresses the column immediately beyond the range.  */
   {
     int next_column = sarif_builder::get_sarif_column (exploc_finish) + 1;
-    region_obj->set ("endColumn", new json::integer_number (next_column));
+    region_obj->set_integer ("endColumn", next_column);
   }
 
   return region_obj;
@@ -1001,11 +1006,11 @@ sarif_builder::maybe_make_region_object_for_context (location_t loc) const
   json::object *region_obj = new json::object ();
 
   /* "startLine" property (SARIF v2.1.0 section 3.30.5) */
-  region_obj->set ("startLine", new json::integer_number (exploc_start.line));
+  region_obj->set_integer ("startLine", exploc_start.line);
 
   /* "endLine" property (SARIF v2.1.0 section 3.30.7) */
   if (exploc_finish.line != exploc_start.line)
-    region_obj->set ("endLine", new json::integer_number (exploc_finish.line));
+    region_obj->set_integer ("endLine", exploc_finish.line);
 
   /* "snippet" property (SARIF v2.1.0 section 3.30.13).  */
   if (json::object *artifact_content_obj
@@ -1032,21 +1037,20 @@ sarif_builder::make_region_object_for_hint (const fixit_hint &hint) const
   json::object *region_obj = new json::object ();
 
   /* "startLine" property (SARIF v2.1.0 section 3.30.5) */
-  region_obj->set ("startLine", new json::integer_number (exploc_start.line));
+  region_obj->set_integer ("startLine", exploc_start.line);
 
   /* "startColumn" property (SARIF v2.1.0 section 3.30.6) */
   int start_col = get_sarif_column (exploc_start);
-  region_obj->set ("startColumn",
-		   new json::integer_number (start_col));
+  region_obj->set_integer ("startColumn", start_col);
 
   /* "endLine" property (SARIF v2.1.0 section 3.30.7) */
   if (exploc_next.line != exploc_start.line)
-    region_obj->set ("endLine", new json::integer_number (exploc_next.line));
+    region_obj->set_integer ("endLine", exploc_next.line);
 
   /* "endColumn" property (SARIF v2.1.0 section 3.30.8).
      This expresses the column immediately beyond the range.  */
   int next_col =  get_sarif_column (exploc_next);
-  region_obj->set ("endColumn", new json::integer_number (next_col));
+  region_obj->set_integer ("endColumn", next_col);
 
   return region_obj;
 }
@@ -1095,21 +1099,20 @@ make_logical_location_object (const logical_location &logical_loc) const
 
   /* "name" property (SARIF v2.1.0 section 3.33.4).  */
   if (const char *short_name = logical_loc.get_short_name ())
-    logical_loc_obj->set ("name", new json::string (short_name));
+    logical_loc_obj->set_string ("name", short_name);
 
   /* "fullyQualifiedName" property (SARIF v2.1.0 section 3.33.5).  */
   if (const char *name_with_scope = logical_loc.get_name_with_scope ())
-    logical_loc_obj->set ("fullyQualifiedName",
-			  new json::string (name_with_scope));
+    logical_loc_obj->set_string ("fullyQualifiedName", name_with_scope);
 
   /* "decoratedName" property (SARIF v2.1.0 section 3.33.6).  */
   if (const char *internal_name = logical_loc.get_internal_name ())
-    logical_loc_obj->set ("decoratedName", new json::string (internal_name));
+    logical_loc_obj->set_string ("decoratedName", internal_name);
 
   /* "kind" property (SARIF v2.1.0 section 3.33.7).  */
   enum logical_location_kind kind = logical_loc.get_kind ();
   if (const char *sarif_kind_str = maybe_get_sarif_kind (kind))
-    logical_loc_obj->set ("kind", new json::string (sarif_kind_str));
+    logical_loc_obj->set_string ("kind", sarif_kind_str);
 
   return logical_loc_obj;
 }
@@ -1172,13 +1175,11 @@ sarif_builder::make_thread_flow_location_object (const diagnostic_event &ev,
     thread_flow_loc_obj->set ("kinds", kinds_arr);
 
   /* "nestingLevel" property (SARIF v2.1.0 section 3.38.10).  */
-  thread_flow_loc_obj->set ("nestingLevel",
-			    new json::integer_number (ev.get_stack_depth ()));
+  thread_flow_loc_obj->set_integer ("nestingLevel", ev.get_stack_depth ());
 
   /* "executionOrder" property (SARIF v2.1.0 3.38.11).
      Offset by 1 to match the human-readable values emitted by %@.  */
-  thread_flow_loc_obj->set ("executionOrder",
-			    new json::integer_number (path_event_idx + 1));
+  thread_flow_loc_obj->set_integer ("executionOrder", path_event_idx + 1);
 
   /* It might be nice to eventually implement the following for -fanalyzer:
      - the "stack" property (SARIF v2.1.0 section 3.38.5)
@@ -1222,7 +1223,7 @@ sarif_builder::make_message_object (const char *msg) const
   json::object *message_obj = new json::object ();
 
   /* "text" property (SARIF v2.1.0 section 3.11.8).  */
-  message_obj->set ("text", new json::string (msg));
+  message_obj->set_string ("text", msg);
 
   return message_obj;
 }
@@ -1238,7 +1239,7 @@ sarif_builder::make_message_object_for_diagram (diagnostic_context *context,
   json::object *message_obj = new json::object ();
 
   /* "text" property (SARIF v2.1.0 section 3.11.8).  */
-  message_obj->set ("text", new json::string (diagram.get_alt_text ()));
+  message_obj->set_string ("text", diagram.get_alt_text ());
 
   char *saved_prefix = pp_take_prefix (context->printer);
   pp_set_prefix (context->printer, NULL);
@@ -1250,8 +1251,7 @@ sarif_builder::make_message_object_for_diagram (diagnostic_context *context,
   pp_set_prefix (context->printer, saved_prefix);
 
   /* "markdown" property (SARIF v2.1.0 section 3.11.9).  */
-  message_obj->set ("markdown",
-		    new json::string (pp_formatted_text (context->printer)));
+  message_obj->set_string ("markdown", pp_formatted_text (context->printer));
 
   pp_clear_output_area (context->printer);
 
@@ -1267,7 +1267,7 @@ sarif_builder::make_multiformat_message_string (const char *msg) const
   json::object *message_obj = new json::object ();
 
   /* "text" property (SARIF v2.1.0 section 3.12.3).  */
-  message_obj->set ("text", new json::string (msg));
+  message_obj->set_string ("text", msg);
 
   return message_obj;
 }
@@ -1285,10 +1285,10 @@ sarif_builder::make_top_level_object (sarif_invocation *invocation_obj,
   json::object *log_obj = new json::object ();
 
   /* "$schema" property (SARIF v2.1.0 section 3.13.3) .  */
-  log_obj->set ("$schema", new json::string (SARIF_SCHEMA));
+  log_obj->set_string ("$schema", SARIF_SCHEMA);
 
   /* "version" property (SARIF v2.1.0 section 3.13.2).  */
-  log_obj->set ("version", new json::string (SARIF_VERSION));
+  log_obj->set_string ("version", SARIF_VERSION);
 
   /* "runs" property (SARIF v2.1.0 section 3.13.4).  */
   json::array *run_arr = new json::array ();
@@ -1376,15 +1376,15 @@ sarif_builder::make_tool_object () const
 
 	    /* "name" property (SARIF v2.1.0 section 3.19.8).  */
 	    if (const char *short_name = p.get_short_name ())
-	      plugin_obj->set ("name", new json::string (short_name));
+	      plugin_obj->set_string ("name", short_name);
 
 	    /* "fullName" property (SARIF v2.1.0 section 3.19.9).  */
 	    if (const char *full_name = p.get_full_name ())
-	      plugin_obj->set ("fullName", new json::string (full_name));
+	      plugin_obj->set_string ("fullName", full_name);
 
 	    /* "version" property (SARIF v2.1.0 section 3.19.13).  */
 	    if (const char *version = p.get_version ())
-	      plugin_obj->set ("version", new json::string (version));
+	      plugin_obj->set_string ("version", version);
 	  }
 	  auto_vec <json::object *> m_plugin_objs;
 	};
@@ -1419,23 +1419,23 @@ sarif_builder::make_driver_tool_component_object () const
       {
 	/* "name" property (SARIF v2.1.0 section 3.19.8).  */
 	if (const char *name = vinfo->get_tool_name ())
-	  driver_obj->set ("name", new json::string (name));
+	  driver_obj->set_string ("name", name);
 
 	/* "fullName" property (SARIF v2.1.0 section 3.19.9).  */
 	if (char *full_name = vinfo->maybe_make_full_name ())
 	  {
-	    driver_obj->set ("fullName", new json::string (full_name));
+	    driver_obj->set_string ("fullName", full_name);
 	    free (full_name);
 	  }
 
 	/* "version" property (SARIF v2.1.0 section 3.19.13).  */
 	if (const char *version = vinfo->get_version_string ())
-	  driver_obj->set ("version", new json::string (version));
+	  driver_obj->set_string ("version", version);
 
 	/* "informationUri" property (SARIF v2.1.0 section 3.19.17).  */
 	if (char *version_url =  vinfo->maybe_make_version_url ())
 	  {
-	    driver_obj->set ("informationUri", new json::string (version_url));
+	    driver_obj->set_string ("informationUri", version_url);
 	    free (version_url);
 	  }
       }
@@ -1480,13 +1480,13 @@ sarif_builder::maybe_make_cwe_taxonomy_object () const
   json::object *taxonomy_obj = new json::object ();
 
   /* "name" property (SARIF v2.1.0 section 3.19.8).  */
-  taxonomy_obj->set ("name", new json::string ("CWE"));
+  taxonomy_obj->set_string ("name", "CWE");
 
   /* "version" property (SARIF v2.1.0 section 3.19.13).  */
-  taxonomy_obj->set ("version", new json::string ("4.7"));
+  taxonomy_obj->set_string ("version", "4.7");
 
   /* "organization" property (SARIF v2.1.0 section 3.19.18).  */
-  taxonomy_obj->set ("organization", new json::string ("MITRE"));
+  taxonomy_obj->set_string ("organization", "MITRE");
 
   /* "shortDescription" property (SARIF v2.1.0 section 3.19.19).  */
   json::object *short_desc
@@ -1527,7 +1527,7 @@ sarif_builder::make_artifact_object (const char *filename)
   if (auto client_data_hooks = m_context->get_client_data_hooks ())
     if (const char *source_lang
 	= client_data_hooks->maybe_get_sarif_source_language (filename))
-      artifact_obj->set ("sourceLanguage", new json::string (source_lang));
+      artifact_obj->set_string ("sourceLanguage", source_lang);
 
   return artifact_obj;
 }
@@ -1540,7 +1540,7 @@ sarif_builder::maybe_make_artifact_content_object (const char *filename) const
 {
   /* Let input.cc handle any charset conversion.  */
   char_span utf8_content
-    = m_context->get_file_cache ()->get_source_file_content (filename);
+    = m_context->get_file_cache ().get_source_file_content (filename);
   if (!utf8_content)
     return NULL;
 
@@ -1568,7 +1568,7 @@ sarif_builder::get_source_lines (const char *filename,
   for (int line = start_line; line <= end_line; line++)
     {
       char_span line_content
-	= m_context->get_file_cache ()->get_source_line (filename, line);
+	= m_context->get_file_cache ().get_source_line (filename, line);
       if (!line_content.get_buffer ())
 	return NULL;
       result.reserve (line_content.length () + 1);
@@ -1602,7 +1602,7 @@ sarif_builder::maybe_make_artifact_content_object (const char *filename,
     }
 
   json::object *artifact_content_obj = new json::object ();
-  artifact_content_obj->set ("text", new json::string (text_utf8));
+  artifact_content_obj->set_string ("text", text_utf8);
   free (text_utf8);
 
   return artifact_content_obj;
@@ -1676,7 +1676,7 @@ sarif_builder::make_artifact_content_object (const char *text) const
   json::object *content_obj = new json::object ();
 
   /* "text" property (SARIF v2.1.0 section 3.3.2).  */
-  content_obj->set ("text", new json::string (text));
+  content_obj->set_string ("text", text);
 
   return content_obj;
 }
@@ -1710,12 +1710,12 @@ public:
     m_builder.end_group ();
   }
   void
-  on_begin_diagnostic (diagnostic_info *) final override
+  on_begin_diagnostic (const diagnostic_info &) final override
   {
     /* No-op,  */
   }
   void
-  on_end_diagnostic (diagnostic_info *diagnostic,
+  on_end_diagnostic (const diagnostic_info &diagnostic,
 		     diagnostic_t orig_diag_kind) final override
   {
     m_builder.end_diagnostic (&m_context, diagnostic, orig_diag_kind);
@@ -1726,9 +1726,10 @@ public:
   }
 
 protected:
-  sarif_output_format (diagnostic_context &context)
+  sarif_output_format (diagnostic_context &context,
+		       bool formatted)
   : diagnostic_output_format (context),
-    m_builder (&context)
+    m_builder (&context, formatted)
   {}
 
   sarif_builder m_builder;
@@ -1737,8 +1738,10 @@ protected:
 class sarif_stream_output_format : public sarif_output_format
 {
 public:
-  sarif_stream_output_format (diagnostic_context &context, FILE *stream)
-  : sarif_output_format (context),
+  sarif_stream_output_format (diagnostic_context &context,
+			      bool formatted,
+			      FILE *stream)
+  : sarif_output_format (context, formatted),
     m_stream (stream)
   {
   }
@@ -1754,8 +1757,9 @@ class sarif_file_output_format : public sarif_output_format
 {
 public:
   sarif_file_output_format (diagnostic_context &context,
-			   const char *base_file_name)
-  : sarif_output_format (context),
+			    bool formatted,
+			    const char *base_file_name)
+  : sarif_output_format (context, formatted),
     m_base_file_name (xstrdup (base_file_name))
   {
   }
@@ -1806,10 +1810,12 @@ diagnostic_output_format_init_sarif (diagnostic_context *context)
 /* Populate CONTEXT in preparation for SARIF output to stderr.  */
 
 void
-diagnostic_output_format_init_sarif_stderr (diagnostic_context *context)
+diagnostic_output_format_init_sarif_stderr (diagnostic_context *context,
+					    bool formatted)
 {
   diagnostic_output_format_init_sarif (context);
   context->set_output_format (new sarif_stream_output_format (*context,
+							      formatted,
 							      stderr));
 }
 
@@ -1818,10 +1824,12 @@ diagnostic_output_format_init_sarif_stderr (diagnostic_context *context)
 
 void
 diagnostic_output_format_init_sarif_file (diagnostic_context *context,
+					  bool formatted,
 					  const char *base_file_name)
 {
   diagnostic_output_format_init_sarif (context);
   context->set_output_format (new sarif_file_output_format (*context,
+							    formatted,
 							    base_file_name));
 }
 
@@ -1829,9 +1837,11 @@ diagnostic_output_format_init_sarif_file (diagnostic_context *context,
 
 void
 diagnostic_output_format_init_sarif_stream (diagnostic_context *context,
+					    bool formatted,
 					    FILE *stream)
 {
   diagnostic_output_format_init_sarif (context);
   context->set_output_format (new sarif_stream_output_format (*context,
+							      formatted,
 							      stream));
 }

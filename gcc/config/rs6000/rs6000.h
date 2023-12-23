@@ -467,6 +467,8 @@ extern int rs6000_vector_align[];
 #define TARGET_FCFIDUS	TARGET_POPCNTD
 #define TARGET_FCTIDUZ	TARGET_POPCNTD
 #define TARGET_FCTIWUZ	TARGET_POPCNTD
+/* Only powerpc64 and powerpc476 support fctid.  */
+#define TARGET_FCTID	(TARGET_POWERPC64 || rs6000_cpu == PROCESSOR_PPC476)
 #define TARGET_CTZ	TARGET_MODULO
 #define TARGET_EXTSWSLI	(TARGET_MODULO && TARGET_POWERPC64)
 #define TARGET_MADDLD	TARGET_MODULO
@@ -1730,6 +1732,9 @@ typedef struct rs6000_args
    in one reasonably fast instruction.  */
 #define MOVE_MAX (! TARGET_POWERPC64 ? 4 : 8)
 #define MAX_MOVE_MAX 8
+#define MOVE_MAX_PIECES (TARGET_EFFICIENT_UNALIGNED_VSX \
+			 ? 16 : (TARGET_POWERPC64 ? 8 : 4))
+#define STORE_MAX_PIECES (TARGET_POWERPC64 ? 8 : 4)
 
 /* Nonzero if access to memory by bytes is no faster than for words.
    Also nonzero if doing byte operations (specifically shifts) in registers

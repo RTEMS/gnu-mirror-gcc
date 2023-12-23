@@ -169,7 +169,9 @@ typedef hash_map<unsigned/*Priority*/, tree/*List*/,
    one for init.  The fini table is only ever used when !cxa_atexit.  */
 static GTY(()) priority_map_t *static_init_fini_fns[2];
 
-/* Nonzero if we're done parsing and into end-of-file activities.  */
+/* Nonzero if we're done parsing and into end-of-file activities.
+   2 if all templates have been instantiated.
+   3 if we're done with front-end processing.  */
 
 int at_eof;
 
@@ -832,8 +834,8 @@ check_classfn (tree ctype, tree function, tree template_parms)
       tree c2 = get_constraints (fndecl);
 
       /* While finding a match, same types and params are not enough
-	 if the function is versioned.  Also check version ("target")
-	 attributes.  */
+	 if the function is versioned.  Also check for different target
+	 specific attributes.  */
       if (same_type_p (TREE_TYPE (TREE_TYPE (function)),
 		       TREE_TYPE (TREE_TYPE (fndecl)))
 	  && compparms (p1, p2)
@@ -2653,7 +2655,10 @@ min_vis_expr_r (tree *tp, int */*walk_subtrees*/, void *data)
   int *vis_p = (int *)data;
   int tpvis = VISIBILITY_DEFAULT;
 
-  switch (TREE_CODE (*tp))
+  tree t = *tp;
+  if (TREE_CODE (t) == PTRMEM_CST)
+    t = PTRMEM_CST_MEMBER (t);
+  switch (TREE_CODE (t))
     {
     case CAST_EXPR:
     case IMPLICIT_CONV_EXPR:
@@ -2664,15 +2669,26 @@ min_vis_expr_r (tree *tp, int */*walk_subtrees*/, void *data)
     case NEW_EXPR:
     case CONSTRUCTOR:
     case LAMBDA_EXPR:
-      tpvis = type_visibility (TREE_TYPE (*tp));
+      tpvis = type_visibility (TREE_TYPE (t));
       break;
 
+    case TEMPLATE_DECL:
+      if (DECL_ALIAS_TEMPLATE_P (t))
+	/* FIXME: We don't maintain TREE_PUBLIC / DECL_VISIBILITY for
+	   alias templates so we can't trust it here (PR107906).  */
+	break;
+      t = DECL_TEMPLATE_RESULT (t);
+      /* Fall through.  */
     case VAR_DECL:
     case FUNCTION_DECL:
-      if (! TREE_PUBLIC (*tp))
+      if (! TREE_PUBLIC (t))
 	tpvis = VISIBILITY_ANON;
       else
-	tpvis = DECL_VISIBILITY (*tp);
+	tpvis = DECL_VISIBILITY (t);
+      break;
+
+    case FIELD_DECL:
+      tpvis = type_visibility (DECL_CONTEXT (t));
       break;
 
     default:
@@ -4987,6 +5003,7 @@ c_parse_final_cleanups (void)
   tree decl;
 
   locus_at_end_of_parsing = input_location;
+  /* We're done parsing.  */
   at_eof = 1;
 
   /* Bad parse errors.  Just forget about it.  */
@@ -5252,6 +5269,9 @@ c_parse_final_cleanups (void)
 	reconsider = true;
     }
 
+  /* All templates have been instantiated.  */
+  at_eof = 2;
+
   void *module_cookie = finish_module_processing (parse_in);
 
   lower_var_init ();
@@ -5294,7 +5314,11 @@ c_parse_final_cleanups (void)
   if (static_init_fini_fns[true])
     for (auto iter : *static_init_fini_fns[true])
       iter.second = nreverse (iter.second);
-  
+
+  /* Now we've instantiated all templates.  Now we can escalate the functions
+     we squirreled away earlier.  */
+  process_and_check_pending_immediate_escalating_fns ();
+
   /* Then, do the Objective-C stuff.  This is where all the
      Objective-C module stuff gets generated (symtab,
      class/protocol/selector lists etc).  This must be done after C++
@@ -5376,7 +5400,7 @@ c_parse_final_cleanups (void)
   timevar_start (TV_PHASE_PARSING);
 
   /* Indicate that we're done with front end processing.  */
-  at_eof = 2;
+  at_eof = 3;
 }
 
 /* Perform any post compilation-proper cleanups for the C++ front-end.

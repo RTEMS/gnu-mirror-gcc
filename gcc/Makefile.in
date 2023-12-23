@@ -1038,6 +1038,7 @@ SYSTEM_H = system.h hwint.h $(srcdir)/../include/libiberty.h \
 	$(HASHTAB_H)
 PREDICT_H = predict.h predict.def
 CPPLIB_H = $(srcdir)/../libcpp/include/line-map.h \
+	$(srcdir)/../libcpp/include/rich-location.h \
 	$(srcdir)/../libcpp/include/cpplib.h
 CODYLIB_H = $(srcdir)/../libcody/cody.hh
 INPUT_H = $(srcdir)/../libcpp/include/line-map.h input.h
@@ -1124,9 +1125,11 @@ else
 BUILD_LIBIBERTY = $(build_libobjdir)/libiberty/libiberty.a
 endif
 
-# Dependencies on the intl and portability libraries.
-LIBDEPS= libcommon.a $(CPPLIB) $(LIBIBERTY) $(LIBINTL_DEP) $(LIBICONV_DEP) \
-	$(LIBDECNUMBER) $(LIBBACKTRACE)
+# Dependencies on the intl and portability libraries.  The INTL dep might be
+# constructed with a ./ prefix, which GNU Make removes while processing
+# prerequisites, so we need to strip it off.
+LIBDEPS= libcommon.a $(CPPLIB) $(LIBIBERTY) $(LIBICONV_DEP) $(LIBDECNUMBER) \
+	$(LIBBACKTRACE) $(LIBINTL_DEP:./%=%)
 
 # Likewise, for use in the tools that must run on this machine
 # even if we are cross-building GCC.
@@ -1322,6 +1325,7 @@ ANALYZER_OBJS = \
 	analyzer/engine.o \
 	analyzer/feasible-graph.o \
 	analyzer/function-set.o \
+	analyzer/infinite-loop.o \
 	analyzer/infinite-recursion.o \
 	analyzer/kf.o \
 	analyzer/kf-analyzer.o \
@@ -1493,6 +1497,7 @@ OBJS = \
 	gimple-ssa-backprop.o \
 	gimple-ssa-isolate-paths.o \
 	gimple-ssa-nonnull-compare.o \
+	gimple-ssa-sccopy.o \
 	gimple-ssa-split-paths.o \
 	gimple-ssa-store-merging.o \
 	gimple-ssa-strength-reduction.o \
@@ -1553,6 +1558,7 @@ OBJS = \
 	ipa-reference.o \
 	ipa-ref.o \
 	ipa-utils.o \
+	ipa-strub.o \
 	ipa.o \
 	ira.o \
 	ira-build.o \
@@ -2812,7 +2818,8 @@ GTFILES = $(CPPLIB_H) $(srcdir)/input.h $(srcdir)/coretypes.h \
   $(srcdir)/symtab-thunks.h $(srcdir)/symtab-thunks.cc \
   $(srcdir)/symtab-clones.h \
   $(srcdir)/reload.h $(srcdir)/caller-save.cc $(srcdir)/symtab.cc \
-  $(srcdir)/alias.cc $(srcdir)/bitmap.cc $(srcdir)/cselib.cc $(srcdir)/cgraph.cc \
+  $(srcdir)/alias.cc $(srcdir)/attribs.cc \
+  $(srcdir)/bitmap.cc $(srcdir)/cselib.cc $(srcdir)/cgraph.cc \
   $(srcdir)/ipa-prop.cc $(srcdir)/ipa-cp.cc $(srcdir)/ipa-utils.h \
   $(srcdir)/ipa-param-manipulation.h $(srcdir)/ipa-sra.cc \
   $(srcdir)/ipa-modref.h $(srcdir)/ipa-modref.cc \
@@ -2874,6 +2881,7 @@ GTFILES = $(CPPLIB_H) $(srcdir)/input.h $(srcdir)/coretypes.h \
   $(srcdir)/sanopt.cc \
   $(srcdir)/sancov.cc \
   $(srcdir)/ipa-devirt.cc \
+  $(srcdir)/ipa-strub.cc \
   $(srcdir)/internal-fn.h \
   $(srcdir)/calls.cc \
   $(srcdir)/omp-general.h \
@@ -3728,7 +3736,6 @@ distclean: clean lang.distclean
 	-rm -f testsuite/*.log testsuite/*.sum
 	-cd testsuite && rm -f x *.x *.x? *.exe *.rpo *.o *.s *.S *.cc
 	-cd testsuite && rm -f *.out *.gcov *$(coverageexts)
-	-rm -rf ${QMTEST_DIR} stamp-qmtest
 	-rm -f .gdbinit configargs.h
 	-rm -f gcov.pod
 # Delete po/*.gmo only if we are not building in the source directory.
@@ -3817,7 +3824,7 @@ PLUGIN_HEADERS = $(TREE_H) $(CONFIG_H) $(SYSTEM_H) coretypes.h $(TM_H) \
   hash-set.h dominance.h cfg.h cfgrtl.h cfganal.h cfgbuild.h cfgcleanup.h \
   lcm.h cfgloopmanip.h file-prefix-map.h builtins.def $(INSN_ATTR_H) \
   pass-instances.def params.list $(srcdir)/../include/gomp-constants.h \
-  $(EXPR_H)
+  $(EXPR_H) $(srcdir)/analyzer/*.h
 
 # generate the 'build fragment' b-header-vars
 s-header-vars: Makefile
@@ -3840,8 +3847,9 @@ install-gengtype: installdirs gengtype$(exeext) gtype.state
 
 # Install the headers needed to build a plugin.
 install-plugin: installdirs lang.install-plugin s-header-vars install-gengtype
-# We keep the directory structure for files in config, common/config or
-# c-family and .def files. All other files are flattened to a single directory.
+# We keep the directory structure for files in analyzer, config, common/config
+# or c-family and .def files.
+# All other files are flattened to a single directory.
 	$(mkinstalldirs) $(DESTDIR)$(plugin_includedir)
 	headers=`echo $(sort $(PLUGIN_HEADERS)) $$(cd $(srcdir); echo *.h *.def) | tr ' ' '\012' | sort -u`; \
 	srcdirstrip=`echo "$(srcdir)" | sed 's/[].[^$$\\*|]/\\\\&/g'`; \
@@ -3853,7 +3861,8 @@ install-plugin: installdirs lang.install-plugin s-header-vars install-gengtype
 	  else continue; \
 	  fi; \
 	  case $$path in \
-	  "$(srcdir)"/config/* | "$(srcdir)"/common/config/* \
+	  "$(srcdir)"/analyzer/* \
+	  | "$(srcdir)"/config/* | "$(srcdir)"/common/config/* \
 	  | "$(srcdir)"/c-family/* | "$(srcdir)"/*.def ) \
 	    base=`echo "$$path" | sed -e "s|$$srcdirstrip/||"`;; \
 	  *) base=`basename $$path` ;; \
@@ -4295,6 +4304,7 @@ $(lang_checks_parallel): site.exp
 	vardots=`echo "$$variant" | sed 's,/,.,g'`; \
 	$(MAKE) TESTSUITEDIR="testsuite.$$vardots" \
 	  RUNTESTFLAGS="--target_board=$$variant $(RUNTESTFLAGS)" \
+	  EXPECT=$(EXPECT) \
 	  "$$target"
 
 TESTSUITEDIR = testsuite
@@ -4360,6 +4370,7 @@ $(lang_checks_parallelized): check-% : site.exp
 	  GCC_RUNTEST_PARALLELIZE_DIR=`${PWD_COMMAND}`/$(TESTSUITEDIR)/$(check_p_tool)-parallel ; \
 	  export GCC_RUNTEST_PARALLELIZE_DIR ; \
 	  $(MAKE) TESTSUITEDIR="$(TESTSUITEDIR)" RUNTESTFLAGS="$(RUNTESTFLAGS)" \
+	    EXPECT=$(EXPECT) \
 	    check-parallel-$* \
 	    $(patsubst %,check-parallel-$*_%, $(check_p_subdirs)); \
 	  sums= ; logs= ; \
@@ -4378,6 +4389,7 @@ $(lang_checks_parallelized): check-% : site.exp
 	  rm -rf $(TESTSUITEDIR)/$*-parallel || true; \
 	else \
 	  $(MAKE) TESTSUITEDIR="$(TESTSUITEDIR)" RUNTESTFLAGS="$(RUNTESTFLAGS)" \
+	    EXPECT=$(EXPECT) \
 	    check_$*_parallelize= check-parallel-$*; \
 	fi
 
@@ -4407,58 +4419,6 @@ check-parallel-% : site.exp
 	    touch $${rootme}/$(TESTSUITEDIR)/$(check_p_tool)-parallel/finished; \
 	  fi ; \
 	fi )
-
-# QMTest targets
-
-# The path to qmtest.
-QMTEST_PATH=qmtest
-
-# The flags to pass to qmtest.
-QMTESTFLAGS=
-
-# The flags to pass to "qmtest run".
-QMTESTRUNFLAGS=-f none --result-stream dejagnu_stream.DejaGNUStream
-
-# The command to use to invoke qmtest.
-QMTEST=${QMTEST_PATH} ${QMTESTFLAGS}
-
-# The tests (or suites) to run.
-QMTEST_GPP_TESTS=g++
-
-# The subdirectory of the OBJDIR that will be used to store the QMTest
-# test database configuration and that will be used for temporary
-# scratch space during QMTest's execution.
-QMTEST_DIR=qmtestsuite
-
-# Create the QMTest database configuration.
-${QMTEST_DIR} stamp-qmtest:
-	${QMTEST} -D ${QMTEST_DIR} create-tdb \
-	    -c gcc_database.GCCDatabase \
-	    -a srcdir=`cd ${srcdir}/testsuite && ${PWD_COMMAND}` && \
-	    $(STAMP) stamp-qmtest
-
-# Create the QMTest context file.
-${QMTEST_DIR}/context: stamp-qmtest
-	rm -f $@
-	echo "CompilerTable.languages=c cplusplus" >> $@
-	echo "CompilerTable.c_kind=GCC" >> $@
-	echo "CompilerTable.c_path=${objdir}/xgcc" >> $@
-	echo "CompilerTable.c_options=-B${objdir}/" >> $@
-	echo "CompilerTable.cplusplus_kind=GCC" >> $@
-	echo "CompilerTable.cplusplus_path=${objdir}/xg++" >> $@
-	echo "CompilerTable.cplusplus_options=-B${objdir}/" >> $@
-	echo "DejaGNUTest.target=${target_noncanonical}" >> $@
-
-# Run the G++ testsuite using QMTest.
-qmtest-g++: ${QMTEST_DIR}/context
-	cd ${QMTEST_DIR} && ${QMTEST} run ${QMTESTRUNFLAGS} -C context \
-	   -o g++.qmr ${QMTEST_GPP_TESTS}
-
-# Use the QMTest GUI.
-qmtest-gui: ${QMTEST_DIR}/context
-	cd ${QMTEST_DIR} && ${QMTEST} gui -C context
-
-.PHONY: qmtest-g++
 
 # Run Paranoia on real.cc.
 

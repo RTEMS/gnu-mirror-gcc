@@ -5683,6 +5683,8 @@ trees_out::lang_decl_bools (tree t)
       WB (lang->u.fn.has_dependent_explicit_spec_p);
       WB (lang->u.fn.immediate_fn_p);
       WB (lang->u.fn.maybe_deleted);
+      WB (lang->u.fn.escalated_p);
+      /* We do not stream lang->u.fn.implicit_constexpr.  */
       goto lds_min;
 
     case lds_decomp:  /* lang_decl_decomp.  */
@@ -5751,6 +5753,8 @@ trees_in::lang_decl_bools (tree t)
       RB (lang->u.fn.has_dependent_explicit_spec_p);
       RB (lang->u.fn.immediate_fn_p);
       RB (lang->u.fn.maybe_deleted);
+      RB (lang->u.fn.escalated_p);
+      /* We do not stream lang->u.fn.implicit_constexpr.  */
       goto lds_min;
 
     case lds_decomp:  /* lang_decl_decomp.  */
@@ -8648,6 +8652,8 @@ trees_out::decl_node (tree decl, walk_kind ref)
 
       tree_node (target);
       tree_node (DECL_NAME (decl));
+      if (DECL_VIRTUAL_P (decl))
+	tree_node (DECL_VINDEX (decl));
       int tag = insert (decl);
       if (streaming_p ())
 	dump (dumper::TREE)
@@ -9869,6 +9875,10 @@ trees_in::tree_node (bool is_use)
 		}
 	  }
 
+	/* A clone might have a different vtable entry.  */
+	if (res && DECL_VIRTUAL_P (res))
+	  DECL_VINDEX (res) = tree_node ();
+
 	if (!res)
 	  set_overrun ();
 	int tag = insert (res);
@@ -10412,13 +10422,16 @@ trees_out::get_merge_kind (tree decl, depset *dep)
 
 	  case RECORD_TYPE:
 	  case UNION_TYPE:
-	    if (DECL_NAME (decl) == as_base_identifier)
-	      mk = MK_as_base;
-	    else if (IDENTIFIER_ANON_P (DECL_NAME (decl)))
-	      mk = MK_field;
-	    break;
-
 	  case NAMESPACE_DECL:
+	    if (DECL_NAME (decl) == as_base_identifier)
+	      {
+		mk = MK_as_base;
+		break;
+	      }
+
+	    /* A lambda may have a class as its context, even though it
+	       isn't a member in the traditional sense; see the test
+	       g++.dg/modules/lambda-6_a.C.  */
 	    if (DECL_IMPLICIT_TYPEDEF_P (STRIP_TEMPLATE (decl))
 		&& LAMBDA_TYPE_P (TREE_TYPE (decl)))
 	      if (tree scope
@@ -10430,6 +10443,13 @@ trees_out::get_merge_kind (tree decl, depset *dep)
 		    mk = MK_keyed;
 		    break;
 		  }
+
+	    if (RECORD_OR_UNION_TYPE_P (ctx))
+	      {
+		if (IDENTIFIER_ANON_P (DECL_NAME (decl)))
+		  mk = MK_field;
+		break;
+	      }
 
 	    if (TREE_CODE (decl) == TEMPLATE_DECL
 		&& DECL_UNINSTANTIATED_TEMPLATE_FRIEND_P (decl))
@@ -14741,9 +14761,7 @@ module_state::write_cluster (elf_out *to, depset *scc[], unsigned size,
   for (unsigned ix = 0; ix != size; ix++)
     {
       depset *b = scc[ix];
-      for (unsigned jx = (b->get_entity_kind () == depset::EK_BINDING
-			  || b->is_special ()) ? 1 : 0;
-	   jx != b->deps.length (); jx++)
+      for (unsigned jx = b->is_special (); jx != b->deps.length (); jx++)
 	{
 	  depset *dep = b->deps[jx];
 
@@ -18887,18 +18905,16 @@ maybe_key_decl (tree ctx, tree decl)
   if (TREE_CODE (ctx) != VAR_DECL)
     return;
 
-  gcc_checking_assert (DECL_NAMESPACE_SCOPE_P (ctx));
-
- if (!keyed_table)
+  if (!keyed_table)
     keyed_table = new keyed_map_t (EXPERIMENT (1, 400));
 
- auto &vec = keyed_table->get_or_insert (ctx);
- if (!vec.length ())
-   {
-     retrofit_lang_decl (ctx);
-     DECL_MODULE_KEYED_DECLS_P (ctx) = true;
-   }
- vec.safe_push (decl);
+  auto &vec = keyed_table->get_or_insert (ctx);
+  if (!vec.length ())
+    {
+      retrofit_lang_decl (ctx);
+      DECL_MODULE_KEYED_DECLS_P (ctx) = true;
+    }
+  vec.safe_push (decl);
 }
 
 /* Create the flat name string.  It is simplest to have it handy.  */
