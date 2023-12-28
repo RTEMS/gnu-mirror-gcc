@@ -850,6 +850,7 @@ static const attribute_spec aarch64_gnu_attributes[] =
        affects_type_identity, handler, exclude } */
   { "aarch64_vector_pcs", 0, 0, false, true,  true,  true,
 			  handle_aarch64_vector_pcs_attribute, NULL },
+  { "indirect_return",    0, 0, false, true, true, false, NULL, NULL },
   { "arm_sve_vector_bits", 1, 1, false, true,  false, true,
 			  aarch64_sve::handle_arm_sve_vector_bits_attribute,
 			  NULL },
@@ -6340,6 +6341,14 @@ aarch64_function_ok_for_sibcall (tree, tree exp)
     if (bool (aarch64_cfun_shared_flags (state))
 	!= bool (aarch64_fntype_shared_flags (fntype, state)))
       return false;
+
+  /* BTI J is needed where indirect_return functions may return
+     if bti is enabled there.  */
+  if (lookup_attribute ("indirect_return", TYPE_ATTRIBUTES (fntype))
+      && !lookup_attribute ("indirect_return",
+			    TYPE_ATTRIBUTES (TREE_TYPE (cfun->decl))))
+    return false;
+
   return true;
 }
 
@@ -28854,6 +28863,8 @@ aarch64_comp_type_attributes (const_tree type1, const_tree type2)
   };
 
   if (!check_attr ("gnu", "aarch64_vector_pcs"))
+    return 0;
+  if (!check_attr ("gnu", "indirect_return"))
     return 0;
   if (!check_attr ("gnu", "Advanced SIMD type"))
     return 0;
