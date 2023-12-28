@@ -92,6 +92,35 @@ const pass_data pass_data_insert_bti =
   0, /* todo_flags_finish.  */
 };
 
+/* Decide if BTI J is needed after a call instruction.  */
+static bool
+call_needs_bti_j (rtx_insn *insn)
+{
+  /* Call returns twice, one of which may be indirect.  */
+  if (find_reg_note (insn, REG_SETJMP, NULL))
+    return true;
+
+  /* Tail call does not return.  */
+  if (SIBLING_CALL_P (insn))
+    return false;
+
+  /* Check if the function is marked to return indirectly.  */
+  rtx call = get_call_rtx_from (insn);
+  rtx fnaddr = XEXP (call, 0);
+  tree fndecl = NULL_TREE;
+  if (GET_CODE (XEXP (fnaddr, 0)) == SYMBOL_REF)
+    fndecl = SYMBOL_REF_DECL (XEXP (fnaddr, 0));
+  if (fndecl == NULL_TREE)
+    fndecl = MEM_EXPR (fnaddr);
+  if (!fndecl)
+    return false;
+  if (TREE_CODE (TREE_TYPE (fndecl)) != FUNCTION_TYPE
+      && TREE_CODE (TREE_TYPE (fndecl)) != METHOD_TYPE)
+    return false;
+  tree fntype = TREE_TYPE (fndecl);
+  return lookup_attribute ("indirect_return", TYPE_ATTRIBUTES (fntype));
+}
+
 /* Insert the BTI instruction.  */
 /* This is implemented as a late RTL pass that runs before branch
    shortening and does the following.  */
@@ -147,10 +176,9 @@ rest_of_insert_bti (void)
 		}
 	    }
 
-	  /* Also look for calls to setjmp () which would be marked with
-	     REG_SETJMP note and put a BTI J after.  This is where longjump ()
-	     will return.  */
-	  if (CALL_P (insn) && (find_reg_note (insn, REG_SETJMP, NULL)))
+	  /* Also look for calls that may return indirectly, such as setjmp,
+	     and put a BTI J after them.  */
+	  if (CALL_P (insn) && call_needs_bti_j (insn))
 	    {
 	      bti_insn = aarch_gen_bti_j ();
 	      emit_insn_after (bti_insn, insn);
