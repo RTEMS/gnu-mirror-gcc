@@ -3816,7 +3816,7 @@ case "$target" in
 esac
 AC_SUBST(compare_exclusions)
 
-AC_CONFIG_FILES([Makefile],
+AC_CONFIG_FILES([Makefile po/Makefile.in],
   [sed "$extrasub_build" Makefile |
    sed "$extrasub_host" |
    sed "$extrasub_target" > mf$$

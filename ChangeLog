@@ -1,3 +1,7 @@
+2023-12-29  gettextize  <bug-gnu-gettext@gnu.org>
+
+	* configure.ac (AC_CONFIG_FILES): Add po/Makefile.in.
+
 2022-05-13  Surya Kumari Jangala  <jskumari@linux.ibm.com>
 
 	* MAINTAINERS: Add myself to write after approval.
