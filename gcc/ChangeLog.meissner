@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 ==================== Branch work151, patch #1 ====================
 
 Power10: Add options to disable load and store vector pair.
@@ -118,6 +119,9 @@ gcc/testsuite/
 libgcc/
 
 	* ChangeLog.meissner: New file.
+=======
+==================== Branch work151-vsubreg, baseline ====================
+>>>>>>> 4cbc20f115e1e90808461dad42006556df61f50c
 
 2024-01-03   Michael Meissner  <meissner@linux.ibm.com>
 
