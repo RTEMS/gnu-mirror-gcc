@@ -14504,13 +14504,17 @@ print_operand (FILE *file, rtx x, int code)
 	print_operand (file, x, 0);
       return;
 
+    case 'S':
     case 'x':
-      /* X is a FPR or Altivec register used in a VSX context.  */
+      /* X is a FPR or Altivec register used in a VSX context.  %x<n> prints
+	 the VSX register number, %S<n> prints the 2nd register number for
+	 vector pair, decimal 128-bit floating and IBM 128-bit binary floating
+	 values.  */
       if (!REG_P (x) || !VSX_REGNO_P (REGNO (x)))
-	output_operand_lossage ("invalid %%x value");
+	output_operand_lossage ("invalid %%%c value", (code == 'S' ? 'S' : 'x'));
       else
 	{
-	  int reg = REGNO (x);
+	  int reg = REGNO (x) + (code == 'S' ? 1 : 0);
 	  int vsx_reg = (FP_REGNO_P (reg)
 			 ? reg - 32
 			 : reg - FIRST_ALTIVEC_REGNO + 32);
