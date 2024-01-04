@@ -1,3 +1,20 @@
+==================== Branch work152-vcombo, work152 patch #2 ====================
+
+PR target/112886, Add %S<n> to print_operand
+
+2024-01-04  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/112886
+	* config/rs6000/rs6000.cc (print_operand): Add %S<n> output modifier.
+	* doc/md.texi (Modifiers): Mention %S can be used like %x.
+
+gcc/testsuite/
+
+	PR target/112886
+	* /gcc.target/powerpc/pr112886.c: New test.
+
 ==================== Branch work152-vcombo, vpair patch #204 ====================
 
 Add vector pair optimizations.
