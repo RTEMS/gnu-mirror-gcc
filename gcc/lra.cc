@@ -1359,6 +1359,7 @@ initialize_lra_reg_info_element (int i)
   lra_reg_info[i].nrefs = lra_reg_info[i].freq = 0;
   lra_reg_info[i].last_reload = 0;
   lra_reg_info[i].restore_rtx = NULL_RTX;
+  lra_reg_info[i].pseudo_conflict = false;
   lra_reg_info[i].val = get_new_reg_value ();
   lra_reg_info[i].offset = 0;
   lra_reg_info[i].copies = NULL;

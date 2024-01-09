@@ -1047,6 +1047,8 @@ setup_profitable_hard_regs (void)
 	continue;
       data = ALLOCNO_COLOR_DATA (a);
       if (ALLOCNO_UPDATED_HARD_REG_COSTS (a) == NULL
+	  && ALLOCNO_CLASS_COST (a) > 0
+	  && ALLOCNO_MEMORY_COST (a) > 0 
 	  && ALLOCNO_CLASS_COST (a) > ALLOCNO_MEMORY_COST (a)
 	  /* Do not empty profitable regs for static chain pointer
 	     pseudo when non-local goto is used.  */
@@ -1131,6 +1133,8 @@ setup_profitable_hard_regs (void)
 				       hard_regno))
 		continue;
 	      if (ALLOCNO_UPDATED_MEMORY_COST (a) < costs[j]
+		  && ALLOCNO_UPDATED_MEMORY_COST (a) > 0
+		  && costs[j] > 0
 		  /* Do not remove HARD_REGNO for static chain pointer
 		     pseudo when non-local goto is used.  */
 		  && ! non_spilled_static_chain_regno_p (ALLOCNO_REGNO (a)))
@@ -1919,6 +1923,175 @@ spill_soft_conflicts (ira_allocno_t a, bitmap allocnos_to_spill,
     }
 }
 
+/* Form register pair for adjacent loads with unified load.  */
+static int
+form_register_pairs (ira_allocno_t a, int regno, HARD_REG_SET *conflicting_regs)
+{
+  int n = ALLOCNO_NUM_OBJECTS (a);
+  int best_hard_regno = -1;
+  for (int i = 0; i < n; i++)
+    {
+      ira_object_t obj = ALLOCNO_OBJECT (a, i);
+      ira_object_t conflict_obj;
+      ira_object_conflict_iterator oci;
+
+      if (OBJECT_CONFLICT_ARRAY (obj) == NULL)
+	{
+	  continue;
+	}
+      FOR_EACH_OBJECT_CONFLICT (obj, conflict_obj, oci)
+	{
+	  ira_allocno_t conflict_a = OBJECT_ALLOCNO (conflict_obj);
+
+	  machine_mode mode = ALLOCNO_MODE (a);
+	  machine_mode confl_mode = ALLOCNO_MODE (conflict_a);
+	  int a_nregs = ira_reg_class_max_nregs[ALLOCNO_CLASS(a)][mode];
+	  int cl = ALLOCNO_CLASS (conflict_a);
+	  int conf_nregs = ira_reg_class_max_nregs[cl][confl_mode];
+
+	  if (mode != confl_mode && a_nregs < conf_nregs)
+	    {
+	      if (DF_REG_DEF_COUNT (ALLOCNO_REGNO (a)) == 0)
+		{
+		  enum reg_class aclass = ALLOCNO_CLASS (a);
+
+		  if (regno < ira_class_hard_regs[aclass][0])
+		    regno = ira_class_hard_regs[aclass][0];
+
+		  if (ALLOCNO_HARD_REGNO (conflict_a) > 0)
+		    best_hard_regno = ALLOCNO_HARD_REGNO (conflict_a) + 1;
+		  else
+		    best_hard_regno = regno;
+
+		  if (ALLOCNO_HARD_REGNO (conflict_a) < 0)
+		    {
+		      if (check_hard_reg_p (a, best_hard_regno, conflicting_regs,
+					    ALLOCNO_COLOR_DATA (a)->profitable_hard_regs))
+			{
+			  if (best_hard_regno % 2 == 0)
+			    {
+			      if (best_hard_regno - 1 < ira_class_hard_regs[aclass][0])
+				return best_hard_regno + 1;
+			      else
+				return best_hard_regno - 1;
+			    }
+			  return best_hard_regno;
+			}
+		      else return -1;
+		    }
+		   else return best_hard_regno;
+		}
+
+	       if (DF_REG_DEF_COUNT (ALLOCNO_REGNO (a)) != 0
+		   && DF_REG_DEF_COUNT (ALLOCNO_REGNO (conflict_a)) == 0)
+		  {
+		    best_hard_regno = ALLOCNO_HARD_REGNO (conflict_a) - 1;
+		    if (check_hard_reg_p (a, best_hard_regno, conflicting_regs,
+					  ALLOCNO_COLOR_DATA (a)->profitable_hard_regs))
+		      {
+			return best_hard_regno;
+		      }
+		  }
+		else if ( DF_REG_DEF_COUNT (ALLOCNO_REGNO (a)) != 0)
+		  {
+		    best_hard_regno = ALLOCNO_HARD_REGNO (conflict_a) + 2;
+
+		    if (check_hard_reg_p (a, best_hard_regno, conflicting_regs,
+					  ALLOCNO_COLOR_DATA (a)->profitable_hard_regs))
+		      {
+			 return best_hard_regno;
+		      }
+		   else if (ira_class_hard_regs[ALLOCNO_CLASS (a)][0] <= (regno + 1)
+			    && check_hard_reg_p(a, regno + 1, conflicting_regs,
+						ALLOCNO_COLOR_DATA (a)->profitable_hard_regs))
+		     return regno+1;
+
+		   else return -1;
+		}
+	     }
+	  else if (mode != confl_mode && a_nregs > conf_nregs)
+	    {
+	      if (DF_REG_DEF_COUNT (ALLOCNO_REGNO (conflict_a)) == 0)
+		{
+		  enum reg_class  aclass = ALLOCNO_CLASS (a);
+
+		  if (regno < ira_class_hard_regs[aclass][0])
+		    regno = ira_class_hard_regs[aclass][0];
+
+		  if (ALLOCNO_ASSIGNED_P (conflict_a)
+		      && ALLOCNO_HARD_REGNO (conflict_a) > 0)
+		    {
+		      best_hard_regno = ALLOCNO_HARD_REGNO (conflict_a) - 1;
+		      return best_hard_regno;
+		    }
+		  else
+		    best_hard_regno = regno;
+
+		  if (check_hard_reg_p (a, best_hard_regno, conflicting_regs,
+					ALLOCNO_COLOR_DATA (a)->profitable_hard_regs))
+		    {
+		      if (best_hard_regno % 2 != 0)
+			{
+			  return best_hard_regno;
+			}
+		      return best_hard_regno;
+		   }
+		}
+	     }
+	   else
+	     {
+	       if (ALLOCNO_HARD_REGNO (conflict_a) > 0
+		   && DF_REG_DEF_COUNT (ALLOCNO_REGNO (conflict_a)) == 0)
+		 {
+		   if (ALLOCNO_ASSIGNED_P (conflict_a))
+		     best_hard_regno = ALLOCNO_HARD_REGNO (conflict_a) + 1;
+		   else
+		     best_hard_regno = regno;
+
+		   if (check_hard_reg_p (a, best_hard_regno, conflicting_regs,
+					 ALLOCNO_COLOR_DATA (a)->profitable_hard_regs))
+		     {
+		       if (best_hard_regno % 2 != 0)
+			 {
+			   return best_hard_regno ;
+			 }
+		       return best_hard_regno;
+		     }
+
+		int i = 0;
+		enum reg_class  aclass = ALLOCNO_CLASS (a);
+		int class_size = ira_class_hard_regs_num[aclass];
+		while (i < best_hard_regno)
+		  {
+		    int last_hard_regno = ira_class_hard_regs[aclass][class_size - 1];
+		    if ((i + best_hard_regno) <= last_hard_regno
+			&& check_hard_reg_p (a, best_hard_regno + i, conflicting_regs,
+					     ALLOCNO_COLOR_DATA (a)->profitable_hard_regs))
+		       return best_hard_regno + i;
+		    ++i;
+		  }
+
+		best_hard_regno -= 3;
+		i = 0;
+
+		while (i < best_hard_regno)
+		  {
+		    if ((best_hard_regno - i) >= ira_class_hard_regs[ALLOCNO_CLASS (a)][0]
+			 && check_hard_reg_p (a, best_hard_regno - i, conflicting_regs,
+					      ALLOCNO_COLOR_DATA (a)->profitable_hard_regs))
+		      return best_hard_regno - i;
+		    ++i;
+		  }
+
+	       return -1;
+
+	    }
+	}
+     }
+  }
+  return -1;
+}
+
 /* Choose a hard register for allocno A.  If RETRY_P is TRUE, it means
    that the function called from function
    `ira_reassign_conflict_allocnos' and `allocno_reload_assign'.  In
@@ -1974,6 +2147,13 @@ assign_hard_reg (ira_allocno_t a, bool retry_p)
 #ifdef STACK_REGS
   no_stack_reg_p = false;
 #endif
+  int maxim_regno = 0;
+  for (i = 0; i < class_size; i++)
+    {
+      if (ira_class_hard_regs[aclass][i] > maxim_regno)
+	maxim_regno = ira_class_hard_regs[aclass][i];
+    }
+
   if (! retry_p)
     start_update_cost ();
   mem_cost += ALLOCNO_UPDATED_MEMORY_COST (a);
@@ -2078,7 +2258,9 @@ assign_hard_reg (ira_allocno_t a, bool retry_p)
 		    }
 		  else
 		    {
-		      if (conflict_nregs == n_objects && conflict_nregs > 1)
+		      int num = OBJECT_SUBWORD (conflict_obj);
+
+		      if (conflict_nregs == n_objects)
 			{
 			  int num = OBJECT_SUBWORD (conflict_obj);
 
@@ -2090,8 +2272,12 @@ assign_hard_reg (ira_allocno_t a, bool retry_p)
 					      hard_regno + num);
 			}
 		      else
-			conflicting_regs[word]
-			  |= ira_reg_mode_hard_regset[hard_regno][mode];
+			{
+			  SET_HARD_REG_BIT (conflicting_regs[word],
+					    hard_regno + num);
+			  conflicting_regs[word]
+			    |= ira_reg_mode_hard_regset[hard_regno][mode];
+			}
 		      if (hard_reg_set_subset_p (profitable_hard_regs,
 						 conflicting_regs[word]))
 			goto fail;
@@ -2185,6 +2371,20 @@ assign_hard_reg (ira_allocno_t a, bool retry_p)
 	}
       if (min_cost > cost)
 	min_cost = cost;
+
+      int reg_pair = form_register_pairs (a, hard_regno, conflicting_regs);
+
+      if (reg_pair > 0)
+	{
+	  if (reg_pair >= ira_class_hard_regs[aclass][0]
+	      && reg_pair < maxim_regno)
+	    {
+	      min_full_cost = full_cost;
+	      best_hard_regno = reg_pair;
+	      break;
+	    }
+	}
+
       if (min_full_cost > full_cost)
 	{
 	  min_full_cost = full_cost;
@@ -2196,7 +2396,7 @@ assign_hard_reg (ira_allocno_t a, bool retry_p)
     }
   if (internal_flag_ira_verbose > 5 && ira_dump_file != NULL)
     fprintf (ira_dump_file, "\n");
-  if (min_full_cost > mem_cost
+  if (best_hard_regno < 0 && min_full_cost > mem_cost
       /* Do not spill static chain pointer pseudo when non-local goto
 	 is used.  */
       && ! non_spilled_static_chain_regno_p (ALLOCNO_REGNO (a)))
@@ -2473,6 +2673,8 @@ init_allocno_threads (void)
       /* Set up initial thread data: */
       ALLOCNO_COLOR_DATA (a)->first_thread_allocno
 	= ALLOCNO_COLOR_DATA (a)->next_thread_allocno = a;
+      if (DF_REG_DEF_COUNT (ALLOCNO_REGNO (a)) == 0)
+	ALLOCNO_FREQ (a) += ALLOCNO_FREQ(a);
       ALLOCNO_COLOR_DATA (a)->thread_freq = ALLOCNO_FREQ (a);
       ALLOCNO_COLOR_DATA (a)->hard_reg_prefs = 0;
       for (pref = ALLOCNO_PREFS (a); pref != NULL; pref = pref->next_pref)
@@ -3315,6 +3517,10 @@ improve_allocation (void)
 	}
       min_cost = INT_MAX;
       best = -1;
+
+      if (DF_REG_DEF_COUNT (ALLOCNO_REGNO (a)) == 0)
+	continue;
+
       /* Now we choose hard register for A which results in highest
 	 allocation cost improvement.  */
       for (j = 0; j < class_size; j++)

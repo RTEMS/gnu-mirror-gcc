@@ -368,12 +368,15 @@ namespace gcc { class context; }
 class rtl_opt_pass;
 
 extern rtl_opt_pass *make_pass_analyze_swaps (gcc::context *);
+extern rtl_opt_pass *make_pass_analyze_vecload (gcc::context *);
 extern rtl_opt_pass *make_pass_pcrel_opt (gcc::context *);
 extern bool rs6000_sum_of_two_registers_p (const_rtx expr);
 extern bool rs6000_quadword_masked_address_p (const_rtx exp);
 extern rtx rs6000_gen_lvx (enum machine_mode, rtx, rtx);
 extern rtx rs6000_gen_stvx (enum machine_mode, rtx, rtx);
-
+extern bool mode_supports_dq_form (machine_mode);
+extern bool get_memref_parts (rtx, rtx *, HOST_WIDE_INT *, HOST_WIDE_INT *);
+extern rtx adjacent_mem_locations (rtx, rtx);
 extern void rs6000_emit_xxspltidp_v2df (rtx, long value);
 extern gimple *currently_expanding_gimple_stmt;
 extern bool rs6000_opaque_type_invalid_use_p (gimple *);
