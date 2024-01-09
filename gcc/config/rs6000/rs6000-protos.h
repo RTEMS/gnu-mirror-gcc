@@ -174,6 +174,19 @@ extern void vpair_split_unary (rtx [], machine_mode, enum rtx_code,
 			       enum vpair_split_unary);
 extern void vpair_split_binary (rtx [], machine_mode, enum rtx_code);
 
+/* When we are splitting a vector pair FMA operation into two vector operations, we
+   may need to modify the code generated.  This enumeration encodes the
+   different choices.  */
+
+enum vpair_split_fma {
+  VPAIR_SPLIT_FMA,		/* Fused multiply-add.  */
+  VPAIR_SPLIT_FMS,		/* Fused multiply-subtract.  */
+  VPAIR_SPLIT_NFMA,		/* Fused negate multiply-add.  */
+  VPAIR_SPLIT_NFMS		/* Fused negate multiply-subtract.  */
+};
+
+extern void vpair_split_fma (rtx [], machine_mode, enum vpair_split_fma);
+
 /* Different PowerPC instruction formats that are used by GCC.  There are
    various other instruction formats used by the PowerPC hardware, but these
    formats are not currently used by GCC.  */
