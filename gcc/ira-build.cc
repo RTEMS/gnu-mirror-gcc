@@ -1862,7 +1862,7 @@ create_insn_allocnos (rtx x, rtx outer, bool output_p)
 	    }
 
 	  ALLOCNO_NREFS (a)++;
-	  ALLOCNO_FREQ (a) += REG_FREQ_FROM_BB (curr_bb);
+	  ALLOCNO_FREQ (a) += REG_FREQ (regno);
 	  if (output_p)
 	    bitmap_set_bit (ira_curr_loop_tree_node->modified_regnos, regno);
 	}
