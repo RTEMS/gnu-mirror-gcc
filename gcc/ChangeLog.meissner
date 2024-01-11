@@ -32,6 +32,9 @@ should give a value between 32 and 63.
 This patch adds %S<n> that acts like %x<n>, except that it adds 1 to the
 register number.
 
+This is version 2 of the patch.  The only difference is I made the test case
+simpler to read.
+
 I have tested this on power10 and power9 little endian systems and on a power9
 big endian system.  There were no regressions in the patch.  Can I apply it to
 the trunk?
@@ -39,7 +42,7 @@ the trunk?
 It would be nice if I could apply it to the open branches.  Can I backport it
 after a burn-in period?
 
-2024-01-09  Michael Meissner  <meissner@linux.ibm.com>
+2024-01-10  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
