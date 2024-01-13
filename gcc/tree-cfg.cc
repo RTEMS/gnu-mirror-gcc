@@ -1,5 +1,5 @@
 /* Control flow functions for trees.
-   Copyright (C) 2001-2023 Free Software Foundation, Inc.
+   Copyright (C) 2001-2024 Free Software Foundation, Inc.
    Contributed by Diego Novillo <dnovillo@redhat.com>
 
 This file is part of GCC.
@@ -8291,6 +8291,15 @@ dump_function_to_file (tree fndecl, FILE *file, dump_flags_t flags)
 
 	      if (strstr (IDENTIFIER_POINTER (name), "no_sanitize"))
 		print_no_sanitize_attr_value (file, TREE_VALUE (chain));
+	      else if (!strcmp (IDENTIFIER_POINTER (name),
+				"omp declare variant base"))
+		{
+		  tree a = TREE_VALUE (chain);
+		  print_generic_expr (file, TREE_PURPOSE (a), dump_flags);
+		  fprintf (file, " match ");
+		  print_omp_context_selector (file, TREE_VALUE (a),
+					      dump_flags);
+		}
 	      else
 		print_generic_expr (file, TREE_VALUE (chain), dump_flags);
 	      fprintf (file, ")");

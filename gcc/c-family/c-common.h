@@ -1,5 +1,5 @@
 /* Definitions for c-common.cc.
-   Copyright (C) 1987-2023 Free Software Foundation, Inc.
+   Copyright (C) 1987-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -1373,8 +1373,8 @@ public:
 
   bool map_supported_p ();
 
-  static tree get_origin (tree);
-  static tree maybe_unconvert_ref (tree);
+  tree get_origin (tree);
+  tree maybe_unconvert_ref (tree);
 
   bool maybe_zero_length_array_section (tree);
 

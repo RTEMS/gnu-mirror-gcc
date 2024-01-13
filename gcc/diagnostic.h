@@ -1,5 +1,5 @@
 /* Various declarations for language-independent diagnostics subroutines.
-   Copyright (C) 2000-2023 Free Software Foundation, Inc.
+   Copyright (C) 2000-2024 Free Software Foundation, Inc.
    Contributed by Gabriel Dos Reis <gdr@codesourcery.com>
 
 This file is part of GCC.
@@ -186,7 +186,8 @@ typedef char *(*diagnostic_make_option_name_cb) (const diagnostic_context *,
 						 diagnostic_t,
 						 diagnostic_t);
 typedef char *(*diagnostic_make_option_url_cb) (const diagnostic_context *,
-						int);
+						int,
+						unsigned);
 
 class edit_context;
 namespace json { class value; }
@@ -526,7 +527,8 @@ public:
   {
     if (!m_option_callbacks.m_make_option_url_cb)
       return nullptr;
-    return m_option_callbacks.m_make_option_url_cb (this, option_index);
+    return m_option_callbacks.m_make_option_url_cb (this, option_index,
+						    get_lang_mask ());
   }
 
   void

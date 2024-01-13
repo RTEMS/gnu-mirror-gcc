@@ -1,5 +1,5 @@
 /* Command line option handling.
-   Copyright (C) 2006-2023 Free Software Foundation, Inc.
+   Copyright (C) 2006-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -467,6 +467,28 @@ static const struct option_map option_map[] =
     { "--", NULL, "-f", true, false },
     { "--no-", NULL, "-f", false, true }
   };
+
+/* Given buffer P of size SZ, look for a prefix within OPTION_MAP;
+   if found, return the prefix and write the new prefix to *OUT_NEW_PREFIX.
+   Otherwise return nullptr.  */
+
+const char *
+get_option_prefix_remapping (const char *p, size_t sz,
+			     const char **out_new_prefix)
+{
+  for (unsigned i = 0; i < ARRAY_SIZE (option_map); i++)
+    {
+      const char * const old_prefix = option_map[i].opt0;
+      const size_t old_prefix_len = strlen (old_prefix);
+      if (old_prefix_len <= sz
+	  && !memcmp (p, old_prefix, old_prefix_len))
+	{
+	  *out_new_prefix = option_map[i].new_prefix;
+	  return old_prefix;
+	}
+    }
+  return nullptr;
+}
 
 /* Helper function for gcc.cc's driver::suggest_option, for populating the
    vec of suggestions for misspelled options.

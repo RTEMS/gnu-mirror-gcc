@@ -1,5 +1,5 @@
 /* Machine description for AArch64 architecture.
-   Copyright (C) 2009-2023 Free Software Foundation, Inc.
+   Copyright (C) 2009-2024 Free Software Foundation, Inc.
    Contributed by ARM Ltd.
 
    This file is part of GCC.
@@ -8465,7 +8465,7 @@ aarch64_save_callee_saves (poly_int64 bytes_below_sp,
 	  emit_move_insn (move_src, gen_int_mode (aarch64_sve_vg, DImode));
 	}
       rtx base_rtx = stack_pointer_rtx;
-      poly_int64 cfa_offset = offset;
+      poly_int64 sp_offset = offset;
 
       HOST_WIDE_INT const_offset;
       if (mode == VNx2DImode && BYTES_BIG_ENDIAN)
@@ -8490,17 +8490,12 @@ aarch64_save_callee_saves (poly_int64 bytes_below_sp,
 	  offset -= fp_offset;
 	}
       rtx mem = gen_frame_mem (mode, plus_constant (Pmode, base_rtx, offset));
+      rtx cfi_mem = gen_frame_mem (mode, plus_constant (Pmode,
+							stack_pointer_rtx,
+							sp_offset));
+      rtx cfi_set = gen_rtx_SET (cfi_mem, reg);
+      bool need_cfi_note_p = (base_rtx != stack_pointer_rtx);
 
-      rtx cfa_base = stack_pointer_rtx;
-      if (hard_fp_valid_p && frame_pointer_needed)
-	{
-	  cfa_base = hard_frame_pointer_rtx;
-	  cfa_offset += (bytes_below_sp - frame.bytes_below_hard_fp);
-	}
-
-      rtx cfa_mem = gen_frame_mem (mode,
-				   plus_constant (Pmode,
-						  cfa_base, cfa_offset));
       unsigned int regno2;
       if (!aarch64_sve_mode_p (mode)
 	  && reg == move_src
@@ -8514,34 +8509,48 @@ aarch64_save_callee_saves (poly_int64 bytes_below_sp,
 	  offset += GET_MODE_SIZE (mode);
 	  insn = emit_insn (aarch64_gen_store_pair (mem, reg, reg2));
 
-	  /* The first part of a frame-related parallel insn is
-	     always assumed to be relevant to the frame
-	     calculations; subsequent parts, are only
-	     frame-related if explicitly marked.  */
+	  rtx cfi_mem2
+	    = gen_frame_mem (mode,
+			     plus_constant (Pmode,
+					    stack_pointer_rtx,
+					    sp_offset + GET_MODE_SIZE (mode)));
+	  rtx cfi_set2 = gen_rtx_SET (cfi_mem2, reg2);
+
+	  /* The first part of a frame-related parallel insn is always
+	     assumed to be relevant to the frame calculations;
+	     subsequent parts, are only frame-related if
+	     explicitly marked.  */
 	  if (aarch64_emit_cfi_for_reg_p (regno2))
-	    {
-	      const auto off = cfa_offset + GET_MODE_SIZE (mode);
-	      rtx cfa_mem2 = gen_frame_mem (mode,
-					    plus_constant (Pmode,
-							   cfa_base,
-							   off));
-	      add_reg_note (insn, REG_CFA_OFFSET,
-			    gen_rtx_SET (cfa_mem2, reg2));
-	    }
+	    RTX_FRAME_RELATED_P (cfi_set2) = 1;
+
+	  /* Add a REG_FRAME_RELATED_EXPR note since the unspec
+	     representation of stp cannot be understood directly by
+	     dwarf2cfi.  */
+	  rtx par = gen_rtx_PARALLEL (VOIDmode,
+				      gen_rtvec (2, cfi_set, cfi_set2));
+	  add_reg_note (insn, REG_FRAME_RELATED_EXPR, par);
 
 	  regno = regno2;
 	  ++i;
 	}
-      else if (mode == VNx2DImode && BYTES_BIG_ENDIAN)
-	insn = emit_insn (gen_aarch64_pred_mov (mode, mem, ptrue, move_src));
-      else if (aarch64_sve_mode_p (mode))
-	insn = emit_insn (gen_rtx_SET (mem, move_src));
       else
-	insn = emit_move_insn (mem, move_src);
+	{
+	  if (mode == VNx2DImode && BYTES_BIG_ENDIAN)
+	    {
+	      insn = emit_insn (gen_aarch64_pred_mov (mode, mem,
+						      ptrue, move_src));
+	      need_cfi_note_p = true;
+	    }
+	  else if (aarch64_sve_mode_p (mode))
+	    insn = emit_insn (gen_rtx_SET (mem, move_src));
+	  else
+	    insn = emit_move_insn (mem, move_src);
+
+	  if (frame_related_p && (need_cfi_note_p || move_src != reg))
+	    add_reg_note (insn, REG_FRAME_RELATED_EXPR, cfi_set);
+	}
 
       RTX_FRAME_RELATED_P (insn) = frame_related_p;
-      if (frame_related_p)
-	add_reg_note (insn, REG_CFA_OFFSET, gen_rtx_SET (cfa_mem, reg));
 
       /* Emit a fake instruction to indicate that the VG save slot has
 	 been initialized.  */
@@ -16077,6 +16086,15 @@ private:
      leaving a vectorization of { elts }.  */
   bool m_stores_to_vector_load_decl = false;
 
+  /* Non-zero if the last operation we costed is a vector promotion or demotion.
+     In this case the value is the number of insns in the last operation.
+
+     On AArch64 vector promotion and demotions require us to first widen or
+     narrow the input and only after that emit conversion instructions.  For
+     costing this means we need to emit the cost of the final conversions as
+     well.  */
+  unsigned int m_num_last_promote_demote = 0;
+
   /* - If M_VEC_FLAGS is zero then we're costing the original scalar code.
      - If M_VEC_FLAGS & VEC_ADVSIMD is nonzero then we're costing Advanced
        SIMD code.
@@ -17131,6 +17149,29 @@ aarch64_vector_costs::add_stmt_cost (int count, vect_cost_for_stmt kind,
   if (stmt_info && vectype && aarch64_sve_mode_p (TYPE_MODE (vectype)))
     stmt_cost = aarch64_sve_adjust_stmt_cost (m_vinfo, kind, stmt_info,
 					      vectype, stmt_cost);
+
+  /*  Vector promotion and demotion requires us to widen the operation first
+      and only after that perform the conversion.  Unfortunately the mid-end
+      expects this to be doable as a single operation and doesn't pass on
+      enough context here for us to tell which operation is happening.  To
+      account for this we count every promote-demote operation twice and if
+      the previously costed operation was also a promote-demote we reduce
+      the cost of the currently being costed operation to simulate the final
+      conversion cost.  Note that for SVE we can do better here if the converted
+      value comes from a load since the widening load would consume the widening
+      operations.  However since we're in stage 3 we can't change the helper
+      vect_is_extending_load and duplicating the code seems not useful.  */
+  gassign *assign = NULL;
+  if (kind == vec_promote_demote
+      && (assign = dyn_cast <gassign *> (STMT_VINFO_STMT (stmt_info)))
+      && gimple_assign_rhs_code (assign) == FLOAT_EXPR)
+    {
+      auto new_count = count * 2 - m_num_last_promote_demote;
+      m_num_last_promote_demote = count;
+      count = new_count;
+    }
+  else
+    m_num_last_promote_demote = 0;
 
   if (stmt_info && aarch64_use_new_vector_costs_p ())
     {
@@ -18191,12 +18232,6 @@ aarch64_override_options_internal (struct gcc_options *opts)
   SET_OPTION_IF_UNSET (opts, &global_options_set,
 		       param_sched_autopref_queue_depth, queue_depth);
 
-  /* If using Advanced SIMD only for autovectorization disable SVE vector costs
-     comparison.  */
-  if (aarch64_autovec_preference == 1)
-    SET_OPTION_IF_UNSET (opts, &global_options_set,
-			 aarch64_sve_compare_costs, 0);
-
   /* Set up parameters to be used in prefetching algorithm.  Do not
      override the defaults unless we are tuning for a core we have
      researched values for.  */
@@ -18288,6 +18323,12 @@ aarch64_override_options_internal (struct gcc_options *opts)
       & AARCH64_EXTRA_TUNE_AVOID_CROSS_LOOP_FMA)
     SET_OPTION_IF_UNSET (opts, &global_options_set, param_avoid_fma_max_bits,
 			 512);
+
+  /* Consider fully pipelined FMA in reassociation.  */
+  if (aarch64_tune_params.extra_tuning_flags
+      & AARCH64_EXTRA_TUNE_FULLY_PIPELINED_FMA)
+    SET_OPTION_IF_UNSET (opts, &global_options_set, param_fully_pipelined_fma,
+			 1);
 
   aarch64_override_options_after_change_1 (opts);
 }
@@ -22100,12 +22141,7 @@ aarch64_autovectorize_vector_modes (vector_modes *modes, bool)
    modes->safe_push (sve_modes[sve_i++]);
 
   unsigned int flags = 0;
-  /* Consider enabling VECT_COMPARE_COSTS for SVE, both so that we
-     can compare SVE against Advanced SIMD and so that we can compare
-     multiple SVE vectorization approaches against each other.  There's
-     not really any point doing this for Advanced SIMD only, since the
-     first mode that works should always be the best.  */
-  if (TARGET_SVE && aarch64_sve_compare_costs)
+  if (aarch64_vect_compare_costs)
     flags |= VECT_COMPARE_COSTS;
   return flags;
 }
@@ -22846,16 +22882,61 @@ aarch64_mov_operand_p (rtx x, machine_mode mode)
     == SYMBOL_TINY_ABSOLUTE;
 }
 
+/* Return a function-invariant register that contains VALUE.  *CACHED_INSN
+   caches instructions that set up such registers, so that they can be
+   reused by future calls.  */
+
+static rtx
+aarch64_get_shareable_reg (rtx_insn **cached_insn, rtx value)
+{
+  rtx_insn *insn = *cached_insn;
+  if (insn && INSN_P (insn) && !insn->deleted ())
+    {
+      rtx pat = PATTERN (insn);
+      if (GET_CODE (pat) == SET)
+	{
+	  rtx dest = SET_DEST (pat);
+	  if (REG_P (dest)
+	      && !HARD_REGISTER_P (dest)
+	      && rtx_equal_p (SET_SRC (pat), value))
+	    return dest;
+	}
+    }
+  rtx reg = gen_reg_rtx (GET_MODE (value));
+  *cached_insn = emit_insn_before (gen_rtx_SET (reg, value),
+				   function_beg_insn);
+  return reg;
+}
+
 /* Create a 0 constant that is based on V4SI to allow CSE to optimally share
    the constant creation.  */
 
 rtx
 aarch64_gen_shareable_zero (machine_mode mode)
 {
-  machine_mode zmode = V4SImode;
-  rtx tmp = gen_reg_rtx (zmode);
-  emit_move_insn (tmp, CONST0_RTX (zmode));
-  return lowpart_subreg (mode, tmp, zmode);
+  rtx reg = aarch64_get_shareable_reg (&cfun->machine->advsimd_zero_insn,
+				       CONST0_RTX (V4SImode));
+  return lowpart_subreg (mode, reg, GET_MODE (reg));
+}
+
+/* INSN is some form of extension or shift that can be split into a
+   permutation involving a shared zero.  Return true if we should
+   perform such a split.
+
+   ??? For now, make sure that the split instruction executes more
+   frequently than the zero that feeds it.  In future it would be good
+   to split without that restriction and instead recombine shared zeros
+   if they turn out not to be worthwhile.  This would allow splits in
+   single-block functions and would also cope more naturally with
+   rematerialization.  */
+
+bool
+aarch64_split_simd_shift_p (rtx_insn *insn)
+{
+  return (can_create_pseudo_p ()
+	  && optimize_bb_for_speed_p (BLOCK_FOR_INSN (insn))
+	  && (ENTRY_BLOCK_PTR_FOR_FN (cfun)->count
+	      < BLOCK_FOR_INSN (insn)->count));
 }
 
 /* Return a const_int vector of VAL.  */
@@ -24169,7 +24250,7 @@ aarch64_declare_function_name (FILE *stream, const char* name,
 
   /* Don't forget the type directive for ELF.  */
   ASM_OUTPUT_TYPE_DIRECTIVE (stream, name, "function");
-  ASM_OUTPUT_LABEL (stream, name);
+  ASM_OUTPUT_FUNCTION_LABEL (stream, name, fndecl);
 
   cfun->machine->label_is_assembled = true;
 }

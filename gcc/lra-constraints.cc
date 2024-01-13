@@ -1,5 +1,5 @@
 /* Code for RTL transformations to satisfy insn constraints.
-   Copyright (C) 2010-2023 Free Software Foundation, Inc.
+   Copyright (C) 2010-2024 Free Software Foundation, Inc.
    Contributed by Vladimir Makarov <vmakarov@redhat.com>.
 
    This file is part of GCC.
@@ -2141,6 +2141,7 @@ process_alt_operands (int only_alternative)
   /* True if output stack pointer reload should be generated for the current
      alternative.  */
   bool curr_alt_out_sp_reload_p;
+  bool curr_alt_class_change_p;
   rtx op;
   /* The register when the operand is a subreg of register, otherwise the
      operand itself.  */
@@ -2227,6 +2228,7 @@ process_alt_operands (int only_alternative)
       early_clobbered_regs_num = 0;
       curr_alt_out_sp_reload_p = false;
       curr_reuse_alt_p = true;
+      curr_alt_class_change_p = false;
       
       for (nop = 0; nop < n_operands; nop++)
 	{
@@ -2251,6 +2253,7 @@ process_alt_operands (int only_alternative)
 	  bool scratch_p;
 	  machine_mode mode;
 	  enum constraint_num cn;
+	  bool class_change_p = false;
 
 	  opalt_num = nalt * n_operands + nop;
 	  if (curr_static_id->operand_alternative[opalt_num].anything_ok)
@@ -2634,9 +2637,16 @@ process_alt_operands (int only_alternative)
 				   (this_alternative_exclude_start_hard_regs,
 				    hard_regno[nop]))))
 			win = true;
-		      else if (hard_regno[nop] < 0
-			       && in_class_p (op, this_alternative, NULL, true))
-			win = true;
+		      else if (hard_regno[nop] < 0)
+			{
+			  if (in_class_p (op, this_alternative, NULL))
+			    win = true;
+			  else if (in_class_p (op, this_alternative, NULL, true))
+			    {
+			      class_change_p = true;
+			      win = true;
+			    }
+			}
 		    }
 		  break;
 		}
@@ -2651,6 +2661,15 @@ process_alt_operands (int only_alternative)
 	  if (win)
 	    {
 	      this_alternative_win = true;
+	      if (class_change_p)
+		{
+		  curr_alt_class_change_p = true;
+		  if (lra_dump_file != NULL)
+		    fprintf (lra_dump_file,
+			     "            %d Narrowing class: reject+=3\n",
+			     nop);
+		  reject += 3;
+		}
 	      if (operand_reg[nop] != NULL_RTX)
 		{
 		  if (hard_regno[nop] >= 0)
@@ -3355,7 +3374,7 @@ process_alt_operands (int only_alternative)
 	  best_reload_sum = reload_sum;
 	  goal_alt_number = nalt;
 	}
-      if (losers == 0)
+      if (losers == 0 && !curr_alt_class_change_p)
 	/* Everything is satisfied.  Do not process alternatives
 	   anymore.  */
 	break;

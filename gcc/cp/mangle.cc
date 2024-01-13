@@ -1,5 +1,5 @@
 /* Name mangling for the 3.0 -*- C++ -*- ABI.
-   Copyright (C) 2000-2023 Free Software Foundation, Inc.
+   Copyright (C) 2000-2024 Free Software Foundation, Inc.
    Written by Alex Samuel <samuel@codesourcery.com>
 
    This file is part of GCC.
@@ -1231,9 +1231,9 @@ write_nested_name (const tree decl)
 
   write_char ('N');
 
-  /* Write CV-qualifiers, if this is a member function.  */
+  /* Write CV-qualifiers, if this is an iobj member function.  */
   if (TREE_CODE (decl) == FUNCTION_DECL
-      && DECL_NONSTATIC_MEMBER_FUNCTION_P (decl))
+      && DECL_IOBJ_MEMBER_FUNCTION_P (decl))
     {
       if (DECL_VOLATILE_MEMFUNC_P (decl))
 	write_char ('V');
@@ -1247,6 +1247,9 @@ write_nested_name (const tree decl)
 	    write_char ('R');
 	}
     }
+  else if (DECL_DECLARES_FUNCTION_P (decl)
+	   && DECL_XOBJ_MEMBER_FUNCTION_P (decl))
+    write_char ('H');
 
   /* Is this a template instance?  */
   if (tree info = maybe_template_info (decl))
@@ -3444,6 +3447,7 @@ write_expression (tree expr)
 
       if (PACK_EXPANSION_P (op))
 	{
+    sizeof_pack:
 	  if (abi_check (11))
 	    {
 	      /* sZ rather than szDp.  */
@@ -3464,6 +3468,19 @@ write_expression (tree expr)
 	  int length = TREE_VEC_LENGTH (args);
 	  if (abi_check (10))
 	    {
+	      /* Before v19 we wrongly mangled all single pack expansions with
+		 sZ, but now only for expressions, as types ICEd (95298).  */
+	      if (length == 1)
+		{
+		  tree arg = TREE_VEC_ELT (args, 0);
+		  if (TREE_CODE (arg) == EXPR_PACK_EXPANSION
+		      && !abi_check (19))
+		    {
+		      op = arg;
+		      goto sizeof_pack;
+		    }
+		}
+
 	      /* sP <template-arg>* E # sizeof...(T), size of a captured
 		 template parameter pack from an alias template */
 	      write_string ("sP");

@@ -1,5 +1,5 @@
 /* Interprocedural scalar replacement of aggregates
-   Copyright (C) 2019-2023 Free Software Foundation, Inc.
+   Copyright (C) 2019-2024 Free Software Foundation, Inc.
    Contributed by Martin Jambor <mjambor@suse.cz>
 
 This file is part of GCC.
@@ -4707,5 +4707,17 @@ make_pass_ipa_sra (gcc::context *ctxt)
   return new pass_ipa_sra (ctxt);
 }
 
+/* Reset all state within ipa-sra.cc so that we can rerun the compiler
+   within the same process.  For use by toplev::finalize.  */
+
+void
+ipa_sra_cc_finalize (void)
+{
+  if (func_sums)
+    ggc_delete (func_sums);
+  func_sums = NULL;
+  delete call_sums;
+  call_sums = NULL;
+}
 
 #include "gt-ipa-sra.h"

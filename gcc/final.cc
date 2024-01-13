@@ -1,5 +1,5 @@
 /* Convert RTL to assembler code and output it, for GNU compiler.
-   Copyright (C) 1987-2023 Free Software Foundation, Inc.
+   Copyright (C) 1987-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -1685,9 +1685,6 @@ final_start_function_1 (rtx_insn **firstp, FILE *file, int *seen,
   force_source_line = false;
 
   high_block_linenum = high_function_linenum = last_linenum;
-
-  if (flag_sanitize & SANITIZE_ADDRESS)
-    asan_function_start ();
 
   rtx_insn *first = *firstp;
   if (in_initial_view_p (first))

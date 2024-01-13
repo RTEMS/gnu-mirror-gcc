@@ -3,7 +3,7 @@
    building RTL.  These routines are used both during actual parsing
    and during the instantiation of template functions.
 
-   Copyright (C) 1998-2023 Free Software Foundation, Inc.
+   Copyright (C) 1998-2024 Free Software Foundation, Inc.
    Written by Mark Mitchell (mmitchell@usa.net) based on code found
    formerly in parse.y and pt.cc.
 
@@ -864,12 +864,70 @@ is_assignment_op_expr_p (tree t)
     && DECL_OVERLOADED_OPERATOR_IS (fndecl, NOP_EXPR);
 }
 
+/* Return true if TYPE is a class type that is convertible to
+   and assignable from bool.  */
+
+static GTY((deletable)) hash_map<tree, bool> *boolish_class_type_p_cache;
+
+static bool
+boolish_class_type_p (tree type)
+{
+  type = TYPE_MAIN_VARIANT (type);
+  if (!CLASS_TYPE_P (type) || !COMPLETE_TYPE_P (type))
+    return false;
+
+  if (bool *r = hash_map_safe_get (boolish_class_type_p_cache, type))
+    return *r;
+
+  tree ops;
+  bool has_bool_assignment = false;
+  bool has_bool_conversion = false;
+
+  ops = lookup_fnfields (type, assign_op_identifier, /*protect=*/0, tf_none);
+  for (tree op : ovl_range (BASELINK_FUNCTIONS (ops)))
+    {
+      op = STRIP_TEMPLATE (op);
+      if (TREE_CODE (op) != FUNCTION_DECL)
+	continue;
+      tree parm = DECL_CHAIN (DECL_ARGUMENTS (op));
+      tree parm_type = non_reference (TREE_TYPE (parm));
+      if (TREE_CODE (parm_type) == BOOLEAN_TYPE)
+	{
+	  has_bool_assignment = true;
+	  break;
+	}
+    }
+
+  if (has_bool_assignment)
+    {
+      ops = lookup_conversions (type);
+      for (; ops; ops = TREE_CHAIN (ops))
+	{
+	  tree op = TREE_VALUE (ops);
+	  if (!DECL_NONCONVERTING_P (op)
+	      && TREE_CODE (DECL_CONV_FN_TYPE (op)) == BOOLEAN_TYPE)
+	    {
+	      has_bool_conversion = true;
+	      break;
+	    }
+	}
+    }
+
+  bool boolish = has_bool_assignment && has_bool_conversion;
+  hash_map_safe_put<true> (boolish_class_type_p_cache, type, boolish);
+  return boolish;
+}
+
+
 /* Maybe warn about an unparenthesized 'a = b' (appearing in a
-   boolean context where 'a == b' might have been intended).  */
+   boolean context where 'a == b' might have been intended).
+   NESTED_P is true if T is the RHS of another assignment.  */
 
 void
-maybe_warn_unparenthesized_assignment (tree t, tsubst_flags_t complain)
+maybe_warn_unparenthesized_assignment (tree t, bool nested_p,
+				       tsubst_flags_t complain)
 {
+  tree type = TREE_TYPE (t);
   t = STRIP_REFERENCE_REF (t);
 
   if ((complain & tf_warning)
@@ -877,7 +935,11 @@ maybe_warn_unparenthesized_assignment (tree t, tsubst_flags_t complain)
       && is_assignment_op_expr_p (t)
       /* A parenthesized expression would've had this warning
 	 suppressed by finish_parenthesized_expr.  */
-      && !warning_suppressed_p (t, OPT_Wparentheses))
+      && !warning_suppressed_p (t, OPT_Wparentheses)
+      /* In c = a = b, don't warn if a has type bool or bool-like class.  */
+      && (!nested_p
+	  || (TREE_CODE (type) != BOOLEAN_TYPE
+	      && !boolish_class_type_p (type))))
     {
       warning_at (cp_expr_loc_or_input_loc (t), OPT_Wparentheses,
 		  "suggest parentheses around assignment used as truth value");
@@ -903,7 +965,8 @@ maybe_convert_cond (tree cond)
   if (warn_sequence_point && !processing_template_decl)
     verify_sequence_points (cond);
 
-  maybe_warn_unparenthesized_assignment (cond, tf_warning_or_error);
+  maybe_warn_unparenthesized_assignment (cond, /*nested_p=*/false,
+					 tf_warning_or_error);
 
   /* Do the conversion.  */
   cond = convert_from_reference (cond);
@@ -3106,7 +3169,30 @@ finish_this_expr (void)
     return rvalue (result);
 
   tree fn = current_nonlambda_function ();
-  if (fn && DECL_STATIC_FUNCTION_P (fn))
+  if (fn && DECL_XOBJ_MEMBER_FUNCTION_P (fn))
+    {
+      auto_diagnostic_group d;
+      error ("%<this%> is unavailable for explicit object member "
+	     "functions");
+      tree xobj_parm = DECL_ARGUMENTS (fn);
+      gcc_assert (xobj_parm);
+      tree parm_name = DECL_NAME (xobj_parm);
+
+      static tree remembered_fn = NULL_TREE;
+      /* Only output this diagnostic once per function.  */
+      if (remembered_fn == fn)
+	/* Early escape.  */;
+      else if (parm_name)
+	inform (DECL_SOURCE_LOCATION (xobj_parm),
+		"use explicit object parameter %qs instead",
+		IDENTIFIER_POINTER (parm_name));
+      else
+	inform (DECL_SOURCE_LOCATION (xobj_parm),
+		"name the explicit object parameter");
+
+      remembered_fn = fn;
+    }
+  else if (fn && DECL_STATIC_FUNCTION_P (fn))
     error ("%<this%> is unavailable for static member functions");
   else if (fn && processing_contract_condition && DECL_CONSTRUCTOR_P (fn))
     error ("invalid use of %<this%> before it is valid");
@@ -5363,7 +5449,7 @@ handle_omp_array_sections_1 (tree c, tree t, vec<tree> &types,
 {
   tree ret, low_bound, length, type;
   bool openacc = (ort & C_ORT_ACC) != 0;
-  if (TREE_CODE (t) != TREE_LIST)
+  if (TREE_CODE (t) != OMP_ARRAY_SECTION)
     {
       if (error_operand_p (t))
 	return error_mark_node;
@@ -5385,7 +5471,9 @@ handle_omp_array_sections_1 (tree c, tree t, vec<tree> &types,
       ret = t_refto;
       if (TREE_CODE (t) == FIELD_DECL)
 	ret = finish_non_static_data_member (t, NULL_TREE, NULL_TREE);
-      else if (!VAR_P (t) && TREE_CODE (t) != PARM_DECL)
+      else if (!VAR_P (t)
+	       && (openacc || !EXPR_P (t))
+	       && TREE_CODE (t) != PARM_DECL)
 	{
 	  if (processing_template_decl && TREE_CODE (t) != OVERLOAD)
 	    return NULL_TREE;
@@ -5418,16 +5506,16 @@ handle_omp_array_sections_1 (tree c, tree t, vec<tree> &types,
       && (OMP_CLAUSE_CODE (c) == OMP_CLAUSE_REDUCTION
 	  || OMP_CLAUSE_CODE (c) == OMP_CLAUSE_IN_REDUCTION
 	  || OMP_CLAUSE_CODE (c) == OMP_CLAUSE_TASK_REDUCTION)
-      && TREE_CODE (TREE_CHAIN (t)) == FIELD_DECL)
-    TREE_CHAIN (t) = omp_privatize_field (TREE_CHAIN (t), false);
-  ret = handle_omp_array_sections_1 (c, TREE_CHAIN (t), types,
+      && TREE_CODE (TREE_OPERAND (t, 0)) == FIELD_DECL)
+    TREE_OPERAND (t, 0) = omp_privatize_field (TREE_OPERAND (t, 0), false);
+  ret = handle_omp_array_sections_1 (c, TREE_OPERAND (t, 0), types,
 				     maybe_zero_len, first_non_one, ort);
   if (ret == error_mark_node || ret == NULL_TREE)
     return ret;
 
   type = TREE_TYPE (ret);
-  low_bound = TREE_PURPOSE (t);
-  length = TREE_VALUE (t);
+  low_bound = TREE_OPERAND (t, 1);
+  length = TREE_OPERAND (t, 2);
   if ((low_bound && type_dependent_expression_p (low_bound))
       || (length && type_dependent_expression_p (length)))
     return NULL_TREE;
@@ -5633,7 +5721,7 @@ handle_omp_array_sections_1 (tree c, tree t, vec<tree> &types,
 	  tree lb = cp_save_expr (low_bound);
 	  if (lb != low_bound)
 	    {
-	      TREE_PURPOSE (t) = lb;
+	      TREE_OPERAND (t, 1) = lb;
 	      low_bound = lb;
 	    }
 	}
@@ -5664,14 +5752,14 @@ handle_omp_array_sections_1 (tree c, tree t, vec<tree> &types,
 	 array-section-subscript, the array section could be non-contiguous.  */
       if (OMP_CLAUSE_CODE (c) != OMP_CLAUSE_AFFINITY
 	  && OMP_CLAUSE_CODE (c) != OMP_CLAUSE_DEPEND
-	  && TREE_CODE (TREE_CHAIN (t)) == TREE_LIST)
+	  && TREE_CODE (TREE_OPERAND (t, 0)) == OMP_ARRAY_SECTION)
 	{
 	  /* If any prior dimension has a non-one length, then deem this
 	     array section as non-contiguous.  */
-	  for (tree d = TREE_CHAIN (t); TREE_CODE (d) == TREE_LIST;
-	       d = TREE_CHAIN (d))
+	  for (tree d = TREE_OPERAND (t, 0); TREE_CODE (d) == OMP_ARRAY_SECTION;
+	       d = TREE_OPERAND (d, 0))
 	    {
-	      tree d_length = TREE_VALUE (d);
+	      tree d_length = TREE_OPERAND (d, 2);
 	      if (d_length == NULL_TREE || !integer_onep (d_length))
 		{
 		  error_at (OMP_CLAUSE_LOCATION (c),
@@ -5694,7 +5782,7 @@ handle_omp_array_sections_1 (tree c, tree t, vec<tree> &types,
   tree lb = cp_save_expr (low_bound);
   if (lb != low_bound)
     {
-      TREE_PURPOSE (t) = lb;
+      TREE_OPERAND (t, 1) = lb;
       low_bound = lb;
     }
   /* Temporarily disable -fstrong-eval-order for array reductions.
@@ -5772,10 +5860,12 @@ handle_omp_array_sections (tree &c, enum c_omp_region_type ort)
 	return false;
 
       for (i = num, t = OMP_CLAUSE_DECL (c); i > 0;
-	   t = TREE_CHAIN (t))
+	   t = TREE_OPERAND (t, 0))
 	{
-	  tree low_bound = TREE_PURPOSE (t);
-	  tree length = TREE_VALUE (t);
+	  gcc_assert (TREE_CODE (t) == OMP_ARRAY_SECTION);
+
+	  tree low_bound = TREE_OPERAND (t, 1);
+	  tree length = TREE_OPERAND (t, 2);
 
 	  i--;
 	  if (low_bound
@@ -6660,7 +6750,7 @@ finish_omp_declare_simd_methods (tree t)
   for (tree x = TYPE_FIELDS (t); x; x = DECL_CHAIN (x))
     {
       if (TREE_CODE (x) == USING_DECL
-	  || !DECL_NONSTATIC_MEMBER_FUNCTION_P (x))
+	  || !DECL_IOBJ_MEMBER_FUNCTION_P (x))
 	continue;
       tree ods = lookup_attribute ("omp declare simd", DECL_ATTRIBUTES (x));
       if (!ods || !TREE_VALUE (ods))
@@ -6888,8 +6978,8 @@ cp_oacc_check_attachments (tree c)
       tree t = OMP_CLAUSE_DECL (c);
       tree type;
 
-      while (TREE_CODE (t) == TREE_LIST)
-	t = TREE_CHAIN (t);
+      while (TREE_CODE (t) == OMP_ARRAY_SECTION)
+	t = TREE_OPERAND (t, 0);
 
       type = TREE_TYPE (t);
 
@@ -6996,7 +7086,7 @@ finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 	case OMP_CLAUSE_TASK_REDUCTION:
 	  field_ok = ((ort & C_ORT_OMP_DECLARE_SIMD) == C_ORT_OMP);
 	  t = OMP_CLAUSE_DECL (c);
-	  if (TREE_CODE (t) == TREE_LIST)
+	  if (TREE_CODE (t) == OMP_ARRAY_SECTION)
 	    {
 	      if (handle_omp_array_sections (c, ort))
 		{
@@ -7012,10 +7102,10 @@ finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 		  remove = true;
 		  break;
 		}
-	      if (TREE_CODE (t) == TREE_LIST)
+	      if (TREE_CODE (t) == OMP_ARRAY_SECTION)
 		{
-		  while (TREE_CODE (t) == TREE_LIST)
-		    t = TREE_CHAIN (t);
+		  while (TREE_CODE (t) == OMP_ARRAY_SECTION)
+		    t = TREE_OPERAND (t, 0);
 		}
 	      else
 		{
@@ -8039,7 +8129,7 @@ finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 	  else
 	    last_iterators = NULL_TREE;
 
-	  if (TREE_CODE (t) == TREE_LIST)
+	  if (TREE_CODE (t) == OMP_ARRAY_SECTION)
 	    {
 	      if (handle_omp_array_sections (c, ort))
 		remove = true;
@@ -8199,7 +8289,7 @@ finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 	    auto_vec<omp_addr_token *, 10> addr_tokens;
 
 	    t = OMP_CLAUSE_DECL (c);
-	    if (TREE_CODE (t) == TREE_LIST)
+	    if (TREE_CODE (t) == OMP_ARRAY_SECTION)
 	      {
 		grp_start_p = pc;
 		grp_sentinel = OMP_CLAUSE_CHAIN (c);
@@ -8209,7 +8299,7 @@ finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 		else
 		  {
 		    t = OMP_CLAUSE_DECL (c);
-		    if (TREE_CODE (t) != TREE_LIST
+		    if (TREE_CODE (t) != OMP_ARRAY_SECTION
 			&& !type_dependent_expression_p (t)
 			&& !omp_mappable_type (TREE_TYPE (t)))
 		      {
@@ -8392,7 +8482,8 @@ finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 		if (OMP_CLAUSE_CODE (c) == OMP_CLAUSE_MAP
 		    && (OMP_CLAUSE_MAP_KIND (c) == GOMP_MAP_POINTER
 			|| OMP_CLAUSE_MAP_KIND (c) == GOMP_MAP_ALWAYS_POINTER
-			|| OMP_CLAUSE_MAP_KIND (c) == GOMP_MAP_ATTACH_DETACH))
+			|| OMP_CLAUSE_MAP_KIND (c) == GOMP_MAP_ATTACH_DETACH
+			|| (!openacc && EXPR_P (t))))
 		  break;
 		if (DECL_P (t))
 		  error_at (OMP_CLAUSE_LOCATION (c),
@@ -8791,15 +8882,15 @@ finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 
 	case OMP_CLAUSE_HAS_DEVICE_ADDR:
 	  t = OMP_CLAUSE_DECL (c);
-	  if (TREE_CODE (t) == TREE_LIST)
+	  if (TREE_CODE (t) == OMP_ARRAY_SECTION)
 	    {
 	      if (handle_omp_array_sections (c, ort))
 		remove = true;
 	      else
 		{
 		  t = OMP_CLAUSE_DECL (c);
-		  while (TREE_CODE (t) == TREE_LIST)
-		    t = TREE_CHAIN (t);
+		  while (TREE_CODE (t) == OMP_ARRAY_SECTION)
+		    t = TREE_OPERAND (t, 0);
 		  while (INDIRECT_REF_P (t)
 			 || TREE_CODE (t) == ARRAY_REF)
 		    t = TREE_OPERAND (t, 0);
@@ -9171,10 +9262,10 @@ finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 		  if (DECL_P (t))
 		    bitmap_clear_bit (&aligned_head, DECL_UID (t));
 		}
-	      else if (TREE_CODE (t) == TREE_LIST)
+	      else if (TREE_CODE (t) == OMP_ARRAY_SECTION)
 		{
-		  while (TREE_CODE (t) == TREE_LIST)
-		    t = TREE_CHAIN (t);
+		  while (TREE_CODE (t) == OMP_ARRAY_SECTION)
+		    t = TREE_OPERAND (t, 0);
 		  if (DECL_P (t))
 		    bitmap_clear_bit (&aligned_head, DECL_UID (t));
 		  t = OMP_CLAUSE_DECL (c);
@@ -11842,9 +11933,13 @@ finish_decltype_type (tree expr, bool id_expression_or_member_access_p,
 	      if (WILDCARD_TYPE_P (non_reference (obtype)))
 		/* We don't know what the eventual obtype quals will be.  */
 		goto dependent;
-	      int quals = cp_type_quals (type);
-	      if (INDIRECT_TYPE_P (obtype))
-		quals |= cp_type_quals (TREE_TYPE (obtype));
+	      auto direct_type = [](tree t){
+		  if (INDIRECT_TYPE_P (t))
+		    return TREE_TYPE (t);
+		  return t;
+	       };
+	      int const quals = cp_type_quals (type)
+			      | cp_type_quals (direct_type (obtype));
 	      type = cp_build_qualified_type (type, quals);
 	      type = build_reference_type (type);
 	    }
@@ -12735,6 +12830,20 @@ is_this_parameter (tree t)
 	      || (VAR_P (t) && DECL_HAS_VALUE_EXPR_P (t))
 	      || (cp_binding_oracle && VAR_P (t)));
   return true;
+}
+
+/* As above, or a C++23 explicit object parameter.  */
+
+bool
+is_object_parameter (tree t)
+{
+  if (is_this_parameter (t))
+    return true;
+  if (TREE_CODE (t) != PARM_DECL)
+    return false;
+  tree ctx = DECL_CONTEXT (t);
+  return (ctx && DECL_XOBJ_MEMBER_FUNCTION_P (ctx)
+	  && t == DECL_ARGUMENTS (ctx));
 }
 
 /* Insert the deduced return type for an auto function.  */
