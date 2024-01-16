@@ -1,5 +1,5 @@
 /* Prototypes of target machine for GNU compiler.  LoongArch version.
-   Copyright (C) 2021-2023 Free Software Foundation, Inc.
+   Copyright (C) 2021-2024 Free Software Foundation, Inc.
    Contributed by Loongson Ltd.
    Based on MIPS target for GNU compiler.
 
@@ -82,11 +82,9 @@ extern rtx loongarch_legitimize_call_address (rtx);
 
 extern rtx loongarch_subword (rtx, bool);
 extern bool loongarch_split_move_p (rtx, rtx);
-extern void loongarch_split_move (rtx, rtx, rtx);
+extern void loongarch_split_move (rtx, rtx);
 extern bool loongarch_addu16i_imm12_operand_p (HOST_WIDE_INT, machine_mode);
 extern void loongarch_split_plus_constant (rtx *, machine_mode);
-extern bool loongarch_split_move_insn_p (rtx, rtx);
-extern void loongarch_split_move_insn (rtx, rtx, rtx);
 extern void loongarch_split_128bit_move (rtx, rtx);
 extern bool loongarch_split_128bit_move_p (rtx, rtx);
 extern void loongarch_split_256bit_move (rtx, rtx);
@@ -165,6 +163,7 @@ extern bool loongarch_use_ins_ext_p (rtx, HOST_WIDE_INT, HOST_WIDE_INT);
 extern bool loongarch_check_zero_div_p (void);
 extern bool loongarch_pre_reload_split (void);
 extern int loongarch_use_bstrins_for_ior_with_mask (machine_mode, rtx *);
+extern rtx loongarch_rewrite_mem_for_simple_ldst (rtx);
 
 union loongarch_gen_fn_ptrs
 {

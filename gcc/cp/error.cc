@@ -1,6 +1,6 @@
 /* Call-backs for C++ error reporting.
    This code is non-reentrant.
-   Copyright (C) 1993-2023 Free Software Foundation, Inc.
+   Copyright (C) 1993-2024 Free Software Foundation, Inc.
    This file is part of GCC.
 
 GCC is free software; you can redistribute it and/or modify
@@ -840,10 +840,14 @@ dump_aggr_type (cxx_pretty_printer *pp, tree t, int flags)
     {
       /* A lambda's "type" is essentially its signature.  */
       pp_string (pp, M_("<lambda"));
-      if (lambda_function (t))
-	dump_parameters (pp,
-                         FUNCTION_FIRST_USER_PARMTYPE (lambda_function (t)),
-			 flags);
+      tree const fn = lambda_function (t);
+      if (fn)
+	{
+	  int const parm_flags
+	    = DECL_XOBJ_MEMBER_FUNCTION_P (fn) ? TFF_XOBJ_FUNC | flags
+					       : flags;
+	  dump_parameters (pp, FUNCTION_FIRST_USER_PARMTYPE (fn), parm_flags);
+	}
       pp_greater (pp);
     }
   else if (!decl || IDENTIFIER_ANON_P (DECL_NAME (decl)))
@@ -1712,7 +1716,9 @@ dump_lambda_function (cxx_pretty_printer *pp,
 {
   /* A lambda's signature is essentially its "type".  */
   dump_type (pp, DECL_CONTEXT (fn), flags);
-  if (TREE_CODE (TREE_TYPE (fn)) == FUNCTION_TYPE)
+  if (DECL_XOBJ_MEMBER_FUNCTION_P (fn))
+    /* Early escape.  */;
+  else if (TREE_CODE (TREE_TYPE (fn)) == FUNCTION_TYPE)
     {
       pp->padding = pp_before;
       pp_c_ws_string (pp, "static");
@@ -1833,7 +1839,9 @@ dump_function_decl (cxx_pretty_printer *pp, tree t, int flags)
 
   if (!(flags & TFF_NO_FUNCTION_ARGUMENTS))
     {
-      dump_parameters (pp, parmtypes, flags);
+      int const parm_flags
+	= DECL_XOBJ_MEMBER_FUNCTION_P (t) ? TFF_XOBJ_FUNC | flags : flags;
+      dump_parameters (pp, parmtypes, parm_flags);
 
       if (TREE_CODE (fntype) == METHOD_TYPE)
 	{
@@ -1912,6 +1920,8 @@ dump_parameters (cxx_pretty_printer *pp, tree parmtypes, int flags)
   for (first = 1; parmtypes != void_list_node;
        parmtypes = TREE_CHAIN (parmtypes))
     {
+      if (first && flags & TFF_XOBJ_FUNC)
+	pp_string (pp, "this ");
       if (!first)
 	pp_separate_with_comma (pp);
       first = 0;
@@ -2494,6 +2504,15 @@ dump_expr (cxx_pretty_printer *pp, tree t, int flags)
       dump_expr (pp, TREE_OPERAND (t, 0), flags | TFF_EXPR_IN_PARENS);
       pp_cxx_left_bracket (pp);
       dump_expr (pp, TREE_OPERAND (t, 1), flags | TFF_EXPR_IN_PARENS);
+      pp_cxx_right_bracket (pp);
+      break;
+
+    case OMP_ARRAY_SECTION:
+      dump_expr (pp, TREE_OPERAND (t, 0), flags);
+      pp_cxx_left_bracket (pp);
+      dump_expr (pp, TREE_OPERAND (t, 1), flags);
+      pp_colon (pp);
+      dump_expr (pp, TREE_OPERAND (t, 2), flags);
       pp_cxx_right_bracket (pp);
       break;
 
@@ -3687,6 +3706,8 @@ function_category (tree fn)
 	return _("In destructor %qD");
       else if (LAMBDA_FUNCTION_P (fn))
 	return _("In lambda function");
+      else if (DECL_XOBJ_MEMBER_FUNCTION_P (fn))
+	return _("In explicit object member function %qD");
       else
 	return _("In member function %qD");
     }

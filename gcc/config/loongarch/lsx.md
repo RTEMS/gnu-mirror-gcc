@@ -1,6 +1,6 @@
 ;; Machine Description for LARCH Loongson SX ASE
 ;;
-;; Copyright (C) 2018 Free Software Foundation, Inc.
+;; Copyright (C) 2018-2024 Free Software Foundation, Inc.
 ;;
 ;; This file is part of GCC.
 ;;
@@ -794,47 +794,21 @@
 })
 
 (define_insn "mov<mode>_lsx"
-  [(set (match_operand:LSX 0 "nonimmediate_operand" "=f,f,R,*r,*f")
-	(match_operand:LSX 1 "move_operand" "fYGYI,R,f,*f,*r"))]
+  [(set (match_operand:LSX 0 "nonimmediate_operand" "=f,f,R,*r,*f,*r")
+	(match_operand:LSX 1 "move_operand" "fYGYI,R,f,*f,*r,*r"))]
   "ISA_HAS_LSX"
 { return loongarch_output_move (operands[0], operands[1]); }
-  [(set_attr "type" "simd_move,simd_load,simd_store,simd_copy,simd_insert")
+  [(set_attr "type" "simd_move,simd_load,simd_store,simd_copy,simd_insert,simd_copy")
    (set_attr "mode" "<MODE>")])
 
 (define_split
   [(set (match_operand:LSX 0 "nonimmediate_operand")
 	(match_operand:LSX 1 "move_operand"))]
   "reload_completed && ISA_HAS_LSX
-   && loongarch_split_move_insn_p (operands[0], operands[1])"
+   && loongarch_split_move_p (operands[0], operands[1])"
   [(const_int 0)]
 {
-  loongarch_split_move_insn (operands[0], operands[1], curr_insn);
-  DONE;
-})
-
-;; Offset load
-(define_expand "lsx_ld_<lsxfmt_f>"
-  [(match_operand:LSX 0 "register_operand")
-   (match_operand 1 "pmode_register_operand")
-   (match_operand 2 "aq10<lsxfmt>_operand")]
-  "ISA_HAS_LSX"
-{
-  rtx addr = plus_constant (GET_MODE (operands[1]), operands[1],
-			    INTVAL (operands[2]));
-  loongarch_emit_move (operands[0], gen_rtx_MEM (<MODE>mode, addr));
-  DONE;
-})
-
-;; Offset store
-(define_expand "lsx_st_<lsxfmt_f>"
-  [(match_operand:LSX 0 "register_operand")
-   (match_operand 1 "pmode_register_operand")
-   (match_operand 2 "aq10<lsxfmt>_operand")]
-  "ISA_HAS_LSX"
-{
-  rtx addr = plus_constant (GET_MODE (operands[1]), operands[1],
-			    INTVAL (operands[2]));
-  loongarch_emit_move (gen_rtx_MEM (<MODE>mode, addr), operands[0]);
+  loongarch_split_move (operands[0], operands[1]);
   DONE;
 })
 
@@ -1505,7 +1479,7 @@
   [(set (match_operand:FLSX 0 "register_operand" "=f")
     (unspec:FLSX [(match_operand:FLSX 1 "register_operand" "f")]
 		 UNSPEC_LSX_VFRECIPE))]
-  "ISA_HAS_LSX && TARGET_FRECIPE"
+  "ISA_HAS_LSX && ISA_HAS_FRECIPE"
   "vfrecipe.<flsxfmt>\t%w0,%w1"
   [(set_attr "type" "simd_fdiv")
    (set_attr "mode" "<MODE>")])
@@ -1538,7 +1512,7 @@
   [(set (match_operand:FLSX 0 "register_operand" "=f")
     (unspec:FLSX [(match_operand:FLSX 1 "register_operand" "f")]
 		 UNSPEC_LSX_VFRSQRTE))]
-  "ISA_HAS_LSX && TARGET_FRECIPE"
+  "ISA_HAS_LSX && ISA_HAS_FRECIPE"
   "vfrsqrte.<flsxfmt>\t%w0,%w1"
   [(set_attr "type" "simd_fdiv")
    (set_attr "mode" "<MODE>")])

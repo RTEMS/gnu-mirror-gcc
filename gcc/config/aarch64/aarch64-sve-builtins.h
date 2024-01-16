@@ -1,5 +1,5 @@
 /* ACLE support for AArch64 SVE
-   Copyright (C) 2018-2023 Free Software Foundation, Inc.
+   Copyright (C) 2018-2024 Free Software Foundation, Inc.
 
    This file is part of GCC.
 
@@ -453,10 +453,6 @@ private:
 
   /* Used for building up function names.  */
   obstack m_string_obstack;
-
-  /* Maps all overloaded function names that we've registered so far
-     to their associated function_instances.  */
-  hash_map<nofree_string_hash, registered_function *> m_overload_names;
 };
 
 /* A base class for handling calls to built-in functions.  */

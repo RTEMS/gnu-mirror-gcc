@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2023 Free Software Foundation, Inc.
+/* Copyright (C) 2002-2024 Free Software Foundation, Inc.
    Contributed by Andy Vaught
    Namelist output contributed by Paul Thomas
    F2003 I/O support contributed by Jerry DeLisle
@@ -2466,6 +2466,8 @@ namelist_write (st_parameter_dt *dtp)
 	dtp->u.p.nml_delim = '\0';
     }
 
+  if (is_internal_unit (dtp))
+    write_character (dtp, " ", 1, 1, NODELIM);
   write_character (dtp, "&", 1, 1, NODELIM);
 
   /* Write namelist name in upper case - f95 std.  */

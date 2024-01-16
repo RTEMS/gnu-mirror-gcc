@@ -1,5 +1,5 @@
 /* Definitions for LoongArch CPU properties.
-   Copyright (C) 2021-2023 Free Software Foundation, Inc.
+   Copyright (C) 2021-2024 Free Software Foundation, Inc.
    Contributed by Loongson Ltd.
 
 This file is part of GCC.
@@ -133,7 +133,7 @@ fill_native_cpu_config (struct loongarch_target *tgt)
 	switch (cpucfg_cache[1] & 0x3)
 	  {
 	    case 0x02:
-	      tmp = ISA_BASE_LA64V100;
+	      tmp = ISA_BASE_LA64;
 	      break;
 
 	    default:

@@ -1,5 +1,5 @@
 /* Some code common to C++ and ObjC++ front ends.
-   Copyright (C) 2004-2023 Free Software Foundation, Inc.
+   Copyright (C) 2004-2024 Free Software Foundation, Inc.
    Contributed by Ziemowit Laski  <zlaski@apple.com>
 
 This file is part of GCC.
@@ -349,7 +349,7 @@ cp_decl_dwarf_attribute (const_tree decl, int attr)
 
     case DW_AT_reference:
       if (TREE_CODE (decl) == FUNCTION_DECL
-	  && DECL_NONSTATIC_MEMBER_FUNCTION_P (decl)
+	  && DECL_IOBJ_MEMBER_FUNCTION_P (decl)
 	  && FUNCTION_REF_QUALIFIED (TREE_TYPE (decl))
 	  && !FUNCTION_RVALUE_QUALIFIED (TREE_TYPE (decl)))
 	return 1;
@@ -357,7 +357,7 @@ cp_decl_dwarf_attribute (const_tree decl, int attr)
 
     case DW_AT_rvalue_reference:
       if (TREE_CODE (decl) == FUNCTION_DECL
-	  && DECL_NONSTATIC_MEMBER_FUNCTION_P (decl)
+	  && DECL_IOBJ_MEMBER_FUNCTION_P (decl)
 	  && FUNCTION_REF_QUALIFIED (TREE_TYPE (decl))
 	  && FUNCTION_RVALUE_QUALIFIED (TREE_TYPE (decl)))
 	return 1;

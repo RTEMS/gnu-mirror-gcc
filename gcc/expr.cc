@@ -1,5 +1,5 @@
 /* Convert tree expression to rtl instructions, for GNU compiler.
-   Copyright (C) 1988-2023 Free Software Foundation, Inc.
+   Copyright (C) 1988-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -6272,19 +6272,32 @@ expand_assignment (tree to, tree from, bool nontemporal)
 		  && known_eq (bitpos, 0)
 		  && known_eq (bitsize, GET_MODE_BITSIZE (GET_MODE (to_rtx))))
 		result = store_expr (from, to_rtx, 0, nontemporal, false);
-	      else
+	      /* Check if the field overlaps the MSB, requiring extension.  */
+	      else if (maybe_eq (bitpos + bitsize,
+				 GET_MODE_BITSIZE (GET_MODE (to_rtx))))
 		{
-		  rtx to_rtx1
-		    = lowpart_subreg (subreg_unpromoted_mode (to_rtx),
-				      SUBREG_REG (to_rtx),
-				      subreg_promoted_mode (to_rtx));
+		  scalar_int_mode imode = subreg_unpromoted_mode (to_rtx);
+		  scalar_int_mode omode = subreg_promoted_mode (to_rtx);
+		  rtx to_rtx1 = lowpart_subreg (imode, SUBREG_REG (to_rtx),
+						omode);
 		  result = store_field (to_rtx1, bitsize, bitpos,
 					bitregion_start, bitregion_end,
 					mode1, from, get_alias_set (to),
 					nontemporal, reversep);
+		  /* If the target usually keeps IMODE appropriately
+		     extended in OMODE it's unsafe to refer to it using
+		     a SUBREG whilst this invariant doesn't hold.  */
+		  if (targetm.mode_rep_extended (imode, omode) != UNKNOWN)
+		    to_rtx1 = simplify_gen_unary (TRUNCATE, imode,
+						  SUBREG_REG (to_rtx), omode);
 		  convert_move (SUBREG_REG (to_rtx), to_rtx1,
 				SUBREG_PROMOTED_SIGN (to_rtx));
 		}
+	      else
+		result = store_field (to_rtx, bitsize, bitpos,
+				      bitregion_start, bitregion_end,
+				      mode1, from, get_alias_set (to),
+				      nontemporal, reversep);
 	    }
 	  else
 	    result = store_field (to_rtx, bitsize, bitpos,
@@ -7828,10 +7841,12 @@ store_constructor (tree exp, rtx target, int cleared, poly_int64 size,
 	    break;
 	  }
 	/* Use sign-extension for uniform boolean vectors with
-	   integer modes.  Effectively "vec_duplicate" for bitmasks.  */
-	if (!TREE_SIDE_EFFECTS (exp)
+	   integer modes and single-bit mask entries.
+	   Effectively "vec_duplicate" for bitmasks.  */
+	if (elt_size == 1
+	    && !TREE_SIDE_EFFECTS (exp)
 	    && VECTOR_BOOLEAN_TYPE_P (type)
-	    && SCALAR_INT_MODE_P (mode)
+	    && SCALAR_INT_MODE_P (TYPE_MODE (type))
 	    && (elt = uniform_vector_p (exp))
 	    && !VECTOR_TYPE_P (TREE_TYPE (elt)))
 	  {
@@ -13606,6 +13621,8 @@ do_store_flag (sepops ops, rtx target, machine_mode mode)
   if ((code == NE || code == EQ)
       && (integer_zerop (arg1)
 	  || integer_pow2p (arg1))
+      /* vector types are not handled here. */
+      && TREE_CODE (TREE_TYPE (arg1)) != VECTOR_TYPE
       && (TYPE_PRECISION (ops->type) != 1 || TYPE_UNSIGNED (ops->type)))
     {
       tree narg0 = arg0;
