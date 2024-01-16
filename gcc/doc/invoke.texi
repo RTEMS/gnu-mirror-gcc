@@ -1,4 +1,4 @@
-@c Copyright (C) 1988-2023 Free Software Foundation, Inc.
+@c Copyright (C) 1988-2024 Free Software Foundation, Inc.
 @c This is part of the GCC manual.
 @c For copying conditions, see the file gcc.texi.
 
@@ -8,7 +8,7 @@
 @c man end
 
 @c man begin COPYRIGHT
-Copyright @copyright{} 1988-2023 Free Software Foundation, Inc.
+Copyright @copyright{} 1988-2024 Free Software Foundation, Inc.
 
 Permission is granted to copy, distribute and/or modify this document
 under the terms of the GNU Free Documentation License, Version 1.3 or
@@ -883,12 +883,12 @@ Objective-C and Objective-C++ Dialects}.
 @emph{AVR Options}
 @gccoptlist{-mmcu=@var{mcu}  -mabsdata  -maccumulate-args
 -mbranch-cost=@var{cost}
--mcall-prologues  -mgas-isr-prologues  -mint8
--mdouble=@var{bits} -mlong-double=@var{bits}
+-mcall-prologues  -mgas-isr-prologues  -mint8  -mflmap
+-mdouble=@var{bits}  -mlong-double=@var{bits}
 -mn_flash=@var{size}  -mno-interrupts
 -mmain-is-OS_task  -mrelax  -mrmw  -mstrict-X  -mtiny-stack
--mfract-convert-truncate
--mshort-calls  -nodevicelib  -nodevicespecs
+-mrodata-in-ram  -mfract-convert-truncate
+-mshort-calls  -mskip-bug  -nodevicelib  -nodevicespecs
 -Waddr-space-convert  -Wmisspelled-isr}
 
 @emph{Blackfin Options}
@@ -1463,7 +1463,7 @@ See RS/6000 and PowerPC Options.
 -mamx-tile  -mamx-int8  -mamx-bf16 -muintr -mhreset -mavxvnni
 -mavx512fp16 -mavxifma -mavxvnniint8 -mavxneconvert -mcmpccxadd -mamx-fp16
 -mprefetchi -mraoint -mamx-complex -mavxvnniint16 -msm3 -msha512 -msm4 -mapxf
--musermsr -mavx10.1 -mavx10.1-256 -mavx10.1-512
+-musermsr -mavx10.1 -mavx10.1-256 -mavx10.1-512 -mevex512
 -mcldemote  -mms-bitfields  -mno-align-stringops  -minline-all-stringops
 -minline-stringops-dynamically  -mstringop-strategy=@var{alg}
 -mkl -mwidekl
@@ -16778,14 +16778,23 @@ With @option{--param=openacc-privatization=noisy}, do diagnose.
 The following choices of @var{name} are available on AArch64 targets:
 
 @table @gcctabopt
-@item aarch64-sve-compare-costs
-When vectorizing for SVE, consider using ``unpacked'' vectors for
-smaller elements and use the cost model to pick the cheapest approach.
-Also use the cost model to choose between SVE and Advanced SIMD vectorization.
+@item aarch64-vect-compare-costs
+When vectorizing, consider using multiple different approaches and use
+the cost model to choose the cheapest one.  This includes:
 
-Using unpacked vectors includes storing smaller elements in larger
-containers and accessing elements with extending loads and truncating
-stores.
+@itemize
+@item
+Trying both SVE and Advanced SIMD, when SVE is available.
+
+@item
+Trying to use 64-bit Advanced SIMD vectors for the smallest data elements,
+rather than using 128-bit vectors for everything.
+
+@item
+Trying to use ``unpacked'' SVE vectors for smaller elements.  This includes
+storing smaller elements in larger containers and accessing elements with
+extending loads and truncating stores.
+@end itemize
 
 @item aarch64-float-recp-precision
 The number of Newton iterations for calculating the reciprocal for float type.
@@ -17724,6 +17733,9 @@ implements checking of validity at the point of returning from a
 function.  The value @code{full} is an alias for specifying both
 @code{branch} and @code{return}. The value @code{none} turns off
 instrumentation.
+
+To override @option{-fcf-protection}, @option{-fcf-protection=none}
+needs to be added and then with @option{-fcf-protection=xxx}.
 
 The value @code{check} is used for the final link with link-time
 optimization (LTO).  An error is issued if LTO object files are
@@ -23094,7 +23106,7 @@ Permissible names are: @samp{arm7tdmi}, @samp{arm7tdmi-s}, @samp{arm710t},
 @samp{cortex-r7}, @samp{cortex-r8}, @samp{cortex-r52}, @samp{cortex-r52plus},
 @samp{cortex-m0}, @samp{cortex-m0plus}, @samp{cortex-m1}, @samp{cortex-m3},
 @samp{cortex-m4}, @samp{cortex-m7}, @samp{cortex-m23}, @samp{cortex-m33},
-@samp{cortex-m35p}, @samp{cortex-m55}, @samp{cortex-m85}, @samp{cortex-x1},
+@samp{cortex-m35p}, @samp{cortex-m52}, @samp{cortex-m55}, @samp{cortex-m85}, @samp{cortex-x1},
 @samp{cortex-x1c}, @samp{cortex-m1.small-multiply}, @samp{cortex-m0.small-multiply},
 @samp{cortex-m0plus.small-multiply}, @samp{exynos-m1}, @samp{marvell-pj4},
 @samp{neoverse-n1}, @samp{neoverse-n2}, @samp{neoverse-v1}, @samp{xscale},
@@ -23160,34 +23172,34 @@ The following extension options are common to the listed CPUs:
 @table @samp
 @item +nodsp
 Disable the DSP instructions on @samp{cortex-m33}, @samp{cortex-m35p},
-@samp{cortex-m55} and @samp{cortex-m85}. Also disable the M-Profile Vector
-Extension (MVE) integer and single precision floating-point instructions on
-@samp{cortex-m55} and @samp{cortex-m85}.
+@samp{cortex-m52}, @samp{cortex-m55} and @samp{cortex-m85}.
+Also disable the M-Profile Vector Extension (MVE) integer and
+single precision floating-point instructions on
+@samp{cortex-m52}, @samp{cortex-m55} and @samp{cortex-m85}.
 
 @item +nopacbti
 Disable the Pointer Authentication and Branch Target Identification Extension
-on @samp{cortex-m85}.
+on @samp{cortex-m52} and @samp{cortex-m85}.
 
 @item +nomve
 Disable the M-Profile Vector Extension (MVE) integer and single precision
-floating-point instructions on @samp{cortex-m55} and @samp{cortex-m85}.
+floating-point instructions on @samp{cortex-m52}, @samp{cortex-m55} and @samp{cortex-m85}.
 
 @item +nomve.fp
 Disable the M-Profile Vector Extension (MVE) single precision floating-point
-instructions on @samp{cortex-m55} and @samp{cortex-m85}.
+instructions on @samp{cortex-m52}, @samp{cortex-m55} and @samp{cortex-m85}.
 
 @item +cdecp0, +cdecp1, ... , +cdecp7
 Enable the Custom Datapath Extension (CDE) on selected coprocessors according
-to the numbers given in the options in the range 0 to 7 on @samp{cortex-m55}.
+to the numbers given in the options in the range 0 to 7 on @samp{cortex-m52} and @samp{cortex-m55}.
 
 @item  +nofp
 Disables the floating-point instructions on @samp{arm9e},
 @samp{arm946e-s}, @samp{arm966e-s}, @samp{arm968e-s}, @samp{arm10e},
 @samp{arm1020e}, @samp{arm1022e}, @samp{arm926ej-s},
 @samp{arm1026ej-s}, @samp{cortex-r5}, @samp{cortex-r7}, @samp{cortex-r8},
-@samp{cortex-m4}, @samp{cortex-m7}, @samp{cortex-m33}, @samp{cortex-m35p}
 @samp{cortex-m4}, @samp{cortex-m7}, @samp{cortex-m33}, @samp{cortex-m35p},
-@samp{cortex-m55} and @samp{cortex-m85}.
+@samp{cortex-m52}, @samp{cortex-m55} and @samp{cortex-m85}.
 Disables the floating-point and SIMD instructions on
 @samp{generic-armv7-a}, @samp{cortex-a5}, @samp{cortex-a7},
 @samp{cortex-a8}, @samp{cortex-a9}, @samp{cortex-a12},
@@ -23530,9 +23542,9 @@ Development Tools Engineering Specification", which can be found on
 Mitigate against a potential security issue with the @code{VLLDM} instruction
 in some M-profile devices when using CMSE (CVE-2021-365465).  This option is
 enabled by default when the option @option{-mcpu=} is used with
-@code{cortex-m33}, @code{cortex-m35p}, @code{cortex-m55}, @code{cortex-m85}
-or @code{star-mc1}. The option @option{-mno-fix-cmse-cve-2021-35465} can be used
-to disable the mitigation.
+@code{cortex-m33}, @code{cortex-m35p}, @code{cortex-m52}, @code{cortex-m55},
+@code{cortex-m85} or @code{star-mc1}. The option @option{-mno-fix-cmse-cve-2021-35465}
+can be used to disable the mitigation.
 
 @opindex mstack-protector-guard
 @opindex mstack-protector-guard-offset
@@ -23686,11 +23698,6 @@ Do not save registers in @code{main}.  The effect is the same like
 attaching attribute @ref{AVR Function Attributes,,@code{OS_task}}
 to @code{main}. It is activated per default if optimization is on.
 
-@opindex mn-flash
-@item -mn-flash=@var{num}
-Assume that the flash memory has a size of 
-@var{num} times 64@tie{}KiB.
-
 @opindex mno-interrupts
 @item -mno-interrupts
 Generated code is not compatible with hardware interrupts.
@@ -23712,34 +23719,19 @@ differ from instructions in the assembler code.
 Relaxing must be turned on if linker stubs are needed, see the
 section on @code{EIND} and linker stubs below.
 
-@opindex mrmw
-@item -mrmw
-Assume that the device supports the Read-Modify-Write
-instructions @code{XCH}, @code{LAC}, @code{LAS} and @code{LAT}.
+@opindex mrodata-in-ram
+@item -mrodata-in-ram
+@itemx -mno-rodata-in-ram
+Locate the @code{.rodata} sections for read-only data in RAM resp.@:
+in program memory.
+For most devices, there is no choice and this option acts rather
+like an assertion.
 
-@opindex mshort-calls
-@item -mshort-calls
-
-Assume that @code{RJMP} and @code{RCALL} can target the whole
-program memory.
-
-This option is used internally for multilib selection.  It is
-not an optimization option, and you don't need to set it by hand.
-
-@opindex msp8
-@item -msp8
-Treat the stack pointer register as an 8-bit register,
-i.e.@: assume the high byte of the stack pointer is zero.
-In general, you don't need to set this option by hand.
-
-This option is used internally by the compiler to select and
-build multilibs for architectures @code{avr2} and @code{avr25}.
-These architectures mix devices with and without @code{SPH}.
-For any setting other than @option{-mmcu=avr2} or @option{-mmcu=avr25}
-the compiler driver adds or removes this option from the compiler
-proper's command line, because the compiler then knows if the device
-or architecture has an 8-bit stack pointer and thus no @code{SPH}
-register or not.
+Since v14 and for the AVR64* and AVR128* devices, @code{.rodata}
+is located in flash memory per default, provided the required GNU Binutils
+support (@w{@uref{https://sourceware.org/PR31124,PR31124}}) is available.
+In that case, @option{-mrodata-in-ram} can be used to return to the old
+layout with @code{.rodata} in RAM.
 
 @opindex mstrict-X
 @item -mstrict-X
@@ -23799,6 +23791,7 @@ Warn if the ISR is misspelled, i.e.@: without __vector prefix.
 Enabled by default.
 @end table
 
+@anchor{eind}
 @subsubsection @code{EIND} and Devices with More Than 128 Ki Bytes of Flash
 @cindex @code{EIND}
 Pointers in the implementation are 16@tie{}bits wide.
@@ -23935,6 +23928,7 @@ and the application be linked with @option{-Wl,--defsym,func_4=0x4}.
 Alternatively, @code{func_4} can be defined in the linker script.
 @end itemize
 
+@anchor{ramp}
 @subsubsection Handling of the @code{RAMPD}, @code{RAMPX}, @code{RAMPY} and @code{RAMPZ} Special Function Registers
 @cindex @code{RAMPD}
 @cindex @code{RAMPX}
@@ -23977,6 +23971,7 @@ you must reset it to zero after the access.
 
 @end itemize
 
+@anchor{avr-macros}
 @subsubsection AVR Built-in Macros
 
 GCC defines several built-in macros so that the user code can test
@@ -24131,6 +24126,23 @@ description file, and is currently available for
 there is no need to use address spaces like @code{__flash} or
 features like attribute @code{progmem} and @code{pgm_read_*}.
 
+@item __AVR_HAVE_FLMAP__
+This macro is defined provided the following conditions are met:
+@itemize @bullet
+@item The device has the @code{NVMCTRL_CTRLB.FLMAP} bitfield.
+This applies to the AVR64* and AVR128* devices.
+@item It's not known at assembler-time which emulation will be used.
+@end itemize
+This implies the compiler was configured with GNU Binutils that implement
+@w{@uref{https://sourceware.org/PR31124,PR31124}}.
+
+@item __AVR_RODATA_IN_RAM__
+This macro is undefined when the code is compiled for a core architecture.
+
+When the code is compiled for a device, the macro is defined to@tie{}1
+when the @code{.rodata} sections for read-only data is located in RAM;
+and defined to@tie{}0, otherwise.
+
 @item __WITH_AVRLIBC__
 The compiler is configured to be used together with AVR-Libc.
 See the @option{--with-avrlibc} configure option.
@@ -24164,6 +24176,56 @@ and is defined to @code{2} or @code{3}.
 @itemx __WITH_LIBF7_MATH_SYMBOLS__
 Reflects the @code{--with-libf7=@{libgcc|math|math-symbols@}}
 @w{@uref{https://gcc.gnu.org/install/configure.html#avr,configure option}}.
+
+@end table
+
+@subsubsection AVR Internal Options
+The following options are used internally by the compiler and to communicate
+between device specs files and the compiler proper. You don't need to set these
+options by hand, in particular they are not optimization options.
+Using these options in the wrong way may lead to sub-optimal or wrong code.
+They are documented for completeness, and in order to get a better
+understanding of
+@w{@uref{https://gcc.gnu.org/wiki/avr-gcc#spec-files,device specs}}
+files.
+
+@table @gcctabopt
+
+@opindex mn-flash
+@item -mn-flash=@var{num}
+Assume that the flash memory has a size of @var{num} times 64@tie{}KiB.
+This determines which @code{__flash@var{N}} address spaces are available.
+
+@opindex mflmap
+@item -mflmap
+The device has the @code{FLMAP} bit field located in special function
+register @code{NVMCTRL_CTRLB}.
+
+@opindex mrmw
+@item -mrmw
+Assume that the device supports the Read-Modify-Write
+instructions @code{XCH}, @code{LAC}, @code{LAS} and @code{LAT}.
+
+@opindex mshort-calls
+@item -mshort-calls
+
+Assume that @code{RJMP} and @code{RCALL} can target the whole
+program memory. This option is used for multilib generation and selection
+for the devices from architecture @code{avrxmega3}.
+
+@opindex mskip-bug
+@item -mskip-bug
+
+Generate code without skips (@code{CPSE}, @code{SBRS},
+@code{SBRC}, @code{SBIS}, @code{SBIC}) over 32-bit instructions.
+
+@opindex msp8
+@item -msp8
+Treat the stack pointer register as an 8-bit register,
+i.e.@: assume the high byte of the stack pointer is zero.
+This option is used by the compiler to select and
+build multilibs for architectures @code{avr2} and @code{avr25}.
+These architectures mix devices with and without @code{SPH}.
 
 @end table
 
@@ -34699,8 +34761,8 @@ see @ref{Other Builtins} for details.
 
 @opindex mmovbe
 @item -mmovbe
-This option enables use of the @code{movbe} instruction to implement
-@code{__builtin_bswap32} and @code{__builtin_bswap64}.
+This option enables use of the @code{movbe} instruction to optimize
+byte swapping of four and eight byte entities.
 
 @opindex mshstk
 @item -mshstk
@@ -35262,6 +35324,19 @@ Add CS prefix to call and jmp to indirect thunk with branch target in
 r8-r15 registers so that the call and jmp instruction length is 6 bytes
 to allow them to be replaced with @samp{lfence; call *%r8-r15} or
 @samp{lfence; jmp *%r8-r15} at run-time.
+
+@opindex mapx-inline-asm-use-gpr32
+@item -mapx-inline-asm-use-gpr32
+For inline asm support with APX, by default the EGPR feature was
+disabled to prevent potential illegal instruction with EGPR occurs.
+To invoke egpr usage in inline asm, use new compiler option
+-mapx-inline-asm-use-gpr32 and user should ensure the instruction
+supports EGPR.
+
+@opindex mevex512
+@item -mevex512
+@itemx -mno-evex512
+Enables/disables 512-bit vector. It will be default on if AVX512F is enabled.
 
 @end table
 

@@ -1,5 +1,5 @@
 /* Subroutines used for code generation on Xilinx MicroBlaze.
-   Copyright (C) 2009-2023 Free Software Foundation, Inc.
+   Copyright (C) 2009-2024 Free Software Foundation, Inc.
 
    Contributed by Michael Eager <eager@eagercon.com>.
 
@@ -2792,8 +2792,7 @@ microblaze_function_prologue (FILE * file)
 	ASM_OUTPUT_TYPE_DIRECTIVE (file, fnname, "function");
     }
 
-  assemble_name (file, fnname);
-  fputs (":\n", file);
+  ASM_OUTPUT_FUNCTION_LABEL (file, fnname, current_function_decl);
 
   if (interrupt_handler && strcmp (INTERRUPT_HANDLER_NAME, fnname))
     fputs ("_interrupt_handler:\n", file);

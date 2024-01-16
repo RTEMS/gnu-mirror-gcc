@@ -898,11 +898,8 @@ namespace __format
 	     _FormatContext&) const
 	{
 	  auto __ymd = _S_date(__t);
-	  basic_string<_CharT> __s;
-#if ! _GLIBCXX_USE_CXX11_ABI
-	  __s.reserve(11);
-#endif
-	  __s += std::format(_GLIBCXX_WIDEN("{:04d}-  -  "), (int)__ymd.year());
+	  auto __s = std::format(_GLIBCXX_WIDEN("{:04d}-  -  "),
+				 (int)__ymd.year());
 	  auto __sv = _S_two_digits((unsigned)__ymd.month());
 	  __s[__s.size() - 5] = __sv[0];
 	  __s[__s.size() - 4] = __sv[1];
@@ -1093,11 +1090,8 @@ namespace __format
 	  // %T Equivalent to %H:%M:%S
 	  auto __hms = _S_hms(__t);
 
-	  basic_string<_CharT> __s;
-#if ! _GLIBCXX_USE_CXX11_ABI
-	  __s.reserve(11);
-#endif
-	  __s = std::format(_GLIBCXX_WIDEN("{:02d}:00"), __hms.hours().count());
+	  auto __s = std::format(_GLIBCXX_WIDEN("{:02d}:00"),
+				 __hms.hours().count());
 	  auto __sv = _S_two_digits(__hms.minutes().count());
 	  __s[__s.size() - 2] = __sv[0];
 	  __s[__s.size() - 1] = __sv[1];
@@ -2273,7 +2267,8 @@ namespace __detail
       _Str __s = _GLIBCXX_WIDEN("{:02d} is not a valid day");
       if (__d.ok())
 	__s = __s.substr(0, 6);
-      __os << std::vformat(__s, make_format_args<_Ctx>((unsigned)__d));
+      auto __u = (unsigned)__d;
+      __os << std::vformat(__s, make_format_args<_Ctx>(__u));
       return __os;
     }
 
@@ -2302,8 +2297,10 @@ namespace __detail
 	__os << std::vformat(__os.getloc(), __s.substr(0, 6),
 			     make_format_args<_Ctx>(__m));
       else
-	__os << std::vformat(__s.substr(6),
-			     make_format_args<_Ctx>((unsigned)__m));
+	{
+	  auto __u = (unsigned)__m;
+	  __os << std::vformat(__s.substr(6), make_format_args<_Ctx>(__u));
+	}
       return __os;
     }
 
@@ -2364,8 +2361,10 @@ namespace __detail
 	__os << std::vformat(__os.getloc(), __s.substr(0, 6),
 			     make_format_args<_Ctx>(__wd));
       else
-	__os << std::vformat(__s.substr(6),
-			     make_format_args<_Ctx>(__wd.c_encoding()));
+	{
+	  auto __c = __wd.c_encoding();
+	  __os << std::vformat(__s.substr(6), make_format_args<_Ctx>(__c));
+	}
       return __os;
     }
 

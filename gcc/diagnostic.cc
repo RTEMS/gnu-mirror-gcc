@@ -1,5 +1,5 @@
 /* Language-independent diagnostic subroutines for the GNU Compiler Collection
-   Copyright (C) 1999-2023 Free Software Foundation, Inc.
+   Copyright (C) 1999-2024 Free Software Foundation, Inc.
    Contributed by Gabriel Dos Reis <gdr@codesourcery.com>
 
 This file is part of GCC.
@@ -1603,7 +1603,7 @@ diagnostic_context::report_diagnostic (diagnostic_info *diagnostic)
 
   pp_format (this->printer, &diagnostic->message, m_urlifier);
   m_output_format->on_begin_diagnostic (*diagnostic);
-  pp_output_formatted_text (this->printer);
+  pp_output_formatted_text (this->printer, m_urlifier);
   if (m_show_cwe)
     print_any_cwe (*diagnostic);
   if (m_show_rules)

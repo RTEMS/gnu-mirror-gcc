@@ -1,5 +1,5 @@
 /* Target code for NVPTX.
-   Copyright (C) 2014-2023 Free Software Foundation, Inc.
+   Copyright (C) 2014-2024 Free Software Foundation, Inc.
    Contributed by Bernd Schmidt <bernds@codesourcery.com>
 
    This file is part of GCC.
@@ -5921,8 +5921,10 @@ nvptx_record_offload_symbol (tree decl)
 	fprintf (asm_out_file, "//:");
 	if (lookup_attribute ("omp declare target indirect",
 			      DECL_ATTRIBUTES (decl)))
-	  fprintf (asm_out_file, "IND_");
-	fprintf (asm_out_file, "FUNC_MAP \"%s\"",
+	  fprintf (asm_out_file, "IND_FUNC_MAP");
+	else
+	  fprintf (asm_out_file, "FUNC_MAP");
+	fprintf (asm_out_file, " \"%s\"",
 		 IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl)));
 
 	for (; dims; dims = TREE_CHAIN (dims))

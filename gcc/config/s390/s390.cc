@@ -1,5 +1,5 @@
 /* Subroutines used for code generation on IBM S/390 and zSeries
-   Copyright (C) 1999-2023 Free Software Foundation, Inc.
+   Copyright (C) 1999-2024 Free Software Foundation, Inc.
    Contributed by Hartmut Penner (hpenner@de.ibm.com) and
                   Ulrich Weigand (uweigand@de.ibm.com) and
                   Andreas Krebbel (Andreas.Krebbel@de.ibm.com).
@@ -8323,7 +8323,7 @@ s390_asm_output_function_label (FILE *out_file, const char *fname,
       asm_fprintf (out_file, "\t# fn:%s wd%d\n", fname,
 		   s390_warn_dynamicstack_p);
     }
-  ASM_OUTPUT_LABEL (out_file, fname);
+  assemble_function_label_raw (out_file, fname);
   if (hw_after > 0)
     asm_fprintf (out_file,
 		 "\t# post-label NOPs for hotpatch (%d halfwords)\n",
@@ -17867,33 +17867,45 @@ expand_perm_as_a_vlbr_vstbr_candidate (const struct expand_vec_perm_d &d)
 
   if (memcmp (d.perm, perm[0], MAX_VECT_LEN) == 0)
     {
-      rtx target = gen_rtx_SUBREG (V8HImode, d.target, 0);
-      rtx op0 = gen_rtx_SUBREG (V8HImode, d.op0, 0);
-      emit_insn (gen_bswapv8hi (target, op0));
+      if (!d.testing_p)
+	{
+	  rtx target = gen_rtx_SUBREG (V8HImode, d.target, 0);
+	  rtx op0 = gen_rtx_SUBREG (V8HImode, d.op0, 0);
+	  emit_insn (gen_bswapv8hi (target, op0));
+	}
       return true;
     }
 
   if (memcmp (d.perm, perm[1], MAX_VECT_LEN) == 0)
     {
-      rtx target = gen_rtx_SUBREG (V4SImode, d.target, 0);
-      rtx op0 = gen_rtx_SUBREG (V4SImode, d.op0, 0);
-      emit_insn (gen_bswapv4si (target, op0));
+      if (!d.testing_p)
+	{
+	  rtx target = gen_rtx_SUBREG (V4SImode, d.target, 0);
+	  rtx op0 = gen_rtx_SUBREG (V4SImode, d.op0, 0);
+	  emit_insn (gen_bswapv4si (target, op0));
+	}
       return true;
     }
 
   if (memcmp (d.perm, perm[2], MAX_VECT_LEN) == 0)
     {
-      rtx target = gen_rtx_SUBREG (V2DImode, d.target, 0);
-      rtx op0 = gen_rtx_SUBREG (V2DImode, d.op0, 0);
-      emit_insn (gen_bswapv2di (target, op0));
+      if (!d.testing_p)
+	{
+	  rtx target = gen_rtx_SUBREG (V2DImode, d.target, 0);
+	  rtx op0 = gen_rtx_SUBREG (V2DImode, d.op0, 0);
+	  emit_insn (gen_bswapv2di (target, op0));
+	}
       return true;
     }
 
   if (memcmp (d.perm, perm[3], MAX_VECT_LEN) == 0)
     {
-      rtx target = gen_rtx_SUBREG (V1TImode, d.target, 0);
-      rtx op0 = gen_rtx_SUBREG (V1TImode, d.op0, 0);
-      emit_insn (gen_bswapv1ti (target, op0));
+      if (!d.testing_p)
+	{
+	  rtx target = gen_rtx_SUBREG (V1TImode, d.target, 0);
+	  rtx op0 = gen_rtx_SUBREG (V1TImode, d.op0, 0);
+	  emit_insn (gen_bswapv1ti (target, op0));
+	}
       return true;
     }
 

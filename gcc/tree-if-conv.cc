@@ -1,5 +1,5 @@
 /* If-conversion for vectorizer.
-   Copyright (C) 2004-2023 Free Software Foundation, Inc.
+   Copyright (C) 2004-2024 Free Software Foundation, Inc.
    Contributed by Devang Patel <dpatel@apple.com>
 
 This file is part of GCC.
@@ -844,7 +844,7 @@ idx_within_array_bound (tree ref, tree *idx, void *dta)
 
 /* Return TRUE if ref is a within bound array reference.  */
 
-static bool
+bool
 ref_within_array_bound (gimple *stmt, tree ref)
 {
   class loop *loop = loop_containing_stmt (stmt);

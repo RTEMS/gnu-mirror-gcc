@@ -1,5 +1,5 @@
 /* Scalar evolution detector.
-   Copyright (C) 2003-2023 Free Software Foundation, Inc.
+   Copyright (C) 2003-2024 Free Software Foundation, Inc.
    Contributed by Sebastian Pop <s.pop@laposte.net>
 
 This file is part of GCC.
@@ -3881,7 +3881,7 @@ final_value_replacement_loop (class loop *loop)
 
       /* Propagate constants immediately, but leave an unused initialization
 	 around to avoid invalidating the SCEV cache.  */
-      if (CONSTANT_CLASS_P (def))
+      if (CONSTANT_CLASS_P (def) && !SSA_NAME_OCCURS_IN_ABNORMAL_PHI (rslt))
 	replace_uses_by (rslt, def);
 
       /* Create the replacement statements.  */

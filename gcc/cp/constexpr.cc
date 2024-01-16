@@ -2,7 +2,7 @@
    constexpr functions.  These routines are used both during actual parsing
    and during the instantiation of template functions.
 
-   Copyright (C) 1998-2023 Free Software Foundation, Inc.
+   Copyright (C) 1998-2024 Free Software Foundation, Inc.
 
    This file is part of GCC.
 
@@ -291,7 +291,7 @@ is_valid_constexpr_fn (tree fun, bool complain)
 
       /* C++14 DR 1684 removed this restriction.  */
       if (cxx_dialect < cxx14
-	  && DECL_NONSTATIC_MEMBER_FUNCTION_P (fun)
+	  && DECL_IOBJ_MEMBER_FUNCTION_P (fun)
 	  && !CLASSTYPE_LITERAL_P (DECL_CONTEXT (fun)))
 	{
 	  ret = false;
@@ -1886,7 +1886,7 @@ cxx_bind_parameters_in_call (const constexpr_ctx *ctx, tree t, tree fun,
 					  non_constant_p, overflow_p);
       /* Check we aren't dereferencing a null pointer when calling a non-static
 	 member function, which is undefined behaviour.  */
-      if (i == 0 && DECL_NONSTATIC_MEMBER_FUNCTION_P (fun)
+      if (i == 0 && DECL_OBJECT_MEMBER_FUNCTION_P (fun)
 	  && integer_zerop (arg)
 	  /* But ignore calls from within compiler-generated code, to handle
 	     cases like lambda function pointer conversion operator thunks
@@ -10105,6 +10105,7 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
     case OACC_ENTER_DATA:
     case OACC_EXIT_DATA:
     case OACC_UPDATE:
+    case OMP_ARRAY_SECTION:
       /* GCC internal stuff.  */
     case VA_ARG_EXPR:
     case TRANSACTION_EXPR:

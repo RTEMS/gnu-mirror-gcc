@@ -1,5 +1,5 @@
 ;; Machine description for RISC-V Bit Manipulation operations.
-;; Copyright (C) 2021-2023 Free Software Foundation, Inc.
+;; Copyright (C) 2021-2024 Free Software Foundation, Inc.
 
 ;; This file is part of GCC.
 
@@ -443,8 +443,8 @@
 ;; orc.b (or-combine) is added as an unspec for the benefit of the support
 ;; for optimized string functions (such as strcmp).
 (define_insn "orcb<mode>2"
-  [(set (match_operand:X 0 "register_operand" "=r")
-	(unspec:X [(match_operand:X 1 "register_operand" "r")] UNSPEC_ORC_B))]
+  [(set (match_operand:GPR 0 "register_operand" "=r")
+	(unspec:GPR [(match_operand:GPR 1 "register_operand" "r")] UNSPEC_ORC_B))]
   "TARGET_ZBB"
   "orc.b\t%0,%1"
   [(set_attr "type" "bitmanip")])
@@ -852,9 +852,9 @@
 
 ;; ZBKC or ZBC extension
 (define_insn "riscv_clmul_<mode>"
-  [(set (match_operand:X 0 "register_operand" "=r")
-        (unspec:X [(match_operand:X 1 "register_operand" "r")
-                  (match_operand:X 2 "register_operand" "r")]
+  [(set (match_operand:GPR 0 "register_operand" "=r")
+        (unspec:GPR [(match_operand:GPR 1 "register_operand" "r")
+                  (match_operand:GPR 2 "register_operand" "r")]
                   UNSPEC_CLMUL))]
   "TARGET_ZBKC || TARGET_ZBC"
   "clmul\t%0,%1,%2"

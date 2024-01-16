@@ -1,5 +1,5 @@
 /* Build expressions with type checking for C++ compiler.
-   Copyright (C) 1987-2023 Free Software Foundation, Inc.
+   Copyright (C) 1987-2024 Free Software Foundation, Inc.
    Hacked by Michael Tiemann (tiemann@cygnus.com)
 
 This file is part of GCC.
@@ -2352,7 +2352,7 @@ invalid_nonstatic_memfn_p (location_t loc, tree expr, tsubst_flags_t complain)
   if (is_overloaded_fn (expr) && !really_overloaded_fn (expr))
     expr = get_first_fn (expr);
   if (TREE_TYPE (expr)
-      && DECL_NONSTATIC_MEMBER_FUNCTION_P (expr))
+      && DECL_IOBJ_MEMBER_FUNCTION_P (expr))
     {
       if (complain & tf_error)
 	{
@@ -4796,6 +4796,56 @@ build_x_array_ref (location_t loc, tree arg1, tree arg2,
   return expr;
 }
 
+/* Build an OpenMP array section reference, creating an exact type for the
+   resulting expression based on the element type and bounds if possible.  If
+   we have variable bounds, create an incomplete array type for the result
+   instead.  */
+
+tree
+build_omp_array_section (location_t loc, tree array_expr, tree index,
+			 tree length)
+{
+  tree type = TREE_TYPE (array_expr);
+  gcc_assert (type);
+  type = non_reference (type);
+
+  tree sectype, eltype = TREE_TYPE (type);
+
+  /* It's not an array or pointer type.  Just reuse the type of the
+     original expression as the type of the array section (an error will be
+     raised anyway, later).  */
+  if (eltype == NULL_TREE)
+    sectype = TREE_TYPE (array_expr);
+  else
+    {
+      tree idxtype = NULL_TREE;
+
+      /* If we know the integer bounds, create an index type with exact
+	 low/high (or zero/length) bounds.  Otherwise, create an incomplete
+	 array type.  (This mostly only affects diagnostics.)  */
+      if (index != NULL_TREE
+	  && length != NULL_TREE
+	  && TREE_CODE (index) == INTEGER_CST
+	  && TREE_CODE (length) == INTEGER_CST)
+	{
+	  tree low = fold_convert (sizetype, index);
+	  tree high = fold_convert (sizetype, length);
+	  high = size_binop (PLUS_EXPR, low, high);
+	  high = size_binop (MINUS_EXPR, high, size_one_node);
+	  idxtype = build_range_type (sizetype, low, high);
+	}
+      else if ((index == NULL_TREE || integer_zerop (index))
+	       && length != NULL_TREE
+	       && TREE_CODE (length) == INTEGER_CST)
+	idxtype = build_index_type (length);
+
+      sectype = build_array_type (eltype, idxtype);
+    }
+
+  return build3_loc (loc, OMP_ARRAY_SECTION, sectype, array_expr, index,
+		     length);
+}
+
 /* Return whether OP is an expression of enum type cast to integer
    type.  In C++ even unsigned enum types are cast to signed integer
    types.  We do not want to issue warnings about comparisons between
@@ -7079,26 +7129,47 @@ cp_build_addr_expr_1 (tree arg, bool strict_lvalue, tsubst_flags_t complain)
       tree fn = get_first_fn (TREE_OPERAND (arg, 1));
       if (!mark_used (fn, complain) && !(complain & tf_error))
 	return error_mark_node;
-
-      if (! flag_ms_extensions)
+      /* Until microsoft headers are known to incorrectly take the address of
+	 unqualified xobj member functions we should not support this
+	 extension.
+	 See comment in class.cc:resolve_address_of_overloaded_function for
+	 the extended reasoning.  */
+      if (!flag_ms_extensions || DECL_XOBJ_MEMBER_FUNCTION_P (fn))
 	{
+	  auto_diagnostic_group d;
 	  tree name = DECL_NAME (fn);
 	  if (!(complain & tf_error))
 	    return error_mark_node;
 	  else if (current_class_type
 		   && TREE_OPERAND (arg, 0) == current_class_ref)
 	    /* An expression like &memfn.  */
-	    permerror (loc,
-		       "ISO C++ forbids taking the address of an unqualified"
-		       " or parenthesized non-static member function to form"
-		       " a pointer to member function.  Say %<&%T::%D%>",
-		       base, name);
+	    if (!DECL_XOBJ_MEMBER_FUNCTION_P (fn))
+	      permerror (loc,
+			 "ISO C++ forbids taking the address of an unqualified"
+			 " or parenthesized non-static member function to form"
+			 " a pointer to member function.  Say %<&%T::%D%>",
+			 base, name);
+	    else
+	      error_at (loc,
+			"ISO C++ forbids taking the address of an unqualified"
+			" or parenthesized non-static member function to form"
+			" a pointer to explicit object member function");
 	  else
-	    permerror (loc,
-		       "ISO C++ forbids taking the address of a bound member"
-		       " function to form a pointer to member function."
-		       "  Say %<&%T::%D%>",
-		       base, name);
+	    if (!DECL_XOBJ_MEMBER_FUNCTION_P (fn))
+	      permerror (loc,
+			 "ISO C++ forbids taking the address of a bound member"
+			 " function to form a pointer to member function."
+			 "  Say %<&%T::%D%>",
+			 base, name);
+	    else
+	      error_at (loc,
+			"ISO C++ forbids taking the address of a bound member"
+			" function to form a pointer to explicit object member"
+			" function");
+	  if (DECL_XOBJ_MEMBER_FUNCTION_P (fn))
+	    inform (loc,
+		    "a pointer to explicit object member function can only be "
+		    "formed with %<&%T::%D%>", base, name);
 	}
       arg = build_offset_ref (base, fn, /*address_p=*/true, complain);
     }
@@ -7214,6 +7285,15 @@ cp_build_addr_expr_1 (tree arg, bool strict_lvalue, tsubst_flags_t complain)
 	    && !DECL_PURE_VIRTUAL_P (t)
 	    && !mark_used (t, complain) && !(complain & tf_error))
 	  return error_mark_node;
+
+	/* Pull out the function_decl for a single xobj member function, and
+	   let the rest of this function handle it.  This is similar to how
+	   static member functions are handled in the BASELINK case above.  */
+	if (DECL_XOBJ_MEMBER_FUNCTION_P (t))
+	  {
+	    arg = t;
+	    break;
+	  }
 
 	type = build_ptrmem_type (context_for_name_lookup (t),
 				  TREE_TYPE (t));

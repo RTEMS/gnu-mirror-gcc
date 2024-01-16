@@ -1,5 +1,5 @@
 /* Lower _BitInt(N) operations to scalar operations.
-   Copyright (C) 2023 Free Software Foundation, Inc.
+   Copyright (C) 2023-2024 Free Software Foundation, Inc.
    Contributed by Jakub Jelinek <jakub@redhat.com>.
 
 This file is part of GCC.
@@ -231,7 +231,8 @@ mergeable_op (gimple *stmt)
 	    && TREE_CODE (rhs_type) == BITINT_TYPE
 	    && bitint_precision_kind (lhs_type) >= bitint_prec_large
 	    && bitint_precision_kind (rhs_type) >= bitint_prec_large
-	    && tree_int_cst_equal (TYPE_SIZE (lhs_type), TYPE_SIZE (rhs_type)))
+	    && (CEIL (TYPE_PRECISION (lhs_type), limb_prec)
+		== CEIL (TYPE_PRECISION (rhs_type), limb_prec)))
 	  {
 	    if (TYPE_PRECISION (rhs_type) >= TYPE_PRECISION (lhs_type))
 	      return true;
@@ -305,6 +306,7 @@ optimizable_arith_overflow (gimple *stmt)
   imm_use_iterator ui;
   use_operand_p use_p;
   int seen = 0;
+  gimple *realpart = NULL, *cast = NULL;
   FOR_EACH_IMM_USE_FAST (use_p, ui, lhs)
     {
       gimple *g = USE_STMT (use_p);
@@ -317,6 +319,7 @@ optimizable_arith_overflow (gimple *stmt)
 	  if ((seen & 1) != 0)
 	    return 0;
 	  seen |= 1;
+	  realpart = g;
 	}
       else if (gimple_assign_rhs_code (g) == IMAGPART_EXPR)
 	{
@@ -338,13 +341,35 @@ optimizable_arith_overflow (gimple *stmt)
 	  if (!INTEGRAL_TYPE_P (TREE_TYPE (lhs2))
 	      || TREE_CODE (TREE_TYPE (lhs2)) == BITINT_TYPE)
 	    return 0;
+	  cast = use_stmt;
 	}
       else
 	return 0;
     }
   if ((seen & 2) == 0)
     return 0;
-  return seen == 3 ? 2 : 1;
+  if (seen == 3)
+    {
+      /* Punt if the cast stmt appears before realpart stmt, because
+	 if both appear, the lowering wants to emit all the code
+	 at the location of realpart stmt.  */
+      gimple_stmt_iterator gsi = gsi_for_stmt (realpart);
+      unsigned int cnt = 0;
+      do
+	{
+	  gsi_prev_nondebug (&gsi);
+	  if (gsi_end_p (gsi) || gsi_stmt (gsi) == cast)
+	    return 0;
+	  if (gsi_stmt (gsi) == stmt)
+	    return 2;
+	  /* If realpart is too far from stmt, punt as well.
+	     Usually it will appear right after it.  */
+	  if (++cnt == 32)
+	    return 0;
+	}
+      while (1);
+    }
+  return 1;
 }
 
 /* If STMT is some kind of comparison (GIMPLE_COND, comparison assignment)
@@ -844,7 +869,7 @@ bitint_large_huge::handle_operand (tree op, tree idx)
 	      && m_data[m_data_cnt + 1] == NULL_TREE))
 	{
 	  unsigned int prec = TYPE_PRECISION (TREE_TYPE (op));
-	  unsigned int rem = prec % (2 * limb_prec);
+	  unsigned int rem = prec % ((m_upwards_2limb ? 2 : 1) * limb_prec);
 	  int ext;
 	  unsigned min_prec = bitint_min_cst_precision (op, ext);
 	  if (m_first)
@@ -971,8 +996,8 @@ bitint_large_huge::handle_operand (tree op, tree idx)
       if (m_data[m_data_cnt + 1] == integer_type_node)
 	{
 	  unsigned int prec = TYPE_PRECISION (TREE_TYPE (op));
-	  unsigned rem = prec % (2 * limb_prec);
-	  int ext = tree_int_cst_sgn (op) < 0 ? -1 : 0;
+	  unsigned rem = prec % ((m_upwards_2limb ? 2 : 1) * limb_prec);
+	  int ext = wi::neg_p (wi::to_wide (op)) ? -1 : 0;
 	  tree c = m_data[m_data_cnt];
 	  unsigned min_prec = TYPE_PRECISION (TREE_TYPE (c));
 	  g = gimple_build_cond (LT_EXPR, idx,
@@ -1239,8 +1264,8 @@ bitint_large_huge::handle_cast (tree lhs_type, tree rhs1, tree idx)
 	     if m_upwards_2limb * limb_prec is equal to
 	     lhs precision that is not the case.  */
 	  || (!m_var_msb
-	      && tree_int_cst_equal (TYPE_SIZE (rhs_type),
-				     TYPE_SIZE (lhs_type))
+	      && (CEIL (TYPE_PRECISION (lhs_type), limb_prec)
+		  == CEIL (TYPE_PRECISION (rhs_type), limb_prec))
 	      && (!m_upwards_2limb
 		  || (m_upwards_2limb * limb_prec
 		      < TYPE_PRECISION (lhs_type)))))
@@ -2202,7 +2227,9 @@ bitint_large_huge::handle_operand_addr (tree op, gimple *stmt,
       mp = CEIL (min_prec, limb_prec) * limb_prec;
       if (mp == 0)
 	mp = 1;
-      if (mp >= (unsigned) TYPE_PRECISION (TREE_TYPE (op)))
+      if (mp >= (unsigned) TYPE_PRECISION (TREE_TYPE (op))
+	  && (TREE_CODE (TREE_TYPE (op)) == BITINT_TYPE
+	      || TYPE_PRECISION (TREE_TYPE (op)) <= limb_prec))
 	type = TREE_TYPE (op);
       else
 	type = build_bitint_type (mp, 1);
@@ -2212,11 +2239,15 @@ bitint_large_huge::handle_operand_addr (tree op, gimple *stmt,
 	  if (TYPE_PRECISION (type) <= limb_prec)
 	    type = m_limb_type;
 	  else
-	    /* This case is for targets which e.g. have 64-bit
-	       limb but categorize up to 128-bits _BitInts as
-	       small.  We could use type of m_limb_type[2] and
-	       similar instead to save space.  */
-	    type = build_bitint_type (mid_min_prec, 1);
+	    {
+	      while (bitint_precision_kind (mp) == bitint_prec_small)
+		mp += limb_prec;
+	      /* This case is for targets which e.g. have 64-bit
+		 limb but categorize up to 128-bits _BitInts as
+		 small.  We could use type of m_limb_type[2] and
+		 similar instead to save space.  */
+	      type = build_bitint_type (mp, 1);
+	    }
 	}
       if (prec_stored)
 	{
@@ -5093,14 +5124,23 @@ bitint_large_huge::lower_call (tree obj, gimple *stmt)
 	  || TREE_CODE (TREE_TYPE (arg)) != BITINT_TYPE
 	  || bitint_precision_kind (TREE_TYPE (arg)) <= bitint_prec_middle)
 	continue;
-      int p = var_to_partition (m_map, arg);
-      tree v = m_vars[p];
-      gcc_assert (v != NULL_TREE);
-      if (!types_compatible_p (TREE_TYPE (arg), TREE_TYPE (v)))
-	v = build1 (VIEW_CONVERT_EXPR, TREE_TYPE (arg), v);
-      arg = make_ssa_name (TREE_TYPE (arg));
-      gimple *g = gimple_build_assign (arg, v);
-      gsi_insert_before (&gsi, g, GSI_SAME_STMT);
+      if (SSA_NAME_IS_DEFAULT_DEF (arg)
+	  && (!SSA_NAME_VAR (arg) || VAR_P (SSA_NAME_VAR (arg))))
+	{
+	  tree var = create_tmp_reg (TREE_TYPE (arg));
+	  arg = get_or_create_ssa_default_def (cfun, var);
+	}
+      else
+	{
+	  int p = var_to_partition (m_map, arg);
+	  tree v = m_vars[p];
+	  gcc_assert (v != NULL_TREE);
+	  if (!types_compatible_p (TREE_TYPE (arg), TREE_TYPE (v)))
+	    v = build1 (VIEW_CONVERT_EXPR, TREE_TYPE (arg), v);
+	  arg = make_ssa_name (TREE_TYPE (arg));
+	  gimple *g = gimple_build_assign (arg, v);
+	  gsi_insert_before (&gsi, g, GSI_SAME_STMT);
+	}
       gimple_call_set_arg (stmt, i, arg);
       if (m_preserved == NULL)
 	m_preserved = BITMAP_ALLOC (NULL);
@@ -5479,7 +5519,7 @@ bitint_dom_walker::before_dom_children (basic_block bb)
       tree lhs = gimple_get_lhs (stmt);
       if (lhs
 	  && TREE_CODE (lhs) == SSA_NAME
-	  && TREE_CODE (TREE_TYPE (lhs)) != BITINT_TYPE
+	  && TREE_CODE (TREE_TYPE (lhs)) == BITINT_TYPE
 	  && bitint_precision_kind (TREE_TYPE (lhs)) >= bitint_prec_large
 	  && !bitmap_bit_p (m_names, SSA_NAME_VERSION (lhs)))
 	/* If lhs of stmt is large/huge _BitInt SSA_NAME not in m_names,
@@ -6582,8 +6622,12 @@ gimple_lower_bitint (void)
 			= build_array_type_nelts (large_huge.m_limb_type,
 						  nelts);
 		      tree ptype = build_pointer_type (TREE_TYPE (v1));
-		      tree off = fold_convert (ptype,
-					       TYPE_SIZE_UNIT (TREE_TYPE (c)));
+		      tree off;
+		      if (c)
+			off = fold_convert (ptype,
+					    TYPE_SIZE_UNIT (TREE_TYPE (c)));
+		      else
+			off = build_zero_cst (ptype);
 		      tree vd = build2 (MEM_REF, vtype,
 					build_fold_addr_expr (v1), off);
 		      g = gimple_build_assign (vd, build_zero_cst (vtype));

@@ -1,5 +1,5 @@
 /* Subroutines for insn-output.cc for HPPA.
-   Copyright (C) 1992-2023 Free Software Foundation, Inc.
+   Copyright (C) 1992-2024 Free Software Foundation, Inc.
    Contributed by Tim Moore (moore@cs.utah.edu), based on sparc.cc
 
 This file is part of GCC.
@@ -3991,7 +3991,8 @@ pa_output_function_label (FILE *file)
   /* The function's label and associated .PROC must never be
      separated and must be output *after* any profiling declarations
      to avoid changing spaces/subspaces within a procedure.  */
-  ASM_OUTPUT_LABEL (file, XSTR (XEXP (DECL_RTL (current_function_decl), 0), 0));
+  const char *name = XSTR (XEXP (DECL_RTL (current_function_decl), 0), 0);
+  ASM_OUTPUT_FUNCTION_LABEL (file, name, current_function_decl);
   fputs ("\t.PROC\n", file);
 
   /* pa_expand_prologue does the dirty work now.  We just need

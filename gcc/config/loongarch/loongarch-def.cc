@@ -1,5 +1,5 @@
 /* LoongArch static properties.
-   Copyright (C) 2021-2023 Free Software Foundation, Inc.
+   Copyright (C) 2021-2024 Free Software Foundation, Inc.
    Contributed by Loongson Ltd.
 
 This file is part of GCC.
@@ -48,16 +48,16 @@ array_arch<loongarch_isa> loongarch_cpu_default_isa =
   array_arch<loongarch_isa> ()
     .set (CPU_LOONGARCH64,
 	  loongarch_isa ()
-	    .base_ (ISA_BASE_LA64V100)
+	    .base_ (ISA_BASE_LA64)
 	    .fpu_ (ISA_EXT_FPU64))
     .set (CPU_LA464,
 	  loongarch_isa ()
-	    .base_ (ISA_BASE_LA64V100)
+	    .base_ (ISA_BASE_LA64)
 	    .fpu_ (ISA_EXT_FPU64)
 	    .simd_ (ISA_EXT_SIMD_LASX))
     .set (CPU_LA664,
 	  loongarch_isa ()
-	    .base_ (ISA_BASE_LA64V100)
+	    .base_ (ISA_BASE_LA64)
 	    .fpu_ (ISA_EXT_FPU64)
 	    .simd_ (ISA_EXT_SIMD_LASX)
 	    .evolution_ (OPTION_MASK_ISA_DIV32 | OPTION_MASK_ISA_LD_SEQ_SA
@@ -101,15 +101,21 @@ loongarch_rtx_cost_data::loongarch_rtx_cost_data ()
     int_mult_di (COSTS_N_INSNS (4)),
     int_div_si (COSTS_N_INSNS (5)),
     int_div_di (COSTS_N_INSNS (5)),
+    movcf2gr (COSTS_N_INSNS (7)),
+    movgr2cf (COSTS_N_INSNS (15)),
     branch_cost (6),
     memory_latency (4) {}
 
 /* The following properties cannot be looked up directly using "cpucfg".
  So it is necessary to provide a default value for "unknown native"
  tune targets (i.e. -mtune=native while PRID does not correspond to
- any known "-mtune" type).  Currently all numbers are default.  */
+ any known "-mtune" type).  */
 array_tune<loongarch_rtx_cost_data> loongarch_cpu_rtx_cost_data =
-  array_tune<loongarch_rtx_cost_data> ();
+  array_tune<loongarch_rtx_cost_data> ()
+    .set (CPU_LA664,
+	  loongarch_rtx_cost_data ()
+	    .movcf2gr_ (COSTS_N_INSNS (1))
+	    .movgr2cf_ (COSTS_N_INSNS (1)));
 
 /* RTX costs to use when optimizing for size.
    We use a value slightly larger than COSTS_N_INSNS (1) for all of them
@@ -125,7 +131,8 @@ const loongarch_rtx_cost_data loongarch_rtx_cost_optimize_size =
     .int_mult_si_ (COST_COMPLEX_INSN)
     .int_mult_di_ (COST_COMPLEX_INSN)
     .int_div_si_ (COST_COMPLEX_INSN)
-    .int_div_di_ (COST_COMPLEX_INSN);
+    .int_div_di_ (COST_COMPLEX_INSN)
+    .movcf2gr_ (COST_COMPLEX_INSN);
 
 array_tune<int> loongarch_cpu_issue_rate = array_tune<int> ()
   .set (CPU_NATIVE, 4)
@@ -146,7 +153,7 @@ array_tune<int> loongarch_cpu_multipass_dfa_lookahead = array_tune<int> ()
 
 array<const char *, N_ISA_BASE_TYPES> loongarch_isa_base_strings =
   array<const char *, N_ISA_BASE_TYPES> ()
-    .set (ISA_BASE_LA64V100, STR_ISA_BASE_LA64V100);
+    .set (ISA_BASE_LA64, STR_ISA_BASE_LA64);
 
 array<const char *, N_ISA_EXT_TYPES> loongarch_isa_ext_strings =
   array<const char *, N_ISA_EXT_TYPES> ()
@@ -182,15 +189,15 @@ array<array<loongarch_isa, N_ABI_EXT_TYPES>, N_ABI_BASE_TYPES>
 	  array<loongarch_isa, N_ABI_EXT_TYPES> ()
 	    .set (ABI_EXT_BASE,
 		  loongarch_isa ()
-		    .base_ (ISA_BASE_LA64V100)
+		    .base_ (ISA_BASE_LA64)
 		    .fpu_ (ISA_EXT_FPU64)))
     .set (ABI_BASE_LP64F,
 	  array<loongarch_isa, N_ABI_EXT_TYPES> ()
 	    .set (ABI_EXT_BASE,
 		  loongarch_isa ()
-		    .base_ (ISA_BASE_LA64V100)
+		    .base_ (ISA_BASE_LA64)
 		    .fpu_ (ISA_EXT_FPU32)))
     .set (ABI_BASE_LP64S,
 	  array<loongarch_isa, N_ABI_EXT_TYPES> ()
 	    .set (ABI_EXT_BASE,
-		  loongarch_isa ().base_ (ISA_BASE_LA64V100)));
+		  loongarch_isa ().base_ (ISA_BASE_LA64)));

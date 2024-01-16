@@ -1,5 +1,5 @@
 /* Build expressions with type checking for C compiler.
-   Copyright (C) 1987-2023 Free Software Foundation, Inc.
+   Copyright (C) 1987-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -75,6 +75,9 @@ int in_typeof;
 
 /* True when parsing OpenMP loop expressions.  */
 bool c_in_omp_for;
+
+/* True when parsing OpenMP map clause.  */
+bool c_omp_array_section_p;
 
 /* The argument of last parsed sizeof expression, only to be tested
    if expr.original_code == SIZEOF_EXPR.  */
@@ -1511,8 +1514,6 @@ tagged_types_tu_compatible_p (const_tree t1, const_tree t2,
   if (!data->anon_field && TYPE_STUB_DECL (t1) != TYPE_STUB_DECL (t2))
     data->different_types_p = true;
 
-  data->anon_field = false;
-
   /* Incomplete types are incompatible inside a TU.  */
   if (TYPE_SIZE (t1) == NULL || TYPE_SIZE (t2) == NULL)
     return false;
@@ -1592,20 +1593,19 @@ tagged_types_tu_compatible_p (const_tree t1, const_tree t2,
 	     s1 && s2;
 	     s1 = DECL_CHAIN (s1), s2 = DECL_CHAIN (s2))
 	  {
-	    if (TREE_CODE (s1) != TREE_CODE (s2)
-		|| DECL_NAME (s1) != DECL_NAME (s2))
+	    gcc_assert (TREE_CODE (s1) == FIELD_DECL);
+	    gcc_assert (TREE_CODE (s2) == FIELD_DECL);
+
+	    if (DECL_NAME (s1) != DECL_NAME (s2))
 	      return false;
 
-	    if (!DECL_NAME (s1) && RECORD_OR_UNION_TYPE_P (TREE_TYPE (s1)))
-	      data->anon_field = true;
+	    if (DECL_ALIGN (s1) != DECL_ALIGN (s2))
+	      return false;
+
+	    data->anon_field = !DECL_NAME (s1);
 
 	    data->cache = &entry;
 	    if (!comptypes_internal (TREE_TYPE (s1), TREE_TYPE (s2), data))
-	      return false;
-
-	    if (TREE_CODE (s1) == FIELD_DECL
-		&& simple_cst_equal (DECL_FIELD_BIT_OFFSET (s1),
-				     DECL_FIELD_BIT_OFFSET (s2)) != 1)
 	      return false;
 
 	    tree st1 = TYPE_SIZE (TREE_TYPE (s1));
@@ -1989,6 +1989,13 @@ mark_exp_read (tree exp)
       /* FALLTHRU */
     case C_MAYBE_CONST_EXPR:
       mark_exp_read (TREE_OPERAND (exp, 1));
+      break;
+    case OMP_ARRAY_SECTION:
+      mark_exp_read (TREE_OPERAND (exp, 0));
+      if (TREE_OPERAND (exp, 1))
+	mark_exp_read (TREE_OPERAND (exp, 1));
+      if (TREE_OPERAND (exp, 2))
+	mark_exp_read (TREE_OPERAND (exp, 2));
       break;
     default:
       break;
@@ -2861,6 +2868,10 @@ build_array_ref (location_t loc, tree array, tree index)
 			 "array");
 	}
 
+      if (TREE_CODE (TREE_TYPE (index)) == BITINT_TYPE
+	  && TYPE_PRECISION (TREE_TYPE (index)) > TYPE_PRECISION (sizetype))
+	index = fold_convert (sizetype, index);
+
       type = TREE_TYPE (TREE_TYPE (array));
       rval = build4 (ARRAY_REF, type, array, index, NULL_TREE, NULL_TREE);
       /* Array ref is const/volatile if the array elements are
@@ -2902,6 +2913,53 @@ build_array_ref (location_t loc, tree array, tree index)
       return ret;
     }
 }
+
+/* Build an OpenMP array section reference, creating an exact type for the
+   resulting expression based on the element type and bounds if possible.  If
+   we have variable bounds, create an incomplete array type for the result
+   instead.  */
+
+tree
+build_omp_array_section (location_t loc, tree array, tree index, tree length)
+{
+  tree type = TREE_TYPE (array);
+  gcc_assert (type);
+
+  tree sectype, eltype = TREE_TYPE (type);
+
+  /* It's not an array or pointer type.  Just reuse the type of the original
+     expression as the type of the array section (an error will be raised
+     anyway, later).  */
+  if (eltype == NULL_TREE || error_operand_p (eltype))
+    sectype = TREE_TYPE (array);
+  else
+    {
+      tree idxtype = NULL_TREE;
+
+      if (index != NULL_TREE
+	  && length != NULL_TREE
+	  && INTEGRAL_TYPE_P (TREE_TYPE (index))
+	  && INTEGRAL_TYPE_P (TREE_TYPE (length)))
+	{
+	  tree low = fold_convert (sizetype, index);
+	  tree high = fold_convert (sizetype, length);
+	  high = size_binop (PLUS_EXPR, low, high);
+	  high = size_binop (MINUS_EXPR, high, size_one_node);
+	  idxtype = build_range_type (sizetype, low, high);
+	}
+      else if ((index == NULL_TREE || integer_zerop (index))
+	       && length != NULL_TREE
+	       && INTEGRAL_TYPE_P (TREE_TYPE (length)))
+	idxtype = build_index_type (length);
+
+      gcc_assert (!error_operand_p (idxtype));
+
+      sectype = build_array_type (eltype, idxtype);
+    }
+
+  return build3_loc (loc, OMP_ARRAY_SECTION, sectype, array, index, length);
+}
+
 
 /* Build an external reference to identifier ID.  FUN indicates
    whether this will be used for a function call.  LOC is the source
@@ -2941,7 +2999,11 @@ build_external_ref (location_t loc, tree id, bool fun, tree *type)
       return error_mark_node;
     }
 
-  if (TREE_TYPE (ref) == error_mark_node)
+  /* For an OpenMP map clause, we can get better diagnostics for decls with
+     unmappable types if we return the decl with an error_mark_node type,
+     rather than returning error_mark_node for the decl itself.  */
+  if (TREE_TYPE (ref) == error_mark_node
+      && !c_omp_array_section_p)
     return error_mark_node;
 
   if (TREE_UNAVAILABLE (ref))
@@ -13765,7 +13827,7 @@ handle_omp_array_sections_1 (tree c, tree t, vec<tree> &types,
 {
   tree ret, low_bound, length, type;
   bool openacc = (ort & C_ORT_ACC) != 0;
-  if (TREE_CODE (t) != TREE_LIST)
+  if (TREE_CODE (t) != OMP_ARRAY_SECTION)
     {
       if (error_operand_p (t))
 	return error_mark_node;
@@ -13790,7 +13852,9 @@ handle_omp_array_sections_1 (tree c, tree t, vec<tree> &types,
 	t = ai.unconverted_ref_origin ();
       if (t == error_mark_node)
 	return error_mark_node;
-      if (!VAR_P (t) && TREE_CODE (t) != PARM_DECL)
+      if (!VAR_P (t)
+	  && (ort == C_ORT_ACC || !EXPR_P (t))
+	  && TREE_CODE (t) != PARM_DECL)
 	{
 	  if (DECL_P (t))
 	    error_at (OMP_CLAUSE_LOCATION (c),
@@ -13838,14 +13902,14 @@ handle_omp_array_sections_1 (tree c, tree t, vec<tree> &types,
       return ret;
     }
 
-  ret = handle_omp_array_sections_1 (c, TREE_CHAIN (t), types,
+  ret = handle_omp_array_sections_1 (c, TREE_OPERAND (t, 0), types,
 				     maybe_zero_len, first_non_one, ort);
   if (ret == error_mark_node || ret == NULL_TREE)
     return ret;
 
   type = TREE_TYPE (ret);
-  low_bound = TREE_PURPOSE (t);
-  length = TREE_VALUE (t);
+  low_bound = TREE_OPERAND (t, 1);
+  length = TREE_OPERAND (t, 2);
 
   if (low_bound == error_mark_node || length == error_mark_node)
     return error_mark_node;
@@ -14038,7 +14102,7 @@ handle_omp_array_sections_1 (tree c, tree t, vec<tree> &types,
 	  tree lb = save_expr (low_bound);
 	  if (lb != low_bound)
 	    {
-	      TREE_PURPOSE (t) = lb;
+	      TREE_OPERAND (t, 1) = lb;
 	      low_bound = lb;
 	    }
 	}
@@ -14069,14 +14133,15 @@ handle_omp_array_sections_1 (tree c, tree t, vec<tree> &types,
 	 array-section-subscript, the array section could be non-contiguous.  */
       if (OMP_CLAUSE_CODE (c) != OMP_CLAUSE_DEPEND
 	  && OMP_CLAUSE_CODE (c) != OMP_CLAUSE_AFFINITY
-	  && TREE_CODE (TREE_CHAIN (t)) == TREE_LIST)
+	  && TREE_CODE (TREE_OPERAND (t, 0)) == OMP_ARRAY_SECTION)
 	{
 	  /* If any prior dimension has a non-one length, then deem this
 	     array section as non-contiguous.  */
-	  for (tree d = TREE_CHAIN (t); TREE_CODE (d) == TREE_LIST;
-	       d = TREE_CHAIN (d))
+	  for (tree d = TREE_OPERAND (t, 0);
+	       TREE_CODE (d) == OMP_ARRAY_SECTION;
+	       d = TREE_OPERAND (d, 0))
 	    {
-	      tree d_length = TREE_VALUE (d);
+	      tree d_length = TREE_OPERAND (d, 2);
 	      if (d_length == NULL_TREE || !integer_onep (d_length))
 		{
 		  error_at (OMP_CLAUSE_LOCATION (c),
@@ -14099,7 +14164,7 @@ handle_omp_array_sections_1 (tree c, tree t, vec<tree> &types,
   tree lb = save_expr (low_bound);
   if (lb != low_bound)
     {
-      TREE_PURPOSE (t) = lb;
+      TREE_OPERAND (t, 1) = lb;
       low_bound = lb;
     }
   ret = build_array_ref (OMP_CLAUSE_LOCATION (c), ret, low_bound);
@@ -14162,10 +14227,10 @@ handle_omp_array_sections (tree &c, enum c_omp_region_type ort)
 	maybe_zero_len = true;
 
       for (i = num, t = OMP_CLAUSE_DECL (c); i > 0;
-	   t = TREE_CHAIN (t))
+	   t = TREE_OPERAND (t, 0))
 	{
-	  tree low_bound = TREE_PURPOSE (t);
-	  tree length = TREE_VALUE (t);
+	  tree low_bound = TREE_OPERAND (t, 1);
+	  tree length = TREE_OPERAND (t, 2);
 
 	  i--;
 	  if (low_bound
@@ -14590,8 +14655,8 @@ c_oacc_check_attachments (tree c)
     {
       tree t = OMP_CLAUSE_DECL (c);
 
-      while (TREE_CODE (t) == TREE_LIST)
-	t = TREE_CHAIN (t);
+      while (TREE_CODE (t) == OMP_ARRAY_SECTION)
+	t = TREE_OPERAND (t, 0);
 
       if (TREE_CODE (TREE_TYPE (t)) != POINTER_TYPE)
 	{
@@ -14699,7 +14764,7 @@ c_finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 	case OMP_CLAUSE_TASK_REDUCTION:
 	  need_implicitly_determined = true;
 	  t = OMP_CLAUSE_DECL (c);
-	  if (TREE_CODE (t) == TREE_LIST)
+	  if (TREE_CODE (t) == OMP_ARRAY_SECTION)
 	    {
 	      if (handle_omp_array_sections (c, ort))
 		{
@@ -15320,7 +15385,7 @@ c_finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 	    }
 	  else
 	    last_iterators = NULL_TREE;
-	  if (TREE_CODE (t) == TREE_LIST)
+	  if (TREE_CODE (t) == OMP_ARRAY_SECTION)
 	    {
 	      if (handle_omp_array_sections (c, ort))
 		remove = true;
@@ -15430,7 +15495,7 @@ c_finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 	    auto_vec<omp_addr_token *, 10> addr_tokens;
 
 	    t = OMP_CLAUSE_DECL (c);
-	    if (TREE_CODE (t) == TREE_LIST)
+	    if (TREE_CODE (t) == OMP_ARRAY_SECTION)
 	      {
 		grp_start_p = pc;
 		grp_sentinel = OMP_CLAUSE_CHAIN (c);
@@ -15600,6 +15665,9 @@ c_finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 
 	    if (!VAR_P (t) && TREE_CODE (t) != PARM_DECL)
 	      {
+		if (ort != C_ORT_ACC && EXPR_P (t))
+		  break;
+
 		error_at (OMP_CLAUSE_LOCATION (c),
 			  "%qE is not a variable in %qs clause", t,
 			  omp_clause_code_name[OMP_CLAUSE_CODE (c)]);
@@ -15830,7 +15898,7 @@ c_finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 
 	case OMP_CLAUSE_HAS_DEVICE_ADDR:
 	  t = OMP_CLAUSE_DECL (c);
-	  if (TREE_CODE (t) == TREE_LIST)
+	  if (TREE_CODE (t) == OMP_ARRAY_SECTION)
 	    {
 	      if (handle_omp_array_sections (c, ort))
 		remove = true;

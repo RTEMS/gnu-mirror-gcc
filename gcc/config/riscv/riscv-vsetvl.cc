@@ -1,5 +1,5 @@
 /* VSETVL pass for RISC-V 'V' Extension for GNU compiler.
-   Copyright (C) 2022-2023 Free Software Foundation, Inc.
+   Copyright (C) 2022-2024 Free Software Foundation, Inc.
    Contributed by Juzhe Zhong (juzhe.zhong@rivai.ai), RiVAI Technologies Ltd.
 
 This file is part of GCC.
@@ -85,6 +85,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "predict.h"
 #include "profile-count.h"
 #include "gcse.h"
+#include "cfgloop.h"
 
 using namespace rtl_ssa;
 using namespace riscv_vector;
@@ -646,6 +647,27 @@ has_no_uses (basic_block cfg_bb, rtx_insn *rinsn, int regno)
       return false;
 
   return true;
+}
+
+/* Return true for the special block that we can't apply LCM optimization.  */
+static bool
+invalid_opt_bb_p (basic_block cfg_bb)
+{
+  edge e;
+  edge_iterator ei;
+
+  /* We don't do LCM optimizations on complex edges.  */
+  FOR_EACH_EDGE (e, ei, cfg_bb->preds)
+    if (e->flags & EDGE_COMPLEX)
+      return true;
+
+  /* We only do LCM optimizations on blocks that are post dominated by
+     EXIT block, that is, we don't do LCM optimizations on infinite loop.  */
+  FOR_EACH_EDGE (e, ei, cfg_bb->succs)
+    if (e->flags & EDGE_FAKE)
+      return true;
+
+  return false;
 }
 
 /* This flags indicates the minimum demand of the vl and vtype values by the
@@ -1646,7 +1668,7 @@ private:
   }
   inline void use_max_sew (vsetvl_info &prev, const vsetvl_info &next)
   {
-    auto max_sew = std::max (prev.get_sew (), next.get_sew ());
+    int max_sew = MAX (prev.get_sew (), next.get_sew ());
     prev.set_sew (max_sew);
     use_min_of_max_sew (prev, next);
   }
@@ -1680,7 +1702,7 @@ private:
   inline void use_max_sew_and_lmul_with_prev_ratio (vsetvl_info &prev,
 						    const vsetvl_info &next)
   {
-    auto max_sew = std::max (prev.get_sew (), next.get_sew ());
+    int max_sew = MAX (prev.get_sew (), next.get_sew ());
     prev.set_vlmul (calculate_vlmul (max_sew, prev.get_ratio ()));
     prev.set_sew (max_sew);
   }
@@ -2261,6 +2283,9 @@ public:
   {
     /* Initialization of RTL_SSA.  */
     calculate_dominance_info (CDI_DOMINATORS);
+    loop_optimizer_init (LOOPS_NORMAL);
+    /* Create FAKE edges for infinite loops.  */
+    connect_infinite_loops_to_exit ();
     df_analyze ();
     crtl->ssa = new function_info (cfun);
     m_vector_block_infos.safe_grow_cleared (last_basic_block_for_fn (cfun));
@@ -2271,6 +2296,7 @@ public:
   void finish ()
   {
     free_dominance_info (CDI_DOMINATORS);
+    loop_optimizer_finalize ();
     if (crtl->ssa->perform_pending_updates ())
       cleanup_cfg (0);
     delete crtl->ssa;
@@ -2785,14 +2811,11 @@ pre_vsetvl::compute_lcm_local_properties ()
   for (const bb_info *bb : crtl->ssa->bbs ())
     {
       unsigned bb_index = bb->index ();
-      edge e;
-      edge_iterator ei;
-      FOR_EACH_EDGE (e, ei, bb->cfg_bb ()->preds)
-	if (e->flags & EDGE_COMPLEX)
-	  {
-	    bitmap_clear (m_antloc[bb_index]);
-	    bitmap_clear (m_transp[bb_index]);
-	  }
+      if (invalid_opt_bb_p (bb->cfg_bb ()))
+	{
+	  bitmap_clear (m_antloc[bb_index]);
+	  bitmap_clear (m_transp[bb_index]);
+	}
     }
 }
 
@@ -2853,6 +2876,23 @@ pre_vsetvl::fuse_local_vsetvl_info ()
 		      curr_info.dump (dump_file, "        ");
 		      fprintf (dump_file, "\n");
 		    }
+		  /* Even though prev_info is available with curr_info,
+		     we need to update the MAX_SEW of prev_info since
+		     we don't check MAX_SEW in available_p check.
+
+		     prev_info:
+		     Demand fields: demand_ratio_and_ge_sew demand_avl
+		     SEW=16, VLMUL=mf4, RATIO=64, MAX_SEW=64
+
+		     curr_info:
+		     Demand fields: demand_ge_sew demand_non_zero_avl
+		     SEW=16, VLMUL=m1, RATIO=16, MAX_SEW=32
+
+		     In the example above, prev_info is available with
+		     curr_info, we need to update prev_info MAX_SEW from
+		     64 into 32.  */
+		  prev_info.set_max_sew (
+		    MIN (prev_info.get_max_sew (), curr_info.get_max_sew ()));
 		  if (!curr_info.vl_used_by_non_rvv_insn_p ()
 		      && vsetvl_insn_p (curr_info.get_insn ()->rtl ()))
 		    m_delete_list.safe_push (curr_info);
@@ -3305,6 +3345,10 @@ pre_vsetvl::emit_vsetvl ()
 {
   bool need_commit = false;
 
+  /* Fake edge is created by connect infinite loops to exit function.
+     We should commit vsetvl edge after fake edges removes, otherwise,
+     it will cause ICE.  */
+  remove_fake_exit_edges ();
   for (const bb_info *bb : crtl->ssa->bbs ())
     {
       for (const auto &curr_info : get_block_info (bb).local_infos)

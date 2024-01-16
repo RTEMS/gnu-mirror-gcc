@@ -1,5 +1,5 @@
 /* Definition of RISC-V target for GNU compiler.
-   Copyright (C) 2011-2023 Free Software Foundation, Inc.
+   Copyright (C) 2011-2024 Free Software Foundation, Inc.
    Contributed by Andrew Waterman (andrew@sifive.com).
    Based on MIPS target for GNU compiler.
 
@@ -633,6 +633,9 @@ enum reg_class
 #define UIMM_EXTRA_BIT_OPERAND(VALUE)					\
   (!SMALL_OPERAND (VALUE)						\
    && SMALL_OPERAND (VALUE & ~(HOST_WIDE_INT_1U << floor_log2 (VALUE))))
+
+/* True if bit BIT is set in VALUE.  */
+#define BITSET_P(VALUE, BIT) (((VALUE) & (1ULL << (BIT))) != 0)
 
 /* Stack layout; function entry, exit and calling.  */
 

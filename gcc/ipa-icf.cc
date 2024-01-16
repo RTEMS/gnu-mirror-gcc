@@ -1,5 +1,5 @@
 /* Interprocedural Identical Code Folding pass
-   Copyright (C) 2014-2023 Free Software Foundation, Inc.
+   Copyright (C) 2014-2024 Free Software Foundation, Inc.
 
    Contributed by Jan Hubicka <hubicka@ucw.cz> and Martin Liska <mliska@suse.cz>
 
@@ -3662,4 +3662,13 @@ ipa_opt_pass_d *
 make_pass_ipa_icf (gcc::context *ctxt)
 {
   return new ipa_icf::pass_ipa_icf (ctxt);
+}
+
+/* Reset all state within ipa-icf.cc so that we can rerun the compiler
+   within the same process.  For use by toplev::finalize.  */
+
+void
+ipa_icf_cc_finalize (void)
+{
+  ipa_icf::optimizer = NULL;
 }

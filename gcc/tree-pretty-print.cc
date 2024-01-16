@@ -1,5 +1,5 @@
 /* Pretty formatting of GENERIC trees in C syntax.
-   Copyright (C) 2001-2023 Free Software Foundation, Inc.
+   Copyright (C) 2001-2024 Free Software Foundation, Inc.
    Adapted from c-pretty-print.cc by Diego Novillo <dnovillo@redhat.com>
 
 This file is part of GCC.
@@ -2727,6 +2727,20 @@ dump_generic_node (pretty_printer *pp, tree node, int spc, dump_flags_t flags,
 	  dump_generic_node (pp, op1, spc, flags, false);
 	  pp_right_brace (pp);
 	}
+      break;
+
+    case OMP_ARRAY_SECTION:
+      op0 = TREE_OPERAND (node, 0);
+      if (op_prio (op0) < op_prio (node))
+	pp_left_paren (pp);
+      dump_generic_node (pp, op0, spc, flags, false);
+      if (op_prio (op0) < op_prio (node))
+	pp_right_paren (pp);
+      pp_left_bracket (pp);
+      dump_generic_node (pp, TREE_OPERAND (node, 1), spc, flags, false);
+      pp_colon (pp);
+      dump_generic_node (pp, TREE_OPERAND (node, 2), spc, flags, false);
+      pp_right_bracket (pp);
       break;
 
     case CONSTRUCTOR:

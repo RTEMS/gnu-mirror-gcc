@@ -1,5 +1,5 @@
 /* Subroutines used for code generation on IA-32.
-   Copyright (C) 1988-2023 Free Software Foundation, Inc.
+   Copyright (C) 1988-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -1640,7 +1640,7 @@ ix86_asm_output_function_label (FILE *out_file, const char *fname,
   SUBTARGET_ASM_UNWIND_INIT (out_file);
 #endif
 
-  ASM_OUTPUT_LABEL (out_file, fname);
+  assemble_function_label_raw (out_file, fname);
 
   /* Output magic byte marker, if hot-patch attribute is set.  */
   if (is_ms_hook)
@@ -16217,23 +16217,6 @@ ix86_dep_by_shift_count (const_rtx set_insn, const_rtx use_insn)
 {
   return ix86_dep_by_shift_count_body (PATTERN (set_insn),
 				       PATTERN (use_insn));
-}
-
-/* Return TRUE or FALSE depending on whether the unary operator meets the
-   appropriate constraints.  */
-
-bool
-ix86_unary_operator_ok (enum rtx_code,
-			machine_mode,
-			rtx operands[2],
-			bool use_ndd)
-{
-  /* If one of operands is memory, source and destination must match.  */
-  if ((MEM_P (operands[0])
-       || (!use_ndd && MEM_P (operands[1])))
-      && ! rtx_equal_p (operands[0], operands[1]))
-    return false;
-  return true;
 }
 
 /* Return TRUE if the operands to a vec_interleave_{high,low}v2df

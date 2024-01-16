@@ -1,5 +1,5 @@
 /* Name mangling for the 3.0 -*- C++ -*- ABI.
-   Copyright (C) 2000-2023 Free Software Foundation, Inc.
+   Copyright (C) 2000-2024 Free Software Foundation, Inc.
    Written by Alex Samuel <samuel@codesourcery.com>
 
    This file is part of GCC.
@@ -1231,9 +1231,9 @@ write_nested_name (const tree decl)
 
   write_char ('N');
 
-  /* Write CV-qualifiers, if this is a member function.  */
+  /* Write CV-qualifiers, if this is an iobj member function.  */
   if (TREE_CODE (decl) == FUNCTION_DECL
-      && DECL_NONSTATIC_MEMBER_FUNCTION_P (decl))
+      && DECL_IOBJ_MEMBER_FUNCTION_P (decl))
     {
       if (DECL_VOLATILE_MEMFUNC_P (decl))
 	write_char ('V');
@@ -1247,6 +1247,9 @@ write_nested_name (const tree decl)
 	    write_char ('R');
 	}
     }
+  else if (DECL_DECLARES_FUNCTION_P (decl)
+	   && DECL_XOBJ_MEMBER_FUNCTION_P (decl))
+    write_char ('H');
 
   /* Is this a template instance?  */
   if (tree info = maybe_template_info (decl))

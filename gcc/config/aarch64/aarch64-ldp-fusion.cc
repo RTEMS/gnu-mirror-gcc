@@ -1,5 +1,5 @@
 // LoadPair fusion optimization pass for AArch64.
-// Copyright (C) 2023 Free Software Foundation, Inc.
+// Copyright (C) 2023-2024 Free Software Foundation, Inc.
 //
 // This file is part of GCC.
 //
@@ -904,9 +904,11 @@ aarch64_operand_mode_for_pair_mode (machine_mode mode)
 // Go through the reg notes rooted at NOTE, dropping those that we should drop,
 // and preserving those that we want to keep by prepending them to (and
 // returning) RESULT.  EH_REGION is used to make sure we have at most one
-// REG_EH_REGION note in the resulting list.
+// REG_EH_REGION note in the resulting list.  FR_EXPR is used to return any
+// REG_FRAME_RELATED_EXPR note we find, as these can need special handling in
+// combine_reg_notes.
 static rtx
-filter_notes (rtx note, rtx result, bool *eh_region)
+filter_notes (rtx note, rtx result, bool *eh_region, rtx *fr_expr)
 {
   for (; note; note = XEXP (note, 1))
     {
@@ -940,6 +942,10 @@ filter_notes (rtx note, rtx result, bool *eh_region)
 				   copy_rtx (XEXP (note, 0)),
 				   result);
 	  break;
+	case REG_FRAME_RELATED_EXPR:
+	  gcc_assert (!*fr_expr);
+	  *fr_expr = copy_rtx (XEXP (note, 0));
+	  break;
 	default:
 	  // Unexpected REG_NOTE kind.
 	  gcc_unreachable ();
@@ -950,14 +956,49 @@ filter_notes (rtx note, rtx result, bool *eh_region)
 }
 
 // Return the notes that should be attached to a combination of I1 and I2, where
-// *I1 < *I2.
+// *I1 < *I2.  LOAD_P is true for loads.
 static rtx
-combine_reg_notes (insn_info *i1, insn_info *i2)
+combine_reg_notes (insn_info *i1, insn_info *i2, bool load_p)
 {
+  // Temporary storage for REG_FRAME_RELATED_EXPR notes.
+  rtx fr_expr[2] = {};
+
   bool found_eh_region = false;
   rtx result = NULL_RTX;
-  result = filter_notes (REG_NOTES (i2->rtl ()), result, &found_eh_region);
-  return filter_notes (REG_NOTES (i1->rtl ()), result, &found_eh_region);
+  result = filter_notes (REG_NOTES (i2->rtl ()), result,
+			 &found_eh_region, fr_expr);
+  result = filter_notes (REG_NOTES (i1->rtl ()), result,
+			 &found_eh_region, fr_expr + 1);
+
+  if (!load_p)
+    {
+      // Simple frame-related sp-relative saves don't need CFI notes, but when
+      // we combine them into an stp we will need a CFI note as dwarf2cfi can't
+      // interpret the unspec pair representation directly.
+      if (RTX_FRAME_RELATED_P (i1->rtl ()) && !fr_expr[0])
+	fr_expr[0] = copy_rtx (PATTERN (i1->rtl ()));
+      if (RTX_FRAME_RELATED_P (i2->rtl ()) && !fr_expr[1])
+	fr_expr[1] = copy_rtx (PATTERN (i2->rtl ()));
+    }
+
+  rtx fr_pat = NULL_RTX;
+  if (fr_expr[0] && fr_expr[1])
+    {
+      // Combining two frame-related insns, need to construct
+      // a REG_FRAME_RELATED_EXPR note which represents the combined
+      // operation.
+      RTX_FRAME_RELATED_P (fr_expr[1]) = 1;
+      fr_pat = gen_rtx_PARALLEL (VOIDmode,
+				 gen_rtvec (2, fr_expr[0], fr_expr[1]));
+    }
+  else
+    fr_pat = fr_expr[0] ? fr_expr[0] : fr_expr[1];
+
+  if (fr_pat)
+    result = alloc_reg_note (REG_FRAME_RELATED_EXPR,
+			     fr_pat, result);
+
+  return result;
 }
 
 // Given two memory accesses in PATS, at least one of which is of a
@@ -1049,6 +1090,14 @@ find_trailing_add (insn_info *insns[2],
 		   poly_int64 initial_offset,
 		   unsigned access_size)
 {
+  // Punt on frame-related insns, it is better to be conservative and
+  // not try to form writeback pairs here, and means we don't have to
+  // worry about the writeback case in forming REG_FRAME_RELATED_EXPR
+  // notes (see combine_reg_notes).
+  if ((insns[0] && RTX_FRAME_RELATED_P (insns[0]->rtl ()))
+      || RTX_FRAME_RELATED_P (insns[1]->rtl ()))
+    return nullptr;
+
   insn_info *pair_dst = pair_range.singleton ();
   gcc_assert (pair_dst);
 
@@ -1380,7 +1429,7 @@ ldp_bb_info::fuse_pair (bool load_p,
       return false;
     }
 
-  rtx reg_notes = combine_reg_notes (first, second);
+  rtx reg_notes = combine_reg_notes (first, second, load_p);
 
   rtx pair_pat;
   if (writeback_effect)
@@ -1987,6 +2036,19 @@ ldp_bb_info::try_fuse_pair (bool load_p, unsigned access_size,
       return false;
     }
 
+  // Punt on frame-related insns with writeback.  We probably won't see
+  // these in practice, but this is conservative and ensures we don't
+  // have to worry about these later on.
+  if (writeback && (RTX_FRAME_RELATED_P (i1->rtl ())
+		    || RTX_FRAME_RELATED_P (i2->rtl ())))
+    {
+      if (dump_file)
+	fprintf (dump_file,
+		 "rejecting pair (%d,%d): frame-related insn with writeback\n",
+		 i1->uid (), i2->uid ());
+      return false;
+    }
+
   rtx *ignore = &XEXP (pats[1], load_p);
   for (auto use : insns[1]->uses ())
     if (!use->is_mem ()
@@ -2194,6 +2256,15 @@ ldp_bb_info::try_fuse_pair (bool load_p, unsigned access_size,
     range.first = base->hazards[1];
   if (base->hazards[0])
     range.last = base->hazards[0]->prev_nondebug_insn ();
+
+  // If the second insn can throw, narrow the move range to exactly that insn.
+  // This prevents us trying to move the second insn from the end of the BB.
+  if (cfun->can_throw_non_call_exceptions
+      && find_reg_note (insns[1]->rtl (), REG_EH_REGION, NULL_RTX))
+    {
+      gcc_assert (range.includes (insns[1]));
+      range = insn_range_info (insns[1]);
+    }
 
   // Placement strategy: push loads down and pull stores up, this should
   // help register pressure by reducing live ranges.

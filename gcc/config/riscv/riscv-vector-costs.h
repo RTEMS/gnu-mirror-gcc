@@ -1,5 +1,5 @@
 /* Cost model declaration of RISC-V 'V' Extension for GNU compiler.
-   Copyright (C) 2023-2023 Free Software Foundation, Inc.
+   Copyright (C) 2023-2024 Free Software Foundation, Inc.
    Contributed by Juzhe Zhong (juzhe.zhong@rivai.ai), RiVAI Technologies Ltd.
 
    This file is part of GCC.
@@ -28,6 +28,7 @@ struct stmt_point
   /* Program point.  */
   unsigned int point;
   gimple *stmt;
+  stmt_vec_info stmt_info;
 };
 
 enum cost_type_enum
@@ -84,14 +85,19 @@ private:
   unsigned HOST_WIDE_INT m_unrolled_vls_niters = 0;
   unsigned HOST_WIDE_INT m_unrolled_vls_stmts = 0;
 
-  /* If we're vectorizing a loop that executes a constant number of times,
-     this variable gives the number of times that the vector loop would
-     iterate, otherwise it is zero.  */
-  uint64_t m_num_vector_iterations = 0;
-
   void analyze_loop_vinfo (loop_vec_info);
   void record_potential_vls_unrolling (loop_vec_info);
   bool prefer_unrolled_loop () const;
+
+  /* Analyze the vectorized program statements and compute the maximum live
+     V_REGS live at some program point if we enable dynamic LMUL cost model.
+
+     It's true when LMUL of loop vectorization factor > 1 and has unexpected
+     V_REGS spills according to the analysis.  */
+  bool m_has_unexpected_spills_p = false;
+  void record_potential_unexpected_spills (loop_vec_info);
+
+  void adjust_vect_cost_per_loop (loop_vec_info);
 };
 
 } // namespace riscv_vector
