@@ -102,6 +102,7 @@ struct riscv_address_info {
 };
 
 /* Routines implemented in riscv.cc.  */
+extern const char *riscv_asm_output_opcode (FILE *asm_out_file, const char *p);
 extern enum riscv_symbol_type riscv_classify_symbolic_expression (rtx);
 extern bool riscv_symbolic_constant_p (rtx, enum riscv_symbol_type *);
 extern int riscv_float_const_rtx_index_for_fli (rtx);
@@ -255,6 +256,8 @@ struct regmove_vector_cost
 {
   const int GR2VR;
   const int FR2VR;
+  const int VR2GR;
+  const int VR2FR;
 };
 
 /* Cost for vector insn classes.  */
@@ -739,6 +742,7 @@ extern void th_mempair_save_restore_regs (rtx[4], bool, machine_mode);
 extern unsigned int th_int_get_mask (unsigned int);
 extern unsigned int th_int_get_save_adjustment (void);
 extern rtx th_int_adjust_cfi_prologue (unsigned int);
+extern const char *th_asm_output_opcode (FILE *asm_out_file, const char *p);
 #ifdef RTX_CODE
 extern const char*
 th_mempair_output_move (rtx[4], bool, machine_mode, RTX_CODE);

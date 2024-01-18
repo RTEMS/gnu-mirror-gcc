@@ -130,7 +130,7 @@ avr_mcu_types[] =
 
 #ifndef IN_GEN_AVR_MMCU_TEXI
 
-static char*
+static char *
 avr_archs_str (void)
 {
   char *archs = concat ("", NULL);
@@ -144,13 +144,29 @@ avr_archs_str (void)
   return archs;
 }
 
-  
+
 void
 avr_inform_core_architectures (void)
 {
   char *archs = avr_archs_str ();
   inform (input_location, "supported core architectures:%s", archs);
   free (archs);
+}
+
+
+/* When MCU names a core arch like "avr5", then return a pointer to the
+   respective entry in avr_arch_types[].  Otherwise, return NULL.  */
+
+const avr_arch_t *
+avr_get_parch (const char *mcu)
+{
+  for (size_t i = 0; i < ARRAY_SIZE (avr_arch_types); ++i)
+    {
+      if (strcmp (mcu, avr_arch_types[i].name) == 0)
+	return & avr_arch_types[i];
+    }
+
+  return NULL;
 }
 
 #endif // IN_GEN_AVR_MMCU_TEXI

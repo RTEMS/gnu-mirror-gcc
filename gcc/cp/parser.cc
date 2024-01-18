@@ -25063,12 +25063,20 @@ cp_parser_type_id (cp_parser *parser, cp_parser_flags flags,
 static tree
 cp_parser_template_type_arg (cp_parser *parser)
 {
-  tree r;
   const char *saved_message = parser->type_definition_forbidden_message;
   parser->type_definition_forbidden_message
     = G_("types may not be defined in template arguments");
-  r = cp_parser_type_id_1 (parser, CP_PARSER_FLAGS_NONE, true, false, NULL);
+  tree r = cp_parser_type_id_1 (parser, CP_PARSER_FLAGS_NONE,
+				/*is_template_arg=*/true,
+				/*is_trailing_return=*/false, nullptr);
   parser->type_definition_forbidden_message = saved_message;
+  /* cp_parser_type_id_1 checks for auto, but only for
+     ->auto_is_implicit_function_template_parm_p.  */
+  if (cxx_dialect >= cxx14 && !flag_concepts_ts && type_uses_auto (r))
+    {
+      error ("invalid use of %<auto%> in template argument");
+      r = error_mark_node;
+    }
   return r;
 }
 
@@ -25706,6 +25714,25 @@ cp_parser_parameter_declaration (cp_parser *parser,
      for a C-style variadic function. */
   token = cp_lexer_peek_token (parser->lexer);
 
+  bool const xobj_param_p
+    = decl_spec_seq_has_spec_p (&decl_specifiers, ds_this);
+
+  if (xobj_param_p
+      && ((declarator && declarator->parameter_pack_p)
+	  || cp_lexer_next_token_is (parser->lexer, CPP_ELLIPSIS)))
+    {
+      location_t xobj_param
+	= make_location (decl_specifiers.locations[ds_this],
+			 decl_spec_token_start->location,
+			 input_location);
+      error_at (xobj_param,
+		"an explicit object parameter cannot "
+		"be a function parameter pack");
+      /* Suppress errors that occur down the line.  */
+      if (declarator)
+	declarator->parameter_pack_p = false;
+    }
+
   /* If a function parameter pack was specified and an implicit template
      parameter was introduced during cp_parser_parameter_declaration,
      change any implicit parameters introduced into packs.  */
@@ -25829,7 +25856,7 @@ cp_parser_parameter_declaration (cp_parser *parser,
   if (default_argument)
     STRIP_ANY_LOCATION_WRAPPER (default_argument);
 
-  if (decl_spec_seq_has_spec_p (&decl_specifiers, ds_this))
+  if (xobj_param_p)
     {
       if (default_argument)
 	{
@@ -35306,7 +35333,8 @@ static void
 cp_parser_check_access_in_redeclaration (tree decl, location_t location)
 {
   if (!decl
-      || (!CLASS_TYPE_P (TREE_TYPE (decl))
+      || (!(CLASS_TYPE_P (TREE_TYPE (decl))
+	    && !CLASSTYPE_TEMPLATE_SPECIALIZATION (TREE_TYPE (decl)))
 	  && TREE_CODE (TREE_TYPE (decl)) != ENUMERAL_TYPE))
     return;
 

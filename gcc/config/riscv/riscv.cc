@@ -395,6 +395,8 @@ static const scalable_vector_cost rvv_vla_vector_cost = {
 static const regmove_vector_cost rvv_regmove_vector_cost = {
   2, /* GR2VR  */
   2, /* FR2VR  */
+  2, /* VR2GR  */
+  2, /* VR2FR  */
 };
 
 /* Generic costs for vector insn classes.  It is supposed to be the vector cost
@@ -1424,6 +1426,9 @@ riscv_v_adjust_bytesize (machine_mode mode, int scale)
 {
   if (riscv_v_ext_vector_mode_p (mode))
     {
+      if (TARGET_XTHEADVECTOR)
+	return BYTES_PER_RISCV_VECTOR;
+
       poly_int64 nunits = GET_MODE_NUNITS (mode);
       poly_int64 mode_size = GET_MODE_SIZE (mode);
 
@@ -4863,59 +4868,6 @@ riscv_pass_fpr_pair (machine_mode mode, unsigned regno1,
 				   GEN_INT (offset2))));
 }
 
-/* Return true if a vector type is included in the type TYPE.  */
-
-static bool
-riscv_arg_has_vector (const_tree type)
-{
-  if (riscv_v_ext_mode_p (TYPE_MODE (type)))
-    return true;
-
-  if (!COMPLETE_TYPE_P (type))
-    return false;
-
-  switch (TREE_CODE (type))
-    {
-    case RECORD_TYPE:
-      /* If it is a record, it is further determined whether its fields have
-	 vector type.  */
-      for (tree f = TYPE_FIELDS (type); f; f = DECL_CHAIN (f))
-	if (TREE_CODE (f) == FIELD_DECL)
-	  {
-	    tree field_type = TREE_TYPE (f);
-	    if (!TYPE_P (field_type))
-	      break;
-
-	    if (riscv_arg_has_vector (field_type))
-	      return true;
-	  }
-      break;
-    case ARRAY_TYPE:
-      return riscv_arg_has_vector (TREE_TYPE (type));
-    default:
-      break;
-    }
-
-  return false;
-}
-
-/* Pass the type to check whether it's a vector type or contains vector type.
-   Only check the value type and no checking for vector pointer type.  */
-
-static void
-riscv_pass_in_vector_p (const_tree type)
-{
-  static int warned = 0;
-
-  if (type && riscv_vector::lookup_vector_type_attribute (type) && !warned)
-    {
-      warning (OPT_Wpsabi,
-	       "ABI for the vector type is currently in experimental stage and "
-	       "may changes in the upcoming version of GCC.");
-      warned = 1;
-    }
-}
-
 /* Initialize a variable CUM of type CUMULATIVE_ARGS
    for a call to a function whose data type is FNTYPE.
    For a library call, FNTYPE is 0.  */
@@ -4933,15 +4885,6 @@ riscv_init_cumulative_args (CUMULATIVE_ARGS *cum,
     cum->variant_cc = (riscv_cc) fntype_abi (fntype).id ();
   else
     cum->variant_cc = RISCV_CC_BASE;
-
-  if (fndecl)
-    {
-      const tree_function_decl &fn
-	= FUNCTION_DECL_CHECK (fndecl)->function_decl;
-
-      if (fn.built_in_class == NOT_BUILT_IN)
-	  cum->rvv_psabi_warning = 1;
-    }
 }
 
 /* Return true if TYPE is a vector type that can be passed in vector registers.
@@ -5057,12 +5000,6 @@ riscv_get_arg_info (struct riscv_arg_info *info, const CUMULATIVE_ARGS *cum,
   memset (info, 0, sizeof (*info));
   info->gpr_offset = cum->num_gprs;
   info->fpr_offset = cum->num_fprs;
-
-  if (cum->rvv_psabi_warning)
-    {
-      /* Only check existing of vector type.  */
-      riscv_pass_in_vector_p (type);
-    }
 
   /* When disable vector_abi or scalable vector argument is anonymous, this
      argument is passed by reference.  */
@@ -5241,17 +5178,7 @@ riscv_function_value (const_tree type, const_tree func, machine_mode mode)
 
   memset (&args, 0, sizeof args);
 
-  const_tree arg_type = type;
-  if (func && DECL_RESULT (func))
-    {
-      const tree_function_decl &fn = FUNCTION_DECL_CHECK (func)->function_decl;
-      if (fn.built_in_class == NOT_BUILT_IN)
-	args.rvv_psabi_warning = 1;
-
-      arg_type = TREE_TYPE (DECL_RESULT (func));
-    }
-
-  return riscv_get_arg_info (&info, &args, mode, arg_type, true, true);
+  return riscv_get_arg_info (&info, &args, mode, type, true, true);
 }
 
 /* Implement TARGET_PASS_BY_REFERENCE. */
@@ -5684,6 +5611,17 @@ riscv_get_v_regno_alignment (machine_mode mode)
   if (known_gt (size, UNITS_PER_V_REG))
     lmul = exact_div (size, UNITS_PER_V_REG).to_constant ();
   return lmul;
+}
+
+/* Define ASM_OUTPUT_OPCODE to do anything special before
+   emitting an opcode.  */
+const char *
+riscv_asm_output_opcode (FILE *asm_out_file, const char *p)
+{
+  if (TARGET_XTHEADVECTOR)
+     return th_asm_output_opcode (asm_out_file, p);
+
+  return p;
 }
 
 /* Implement TARGET_PRINT_OPERAND.  The RISCV-specific operand codes are:
@@ -8863,6 +8801,11 @@ riscv_override_options_internal (struct gcc_options *opts)
     sorry ("Current RISC-V GCC cannot support VLEN greater than 4096bit for "
 	   "'V' Extension");
 
+  /* FIXME: We don't support RVV in big-endian for now, we may enable RVV with
+     big-endian after finishing full coverage testing.  */
+  if (TARGET_VECTOR && TARGET_BIG_ENDIAN)
+    sorry ("Current RISC-V GCC cannot support RVV in big-endian mode");
+
   /* Convert -march to a chunks count.  */
   riscv_vector_chunks = riscv_convert_vector_bits (opts);
 }
@@ -10049,7 +9992,7 @@ riscv_use_divmod_expander (void)
 static machine_mode
 riscv_preferred_simd_mode (scalar_mode mode)
 {
-  if (TARGET_VECTOR)
+  if (TARGET_VECTOR && !TARGET_XTHEADVECTOR)
     return riscv_vector::preferred_simd_mode (mode);
 
   return word_mode;
@@ -10400,7 +10343,7 @@ riscv_mode_priority (int, int n)
 unsigned int
 riscv_autovectorize_vector_modes (vector_modes *modes, bool all)
 {
-  if (TARGET_VECTOR)
+  if (TARGET_VECTOR && !TARGET_XTHEADVECTOR)
     return riscv_vector::autovectorize_vector_modes (modes, all);
 
   return default_autovectorize_vector_modes (modes, all);
@@ -10522,7 +10465,7 @@ riscv_builtin_vectorization_cost (enum vect_cost_for_stmt type_of_cost,
       return fp ? common_costs->fp_stmt_cost : common_costs->int_stmt_cost;
 
     case vec_construct:
-      return estimated_poly_value (TYPE_VECTOR_SUBPARTS (vectype)) - 1;
+      return estimated_poly_value (TYPE_VECTOR_SUBPARTS (vectype));
 
     default:
       gcc_unreachable ();
@@ -10586,6 +10529,16 @@ extract_base_offset_in_addr (rtx mem, rtx *base, rtx *offset)
   *offset = NULL_RTX;
 
   return false;
+}
+
+/* Implements target hook vector_mode_supported_any_target_p.  */
+
+static bool
+riscv_vector_mode_supported_any_target_p (machine_mode mode)
+{
+  if (TARGET_XTHEADVECTOR)
+    return false;
+  return true;
 }
 
 /* Initialize the GCC target structure.  */
@@ -10930,6 +10883,9 @@ extract_base_offset_in_addr (rtx mem, rtx *base, rtx *offset)
 
 #undef TARGET_PREFERRED_ELSE_VALUE
 #define TARGET_PREFERRED_ELSE_VALUE riscv_preferred_else_value
+
+#undef TARGET_VECTOR_MODE_SUPPORTED_ANY_TARGET_P
+#define TARGET_VECTOR_MODE_SUPPORTED_ANY_TARGET_P riscv_vector_mode_supported_any_target_p
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

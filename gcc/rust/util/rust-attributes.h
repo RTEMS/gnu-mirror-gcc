@@ -15,6 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with GCC; see the file COPYING3.  If not see
 // <http://www.gnu.org/licenses/>.
+#ifndef RUST_ATTRIBUTES_H
+#define RUST_ATTRIBUTES_H
 
 #include "rust-ast.h"
 #include "rust-system.h"
@@ -113,6 +115,7 @@ private:
   // rust-expr.h
   void visit (AST::LiteralExpr &expr);
   void visit (AST::AttrInputLiteral &attr_input);
+  void visit (AST::AttrInputMacro &attr_input);
   void visit (AST::MetaItemLitExpr &meta_item);
   void visit (AST::MetaItemPathLit &meta_item);
   void visit (AST::BorrowExpr &expr);
@@ -160,12 +163,8 @@ private:
   void visit (AST::ForLoopExpr &expr);
   void visit (AST::IfExpr &expr);
   void visit (AST::IfExprConseqElse &expr);
-  void visit (AST::IfExprConseqIf &expr);
-  void visit (AST::IfExprConseqIfLet &expr);
   void visit (AST::IfLetExpr &expr);
   void visit (AST::IfLetExprConseqElse &expr);
-  void visit (AST::IfLetExprConseqIf &expr);
-  void visit (AST::IfLetExprConseqIfLet &expr);
   void visit (AST::MatchExpr &expr);
   void visit (AST::AwaitExpr &expr);
   void visit (AST::AsyncBlockExpr &expr);
@@ -174,7 +173,6 @@ private:
   void visit (AST::TypeParam &param);
   void visit (AST::LifetimeWhereClauseItem &item);
   void visit (AST::TypeBoundWhereClauseItem &item);
-  void visit (AST::Method &method);
   void visit (AST::Module &module);
   void visit (AST::ExternCrate &crate);
   void visit (AST::UseTreeGlob &use_tree);
@@ -200,6 +198,7 @@ private:
   void visit (AST::Trait &trait);
   void visit (AST::InherentImpl &impl);
   void visit (AST::TraitImpl &impl);
+  void visit (AST::ExternalTypeItem &item);
   void visit (AST::ExternalStaticItem &item);
   void visit (AST::ExternalFunctionItem &item);
   void visit (AST::ExternBlock &block);
@@ -221,6 +220,7 @@ private:
   void visit (AST::LiteralPattern &pattern);
   void visit (AST::IdentifierPattern &pattern);
   void visit (AST::WildcardPattern &pattern);
+  void visit (AST::RestPattern &pattern);
   // void visit(RangePatternBound& bound);
   void visit (AST::RangePatternBoundLiteral &bound);
   void visit (AST::RangePatternBoundPath &bound);
@@ -247,8 +247,7 @@ private:
   // rust-stmt.h
   void visit (AST::EmptyStmt &stmt);
   void visit (AST::LetStmt &stmt);
-  void visit (AST::ExprStmtWithoutBlock &stmt);
-  void visit (AST::ExprStmtWithBlock &stmt);
+  void visit (AST::ExprStmt &stmt);
 
   // rust-type.h
   void visit (AST::TraitBound &bound);
@@ -265,7 +264,12 @@ private:
   void visit (AST::SliceType &type);
   void visit (AST::InferredType &type);
   void visit (AST::BareFunctionType &type);
+  void visit (AST::FunctionParam &param);
+  void visit (AST::VariadicParam &param);
+  void visit (AST::SelfParam &param);
 };
 
 } // namespace Analysis
 } // namespace Rust
+
+#endif /* ! RUST_ATTRIBUTES_H */
