@@ -15827,6 +15827,7 @@ instructions, but allow the compiler to schedule those calls.
 * NDS32 Built-in Functions::
 * Nvidia PTX Built-in Functions::
 * Basic PowerPC Built-in Functions::
+* PowerPC Vector Pair Built-in Functions::
 * PowerPC AltiVec/VSX Built-in Functions::
 * PowerPC Hardware Transactional Memory Built-in Functions::
 * PowerPC Atomic Memory Operation Functions::
@@ -23856,6 +23857,90 @@ int vec_any_le (vector signed __int128, vector signed __int128);
 int vec_any_le (vector unsigned __int128, vector unsigned __int128);
 @end smallexample
 
+
+@node PowerPC Vector Pair Built-in Functions
+@subsection PowerPC Vector Pair Built-in Functions
+
+GCC provides functions to speed up processing by using the type
+@code{__vector_pair} to hold two 128-bit vectors on processors that
+support ISA 3.1 (power10).  The @code{__vector_pair} type and the
+vector pair built-in functions require the MMA instruction set
+(@option{-mmma}) to be enabled, which is on by default for
+@option{-mcpu=power10}.
+
+By default, @code{__vector_pair} types are loaded into vectors with a
+single load vector pair instruction.  The processing for the built-in
+function is done as two separate vector instructions on each of the
+two 128-bit vectors stored in the vector pair.  The
+@code{__vector_pair} type is usually stored with a single vector pair
+store instruction.
+
+The @code{nabs} built-in is a combination of @code{neg} and
+@code{abs}.
+
+The @code{fms} built-in is a combination of @code{fma} and @code{neg}
+of the third element.
+
+The @code{nfma} built-in is a combination of @code{neg} of the
+@code{fma} built-in.
+
+The @code{nfms} built-in is a combination of @code{neg} of the
+@code{fms} built-in.
+
+The following built-in function is independent on the type of the
+underlying vector:
+
+@smallexample
+__vector_pair __builtin_vpair_zero ();
+@end smallexample
+
+The following built-in functions operate on pairs of
+@code{vector float} values:
+
+@smallexample
+__vector_pair __builtin_vpair_f32_abs (__vector_pair);
+__vector_pair __builtin_vpair_f32_add (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f32_div (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f32_fma (__vector_pair, __vector_pair,
+                                       __vector_pair);
+__vector_pair __builtin_vpair_f32_fms (__vector_pair, __vector_pair,
+                                       __vector_pair);
+__vector_pair __builtin_vpair_f32_max (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f32_min (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f32_mul (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f32_nabs (__vector_pair);
+__vector_pair __builtin_vpair_f32_neg (__vector_pair);
+__vector_pair __builtin_vpair_f32_nfma (__vector_pair, __vector_pair,
+                                       __vector_pair);
+__vector_pair __builtin_vpair_f32_nfms (__vector_pair, __vector_pair,
+                                       __vector_pair);
+__vector_pair __builtin_vpair_f32_splat (float);
+__vector_pair __builtin_vpair_f32_sub (__vector_pair, __vector_pair);
+@end smallexample
+
+The following built-in functions operate on pairs of
+@code{vector double} values:
+
+@smallexample
+__vector_pair __builtin_vpair_f64_abs (__vector_pair);
+__vector_pair __builtin_vpair_f64_add (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f64_div (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f64_fma (__vector_pair, __vector_pair,
+                                       __vector_pair);
+__vector_pair __builtin_vpair_f64_fms (__vector_pair, __vector_pair,
+                                       __vector_pair);
+__vector_pair __builtin_vpair_f64_max (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f64_min (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f64_mul (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f64_nabs (__vector_pair);
+__vector_pair __builtin_vpair_f64_neg (__vector_pair);
+__vector_pair __builtin_vpair_f64_nfma (__vector_pair, __vector_pair,
+                                       __vector_pair);
+__vector_pair __builtin_vpair_f64_nfms (__vector_pair, __vector_pair,
+                                       __vector_pair);
+__vector_pair __builtin_vpair_f64_splat (double);
+__vector_pair __builtin_vpair_f64_sub (__vector_pair, __vector_pair);
+@end smallexample
 
 @node PowerPC Hardware Transactional Memory Built-in Functions
 @subsection PowerPC Hardware Transactional Memory Built-in Functions
