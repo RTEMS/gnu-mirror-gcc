@@ -35,6 +35,11 @@ rs6000-p8swap.o: $(srcdir)/config/rs6000/rs6000-p8swap.cc
 	$(COMPILE) $<
 	$(POSTCOMPILE)
 
+rs6000-vecload-opt.o: $(srcdir)/config/rs6000/rs6000-vecload-opt.cc
+	$(COMPILE) $<
+	$(POSTCOMPILE)
+
+
 rs6000-d.o: $(srcdir)/config/rs6000/rs6000-d.cc
 	$(COMPILE) $<
 	$(POSTCOMPILE)

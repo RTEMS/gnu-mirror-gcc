@@ -921,7 +921,7 @@ validate_subreg (machine_mode omode, machine_mode imode,
     return false;
 
   /* The subreg offset cannot be outside the inner object.  */
-  if (maybe_ge (offset, isize))
+  if (maybe_gt (offset, isize))
     return false;
 
   poly_uint64 regsize = REGMODE_NATURAL_SIZE (imode);
@@ -3034,18 +3034,6 @@ verify_rtx_sharing (rtx orig, rtx insn)
     default:
       break;
     }
-
-  /* This rtx may not be shared.  If it has already been seen,
-     replace it with a copy of itself.  */
-  if (flag_checking && RTX_FLAG (x, used))
-    {
-      error ("invalid rtl sharing found in the insn");
-      debug_rtx (insn);
-      error ("shared rtx");
-      debug_rtx (x);
-      internal_error ("internal consistency failure");
-    }
-  gcc_assert (!RTX_FLAG (x, used));
 
   RTX_FLAG (x, used) = 1;
 

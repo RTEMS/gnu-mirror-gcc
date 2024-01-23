@@ -1178,6 +1178,7 @@ static bool rs6000_secondary_reload_move (enum rs6000_reg_type,
 					  secondary_reload_info *,
 					  bool);
 rtl_opt_pass *make_pass_analyze_swaps (gcc::context*);
+rtl_opt_pass *make_pass_analyze_vecload (gcc::context*);
 
 /* Hash table stuff for keeping track of TOC entries.  */
 
