@@ -48,6 +48,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
  * separately to minimize code size.
  */
 
+#include "aarch64-asm.h"
 #include "auto-target.h"
 
 /* Tell the assembler to accept LSE instructions.  */
@@ -58,7 +59,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #endif
 
 /* Declare the symbol gating the LSE implementations.  */
-	.hidden	__aarch64_have_lse_atomics
+	HIDDEN(__aarch64_have_lse_atomics)
 
 /* Turn size and memory model defines into mnemonic fragments.  */
 #if SIZE == 1
@@ -168,8 +169,8 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 	.text
 	.balign	16
 	.globl	\name
-	.hidden	\name
-	.type	\name, %function
+	HIDDEN(\name)
+	SYMBOL_TYPE(\name, %function)
 	.cfi_startproc
 \name:
 	BTI_C
@@ -177,7 +178,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 .macro	ENDFN name
 	.cfi_endproc
-	.size	\name, . - \name
+	SYMBOL_SIZE(\name)
 .endm
 
 /* Branch to LABEL if LSE is disabled.  */
