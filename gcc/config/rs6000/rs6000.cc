@@ -4410,6 +4410,16 @@ rs6000_option_override_internal (bool global_init_p)
       rs6000_isa_flags &= ~OPTION_MASK_PCREL;
     }
 
+
+  /* -mpaddis requires -mcpu=future.  */
+  if (TARGET_PADDIS && !TARGET_FUTURE)
+    {
+      if (OPTION_SET_P (TARGET_PADDIS))
+	error ("%qs requires %qs", "-mpaddis", "-mcpu=future");
+
+      TARGET_PADDIS = 0;
+    }
+
   /* Print the options after updating the defaults.  */
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
     rs6000_print_isa_options (stderr, 0, "after defaults", rs6000_isa_flags);
@@ -6239,6 +6249,17 @@ num_insns_constant_gpr (HOST_WIDE_INT value)
   else if (TARGET_PREFIXED && SIGNED_INTEGER_34BIT_P (value))
     return 1;
 
+  /* PADDIS support.  */
+  else if (TARGET_PADDIS && TARGET_POWERPC64
+	   && !IN_RANGE (value >> 32, -1, 0)
+	   && (SIGNED_INTEGER_32BIT_P (value >> 32)))
+    {
+      fprintf (stderr, "=== 0x%lx ===\n", (long)value);
+      return ((value & HOST_WIDE_INT_C (0xffffffff)) == 0
+	      ? 1
+	      : 2);
+    }
+
   else if (TARGET_POWERPC64)
     {
       int num_insns = 0;
@@ -6259,6 +6280,14 @@ num_insns_constant_multi (HOST_WIDE_INT value, machine_mode mode)
 {
   int nregs = (GET_MODE_SIZE (mode) + UNITS_PER_WORD - 1) / UNITS_PER_WORD;
   int total = 0;
+  if (nregs == 1
+      && TARGET_PADDIS && TARGET_POWERPC64
+      && !IN_RANGE (value >> 32, -1, 0)
+      && SIGNED_INTEGER_32BIT_P (value >> 32))
+    return ((value & HOST_WIDE_INT_C (0xffffffff)) == 0
+	    ? 1
+	    : 2);
+
   while (nregs-- > 0)
     {
       HOST_WIDE_INT low = sext_hwi (value, BITS_PER_WORD);
@@ -14330,6 +14359,14 @@ print_operand (FILE *file, rtx x, int code)
 	output_operand_lossage ("invalid %%A value");
       else
 	fprintf (file, "%d", (REGNO (x) - FIRST_FPR_REGNO) / 4);
+      return;
+
+    case 'B':
+      /* Upper 32-bits of a constant.  */
+      if (!CONST_INT_P (x))
+	output_operand_lossage ("Not a constant.");
+
+      fprintf (file, "%" HOST_LONG_FORMAT "d", INTVAL (x) >> 32);
       return;
 
     case 'D':
@@ -24858,6 +24895,9 @@ static struct rs6000_opt_var const rs6000_opt_vars[] =
   { "speculate-indirect-jumps",
     offsetof (struct gcc_options, x_rs6000_speculate_indirect_jumps),
     offsetof (struct cl_target_option, x_rs6000_speculate_indirect_jumps), },
+  { "paddis",
+    offsetof (struct gcc_options, x_TARGET_PADDIS),
+    offsetof (struct cl_target_option, x_TARGET_PADDIS), },
 };
 
 /* Inner function to handle attribute((target("..."))) and #pragma GCC target
