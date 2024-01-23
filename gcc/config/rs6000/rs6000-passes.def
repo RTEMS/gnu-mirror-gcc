@@ -28,6 +28,9 @@ along with GCC; see the file COPYING3.  If not see
      The power8 does not have instructions that automaticaly do the byte swaps
      for loads and stores.  */
   INSERT_PASS_BEFORE (pass_cse, 1, pass_analyze_swaps);
+  /* Pass to replace adjacent memory addresses lxv instruction with lxvp
+     instruction.  */
+  INSERT_PASS_BEFORE (pass_early_remat, 1, pass_analyze_vecload);
 
   /* Pass to do the PCREL_OPT optimization that combines the load of an
      external symbol's address along with a single load or store using that
