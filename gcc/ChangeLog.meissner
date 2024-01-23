@@ -42,7 +42,7 @@ the trunk?
 It would be nice if I could apply it to the open branches.  Can I backport it
 after a burn-in period?
 
-2024-01-10  Michael Meissner  <meissner@linux.ibm.com>
+2024-01-23  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -111,7 +111,7 @@ systems doing the normal bootstrap and test.  There were no regressions in any
 of the tests, and the new tests passed.  Can I check this patch into the master
 branch?
 
-2024-01-09  Michael Meissner  <meissner@linux.ibm.com>
+2024-01-23  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -145,7 +145,7 @@ gcc/testsuite/
 
 Add ChangeLog.meissner and REVISION.
 
-2024-01-09  Michael Meissner  <meissner@linux.ibm.com>
+2024-01-23  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
