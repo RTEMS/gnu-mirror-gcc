@@ -4873,11 +4873,7 @@ riscv_pass_fpr_pair (machine_mode mode, unsigned regno1,
    For a library call, FNTYPE is 0.  */
 
 void
-riscv_init_cumulative_args (CUMULATIVE_ARGS *cum,
-			    tree fntype ATTRIBUTE_UNUSED,
-			    rtx libname ATTRIBUTE_UNUSED,
-			    tree fndecl,
-			    int caller ATTRIBUTE_UNUSED)
+riscv_init_cumulative_args (CUMULATIVE_ARGS *cum, tree fntype, rtx, tree, int)
 {
   memset (cum, 0, sizeof (*cum));
 
@@ -8798,13 +8794,13 @@ riscv_override_options_internal (struct gcc_options *opts)
 
      We can only allow TARGET_MIN_VLEN * 8 (LMUL) < 65535.  */
   if (TARGET_MIN_VLEN_OPTS (opts) > 4096)
-    sorry ("Current RISC-V GCC cannot support VLEN greater than 4096bit for "
+    sorry ("Current RISC-V GCC does not support VLEN greater than 4096bit for "
 	   "'V' Extension");
 
   /* FIXME: We don't support RVV in big-endian for now, we may enable RVV with
      big-endian after finishing full coverage testing.  */
   if (TARGET_VECTOR && TARGET_BIG_ENDIAN)
-    sorry ("Current RISC-V GCC cannot support RVV in big-endian mode");
+    sorry ("Current RISC-V GCC does not support RVV in big-endian mode");
 
   /* Convert -march to a chunks count.  */
   riscv_vector_chunks = riscv_convert_vector_bits (opts);
@@ -10534,7 +10530,7 @@ extract_base_offset_in_addr (rtx mem, rtx *base, rtx *offset)
 /* Implements target hook vector_mode_supported_any_target_p.  */
 
 static bool
-riscv_vector_mode_supported_any_target_p (machine_mode mode)
+riscv_vector_mode_supported_any_target_p (machine_mode)
 {
   if (TARGET_XTHEADVECTOR)
     return false;

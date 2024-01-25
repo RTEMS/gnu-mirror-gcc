@@ -7221,6 +7221,10 @@ aarch64_function_arg_boundary (machine_mode mode, const_tree type)
 static fixed_size_mode
 aarch64_get_reg_raw_mode (int regno)
 {
+  /* Don't use any non GP registers for __builtin_apply and
+     __builtin_return if general registers only mode is requested. */
+  if (TARGET_GENERAL_REGS_ONLY && !GP_REGNUM_P (regno))
+    return as_a <fixed_size_mode> (VOIDmode);
   if (TARGET_SVE && FP_REGNUM_P (regno))
     /* Don't use the SVE part of the register for __builtin_apply and
        __builtin_return.  The SVE registers aren't used by the normal PCS,
@@ -28620,7 +28624,8 @@ aarch64_simd_clone_compute_vecsize_and_simdlen (struct cgraph_node *node,
   if (known_eq (clonei->simdlen, 0U))
     {
       simdlen = exact_div (poly_uint64 (64), nds_elt_bits);
-      simdlens.safe_push (simdlen);
+      if (maybe_ne (simdlen, 1U))
+	simdlens.safe_push (simdlen);
       simdlens.safe_push (simdlen * 2);
     }
   else

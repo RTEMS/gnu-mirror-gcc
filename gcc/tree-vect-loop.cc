@@ -991,8 +991,13 @@ vec_init_loop_exit_info (class loop *loop)
 	{
 	  tree may_be_zero = niter_desc.may_be_zero;
 	  if ((integer_zerop (may_be_zero)
-	       || integer_nonzerop (may_be_zero)
-	       || COMPARISON_CLASS_P (may_be_zero))
+	       /* As we are handling may_be_zero that's not false by
+		  rewriting niter to may_be_zero ? 0 : niter we require
+		  an empty latch.  */
+	       || (single_pred_p (loop->latch)
+		   && exit->src == single_pred (loop->latch)
+		   && (integer_nonzerop (may_be_zero)
+		       || COMPARISON_CLASS_P (may_be_zero))))
 	      && (!candidate
 		  || dominated_by_p (CDI_DOMINATORS, exit->src,
 				     candidate->src)))
@@ -5892,25 +5897,26 @@ vect_create_partial_epilog (tree vec_def, tree vectype, code_helper code,
 }
 
 /* Retrieves the definining statement to be used for a reduction.
-   For MAIN_EXIT_P we use the current VEC_STMTs and otherwise we look at
-   the reduction definitions.  */
+   For LAST_VAL_REDUC_P we use the current VEC_STMTs which correspond to the
+   final value after vectorization and otherwise we look at the reduction
+   definitions to get the first.  */
 
 tree
 vect_get_vect_def (stmt_vec_info reduc_info, slp_tree slp_node,
-		   slp_instance slp_node_instance, bool main_exit_p, unsigned i,
-		   vec <gimple *> &vec_stmts)
+		   slp_instance slp_node_instance, bool last_val_reduc_p,
+		   unsigned i, vec <gimple *> &vec_stmts)
 {
   tree def;
 
   if (slp_node)
     {
-      if (!main_exit_p)
+      if (!last_val_reduc_p)
         slp_node = slp_node_instance->reduc_phis;
       def = vect_get_slp_vect_def (slp_node, i);
     }
   else
     {
-      if (!main_exit_p)
+      if (!last_val_reduc_p)
 	reduc_info = STMT_VINFO_REDUC_DEF (vect_orig_stmt (reduc_info));
       vec_stmts = STMT_VINFO_VEC_STMTS (reduc_info);
       def = gimple_get_lhs (vec_stmts[0]);
@@ -5982,7 +5988,8 @@ vect_create_epilog_for_reduction (loop_vec_info loop_vinfo,
      loop-closed PHI of the inner loop which we remember as
      def for the reduction PHI generation.  */
   bool double_reduc = false;
-  bool main_exit_p = LOOP_VINFO_IV_EXIT (loop_vinfo) == loop_exit;
+  bool last_val_reduc_p = LOOP_VINFO_IV_EXIT (loop_vinfo) == loop_exit
+			  && !LOOP_VINFO_EARLY_BREAKS_VECT_PEELED (loop_vinfo);
   stmt_vec_info rdef_info = stmt_info;
   if (STMT_VINFO_DEF_TYPE (stmt_info) == vect_double_reduction_def)
     {
@@ -6017,7 +6024,6 @@ vect_create_epilog_for_reduction (loop_vec_info loop_vinfo,
   int j, i;
   vec<tree> &scalar_results = reduc_info->reduc_scalar_results;
   unsigned int group_size = 1, k;
-  auto_vec<gimple *> phis;
   /* SLP reduction without reduction chain, e.g.,
      # a1 = phi <a2, a0>
      # b1 = phi <b2, b0>
@@ -6233,7 +6239,7 @@ vect_create_epilog_for_reduction (loop_vec_info loop_vinfo,
     {
       gimple_seq stmts = NULL;
       def = vect_get_vect_def (rdef_info, slp_node, slp_node_instance,
-			       main_exit_p, i, vec_stmts);
+			       last_val_reduc_p, i, vec_stmts);
       for (j = 0; j < ncopies; j++)
 	{
 	  tree new_def = copy_ssa_name (def);
@@ -6930,12 +6936,12 @@ vect_create_epilog_for_reduction (loop_vec_info loop_vinfo,
           use <s_out4> */
 
   gcc_assert (live_out_stmts.size () == scalar_results.length ());
+  auto_vec<gimple *> phis;
   for (k = 0; k < live_out_stmts.size (); k++)
     {
       stmt_vec_info scalar_stmt_info = vect_orig_stmt (live_out_stmts[k]);
       scalar_dest = gimple_get_lhs (scalar_stmt_info->stmt);
 
-      phis.create (3);
       /* Find the loop-closed-use at the loop exit of the original scalar
          result.  (The reduction result is expected to have two immediate uses,
          one at the latch block, and one at the loop exit).  For double
@@ -6988,7 +6994,7 @@ vect_create_epilog_for_reduction (loop_vec_info loop_vinfo,
 	    }
         }
 
-      phis.release ();
+      phis.truncate (0);
     }
 }
 
@@ -10710,18 +10716,6 @@ vectorizable_live_operation_1 (loop_vec_info loop_vinfo,
   return new_tree;
 }
 
-/* Find the edge that's the final one in the path from SRC to DEST and
-   return it.  This edge must exist in at most one forwarder edge between.  */
-
-static edge
-find_connected_edge (edge src, basic_block dest)
-{
-   if (src->dest == dest)
-     return src;
-
-  return find_edge (src->dest, dest);
-}
-
 /* Function vectorizable_live_operation.
 
    STMT_INFO computes a value that is used outside the loop.  Check if
@@ -10964,13 +10958,8 @@ vectorizable_live_operation (vec_info *vinfo, stmt_vec_info stmt_info,
 	    {
 	      edge e = gimple_phi_arg_edge (as_a <gphi *> (use_stmt),
 					   phi_arg_index_from_use (use_p));
-	      bool main_exit_edge = e == main_e
-				    || find_connected_edge (main_e, e->src);
-
-	      /* Early exits have an merge block, we want the merge block itself
-		 so use ->src.  For main exit the merge block is the
-		 destination.  */
-	      basic_block dest = main_exit_edge ? main_e->dest : e->src;
+	      gcc_assert (loop_exit_edge_p (loop, e));
+	      bool main_exit_edge = e == main_e;
 	      tree tmp_vec_lhs = vec_lhs;
 	      tree tmp_bitstart = bitstart;
 
@@ -10988,22 +10977,18 @@ vectorizable_live_operation (vec_info *vinfo, stmt_vec_info stmt_info,
 	      gimple_stmt_iterator exit_gsi;
 	      tree new_tree
 		= vectorizable_live_operation_1 (loop_vinfo, stmt_info,
-						 dest, vectype, ncopies,
+						 e->dest, vectype, ncopies,
 						 slp_node, bitsize,
 						 tmp_bitstart, tmp_vec_lhs,
 						 lhs_type, &exit_gsi);
 
-	      if (gimple_phi_num_args (use_stmt) == 1)
-		{
-		  auto gsi = gsi_for_stmt (use_stmt);
-		  remove_phi_node (&gsi, false);
-		  tree lhs_phi = gimple_phi_result (use_stmt);
-		  gimple *copy = gimple_build_assign (lhs_phi, new_tree);
-		  gsi_insert_before (&exit_gsi, copy, GSI_SAME_STMT);
-		}
-	      else
-		SET_PHI_ARG_DEF (use_stmt, e->dest_idx, new_tree);
-	  }
+	      auto gsi = gsi_for_stmt (use_stmt);
+	      remove_phi_node (&gsi, false);
+	      tree lhs_phi = gimple_phi_result (use_stmt);
+	      gimple *copy = gimple_build_assign (lhs_phi, new_tree);
+	      gsi_insert_before (&exit_gsi, copy, GSI_SAME_STMT);
+	      break;
+	    }
 
       /* There a no further out-of-loop uses of lhs by LC-SSA construction.  */
       FOR_EACH_IMM_USE_STMT (use_stmt, imm_iter, lhs)

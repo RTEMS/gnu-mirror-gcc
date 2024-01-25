@@ -96,8 +96,6 @@ static const riscv_implied_info_t riscv_implied_info[] =
   {"zks", "zksed"},
   {"zks", "zksh"},
 
-  {"ztso", "a"},
-
   {"v", "zvl128b"},
   {"v", "zve64d"},
 
@@ -278,6 +276,9 @@ static const struct riscv_ext_version riscv_ext_version_table[] =
   {"zicboz",ISA_SPEC_CLASS_NONE, 1, 0},
   {"zicbom",ISA_SPEC_CLASS_NONE, 1, 0},
   {"zicbop",ISA_SPEC_CLASS_NONE, 1, 0},
+
+  {"zicntr", ISA_SPEC_CLASS_NONE, 2, 0},
+  {"zihpm",  ISA_SPEC_CLASS_NONE, 2, 0},
 
   {"zk",    ISA_SPEC_CLASS_NONE, 1, 0},
   {"zkn",   ISA_SPEC_CLASS_NONE, 1, 0},
@@ -971,24 +972,36 @@ riscv_subset_list::parsing_subset_version (const char *ext,
   return p;
 }
 
-/* Parsing function for standard extensions.
+/* Parsing function for base extensions, rv[32|64][i|e|g]
 
    Return Value:
-     Points to the end of extensions.
+     Points to the end of extensions, return NULL if any error.
 
    Arguments:
      `p`: Current parsing position.  */
-
 const char *
-riscv_subset_list::parse_std_ext (const char *p)
+riscv_subset_list::parse_base_ext (const char *p)
 {
-  const char *all_std_exts = riscv_supported_std_ext ();
-  const char *std_exts = all_std_exts;
-
   unsigned major_version = 0;
   unsigned minor_version = 0;
-  char std_ext = '\0';
   bool explicit_version_p = false;
+
+  if (startswith (p, "rv32"))
+    {
+      m_xlen = 32;
+      p += 4;
+    }
+  else if (startswith (p, "rv64"))
+    {
+      m_xlen = 64;
+      p += 4;
+    }
+  else
+    {
+      error_at (m_loc, "%<-march=%s%>: ISA string must begin with rv32 or rv64",
+		m_arch);
+      return NULL;
+    }
 
   /* First letter must start with i, e or g.  */
   switch (*p)
@@ -1044,51 +1057,6 @@ riscv_subset_list::parse_std_ext (const char *p)
 		"%<i%> or %<g%>", m_arch);
       return NULL;
     }
-
-  while (p != NULL && *p)
-    {
-      char subset[2] = {0, 0};
-
-      if (*p == 'x' || *p == 's' || *p == 'z')
-	break;
-
-      if (*p == '_')
-	{
-	  p++;
-	  continue;
-	}
-
-      std_ext = *p;
-
-      /* Checking canonical order.  */
-      const char *prior_std_exts = std_exts;
-
-      while (*std_exts && std_ext != *std_exts)
-	std_exts++;
-
-      subset[0] = std_ext;
-      if (std_ext != *std_exts && standard_extensions_p (subset))
-	{
-	  error_at (m_loc,
-		    "%<-march=%s%>: ISA string is not in canonical order. "
-		    "%<%c%>",
-		    m_arch, *p);
-	  /* Extension ordering is invalid.  Ignore this extension and keep
-	     searching for other issues with remaining extensions.  */
-	  std_exts = prior_std_exts;
-	  p++;
-	  continue;
-	}
-
-      std_exts++;
-
-      p++;
-
-      p = parsing_subset_version (subset, p, &major_version, &minor_version,
-				  /* std_ext_p= */ true, &explicit_version_p);
-
-      add (subset, major_version, minor_version, explicit_version_p, false);
-    }
   return p;
 }
 
@@ -1098,10 +1066,12 @@ riscv_subset_list::parse_std_ext (const char *p)
      Points to the end of extensions.
 
    Arguments:
-     `p`: Current parsing position.  */
+     `p`: Current parsing position.
+     `exact_single_p`: True if input string is exactly an extension and end
+     with '\0'.  */
 
 const char *
-riscv_subset_list::parse_single_std_ext (const char *p)
+riscv_subset_list::parse_single_std_ext (const char *p, bool exact_single_p)
 {
   if (*p == 'x' || *p == 's' || *p == 'z')
     {
@@ -1109,6 +1079,11 @@ riscv_subset_list::parse_single_std_ext (const char *p)
 		"%<-march=%s%>: Not single-letter extension. "
 		"%<%c%>",
 		m_arch, *p);
+      return nullptr;
+    }
+
+  if (exact_single_p && strlen (p) > 1)
+    {
       return nullptr;
     }
 
@@ -1271,13 +1246,16 @@ riscv_subset_list::check_conflict_ext ()
    Arguments:
      `p`: Current parsing position.
      `ext_type`: What kind of extensions, 's', 'z' or 'x'.
-     `ext_type_str`: Full name for kind of extension.  */
+     `ext_type_str`: Full name for kind of extension.
+     `exact_single_p`: True if input string is exactly an extension and end
+     with '\0'.   */
 
 
 const char *
 riscv_subset_list::parse_single_multiletter_ext (const char *p,
 						 const char *ext_type,
-						 const char *ext_type_str)
+						 const char *ext_type_str,
+						 bool exact_single_p)
 {
   unsigned major_version = 0;
   unsigned minor_version = 0;
@@ -1289,12 +1267,24 @@ riscv_subset_list::parse_single_multiletter_ext (const char *p,
   char *subset = xstrdup (p);
   const char *end_of_version;
   bool explicit_version_p = false;
+  char *q = subset;
   char *ext;
   char backup;
   size_t len = strlen (p);
   size_t end_of_version_pos, i;
   bool found_any_number = false;
   bool found_minor_version = false;
+
+  if (!exact_single_p)
+    {
+      /* Extension may not ended with '\0', may come with another extension
+	 which concat by '_' */
+      /* Parse until end of this extension including version number.  */
+      while (*++q != '\0' && *q != '_')
+	;
+
+      len = q - subset;
+    }
 
   end_of_version_pos = len;
   /* Find the begin of version string.  */
@@ -1362,139 +1352,32 @@ riscv_subset_list::parse_single_multiletter_ext (const char *p,
 
 }
 
-/* Parsing function for multi-letter extensions.
-
-   Return Value:
-     Points to the end of extensions.
-
-   Arguments:
-     `p`: Current parsing position.
-     `ext_type`: What kind of extensions, 's', 'z' or 'x'.
-     `ext_type_str`: Full name for kind of extension.  */
-
-const char *
-riscv_subset_list::parse_multiletter_ext (const char *p,
-					  const char *ext_type,
-					  const char *ext_type_str)
-{
-  unsigned major_version = 0;
-  unsigned minor_version = 0;
-  size_t ext_type_len = strlen (ext_type);
-
-  while (*p)
-    {
-      if (*p == '_')
-	{
-	  p++;
-	  continue;
-	}
-
-      if (strncmp (p, ext_type, ext_type_len) != 0)
-	break;
-
-      char *subset = xstrdup (p);
-      char *q = subset;
-      const char *end_of_version;
-      bool explicit_version_p = false;
-      char *ext;
-      char backup;
-      size_t len;
-      size_t end_of_version_pos, i;
-      bool found_any_number = false;
-      bool found_minor_version = false;
-
-      /* Parse until end of this extension including version number.  */
-      while (*++q != '\0' && *q != '_')
-	;
-
-      backup = *q;
-      *q = '\0';
-      len = q - subset;
-      *q = backup;
-
-      end_of_version_pos = len;
-      /* Find the begin of version string.  */
-      for (i = len -1; i > 0; --i)
-	{
-	  if (ISDIGIT (subset[i]))
-	    {
-	      found_any_number = true;
-	      continue;
-	    }
-	  /* Might be version seperator, but need to check one more char,
-	     we only allow <major>p<minor>, so we could stop parsing if found
-	     any more `p`.  */
-	  if (subset[i] == 'p' &&
-	      !found_minor_version &&
-	      found_any_number && ISDIGIT (subset[i-1]))
-	    {
-	      found_minor_version = true;
-	      continue;
-	    }
-
-	  end_of_version_pos = i + 1;
-	  break;
-	}
-
-      backup = subset[end_of_version_pos];
-      subset[end_of_version_pos] = '\0';
-      ext = xstrdup (subset);
-      subset[end_of_version_pos] = backup;
-
-      end_of_version
-	= parsing_subset_version (ext, subset + end_of_version_pos, &major_version, &minor_version,
-				  /* std_ext_p= */ false, &explicit_version_p);
-      free (ext);
-
-      if (end_of_version == NULL)
-	return NULL;
-
-      subset[end_of_version_pos] = '\0';
-
-      if (strlen (subset) == 1)
-	{
-	  error_at (m_loc, "%<-march=%s%>: name of %s must be more than 1 letter",
-		    m_arch, ext_type_str);
-	  free (subset);
-	  return NULL;
-	}
-
-      add (subset, major_version, minor_version, explicit_version_p, false);
-      p += end_of_version - subset;
-      free (subset);
-
-      if (*p != '\0' && *p != '_')
-	{
-	  error_at (m_loc, "%<-march=%s%>: %s must separate with %<_%>",
-		    m_arch, ext_type_str);
-	  return NULL;
-	}
-    }
-
-  return p;
-}
-
 /* Parsing function for a single-letter or multi-letter extensions.
 
    Return Value:
      Points to the end of extensions.
 
    Arguments:
-     `p`: Current parsing position.  */
+     `p`: Current parsing position.
+     `exact_single_p`: True if input string is exactly an extension and end
+     with '\0'.  */
 
 const char *
-riscv_subset_list::parse_single_ext (const char *p)
+riscv_subset_list::parse_single_ext (const char *p, bool exact_single_p)
 {
   switch (p[0])
     {
     case 'x':
-      return parse_single_multiletter_ext (p, "x", "non-standard extension");
+      return parse_single_multiletter_ext (p, "x", "non-standard extension",
+					   exact_single_p);
     case 'z':
-      return parse_single_multiletter_ext (p, "z", "sub-extension");
+      return parse_single_multiletter_ext (p, "z", "sub-extension",
+					   exact_single_p);
     case 's':
-      return parse_single_multiletter_ext (p, "s", "supervisor extension");
+      return parse_single_multiletter_ext (p, "s", "supervisor extension",
+					   exact_single_p);
     default:
-      return parse_single_std_ext (p);
+      return parse_single_std_ext (p, exact_single_p);
     }
 }
 
@@ -1509,53 +1392,30 @@ riscv_subset_list::parse (const char *arch, location_t loc)
   riscv_subset_list *subset_list = new riscv_subset_list (arch, loc);
   riscv_subset_t *itr;
   const char *p = arch;
-  if (startswith (p, "rv32"))
-    {
-      subset_list->m_xlen = 32;
-      p += 4;
-    }
-  else if (startswith (p, "rv64"))
-    {
-      subset_list->m_xlen = 64;
-      p += 4;
-    }
-  else
-    {
-      error_at (loc, "%<-march=%s%>: ISA string must begin with rv32 or rv64",
-		arch);
-      goto fail;
-    }
-
-  /* Parsing standard extension.  */
-  p = subset_list->parse_std_ext (p);
-
+  p = subset_list->parse_base_ext (p);
   if (p == NULL)
     goto fail;
 
-  /* Parsing sub-extensions.  */
-  p = subset_list->parse_multiletter_ext (p, "z", "sub-extension");
-
-  if (p == NULL)
-    goto fail;
-
-  /* Parsing supervisor extension.  */
-  p = subset_list->parse_multiletter_ext (p, "s", "supervisor extension");
-
-  if (p == NULL)
-    goto fail;
-
-  /* Parsing non-standard extension.  */
-  p = subset_list->parse_multiletter_ext (p, "x", "non-standard extension");
-
-  if (p == NULL)
-    goto fail;
-
-  if (*p != '\0')
+  while (p && *p)
     {
-      error_at (loc, "%<-march=%s%>: unexpected ISA string at end: %qs",
-               arch, p);
-      goto fail;
+      switch (*p)
+	{
+	case '_':
+	  ++p;
+	  continue;
+	case 'e':
+	case 'i':
+	case 'g':
+	  error_at (loc, "%<-march=%s%>: i, e or g must be the first extension",
+		    arch);
+	  goto fail;
+	default:
+	  p = subset_list->parse_single_ext (p, /*exact_single_p=*/ false);
+	}
     }
+
+  if (p == NULL)
+    goto fail;
 
   for (itr = subset_list->m_head; itr != NULL; itr = itr->next)
     {
