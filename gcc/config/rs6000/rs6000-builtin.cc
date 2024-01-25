@@ -178,8 +178,6 @@ rs6000_builtin_is_supported (enum rs6000_gen_builtins fncode)
       return TARGET_POWER10;
     case ENB_P10_64:
       return TARGET_POWER10 && TARGET_POWERPC64;
-    case ENB_P11:
-      return TARGET_POWER11;
     case ENB_ALTIVEC:
       return TARGET_ALTIVEC;
     case ENB_VSX:
@@ -2495,7 +2493,6 @@ static const struct
   const char *cpu;
   unsigned int cpuid;
 } cpu_is_info[] = {
-  { "power11",	   PPC_PLATFORM_POWER11 },
   { "power10",	   PPC_PLATFORM_POWER10 },
   { "power9",	   PPC_PLATFORM_POWER9 },
   { "power8",	   PPC_PLATFORM_POWER8 },
