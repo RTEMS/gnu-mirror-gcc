@@ -233,6 +233,7 @@ enum bif_stanza
  BSTZ_P10,
  BSTZ_P10_64,
  BSTZ_MMA,
+ BSTZ_P11,
  NUMBIFSTANZAS
 };
 
@@ -266,7 +267,8 @@ static stanza_entry stanza_map[NUMBIFSTANZAS] =
     { "htm",		BSTZ_HTM	},
     { "power10",	BSTZ_P10	},
     { "power10-64",	BSTZ_P10_64	},
-    { "mma",		BSTZ_MMA	}
+    { "mma",		BSTZ_MMA	},
+    { "power11",	BSTZ_P11	},
   };
 
 static const char *enable_string[NUMBIFSTANZAS] =
@@ -291,7 +293,8 @@ static const char *enable_string[NUMBIFSTANZAS] =
     "ENB_HTM",
     "ENB_P10",
     "ENB_P10_64",
-    "ENB_MMA"
+    "ENB_MMA",
+    "ENB_P11"
   };
 
 /* Function modifiers provide special handling for const, pure, and fpmath
@@ -2257,6 +2260,7 @@ write_decls (void)
   fprintf (header_file, "  ENB_HTM,\n");
   fprintf (header_file, "  ENB_P10,\n");
   fprintf (header_file, "  ENB_P10_64,\n");
+  fprintf (header_file, "  ENB_P11,\n");
   fprintf (header_file, "  ENB_MMA\n");
   fprintf (header_file, "};\n\n");
 
