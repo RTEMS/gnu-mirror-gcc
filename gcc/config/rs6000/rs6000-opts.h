@@ -63,6 +63,9 @@ enum processor_type
    PROCESSOR_POWER9,
    PROCESSOR_POWER10,
 
+   /* We do not define PROCESSOR_POWER11, since GCC does not have differences
+      in code generation from power10.  */
+
    PROCESSOR_RS64A,
    PROCESSOR_MPCCORE,
    PROCESSOR_CELL,
