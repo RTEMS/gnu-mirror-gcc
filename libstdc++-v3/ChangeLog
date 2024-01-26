@@ -1,3 +1,103 @@
+2024-01-11  Ken Matsui  <kmatsui@gcc.gnu.org>
+
+	Backported from master:
+	2024-01-11  Ken Matsui  <kmatsui@gcc.gnu.org>
+
+	PR libstdc++/113250
+	* src/c++17/fs_ops.cc (fs::equivalent): Use || instead of &&.
+	* src/filesystem/ops.cc (fs::equivalent): Likewise.
+	* testsuite/27_io/filesystem/operations/equivalent.cc: Handle
+	error codes.
+	* testsuite/experimental/filesystem/operations/equivalent.cc:
+	Likewise.
+
+2024-01-03  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-01-03  Patrick Palka  <ppalka@redhat.com>
+
+	PR testsuite/113175
+	* testsuite/std/ranges/iota/max_size_type.cc (test02): Reduce
+	'limit' to 100 from 1000 and adjust 'log2_limit' accordingly.
+	(test03): Likewise.
+
+2023-12-17  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-10-13  Jakub Jelinek  <jakub@redhat.com>
+
+	* testsuite/tr1/8_c_compatibility/cstdio/functions.cc (test01):
+	Initialize stream to va_arg(ap, FILE*) rather than 0.
+	* testsuite/tr1/8_c_compatibility/cwchar/functions.cc (test01):
+	Likewise.
+
+2023-12-06  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2021-11-01  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/debug/stl_iterator.h (__valid_range): Add constexpr
+	for C++20. Qualify call to avoid ADL.
+	(__get_distance, __can_advance, __unsafe, __base): Likewise.
+	* testsuite/25_algorithms/move/constexpr.cc: Also check with
+	std::reverse_iterator arguments.
+
+2023-12-06  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2023-11-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/112314
+	* include/std/string_view (string_view::remove_suffix): Add
+	debug assertion.
+	* testsuite/21_strings/basic_string_view/modifiers/remove_prefix/debug.cc:
+	New test.
+	* testsuite/21_strings/basic_string_view/modifiers/remove_suffix/debug.cc:
+	New test.
+
+2023-12-06  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2023-11-17  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/utility (in_range): Rename _Up parameter to _Res.
+
+2023-11-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2023-11-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/112491
+	* python/libstdcxx/v6/xmethods.py (DequeWorkerBase.index):
+	Correctly handle unused capacity at the start of the first node.
+	* testsuite/libstdc++-xmethods/deque.cc: Check index operator
+	when elements have been removed from the front.
+
+2023-11-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2023-11-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/112491
+	* python/libstdcxx/v6/xmethods.py (DequeWorkerBase.size): Fix
+	calculation to use _M_start._M_cur.
+	* testsuite/libstdc++-xmethods/deque.cc: Check failing cases.
+
+2023-11-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2023-09-28  Jonathan Wakely  <jwakely@redhat.com>
+
+	* python/libstdcxx/v6/printers.py: Break long lines. Use raw
+	strings for regular expressions. Add whitespace around
+	operators.
+	(is_member_of_namespace): Use isinstance to check type.
+	(is_specialization_of): Likewise. Adjust template_name
+	for versioned namespace instead of duplicating the re.match
+	call.
+	(StdExpAnyPrinter._string_types): New static method.
+	(StdExpAnyPrinter.to_string): Use _string_types.
+
 2023-10-04  Jonathan Wakely  <jwakely@redhat.com>
 
 	* testsuite/20_util/integer_comparisons/greater_equal_neg.cc:

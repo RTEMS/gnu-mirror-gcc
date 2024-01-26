@@ -8058,10 +8058,11 @@ ix86_elim_entry_set_got (rtx reg)
       rtx pat = PATTERN (c_insn);
       if (GET_CODE (pat) == PARALLEL)
 	{
-	  rtx vec = XVECEXP (pat, 0, 0);
-	  if (GET_CODE (vec) == SET
-	      && XINT (XEXP (vec, 1), 1) == UNSPEC_SET_GOT
-	      && REGNO (XEXP (vec, 0)) == REGNO (reg))
+	  rtx set = XVECEXP (pat, 0, 0);
+	  if (GET_CODE (set) == SET
+	      && GET_CODE (SET_SRC (set)) == UNSPEC
+	      && XINT (SET_SRC (set), 1) == UNSPEC_SET_GOT
+	      && REGNO (SET_DEST (set)) == REGNO (reg))
 	    delete_insn (c_insn);
 	}
     }
@@ -14119,8 +14120,12 @@ ix86_avx_u128_mode_needed (rtx_insn *insn)
 	 modes wider than 256 bits.  It's only safe to issue a
 	 vzeroupper if all SSE registers are clobbered.  */
       const function_abi &abi = insn_callee_abi (insn);
-      if (!hard_reg_set_subset_p (reg_class_contents[SSE_REGS],
-				  abi.mode_clobbers (V4DImode)))
+      /* Should be safe to issue an vzeroupper before sibling_call_p.
+	 Also there not mode_exit for sibling_call, so there could be
+	 missing vzeroupper for that.  */
+      if (!(SIBLING_CALL_P (insn)
+	    || hard_reg_set_subset_p (reg_class_contents[SSE_REGS],
+				      abi.mode_clobbers (V4DImode))))
 	return AVX_U128_ANY;
 
       return AVX_U128_CLEAN;
@@ -14244,7 +14249,19 @@ ix86_avx_u128_mode_after (int mode, rtx_insn *insn)
       bool avx_upper_reg_found = false;
       note_stores (insn, ix86_check_avx_upper_stores, &avx_upper_reg_found);
 
-      return avx_upper_reg_found ? AVX_U128_DIRTY : AVX_U128_CLEAN;
+      if (avx_upper_reg_found)
+	return AVX_U128_DIRTY;
+
+      /* If the function desn't clobber any sse registers or only clobber
+	 128-bit part, Then vzeroupper isn't issued before the function exit.
+	 the status not CLEAN but ANY after the function.  */
+      const function_abi &abi = insn_callee_abi (insn);
+      if (!(SIBLING_CALL_P (insn)
+	    || hard_reg_set_subset_p (reg_class_contents[SSE_REGS],
+				      abi.mode_clobbers (V4DImode))))
+	return AVX_U128_ANY;
+
+      return AVX_U128_CLEAN;
     }
 
   /* Otherwise, return current mode.  Remember that if insn
@@ -19635,10 +19652,13 @@ ix86_vec_cost (machine_mode mode, int cost)
 
   if (GET_MODE_BITSIZE (mode) == 128
       && TARGET_SSE_SPLIT_REGS)
-    return cost * 2;
-  if (GET_MODE_BITSIZE (mode) > 128
+    return cost * GET_MODE_BITSIZE (mode) / 64;
+  else if (GET_MODE_BITSIZE (mode) > 128
       && TARGET_AVX256_SPLIT_REGS)
     return cost * GET_MODE_BITSIZE (mode) / 128;
+  else if (GET_MODE_BITSIZE (mode) > 256
+      && TARGET_AVX512_SPLIT_REGS)
+    return cost * GET_MODE_BITSIZE (mode) / 256;
   return cost;
 }
 
@@ -22049,12 +22069,14 @@ ix86_reassociation_width (unsigned int op, machine_mode mode)
       /* Integer vector instructions execute in FP unit
 	 and can execute 3 additions and one multiplication per cycle.  */
       if ((ix86_tune == PROCESSOR_ZNVER1 || ix86_tune == PROCESSOR_ZNVER2
-	   || ix86_tune == PROCESSOR_ZNVER3)
+	   || ix86_tune == PROCESSOR_ZNVER3 || ix86_tune == PROCESSOR_ZNVER4)
    	  && INTEGRAL_MODE_P (mode) && op != PLUS && op != MINUS)
 	return 1;
 
       /* Account for targets that splits wide vectors into multiple parts.  */
-      if (TARGET_AVX256_SPLIT_REGS && GET_MODE_BITSIZE (mode) > 128)
+      if (TARGET_AVX512_SPLIT_REGS && GET_MODE_BITSIZE (mode) > 256)
+	div = GET_MODE_BITSIZE (mode) / 256;
+      else if (TARGET_AVX256_SPLIT_REGS && GET_MODE_BITSIZE (mode) > 128)
 	div = GET_MODE_BITSIZE (mode) / 128;
       else if (TARGET_SSE_SPLIT_REGS && GET_MODE_BITSIZE (mode) > 64)
 	div = GET_MODE_BITSIZE (mode) / 64;
