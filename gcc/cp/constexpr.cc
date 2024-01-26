@@ -9080,8 +9080,9 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
       if (now && want_rval)
 	{
 	  tree type = TREE_TYPE (t);
-	  if ((processing_template_decl && !COMPLETE_TYPE_P (type))
-	      || dependent_type_p (type)
+	  if (dependent_type_p (type)
+	      || !COMPLETE_TYPE_P (processing_template_decl
+				   ? type : complete_type (type))
 	      || is_really_empty_class (type, /*ignore_vptr*/false))
 	    /* An empty class has no data to read.  */
 	    return true;
@@ -9207,7 +9208,12 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
 	  }
 	else if (fun)
           {
-	    if (RECUR (fun, FUNCTION_POINTER_TYPE_P (fun) ? rval : any))
+	    if (TREE_TYPE (fun)
+		&& FUNCTION_POINTER_TYPE_P (TREE_TYPE (fun)))
+	      want_rval = rval;
+	    else
+	      want_rval = any;
+	    if (RECUR (fun, want_rval))
 	      /* Might end up being a constant function pointer.  But it
 		 could also be a function object with constexpr op(), so
 		 we pass 'any' so that the underlying VAR_DECL is deemed
@@ -9282,7 +9288,7 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
 	  return RECUR (DECL_VALUE_EXPR (t), rval);
 	}
       if (want_rval
-	  && !var_in_maybe_constexpr_fn (t)
+	  && (now || !var_in_maybe_constexpr_fn (t))
 	  && !type_dependent_expression_p (t)
 	  && !decl_maybe_constant_var_p (t)
 	  && (strict
@@ -9396,7 +9402,7 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
         STRIP_NOPS (x);
         if (is_this_parameter (x) && !is_capture_proxy (x))
 	  {
-	    if (!var_in_maybe_constexpr_fn (x))
+	    if (now || !var_in_maybe_constexpr_fn (x))
 	      {
 		if (flags & tf_error)
 		  constexpr_error (loc, fundef_p, "use of %<this%> in a "

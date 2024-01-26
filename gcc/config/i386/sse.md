@@ -4961,7 +4961,10 @@
 	    (match_operand:VF1_AVX2 1 "register_operand") 0)
 	  (match_dup 2)))]
   "TARGET_SSE2"
-  "operands[2] = GEN_INT (GET_MODE_UNIT_BITSIZE (<MODE>mode)-1);")
+{
+  operands[1] = force_reg (<MODE>mode, operands[1]);
+  operands[2] = GEN_INT (GET_MODE_UNIT_BITSIZE (<MODE>mode)-1);
+})
 
 ;; Also define scalar versions.  These are used for abs, neg, and
 ;; conditional move.  Using subregs into vector modes causes register
@@ -16635,7 +16638,7 @@
 	     (match_dup 4))]
 	     UNSPEC_BLENDV))]
 {
-  if (INTVAL (operands[5]) == 1)
+  if (INTVAL (operands[5]) == 5)
     std::swap (operands[1], operands[2]);
   operands[3] = gen_lowpart (<MODE>mode, operands[3]);
 })
@@ -16665,7 +16668,7 @@
 	     (match_dup 4))]
 	     UNSPEC_BLENDV))]
 {
-  if (INTVAL (operands[5]) == 1)
+  if (INTVAL (operands[5]) == 5)
     std::swap (operands[1], operands[2]);
 })
 

@@ -2106,10 +2106,24 @@ gfc_conv_missing_dummy (gfc_se * se, gfc_expr * arg, gfc_typespec ts, int kind)
 
   if (ts.type == BT_CHARACTER)
     {
-      tmp = build_int_cst (gfc_charlen_type_node, 0);
-      tmp = fold_build3_loc (input_location, COND_EXPR, gfc_charlen_type_node,
-			     present, se->string_length, tmp);
-      tmp = gfc_evaluate_now (tmp, &se->pre);
+      /* Handle deferred-length dummies that pass the character length by
+	 reference so that the value can be returned.  */
+      if (ts.deferred && INDIRECT_REF_P (se->string_length))
+	{
+	  tmp = gfc_build_addr_expr (NULL_TREE, se->string_length);
+	  tmp = fold_build3_loc (input_location, COND_EXPR, TREE_TYPE (tmp),
+				 present, tmp, null_pointer_node);
+	  tmp = gfc_evaluate_now (tmp, &se->pre);
+	  tmp = build_fold_indirect_ref_loc (input_location, tmp);
+	}
+      else
+	{
+	  tmp = build_int_cst (gfc_charlen_type_node, 0);
+	  tmp = fold_build3_loc (input_location, COND_EXPR,
+				 gfc_charlen_type_node,
+				 present, se->string_length, tmp);
+	  tmp = gfc_evaluate_now (tmp, &se->pre);
+	}
       se->string_length = tmp;
     }
   return;
@@ -6919,7 +6933,9 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
 					     INTENT_IN, fsym->attr.pointer);
 		}
 	      else if (fsym && fsym->attr.contiguous
-		       && !gfc_is_simply_contiguous (e, false, true)
+		       && (fsym->attr.target
+			   ? gfc_is_not_contiguous (e)
+			   : !gfc_is_simply_contiguous (e, false, true))
 		       && gfc_expr_is_variable (e))
 		{
 		  gfc_conv_subref_array_arg (&parmse, e, nodesc_arg,
@@ -10213,11 +10229,36 @@ gfc_trans_pointer_assignment (gfc_expr * expr1, gfc_expr * expr2)
 	}
 
       if (expr1->ts.type == BT_CHARACTER
-	  && expr1->symtree->n.sym->ts.deferred
-	  && expr1->symtree->n.sym->ts.u.cl->backend_decl
-	  && VAR_P (expr1->symtree->n.sym->ts.u.cl->backend_decl))
+	  && expr1->ts.deferred)
 	{
-	  tmp = expr1->symtree->n.sym->ts.u.cl->backend_decl;
+	  gfc_symbol *psym = expr1->symtree->n.sym;
+	  tmp = NULL_TREE;
+	  if (psym->ts.type == BT_CHARACTER)
+	    {
+	      gcc_assert (psym->ts.u.cl->backend_decl
+			  && VAR_P (psym->ts.u.cl->backend_decl));
+	      tmp = psym->ts.u.cl->backend_decl;
+	    }
+	  else if (expr1->ts.u.cl->backend_decl
+		   && VAR_P (expr1->ts.u.cl->backend_decl))
+	    tmp = expr1->ts.u.cl->backend_decl;
+	  else if (TREE_CODE (lse.expr) == COMPONENT_REF)
+	    {
+	      gfc_ref *ref = expr1->ref;
+	      for (;ref; ref = ref->next)
+		{
+		  if (ref->type == REF_COMPONENT
+		      && ref->u.c.component->ts.type == BT_CHARACTER
+		      && gfc_deferred_strlen (ref->u.c.component, &tmp))
+		    tmp = fold_build3_loc (input_location, COMPONENT_REF,
+					   TREE_TYPE (tmp),
+					   TREE_OPERAND (lse.expr, 0),
+					   tmp, NULL_TREE);
+		}
+	    }
+
+	  gcc_assert (tmp);
+
 	  if (expr2->expr_type != EXPR_NULL)
 	    gfc_add_modify (&block, tmp,
 			    fold_convert (TREE_TYPE (tmp), strlen_rhs));

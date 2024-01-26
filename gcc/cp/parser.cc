@@ -23334,6 +23334,19 @@ cp_parser_direct_declarator (cp_parser* parser,
 	      /* Consume the `)'.  */
 	      parens.require_close (parser);
 
+	      /* For code like
+		  int x(auto(42));
+		  A a(auto(i), 42);
+		 we have synthesized an implicit template parameter and marked
+		 what we thought was a function as an implicit function template.
+		 But now, having seen the whole parameter list, we know it's not
+		 a function declaration, so undo that.  */
+	      if (cp_parser_error_occurred (parser)
+		  && parser->fully_implicit_function_template_p
+		  /* Don't do this for the inner ().  */
+		  && parser->default_arg_ok_p)
+		abort_fully_implicit_template (parser);
+
 	      /* If all went well, parse the cv-qualifier-seq,
 		 ref-qualifier and the exception-specification.  */
 	      if (member_p || cp_parser_parse_definitely (parser))
@@ -49128,7 +49141,7 @@ cp_parser_pragma_unroll (cp_parser *parser, cp_token *pragma_tok)
   location_t location = cp_lexer_peek_token (parser->lexer)->location;
   tree expr = cp_parser_constant_expression (parser);
   unsigned short unroll;
-  expr = maybe_constant_value (expr);
+  expr = fold_non_dependent_expr (expr);
   HOST_WIDE_INT lunroll = 0;
   if (!INTEGRAL_TYPE_P (TREE_TYPE (expr))
       || TREE_CODE (expr) != INTEGER_CST

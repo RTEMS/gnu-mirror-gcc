@@ -3685,24 +3685,15 @@ pop:
 	 ???  We could relax this and handle arbitrary live stmts by
 	 forcing a scalar epilogue for example.  */
       imm_use_iterator imm_iter;
+      use_operand_p use_p;
       gimple *op_use_stmt;
       unsigned cnt = 0;
       FOR_EACH_IMM_USE_STMT (op_use_stmt, imm_iter, op.ops[opi])
 	if (!is_gimple_debug (op_use_stmt)
 	    && (*code != ERROR_MARK
 		|| flow_bb_inside_loop_p (loop, gimple_bb (op_use_stmt))))
-	  {
-	    /* We want to allow x + x but not x < 1 ? x : 2.  */
-	    if (is_gimple_assign (op_use_stmt)
-		&& gimple_assign_rhs_code (op_use_stmt) == COND_EXPR)
-	      {
-		use_operand_p use_p;
-		FOR_EACH_IMM_USE_ON_STMT (use_p, imm_iter)
-		  cnt++;
-	      }
-	    else
-	      cnt++;
-	  }
+	  FOR_EACH_IMM_USE_ON_STMT (use_p, imm_iter)
+	    cnt++;
       if (cnt != 1)
 	{
 	  fail = true;
@@ -8728,13 +8719,26 @@ vect_peel_nonlinear_iv_init (gimple_seq* stmts, tree init_expr,
       {
 	tree utype = unsigned_type_for (type);
 	init_expr = gimple_convert (stmts, utype, init_expr);
-	unsigned skipn = TREE_INT_CST_LOW (skip_niters);
+	wide_int skipn = wi::to_wide (skip_niters);
 	wide_int begin = wi::to_wide (step_expr);
-	for (unsigned i = 0; i != skipn - 1; i++)
-	  begin = wi::mul (begin, wi::to_wide (step_expr));
+	mpz_t base, exp, mod, res;
+	mpz_init (base);
+	mpz_init (mod);
+	mpz_init (exp);
+	mpz_init (res);
+	wi::to_mpz (begin, base, TYPE_SIGN (type));
+	wi::to_mpz (skipn, exp, UNSIGNED);
+	mpz_ui_pow_ui (mod, 2, TYPE_PRECISION (type));
+	mpz_powm (res, base, exp, mod);
+	begin = wi::from_mpz (type, res, TYPE_SIGN (type));
 	tree mult_expr = wide_int_to_tree (utype, begin);
-	init_expr = gimple_build (stmts, MULT_EXPR, utype, init_expr, mult_expr);
+	init_expr = gimple_build (stmts, MULT_EXPR, utype,
+				  init_expr, mult_expr);
 	init_expr = gimple_convert (stmts, type, init_expr);
+	mpz_clear (base);
+	mpz_clear (mod);
+	mpz_clear (exp);
+	mpz_clear (res);
       }
       break;
 
@@ -8925,9 +8929,16 @@ vectorizable_nonlinear_induction (loop_vec_info loop_vinfo,
 
   if (TREE_CODE (init_expr) == INTEGER_CST)
     init_expr = fold_convert (TREE_TYPE (vectype), init_expr);
-  else
-    gcc_assert (tree_nop_conversion_p (TREE_TYPE (vectype),
-				       TREE_TYPE (init_expr)));
+  else if (!tree_nop_conversion_p (TREE_TYPE (vectype), TREE_TYPE (init_expr)))
+    {
+      /* INIT_EXPR could be a bit_field, bail out for such case.  */
+      if (dump_enabled_p ())
+	dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+			 "nonlinear induction vectorization failed:"
+			 " component type of vectype is not a nop conversion"
+			 " from type of init_expr.\n");
+      return false;
+    }
 
   switch (induction_type)
     {

@@ -1,3 +1,104 @@
+2024-01-09  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR ada/112781
+	* exp_ch6.ads (Is_Build_In_Place_Function): Adjust description.
+	* exp_ch6.adb (Is_True_Build_In_Place_Function_Call): Delete.
+	(Is_Function_Call_With_BIP_Formals): New predicate.
+	(Is_Build_In_Place_Function_Call): Restore original semantics.
+	(Expand_Call_Helper): Adjust conditions guarding the calls to
+	Add_Dummy_Build_In_Place_Actuals to above renaming.
+	(Expand_N_Extended_Return_Statement): Adjust to above renaming.
+	(Expand_Simple_Function_Return): Likewise.  Move the assertion
+	to after the transformation into an extended return statement.
+	(Make_Build_In_Place_Call_In_Allocator): Remove unreachable code.
+	(Make_Build_In_Place_Call_In_Assignment): Likewise.
+
+2024-01-09  Javier Miranda  <miranda@adacore.com>
+
+	* einfo-utils.adb (Underlying_Type): Protect recursion call
+	against non-available attribute Etype.
+	* einfo.ads (Protected_Subprogram): Fix typo in documentation.
+	* exp_ch3.adb (BIP_Function_Call_Id): New subprogram.
+	(Expand_N_Object_Declaration): Improve code that evaluates if the
+	object is initialized with a BIP function call.
+	* exp_ch6.adb (Is_True_Build_In_Place_Function_Call): New
+	subprogram.
+	(Add_Task_Actuals_To_Build_In_Place_Call): Add dummy actuals if
+	the function does not require the BIP task actuals but it is a
+	dispatching operation that inherited them.
+	(Build_In_Place_Formal): Improve code to avoid never-ending loop
+	if the BIP formal is not found.
+	(Add_Dummy_Build_In_Place_Actuals): New subprogram.
+	(Expand_Call_Helper): Add calls to
+	Add_Dummy_Build_In_Place_Actuals.
+	(Expand_N_Extended_Return_Statement): Adjust assertion.
+	(Expand_Simple_Function_Return): Adjust assertion.
+	(Make_Build_In_Place_Call_In_Allocator): No action needed if the
+	called function inherited the BIP extra formals but it is not a
+	true BIP function.
+	(Make_Build_In_Place_Call_In_Assignment): Ditto.
+	* exp_intr.adb (Expand_Dispatching_Constructor_Call): Remove code
+	reporting unsupported case (since this patch adds support for it).
+	* sem_ch6.adb (Analyze_Subprogram_Body_Helper): Adding assertion
+	to ensure matching of BIP formals when setting the
+	Protected_Formal field of a protected subprogram to reference the
+	corresponding extra formal of the subprogram that implements it.
+	(Might_Need_BIP_Task_Actuals): New subprogram.
+	(Create_Extra_Formals): Improve code adding inherited extra
+	formals.
+
+2024-01-09  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR ada/112781
+	* sem_ch12.adb (Instantiate_Type): Use Etype instead of Base_Type
+	consistently to retrieve the ancestor for a derived type.
+	* sem_ch4.adb (Analyze_Explicit_Dereference): Test Is_Access_Type
+	consistently before accessing Designated_Type.
+
+2024-01-09  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gcc-interface/utils2.cc (build_binary_op) <EQ_EXPR>: Relax
+	assertion for regular pointer types.
+
+2023-12-20  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* sem_ch3.adb (Analyze_Subtype_Declaration): Remove a short-circuit
+	for subtypes without aspects when it comes to predicates.
+	* sem_util.adb (Inherit_Predicate_Flags): Deal with private subtypes
+	whose full view is an Itype.
+
+2023-12-04  Steve Baird  <baird@adacore.com>
+
+	* exp_attr.adb (Expand_N_Attribute_Reference): In the case of a
+	Reduce attribute reference, fix bugs in initializing Accum_Typ.
+	The previous version was incorrect in the case where E1 refers to
+	the first of multiple possible overload resolution candidates and
+	that candidate does not turn out to be the right one. The previous
+	version also had code to compute Accum_Typ via a different method
+	if the initial computation turned out to yield a universal numeric
+	type. Delete that initial computation and use the second method in
+	all cases.
+
+2023-11-16  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gcc-interface/decl.cc (gnat_to_gnu_subprog_type): Also create a
+	TYPE_DECL for the return type built for the CI/CO mechanism.
+
+2023-10-10  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR ada/111434
+	* sem_ch10.adb (Replace): New procedure to replace an entity with
+	another on the homonym chain.
+	(Install_Limited_With_Clause): Rename Non_Lim_View to Typ for the
+	sake of consistency.  Call Replace to do the replacements and split
+	the code into the regular and the special cases.  Add debuggging
+	output controlled by -gnatdi.
+	(Install_With_Clause): Print the Parent_With and Implicit_With flags
+	in the debugging output controlled by -gnatdi.
+	(Remove_Limited_With_Unit.Restore_Chain_For_Shadow (Shadow)): Rewrite
+	using a direct replacement of E4 by E2.   Call Replace to do the
+	replacements.  Add debuggging output controlled by -gnatdi.
+
 2023-09-27  Eric Botcazou  <ebotcazou@adacore.com>
 
 	* exp_ch7.adb (Build_Finalizer.Process_Declarations): Remove call
