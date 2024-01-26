@@ -1,3 +1,328 @@
+2024-01-25  Georg-Johann Lay  <avr@gjlay.de>
+
+	Backported from master:
+	2024-01-25  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR target/113601
+	* config/avr/avr-mcus.def (atmega3208, atmega3209): Fix data_section_start.
+
+2024-01-16  Georg-Johann Lay  <avr@gjlay.de>
+
+	Backported from master:
+	2024-01-15  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR target/107201
+	* config/avr/avr.h (EXTRA_SPEC_FUNCTIONS): Add no-devlib, avr_no_devlib.
+	* config/avr/driver-avr.cc (avr_no_devlib): New function.
+	(avr_devicespecs_file): Use it to remove -nodevicelib from the
+	options for cores only.
+	* config/avr/avr-arch.h (avr_get_parch): New prototype.
+	* config/avr/avr-devices.cc (avr_get_parch): New function.
+
+2024-01-15  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	Backported from master:
+	2024-01-15  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	PR target/113156
+	* config/avr/avr.opt (-mdouble, -mlong-double): Add "Save" flag.
+	(-mbranch-cost): Set "Optimization" flag.
+
+2024-01-12  Georg-Johann Lay  <avr@gjlay.de>
+
+	Backported from master:
+	2024-01-12  Georg-Johann Lay  <avr@gjlay.de>
+
+	* config/avr/avr.cc (avr_handle_addr_attribute): Move "..." from
+	format string to %s argument.
+
+2024-01-08  Georg-Johann Lay  <avr@gjlay.de>
+
+	Backported from master:
+	2024-01-08  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR target/112952
+	* config/avr/avr.cc (avr_handle_addr_attribute): Also print valid
+	range when diagnosing attribute "io" and "io_low" are out of range.
+	(avr_eval_addr_attrib): Don't ICE on empty address at that place.
+	(avr_insert_attributes): Reject if attribute "address", "io" or "io_low"
+	in contexts other than static storage.
+	(avr_asm_output_aligned_decl_common): Move output of decls with
+	attribute "address", "io", and "io_low" to...
+	(avr_output_addr_attrib): ...this new function.
+	(avr_asm_asm_output_aligned_bss): Remove output for decls with
+	attribute "address", "io", and "io_low".
+	(avr_encode_section_info): Rectify handling of decls with attribute
+	"address", "io", and "io_low".
+
+2023-12-19  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-12-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/112816
+	* config/i386/mmx.md (signbitv2sf2): Force operands[1] into a REG.
+
+2023-12-18  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-12-18  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/113013
+	* tree-object-size.cc (alloc_object_size): Return size_unknown if
+	corresponding argument(s) don't have integral type or have integral
+	type with higher precision than sizetype.  Don't check arg1 >= 0
+	uselessly.  Compare argument indexes against gimple_call_num_args
+	in unsigned type rather than int.  Formatting fixes.
+
+2023-12-16  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-11-29  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/112733
+	* fold-const.cc (multiple_of_p): Pass SIGNED rather than
+	UNSIGNED for wi::multiple_of_p on widest_int arguments.
+
+2023-12-16  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-12-05  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/112845
+	* config/i386/i386.md (movabsq $(i32 << shift), r64 peephole2): FAIL
+	if the new immediate is ix86_endbr_immediate_operand.
+
+2023-12-16  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-12-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/112837
+	* config/i386/i386.cc (ix86_elim_entry_set_got): Before checking
+	for UNSPEC_SET_GOT check that SET_SRC is UNSPEC.  Use SET_SRC and
+	SET_DEST macros instead of XEXP, rename vec variable to set.
+
+2023-12-16  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-12-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/112816
+	* config/i386/sse.md (signbit<mode>2): Force operands[1] into a REG.
+
+2023-12-16  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-11-25  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/111408
+	* config/i386/i386.md (*jcc_bt<mode>_mask): Add (const_int 0) as
+	expected second operand of bt_comparison_operator.
+
+2023-12-16  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-11-13  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/111967
+	* gimple-range-cache.cc (block_range_cache::set_bb_range): Grow
+	m_ssa_ranges to num_ssa_names rather than num_ssa_names + 1.
+	(block_range_cache::dump): Iterate from 1 rather than 0.  Don't use
+	ssa_name (x) unless m_ssa_ranges[x] is non-NULL.  Iterate to
+	m_ssa_ranges.length () rather than num_ssa_names.
+
+2023-12-16  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-11-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/112339
+	* attribs.cc (attribute_ignored_p): Only return true for
+	attr_namespace_ignored_p if as is NULL.
+	(decl_attributes): Never add ignored attributes.
+
+2023-12-16  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2023-07-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/110731
+	* wide-int.cc (wi::divmod_internal): Always unpack dividend and
+	divisor as UNSIGNED regardless of sgn.
+
+2023-12-15  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-08-24  Richard Biener  <rguenther@suse.de>
+
+	PR debug/111080
+	* dwarf2out.cc (prune_unused_types_walk): Handle
+	DW_TAG_restrict_type, DW_TAG_shared_type, DW_TAG_atomic_type,
+	DW_TAG_immutable_type, DW_TAG_coarray_type, DW_TAG_unspecified_type
+	and DW_TAG_dynamic_type as to only output them when referenced.
+
+2023-12-15  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-08-25  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/111137
+	* tree-vect-data-refs.cc (vect_slp_analyze_load_dependences):
+	Properly handle grouped stores from other SLP instances.
+
+2023-12-15  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-08-25  Richard Biener  <rguenther@suse.de>
+
+	* tree-vect-data-refs.cc (vect_slp_analyze_store_dependences):
+	Split out from vect_slp_analyze_node_dependences, remove
+	dead code.
+	(vect_slp_analyze_load_dependences): Split out from
+	vect_slp_analyze_node_dependences, adjust comments.  Process
+	queued stores before any disambiguation.
+	(vect_slp_analyze_node_dependences): Remove.
+	(vect_slp_analyze_instance_dependence): Adjust.
+
+2023-12-12  liuhongt  <hongtao.liu@intel.com>
+
+	Backported from master:
+	2023-12-12  liuhongt  <hongtao.liu@intel.com>
+
+	PR target/112891
+	* config/i386/i386.cc (ix86_avx_u128_mode_after): Return
+	AVX_U128_ANY if callee_abi doesn't clobber all_sse_regs to
+	align with ix86_avx_u128_mode_needed.
+	(ix86_avx_u128_mode_needed): Return AVX_U128_ClEAN for
+	sibling_call.
+
+2023-11-27  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-10-23  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/111917
+	* tree-ssa-loop-unswitch.cc (hoist_guard): Always insert
+	new conditional after last stmt.
+
+2023-11-27  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-10-17  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/111818
+	* tree-ssa.cc (maybe_optimize_var): When clearing
+	DECL_NOT_GIMPLE_REG_P always rewrite into SSA.
+
+2023-11-27  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-09-28  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/111614
+	* tree-ssa-reassoc.cc (undistribute_bitref_for_vector): Properly
+	convert the first vector when required.
+
+2023-11-27  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-10-12  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/111764
+	* tree-vect-loop.cc (check_reduction_path): Remove the attempt
+	to allow x + x via special-casing of assigns.
+
+2023-11-27  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-10-20  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/111445
+	* tree-scalar-evolution.cc (simple_iv_with_niters):
+	Add missing check for a sign-conversion.
+
+2023-11-27  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-08-18  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/111019
+	* tree-ssa-loop-im.cc (gather_mem_refs_stmt): When canonicalizing
+	also scrap base and offset in case the ref is indirect.
+
+2023-11-27  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-08-03  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/110702
+	* tree-ssa-loop-ivopts.cc (rewrite_use_address): When
+	we created a NULL pointer based access rewrite that to
+	a LEA.
+
+2023-11-27  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-07-06  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/110556
+	* tree-ssa-tail-merge.cc (gimple_equal_p): Check
+	assign code and all operands of non-stores.
+
+2023-11-27  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-07-06  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/110515
+	* tree-ssa-pre.cc (compute_avail): Make code dealing
+	with hoisting loads with different alias-sets more
+	robust.
+
+2023-11-27  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-06-20  Richard Biener  <rguenther@suse.de>
+
+	PR debug/110295
+	* dwarf2out.cc (process_scope_var): Continue processing
+	the decl after setting a parent in case the existing DIE
+	was in limbo.
+
+2023-11-27  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2023-05-31  Richard Biener  <rguenther@suse.de>
+
+	PR ipa/109983
+	PR tree-optimization/109143
+	* tree-ssa-structalias.cc (struct topo_info): Remove.
+	(init_topo_info): Likewise.
+	(free_topo_info): Likewise.
+	(compute_topo_order): Simplify API, put the component
+	with ESCAPED last so it's processed first.
+	(topo_visit): Adjust.
+	(solve_graph): Likewise.
+
+2023-11-24  Uros Bizjak  <ubizjak@gmail.com>
+
+	Backported from master:
+	2023-11-23  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/112672
+	* config/i386/i386.md (parityhi2):
+	Use temporary register in the call to gen_parityhi2_cmp.
+
+2023-11-22  Maciej W. Rozycki  <macro@embecosm.com>
+
+	Backported from master:
+	2023-11-22  Maciej W. Rozycki  <macro@embecosm.com>
+
+	PR target/111815
+	* config/vax/vax.cc (index_term_p): Only accept the index scaler
+	as the RHS operand to ASHIFT.
+
 2023-11-20  Lulu Cheng  <chenglulu@loongson.cn>
 
 	Backported from master:
