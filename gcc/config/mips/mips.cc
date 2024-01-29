@@ -11353,6 +11353,8 @@ mips_compute_frame_info (void)
      in, which is why the global_pointer field is initialised here and not
      earlier.  */
   cfun->machine->global_pointer = mips_global_pointer ();
+  if (cfun->machine->global_pointer != GLOBAL_POINTER_REGNUM)
+    df_set_regs_ever_live (GLOBAL_POINTER_REGNUM, false);
 
   offset = frame->args_size + frame->cprestore_size;
 
@@ -20031,8 +20033,6 @@ mips_set_compression_mode (unsigned int compression_mode)
 	 call.  */
       flag_move_loop_invariants = 0;
 
-      target_flags |= MASK_EXPLICIT_RELOCS;
-
       /* Experiments suggest we get the best overall section-anchor
 	 results from using the range of an unextended LW or SW.  Code
 	 that makes heavy use of byte or short accesses can do better
@@ -20062,6 +20062,9 @@ mips_set_compression_mode (unsigned int compression_mode)
 
       if (TARGET_MSA)
 	sorry ("MSA MIPS16 code");
+
+      if (!TARGET_EXPLICIT_RELOCS)
+	sorry ("MIPS16 requires %<-mexplicit-relocs%>");
     }
   else
     {

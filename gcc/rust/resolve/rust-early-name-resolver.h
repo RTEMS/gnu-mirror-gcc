@@ -54,6 +54,18 @@ private:
   }
 
   /**
+   * Accumulate all of the nested macros which escape their module through the
+   * use of the #[macro_use] attribute.
+   *
+   * This function recursively accumulates macros in all of the nested modules
+   * of an item container (an AST::Crate or an AST::Module) and returns this new
+   * list of items. You can then use the `take_items` and `set_items` functions
+   * on these containers to replace their list of items.
+   */
+  std::vector<std::unique_ptr<AST::Item>>
+  accumulate_escaped_macros (AST::Module &module);
+
+  /**
    * The "scope" we are currently in.
    *
    * This involves lexical scopes:
@@ -130,6 +142,7 @@ private:
   virtual void visit (AST::QualifiedPathInType &path);
   virtual void visit (AST::LiteralExpr &expr);
   virtual void visit (AST::AttrInputLiteral &attr_input);
+  virtual void visit (AST::AttrInputMacro &attr_input);
   virtual void visit (AST::MetaItemLitExpr &meta_item);
   virtual void visit (AST::MetaItemPathLit &meta_item);
   virtual void visit (AST::BorrowExpr &expr);
@@ -177,19 +190,14 @@ private:
   virtual void visit (AST::ForLoopExpr &expr);
   virtual void visit (AST::IfExpr &expr);
   virtual void visit (AST::IfExprConseqElse &expr);
-  virtual void visit (AST::IfExprConseqIf &expr);
-  virtual void visit (AST::IfExprConseqIfLet &expr);
   virtual void visit (AST::IfLetExpr &expr);
   virtual void visit (AST::IfLetExprConseqElse &expr);
-  virtual void visit (AST::IfLetExprConseqIf &expr);
-  virtual void visit (AST::IfLetExprConseqIfLet &expr);
   virtual void visit (AST::MatchExpr &expr);
   virtual void visit (AST::AwaitExpr &expr);
   virtual void visit (AST::AsyncBlockExpr &expr);
   virtual void visit (AST::TypeParam &param);
   virtual void visit (AST::LifetimeWhereClauseItem &item);
   virtual void visit (AST::TypeBoundWhereClauseItem &item);
-  virtual void visit (AST::Method &method);
   virtual void visit (AST::Module &module);
   virtual void visit (AST::ExternCrate &crate);
   virtual void visit (AST::UseTreeGlob &use_tree);
@@ -215,6 +223,7 @@ private:
   virtual void visit (AST::Trait &trait);
   virtual void visit (AST::InherentImpl &impl);
   virtual void visit (AST::TraitImpl &impl);
+  virtual void visit (AST::ExternalTypeItem &item);
   virtual void visit (AST::ExternalStaticItem &item);
   virtual void visit (AST::ExternalFunctionItem &item);
   virtual void visit (AST::ExternBlock &block);
@@ -232,6 +241,7 @@ private:
   virtual void visit (AST::LiteralPattern &pattern);
   virtual void visit (AST::IdentifierPattern &pattern);
   virtual void visit (AST::WildcardPattern &pattern);
+  virtual void visit (AST::RestPattern &pattern);
   virtual void visit (AST::RangePatternBoundLiteral &bound);
   virtual void visit (AST::RangePatternBoundPath &bound);
   virtual void visit (AST::RangePatternBoundQualPath &bound);
@@ -252,8 +262,7 @@ private:
   virtual void visit (AST::AltPattern &pattern);
   virtual void visit (AST::EmptyStmt &stmt);
   virtual void visit (AST::LetStmt &stmt);
-  virtual void visit (AST::ExprStmtWithoutBlock &stmt);
-  virtual void visit (AST::ExprStmtWithBlock &stmt);
+  virtual void visit (AST::ExprStmt &stmt);
   virtual void visit (AST::TraitBound &bound);
   virtual void visit (AST::ImplTraitType &type);
   virtual void visit (AST::TraitObjectType &type);
@@ -268,6 +277,10 @@ private:
   virtual void visit (AST::SliceType &type);
   virtual void visit (AST::InferredType &type);
   virtual void visit (AST::BareFunctionType &type);
+
+  virtual void visit (AST::VariadicParam &type);
+  virtual void visit (AST::FunctionParam &type);
+  virtual void visit (AST::SelfParam &type);
 };
 
 } // namespace Resolver
