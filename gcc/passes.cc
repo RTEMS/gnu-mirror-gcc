@@ -2144,7 +2144,10 @@ execute_todo (unsigned int flags)
   /* At this point we should not have any unreachable code in the
      CFG, so it is safe to flush the pending freelist for SSA_NAMES.  */
   if (cfun && cfun->gimple_df)
-    flush_ssaname_freelist ();
+    {
+      flush_ssaname_freelist ();
+      release_free_names_and_compact_live_names (cfun);
+    }
 
   /* Always remove functions just as before inlining: IPA passes might be
      interested to see bodies of extern inline functions that are not inlined

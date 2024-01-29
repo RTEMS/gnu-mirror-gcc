@@ -87,6 +87,7 @@ extern void reset_flow_sensitive_info_in_bb (basic_block);
 extern void release_defs (gimple *);
 extern void replace_ssa_name_symbol (tree, tree);
 extern void flush_ssaname_freelist (void);
+extern void release_free_names_and_compact_live_names (struct function *);
 
 
 /* Return an SSA_NAME node for variable VAR defined in statement STMT

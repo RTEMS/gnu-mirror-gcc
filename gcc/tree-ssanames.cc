@@ -850,7 +850,7 @@ replace_ssa_name_symbol (tree ssa_name, tree sym)
 /* Release the vector of free SSA_NAMEs and compact the vector of SSA_NAMEs
    that are live.  */
 
-static void
+void
 release_free_names_and_compact_live_names (function *fun)
 {
   unsigned i, j;
@@ -881,52 +881,6 @@ release_free_names_and_compact_live_names (function *fun)
   if (dump_file)
     fprintf (dump_file, "Released %i names, %.2f%%, removed %i holes\n",
 	     n, n * 100.0 / num_ssa_names, i - j);
-}
-
-/* Return SSA names that are unused to GGC memory and compact the SSA
-   version namespace.  This is used to keep footprint of compiler during
-   interprocedural optimization.  */
-
-namespace {
-
-const pass_data pass_data_release_ssa_names =
-{
-  GIMPLE_PASS, /* type */
-  "release_ssa", /* name */
-  OPTGROUP_NONE, /* optinfo_flags */
-  TV_TREE_SSA_OTHER, /* tv_id */
-  PROP_ssa, /* properties_required */
-  0, /* properties_provided */
-  0, /* properties_destroyed */
-  TODO_remove_unused_locals, /* todo_flags_start */
-  0, /* todo_flags_finish */
-};
-
-class pass_release_ssa_names : public gimple_opt_pass
-{
-public:
-  pass_release_ssa_names (gcc::context *ctxt)
-    : gimple_opt_pass (pass_data_release_ssa_names, ctxt)
-  {}
-
-  /* opt_pass methods: */
-  unsigned int execute (function *) final override;
-
-}; // class pass_release_ssa_names
-
-unsigned int
-pass_release_ssa_names::execute (function *fun)
-{
-  release_free_names_and_compact_live_names (fun);
-  return 0;
-}
-
-} // anon namespace
-
-gimple_opt_pass *
-make_pass_release_ssa_names (gcc::context *ctxt)
-{
-  return new pass_release_ssa_names (ctxt);
 }
 
 /* Save and restore of flow sensitive information. */

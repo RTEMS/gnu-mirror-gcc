@@ -651,7 +651,6 @@ extern rtl_opt_pass *make_pass_set_nothrow_function_flags (gcc::context *ctxt);
 extern rtl_opt_pass *make_pass_dwarf2_frame (gcc::context *ctxt);
 extern rtl_opt_pass *make_pass_final (gcc::context *ctxt);
 extern rtl_opt_pass *make_pass_rtl_seqabstr (gcc::context *ctxt);
-extern gimple_opt_pass *make_pass_release_ssa_names (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_early_inline (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_local_fn_summary (gcc::context *ctxt);
 extern gimple_opt_pass *make_pass_update_address_taken (gcc::context *ctxt);
