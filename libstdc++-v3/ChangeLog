@@ -1,3 +1,201 @@
+2024-01-24  Huanghui Nie  <nnnjkk@gmail.com>
+	    Théo Papadopoulo   <papadopoulo@gmail.com>
+
+	* include/bits/hashtable.h (_Hahstable<>::_M_remove_bucket_begin): Remove
+	_M_before_begin check and cleanup implementation.
+
+2024-01-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/std/time/clock/file/io.cc: Fix expected result in
+	assertion and call test_format() from main.
+
+2024-01-21  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/113500
+	* include/bits/chrono_io.h (__formatter_chrono::_M_S): Fix
+	printing of subseconds with floating-point rep.
+	(__formatter_chrono::_M_format_to_ostream): Do not write
+	time_point specializations directly to the ostream.
+	(formatter<chrono::sys_time<D>, C>::parse): Do not allow an
+	empty chrono-spec if the type fails to meet the constraints for
+	writing to an ostream with operator<<.
+	* testsuite/std/time/clock/file/io.cc: Check formatting
+	non-integral times with empty chrono-specs.
+	* testsuite/std/time/clock/gps/io.cc: Likewise.
+	* testsuite/std/time/clock/utc/io.cc: Likewise.
+	* testsuite/std/time/hh_mm_ss/io.cc: Likewise.
+
+2024-01-21  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/chrono.h (__file_clock::from_sys)
+	(__file_clock::to_sys, __file_clock::_S_from_sys)
+	(__file_clock::_S_to_sys): Use common_type for return type.
+	* testsuite/std/time/clock/file/members.cc: Check round trip
+	conversion for time with lower precision that seconds.
+
+2024-01-21  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/113512
+	* include/std/format (__formatter_fp::format): Fix logic for
+	alternate forms.
+	* testsuite/std/format/functions/format.cc: Check buggy cases of
+	alternate forms with g presentation type.
+
+2024-01-20  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/111410
+	* include/std/ranges: Add #pragma to disable -Wdangling-reference with
+	std::ranges::views::__adaptor::operator|.
+
+2024-01-19  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/format (_Spec::_M_parse_fill_and_align): Do not
+	use CTAD for _Utf32_view.
+
+2024-01-19  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/108822
+	* include/std/tuple (__glibcxx_no_dangling_refs) [C++17]: Fix
+	wrong fold-operator.
+	* testsuite/20_util/tuple/dangling_ref.cc: Check tuples with one
+	element and three elements. Check allocator-extended
+	constructors.
+
+2024-01-19  Patrick Palka  <ppalka@redhat.com>
+
+	* include/precompiled/stdc++.h [_GLIBCXX_HOSTED]: Include
+	<print> and <text_encoding> for C++23 and C++26 respectively.
+
+2024-01-18  Patrick Palka  <ppalka@redhat.com>
+
+	* include/bits/stl_pair.h [__cplusplus > 202002L]:
+	Guard P2321R2 changes with __glibcxx_ranges_zip instead.
+
+2024-01-18  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/tuple [__cplusplus > 202002L]: Guard P2321R2
+	changes with __cpp_lib_ranges_zip instead.
+
+2024-01-18  Patrick Palka  <ppalka@redhat.com>
+
+	PR libstdc++/109536
+	* include/debug/safe_base.h (_Safe_sequence_base::_M_swap):
+	Remove _GLIBCXX20_CONSTEXPR from non-inline member function.
+	* include/debug/safe_iterator.h
+	(_GLIBCXX20_CONSTEXPR_NON_LITERAL_SCOPE_BEGIN): Define.
+	(_GLIBCXX20_CONSTEXPR_NON_LITERAL_SCOPE_END): Define.
+	(_Safe_iterator::operator=): Use them around the code path that
+	defines a variable of type __gnu_cxx::__scoped_lock.
+	(_Safe_iterator::operator++): Likewise.
+	(_Safe_iterator::operator--): Likewise.
+	(_Safe_iterator::operator+=): Likewise.
+	(_Safe_iterator::operator-=): Likewise.
+	* testsuite/23_containers/vector/element_access/constexpr.cc
+	(test_iterators): Test more iterator operations.
+	* testsuite/23_containers/vector/bool/element_access/constexpr.cc
+	(test_iterators): Likewise.
+	* testsuite/std/ranges/adaptors/all.cc (test08) [_GLIBCXX_DEBUG]:
+	Remove.
+
+2024-01-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/unicode.h (__charset_alias_match): Initialize
+	__var_a and __var_b.
+
+2024-01-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/113450
+	* testsuite/std/format/functions/format.cc: Use signed char
+	instead of int8_t.
+
+2024-01-17  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/113318
+	* acinclude.m4 (GLIBCXX_CONFIGURE): Add c++26 directory.
+	(GLIBCXX_CHECK_TEXT_ENCODING): Define.
+	* config.h.in: Regenerate.
+	* configure: Regenerate.
+	* configure.ac: Use GLIBCXX_CHECK_TEXT_ENCODING.
+	* include/Makefile.am: Add new headers.
+	* include/Makefile.in: Regenerate.
+	* include/bits/locale_classes.h (locale::encoding): Declare new
+	member function.
+	* include/bits/unicode.h (__charset_alias_match): New function.
+	* include/bits/text_encoding-data.h: New file.
+	* include/bits/version.def (text_encoding): Define.
+	* include/bits/version.h: Regenerate.
+	* include/std/text_encoding: New file.
+	* src/Makefile.am: Add new subdirectory.
+	* src/Makefile.in: Regenerate.
+	* src/c++26/Makefile.am: New file.
+	* src/c++26/Makefile.in: New file.
+	* src/c++26/text_encoding.cc: New file.
+	* src/experimental/Makefile.am: Include c++26 convenience
+	library.
+	* src/experimental/Makefile.in: Regenerate.
+	* python/libstdcxx/v6/printers.py (StdTextEncodingPrinter): New
+	printer.
+	* scripts/gen_text_encoding_data.py: New file.
+	* testsuite/22_locale/locale/encoding.cc: New test.
+	* testsuite/ext/unicode/charset_alias_match.cc: New test.
+	* testsuite/std/text_encoding/cons.cc: New test.
+	* testsuite/std/text_encoding/members.cc: New test.
+	* testsuite/std/text_encoding/requirements.cc: New test.
+
+2024-01-17  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/unicode.h (_Grapheme_cluster_view): Require view.
+	Do not use CTAD for _Utf32_view.
+	(__format_width, __truncate): Do not use CTAD.
+	(enable_borrowed_range<_Utf_view<T, R>>): Define specialization.
+	(enable_borrowed_range<_Grapheme_cluster_view<R>>): Likewise.
+
+2024-01-17  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/ranges (views::_CartesianProduct::operator()):
+	Adjust identity case as per P2540R1.
+	* testsuite/std/ranges/cartesian_product/1.cc (test01):
+	Adjust expected result of the identity case.
+
+2024-01-15  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/variant (__detail::__variant::_Variadic_union):
+	Add bool __trivially_destructible template parameter.
+	(__detail::__variant::_Variadic_union::~_Variadic_union):
+	Use __trivially_destructible in constraints instead.
+	(__detail::__variant::_Variant_storage): Pass
+	__trivially_destructible value to _Variadic_union.
+
+2024-01-15  Patrick Palka  <ppalka@redhat.com>
+
+	* include/bits/stl_iterator.h (const_iterator): Define conversion
+	operators as per P2836R1.
+	* include/bits/version.def (ranges_as_const): Update value.
+	* include/bits/version.h: Regenerate.
+	* testsuite/24_iterators/const_iterator/1.cc (test04): New test.
+	* testsuite/std/ranges/adaptors/as_const/1.cc: Adjust expected
+	value of __cpp_lib_ranges_as_const.
+	* testsuite/std/ranges/version_c++23.cc: Likewise.
+
+2024-01-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/108822
+	* include/std/tuple (__assignable, __is_nothrow_assignable):
+	Move pre-C++20 definitions adjacent to their use.
+
+2024-01-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR testsuite/113366
+	* include/std/format (basic_format_arg): Use __formattable
+	variable template instead of __format::__formattable_with
+	concept.
+
+2024-01-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	* src/c++20/tzdata.zi: Import new file from 2023d release.
+	* src/c++20/tzdb.cc (tzdb_list::_Node::_S_read_leap_seconds)
+	Update expiry date for leap seconds list.
+
 2024-01-13  Jonathan Wakely  <jwakely@redhat.com>
 
 	PR libstdc++/108822

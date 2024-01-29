@@ -116,6 +116,17 @@ enum stringop_strategy_enum {
   STRATEGY_AUTO = STRATEGY_SCALAR | STRATEGY_VECTOR
 };
 
+/* Behavior of VSETVL Pass.  */
+enum vsetvl_strategy_enum {
+  /* Optimized: Run LCM dataflow analysis to reduce vsetvl* insns and
+     delete any redundant ones generated in the process.  */
+  VSETVL_OPT,
+  /* Simple: Insert a vsetvl* instruction for each Vector instruction.  */
+  VSETVL_SIMPLE,
+  /* No fusion: Disable Phase 2 earliest global fusion.  */
+  VSETVL_OPT_NO_FUSION,
+};
+
 #define TARGET_ZICOND_LIKE (TARGET_ZICOND || (TARGET_XVENTANACONDOPS && TARGET_64BIT))
 
 /* Bit of riscv_zvl_flags will set contintuly, N-1 bit will set if N-bit is

@@ -19,9 +19,58 @@
 #include "rust-early-name-resolver.h"
 #include "rust-ast-full.h"
 #include "rust-name-resolver.h"
+#include "rust-macro-builtins.h"
+#include "rust-attribute-values.h"
 
 namespace Rust {
 namespace Resolver {
+
+// Check if a module contains the `#[macro_use]` attribute
+static bool
+is_macro_use_module (const AST::Module &mod)
+{
+  for (const auto &attr : mod.get_outer_attrs ())
+    if (attr.get_path ().as_string () == Values::Attributes::MACRO_USE)
+      return true;
+
+  return false;
+}
+
+std::vector<std::unique_ptr<AST::Item>>
+EarlyNameResolver::accumulate_escaped_macros (AST::Module &module)
+{
+  if (!is_macro_use_module (module))
+    return {};
+
+  // Parse the module's items if they haven't been expanded and the file
+  // should be parsed (i.e isn't hidden behind an untrue or impossible cfg
+  // directive)
+  if (module.get_kind () == AST::Module::UNLOADED)
+    module.load_items ();
+
+  std::vector<std::unique_ptr<AST::Item>> escaped_macros;
+
+  scoped (module.get_node_id (), [&module, &escaped_macros, this] {
+    for (auto &item : module.get_items ())
+      {
+	if (item->get_ast_kind () == AST::Kind::MODULE)
+	  {
+	    auto &module = *static_cast<AST::Module *> (item.get ());
+	    auto new_macros = accumulate_escaped_macros (module);
+
+	    std::move (new_macros.begin (), new_macros.end (),
+		       std::back_inserter (escaped_macros));
+
+	    continue;
+	  }
+
+	if (item->get_ast_kind () == AST::Kind::MACRO_RULES_DEFINITION)
+	  escaped_macros.emplace_back (item->clone_item ());
+      }
+  });
+
+  return escaped_macros;
+}
 
 EarlyNameResolver::EarlyNameResolver ()
   : current_scope (UNKNOWN_NODEID), resolver (*Resolver::get ()),
@@ -31,6 +80,26 @@ EarlyNameResolver::EarlyNameResolver ()
 void
 EarlyNameResolver::go (AST::Crate &crate)
 {
+  std::vector<std::unique_ptr<AST::Item>> new_items;
+  auto items = crate.take_items ();
+
+  scoped (crate.get_node_id (), [&items, &new_items, this] {
+    for (auto &&item : items)
+      {
+	auto new_macros = std::vector<std::unique_ptr<AST::Item>> ();
+
+	if (item->get_ast_kind () == AST::Kind::MODULE)
+	  new_macros = accumulate_escaped_macros (
+	    *static_cast<AST::Module *> (item.get ()));
+
+	new_items.emplace_back (std::move (item));
+	std::move (new_macros.begin (), new_macros.end (),
+		   std::back_inserter (new_items));
+      }
+  });
+
+  crate.set_items (std::move (new_items));
+
   scoped (crate.get_node_id (), [&crate, this] () {
     for (auto &item : crate.items)
       item->accept_vis (*this);
@@ -146,6 +215,10 @@ EarlyNameResolver::visit (AST::LiteralExpr &)
 
 void
 EarlyNameResolver::visit (AST::AttrInputLiteral &)
+{}
+
+void
+EarlyNameResolver::visit (AST::AttrInputMacro &)
 {}
 
 void
@@ -326,7 +399,8 @@ EarlyNameResolver::visit (AST::ClosureExprInner &expr)
   expr.get_definition_expr ()->accept_vis (*this);
 
   for (auto &param : expr.get_params ())
-    param.get_type ()->accept_vis (*this);
+    if (param.has_type_given ())
+      param.get_type ()->accept_vis (*this);
 }
 
 void
@@ -456,22 +530,6 @@ EarlyNameResolver::visit (AST::IfExprConseqElse &expr)
 }
 
 void
-EarlyNameResolver::visit (AST::IfExprConseqIf &expr)
-{
-  expr.get_condition_expr ()->accept_vis (*this);
-  expr.get_if_block ()->accept_vis (*this);
-  expr.get_conseq_if_expr ()->accept_vis (*this);
-}
-
-void
-EarlyNameResolver::visit (AST::IfExprConseqIfLet &expr)
-{
-  expr.get_condition_expr ()->accept_vis (*this);
-  expr.get_if_block ()->accept_vis (*this);
-  expr.get_conseq_if_let_expr ()->accept_vis (*this);
-}
-
-void
 EarlyNameResolver::visit (AST::IfLetExpr &expr)
 {
   expr.get_value_expr ()->accept_vis (*this);
@@ -486,22 +544,6 @@ EarlyNameResolver::visit (AST::IfLetExprConseqElse &expr)
   expr.get_value_expr ()->accept_vis (*this);
   expr.get_if_block ()->accept_vis (*this);
   expr.get_else_block ()->accept_vis (*this);
-}
-
-void
-EarlyNameResolver::visit (AST::IfLetExprConseqIf &expr)
-{
-  expr.get_value_expr ()->accept_vis (*this);
-  expr.get_if_block ()->accept_vis (*this);
-  expr.get_conseq_if_expr ()->accept_vis (*this);
-}
-
-void
-EarlyNameResolver::visit (AST::IfLetExprConseqIfLet &expr)
-{
-  expr.get_value_expr ()->accept_vis (*this);
-  expr.get_if_block ()->accept_vis (*this);
-  expr.get_conseq_if_let_expr ()->accept_vis (*this);
 }
 
 void
@@ -559,27 +601,34 @@ EarlyNameResolver::visit (AST::TypeBoundWhereClauseItem &item)
 }
 
 void
-EarlyNameResolver::visit (AST::Method &method)
-{
-  if (method.has_generics ())
-    for (auto &generic : method.get_generic_params ())
-      generic->accept_vis (*this);
-
-  if (method.get_self_param ().has_type ())
-    method.get_self_param ().get_type ()->accept_vis (*this);
-
-  for (auto &param : method.get_function_params ())
-    param.get_type ()->accept_vis (*this);
-
-  if (method.has_return_type ())
-    method.get_return_type ()->accept_vis (*this);
-
-  method.get_definition ()->accept_vis (*this);
-}
-
-void
 EarlyNameResolver::visit (AST::Module &module)
 {
+  if (module.get_kind () == AST::Module::UNLOADED)
+    module.load_items ();
+
+  // so we need to only go "one scope down" for fetching macros. Macros within
+  // functions are still scoped only within that function. But we have to be
+  // careful because nested modules with #[macro_use] actually works!
+  std::vector<std::unique_ptr<AST::Item>> new_items;
+  auto items = module.take_items ();
+
+  scoped (module.get_node_id (), [&items, &new_items, this] {
+    for (auto &&item : items)
+      {
+	auto new_macros = std::vector<std::unique_ptr<AST::Item>> ();
+
+	if (item->get_ast_kind () == AST::Kind::MODULE)
+	  new_macros = accumulate_escaped_macros (
+	    *static_cast<AST::Module *> (item.get ()));
+
+	new_items.emplace_back (std::move (item));
+	std::move (new_macros.begin (), new_macros.end (),
+		   std::back_inserter (new_items));
+      }
+  });
+
+  module.set_items (std::move (new_items));
+
   scoped (module.get_node_id (), [&module, this] () {
     for (auto &item : module.get_items ())
       item->accept_vis (*this);
@@ -613,8 +662,8 @@ EarlyNameResolver::visit (AST::Function &function)
     for (auto &generic : function.get_generic_params ())
       generic->accept_vis (*this);
 
-  for (auto &param : function.get_function_params ())
-    param.get_type ()->accept_vis (*this);
+  for (auto &p : function.get_function_params ())
+    p->accept_vis (*this);
 
   if (function.has_return_type ())
     function.get_return_type ()->accept_vis (*this);
@@ -647,20 +696,34 @@ EarlyNameResolver::visit (AST::EnumItem &)
 {}
 
 void
-EarlyNameResolver::visit (AST::EnumItemTuple &)
-{}
+EarlyNameResolver::visit (AST::EnumItemTuple &item)
+{
+  for (auto &field : item.get_tuple_fields ())
+    field.get_field_type ()->accept_vis (*this);
+}
 
 void
-EarlyNameResolver::visit (AST::EnumItemStruct &)
-{}
+EarlyNameResolver::visit (AST::EnumItemStruct &item)
+{
+  for (auto &field : item.get_struct_fields ())
+    field.get_field_type ()->accept_vis (*this);
+}
 
 void
-EarlyNameResolver::visit (AST::EnumItemDiscriminant &)
-{}
+EarlyNameResolver::visit (AST::EnumItemDiscriminant &item)
+{
+  item.get_expr ()->accept_vis (*this);
+}
 
 void
-EarlyNameResolver::visit (AST::Enum &)
-{}
+EarlyNameResolver::visit (AST::Enum &enum_item)
+{
+  for (auto &generic : enum_item.get_generic_params ())
+    generic->accept_vis (*this);
+
+  for (auto &variant : enum_item.get_variants ())
+    variant->accept_vis (*this);
+}
 
 void
 EarlyNameResolver::visit (AST::Union &)
@@ -670,7 +733,8 @@ void
 EarlyNameResolver::visit (AST::ConstantItem &const_item)
 {
   const_item.get_type ()->accept_vis (*this);
-  const_item.get_expr ()->accept_vis (*this);
+  if (const_item.has_expr ())
+    const_item.get_expr ()->accept_vis (*this);
 }
 
 void
@@ -691,8 +755,8 @@ EarlyNameResolver::visit (AST::TraitItemFunc &item)
   for (auto &generic : decl.get_generic_params ())
     generic->accept_vis (*this);
 
-  for (auto &param : decl.get_function_params ())
-    param.get_type ()->accept_vis (*this);
+  for (auto &p : decl.get_function_params ())
+    p->accept_vis (*this);
 
   if (item.has_definition ())
     item.get_definition ()->accept_vis (*this);
@@ -710,8 +774,8 @@ EarlyNameResolver::visit (AST::TraitItemMethod &item)
   for (auto &generic : decl.get_generic_params ())
     generic->accept_vis (*this);
 
-  for (auto &param : decl.get_function_params ())
-    param.get_type ()->accept_vis (*this);
+  for (auto &p : decl.get_function_params ())
+    p->accept_vis (*this);
 
   if (item.has_definition ())
     item.get_definition ()->accept_vis (*this);
@@ -771,6 +835,12 @@ EarlyNameResolver::visit (AST::TraitImpl &impl)
 }
 
 void
+EarlyNameResolver::visit (AST::ExternalTypeItem &item)
+{
+  // nothing to do?
+}
+
+void
 EarlyNameResolver::visit (AST::ExternalStaticItem &item)
 {
   item.get_type ()->accept_vis (*this);
@@ -783,7 +853,8 @@ EarlyNameResolver::visit (AST::ExternalFunctionItem &item)
     generic->accept_vis (*this);
 
   for (auto &param : item.get_function_params ())
-    param.get_type ()->accept_vis (*this);
+    if (!param.is_variadic ())
+      param.get_type ()->accept_vis (*this);
 
   if (item.has_return_type ())
     item.get_return_type ()->accept_vis (*this);
@@ -814,7 +885,7 @@ void
 EarlyNameResolver::visit (AST::MacroRulesDefinition &rules_def)
 {
   auto path = CanonicalPath::new_seg (rules_def.get_node_id (),
-				      rules_def.get_rule_name ());
+				      rules_def.get_rule_name ().as_string ());
   resolver.get_macro_scope ().insert (path, rules_def.get_node_id (),
 				      rules_def.get_locus ());
 
@@ -865,7 +936,7 @@ EarlyNameResolver::visit (AST::MacroInvocation &invoc)
   if (has_semicolon)
     source_node = invoc.get_macro_node_id ();
   else
-    source_node = invoc.get_pattern_node_id ();
+    source_node = invoc.get_node_id ();
   auto seg
     = CanonicalPath::new_seg (source_node, invoc_data.get_path ().as_string ());
 
@@ -886,13 +957,14 @@ EarlyNameResolver::visit (AST::MacroInvocation &invoc)
   bool is_builtin
     = std::any_of (outer_attrs.begin (), outer_attrs.end (),
 		   [] (AST::Attribute attr) {
-		     return attr.get_path () == "rustc_builtin_macro";
+		     return attr.get_path ()
+			    == Values::Attributes::RUSTC_BUILTIN_MACRO;
 		   });
 
   if (is_builtin)
     {
       auto builtin_kind
-	= AST::builtin_macro_from_string (rules_def->get_rule_name ());
+	= builtin_macro_from_string (rules_def->get_rule_name ().as_string ());
       invoc.map_to_builtin (builtin_kind);
     }
 
@@ -948,6 +1020,10 @@ EarlyNameResolver::visit (AST::IdentifierPattern &pattern)
 
 void
 EarlyNameResolver::visit (AST::WildcardPattern &)
+{}
+
+void
+EarlyNameResolver::visit (AST::RestPattern &)
 {}
 
 void
@@ -1014,6 +1090,16 @@ EarlyNameResolver::visit (AST::TupleStructItemsRange &tuple_items)
 void
 EarlyNameResolver::visit (AST::TupleStructPattern &pattern)
 {
+  if (!pattern.has_items ())
+    {
+      rich_location rich_locus (line_table, pattern.get_locus ());
+      rich_locus.add_fixit_replace (
+	"function calls are not allowed in patterns");
+      rust_error_at (
+	rich_locus, ErrorCode::E0164,
+	"expected tuple struct or tuple variant, found associated function");
+      return;
+    }
   pattern.get_items ()->accept_vis (*this);
 }
 
@@ -1076,13 +1162,7 @@ EarlyNameResolver::visit (AST::LetStmt &stmt)
 }
 
 void
-EarlyNameResolver::visit (AST::ExprStmtWithoutBlock &stmt)
-{
-  stmt.get_expr ()->accept_vis (*this);
-}
-
-void
-EarlyNameResolver::visit (AST::ExprStmtWithBlock &stmt)
+EarlyNameResolver::visit (AST::ExprStmt &stmt)
 {
   stmt.get_expr ()->accept_vis (*this);
 }
@@ -1147,6 +1227,29 @@ EarlyNameResolver::visit (AST::BareFunctionType &type)
 
   if (type.has_return_type ())
     type.get_return_type ()->accept_vis (*this);
+}
+
+void
+EarlyNameResolver::visit (AST::VariadicParam &param)
+{
+  if (param.has_pattern ())
+    param.get_pattern ()->accept_vis (*this);
+}
+
+void
+EarlyNameResolver::visit (AST::FunctionParam &param)
+{
+  param.get_pattern ()->accept_vis (*this);
+  param.get_type ()->accept_vis (*this);
+}
+
+void
+EarlyNameResolver::visit (AST::SelfParam &param)
+{
+  if (param.has_type ())
+    param.get_type ()->accept_vis (*this);
+  if (param.has_lifetime ())
+    param.get_lifetime ().accept_vis (*this);
 }
 
 } // namespace Resolver

@@ -736,8 +736,6 @@ typedef struct {
   /* Number of floating-point registers used so far, likewise.  */
   unsigned int num_fprs;
 
-  int rvv_psabi_warning;
-
   /* Number of mask registers used so far, up to MAX_ARGS_IN_MASK_REGISTERS.  */
   unsigned int num_mrs;
 
@@ -828,6 +826,10 @@ extern enum riscv_cc get_riscv_cc (const rtx use);
     else								\
       asm_fprintf ((FILE), "%U%s", (NAME));				\
   } while (0)
+
+#undef ASM_OUTPUT_OPCODE
+#define ASM_OUTPUT_OPCODE(STREAM, PTR)	\
+  (PTR) = riscv_asm_output_opcode(STREAM, PTR)
 
 #define JUMP_TABLES_IN_TEXT_SECTION 0
 #define CASE_VECTOR_MODE SImode
