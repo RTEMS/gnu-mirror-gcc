@@ -7149,6 +7149,23 @@ proc check_effective_target_power10_ok { } {
     }
 }
 
+# Return 1 if this is a PowerPC target supporting -mcpu=power11.
+
+proc check_effective_target_power11_ok { } {
+    return [check_no_messages_and_pattern power11 "[.]machine power11" assembly {
+	void test (void)
+	{
+	  #ifndef _ARCH_PWR11
+	  #error does not have power11 support.
+	  #else
+	  /* "has power11 support" */
+	  #endif
+	}} {-mcpu=power11}]
+    } else {
+	return 0
+    }
+}
+
 # Return 1 if this is a PowerPC target supporting -mfloat128 via either
 # software emulation on power7/power8 systems or hardware support on power9.
 
