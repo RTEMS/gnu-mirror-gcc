@@ -1,3 +1,16 @@
+==================== Branch work154-test, patch #705 ====================
+
+Fix power11 tests #3.
+
+2024-01-30  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/power11-1.c: Rewite;
+	* gcc.target/powerpc/power11-2.c: Rewite;
+	* gcc.target/powerpc/power11-3.c: Rewite;
+	* lib/target-supports.exp (check_effective_target_power11_ok): Rewrite.
+
 ==================== Branch work154-test, patch #704 ====================
 
 Fix power11 tests #2
