@@ -1,3 +1,13 @@
+==================== Branch work154-test, patch #703 ====================
+
+Add power11 tests.
+
+2024-01-30  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* lib/target-supports.exp (check_effective_target_power11_ok): Fix typo.
+
 ==================== Branch work154-test, patch #702 ====================
 
 Add power11 tests.
