@@ -7152,7 +7152,7 @@ proc check_effective_target_power10_ok { } {
 # Return 1 if this is a PowerPC target supporting -mcpu=power11.
 
 proc check_effective_target_power11_ok { } {
-    return [check_no_messages_and_pattern power11 "machine power11" assembly {
+    return [check_no_messages_and_pattern power11_ok "machine power11" assembly {
 	void test (void)
 	{
 	  #ifndef _ARCH_PWR11
