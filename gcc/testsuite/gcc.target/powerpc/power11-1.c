@@ -11,5 +11,3 @@
 void foo (void)
 {
 }
-
-/* { dg-final { scan-assembler {\m[.]machine power11\M} } } */

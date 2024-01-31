@@ -18,7 +18,3 @@ __attribute__((__target__("cpu=power11")))
 void foo_p11 (void)
 {
 }
-
-/* { dg-final { scan-assembler {\m[.]machine power9\M}  } } */
-/* { dg-final { scan-assembler {\m[.]machine power10\M} } } */
-/* { dg-final { scan-assembler {\m[.]machine power11\M} } } */

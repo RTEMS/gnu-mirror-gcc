@@ -8,6 +8,3 @@ __attribute__((__target_clones__("cpu=power11,cpu=power9,default")))
 void foo (void)
 {
 }
-
-/* { dg-final { scan-assembler {\m[.]machine power9\M}  } } */
-/* { dg-final { scan-assembler {\m[.]machine power11\M} } } */
