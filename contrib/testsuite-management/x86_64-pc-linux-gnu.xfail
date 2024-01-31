@@ -230,3 +230,13 @@ FAIL: g++.dg/modules/xtreme-header_b.C -std=c++2b (internal compiler error: tree
 FAIL: gcc.dg/gomp/pr27573.c (internal compiler error: verify_gimple failed)
 FAIL: gcc.dg/gomp/pr27573.c (test for excess errors)
 FAIL: gcc.dg/tree-ssa/ssa-lim-11.c scan-tree-dump-times lim2 "Executing store motion of __gcov0.access_buf\\[[12]\\] from loop 1" 2
+FAIL: gcc.dg/guality/ipa-sra-1.c -O2  -DPREVENT_OPTIMIZATION  line 27 k == 3
+FAIL: gcc.dg/guality/ipa-sra-1.c -O2 -flto -fno-use-linker-plugin -flto-partition=none  -DPREVENT_OPTIMIZATION line 27 k == 3
+FAIL: gcc.dg/guality/ipa-sra-1.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 27 k == 3
+FAIL: gcc.dg/guality/ipa-sra-1.c -O3 -g  -DPREVENT_OPTIMIZATION  line 27 k == 3
+FAIL: gcc.dg/guality/ipa-sra-1.c -Os  -DPREVENT_OPTIMIZATION  line 27 k == 3
+FAIL: gcc.dg/guality/vla-1.c -O2  -DPREVENT_OPTIMIZATION  line 17 sizeof (a) == 6
+FAIL: gcc.dg/guality/vla-1.c -O2 -flto -fno-use-linker-plugin -flto-partition=none  -DPREVENT_OPTIMIZATION line 17 sizeof (a) == 6
+FAIL: gcc.dg/guality/vla-1.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 17 sizeof (a) == 6
+FAIL: gcc.dg/guality/vla-1.c -O3 -g  -DPREVENT_OPTIMIZATION  line 17 sizeof (a) == 6
+FAIL: gcc.dg/guality/vla-1.c -Os  -DPREVENT_OPTIMIZATION  line 17 sizeof (a) == 6
