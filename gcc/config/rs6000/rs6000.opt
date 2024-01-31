@@ -581,6 +581,9 @@ Target Undocumented Var(rs6000_speculate_indirect_jumps) Init(1) Save
 mpower10
 Target Undocumented Mask(POWER10) Var(rs6000_isa_flags) WarnRemoved
 
+mpower11
+Target Undocumented Mask(POWER11) Var(rs6000_isa_flags) Warn(%qs should not be used)
+
 mprefixed
 Target Mask(PREFIXED) Var(rs6000_isa_flags)
 Generate (do not generate) prefixed memory instructions.
