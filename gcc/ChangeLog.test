@@ -1,3 +1,15 @@
+==================== Branch work154-test, patch #706 ====================
+
+Fix power11 tests #4.
+
+2024-01-30  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/power11-1.c: Use correct target.
+	* gcc.target/powerpc/power11-2.c: Likewise.
+	* gcc.target/powerpc/power11-3.c: Likewise.
+
 ==================== Branch work154-test, patch #705 ====================
 
 Fix power11 tests #3.
