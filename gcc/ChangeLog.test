@@ -1,67 +1,26 @@
-==================== Branch work154-test, patch #706 ====================
-
-Fix power11 tests #4.
-
-2024-01-30  Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/testsuite/
-
-	* gcc.target/powerpc/power11-1.c: Use correct target.
-	* gcc.target/powerpc/power11-2.c: Likewise.
-	* gcc.target/powerpc/power11-3.c: Likewise.
-
-==================== Branch work154-test, patch #705 ====================
-
-Fix power11 tests #3.
-
-2024-01-30  Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/testsuite/
-
-	* gcc.target/powerpc/power11-1.c: Rewite;
-	* gcc.target/powerpc/power11-2.c: Rewite;
-	* gcc.target/powerpc/power11-3.c: Rewite;
-	* lib/target-supports.exp (check_effective_target_power11_ok): Rewrite.
-
-==================== Branch work154-test, patch #704 ====================
-
-Fix power11 tests #2
-
-2024-01-30  Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/testsuite/
-
-	* lib/target-supports.exp (check_effective_target_power11_ok): Fix typo.
-
-==================== Branch work154-test, patch #703 ====================
-
-Fix power11 tests #1.
-
-2024-01-30  Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/testsuite/
-
-	* lib/target-supports.exp (check_effective_target_power11_ok): Fix typo.
-
-==================== Branch work154-test, patch #702 ====================
-
-Add power11 tests.
-
-2024-01-30  Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/testsuite/
-
-	* gcc.target/powerpc/power11-1.c: New test.
-	* gcc.target/powerpc/power11-2.c: Likewise.
-	* gcc.target/powerpc/power11-3.c: Likewise.
-	* lib/target-supports.exp (check_effective_target_power11_ok): Add
-	power11 support.
-
-==================== Branch work154-test, patch #701 ====================
+==================== Branch work154-test, patch #710 ====================
 
 Initial power11 patch.
 
-2024-01-25  Michael Meissner  <meissner@linux.ibm.com>
+This patch adds -mcpu=power11 support.
+
+I did not add a separate PROCESSOR_POWER11 since power11 will generate exactly
+the same code as power10.  I did put a comment into rs6000-opts.h why we did
+not create PROCESSOR_POWER11.
+
+I used an option bit in rs6000_isa_flags to signal that we should put out a
+".machine power11" instead of ".machine power10" and also define _ARCH_PWR11.
+
+We could have a separate variable to hold the power11 status, but this would
+require adding a lot of code that would be needed when we change the cpu via
+attribute/pragma target and attribute target_clones.  We would need to pass
+additional arguments to the function rs6000_machine_from_flags and
+rs6000_target_modify_macros which only take the isa flags variable.
+
+I added some test cases to verify that -mcpu=power11, and that we can set
+power11 via a target attribute/pragma or via target_clones attribute.
+
+2024-01-31  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -88,7 +47,16 @@ gcc/
 	* config/rs6000/rs6000.opt (-mpower11): Dummy option to flag
 	-mcpu=power11.
 	* doc/invoke.texi (PowerPC options): Document -mcpu=power11.
-	* doc/invoke.texi: Ditto.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/power11-1.c: New test.
+	* gcc.target/powerpc/power11-2.c: Likewise.
+	* gcc.target/powerpc/power11-3.c: Likewise.
+	* lib/target-supports.exp (check_effective_target_power11_ok): Add
+	power11 support.
+
+==================== Branch work154-test, patches #706-700 were reverted ====================
 
 ==================== Branch work154-test, patch #2 from work154 ====================
 
