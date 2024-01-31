@@ -1,5 +1,5 @@
 /* { dg-do compile { target powerpc*-*-* } } */
-/* { dg-require-effective-target power11 } */
+/* { dg-require-effective-target power11_ok } */
 /* { dg-options "-mdejagnu-cpu=power11 -O2" } */
 
 /* Basic check to see if the compiler supports -mcpu=power11.  */

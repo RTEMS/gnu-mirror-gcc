@@ -1,5 +1,5 @@
 /* { dg-do compile { target powerpc*-*-* } } */
-/* { dg-require-effective-target power11 } */
+/* { dg-require-effective-target power11_ok } */
 /* { dg-options "-O2" } */
 
 /* Check if we can set the power11 target via a target attribute.  */
