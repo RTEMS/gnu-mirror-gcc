@@ -1,5 +1,5 @@
 // Implementation of instruction-related RTL SSA functions          -*- C++ -*-
-// Copyright (C) 2020-2023 Free Software Foundation, Inc.
+// Copyright (C) 2020-2024 Free Software Foundation, Inc.
 //
 // This file is part of GCC.
 //
@@ -191,6 +191,11 @@ insn_info::print_full (pretty_printer *pp) const
 	    {
 	      pp_newline_and_indent (pp, 0);
 	      pp_string (pp, "has volatile refs");
+	    }
+	  if (m_is_temp)
+	    {
+	      pp_newline_and_indent (pp, 0);
+	      pp_string (pp, "temporary");
 	    }
 	}
       pp_indentation (pp) -= 2;
@@ -515,9 +520,14 @@ function_info::record_use (build_info &bi, insn_info *insn,
       // the instruction (unusually) references the same register in two
       // different but equal-sized modes.
       gcc_checking_assert (use->insn () == insn);
-      if (HARD_REGISTER_NUM_P (regno)
-	  && partial_subreg_p (use->mode (), mode))
-	use->set_mode (mode);
+      if (HARD_REGISTER_NUM_P (regno))
+	{
+	  if (!ordered_p (GET_MODE_PRECISION (use->mode ()),
+			  GET_MODE_PRECISION (mode)))
+	    use->set_mode (reg_raw_mode[regno]);
+	  else if (partial_subreg_p (use->mode (), mode))
+	    use->set_mode (mode);
+	}
       use->record_reference (ref, false);
     }
 }

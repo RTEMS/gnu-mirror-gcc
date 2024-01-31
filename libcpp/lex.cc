@@ -1,5 +1,5 @@
 /* CPP Library - lexical analysis.
-   Copyright (C) 2000-2023 Free Software Foundation, Inc.
+   Copyright (C) 2000-2024 Free Software Foundation, Inc.
    Contributed by Per Bothner, 1994-95.
    Based on CCCP program by Paul Rubin, June 1986
    Adapted to ANSI C, Richard Stallman, Jan 1987
@@ -3809,7 +3809,7 @@ _cpp_get_fresh_line (cpp_reader *pfile)
 cpp_token *
 _cpp_lex_direct (cpp_reader *pfile)
 {
-  cppchar_t c;
+  cppchar_t c = 0;
   cpp_buffer *buffer;
   const unsigned char *comment_start;
   bool fallthrough_comment = false;
@@ -3833,6 +3833,7 @@ _cpp_lex_direct (cpp_reader *pfile)
 	  pfile->state.in_deferred_pragma = false;
 	  if (!pfile->state.pragma_allow_expansion)
 	    pfile->state.prevent_expansion--;
+	  result->src_loc = pfile->line_table->highest_line;
 	  return result;
 	}
       if (!_cpp_get_fresh_line (pfile))
@@ -3849,6 +3850,8 @@ _cpp_lex_direct (cpp_reader *pfile)
 	      /* Now pop the buffer that _cpp_get_fresh_line did not.  */
 	      _cpp_pop_buffer (pfile);
 	    }
+	  else if (c == 0)
+	    result->src_loc = pfile->line_table->highest_line;
 	  return result;
 	}
       if (buffer != pfile->buffer)
@@ -4762,7 +4765,7 @@ new_buff (size_t len)
     len = MIN_BUFF_SIZE;
   len = CPP_ALIGN (len);
 
-#ifdef ENABLE_VALGRIND_ANNOTATIONS
+#ifdef ENABLE_VALGRIND_WORKAROUNDS
   /* Valgrind warns about uses of interior pointers, so put _cpp_buff
      struct first.  */
   size_t slen = CPP_ALIGN2 (sizeof (_cpp_buff), 2 * DEFAULT_ALIGNMENT);
@@ -4859,7 +4862,7 @@ _cpp_free_buff (_cpp_buff *buff)
   for (; buff; buff = next)
     {
       next = buff->next;
-#ifdef ENABLE_VALGRIND_ANNOTATIONS
+#ifdef ENABLE_VALGRIND_WORKAROUNDS
       free (buff);
 #else
       free (buff->base);

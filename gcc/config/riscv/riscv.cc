@@ -1,5 +1,5 @@
 /* Subroutines used for code generation for RISC-V.
-   Copyright (C) 2011-2023 Free Software Foundation, Inc.
+   Copyright (C) 2011-2024 Free Software Foundation, Inc.
    Contributed by Andrew Waterman (andrew@sifive.com).
    Based on MIPS target for GNU compiler.
 
@@ -43,6 +43,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "calls.h"
 #include "function.h"
 #include "explow.h"
+#include "ifcvt.h"
 #include "memmodel.h"
 #include "emit-rtl.h"
 #include "reload.h"
@@ -94,14 +95,21 @@ along with GCC; see the file COPYING3.  If not see
 #define UNSPEC_ADDRESS_TYPE(X) \
   ((enum riscv_symbol_type) (XINT (X, 1) - UNSPEC_ADDRESS_FIRST))
 
-/* True if bit BIT is set in VALUE.  */
-#define BITSET_P(VALUE, BIT) (((VALUE) & (1ULL << (BIT))) != 0)
-
 /* Extract the backup dynamic frm rtl.  */
 #define DYNAMIC_FRM_RTL(c) ((c)->machine->mode_sw_info.dynamic_frm)
 
 /* True the mode switching has static frm, or false.  */
 #define STATIC_FRM_P(c) ((c)->machine->mode_sw_info.static_frm_p)
+
+/* True if we can use the instructions in the XTheadInt extension
+   to handle interrupts, or false.  */
+#define TH_INT_INTERRUPT(c)						\
+  (TARGET_XTHEADINT							\
+   /* The XTheadInt extension only supports rv32.  */			\
+   && !TARGET_64BIT							\
+   && (c)->machine->interrupt_handler_p					\
+   /* The XTheadInt instructions can only be executed in M-mode.  */	\
+   && (c)->machine->interrupt_mode == MACHINE_MODE)
 
 /* Information about a function's frame layout.  */
 struct GTY(())  riscv_frame_info {
@@ -280,6 +288,7 @@ struct riscv_tune_param
   bool slow_unaligned_access;
   bool use_divmod_expansion;
   unsigned int fusible_ops;
+  const struct cpu_vector_cost *vec_costs;
 };
 
 
@@ -293,6 +302,9 @@ bool riscv_user_wants_strict_align;
 
 /* Stack alignment to assume/maintain.  */
 unsigned riscv_stack_boundary;
+
+/* Whether in riscv_output_mi_thunk. */
+static bool riscv_in_thunk_func = false;
 
 /* If non-zero, this is an offset to be added to SP to redefine the CFA
    when restoring the FP register from the stack.  Only valid when generating
@@ -347,6 +359,60 @@ const enum reg_class riscv_regno_to_class[FIRST_PSEUDO_REGISTER] = {
   VD_REGS,	VD_REGS,	VD_REGS,	VD_REGS,
 };
 
+/* RVV costs for VLS vector operations.   */
+static const common_vector_cost rvv_vls_vector_cost = {
+  1, /* int_stmt_cost  */
+  1, /* fp_stmt_cost  */
+  1, /* gather_load_cost  */
+  1, /* scatter_store_cost  */
+  1, /* vec_to_scalar_cost  */
+  1, /* scalar_to_vec_cost  */
+  1, /* permute_cost  */
+  1, /* align_load_cost  */
+  1, /* align_store_cost  */
+  2, /* unalign_load_cost  */
+  2, /* unalign_store_cost  */
+};
+
+/* RVV costs for VLA vector operations.  */
+static const scalable_vector_cost rvv_vla_vector_cost = {
+  {
+    1, /* int_stmt_cost  */
+    1, /* fp_stmt_cost  */
+    1, /* gather_load_cost  */
+    1, /* scatter_store_cost  */
+    1, /* vec_to_scalar_cost  */
+    1, /* scalar_to_vec_cost  */
+    1, /* permute_cost  */
+    1, /* align_load_cost  */
+    1, /* align_store_cost  */
+    2, /* unalign_load_cost  */
+    2, /* unalign_store_cost  */
+  },
+};
+
+/* RVV register move cost.   */
+static const regmove_vector_cost rvv_regmove_vector_cost = {
+  2, /* GR2VR  */
+  2, /* FR2VR  */
+  2, /* VR2GR  */
+  2, /* VR2FR  */
+};
+
+/* Generic costs for vector insn classes.  It is supposed to be the vector cost
+   models used by default if no other cost model was specified.  */
+static const struct cpu_vector_cost generic_vector_cost = {
+  1,			    /* scalar_int_stmt_cost  */
+  1,			    /* scalar_fp_stmt_cost  */
+  1,			    /* scalar_load_cost  */
+  1,			    /* scalar_store_cost  */
+  3,			    /* cond_taken_branch_cost  */
+  1,			    /* cond_not_taken_branch_cost  */
+  &rvv_vls_vector_cost,	    /* vls  */
+  &rvv_vla_vector_cost,	    /* vla  */
+  &rvv_regmove_vector_cost, /* regmove  */
+};
+
 /* Costs to use when optimizing for rocket.  */
 static const struct riscv_tune_param rocket_tune_info = {
   {COSTS_N_INSNS (4), COSTS_N_INSNS (5)},	/* fp_add */
@@ -361,6 +427,7 @@ static const struct riscv_tune_param rocket_tune_info = {
   true,						/* slow_unaligned_access */
   false,					/* use_divmod_expansion */
   RISCV_FUSE_NOTHING,                           /* fusible_ops */
+  NULL,						/* vector cost */
 };
 
 /* Costs to use when optimizing for Sifive 7 Series.  */
@@ -377,6 +444,7 @@ static const struct riscv_tune_param sifive_7_tune_info = {
   true,						/* slow_unaligned_access */
   false,					/* use_divmod_expansion */
   RISCV_FUSE_NOTHING,                           /* fusible_ops */
+  NULL,						/* vector cost */
 };
 
 /* Costs to use when optimizing for T-HEAD c906.  */
@@ -393,6 +461,7 @@ static const struct riscv_tune_param thead_c906_tune_info = {
   false,            /* slow_unaligned_access */
   false,	/* use_divmod_expansion */
   RISCV_FUSE_NOTHING,                           /* fusible_ops */
+  NULL,						/* vector cost */
 };
 
 /* Costs to use when optimizing for a generic ooo profile.  */
@@ -409,6 +478,7 @@ static const struct riscv_tune_param generic_ooo_tune_info = {
   false,					/* slow_unaligned_access */
   false,					/* use_divmod_expansion */
   RISCV_FUSE_NOTHING,                           /* fusible_ops */
+  &generic_vector_cost,				/* vector cost */
 };
 
 /* Costs to use when optimizing for size.  */
@@ -425,15 +495,15 @@ static const struct riscv_tune_param optimize_size_tune_info = {
   false,					/* slow_unaligned_access */
   false,					/* use_divmod_expansion */
   RISCV_FUSE_NOTHING,                           /* fusible_ops */
+  NULL,						/* vector cost */
 };
 
 static bool riscv_avoid_shrink_wrapping_separate ();
 static tree riscv_handle_fndecl_attribute (tree *, tree, tree, int, bool *);
 static tree riscv_handle_type_attribute (tree *, tree, tree, int, bool *);
-static void riscv_legitimize_poly_move (machine_mode, rtx, rtx, rtx);
 
 /* Defining target-specific uses of __attribute__.  */
-static const struct attribute_spec riscv_attribute_table[] =
+TARGET_GNU_ATTRIBUTES (riscv_attribute_table,
 {
   /* Syntax: { name, min_len, max_len, decl_required, type_required,
 	       function_type_required, affects_type_identity, handler,
@@ -449,11 +519,8 @@ static const struct attribute_spec riscv_attribute_table[] =
   /* The following two are used for the built-in properties of the Vector type
      and are not used externally */
   {"RVV sizeless type", 4, 4, false, true, false, true, NULL, NULL},
-  {"RVV type", 0, 0, false, true, false, true, NULL, NULL},
-
-  /* The last attribute spec is set to be NULL.  */
-  { NULL,	0,  0, false, false, false, false, NULL, NULL }
-};
+  {"RVV type", 0, 0, false, true, false, true, NULL, NULL}
+});
 
 /* Order for the CLOBBERs/USEs of gpr_save.  */
 static const unsigned gpr_save_reg_order[] = {
@@ -831,7 +898,17 @@ riscv_classify_symbol (const_rtx x)
   if (GET_CODE (x) == SYMBOL_REF && flag_pic && !riscv_symbol_binds_local_p (x))
     return SYMBOL_GOT_DISP;
 
-  return riscv_cmodel == CM_MEDLOW ? SYMBOL_ABSOLUTE : SYMBOL_PCREL;
+  switch (riscv_cmodel)
+    {
+    case CM_MEDLOW:
+      return SYMBOL_ABSOLUTE;
+    case CM_LARGE:
+      if (SYMBOL_REF_P (x))
+	return CONSTANT_POOL_ADDRESS_P (x) ? SYMBOL_PCREL : SYMBOL_FORCE_TO_MEM;
+      return SYMBOL_PCREL;
+    default:
+      return SYMBOL_PCREL;
+    }
 }
 
 /* Classify the base of symbolic expression X.  */
@@ -895,6 +972,7 @@ static int riscv_symbol_insns (enum riscv_symbol_type type)
     case SYMBOL_PCREL: return 2; /* AUIPC + the reference.  */
     case SYMBOL_TLS_LE: return 3; /* LUI + ADD TP + the reference.  */
     case SYMBOL_GOT_DISP: return 3; /* AUIPC + LD GOT + the reference.  */
+    case SYMBOL_FORCE_TO_MEM: return 3; /* AUIPC + LD + the reference.  */
     default: gcc_unreachable ();
     }
 }
@@ -1064,6 +1142,9 @@ riscv_cannot_force_const_mem (machine_mode mode ATTRIBUTE_UNUSED, rtx x)
   split_const (x, &base, &offset);
   if (riscv_symbolic_constant_p (base, &type))
     {
+      if (type == SYMBOL_FORCE_TO_MEM)
+	return false;
+
       /* As an optimization, don't spill symbolic constants that are as
 	 cheap to rematerialize as to access in the constant pool.  */
       if (SMALL_OPERAND (INTVAL (offset)) && riscv_symbol_insns (type) > 0)
@@ -1289,13 +1370,51 @@ riscv_v_ext_vls_mode_p (machine_mode mode)
   return false;
 }
 
-/* Return true if it is either RVV vector mode or RVV tuple mode.  */
+/* Return true if it is either of below modes.
+   1. RVV vector mode.
+   2. RVV tuple mode.
+   3. RVV vls mode.  */
 
 static bool
 riscv_v_ext_mode_p (machine_mode mode)
 {
   return riscv_v_ext_vector_mode_p (mode) || riscv_v_ext_tuple_mode_p (mode)
 	 || riscv_v_ext_vls_mode_p (mode);
+}
+
+static unsigned
+riscv_v_vls_mode_aggregate_gpr_count (unsigned vls_unit_size,
+				      unsigned scalar_unit_size)
+{
+  gcc_assert (vls_unit_size != 0 && scalar_unit_size != 0);
+
+  if (vls_unit_size < scalar_unit_size)
+    return 1;
+
+  /* Ensure the vls mode is exact_div by scalar_unit_size.  */
+  gcc_assert ((vls_unit_size % scalar_unit_size) == 0);
+
+  return vls_unit_size / scalar_unit_size;
+}
+
+static machine_mode
+riscv_v_vls_to_gpr_mode (unsigned vls_mode_size)
+{
+  switch (vls_mode_size)
+    {
+      case 16:
+	return TImode;
+      case 8:
+	return DImode;
+      case 4:
+	return SImode;
+      case 2:
+	return HImode;
+      case 1:
+	return QImode;
+      default:
+	gcc_unreachable ();
+    }
 }
 
 /* Call from ADJUST_NUNITS in riscv-modes.def. Return the correct
@@ -1342,6 +1461,9 @@ riscv_v_adjust_bytesize (machine_mode mode, int scale)
 {
   if (riscv_v_ext_vector_mode_p (mode))
     {
+      if (TARGET_XTHEADVECTOR)
+	return BYTES_PER_RISCV_VECTOR;
+
       poly_int64 nunits = GET_MODE_NUNITS (mode);
       poly_int64 mode_size = GET_MODE_SIZE (mode);
 
@@ -1598,6 +1720,14 @@ riscv_const_insns (rtx x)
 	    rtx elt;
 	    if (const_vec_duplicate_p (x, &elt))
 	      {
+		/* We don't allow CONST_VECTOR for DI vector on RV32
+		   system since the ELT constant value can not held
+		   within a single register to disable reload a DI
+		   register vec_duplicate into vmv.v.x.  */
+		scalar_mode smode = GET_MODE_INNER (GET_MODE (x));
+		if (maybe_gt (GET_MODE_SIZE (smode), UNITS_PER_WORD)
+		    && !immediate_operand (elt, Pmode))
+		  return 0;
 		/* Constants from -16 to 15 can be loaded with vmv.v.i.
 		   The Wc0, Wc1 constraints are already covered by the
 		   vi constraint so we do not need to check them here
@@ -1721,6 +1851,14 @@ riscv_emit_set (rtx target, rtx src)
 {
   emit_insn (gen_rtx_SET (target, src));
   return target;
+}
+
+/* Emit an instruction of the form (set DEST (CODE X)).  */
+
+rtx
+riscv_emit_unary (enum rtx_code code, rtx dest, rtx x)
+{
+  return riscv_emit_set (dest, gen_rtx_fmt_e (code, GET_MODE (dest), x));
 }
 
 /* Emit an instruction of the form (set DEST (CODE X Y)).  */
@@ -1875,6 +2013,9 @@ riscv_split_symbol (rtx temp, rtx addr, machine_mode mode, rtx *low_out)
   if (low_out)
     switch (symbol_type)
       {
+      case SYMBOL_FORCE_TO_MEM:
+	return false;
+
       case SYMBOL_ABSOLUTE:
 	{
 	  rtx high = gen_rtx_HIGH (Pmode, copy_rtx (addr));
@@ -2032,7 +2173,20 @@ static rtx
 riscv_force_address (rtx x, machine_mode mode)
 {
   if (!riscv_legitimate_address_p (mode, x, false))
-    x = force_reg (Pmode, x);
+    {
+      if (can_create_pseudo_p ())
+	return force_reg (Pmode, x);
+      else
+	{
+	  /* It's only safe for the thunk function.
+	     Use ra as the temp regiater.  */
+	  gcc_assert (riscv_in_thunk_func);
+	  rtx reg = RISCV_PROLOGUE_TEMP2 (Pmode);
+	  riscv_emit_move (reg, x);
+	  return reg;
+	}
+    }
+
   return x;
 }
 
@@ -2308,7 +2462,7 @@ riscv_expand_op (enum rtx_code code, machine_mode mode, rtx op0, rtx op1,
 
 static void
 riscv_expand_mult_with_const_int (machine_mode mode, rtx dest, rtx multiplicand,
-				  int multiplier)
+				  HOST_WIDE_INT multiplier)
 {
   if (multiplier == 0)
     {
@@ -2317,7 +2471,7 @@ riscv_expand_mult_with_const_int (machine_mode mode, rtx dest, rtx multiplicand,
     }
 
   bool neg_p = multiplier < 0;
-  int multiplier_abs = abs (multiplier);
+  unsigned HOST_WIDE_INT multiplier_abs = abs (multiplier);
 
   if (multiplier_abs == 1)
     {
@@ -2408,12 +2562,14 @@ riscv_expand_mult_with_const_int (machine_mode mode, rtx dest, rtx multiplicand,
 
 /* Analyze src and emit const_poly_int mov sequence.  */
 
-static void
+void
 riscv_legitimize_poly_move (machine_mode mode, rtx dest, rtx tmp, rtx src)
 {
   poly_int64 value = rtx_to_poly_int64 (src);
-  int offset = value.coeffs[0];
-  int factor = value.coeffs[1];
+  /* It use HOST_WIDE_INT intead of int since 32bit type is not enough
+     for e.g. (const_poly_int:DI [549755813888, 549755813888]).  */
+  HOST_WIDE_INT offset = value.coeffs[0];
+  HOST_WIDE_INT factor = value.coeffs[1];
   int vlenb = BYTES_PER_RISCV_VECTOR.coeffs[1];
   int div_factor = 0;
   /* Calculate (const_poly_int:MODE [m, n]) using scalar instructions.
@@ -2588,51 +2744,73 @@ riscv_legitimize_move (machine_mode mode, rtx dest, rtx src)
       unsigned int nunits = vmode_size > mode_size ? vmode_size / mode_size : 1;
       scalar_mode smode = as_a<scalar_mode> (mode);
       unsigned int index = SUBREG_BYTE (src).to_constant () / mode_size;
-      unsigned int num = smode == DImode && !TARGET_VECTOR_ELEN_64 ? 2 : 1;
+      unsigned int num = known_eq (GET_MODE_SIZE (smode), 8)
+	&& !TARGET_VECTOR_ELEN_64 ? 2 : 1;
+      bool need_int_reg_p = false;
 
       if (num == 2)
 	{
 	  /* If we want to extract 64bit value but ELEN < 64,
 	     we use RVV vector mode with EEW = 32 to extract
 	     the highpart and lowpart.  */
+	  need_int_reg_p = smode == DFmode;
 	  smode = SImode;
 	  nunits = nunits * 2;
 	}
-      vmode = riscv_vector::get_vector_mode (smode, nunits).require ();
-      enum insn_code icode
-	= convert_optab_handler (vec_extract_optab, vmode, smode);
-      gcc_assert (icode != CODE_FOR_nothing);
-      rtx v = gen_lowpart (vmode, SUBREG_REG (src));
 
-      for (unsigned int i = 0; i < num; i++)
+      if (riscv_vector::get_vector_mode (smode, nunits).exists (&vmode))
 	{
-	  class expand_operand ops[3];
-	  rtx result;
-	  if (num == 1)
-	    result = dest;
-	  else if (i == 0)
-	    result = gen_lowpart (smode, dest);
-	  else
-	    result = gen_reg_rtx (smode);
-	  create_output_operand (&ops[0], result, smode);
-	  ops[0].target = 1;
-	  create_input_operand (&ops[1], v, vmode);
-	  create_integer_operand (&ops[2], index + i);
-	  expand_insn (icode, 3, ops);
-	  if (ops[0].value != result)
-	    emit_move_insn (result, ops[0].value);
+	  rtx v = gen_lowpart (vmode, SUBREG_REG (src));
+	  rtx int_reg = dest;
 
-	  if (i == 1)
+	  if (need_int_reg_p)
 	    {
-	      rtx tmp
-		= expand_binop (Pmode, ashl_optab, gen_lowpart (Pmode, result),
-				gen_int_mode (32, Pmode), NULL_RTX, 0,
-				OPTAB_DIRECT);
-	      rtx tmp2 = expand_binop (Pmode, ior_optab, tmp, dest, NULL_RTX, 0,
-				       OPTAB_DIRECT);
-	      emit_move_insn (dest, tmp2);
+	      int_reg = gen_reg_rtx (DImode);
+	      emit_move_insn (int_reg, gen_lowpart (GET_MODE (int_reg), dest));
 	    }
+
+	  for (unsigned int i = 0; i < num; i++)
+	    {
+	      rtx result;
+	      if (num == 1)
+		result = int_reg;
+	      else if (i == 0)
+		result = gen_lowpart (smode, int_reg);
+	      else
+		result = gen_reg_rtx (smode);
+
+	      riscv_vector::emit_vec_extract (result, v,
+					      gen_int_mode (index + i, Pmode));
+
+	      if (i == 1)
+		{
+		  if (UNITS_PER_WORD < mode_size)
+		    /* If Pmode = SImode and mode = DImode, we just need to
+		       extract element of index = 1 from the vector and move it
+		       into the highpart of the DEST since DEST consists of 2
+		       scalar registers.  */
+		    emit_move_insn (gen_highpart (smode, int_reg), result);
+		  else
+		    {
+		      rtx tmp = expand_binop (Pmode, ashl_optab,
+					      gen_lowpart (Pmode, result),
+					      gen_int_mode (32, Pmode),
+					      NULL_RTX, 0, OPTAB_DIRECT);
+		      rtx tmp2 = expand_binop (Pmode, ior_optab, tmp, int_reg,
+					       NULL_RTX, 0, OPTAB_DIRECT);
+		      emit_move_insn (int_reg, tmp2);
+		    }
+		}
+	    }
+
+	  if (need_int_reg_p)
+	    emit_move_insn (dest, gen_lowpart (GET_MODE (dest), int_reg));
+	  else
+	    emit_move_insn (dest, int_reg);
 	}
+      else
+	gcc_unreachable ();
+
       return true;
     }
   /* Expand
@@ -2686,6 +2864,37 @@ riscv_legitimize_move (machine_mode mode, rtx dest, rtx src)
       riscv_emit_move (dest, reg);
       return true;
     }
+
+  /* In order to fit NaN boxing, expand
+     (set FP_REG (reg:HF src))
+     to
+     (set (reg:SI/DI mask) (const_int -65536)
+     (set (reg:SI/DI temp) (zero_extend:SI/DI (subreg:HI (reg:HF src) 0)))
+     (set (reg:SI/DI temp) (ior:SI/DI (reg:SI/DI mask) (reg:SI/DI temp)))
+     (set (reg:HF dest) (unspec:HF [ (reg:SI/DI temp) ] UNSPEC_FMV_SFP16_X))
+     */
+
+ if (TARGET_HARD_FLOAT
+     && !TARGET_ZFHMIN && mode == HFmode
+     && REG_P (dest) && FP_REG_P (REGNO (dest))
+     && REG_P (src) && !FP_REG_P (REGNO (src))
+     && can_create_pseudo_p ())
+   {
+     rtx mask = force_reg (word_mode, gen_int_mode (-65536, word_mode));
+     rtx temp = gen_reg_rtx (word_mode);
+     emit_insn (gen_extend_insn (temp,
+				 simplify_gen_subreg (HImode, src, mode, 0),
+				 word_mode, HImode, 1));
+     if (word_mode == SImode)
+       emit_insn (gen_iorsi3 (temp, mask, temp));
+     else
+       emit_insn (gen_iordi3 (temp, mask, temp));
+
+     riscv_emit_move (dest, gen_rtx_UNSPEC (HFmode, gen_rtvec (1, temp),
+					    UNSPEC_FMV_SFP16_X));
+
+     return true;
+   }
 
   /* We need to deal with constants that would be legitimate
      immediate_operands but aren't legitimate move_operands.  */
@@ -2926,7 +3135,7 @@ riscv_rtx_costs (rtx x, machine_mode mode, int outer_code, int opno ATTRIBUTE_UN
 	      *total = COSTS_N_INSNS (SINGLE_SHIFT_COST + 1);
 	      return true;
 	    }
-	  if (order_operator (XEXP (x, 0), mode))
+	  if (ordered_comparison_operator (XEXP (x, 0), mode))
 	    {
 	      *total = COSTS_N_INSNS (1);
 	      return true;
@@ -3314,6 +3523,129 @@ riscv_address_cost (rtx addr, machine_mode mode,
       && !riscv_compressed_lw_address_p (addr))
     return riscv_address_insns (addr, mode, false) + 1;
   return riscv_address_insns (addr, mode, false);
+}
+
+/* Implement TARGET_INSN_COST.  We factor in the branch cost in the cost
+   calculation for conditional branches: one unit is considered the cost
+   of microarchitecture-dependent actual branch execution and therefore
+   multiplied by BRANCH_COST and any remaining units are considered fixed
+   branch overhead.  Branches on a floating-point condition incur an extra
+   instruction cost as they will be split into an FCMP operation followed
+   by a branch on an integer condition.  */
+
+static int
+riscv_insn_cost (rtx_insn *insn, bool speed)
+{
+  rtx x = PATTERN (insn);
+  int cost = pattern_cost (x, speed);
+
+  if (JUMP_P (insn))
+    {
+      if (GET_CODE (x) == PARALLEL)
+	x = XVECEXP (x, 0, 0);
+      if (GET_CODE (x) == SET
+	  && GET_CODE (SET_DEST (x)) == PC
+	  && GET_CODE (SET_SRC (x)) == IF_THEN_ELSE)
+	{
+	  cost += COSTS_N_INSNS (BRANCH_COST (speed, false) - 1);
+	  if (FLOAT_MODE_P (GET_MODE (XEXP (XEXP (SET_SRC (x), 0), 0))))
+	    cost += COSTS_N_INSNS (1);
+	}
+    }
+  return cost;
+}
+
+/* Implement TARGET_MAX_NOCE_IFCVT_SEQ_COST.  Like the default implementation,
+   but we consider cost units of branch instructions equal to cost units of
+   other instructions.  */
+
+static unsigned int
+riscv_max_noce_ifcvt_seq_cost (edge e)
+{
+  bool predictable_p = predictable_edge_p (e);
+
+  if (predictable_p)
+    {
+      if (OPTION_SET_P (param_max_rtl_if_conversion_predictable_cost))
+	return param_max_rtl_if_conversion_predictable_cost;
+    }
+  else
+    {
+      if (OPTION_SET_P (param_max_rtl_if_conversion_unpredictable_cost))
+	return param_max_rtl_if_conversion_unpredictable_cost;
+    }
+
+  return COSTS_N_INSNS (BRANCH_COST (true, predictable_p));
+}
+
+/* Implement TARGET_NOCE_CONVERSION_PROFITABLE_P.  We replace the cost of a
+   conditional branch assumed by `noce_find_if_block' at `COSTS_N_INSNS (2)'
+   by our actual conditional branch cost, observing that our branches test
+   conditions directly, so there is no preparatory extra condition-set
+   instruction.  */
+
+static bool
+riscv_noce_conversion_profitable_p (rtx_insn *seq,
+				    struct noce_if_info *if_info)
+{
+  struct noce_if_info riscv_if_info = *if_info;
+
+  riscv_if_info.original_cost -= COSTS_N_INSNS (2);
+  riscv_if_info.original_cost += insn_cost (if_info->jump, if_info->speed_p);
+
+  /* Hack alert!  When `noce_try_store_flag_mask' uses `cstore<mode>4'
+     to emit a conditional set operation on DImode output it comes up
+     with a sequence such as:
+
+     (insn 26 0 27 (set (reg:SI 140)
+	     (eq:SI (reg/v:DI 137 [ c ])
+		 (const_int 0 [0]))) 302 {*seq_zero_disi}
+	  (nil))
+     (insn 27 26 28 (set (reg:DI 139)
+	     (zero_extend:DI (reg:SI 140))) 116 {*zero_extendsidi2_internal}
+	  (nil))
+
+     because our `cstore<mode>4' pattern expands to an insn that gives
+     a SImode output.  The output of conditional set is 0 or 1 boolean,
+     so it is valid for input in any scalar integer mode and therefore
+     combine later folds the zero extend operation into an equivalent
+     conditional set operation that produces a DImode output, however
+     this redundant zero extend operation counts towards the cost of
+     the replacement sequence.  Compensate for that by incrementing the
+     cost of the original sequence as well as the maximum sequence cost
+     accordingly.  Likewise for sign extension.  */
+  rtx last_dest = NULL_RTX;
+  for (rtx_insn *insn = seq; insn; insn = NEXT_INSN (insn))
+    {
+      if (!NONDEBUG_INSN_P (insn))
+	continue;
+
+      rtx x = PATTERN (insn);
+      if (NONJUMP_INSN_P (insn)
+	  && GET_CODE (x) == SET)
+	{
+	  rtx src = SET_SRC (x);
+	  enum rtx_code code = GET_CODE (src);
+	  if (last_dest != NULL_RTX
+	      && (code == SIGN_EXTEND || code == ZERO_EXTEND)
+	      && REG_P (XEXP (src, 0))
+	      && REGNO (XEXP (src, 0)) == REGNO (last_dest))
+	    {
+	      riscv_if_info.original_cost += COSTS_N_INSNS (1);
+	      riscv_if_info.max_seq_cost += COSTS_N_INSNS (1);
+	    }
+	  last_dest = NULL_RTX;
+	  rtx dest = SET_DEST (x);
+	  if (COMPARISON_P (src)
+	      && REG_P (dest)
+	      && GET_MODE (dest) == SImode)
+	    last_dest = dest;
+	}
+      else
+	last_dest = NULL_RTX;
+    }
+
+  return default_noce_conversion_profitable_p (seq, &riscv_if_info);
 }
 
 /* Return one word of double-word value OP.  HIGH_P is true to select the
@@ -3800,6 +4132,7 @@ riscv_emit_int_compare (enum rtx_code *code, rtx *op0, rtx *op1,
 	  *op1 = const0_rtx;
 	  return;
 	}
+      gcc_unreachable ();
     }
 
   if (splittable_const_int_operand (*op1, VOIDmode))
@@ -3854,7 +4187,8 @@ riscv_emit_int_compare (enum rtx_code *code, rtx *op0, rtx *op1,
 /* Like riscv_emit_int_compare, but for floating-point comparisons.  */
 
 static void
-riscv_emit_float_compare (enum rtx_code *code, rtx *op0, rtx *op1)
+riscv_emit_float_compare (enum rtx_code *code, rtx *op0, rtx *op1,
+			  bool *invert_ptr = nullptr)
 {
   rtx tmp0, tmp1, cmp_op0 = *op0, cmp_op1 = *op1;
   enum rtx_code fp_code = *code;
@@ -3919,8 +4253,14 @@ riscv_emit_float_compare (enum rtx_code *code, rtx *op0, rtx *op1)
 
     case NE:
       fp_code = EQ;
-      *code = EQ;
-      /* Fall through.  */
+      if (invert_ptr != nullptr)
+	*invert_ptr = !*invert_ptr;
+      else
+	{
+	  cmp_op0 = riscv_force_binary (word_mode, fp_code, cmp_op0, cmp_op1);
+	  cmp_op1 = const0_rtx;
+	}
+      gcc_fallthrough ();
 
     case EQ:
     case LE:
@@ -3928,8 +4268,9 @@ riscv_emit_float_compare (enum rtx_code *code, rtx *op0, rtx *op1)
     case GE:
     case GT:
       /* We have instructions for these cases.  */
-      *op0 = riscv_force_binary (word_mode, fp_code, cmp_op0, cmp_op1);
-      *op1 = const0_rtx;
+      *code = fp_code;
+      *op0 = cmp_op0;
+      *op1 = cmp_op1;
       break;
 
     case LTGT:
@@ -3965,12 +4306,19 @@ riscv_expand_int_scc (rtx target, enum rtx_code code, rtx op0, rtx op1, bool *in
 /* Like riscv_expand_int_scc, but for floating-point comparisons.  */
 
 void
-riscv_expand_float_scc (rtx target, enum rtx_code code, rtx op0, rtx op1)
+riscv_expand_float_scc (rtx target, enum rtx_code code, rtx op0, rtx op1,
+			bool *invert_ptr)
 {
-  riscv_emit_float_compare (&code, &op0, &op1);
+  riscv_emit_float_compare (&code, &op0, &op1, invert_ptr);
 
-  rtx cmp = riscv_force_binary (word_mode, code, op0, op1);
-  riscv_emit_set (target, lowpart_subreg (SImode, cmp, word_mode));
+  machine_mode mode = GET_MODE (target);
+  if (mode != word_mode)
+    {
+      rtx cmp = riscv_force_binary (word_mode, code, op0, op1);
+      riscv_emit_set (target, lowpart_subreg (mode, cmp, word_mode));
+    }
+  else
+    riscv_emit_binary (code, target, op0, op1);
 }
 
 /* Jump to LABEL if (CODE OP0 OP1) holds.  */
@@ -3982,6 +4330,13 @@ riscv_expand_conditional_branch (rtx label, rtx_code code, rtx op0, rtx op1)
     riscv_emit_float_compare (&code, &op0, &op1);
   else
     riscv_emit_int_compare (&code, &op0, &op1);
+
+  if (FLOAT_MODE_P (GET_MODE (op0)))
+    {
+      op0 = riscv_force_binary (word_mode, code, op0, op1);
+      op1 = const0_rtx;
+      code = NE;
+    }
 
   rtx condition = gen_rtx_fmt_ee (code, VOIDmode, op0, op1);
   emit_jump_insn (gen_condjump (condition, label));
@@ -3997,87 +4352,105 @@ riscv_expand_conditional_move (rtx dest, rtx op, rtx cons, rtx alt)
   rtx_code code = GET_CODE (op);
   rtx op0 = XEXP (op, 0);
   rtx op1 = XEXP (op, 1);
-  bool need_eq_ne_p = false;
 
-  if (TARGET_XTHEADCONDMOV
-      && GET_MODE_CLASS (mode) == MODE_INT
-      && reg_or_0_operand (cons, mode)
-      && reg_or_0_operand (alt, mode)
-      && (GET_MODE (op) == mode || GET_MODE (op) == E_VOIDmode)
-      && GET_MODE (op0) == mode
-      && GET_MODE (op1) == mode
-      && (code == EQ || code == NE))
-    need_eq_ne_p = true;
-
-  if (need_eq_ne_p
-      || (TARGET_SFB_ALU && GET_MODE (op0) == word_mode))
+  if (((TARGET_ZICOND_LIKE
+	|| (arith_operand (cons, mode) && arith_operand (alt, mode)))
+       && (GET_MODE_CLASS (mode) == MODE_INT))
+      || TARGET_SFB_ALU || TARGET_XTHEADCONDMOV)
     {
-      riscv_emit_int_compare (&code, &op0, &op1, need_eq_ne_p);
-      rtx cond = gen_rtx_fmt_ee (code, GET_MODE (op0), op0, op1);
+      machine_mode mode0 = GET_MODE (op0);
+      machine_mode mode1 = GET_MODE (op1);
 
-      /* The expander is a bit loose in its specification of the true
-	 arm of the conditional move.  That allows us to support more
-	 cases for extensions which are more general than SFB.  But
-	 does mean we need to force CONS into a register at this point.  */
-      cons = force_reg (GET_MODE (dest), cons);
-      emit_insn (gen_rtx_SET (dest, gen_rtx_IF_THEN_ELSE (GET_MODE (dest),
-							  cond, cons, alt)));
-      return true;
-    }
-  else if (TARGET_ZICOND_LIKE
-	   && GET_MODE_CLASS (mode) == MODE_INT)
-    {
-      /* The comparison must be comparing WORD_MODE objects.   We must
-	 enforce that so that we don't strip away a sign_extension
+      /* An integer comparison must be comparing WORD_MODE objects.  We
+	 must enforce that so that we don't strip away a sign_extension
 	 thinking it is unnecessary.  We might consider using
 	 riscv_extend_operands if they are not already properly extended.  */
-      if ((GET_MODE (op0) != word_mode && GET_MODE (op0) != VOIDmode)
-	  || (GET_MODE (op1) != word_mode && GET_MODE (op1) != VOIDmode))
+      if ((INTEGRAL_MODE_P (mode0) && mode0 != word_mode)
+	  || (INTEGRAL_MODE_P (mode1) && mode1 != word_mode))
 	return false;
 
+      /* In the fallback generic case use MODE rather than WORD_MODE for
+	 the output of the SCC instruction, to match the mode of the NEG
+	 operation below.  The output of SCC is 0 or 1 boolean, so it is
+	 valid for input in any scalar integer mode.  */
+      rtx tmp = gen_reg_rtx ((TARGET_ZICOND_LIKE
+			      || TARGET_SFB_ALU || TARGET_XTHEADCONDMOV)
+			     ? word_mode : mode);
+      bool invert = false;
+
       /* Canonicalize the comparison.  It must be an equality comparison
-	 against 0.  If it isn't, then emit an SCC instruction so that
-	 we can then use an equality comparison against zero.  */
-      if (!equality_operator (op, VOIDmode) || op1 != CONST0_RTX (mode))
+	 of integer operands, or with SFB it can be any comparison of
+	 integer operands.  If it isn't, then emit an SCC instruction
+	 so that we can then use an equality comparison against zero.  */
+      if ((!TARGET_SFB_ALU && !equality_operator (op, VOIDmode))
+	  || !INTEGRAL_MODE_P (mode0))
 	{
-	  enum rtx_code new_code = NE;
-	  bool *invert_ptr = 0;
-	  bool invert = false;
-
-	  if (code == LE || code == GE)
-	    invert_ptr = &invert;
-
-	  /* Emit an scc like instruction into a temporary
-	     so that we can use an EQ/NE comparison.  */
-	  rtx tmp = gen_reg_rtx (word_mode);
-
-	  /* We can support both FP and integer conditional moves.  */
-	  if (INTEGRAL_MODE_P (GET_MODE (XEXP (op, 0))))
-	    riscv_expand_int_scc (tmp, code, op0, op1, invert_ptr);
-	  else if (FLOAT_MODE_P (GET_MODE (XEXP (op, 0)))
-		   && fp_scc_comparison (op, GET_MODE (op)))
-	    riscv_expand_float_scc (tmp, code, op0, op1);
-	  else
-	    return false;
+	  bool *invert_ptr = nullptr;
 
 	  /* If riscv_expand_int_scc inverts the condition, then it will
 	     flip the value of INVERT.  We need to know where so that
 	     we can adjust it for our needs.  */
-	  if (invert)
-	    new_code = EQ;
+	  if (code == LE || code == LEU || code == GE || code == GEU)
+	    invert_ptr = &invert;
 
-	  op = gen_rtx_fmt_ee (new_code, mode, tmp, const0_rtx);
+	  /* Emit an SCC-like instruction into a temporary so that we can
+	     use an EQ/NE comparison.  We can support both FP and integer
+	     conditional moves.  */
+	  if (INTEGRAL_MODE_P (mode0))
+	    riscv_expand_int_scc (tmp, code, op0, op1, invert_ptr);
+	  else if (FLOAT_MODE_P (mode0)
+		   && fp_scc_comparison (op, GET_MODE (op)))
+	    riscv_expand_float_scc (tmp, code, op0, op1, &invert);
+	  else
+	    return false;
+
+	  op = gen_rtx_fmt_ee (invert ? EQ : NE, mode, tmp, const0_rtx);
 
 	  /* We've generated a new comparison.  Update the local variables.  */
 	  code = GET_CODE (op);
 	  op0 = XEXP (op, 0);
 	  op1 = XEXP (op, 1);
 	}
+      else if (!TARGET_ZICOND_LIKE && !TARGET_SFB_ALU && !TARGET_XTHEADCONDMOV)
+	riscv_expand_int_scc (tmp, code, op0, op1, &invert);
 
+      if (TARGET_SFB_ALU || TARGET_XTHEADCONDMOV)
+	{
+	  riscv_emit_int_compare (&code, &op0, &op1, !TARGET_SFB_ALU);
+	  rtx cond = gen_rtx_fmt_ee (code, GET_MODE (op0), op0, op1);
+
+	  /* The expander is a bit loose in its specification of the true
+	     arm of the conditional move.  That allows us to support more
+	     cases for extensions which are more general than SFB.  But
+	     does mean we need to force CONS into a register at this point.  */
+	  cons = force_reg (mode, cons);
+	  /* With XTheadCondMov we need to force ALT into a register too.  */
+	  alt = force_reg (mode, alt);
+	  emit_insn (gen_rtx_SET (dest, gen_rtx_IF_THEN_ELSE (mode, cond,
+							      cons, alt)));
+	  return true;
+	}
+      else if (!TARGET_ZICOND_LIKE)
+	{
+	  if (invert)
+	    std::swap (cons, alt);
+
+	  rtx reg1 = gen_reg_rtx (mode);
+	  rtx reg2 = gen_reg_rtx (mode);
+	  rtx reg3 = gen_reg_rtx (mode);
+	  rtx reg4 = gen_reg_rtx (mode);
+
+	  riscv_emit_unary (NEG, reg1, tmp);
+	  riscv_emit_binary (AND, reg2, reg1, cons);
+	  riscv_emit_unary (NOT, reg3, reg1);
+	  riscv_emit_binary (AND, reg4, reg3, alt);
+	  riscv_emit_binary (IOR, dest, reg2, reg4);
+	  return true;
+	}
       /* 0, reg or 0, imm */
-      if (cons == CONST0_RTX (mode)
-	  && (REG_P (alt)
-	      || (CONST_INT_P (alt) && alt != CONST0_RTX (mode))))
+      else if (cons == CONST0_RTX (mode)
+	       && (REG_P (alt)
+		   || (CONST_INT_P (alt) && alt != CONST0_RTX (mode))))
 	{
 	  riscv_emit_int_compare (&code, &op0, &op1, true);
 	  rtx cond = gen_rtx_fmt_ee (code, GET_MODE (op0), op0, op1);
@@ -4530,57 +4903,39 @@ riscv_pass_fpr_pair (machine_mode mode, unsigned regno1,
 				   GEN_INT (offset2))));
 }
 
-/* Return true if a vector type is included in the type TYPE.  */
-
-static bool
-riscv_arg_has_vector (const_tree type)
+static rtx
+riscv_pass_vls_aggregate_in_gpr (struct riscv_arg_info *info, machine_mode mode,
+				 unsigned gpr_base)
 {
-  if (riscv_v_ext_mode_p (TYPE_MODE (type)))
-    return true;
+  gcc_assert (riscv_v_ext_vls_mode_p (mode));
 
-  if (!COMPLETE_TYPE_P (type))
-    return false;
+  unsigned count = 0;
+  unsigned regnum = 0;
+  machine_mode gpr_mode = VOIDmode;
+  unsigned vls_size = GET_MODE_SIZE (mode).to_constant ();
+  unsigned gpr_size =  GET_MODE_SIZE (Xmode);
 
-  switch (TREE_CODE (type))
+  if (IN_RANGE (vls_size, 0, gpr_size * 2))
     {
-    case RECORD_TYPE:
-      /* If it is a record, it is further determined whether its fields have
-	 vector type.  */
-      for (tree f = TYPE_FIELDS (type); f; f = DECL_CHAIN (f))
-	if (TREE_CODE (f) == FIELD_DECL)
-	  {
-	    tree field_type = TREE_TYPE (f);
-	    if (!TYPE_P (field_type))
-	      break;
+      count = riscv_v_vls_mode_aggregate_gpr_count (vls_size, gpr_size);
 
-	    if (riscv_arg_has_vector (field_type))
-	      return true;
-	  }
-      break;
-    case ARRAY_TYPE:
-      return riscv_arg_has_vector (TREE_TYPE (type));
-    default:
-      break;
+      if (count + info->gpr_offset <= MAX_ARGS_IN_REGISTERS)
+	{
+	  regnum = gpr_base + info->gpr_offset;
+	  info->num_gprs = count;
+	  gpr_mode = riscv_v_vls_to_gpr_mode (vls_size);
+	}
     }
 
-  return false;
-}
+  if (!regnum)
+    return NULL_RTX; /* Return NULL_RTX if we cannot find a suitable reg.  */
 
-/* Pass the type to check whether it's a vector type or contains vector type.
-   Only check the value type and no checking for vector pointer type.  */
+  gcc_assert (gpr_mode != VOIDmode);
 
-static void
-riscv_pass_in_vector_p (const_tree type)
-{
-  static int warned = 0;
+  rtx reg = gen_rtx_REG (gpr_mode, regnum);
+  rtx x = gen_rtx_EXPR_LIST (VOIDmode, reg, CONST0_RTX (gpr_mode));
 
-  if (type && riscv_vector::lookup_vector_type_attribute (type) && !warned)
-    {
-      warning (OPT_Wpsabi,
-	       "ABI for the vector type is currently in experimental stage and "
-	       "may changes in the upcoming version of GCC.");
-      warned = 1;
-    }
+  return gen_rtx_PARALLEL (mode, gen_rtvec (1, x));
 }
 
 /* Initialize a variable CUM of type CUMULATIVE_ARGS
@@ -4588,11 +4943,7 @@ riscv_pass_in_vector_p (const_tree type)
    For a library call, FNTYPE is 0.  */
 
 void
-riscv_init_cumulative_args (CUMULATIVE_ARGS *cum,
-			    tree fntype ATTRIBUTE_UNUSED,
-			    rtx libname ATTRIBUTE_UNUSED,
-			    tree fndecl,
-			    int caller ATTRIBUTE_UNUSED)
+riscv_init_cumulative_args (CUMULATIVE_ARGS *cum, tree fntype, rtx, tree, int)
 {
   memset (cum, 0, sizeof (*cum));
 
@@ -4600,15 +4951,6 @@ riscv_init_cumulative_args (CUMULATIVE_ARGS *cum,
     cum->variant_cc = (riscv_cc) fntype_abi (fntype).id ();
   else
     cum->variant_cc = RISCV_CC_BASE;
-
-  if (fndecl)
-    {
-      const tree_function_decl &fn
-	= FUNCTION_DECL_CHECK (fndecl)->function_decl;
-
-      if (fn.built_in_class == NOT_BUILT_IN)
-	  cum->rvv_psabi_warning = 1;
-    }
 }
 
 /* Return true if TYPE is a vector type that can be passed in vector registers.
@@ -4725,15 +5067,9 @@ riscv_get_arg_info (struct riscv_arg_info *info, const CUMULATIVE_ARGS *cum,
   info->gpr_offset = cum->num_gprs;
   info->fpr_offset = cum->num_fprs;
 
-  if (cum->rvv_psabi_warning)
-    {
-      /* Only check existing of vector type.  */
-      riscv_pass_in_vector_p (type);
-    }
-
   /* When disable vector_abi or scalable vector argument is anonymous, this
      argument is passed by reference.  */
-  if (riscv_v_ext_mode_p (mode) && (!riscv_vector_abi || !named))
+  if (riscv_v_ext_mode_p (mode) && !named)
     return NULL_RTX;
 
   if (named)
@@ -4801,6 +5137,10 @@ riscv_get_arg_info (struct riscv_arg_info *info, const CUMULATIVE_ARGS *cum,
       /* For scalable vector argument.  */
       if (riscv_vector_type_p (type) && riscv_v_ext_mode_p (mode))
 	return riscv_get_vector_arg (info, cum, mode, return_p);
+
+      /* For vls mode aggregated in gpr.  */
+      if (riscv_v_ext_vls_mode_p (mode))
+	return riscv_pass_vls_aggregate_in_gpr (info, mode, gpr_base);
     }
 
   /* Work out the size of the argument.  */
@@ -4908,17 +5248,7 @@ riscv_function_value (const_tree type, const_tree func, machine_mode mode)
 
   memset (&args, 0, sizeof args);
 
-  const_tree arg_type = type;
-  if (func && DECL_RESULT (func))
-    {
-      const tree_function_decl &fn = FUNCTION_DECL_CHECK (func)->function_decl;
-      if (fn.built_in_class == NOT_BUILT_IN)
-	args.rvv_psabi_warning = 1;
-
-      arg_type = TREE_TYPE (DECL_RESULT (func));
-    }
-
-  return riscv_get_arg_info (&info, &args, mode, arg_type, true, true);
+  return riscv_get_arg_info (&info, &args, mode, type, true, true);
 }
 
 /* Implement TARGET_PASS_BY_REFERENCE. */
@@ -4938,6 +5268,10 @@ riscv_pass_by_reference (cumulative_args_t cum_v, const function_arg_info &arg)
       /* Don't pass by reference if we can use a floating-point register.  */
       riscv_get_arg_info (&info, cum, arg.mode, arg.type, arg.named, false);
       if (info.num_fprs)
+	return false;
+
+      /* Don't pass by reference if we can use general register(s) for vls.  */
+      if (info.num_gprs && riscv_v_ext_vls_mode_p (arg.mode))
 	return false;
 
       /* Don't pass by reference if we can use vector register groups.  */
@@ -5064,9 +5398,8 @@ riscv_fntype_abi (const_tree fntype)
 
      You can enable this feature via the `--param=riscv-vector-abi` compiler
      option.  */
-  if (riscv_vector_abi
-      && (riscv_return_value_is_vector_type_p (fntype)
-	  || riscv_arguments_is_vector_type_p (fntype)))
+  if (riscv_return_value_is_vector_type_p (fntype)
+	  || riscv_arguments_is_vector_type_p (fntype))
     return riscv_v_abi ();
 
   return default_function_abi;
@@ -5353,6 +5686,17 @@ riscv_get_v_regno_alignment (machine_mode mode)
   return lmul;
 }
 
+/* Define ASM_OUTPUT_OPCODE to do anything special before
+   emitting an opcode.  */
+const char *
+riscv_asm_output_opcode (FILE *asm_out_file, const char *p)
+{
+  if (TARGET_XTHEADVECTOR)
+     return th_asm_output_opcode (asm_out_file, p);
+
+  return p;
+}
+
 /* Implement TARGET_PRINT_OPERAND.  The RISCV-specific operand codes are:
 
    'h'	Print the high-part relocation associated with OP, after stripping
@@ -5585,6 +5929,14 @@ riscv_print_operand (FILE *file, rtx op, int letter)
 	output_addr_const (file, newop);
 	break;
       }
+    case 'Y':
+      {
+	unsigned int imm = (UINTVAL (op) & 63);
+	gcc_assert (imm <= 63);
+	rtx newop = GEN_INT (imm);
+	output_addr_const (file, newop);
+	break;
+      }
     default:
       switch (code)
 	{
@@ -5688,6 +6040,12 @@ riscv_size_ok_for_small_data_p (int size)
 static bool
 riscv_in_small_data_p (const_tree x)
 {
+  /* Because default_use_anchors_for_symbol_p doesn't gather small data to use
+     the anchor symbol to address nearby objects.  In large model, it can get
+     the better result using the anchor optiomization.  */
+  if (riscv_cmodel == CM_LARGE)
+    return false;
+
   if (TREE_CODE (x) == STRING_CST || TREE_CODE (x) == FUNCTION_DECL)
     return false;
 
@@ -5753,12 +6111,32 @@ riscv_unique_section (tree decl, int reloc)
   default_unique_section (decl, reloc);
 }
 
+/* Constant pools are per-function when in large code model.  */
+
+static inline bool
+riscv_can_use_per_function_literal_pools_p (void)
+{
+  return riscv_cmodel == CM_LARGE;
+}
+
+static bool
+riscv_use_blocks_for_constant_p (machine_mode, const_rtx)
+{
+  /* We can't use blocks for constants when we're using a per-function
+     constant pool.  */
+  return !riscv_can_use_per_function_literal_pools_p ();
+}
+
 /* Return a section for X, handling small data. */
 
 static section *
 riscv_elf_select_rtx_section (machine_mode mode, rtx x,
 			      unsigned HOST_WIDE_INT align)
 {
+  /* The literal pool stays with the function.  */
+  if (riscv_can_use_per_function_literal_pools_p ())
+    return function_section (current_function_decl);
+
   section *s = default_elf_select_rtx_section (mode, x, align);
 
   if (riscv_size_ok_for_small_data_p (GET_MODE_SIZE (mode).to_constant ()))
@@ -6409,7 +6787,9 @@ riscv_for_each_saved_reg (poly_int64 sp_offset, riscv_save_restore_fn fn,
 	      || (TARGET_ZFINX
 		  && (cfun->machine->frame.mask & ~(1 << RISCV_PROLOGUE_TEMP_REGNUM)))))
 	{
-	  unsigned int fcsr_size = GET_MODE_SIZE (SImode);
+	  /* Always assume FCSR occupy UNITS_PER_WORD to prevent stack
+	     offset misaligned later.  */
+	  unsigned int fcsr_size = UNITS_PER_WORD;
 	  if (!epilogue)
 	    {
 	      riscv_save_restore_reg (word_mode, regno, offset, fn);
@@ -6758,6 +7138,7 @@ riscv_expand_prologue (void)
   unsigned fmask = frame->fmask;
   int spimm, multi_push_additional, stack_adj;
   rtx insn, dwarf = NULL_RTX;
+  unsigned th_int_mask = 0;
 
   if (flag_stack_usage_info)
     current_function_static_stack_size = constant_lower_bound (remaining_size);
@@ -6822,6 +7203,28 @@ riscv_expand_prologue (void)
       insn = emit_insn (riscv_gen_gpr_save_insn (frame));
       frame->mask = 0; /* Temporarily fib that we need not save GPRs.  */
 
+      RTX_FRAME_RELATED_P (insn) = 1;
+      REG_NOTES (insn) = dwarf;
+    }
+
+  th_int_mask = th_int_get_mask (frame->mask);
+  if (th_int_mask && TH_INT_INTERRUPT (cfun))
+    {
+      frame->mask &= ~th_int_mask;
+
+      /* RISCV_PROLOGUE_TEMP may be used to handle some CSR for
+	 interrupts, such as fcsr.  */
+      if ((TARGET_HARD_FLOAT  && frame->fmask)
+	  || (TARGET_ZFINX && frame->mask))
+	frame->mask |= (1 << RISCV_PROLOGUE_TEMP_REGNUM);
+
+      unsigned save_adjustment = th_int_get_save_adjustment ();
+      frame->gp_sp_offset -= save_adjustment;
+      remaining_size -= save_adjustment;
+
+      insn = emit_insn (gen_th_int_push ());
+
+      rtx dwarf = th_int_adjust_cfi_prologue (th_int_mask);
       RTX_FRAME_RELATED_P (insn) = 1;
       REG_NOTES (insn) = dwarf;
     }
@@ -7054,6 +7457,7 @@ riscv_expand_epilogue (int style)
     = use_multi_pop ? frame->multi_push_adj_base + frame->multi_push_adj_addi
 		    : 0;
   rtx ra = gen_rtx_REG (Pmode, RETURN_ADDR_REGNUM);
+  unsigned th_int_mask = 0;
   rtx insn;
 
   /* We need to add memory barrier to prevent read from deallocated stack.  */
@@ -7216,11 +7620,31 @@ riscv_expand_epilogue (int style)
   else if (use_restore_libcall)
     frame->mask = 0; /* Temporarily fib that we need not restore GPRs.  */
 
+  th_int_mask = th_int_get_mask (frame->mask);
+  if (th_int_mask && TH_INT_INTERRUPT (cfun))
+    {
+      frame->mask &= ~th_int_mask;
+
+      /* RISCV_PROLOGUE_TEMP may be used to handle some CSR for
+	 interrupts, such as fcsr.  */
+      if ((TARGET_HARD_FLOAT  && frame->fmask)
+	  || (TARGET_ZFINX && frame->mask))
+	frame->mask |= (1 << RISCV_PROLOGUE_TEMP_REGNUM);
+    }
+
   /* Restore the registers.  */
   riscv_for_each_saved_v_reg (step2, riscv_restore_reg, false);
   riscv_for_each_saved_reg (frame->total_size - step2 - libcall_size
 			      - multipop_size,
 			    riscv_restore_reg, true, style == EXCEPTION_RETURN);
+
+  if (th_int_mask && TH_INT_INTERRUPT (cfun))
+    {
+      frame->mask = mask; /* Undo the above fib.  */
+      unsigned save_adjustment = th_int_get_save_adjustment ();
+      gcc_assert (step2.to_constant () >= save_adjustment);
+      step2 -= save_adjustment;
+    }
 
   if (use_restore_libcall)
     frame->mask = mask; /* Undo the above fib.  */
@@ -7284,7 +7708,9 @@ riscv_expand_epilogue (int style)
 
       gcc_assert (mode != UNKNOWN_MODE);
 
-      if (mode == MACHINE_MODE)
+      if (th_int_mask && TH_INT_INTERRUPT (cfun))
+	emit_jump_insn (gen_th_int_pop ());
+      else if (mode == MACHINE_MODE)
 	emit_jump_insn (gen_riscv_mret ());
       else if (mode == SUPERVISOR_MODE)
 	emit_jump_insn (gen_riscv_sret ());
@@ -7846,8 +8272,9 @@ riscv_macro_fusion_pair_p (rtx_insn *prev, rtx_insn *curr)
   if (!riscv_macro_fusion_p ())
     return false;
 
-  if (simple_sets_p && (riscv_fusion_enabled_p (RISCV_FUSE_ZEXTW) ||
-			riscv_fusion_enabled_p (RISCV_FUSE_ZEXTH)))
+  if (simple_sets_p
+      && (riscv_fusion_enabled_p (RISCV_FUSE_ZEXTW)
+	  || riscv_fusion_enabled_p (RISCV_FUSE_ZEXTWS)))
     {
       /* We are trying to match the following:
 	   prev (slli) == (set (reg:DI rD)
@@ -8176,7 +8603,7 @@ riscv_declare_function_name (FILE *stream, const char *name, tree fndecl)
 {
   riscv_asm_output_variant_cc (stream, fndecl, name);
   ASM_OUTPUT_TYPE_DIRECTIVE (stream, name, "function");
-  ASM_OUTPUT_LABEL (stream, name);
+  ASM_OUTPUT_FUNCTION_LABEL (stream, name, fndecl);
   if (DECL_FUNCTION_SPECIFIC_TARGET (fndecl))
     {
       fprintf (stream, "\t.option push\n");
@@ -8262,6 +8689,8 @@ riscv_output_mi_thunk (FILE *file, tree thunk_fndecl ATTRIBUTE_UNUSED,
   rtx this_rtx, temp1, temp2, fnaddr;
   rtx_insn *insn;
 
+  riscv_in_thunk_func = true;
+
   /* Pretend to be a post-reload pass while generating rtl.  */
   reload_completed = 1;
 
@@ -8328,6 +8757,7 @@ riscv_output_mi_thunk (FILE *file, tree thunk_fndecl ATTRIBUTE_UNUSED,
   /* Clean up the vars set above.  Note that final_end_function resets
      the global pointer for us.  */
   reload_completed = 0;
+  riscv_in_thunk_func = false;
 }
 
 /* Allocate a chunk of memory for per-function machine-dependent data.  */
@@ -8449,8 +8879,13 @@ riscv_override_options_internal (struct gcc_options *opts)
 
      We can only allow TARGET_MIN_VLEN * 8 (LMUL) < 65535.  */
   if (TARGET_MIN_VLEN_OPTS (opts) > 4096)
-    sorry ("Current RISC-V GCC cannot support VLEN greater than 4096bit for "
+    sorry ("Current RISC-V GCC does not support VLEN greater than 4096bit for "
 	   "'V' Extension");
+
+  /* FIXME: We don't support RVV in big-endian for now, we may enable RVV with
+     big-endian after finishing full coverage testing.  */
+  if (TARGET_VECTOR && TARGET_BIG_ENDIAN)
+    sorry ("Current RISC-V GCC does not support RVV in big-endian mode");
 
   /* Convert -march to a chunks count.  */
   riscv_vector_chunks = riscv_convert_vector_bits (opts);
@@ -8469,6 +8904,18 @@ riscv_option_override (void)
 
   if (flag_pic)
     g_switch_value = 0;
+
+  /* Always prefer medlow than medany for RV32 since medlow can access
+     full address space. */
+  if (riscv_cmodel == CM_LARGE && !TARGET_64BIT)
+    riscv_cmodel = CM_MEDLOW;
+
+  if (riscv_cmodel == CM_LARGE && TARGET_EXPLICIT_RELOCS)
+    sorry ("code model %qs with %qs", "large", "-mexplicit-relocs");
+
+  if (riscv_cmodel == CM_LARGE && flag_pic)
+    sorry ("code model %qs with %qs", "large",
+	   global_options.x_flag_pic > 1 ? "-fPIC" : "-fpic");
 
   if (flag_pic)
     riscv_cmodel = CM_PIC;
@@ -8499,13 +8946,20 @@ riscv_option_override (void)
     error ("requested ABI requires %<-march%> to subsume the %qc extension",
 	   UNITS_PER_FP_ARG > 8 ? 'Q' : (UNITS_PER_FP_ARG > 4 ? 'D' : 'F'));
 
-  if (TARGET_RVE && riscv_abi != ABI_ILP32E)
-    error ("rv32e requires ilp32e ABI");
+  /* RVE requires specific ABI.  */
+  if (TARGET_RVE)
+    {
+      if (!TARGET_64BIT && riscv_abi != ABI_ILP32E)
+	error ("rv32e requires ilp32e ABI");
+      else if (TARGET_64BIT && riscv_abi != ABI_LP64E)
+	error ("rv64e requires lp64e ABI");
+    }
 
-  // Zfinx require abi ilp32,ilp32e or lp64.
-  if (TARGET_ZFINX && riscv_abi != ABI_ILP32
-      && riscv_abi != ABI_LP64 && riscv_abi != ABI_ILP32E)
-    error ("z*inx requires ABI ilp32, ilp32e or lp64");
+  /* Zfinx require abi ilp32, ilp32e, lp64 or lp64e.  */
+  if (TARGET_ZFINX
+      && riscv_abi != ABI_ILP32 && riscv_abi != ABI_LP64
+      && riscv_abi != ABI_ILP32E && riscv_abi != ABI_LP64E)
+    error ("z*inx requires ABI ilp32, ilp32e, lp64 or lp64e");
 
   /* We do not yet support ILP32 on RV64.  */
   if (BITS_PER_WORD != POINTER_SIZE)
@@ -8631,7 +9085,7 @@ static GTY (()) tree riscv_previous_fndecl;
 static void
 riscv_conditional_register_usage (void)
 {
-  /* We have only x0~x15 on RV32E.  */
+  /* We have only x0~x15 on RV32E/RV64E.  */
   if (TARGET_RVE)
     {
       for (int r = 16; r <= 31; r++)
@@ -8835,6 +9289,12 @@ riscv_function_ok_for_sibcall (tree decl ATTRIBUTE_UNUSED,
 
   /* Don't use sibcall for interrupt functions.  */
   if (cfun->machine->interrupt_handler_p)
+    return false;
+
+  /* Don't use sibcalls in the large model, because a sibcall instruction
+     expanding and a epilogue expanding both use RISCV_PROLOGUE_TEMP
+     register.  */
+  if (riscv_cmodel == CM_LARGE)
     return false;
 
   return true;
@@ -9372,10 +9832,10 @@ riscv_regmode_natural_size (machine_mode mode)
 
   if (riscv_v_ext_mode_p (mode))
     {
+      poly_uint64 size = GET_MODE_SIZE (mode);
       if (riscv_v_ext_tuple_mode_p (mode))
 	{
-	  poly_uint64 size
-	    = GET_MODE_SIZE (riscv_vector::get_subpart_mode (mode));
+	  size = GET_MODE_SIZE (riscv_vector::get_subpart_mode (mode));
 	  if (known_lt (size, BYTES_PER_RISCV_VECTOR))
 	    return size;
 	}
@@ -9385,8 +9845,14 @@ riscv_regmode_natural_size (machine_mode mode)
 	  if (GET_MODE_CLASS (mode) == MODE_VECTOR_BOOL)
 	    return BYTES_PER_RISCV_VECTOR;
 	}
-      if (!GET_MODE_SIZE (mode).is_constant ())
+      if (!size.is_constant ())
 	return BYTES_PER_RISCV_VECTOR;
+      else if (!riscv_v_ext_vls_mode_p (mode))
+	/* For -march=rv64gc_zve32f, the natural vector register size
+	   is 32bits which is smaller than scalar register size, so we
+	   return minimum size between vector register size and scalar
+	   register size.  */
+	return MIN (size.to_constant (), UNITS_PER_WORD);
     }
   return UNITS_PER_WORD;
 }
@@ -9407,51 +9873,15 @@ riscv_dwarf_poly_indeterminate_value (unsigned int i, unsigned int *factor,
   return RISCV_DWARF_VLENB;
 }
 
-/* Implement TARGET_ESTIMATED_POLY_VALUE.
-   Look into the tuning structure for an estimate.
-   KIND specifies the type of requested estimate: min, max or likely.
-   For cores with a known RVV width all three estimates are the same.
-   For generic RVV tuning we want to distinguish the maximum estimate from
-   the minimum and likely ones.
-   The likely estimate is the same as the minimum in that case to give a
-   conservative behavior of auto-vectorizing with RVV when it is a win
-   even for 128-bit RVV.
-   When RVV width information is available VAL.coeffs[1] is multiplied by
-   the number of VQ chunks over the initial Advanced SIMD 128 bits.  */
+/* Implement TARGET_ESTIMATED_POLY_VALUE.  */
 
 static HOST_WIDE_INT
 riscv_estimated_poly_value (poly_int64 val,
 			    poly_value_estimate_kind kind = POLY_VALUE_LIKELY)
 {
-  unsigned int width_source = BITS_PER_RISCV_VECTOR.is_constant ()
-    ? (unsigned int) BITS_PER_RISCV_VECTOR.to_constant ()
-    : (unsigned int) RVV_SCALABLE;
-
-  /* If there is no core-specific information then the minimum and likely
-     values are based on 128-bit vectors and the maximum is based on
-     the architectural maximum of 65536 bits.  */
-  if (width_source == RVV_SCALABLE)
-    switch (kind)
-      {
-      case POLY_VALUE_MIN:
-      case POLY_VALUE_LIKELY:
-	return val.coeffs[0];
-
-      case POLY_VALUE_MAX:
-	return val.coeffs[0] + val.coeffs[1] * 15;
-      }
-
-  /* Allow BITS_PER_RISCV_VECTOR to be a bitmask of different VL, treating the
-     lowest as likely.  This could be made more general if future -mtune
-     options need it to be.  */
-  if (kind == POLY_VALUE_MAX)
-    width_source = 1 << floor_log2 (width_source);
-  else
-    width_source = least_bit_hwi (width_source);
-
-  /* If the core provides width information, use that.  */
-  HOST_WIDE_INT over_128 = width_source - 128;
-  return val.coeffs[0] + val.coeffs[1] * over_128 / 128;
+  if (TARGET_VECTOR)
+    return riscv_vector::estimated_poly_value (val, kind);
+  return default_estimated_poly_value (val, kind);
 }
 
 /* Return true if the vector misalignment factor is supported by the
@@ -9643,7 +10073,7 @@ riscv_use_divmod_expander (void)
 static machine_mode
 riscv_preferred_simd_mode (scalar_mode mode)
 {
-  if (TARGET_VECTOR)
+  if (TARGET_VECTOR && !TARGET_XTHEADVECTOR)
     return riscv_vector::preferred_simd_mode (mode);
 
   return word_mode;
@@ -9994,7 +10424,7 @@ riscv_mode_priority (int, int n)
 unsigned int
 riscv_autovectorize_vector_modes (vector_modes *modes, bool all)
 {
-  if (TARGET_VECTOR)
+  if (TARGET_VECTOR && !TARGET_XTHEADVECTOR)
     return riscv_vector::autovectorize_vector_modes (modes, all);
 
   return default_autovectorize_vector_modes (modes, all);
@@ -10029,6 +10459,100 @@ static bool
 riscv_frame_pointer_required (void)
 {
   return riscv_save_frame_pointer && !crtl->is_leaf;
+}
+
+/* Return the appropriate common costs according to VECTYPE from COSTS.  */
+static const common_vector_cost *
+get_common_costs (const cpu_vector_cost *costs, tree vectype)
+{
+  gcc_assert (costs);
+
+  if (vectype && riscv_v_ext_vls_mode_p (TYPE_MODE (vectype)))
+    return costs->vls;
+  return costs->vla;
+}
+
+/* Return the CPU vector costs according to -mtune if tune info has non-NULL
+   vector cost.  Otherwide, return the default generic vector costs.  */
+const cpu_vector_cost *
+get_vector_costs ()
+{
+  const cpu_vector_cost *costs = tune_param->vec_costs;
+  if (!costs)
+    return &generic_vector_cost;
+  return costs;
+}
+
+/* Implement targetm.vectorize.builtin_vectorization_cost.  */
+
+static int
+riscv_builtin_vectorization_cost (enum vect_cost_for_stmt type_of_cost,
+				  tree vectype, int misalign ATTRIBUTE_UNUSED)
+{
+  const cpu_vector_cost *costs = get_vector_costs ();
+  bool fp = false;
+
+  if (vectype != NULL)
+    fp = FLOAT_TYPE_P (vectype);
+
+  const common_vector_cost *common_costs = get_common_costs (costs, vectype);
+  gcc_assert (common_costs != NULL);
+  switch (type_of_cost)
+    {
+    case scalar_stmt:
+      return fp ? costs->scalar_fp_stmt_cost : costs->scalar_int_stmt_cost;
+
+    case scalar_load:
+      return costs->scalar_load_cost;
+
+    case scalar_store:
+      return costs->scalar_store_cost;
+
+    case vector_stmt:
+      return fp ? common_costs->fp_stmt_cost : common_costs->int_stmt_cost;
+
+    case vector_load:
+      return common_costs->align_load_cost;
+
+    case vector_store:
+      return common_costs->align_store_cost;
+
+    case vec_to_scalar:
+      return common_costs->vec_to_scalar_cost;
+
+    case scalar_to_vec:
+      return common_costs->scalar_to_vec_cost;
+
+    case unaligned_load:
+      return common_costs->unalign_load_cost;
+    case vector_gather_load:
+      return common_costs->gather_load_cost;
+
+    case unaligned_store:
+      return common_costs->unalign_store_cost;
+    case vector_scatter_store:
+      return common_costs->scatter_store_cost;
+
+    case cond_branch_taken:
+      return costs->cond_taken_branch_cost;
+
+    case cond_branch_not_taken:
+      return costs->cond_not_taken_branch_cost;
+
+    case vec_perm:
+      return common_costs->permute_cost;
+
+    case vec_promote_demote:
+      return fp ? common_costs->fp_stmt_cost : common_costs->int_stmt_cost;
+
+    case vec_construct:
+      return estimated_poly_value (TYPE_VECTOR_SUBPARTS (vectype));
+
+    default:
+      gcc_unreachable ();
+    }
+
+  return default_builtin_vectorization_cost (type_of_cost, vectype, misalign);
 }
 
 /* Implement targetm.vectorize.create_costs.  */
@@ -10088,6 +10612,16 @@ extract_base_offset_in_addr (rtx mem, rtx *base, rtx *offset)
   return false;
 }
 
+/* Implements target hook vector_mode_supported_any_target_p.  */
+
+static bool
+riscv_vector_mode_supported_any_target_p (machine_mode)
+{
+  if (TARGET_XTHEADVECTOR)
+    return false;
+  return true;
+}
+
 /* Initialize the GCC target structure.  */
 #undef TARGET_ASM_ALIGNED_HI_OP
 #define TARGET_ASM_ALIGNED_HI_OP "\t.half\t"
@@ -10135,6 +10669,13 @@ extract_base_offset_in_addr (rtx mem, rtx *base, rtx *offset)
 #define TARGET_RTX_COSTS riscv_rtx_costs
 #undef TARGET_ADDRESS_COST
 #define TARGET_ADDRESS_COST riscv_address_cost
+#undef TARGET_INSN_COST
+#define TARGET_INSN_COST riscv_insn_cost
+
+#undef TARGET_MAX_NOCE_IFCVT_SEQ_COST
+#define TARGET_MAX_NOCE_IFCVT_SEQ_COST riscv_max_noce_ifcvt_seq_cost
+#undef TARGET_NOCE_CONVERSION_PROFITABLE_P
+#define TARGET_NOCE_CONVERSION_PROFITABLE_P riscv_noce_conversion_profitable_p
 
 #undef TARGET_ASM_FILE_START
 #define TARGET_ASM_FILE_START riscv_file_start
@@ -10224,7 +10765,7 @@ extract_base_offset_in_addr (rtx mem, rtx *base, rtx *offset)
 #define TARGET_LEGITIMATE_CONSTANT_P riscv_legitimate_constant_p
 
 #undef TARGET_USE_BLOCKS_FOR_CONSTANT_P
-#define TARGET_USE_BLOCKS_FOR_CONSTANT_P hook_bool_mode_const_rtx_true
+#define TARGET_USE_BLOCKS_FOR_CONSTANT_P riscv_use_blocks_for_constant_p
 
 #undef TARGET_LEGITIMATE_ADDRESS_P
 #define TARGET_LEGITIMATE_ADDRESS_P	riscv_legitimate_address_p
@@ -10414,11 +10955,18 @@ extract_base_offset_in_addr (rtx mem, rtx *base, rtx *offset)
 #undef TARGET_FRAME_POINTER_REQUIRED
 #define TARGET_FRAME_POINTER_REQUIRED riscv_frame_pointer_required
 
+#undef TARGET_VECTORIZE_BUILTIN_VECTORIZATION_COST
+#define TARGET_VECTORIZE_BUILTIN_VECTORIZATION_COST \
+  riscv_builtin_vectorization_cost
+
 #undef TARGET_VECTORIZE_CREATE_COSTS
 #define TARGET_VECTORIZE_CREATE_COSTS riscv_vectorize_create_costs
 
 #undef TARGET_PREFERRED_ELSE_VALUE
 #define TARGET_PREFERRED_ELSE_VALUE riscv_preferred_else_value
+
+#undef TARGET_VECTOR_MODE_SUPPORTED_ANY_TARGET_P
+#define TARGET_VECTOR_MODE_SUPPORTED_ANY_TARGET_P riscv_vector_mode_supported_any_target_p
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

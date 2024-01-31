@@ -1,5 +1,5 @@
 /* Subroutines used for code generation for eBPF.
-   Copyright (C) 2019-2023 Free Software Foundation, Inc.
+   Copyright (C) 2019-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -1473,8 +1473,6 @@ tree
 bpf_resolve_overloaded_core_builtin (location_t loc, tree fndecl,
 				     void *arglist)
 {
-  remove_parser_plugin ();
-
   if (!bpf_require_core_support ())
     return error_mark_node;
 
@@ -1613,7 +1611,7 @@ core_mark_as_access_index (tree expr)
       || TREE_CODE (expr) == INDIRECT_REF)
     expr = TREE_OPERAND (expr, 0);
 
-  if (bpf_enum_mappings->get (expr) == NULL)
+  if (core_access_index_map->get (expr) == NULL)
     core_access_index_map->put (expr, NULL_TREE);
 }
 
@@ -1688,6 +1686,7 @@ make_gimple_core_safe_access_index (tree *tp,
 static unsigned int
 execute_lower_bpf_core (void)
 {
+  remove_parser_plugin ();
   if (!TARGET_BPF_CORE)
     return 0;
 

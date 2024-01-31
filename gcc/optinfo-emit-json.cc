@@ -1,5 +1,5 @@
 /* Emit optimization information as JSON files.
-   Copyright (C) 2018-2023 Free Software Foundation, Inc.
+   Copyright (C) 2018-2024 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -103,7 +103,7 @@ void
 optrecord_json_writer::write () const
 {
   pretty_printer pp;
-  m_root_tuple->print (&pp);
+  m_root_tuple->print (&pp, false);
 
   bool emitted_error = false;
   char *filename = concat (dump_base_name, ".opt-record.json.gz", NULL);
@@ -466,7 +466,7 @@ test_building_json_from_dump_calls ()
 
   /* Verify that the json is sane.  */
   pretty_printer pp;
-  json_obj->print (&pp);
+  json_obj->print (&pp, false);
   const char *json_str = pp_formatted_text (&pp);
   ASSERT_STR_CONTAINS (json_str, "impl_location");
   ASSERT_STR_CONTAINS (json_str, "\"kind\": \"note\"");

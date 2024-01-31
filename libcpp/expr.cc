@@ -1,5 +1,5 @@
 /* Parse C expressions for cpplib.
-   Copyright (C) 1987-2023 Free Software Foundation, Inc.
+   Copyright (C) 1987-2024 Free Software Foundation, Inc.
    Contributed by Per Bothner, 1994.
 
 This program is free software; you can redistribute it and/or modify it
@@ -2216,6 +2216,7 @@ num_div_op (cpp_reader *pfile, cpp_num lhs, cpp_num rhs, enum cpp_ttype op,
       if (!pfile->state.skip_eval)
 	cpp_error_with_line (pfile, CPP_DL_ERROR, location, 0,
 			     "division by zero in #if");
+      lhs.unsignedp = unsignedp;
       return lhs;
     }
 

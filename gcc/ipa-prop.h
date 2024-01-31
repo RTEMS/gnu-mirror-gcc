@@ -1,5 +1,5 @@
 /* Interprocedural analyses.
-   Copyright (C) 2005-2023 Free Software Foundation, Inc.
+   Copyright (C) 2005-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -309,7 +309,7 @@ public:
   void get_vrange (Value_Range &) const;
   bool equal_p (const vrange &) const;
   const vrange_storage *storage () const { return m_storage; }
-  void streamer_read (lto_input_block *, data_in *);
+  void streamer_read (lto_input_block *, class data_in *);
   void streamer_write (output_block *) const;
   void dump (FILE *) const;
 
@@ -1255,6 +1255,8 @@ tree ipcp_get_aggregate_const (struct function *func, tree parm, bool by_ref,
 bool unadjusted_ptr_and_unit_offset (tree op, tree *ret,
 				     poly_int64 *offset_ret);
 
+void ipa_prop_cc_finalize (void);
+
 /* From tree-sra.cc:  */
 tree build_ref_for_offset (location_t, tree, poly_int64, bool, tree,
 			   gimple_stmt_iterator *, bool);
@@ -1273,5 +1275,8 @@ ipa_range_set_and_normalize (vrange &r, tree val)
   else
     r.set (val, val);
 }
+
+bool ipa_return_value_range (Value_Range &range, tree decl);
+void ipa_record_return_value_range (Value_Range val);
 
 #endif /* IPA_PROP_H */

@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -2581,6 +2581,7 @@ package body Sem_Disp is
                loop
                   Parent_Op := Overridden_Operation (Parent_Op);
                   exit when No (Parent_Op)
+                    or else No (Find_DT (Parent_Op))
                     or else (No_Interfaces
                               and then Is_Interface (Find_DT (Parent_Op)));
 

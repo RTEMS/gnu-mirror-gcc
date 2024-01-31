@@ -1,4 +1,4 @@
-# Copyright (C) 2021-2023 Free Software Foundation, Inc.
+# Copyright (C) 2021-2024 Free Software Foundation, Inc.
 #
 # This file is part of GCC.
 #
@@ -64,8 +64,12 @@ loongarch-cpu.o: $(srcdir)/config/loongarch/loongarch-cpu.cc $(LA_STR_H) \
 		 $(srcdir)/config/loongarch/loongarch-cpucfg-map.h
 	$(COMPILER) -c $(ALL_COMPILERFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) $<
 
-loongarch-def.o: $(srcdir)/config/loongarch/loongarch-def.c $(LA_STR_H)
-	$(CC) -c $(ALL_CFLAGS) $(INCLUDES) $<
+loongarch-def.o: $(srcdir)/config/loongarch/loongarch-def.cc $(LA_STR_H)
+	$(COMPILER) -c $(ALL_COMPILERFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) $<
+
+loongarch-d.o: $(srcdir)/config/loongarch/loongarch-d.cc
+	$(COMPILE) $<
+	$(POSTCOMPILE)
 
 $(srcdir)/config/loongarch/loongarch.opt: s-loongarch-opt ; @true
 s-loongarch-opt: $(srcdir)/config/loongarch/genopts/genstr.sh \

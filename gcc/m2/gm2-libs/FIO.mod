@@ -1,6 +1,6 @@
 (* FIO.mod provides a simple buffered file input/output library.
 
-Copyright (C) 2001-2023 Free Software Foundation, Inc.
+Copyright (C) 2001-2024 Free Software Foundation, Inc.
 Contributed by Gaius Mulley <gaius.mulley@southwales.ac.uk>.
 
 This file is part of GNU Modula-2.
@@ -36,7 +36,7 @@ IMPLEMENTATION MODULE FIO ;
                  provides a simple buffered file input/output library.
 *)
 
-FROM SYSTEM IMPORT ADR, TSIZE, SIZE, WORD ;
+FROM SYSTEM IMPORT ADR, TSIZE, WORD, CSSIZE_T ;
 FROM ASCII IMPORT nl, nul, tab ;
 FROM StrLib IMPORT StrLen, StrConCat, StrCopy ;
 FROM Storage IMPORT ALLOCATE, DEALLOCATE ;
@@ -1448,7 +1448,7 @@ BEGIN
                      filled   := 0
                   END
                END ;
-               offset := lseek(unixfd, pos, SEEK_SET) ;
+               offset := lseek (unixfd, VAL (CSSIZE_T, pos), SEEK_SET) ;
                IF (offset>=0) AND (pos=offset)
                THEN
                   abspos := pos
@@ -1497,7 +1497,7 @@ BEGIN
                   filled   := 0
                END
             END ;
-            offset := lseek(unixfd, pos, SEEK_END) ;
+            offset := lseek (unixfd, VAL (CSSIZE_T, pos), SEEK_END) ;
             IF offset>=0
             THEN
                abspos := offset ;

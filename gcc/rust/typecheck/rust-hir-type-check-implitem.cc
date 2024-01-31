@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2023 Free Software Foundation, Inc.
+// Copyright (C) 2020-2024 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -18,10 +18,10 @@
 
 #include "rust-hir-type-check-implitem.h"
 #include "rust-hir-type-check-base.h"
-#include "rust-hir-full.h"
 #include "rust-hir-type-check-type.h"
 #include "rust-hir-type-check-expr.h"
 #include "rust-hir-type-check-pattern.h"
+#include "rust-type-util.h"
 #include "rust-tyty.h"
 
 namespace Rust {
@@ -123,7 +123,7 @@ TypeCheckTopLevelExternItem::visit (HIR::ExternalFunctionItem &function)
 
       HIR::IdentifierPattern *param_pattern
 	= new HIR::IdentifierPattern (mapping, param.get_param_name (),
-				      Location (), false, Mutability::Imm,
+				      UNDEF_LOCATION, false, Mutability::Imm,
 				      std::unique_ptr<HIR::Pattern> (nullptr));
 
       params.push_back (
@@ -138,17 +138,25 @@ TypeCheckTopLevelExternItem::visit (HIR::ExternalFunctionItem &function)
 
   uint8_t flags = TyTy::FnType::FNTYPE_IS_EXTERN_FLAG;
   if (function.is_variadic ())
-    flags |= TyTy::FnType::FNTYPE_IS_VARADIC_FLAG;
+    {
+      flags |= TyTy::FnType::FNTYPE_IS_VARADIC_FLAG;
+      if (parent.get_abi () != Rust::ABI::C)
+	{
+	  rust_error_at (
+	    function.get_locus (), ErrorCode::E0045,
+	    "C-variadic function must have C or cdecl calling convention");
+	}
+    }
 
   RustIdent ident{
     CanonicalPath::new_seg (function.get_mappings ().get_nodeid (),
-			    function.get_item_name ()),
+			    function.get_item_name ().as_string ()),
     function.get_locus ()};
 
   auto fnType = new TyTy::FnType (function.get_mappings ().get_hirid (),
 				  function.get_mappings ().get_defid (),
-				  function.get_item_name (), ident, flags,
-				  parent.get_abi (), std::move (params),
+				  function.get_item_name ().as_string (), ident,
+				  flags, parent.get_abi (), std::move (params),
 				  ret_type, std::move (substitutions));
 
   context->insert_type (function.get_mappings (), fnType);
@@ -225,11 +233,10 @@ TypeCheckImplItem::visit (HIR::Function &function)
       // compilation to know parameter names. The types are ignored but we
       // reuse the HIR identifier pattern which requires it
       HIR::SelfParam &self_param = function.get_self_param ();
-      HIR::IdentifierPattern *self_pattern
-	= new HIR::IdentifierPattern (mapping, "self", self_param.get_locus (),
-				      self_param.is_ref (),
-				      self_param.get_mut (),
-				      std::unique_ptr<HIR::Pattern> (nullptr));
+      // FIXME: which location should be used for Rust::Identifier for `self`?
+      HIR::IdentifierPattern *self_pattern = new HIR::IdentifierPattern (
+	mapping, {"self"}, self_param.get_locus (), self_param.is_ref (),
+	self_param.get_mut (), std::unique_ptr<HIR::Pattern> (nullptr));
 
       // might have a specified type
       TyTy::BaseType *self_type = nullptr;
@@ -260,7 +267,7 @@ TypeCheckImplItem::visit (HIR::Function &function)
 	      break;
 
 	    default:
-	      gcc_unreachable ();
+	      rust_unreachable ();
 	      return;
 	    }
 	}
@@ -273,13 +280,12 @@ TypeCheckImplItem::visit (HIR::Function &function)
   for (auto &param : function.get_function_params ())
     {
       // get the name as well required for later on
-      auto param_tyty = TypeCheckType::Resolve (param.get_type ());
-      params.push_back (
-	std::pair<HIR::Pattern *, TyTy::BaseType *> (param.get_param_name (),
-						     param_tyty));
+      auto param_tyty = TypeCheckType::Resolve (param.get_type ().get ());
+      params.push_back (std::pair<HIR::Pattern *, TyTy::BaseType *> (
+	param.get_param_name ().get (), param_tyty));
 
       context->insert_type (param.get_mappings (), param_tyty);
-      TypeCheckPattern::Resolve (param.get_param_name (), param_tyty);
+      TypeCheckPattern::Resolve (param.get_param_name ().get (), param_tyty);
     }
 
   const CanonicalPath *canonical_path = nullptr;
@@ -289,14 +295,15 @@ TypeCheckImplItem::visit (HIR::Function &function)
   rust_assert (ok);
 
   RustIdent ident{*canonical_path, function.get_locus ()};
-  auto fnType = new TyTy::FnType (function.get_mappings ().get_hirid (),
-				  function.get_mappings ().get_defid (),
-				  function.get_function_name (), ident,
-				  function.is_method ()
-				    ? TyTy::FnType::FNTYPE_IS_METHOD_FLAG
-				    : TyTy::FnType::FNTYPE_DEFAULT_FLAGS,
-				  ABI::RUST, std::move (params), ret_type,
-				  std::move (substitutions));
+  auto fnType
+    = new TyTy::FnType (function.get_mappings ().get_hirid (),
+			function.get_mappings ().get_defid (),
+			function.get_function_name ().as_string (), ident,
+			function.is_method ()
+			  ? TyTy::FnType::FNTYPE_IS_METHOD_FLAG
+			  : TyTy::FnType::FNTYPE_DEFAULT_FLAGS,
+			ABI::RUST, std::move (params), ret_type,
+			std::move (substitutions));
 
   context->insert_type (function.get_mappings (), fnType);
   result = fnType;
@@ -310,9 +317,9 @@ TypeCheckImplItem::visit (HIR::Function &function)
   auto block_expr_ty
     = TypeCheckExpr::Resolve (function.get_definition ().get ());
 
-  Location fn_return_locus = function.has_function_return_type ()
-			       ? function.get_return_type ()->get_locus ()
-			       : function.get_locus ();
+  location_t fn_return_locus = function.has_function_return_type ()
+				 ? function.get_return_type ()->get_locus ()
+				 : function.get_locus ();
 
   coercion_site (function.get_definition ()->get_mappings ().get_hirid (),
 		 TyTy::TyWithLocation (expected_ret_tyty, fn_return_locus),
@@ -325,8 +332,9 @@ TypeCheckImplItem::visit (HIR::Function &function)
 void
 TypeCheckImplItem::visit (HIR::ConstantItem &constant)
 {
-  TyTy::BaseType *type = TypeCheckType::Resolve (constant.get_type ());
-  TyTy::BaseType *expr_type = TypeCheckExpr::Resolve (constant.get_expr ());
+  TyTy::BaseType *type = TypeCheckType::Resolve (constant.get_type ().get ());
+  TyTy::BaseType *expr_type
+    = TypeCheckExpr::Resolve (constant.get_expr ().get ());
 
   TyTy::BaseType *unified = unify_site (
     constant.get_mappings ().get_hirid (),
@@ -385,17 +393,19 @@ TypeCheckImplItemWithTrait::visit (HIR::ConstantItem &constant)
   const auto tref = trait_reference.get ();
   const TraitItemReference *raw_trait_item = nullptr;
   bool found
-    = tref->lookup_trait_item_by_type (constant.get_identifier (),
+    = tref->lookup_trait_item_by_type (constant.get_identifier ().as_string (),
 				       TraitItemReference::TraitItemType::CONST,
 				       &raw_trait_item);
 
-  // unknown trait item
+  // unknown trait item - https://doc.rust-lang.org/error_codes/E0323.html
   if (!found || raw_trait_item->is_error ())
     {
-      RichLocation r (constant.get_locus ());
+      rich_location r (line_table, constant.get_locus ());
       r.add_range (trait_reference.get_locus ());
-      rust_error_at (r, "constant %<%s%> is not a member of trait %<%s%>",
-		     constant.get_identifier ().c_str (),
+      rust_error_at (r, ErrorCode::E0323,
+		     "item %qs is an associated const, which does not match "
+		     "its trait %qs",
+		     constant.get_identifier ().as_string ().c_str (),
 		     trait_reference.get_name ().c_str ());
       return;
     }
@@ -411,14 +421,16 @@ TypeCheckImplItemWithTrait::visit (HIR::ConstantItem &constant)
 
   // check the types are compatible
   auto trait_item_type = resolved_trait_item.get_tyty_for_receiver (self);
-  if (!trait_item_type->can_eq (lookup, true))
+  if (!types_compatable (TyTy::TyWithLocation (trait_item_type),
+			 TyTy::TyWithLocation (lookup), constant.get_locus (),
+			 true /*emit_errors*/))
     {
-      RichLocation r (constant.get_locus ());
+      rich_location r (line_table, constant.get_locus ());
       r.add_range (resolved_trait_item.get_locus ());
 
       rust_error_at (
 	r, "constant %<%s%> has an incompatible type for trait %<%s%>",
-	constant.get_identifier ().c_str (),
+	constant.get_identifier ().as_string ().c_str (),
 	trait_reference.get_name ().c_str ());
     }
 }
@@ -434,17 +446,17 @@ TypeCheckImplItemWithTrait::visit (HIR::TypeAlias &type)
   const auto tref = trait_reference.get ();
   const TraitItemReference *raw_trait_item = nullptr;
   bool found
-    = tref->lookup_trait_item_by_type (type.get_new_type_name (),
+    = tref->lookup_trait_item_by_type (type.get_new_type_name ().as_string (),
 				       TraitItemReference::TraitItemType::TYPE,
 				       &raw_trait_item);
 
   // unknown trait item
   if (!found || raw_trait_item->is_error ())
     {
-      RichLocation r (type.get_locus ());
+      rich_location r (line_table, type.get_locus ());
       r.add_range (trait_reference.get_locus ());
       rust_error_at (r, "type alias %<%s%> is not a member of trait %<%s%>",
-		     type.get_new_type_name ().c_str (),
+		     type.get_new_type_name ().as_string ().c_str (),
 		     trait_reference.get_name ().c_str ());
       return;
     }
@@ -460,14 +472,16 @@ TypeCheckImplItemWithTrait::visit (HIR::TypeAlias &type)
 
   // check the types are compatible
   auto trait_item_type = resolved_trait_item.get_tyty_for_receiver (self);
-  if (!trait_item_type->can_eq (lookup, true))
+  if (!types_compatable (TyTy::TyWithLocation (trait_item_type),
+			 TyTy::TyWithLocation (lookup), type.get_locus (),
+			 true /*emit_errors*/))
     {
-      RichLocation r (type.get_locus ());
+      rich_location r (line_table, type.get_locus ());
       r.add_range (resolved_trait_item.get_locus ());
 
       rust_error_at (
 	r, "type alias %<%s%> has an incompatible type for trait %<%s%>",
-	type.get_new_type_name ().c_str (),
+	type.get_new_type_name ().as_string ().c_str (),
 	trait_reference.get_name ().c_str ());
     }
 
@@ -492,18 +506,17 @@ TypeCheckImplItemWithTrait::visit (HIR::Function &function)
   // map the impl item to the associated trait item
   const auto tref = trait_reference.get ();
   const TraitItemReference *raw_trait_item = nullptr;
-  bool found
-    = tref->lookup_trait_item_by_type (function.get_function_name (),
-				       TraitItemReference::TraitItemType::FN,
-				       &raw_trait_item);
+  bool found = tref->lookup_trait_item_by_type (
+    function.get_function_name ().as_string (),
+    TraitItemReference::TraitItemType::FN, &raw_trait_item);
 
   // unknown trait item
   if (!found || raw_trait_item->is_error ())
     {
-      RichLocation r (function.get_locus ());
+      rich_location r (line_table, function.get_locus ());
       r.add_range (trait_reference.get_locus ());
       rust_error_at (r, "method %<%s%> is not a member of trait %<%s%>",
-		     function.get_function_name ().c_str (),
+		     function.get_function_name ().as_string ().c_str (),
 		     trait_reference.get_name ().c_str ());
       return;
     }
@@ -519,14 +532,16 @@ TypeCheckImplItemWithTrait::visit (HIR::Function &function)
 
   // check the types are compatible
   auto trait_item_type = resolved_trait_item.get_tyty_for_receiver (self);
-  if (!trait_item_type->can_eq (lookup, true))
+  if (!types_compatable (TyTy::TyWithLocation (trait_item_type),
+			 TyTy::TyWithLocation (lookup), function.get_locus (),
+			 true /*emit_errors*/))
     {
-      RichLocation r (function.get_locus ());
+      rich_location r (line_table, function.get_locus ());
       r.add_range (resolved_trait_item.get_locus ());
 
-      rust_error_at (r,
+      rust_error_at (r, ErrorCode::E0053,
 		     "method %<%s%> has an incompatible type for trait %<%s%>",
-		     function.get_function_name ().c_str (),
+		     function.get_function_name ().as_string ().c_str (),
 		     trait_reference.get_name ().c_str ());
     }
 }

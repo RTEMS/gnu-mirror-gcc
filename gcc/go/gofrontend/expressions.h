@@ -596,7 +596,8 @@ class Expression
   { return this->do_is_static_initializer(); }
 
   // If this is not a numeric constant, return false.  If it is one,
-  // return true, and set VAL to hold the value.
+  // return true, and set VAL to hold the value.  This method can be
+  // called before the determine_types pass.
   bool
   numeric_constant_value(Numeric_constant* val)
   { return this->do_numeric_constant_value(val); }
@@ -633,8 +634,7 @@ class Expression
 
   // Return whether this expression really represents a type.
   bool
-  is_type_expression() const
-  { return this->classification_ == EXPRESSION_TYPE; }
+  is_type_expression() const;
 
   // If this is a const reference, return the Const_expression
   // structure.  Otherwise, return NULL.  This is a controlled dynamic
@@ -734,6 +734,10 @@ class Expression
   Unary_expression*
   unary_expression()
   { return this->convert<Unary_expression, EXPRESSION_UNARY>(); }
+
+  const Unary_expression*
+  unary_expression() const
+  { return this->convert<const Unary_expression, EXPRESSION_UNARY>(); }
 
   // If this is a binary expression, return the Binary_expression
   // structure.  Otherwise return NULL.
@@ -986,9 +990,8 @@ class Expression
   // which could not be fully parsed into their final form.  It
   // returns the same Expression or a new one.
   Expression*
-  lower(Gogo* gogo, Named_object* function, Statement_inserter* inserter,
-	int iota_value)
-  { return this->do_lower(gogo, function, inserter, iota_value); }
+  lower(Gogo* gogo, Named_object* function, Statement_inserter* inserter)
+  { return this->do_lower(gogo, function, inserter); }
 
   // Flatten an expression. This is called after order_evaluation.
   // FUNCTION is the function we are in; it will be NULL for an
@@ -1022,10 +1025,8 @@ class Expression
   void
   determine_type_no_context(Gogo*);
 
-  // Return the current type of the expression.  This may be changed
-  // by determine_type.  This should not be called before the lowering
-  // pass, unless the is_type_expression method returns true (i.e.,
-  // this is an EXPRESSION_TYPE).
+  // Return the type of the expression.  This should not be called
+  // before the determine_types pass.
   Type*
   type()
   { return this->do_type(); }
@@ -1160,7 +1161,7 @@ class Expression
 
   // Return a lowered expression.
   virtual Expression*
-  do_lower(Gogo*, Named_object*, Statement_inserter*, int)
+  do_lower(Gogo*, Named_object*, Statement_inserter*)
   { return this; }
 
   // Return a flattened expression.
@@ -1470,18 +1471,7 @@ class Parser_expression : public Expression
 
  protected:
   virtual Expression*
-  do_lower(Gogo*, Named_object*, Statement_inserter*, int) = 0;
-
-  Type*
-  do_type();
-
-  void
-  do_determine_type(Gogo*, const Type_context*)
-  { go_unreachable(); }
-
-  void
-  do_check_types(Gogo*)
-  { go_unreachable(); }
+  do_lower(Gogo*, Named_object*, Statement_inserter*) = 0;
 
   Bexpression*
   do_get_backend(Translate_context*)
@@ -1495,7 +1485,8 @@ class Const_expression : public Expression
  public:
   Const_expression(Named_object* constant, Location location)
     : Expression(EXPRESSION_CONST_REFERENCE, location),
-      constant_(constant), type_(NULL), seen_(false)
+      constant_(constant), type_(NULL), iota_value_(0), seen_(false),
+      is_iota_(false)
   { }
 
   Named_object*
@@ -1510,12 +1501,16 @@ class Const_expression : public Expression
   void
   check_for_init_loop();
 
+  // Set the iota value if this is a reference to iota.
+  void
+  set_iota_value(int);
+
  protected:
   int
   do_traverse(Traverse*);
 
   Expression*
-  do_lower(Gogo*, Named_object*, Statement_inserter*, int);
+  do_lower(Gogo*, Named_object*, Statement_inserter*);
 
   bool
   do_is_constant() const
@@ -1576,9 +1571,14 @@ class Const_expression : public Expression
   // The type of this reference.  This is used if the constant has an
   // abstract type.
   Type* type_;
+  // If this const is a reference to the predeclared iota value, the
+  // value to use.
+  int iota_value_;
   // Used to prevent infinite recursion when a constant incorrectly
   // refers to itself.
   mutable bool seen_;
+  // Whether this const is a reference to the predeclared iota value.
+  bool is_iota_;
 };
 
 // An expression which is simply a variable.
@@ -1598,7 +1598,7 @@ class Var_expression : public Expression
 
  protected:
   Expression*
-  do_lower(Gogo*, Named_object*, Statement_inserter*, int);
+  do_lower(Gogo*, Named_object*, Statement_inserter*);
 
   Type*
   do_type();
@@ -1662,7 +1662,7 @@ class Enclosed_var_expression : public Expression
   do_traverse(Traverse*);
 
   Expression*
-  do_lower(Gogo*, Named_object*, Statement_inserter*, int);
+  do_lower(Gogo*, Named_object*, Statement_inserter*);
 
   Expression*
   do_flatten(Gogo*, Named_object*, Statement_inserter*);
@@ -1952,7 +1952,7 @@ class Type_conversion_expression : public Expression
   do_traverse(Traverse* traverse);
 
   Expression*
-  do_lower(Gogo*, Named_object*, Statement_inserter*, int);
+  do_lower(Gogo*, Named_object*, Statement_inserter*);
 
   Expression*
   do_flatten(Gogo*, Named_object*, Statement_inserter*);
@@ -1976,8 +1976,7 @@ class Type_conversion_expression : public Expression
   do_boolean_constant_value(bool*);
 
   Type*
-  do_type()
-  { return this->type_; }
+  do_type();
 
   void
   do_determine_type(Gogo*, const Type_context*);
@@ -2074,7 +2073,7 @@ class Unary_expression : public Expression
   Unary_expression(Operator op, Expression* expr, Location location)
     : Expression(EXPRESSION_UNARY, location),
       op_(op), escapes_(true), create_temp_(false), is_gc_root_(false),
-      is_slice_init_(false), expr_(expr),
+      is_slice_init_(false), expr_(expr), type_(NULL),
       issue_nil_check_(NIL_CHECK_DEFAULT)
   { }
 
@@ -2131,7 +2130,7 @@ class Unary_expression : public Expression
   // could be done, false if not.  On overflow, issues an error and
   // sets *ISSUED_ERROR.
   static bool
-  eval_constant(Operator op, const Numeric_constant* unc,
+  eval_constant(Type*, Operator op, const Numeric_constant* unc,
 		Location, Numeric_constant* nc, bool *issued_error);
 
   static Expression*
@@ -2154,7 +2153,7 @@ class Unary_expression : public Expression
   { return Expression::traverse(&this->expr_, traverse); }
 
   Expression*
-  do_lower(Gogo*, Named_object*, Statement_inserter*, int);
+  do_lower(Gogo*, Named_object*, Statement_inserter*);
 
   Expression*
   do_flatten(Gogo*, Named_object*, Statement_inserter*);
@@ -2246,6 +2245,8 @@ class Unary_expression : public Expression
   bool is_slice_init_;
   // The operand.
   Expression* expr_;
+  // The type of the expression.  Not used for AND and MULT.
+  Type* type_;
   // Whether or not to issue a nil check for this expression if its address
   // is being taken.
   Nil_check_classification issue_nil_check_;
@@ -2313,7 +2314,7 @@ class Binary_expression : public Expression
   do_traverse(Traverse* traverse);
 
   Expression*
-  do_lower(Gogo*, Named_object*, Statement_inserter*, int);
+  do_lower(Gogo*, Named_object*, Statement_inserter*);
 
   Expression*
   do_flatten(Gogo*, Named_object*, Statement_inserter*);
@@ -2372,15 +2373,15 @@ class Binary_expression : public Expression
 
   static bool
   eval_integer(Operator op, const Numeric_constant*, const Numeric_constant*,
-	       Location, Numeric_constant*);
+	       Location, Numeric_constant*, bool* issued_error);
 
   static bool
   eval_float(Operator op, const Numeric_constant*, const Numeric_constant*,
-	     Location, Numeric_constant*);
+	     Location, Numeric_constant*, bool* issued_error);
 
   static bool
   eval_complex(Operator op, const Numeric_constant*, const Numeric_constant*,
-	       Location, Numeric_constant*);
+	       Location, Numeric_constant*, bool* issued_error);
 
   static bool
   compare_integer(const Numeric_constant*, const Numeric_constant*, int*);
@@ -2412,7 +2413,7 @@ class Binary_expression : public Expression
   Expression* left_;
   // The right hand side operand.
   Expression* right_;
-  // The type of a comparison operation.
+  // The type of the expression.
   Type* type_;
 };
 
@@ -2438,7 +2439,7 @@ class String_concat_expression : public Expression
   { return this->exprs_->traverse(traverse); }
 
   Expression*
-  do_lower(Gogo*, Named_object*, Statement_inserter*, int)
+  do_lower(Gogo*, Named_object*, Statement_inserter*)
   { return this; }
 
   Expression*
@@ -2493,8 +2494,8 @@ class Call_expression : public Expression
   Call_expression(Expression* fn, Expression_list* args, bool is_varargs,
 		  Location location)
     : Expression(EXPRESSION_CALL, location),
-      fn_(fn), args_(args), type_(NULL), call_(NULL), call_temp_(NULL)
-    , expected_result_count_(0), is_varargs_(is_varargs),
+      fn_(fn), args_(args), type_(NULL), lowered_(NULL), call_(NULL),
+      call_temp_(NULL), expected_result_count_(0), is_varargs_(is_varargs),
       varargs_are_lowered_(false), types_are_determined_(false),
       is_deferred_(false), is_concurrent_(false), is_equal_function_(false),
       issued_error_(false), is_multi_value_arg_(false), is_flattened_(false)
@@ -2530,7 +2531,8 @@ class Call_expression : public Expression
 
   // Set the number of results expected from this call.  This is used
   // when the call appears in a context that expects multiple results,
-  // such as a, b = f().
+  // such as a, b = f().  This must be called before the
+  // determine_types pass.
   void
   set_expected_result_count(size_t);
 
@@ -2616,22 +2618,34 @@ class Call_expression : public Expression
   inline const Builtin_call_expression*
   builtin_call_expression() const;
 
+  // Lower to a Builtin_call_expression if appropriate.
+  Expression*
+  lower_builtin(Gogo*);
+
  protected:
   int
   do_traverse(Traverse*);
 
   virtual Expression*
-  do_lower(Gogo*, Named_object*, Statement_inserter*, int);
+  do_lower(Gogo*, Named_object*, Statement_inserter*);
 
   virtual Expression*
   do_flatten(Gogo*, Named_object*, Statement_inserter*);
 
   bool
-  do_discarding_value()
-  { return true; }
+  do_discarding_value();
 
   virtual Type*
   do_type();
+
+  virtual bool
+  do_is_constant() const;
+
+  bool
+  do_is_untyped(Type**) const;
+
+  bool
+  do_numeric_constant_value(Numeric_constant*);
 
   virtual void
   do_determine_type(Gogo*, const Type_context*);
@@ -2665,16 +2679,25 @@ class Call_expression : public Expression
   set_args(Expression_list* args)
   { this->args_ = args; }
 
-  // Let a builtin expression lower varargs.
-  void
-  lower_varargs(Gogo*, Named_object* function, Statement_inserter* inserter,
-		Type* varargs_type, size_t param_count,
-		Slice_storage_escape_disp escape_disp);
-
   // Let a builtin expression check whether types have been
   // determined.
   bool
   determining_types();
+
+  // Let a builtin expression retrieve the expected type.
+  Type*
+  type()
+  { return this->type_; }
+
+  // Let a builtin expression set the expected type.
+  void
+  set_type(Type* type)
+  { this->type_ = type; }
+
+  // Let a builtin expression simply f(g()) where g returns multiple
+  // results.
+  void
+  simplify_multiple_results(Gogo*);
 
   void
   export_arguments(Export_function_body*) const;
@@ -2687,7 +2710,10 @@ class Call_expression : public Expression
 
  private:
   bool
-  check_argument_type(int, const Type*, const Type*, Location, bool);
+  rewrite_varargs();
+
+  bool
+  check_argument_type(int, const Type*, const Type*, Location);
 
   Expression*
   intrinsify(Gogo*, Statement_inserter*);
@@ -2706,6 +2732,8 @@ class Call_expression : public Expression
   Expression_list* args_;
   // The type of the expression, to avoid recomputing it.
   Type* type_;
+  // If not NULL, this is a lowered version of this Call_expression.
+  Expression* lowered_;
   // The backend expression for the call, used for a call which returns a tuple.
   Bexpression* call_;
   // A temporary variable to store this call if the function returns a tuple.
@@ -2794,7 +2822,7 @@ class Builtin_call_expression : public Call_expression
  protected:
   // This overrides Call_expression::do_lower.
   Expression*
-  do_lower(Gogo*, Named_object*, Statement_inserter*, int);
+  do_lower(Gogo*, Named_object*, Statement_inserter*);
 
   Expression*
   do_flatten(Gogo*, Named_object*, Statement_inserter*);
@@ -3087,7 +3115,8 @@ class Unknown_expression : public Parser_expression
  public:
   Unknown_expression(Named_object* named_object, Location location)
     : Parser_expression(EXPRESSION_UNKNOWN_REFERENCE, location),
-      named_object_(named_object), no_error_message_(false)
+      named_object_(named_object), lowered_(NULL), iota_value_(0),
+      no_error_message_(false), is_iota_(false)
   { }
 
   // The associated named object.
@@ -3106,9 +3135,40 @@ class Unknown_expression : public Parser_expression
   set_no_error_message()
   { this->no_error_message_ = true; }
 
+  // Set the iota value if this is a reference to iota.
+  void
+  set_iota_value(int);
+
  protected:
+  int
+  do_traverse(Traverse*);
+
+  Type*
+  do_type();
+
+  void
+  do_determine_type(Gogo*, const Type_context*);
+
+  bool
+  do_is_constant() const;
+
+  bool
+  do_is_untyped(Type**) const;
+
+  virtual bool
+  do_numeric_constant_value(Numeric_constant*);
+
+  virtual bool
+  do_string_constant_value(std::string*);
+
+  virtual bool
+  do_boolean_constant_value(bool*);
+
+  bool
+  do_is_addressable() const;
+
   Expression*
-  do_lower(Gogo*, Named_object*, Statement_inserter*, int);
+  do_lower(Gogo*, Named_object*, Statement_inserter*);
 
   Expression*
   do_copy()
@@ -3120,9 +3180,15 @@ class Unknown_expression : public Parser_expression
  private:
   // The unknown name.
   Named_object* named_object_;
+  // The fully resolved expression.
+  Expression* lowered_;
+  // The iota value if this turns out to be a reference to iota.
+  int iota_value_;
   // True if we should not give errors if this is undefined.  This is
   // used if there was a parse failure.
   bool no_error_message_;
+  // True if this could be a reference to iota.
+  bool is_iota_;
 };
 
 // An index expression.  This is lowered to an array index, a string
@@ -3134,8 +3200,14 @@ class Index_expression : public Parser_expression
   Index_expression(Expression* left, Expression* start, Expression* end,
                    Expression* cap, Location location)
     : Parser_expression(EXPRESSION_INDEX, location),
-      left_(left), start_(start), end_(end), cap_(cap)
+      left_(left), start_(start), end_(end), cap_(cap),
+      needs_nil_check_(false)
   { }
+
+  // Return the expression being indexed.
+  Expression*
+  left() const
+  { return this->left_; }
 
   // Dump an index expression, i.e. an expression of the form
   // expr[expr], expr[expr:expr], or expr[expr:expr:expr] to a dump context.
@@ -3144,24 +3216,44 @@ class Index_expression : public Parser_expression
                         const Expression* start, const Expression* end,
                         const Expression* cap);
 
+  // Report whether EXPR is a map index expression.
+  static bool
+  is_map_index(Expression* expr);
+
  protected:
   int
   do_traverse(Traverse*);
 
+  Type*
+  do_type();
+
+  void
+  do_determine_type(Gogo*, const Type_context*);
+
+  void
+  do_check_types(Gogo*);
+
+  bool
+  do_is_addressable() const;
+
   Expression*
-  do_lower(Gogo*, Named_object*, Statement_inserter*, int);
+  do_lower(Gogo*, Named_object*, Statement_inserter*s);
 
   Expression*
   do_copy()
   {
-    return new Index_expression(this->left_->copy(), this->start_->copy(),
-				(this->end_ == NULL
-				 ? NULL
-				 : this->end_->copy()),
-				(this->cap_ == NULL
-				 ? NULL
-				 : this->cap_->copy()),
-				this->location());
+    Index_expression* ret =
+      new Index_expression(this->left_->copy(), this->start_->copy(),
+			   (this->end_ == NULL
+			    ? NULL
+			    : this->end_->copy()),
+			   (this->cap_ == NULL
+			    ? NULL
+			    : this->cap_->copy()),
+			   this->location());
+    if (this->needs_nil_check_)
+      ret->needs_nil_check_ = true;
+    return ret;
   }
 
   // This shouldn't be called--we don't know yet.
@@ -3173,8 +3265,8 @@ class Index_expression : public Parser_expression
   do_dump_expression(Ast_dump_context*) const;
 
   void
-  do_issue_nil_check()
-  { this->left_->issue_nil_check(); }
+  do_issue_nil_check();
+
  private:
   // The expression being indexed.
   Expression* left_;
@@ -3187,6 +3279,9 @@ class Index_expression : public Parser_expression
   // default capacity, non-NULL for indices and slices that specify the
   // capacity.
   Expression* cap_;
+  // True if this needs a nil check.  This changes how we handle
+  // dereferencing a pointer to an array.
+  bool needs_nil_check_;
 };
 
 // An array index.  This is used for both indexing and slicing.
@@ -3233,6 +3328,11 @@ class Array_index_expression : public Expression
   void
   set_needs_bounds_check(bool b)
   { this->needs_bounds_check_ = b; }
+
+  // Check indexes.
+  static bool
+  check_indexes(Expression* array, Expression* start, Expression* len,
+		Expression* cap, Location);
 
  protected:
   int
@@ -3338,6 +3438,11 @@ class String_index_expression : public Expression
   Expression*
   end() const
   { return this->end_; }
+
+  // Check indexes.
+  static bool
+  check_indexes(Expression* string, Expression* start, Expression* len,
+		Location);
 
  protected:
   int
@@ -3633,7 +3738,7 @@ class Field_reference_expression : public Expression
   { return Expression::traverse(&this->expr_, traverse); }
 
   Expression*
-  do_lower(Gogo*, Named_object*, Statement_inserter*, int);
+  do_lower(Gogo*, Named_object*, Statement_inserter*);
 
   Type*
   do_type();
@@ -3832,7 +3937,8 @@ class Composite_literal_expression : public Parser_expression
 			       Location location)
     : Parser_expression(EXPRESSION_COMPOSITE_LITERAL, location),
       type_(type), depth_(depth), vals_(vals), has_keys_(has_keys),
-      all_are_names_(all_are_names), key_path_(std::vector<bool>(depth))
+      all_are_names_(all_are_names), key_path_(std::vector<bool>(depth)),
+      traverse_order_(NULL)
   {}
 
 
@@ -3848,8 +3954,17 @@ class Composite_literal_expression : public Parser_expression
   int
   do_traverse(Traverse* traverse);
 
+  Type*
+  do_type();
+
+  void
+  do_determine_type(Gogo*, const Type_context*);
+
+  void
+  do_check_types(Gogo*);
+
   Expression*
-  do_lower(Gogo*, Named_object*, Statement_inserter*, int);
+  do_lower(Gogo*, Named_object*, Statement_inserter*);
 
   Expression*
   do_copy();
@@ -3858,8 +3973,14 @@ class Composite_literal_expression : public Parser_expression
   do_dump_expression(Ast_dump_context*) const;
 
  private:
+  bool
+  resolve_struct_keys(Gogo*, Type* type);
+
+  void
+  resolve_array_length(Type*);
+
   Expression*
-  lower_struct(Gogo*, Type*);
+  lower_struct(Type*);
 
   Expression*
   lower_array(Type*);
@@ -3888,6 +4009,10 @@ class Composite_literal_expression : public Parser_expression
   // a value.  This is used to decide which type to use when given a map literal
   // with omitted key types.
   std::vector<bool> key_path_;
+  // If not NULL, the order in which to traverse vals_ for a struct
+  // composite literal.  This is used so that we implement the order
+  // of evaluation rules correctly.
+  std::vector<unsigned long>* traverse_order_;
 };
 
 // Helper/mixin class for struct and array construction expressions;
@@ -3947,6 +4072,10 @@ class Struct_construction_expression : public Expression,
   // Return whether this is a constant initializer.
   bool
   is_constant_struct() const;
+
+  // Check types of a struct composite literal.
+  static bool
+  check_value_types(Gogo*, Type*, Expression_list*, Location);
 
  protected:
   int

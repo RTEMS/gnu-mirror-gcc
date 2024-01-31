@@ -1,6 +1,6 @@
 // Iterators -*- C++ -*-
 
-// Copyright (C) 2001-2023 Free Software Foundation, Inc.
+// Copyright (C) 2001-2024 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -2774,6 +2774,18 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       operator==(const _Sent& __s) const
       noexcept(noexcept(_M_current == __s))
       { return _M_current == __s; }
+
+    template<__detail::__not_a_const_iterator _CIt>
+      requires __detail::__constant_iterator<_CIt> && convertible_to<_It, _CIt>
+    constexpr
+    operator _CIt() const&
+    { return _M_current; }
+
+    template<__detail::__not_a_const_iterator _CIt>
+      requires __detail::__constant_iterator<_CIt> && convertible_to<_It, _CIt>
+    constexpr
+    operator _CIt() &&
+    { return std::move(_M_current); }
 
     constexpr bool
     operator<(const basic_const_iterator& __y) const

@@ -1,5 +1,5 @@
 // Implementation of access-related functions for RTL SSA           -*- C++ -*-
-// Copyright (C) 2020-2023 Free Software Foundation, Inc.
+// Copyright (C) 2020-2024 Free Software Foundation, Inc.
 //
 // This file is part of GCC.
 //
@@ -1456,6 +1456,26 @@ function_info::make_uses_available (obstack_watermark &watermark,
   return use_array (new_uses, num_uses);
 }
 
+set_info *
+function_info::create_set (obstack_watermark &watermark,
+			   insn_info *insn,
+			   resource_info resource)
+{
+  auto set = change_alloc<set_info> (watermark, insn, resource);
+  set->m_is_temp = true;
+  return set;
+}
+
+use_info *
+function_info::create_use (obstack_watermark &watermark,
+			   insn_info *insn,
+			   set_info *set)
+{
+  auto use = change_alloc<use_info> (watermark, insn, set->resource (), set);
+  use->m_is_temp = true;
+  return use;
+}
+
 // Return true if ACCESS1 can represent ACCESS2 and if ACCESS2 can
 // represent ACCESS1.
 static bool
@@ -1587,16 +1607,14 @@ access_array
 rtl_ssa::remove_note_accesses_base (obstack_watermark &watermark,
 				    access_array accesses)
 {
+  auto predicate = [](access_info *a) {
+    return !a->only_occurs_in_notes ();
+  };
+
   for (access_info *access : accesses)
     if (access->only_occurs_in_notes ())
-      {
-	access_array_builder builder (watermark);
-	builder.reserve (accesses.size ());
-	for (access_info *access2 : accesses)
-	  if (!access2->only_occurs_in_notes ())
-	    builder.quick_push (access2);
-	return builder.finish ();
-      }
+      return filter_accesses (watermark, accesses, predicate);
+
   return accesses;
 }
 

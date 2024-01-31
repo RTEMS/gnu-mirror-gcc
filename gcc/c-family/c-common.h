@@ -1,5 +1,5 @@
 /* Definitions for c-common.cc.
-   Copyright (C) 1987-2023 Free Software Foundation, Inc.
+   Copyright (C) 1987-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -106,10 +106,10 @@ enum rid
   /* C extensions */
   RID_ASM,       RID_TYPEOF,   RID_TYPEOF_UNQUAL, RID_ALIGNOF,  RID_ATTRIBUTE,
   RID_VA_ARG,
-  RID_EXTENSION, RID_IMAGPART, RID_REALPART, RID_LABEL,      RID_CHOOSE_EXPR,
-  RID_TYPES_COMPATIBLE_P,      RID_BUILTIN_COMPLEX,	     RID_BUILTIN_SHUFFLE,
-  RID_BUILTIN_SHUFFLEVECTOR,   RID_BUILTIN_CONVERTVECTOR,   RID_BUILTIN_TGMATH,
-  RID_BUILTIN_HAS_ATTRIBUTE,   RID_BUILTIN_ASSOC_BARRIER,
+  RID_EXTENSION, RID_IMAGPART, RID_REALPART, RID_LABEL,    RID_CHOOSE_EXPR,
+  RID_TYPES_COMPATIBLE_P,      RID_BUILTIN_COMPLEX,	   RID_BUILTIN_SHUFFLE,
+  RID_BUILTIN_SHUFFLEVECTOR,   RID_BUILTIN_CONVERTVECTOR,  RID_BUILTIN_TGMATH,
+  RID_BUILTIN_HAS_ATTRIBUTE,   RID_BUILTIN_ASSOC_BARRIER,  RID_BUILTIN_STDC,
   RID_DFLOAT32, RID_DFLOAT64, RID_DFLOAT128,
 
   /* TS 18661-3 keywords, in the same sequence as the TI_* values.  */
@@ -167,11 +167,6 @@ enum rid
   RID_ADDRESSOF,
   RID_BUILTIN_LAUNDER,
   RID_BUILTIN_BIT_CAST,
-
-#define DEFTRAIT(TCC, CODE, NAME, ARITY) \
-  RID_##CODE,
-#include "cp/cp-trait.def"
-#undef DEFTRAIT
 
   /* C++11 */
   RID_CONSTEXPR, RID_DECLTYPE, RID_NOEXCEPT, RID_NULLPTR, RID_STATIC_ASSERT,
@@ -821,8 +816,8 @@ enum conversion_safety {
 extern struct visibility_flags visibility_options;
 
 /* Attribute table common to the C front ends.  */
-extern const struct attribute_spec c_common_attribute_table[];
-extern const struct attribute_spec c_common_format_attribute_table[];
+extern const struct scoped_attribute_specs c_common_gnu_attribute_table;
+extern const struct scoped_attribute_specs c_common_format_attribute_table;
 
 /* Pointer to function to lazily generate the VAR_DECL for __FUNCTION__ etc.
    ID is the identifier to use, NAME is the string.
@@ -911,6 +906,7 @@ extern bool get_attribute_operand (tree, unsigned HOST_WIDE_INT *);
 extern void c_common_finalize_early_debug (void);
 extern unsigned int c_strict_flex_array_level_of (tree);
 extern bool c_option_is_from_cpp_diagnostics (int);
+extern tree c_hardbool_type_attr_1 (tree, tree *, tree *);
 
 /* Used by convert_and_check; in front ends.  */
 extern tree convert_init (tree, tree);
@@ -1126,6 +1122,14 @@ extern bool c_cpp_diagnostic (cpp_reader *, enum cpp_diagnostic_level,
      ATTRIBUTE_GCC_DIAG(5,0);
 extern int c_common_has_attribute (cpp_reader *, bool);
 extern int c_common_has_builtin (cpp_reader *);
+extern int c_common_has_feature (cpp_reader *, bool);
+
+/* Implemented by each front end in *-lang.cc.  */
+extern void c_family_register_lang_features ();
+
+/* Implemented in c-family/c-common.cc.  */
+extern void c_common_register_feature (const char *, bool);
+extern bool has_feature_p (const char *, bool);
 
 extern bool parse_optimize_options (tree, bool);
 
@@ -1275,8 +1279,11 @@ enum c_omp_region_type
   C_ORT_ACC			= 1 << 1,
   C_ORT_DECLARE_SIMD		= 1 << 2,
   C_ORT_TARGET			= 1 << 3,
+  C_ORT_EXIT_DATA		= 1 << 4,
   C_ORT_OMP_DECLARE_SIMD	= C_ORT_OMP | C_ORT_DECLARE_SIMD,
-  C_ORT_OMP_TARGET		= C_ORT_OMP | C_ORT_TARGET
+  C_ORT_OMP_TARGET		= C_ORT_OMP | C_ORT_TARGET,
+  C_ORT_OMP_EXIT_DATA		= C_ORT_OMP | C_ORT_EXIT_DATA,
+  C_ORT_ACC_TARGET		= C_ORT_ACC | C_ORT_TARGET
 };
 
 extern tree c_finish_omp_master (location_t, tree);
@@ -1313,6 +1320,72 @@ extern tree c_omp_check_context_selector (location_t, tree);
 extern void c_omp_mark_declare_variant (location_t, tree, tree);
 extern void c_omp_adjust_map_clauses (tree, bool);
 
+namespace omp_addr_tokenizer { struct omp_addr_token; }
+typedef omp_addr_tokenizer::omp_addr_token omp_addr_token;
+
+class c_omp_address_inspector
+{
+  location_t loc;
+  tree root_term;
+  bool indirections;
+  int map_supported;
+
+protected:
+  tree orig;
+
+public:
+  c_omp_address_inspector (location_t loc, tree t)
+    : loc (loc), root_term (NULL_TREE), indirections (false),
+      map_supported (-1), orig (t)
+    {
+    }
+
+  ~c_omp_address_inspector ()
+    {
+    }
+
+  virtual bool processing_template_decl_p ()
+    {
+      return false;
+    }
+
+  virtual void emit_unmappable_type_notes (tree)
+    {
+    }
+
+  virtual tree convert_from_reference (tree)
+    {
+      gcc_unreachable ();
+    }
+
+  virtual tree build_array_ref (location_t loc, tree arr, tree idx)
+    {
+      tree eltype = TREE_TYPE (TREE_TYPE (arr));
+      return build4_loc (loc, ARRAY_REF, eltype, arr, idx, NULL_TREE,
+			 NULL_TREE);
+    }
+
+  virtual bool check_clause (tree);
+  tree get_root_term (bool);
+
+  tree unconverted_ref_origin ();
+  bool component_access_p ();
+
+  bool map_supported_p ();
+
+  tree get_origin (tree);
+  tree maybe_unconvert_ref (tree);
+
+  bool maybe_zero_length_array_section (tree);
+
+  tree expand_array_base (tree, vec<omp_addr_token *> &, tree, unsigned *,
+			  c_omp_region_type);
+  tree expand_component_selector (tree, vec<omp_addr_token *> &, tree,
+				  unsigned *, c_omp_region_type);
+  tree expand_map_clause (tree, tree, vec<omp_addr_token *> &,
+			  c_omp_region_type);
+};
+
 enum c_omp_directive_kind {
   C_OMP_DIR_STANDALONE,
   C_OMP_DIR_CONSTRUCT,
@@ -1346,6 +1419,23 @@ c_tree_chain_next (tree t)
   if (CODE_CONTAINS_STRUCT (TREE_CODE (t), TS_COMMON))
     return TREE_CHAIN (t);
   return NULL;
+}
+
+/* Return the hardbool attribute associated with TYPE, if there is one, provided
+   that TYPE looks like an enumeral type that might have been set up by
+   handle_hardbool_attribute.  Return NULL otherwise.
+
+   If FALSE_VALUE or TRUE_VALUE are non-NULL and TYPE is a hardened boolean
+   type, store the corresponding representation values.  */
+static inline tree
+c_hardbool_type_attr (tree type,
+		      tree *false_value = NULL, tree *true_value = NULL)
+{
+  if (TREE_CODE (type) != ENUMERAL_TYPE
+      || TYPE_LANG_SPECIFIC (type))
+    return NULL_TREE;
+
+  return c_hardbool_type_attr_1 (type, false_value, true_value);
 }
 
 /* Mask used by tm_stmt_attr.  */
@@ -1482,7 +1572,7 @@ extern void warnings_for_convert_and_check (location_t, tree, tree, tree);
 extern void c_do_switch_warnings (splay_tree, location_t, tree, tree, bool);
 extern void warn_for_omitted_condop (location_t, tree);
 extern bool warn_for_restrict (unsigned, tree *, unsigned);
-extern void warn_for_address_or_pointer_of_packed_member (tree, tree);
+extern void warn_for_address_of_packed_member (tree, tree);
 extern void warn_parm_array_mismatch (location_t, tree, tree);
 extern void maybe_warn_sizeof_array_div (location_t, tree, tree, tree, tree);
 extern void do_warn_array_compare (location_t, tree_code, tree, tree);
@@ -1509,6 +1599,9 @@ extern void warn_about_parentheses (location_t,
 extern void warn_for_unused_label (tree label);
 extern void warn_for_div_by_zero (location_t, tree divisor);
 extern void warn_for_memset (location_t, tree, tree, int);
+extern void warn_for_calloc (location_t *, tree, vec<tree, va_gc> *,
+			     tree *, tree);
+extern void warn_for_alloc_size (location_t, tree, tree, tree);
 extern void warn_for_sign_compare (location_t,
 				   tree orig_op0, tree orig_op1,
 				   tree op0, tree op1,

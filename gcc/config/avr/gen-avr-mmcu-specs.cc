@@ -1,4 +1,4 @@
-/* Copyright (C) 1998-2023 Free Software Foundation, Inc.
+/* Copyright (C) 1998-2024 Free Software Foundation, Inc.
    Contributed by Joern Rennecke
 
    This file is part of GCC.
@@ -44,12 +44,14 @@
 #endif
 
 
-#define SPECFILE_DOC_URL                                \
+#define SPECFILE_DOC_URL				\
   "https://gcc.gnu.org/onlinedocs/gcc/Spec-Files.html"
 
-#define SPECFILE_USAGE_URL                              \
+#define SPECFILE_USAGE_URL			        \
   "https://gcc.gnu.org/gcc-5/changes.html"
 
+#define WIKI_URL					\
+  "https://gcc.gnu.org/wiki/avr-gcc#spec-files"
 
 static const char header[] =
   "#\n"
@@ -68,9 +70,13 @@ static const char header[] =
 
 static const char help_copy_paste[] =
   "# If you intend to use an existing device specs file as a starting point\n"
-  "# for a new device spec file, make sure you are copying from a specs\n"
-  "# file for a device from the same core architecture and SP width.\n"
-  "# See <" SPECFILE_USAGE_URL "> for a description\n"
+  "# for a new device spec file, make sure you are copying from a specs file\n"
+  "# for a device from the same or compatible:\n"
+  "#     compiler version, compiler vendor, core architecture, SP width,\n"
+  "#     short-calls and FLMAP.\n"
+  "# Otherwise, errors and wrong or sub-optimal code may likely occur.\n"
+  "# See <" WIKI_URL ">\n"
+  "# and <" SPECFILE_USAGE_URL "> for a description\n"
   "# of how to use such own spec files.\n";
 
 #if defined (WITH_AVRLIBC)
@@ -103,6 +109,66 @@ static const char help_dev_lib_name[] =
   "\n";
 #endif // WITH_AVRLIBC
 
+
+#ifdef HAVE_LD_AVR_AVRXMEGA2_FLMAP
+static const bool have_avrxmega2_flmap = true;
+#else
+static const bool have_avrxmega2_flmap = false;
+#endif
+
+#ifdef HAVE_LD_AVR_AVRXMEGA4_FLMAP
+static const bool have_avrxmega4_flmap = true;
+#else
+static const bool have_avrxmega4_flmap = false;
+#endif
+
+#ifdef HAVE_LD_AVR_AVRXMEGA3_RODATA_IN_FLASH
+static const bool have_avrxmega3_rodata_in_flash = true;
+#else
+static const bool have_avrxmega3_rodata_in_flash = false;
+#endif
+
+
+static void
+diagnose_mrodata_in_ram (FILE *f, const char *spec, const avr_mcu_t *mcu)
+{
+  enum avr_arch_id arch_id = mcu->arch_id;
+  const avr_arch_t *arch = &avr_arch_types[arch_id];
+  const bool is_arch = mcu->macro == NULL;
+  const bool flmap = (mcu->dev_attribute & AVR_ISA_FLMAP);
+  const bool have_flmap2 = have_avrxmega2_flmap && arch_id == ARCH_AVRXMEGA2;
+  const bool have_flmap4 = have_avrxmega4_flmap && arch_id == ARCH_AVRXMEGA4;
+  const bool have_flmap = flmap && (have_flmap2 || have_flmap4);
+
+  const bool rodata_in_flash = (arch_id == ARCH_AVRTINY
+				|| (arch_id == ARCH_AVRXMEGA3
+				    && have_avrxmega3_rodata_in_flash));
+  // Device name as used by the vendor, extracted from "__AVR_<Name>__".
+  char mcu_Name[50] = { 0 };
+  if (! is_arch)
+    snprintf (mcu_Name, 1 + strlen (mcu->macro) - strlen ("__AVR___"),
+	      "%s", mcu->macro + strlen ("__AVR_"));
+
+  fprintf (f, "%s:\n", spec);
+  if (rodata_in_flash && is_arch)
+    fprintf (f, "\t%%{mrodata-in-ram: %%e-mrodata-in-ram is not supported"
+	     " for %s}", mcu->name);
+  else if (rodata_in_flash)
+    fprintf (f, "\t%%{mrodata-in-ram: %%e-mrodata-in-ram is not supported"
+	     " for %s (arch=%s)}", mcu_Name, arch->name);
+  else if (is_arch)
+    {
+      if (! have_flmap2 && ! have_flmap4)
+	fprintf (f, "\t%%{mno-rodata-in-ram: %%e-mno-rodata-in-ram is not"
+		 " supported for %s}", mcu->name);
+    }
+  else if (! have_flmap)
+    fprintf (f, "\t%%{mno-rodata-in-ram: %%e-mno-rodata-in-ram is not supported"
+	     " for %s (arch=%s)}", mcu_Name, arch->name);
+  fprintf (f, "\n\n");
+}
+
+
 static void
 print_mcu (const avr_mcu_t *mcu)
 {
@@ -130,6 +196,7 @@ print_mcu (const avr_mcu_t *mcu)
   bool rmw = (mcu->dev_attribute & AVR_ISA_RMW) != 0;
   bool sp8 = (mcu->dev_attribute & AVR_SHORT_SP) != 0;
   bool rcall = (mcu->dev_attribute & AVR_ISA_RCALL);
+  bool flmap = (mcu->dev_attribute & AVR_ISA_FLMAP);
   bool is_arch = mcu->macro == NULL;
   bool is_device = ! is_arch;
   int flash_pm_offset = 0;
@@ -143,7 +210,7 @@ print_mcu (const avr_mcu_t *mcu)
 
   if (is_arch
       && (ARCH_AVR2 == arch_id
-          || ARCH_AVR25 == arch_id))
+	  || ARCH_AVR25 == arch_id))
     {
       // Leave "avr2" and "avr25" alone.  These two architectures are
       // the only ones that mix devices with 8-bit SP and 16-bit SP.
@@ -166,13 +233,24 @@ print_mcu (const avr_mcu_t *mcu)
       rcall_spec = rcall ? "-mshort-calls" : "%<mshort-calls";
     }
 
+  const char *flmap_spec = flmap ? "-mflmap" : "%<mflmap";
+  const char *link_arch_spec = "%{mmcu=*:-m%*}";
+  const char *link_arch_flmap_spec = "%{mmcu=*:-m%*%{!mrodata-in-ram:_flmap}}";
+  const bool have_flmap2 = have_avrxmega2_flmap && arch_id == ARCH_AVRXMEGA2;
+  const bool have_flmap4 = have_avrxmega4_flmap && arch_id == ARCH_AVRXMEGA4;
+  const bool have_flmap = flmap && (have_flmap2 || have_flmap4);
+
+  if (have_flmap)
+    link_arch_spec = link_arch_flmap_spec;
+
   fprintf (f, "#\n"
-           "# Auto-generated specs for AVR ");
+	   "# Auto-generated specs for AVR ");
   if (is_arch)
     fprintf (f, "core architecture %s\n", arch->name);
   else
-    fprintf (f, "device %s (core %s, %d-bit SP%s)\n", mcu->name,
-             arch->name, sp8 ? 8 : 16, rcall ? ", short-calls" : "");
+    fprintf (f, "device %s (core %s, %d-bit SP%s%s)\n", mcu->name,
+	     arch->name, sp8 ? 8 : 16, rcall ? ", short-calls" : "",
+	     have_flmap ? ", FLMAP" : "");
   fprintf (f, "%s\n", header);
 
   if (is_device)
@@ -193,24 +271,30 @@ print_mcu (const avr_mcu_t *mcu)
     }
 #endif  // WITH_AVRLIBC
 
+  // Diagnose usage of -m[no-]rodata-in-ram.
+  diagnose_mrodata_in_ram (f, "*check_rodata_in_ram", mcu);
+
   // avr-gcc specific specs for the compilation / the compiler proper.
 
   int n_flash = 1 + (mcu->flash_size - 1) / 0x10000;
 
   fprintf (f, "*cc1_n_flash:\n"
-           "\t%%{!mn-flash=*:-mn-flash=%d}\n\n", n_flash);
+	   "\t%%{!mn-flash=*:-mn-flash=%d}\n\n", n_flash);
 
   fprintf (f, "*cc1_rmw:\n%s\n\n", rmw
-           ? "\t%{!mno-rmw: -mrmw}"
-           : "\t%{mrmw}");
+	   ? "\t%{!mno-rmw: -mrmw}"
+	   : "\t%{mrmw}");
 
   fprintf (f, "*cc1_errata_skip:\n%s\n\n", errata_skip
-           ? "\t%{!mno-skip-bug: -mskip-bug}"
-           : "\t%{!mskip-bug: -mno-skip-bug}");
+	   ? "\t%{!mno-skip-bug: -mskip-bug}"
+	   : "\t%{!mskip-bug: -mno-skip-bug}");
 
   fprintf (f, "*cc1_absdata:\n%s\n\n", absdata
-           ? "\t%{!mno-absdata: -mabsdata}"
-           : "\t%{mabsdata}");
+	   ? "\t%{!mno-absdata: -mabsdata}"
+	   : "\t%{mabsdata}");
+
+  // -m[no-]rodata-in-ram basically affects linking, but sanity-check early.
+  fprintf (f, "*cc1_misc:\n\t%%(check_rodata_in_ram)\n\n");
 
   // avr-gcc specific specs for assembling / the assembler.
 
@@ -222,18 +306,20 @@ print_mcu (const avr_mcu_t *mcu)
 
 #ifdef HAVE_AS_AVR_MRMW_OPTION
   fprintf (f, "*asm_rmw:\n%s\n\n", rmw
-           ? "\t%{!mno-rmw: -mrmw}"
-           : "\t%{mrmw}");
+	   ? "\t%{!mno-rmw: -mrmw}"
+	   : "\t%{mrmw}");
 #endif // have avr-as -mrmw
 
 #ifdef HAVE_AS_AVR_MGCCISR_OPTION
   fprintf (f, "*asm_gccisr:\n%s\n\n",
-           "\t%{!mno-gas-isr-prologues: -mgcc-isr}");
+	   "\t%{!mno-gas-isr-prologues: -mgcc-isr}");
 #endif // have avr-as -mgcc-isr
 
   fprintf (f, "*asm_errata_skip:\n%s\n\n", errata_skip
-           ? "\t%{mno-skip-bug}"
-           : "\t%{!mskip-bug: -mno-skip-bug}");
+	   ? "\t%{mno-skip-bug}"
+	   : "\t%{!mskip-bug: -mno-skip-bug}");
+
+  fprintf (f, "*asm_misc:\n" /* empty */ "\n\n");
 
   // avr-specific specs for linking / the linker.
 
@@ -253,7 +339,7 @@ print_mcu (const avr_mcu_t *mcu)
 
   fprintf (f, "*link_relax:\n\t%s\n\n", LINK_RELAX_SPEC);
 
-  fprintf (f, "*link_arch:\n\t%s", LINK_ARCH_SPEC);
+  fprintf (f, "*link_arch:\n\t%s", link_arch_spec);
   if (is_device
       && flash_pm_offset)
     fprintf (f, " --defsym=__RODATA_PM_OFFSET__=0x%x", flash_pm_offset);
@@ -263,16 +349,19 @@ print_mcu (const avr_mcu_t *mcu)
     {
       fprintf (f, "*link_data_start:\n");
       if (mcu->data_section_start
-          != arch->default_data_section_start)
-        fprintf (f, "\t%%{!Tdata:-Tdata 0x%lX}",
-                 0x800000UL + mcu->data_section_start);
+	  != arch->default_data_section_start)
+	fprintf (f, "\t%%{!Tdata:-Tdata 0x%lX}",
+		 0x800000UL + mcu->data_section_start);
       fprintf (f, "\n\n");
 
       fprintf (f, "*link_text_start:\n");
       if (mcu->text_section_start != 0x0)
-        fprintf (f, "\t%%{!Ttext:-Ttext 0x%lX}", 0UL + mcu->text_section_start);
+	fprintf (f, "\t%%{!Ttext:-Ttext 0x%lX}", 0UL + mcu->text_section_start);
       fprintf (f, "\n\n");
     }
+
+  // -m[no-]rodata-in-ram affects linking.  Sanity check its usage.
+  fprintf (f, "*link_misc:\n\t%%(check_rodata_in_ram)\n\n");
 
   // Specs known to GCC.
 
@@ -280,6 +369,7 @@ print_mcu (const avr_mcu_t *mcu)
     {
       fprintf (f, "*self_spec:\n");
       fprintf (f, "\t%%<mmcu=* -mmcu=%s ", arch->name);
+      fprintf (f, "%s ", flmap_spec);
       fprintf (f, "%s ", rcall_spec);
       fprintf (f, "%s\n\n", sp8_spec);
 
@@ -298,10 +388,26 @@ print_mcu (const avr_mcu_t *mcu)
 	  fprintf (f, " -U__AVR_PM_BASE_ADDRESS__");
 	  fprintf (f, " -D__AVR_PM_BASE_ADDRESS__=0x%x", flash_pm_offset);
 	}
+      if (have_flmap)
+	fprintf (f, " -D__AVR_HAVE_FLMAP__");
+
+      fprintf (f, "\n\n"); // *cpp_mcu
+
+      const bool rodata_in_flash = (arch_id == ARCH_AVRTINY
+				    || (arch_id == ARCH_AVRXMEGA3
+					&& have_avrxmega3_rodata_in_flash));
+      fprintf (f, "*cpp_rodata_in_ram:\n\t-D__AVR_RODATA_IN_RAM__=");
+      if (rodata_in_flash)
+	fprintf (f, "0");
+      else if (! have_flmap)
+	fprintf (f, "1");
+      else
+	fprintf (f, "%%{!mrodata-in-ram:%%{!mno-rodata-in-ram:0}}"
+		 "%%{mrodata-in-ram:1}" "%%{mno-rodata-in-ram:0}");
       fprintf (f, "\n\n");
 
       fprintf (f, "*cpp:\n");
-      fprintf (f, "\t%%(cpp_mcu)");
+      fprintf (f, "\t%%(cpp_mcu) %%(cpp_rodata_in_ram)");
 #if defined (WITH_AVRLIBC)
       fprintf (f, " %%(cpp_avrlibc)");
 #endif // WITH_AVRLIBC

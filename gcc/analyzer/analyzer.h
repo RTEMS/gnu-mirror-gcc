@@ -1,5 +1,5 @@
 /* Utility functions for the analyzer.
-   Copyright (C) 2019-2023 Free Software Foundation, Inc.
+   Copyright (C) 2019-2024 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -94,6 +94,7 @@ class bounded_ranges_manager;
 struct pending_location;
 class pending_diagnostic;
 class pending_note;
+class saved_diagnostic;
 struct event_loc_info;
 class checker_event;
   class state_change_event;
@@ -413,6 +414,21 @@ extern tree get_stashed_constant_by_name (const char *name);
 extern void log_stashed_constants (logger *logger);
 
 extern FILE *get_or_create_any_logfile ();
+
+extern json::value *
+tree_to_json (tree node);
+
+extern json::value *
+diagnostic_event_id_to_json (const diagnostic_event_id_t &);
+
+extern json::value *
+bit_offset_to_json (const bit_offset_t &offset);
+
+extern json::value *
+byte_offset_to_json (const byte_offset_t &offset);
+
+extern tristate
+compare_constants (tree lhs_const, enum tree_code op, tree rhs_const);
 
 } // namespace ana
 

@@ -1,5 +1,5 @@
 /* Consolidation of svalues and regions.
-   Copyright (C) 2020-2023 Free Software Foundation, Inc.
+   Copyright (C) 2020-2024 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -184,6 +184,16 @@ region_model_manager::reject_if_too_complex (svalue *sval)
 	m_max_complexity.m_max_depth = c.m_max_depth;
       return false;
     }
+
+  pretty_printer pp;
+  pp_format_decoder (&pp) = default_tree_printer;
+  sval->dump_to_pp (&pp, true);
+  if (warning_at (input_location, OPT_Wanalyzer_symbol_too_complex,
+		  "symbol too complicated: %qs",
+		  pp_formatted_text (&pp)))
+    inform (input_location,
+	    "max_depth %i exceeds --param=analyzer-max-svalue-depth=%i",
+	    c.m_max_depth, param_analyzer_max_svalue_depth);
 
   delete sval;
   return true;
@@ -447,6 +457,12 @@ region_model_manager::maybe_fold_unaryop (tree type, enum tree_code op,
 	      && region_sval->get_type ()
 	      && POINTER_TYPE_P (region_sval->get_type ()))
 	    return get_ptr_svalue (type, region_sval->get_pointee ());
+
+	/* Casting all zeroes should give all zeroes.  */
+	if (type
+	    && arg->all_zeroes_p ()
+	    && (INTEGRAL_TYPE_P (type) || POINTER_TYPE_P (type)))
+	  return get_or_create_int_cst (type, 0);
       }
       break;
     case TRUTH_NOT_EXPR:
@@ -586,9 +602,6 @@ maybe_undo_optimize_bit_field_compare (tree type,
 				       tree cst,
 				       const svalue *arg1)
 {
-  if (type != unsigned_char_type_node)
-    return NULL;
-
   const binding_map &map = compound_sval->get_map ();
   unsigned HOST_WIDE_INT mask = TREE_INT_CST_LOW (cst);
   /* If "mask" is a contiguous range of set bits, see if the

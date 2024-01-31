@@ -1,3 +1,51 @@
+2024-01-18  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/111956
+	* Makefile.am (TARGET_LONGDOUBLE_ABI): Remove.
+	* Makefile.in: Regenerate.
+	* libm2cor/Makefile.am (TARGET_LONGDOUBLE_ABI): Remove.
+	* libm2cor/Makefile.in: Regenerate.
+	* libm2iso/Makefile.am (TARGET_LONGDOUBLE_ABI): Remove.
+	* libm2iso/Makefile.in: Regenerate.
+	* libm2log/Makefile.am (TARGET_LONGDOUBLE_ABI): Remove.
+	* libm2log/Makefile.in: Regenerate.
+	* libm2min/Makefile.am (TARGET_LONGDOUBLE_ABI): Remove.
+	* libm2min/Makefile.in: Regenerate.
+	* libm2pim/Makefile.am (TARGET_LONGDOUBLE_ABI): Remove.
+	* libm2pim/Makefile.in: Regenerate.
+
+2024-01-05  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* libm2iso/RTco.cc (initialized): Use bool instead of int.
+
+2023-12-22  Christophe Lyon  <christophe.lyon@linaro.org>
+
+	* Makefile.am: Allow overriding EXEPCT.
+	* Makefile.in: Regenerate.
+
+2023-12-13  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/112921
+	* libm2iso/Makefile.am (M2DEFS): Add ConvStringShort.def,
+	ShortConv.def, ShortMath.def and ShortStr.def.
+	(M2MODS): Add ConvStringShort.mod,
+	ShortConv.mod, ShortMath.mod and ShortStr.mod.
+	* libm2iso/Makefile.in: Regenerate.
+
+2023-12-12  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* libm2iso/Makefile.am (libm2iso_la_M2FLAGS): Added line breaks.
+	* libm2iso/Makefile.in: Regenerate.
+	* libm2log/Makefile.am (libm2log_la_M2FLAGS): Added line breaks.
+	* libm2log/Makefile.in: Regenerate.
+	* libm2pim/Makefile.am (libm2pim_la_M2FLAGS): Added line breaks.
+	* libm2pim/Makefile.in: Regenerate.
+
+2023-11-30  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* configure: Regenerate.
+	* configure.ac:(libtool_VERSION): Bump to 19:0:0.
+
 2023-11-13  Gaius Mulley  <gaiusmod2@gmail.com>
 
 	PR modula2/110779

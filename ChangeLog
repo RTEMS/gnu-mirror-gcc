@@ -1,3 +1,98 @@
+2024-01-29  Kwok Cheung Yeung  <kcy@codesourcery.com>
+
+	* MAINTAINERS: Update my work email address.
+
+2024-01-25  Chung-Lin Tang  <cltang@baylibre.com>
+
+	* MAINTAINERS: Update my work email address.
+
+2024-01-24  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* MAINTAINERS: Update my work email address.
+
+2024-01-23  Tobias Burnus  <tburnus@baylibre.com>
+
+	* MAINTAINERS: Update my email address.
+
+2024-01-23  Andrew Stubbs  <ams@baylibre.com>
+
+	* MAINTAINERS: Update
+
+2024-01-16  Pierre-Emmanuel Patry  <pierre-emmanuel.patry@embecosm.com>
+
+	* Makefile.def: Add a dependency to libgrust for all-gcc.
+	* Makefile.in: Regenerate the file.
+
+2024-01-16  Pierre-Emmanuel Patry  <pierre-emmanuel.patry@embecosm.com>
+
+	* Makefile.def: Add libgrust target to bootstrap.
+	* Makefile.in: Regenerate.
+
+2024-01-15  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	* MAINTAINERS (DCO): Add myself.
+
+2024-01-09  Siddhesh Poyarekar  <siddhesh@gotplt.org>
+
+	* SECURITY.txt: Drop "exploitable" in the hardening section.
+
+2024-01-09  Tom Tromey  <tom@tromey.com>
+
+	* Makefile.in: Rebuild.
+	* Makefile.tpl (BASE_EXPORTS): Add GUILE.
+	(GUILE): New variable.
+	* Makefile.def (flags_to_pass): Add GUILE.
+
+2024-01-08  Joseph Myers  <josmyers@redhat.com>
+
+	* MAINTAINERS: Update my email address.
+
+2023-12-30  Joseph Myers  <jsm@polyomino.org.uk>
+
+	* MAINTAINERS: Update my email address.
+
+2023-12-14  Pierre-Emmanuel Patry  <pierre-emmanuel.patry@embecosm.com>
+	    Thomas Schwinge  <thomas@codesourcery.com>
+
+	* Makefile.def: Add libgrust as host & target module.
+	* configure.ac: Add libgrust to host tools list. Add libgrust to
+	noconfigdirs if we're not building target libstdc++.
+	* Makefile.in: Regenerate.
+	* configure: Regenerate.
+
+2023-12-14  Pierre-Emmanuel Patry  <pierre-emmanuel.patry@embecosm.com>
+	    Arthur Cohen  <arthur.cohen@embecosm.com>
+
+	* MAINTAINERS: Add maintainers for libgrust.
+
+2023-12-13  Arsen Arsenović  <arsen@aarsen.me>
+
+	* Makefile.def (gettext): Disable (via missing)
+	{install-,}{pdf,html,info,dvi} and TAGS targets.  Set no_install
+	to true.  Add --disable-threads --disable-libasprintf.  Drop the
+	lib_path (as there are no shared libs).
+	* Makefile.in: Regenerate.
+
+2023-12-12  Paul Iannetta  <piannetta@kalrayinc.com>
+
+	* MAINTAINERS: Add myself to write after approval
+
+2023-12-12  Feng Wang  <wangfeng@eswincomputing.com>
+
+	* MAINTAINERS: Update my email address
+
+2023-12-12  Feng Wang  <wangfeng@eswincomputing.com>
+
+	* MAINTAINERS: Add myself to write after approval
+
+2023-11-23  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	* MAINTAINERS: Add myself to write after approval and DCO
+
+2023-11-22  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	* libtool.m4: Fix stray call
+
 2023-11-19  Lewis Hyatt  <lhyatt@gmail.com>
 
 	* Makefile.in: Regenerate.

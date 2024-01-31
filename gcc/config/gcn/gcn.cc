@@ -1,4 +1,4 @@
-/* Copyright (C) 2016-2023 Free Software Foundation, Inc.
+/* Copyright (C) 2016-2024 Free Software Foundation, Inc.
 
    This file is free software; you can redistribute it and/or modify it under
    the terms of the GNU General Public License as published by the Free
@@ -110,7 +110,8 @@ gcn_init_machine_status (void)
 
   f = ggc_cleared_alloc<machine_function> ();
 
-  if (TARGET_GCN3)
+  // FIXME: re-enable global addressing with safety for LDS-flat addresses
+  //if (TARGET_GCN3)
     f->use_flat_addressing = true;
 
   return f;
@@ -138,6 +139,7 @@ gcn_option_override (void)
       : gcn_arch == PROCESSOR_GFX908 ? ISA_CDNA1
       : gcn_arch == PROCESSOR_GFX90a ? ISA_CDNA2
       : gcn_arch == PROCESSOR_GFX1030 ? ISA_RDNA2
+      : gcn_arch == PROCESSOR_GFX1100 ? ISA_RDNA3
       : ISA_UNKNOWN);
   gcc_assert (gcn_isa != ISA_UNKNOWN);
 
@@ -159,11 +161,43 @@ gcn_option_override (void)
 	acc_lds_size = 32768;
     }
 
-  /* The xnack option is a placeholder, for now.  Before removing, update
-     gcn-hsa.h's XNACKOPT, gcn.opt's mxnack= default init+descr, and
-     invoke.texi's default description.  */
-  if (flag_xnack != HSACO_ATTR_OFF)
-    sorry ("XNACK support");
+  /* gfx803 "Fiji", gfx1030 and gfx1100 do not support XNACK.  */
+  if (gcn_arch == PROCESSOR_FIJI
+      || gcn_arch == PROCESSOR_GFX1030
+      || gcn_arch == PROCESSOR_GFX1100)
+    {
+      if (flag_xnack == HSACO_ATTR_ON)
+	error ("%<-mxnack=on%> is incompatible with %<-march=%s%>",
+	       (gcn_arch == PROCESSOR_FIJI ? "fiji"
+		: gcn_arch == PROCESSOR_GFX1030 ? "gfx1030"
+		: gcn_arch == PROCESSOR_GFX1100 ? "gfx1100"
+		: NULL));
+      /* Allow HSACO_ATTR_ANY silently because that's the default.  */
+      flag_xnack = HSACO_ATTR_OFF;
+    }
+
+  /* There's no need for XNACK on devices without USM, and there are register
+     allocation problems caused by the early-clobber when AVGPR spills are not
+     available.
+     FIXME: can the regalloc mean the default can be really "any"?  */
+  if (flag_xnack == HSACO_ATTR_DEFAULT)
+    switch (gcn_arch)
+      {
+      case PROCESSOR_FIJI:
+      case PROCESSOR_VEGA10:
+      case PROCESSOR_VEGA20:
+      case PROCESSOR_GFX908:
+	flag_xnack = HSACO_ATTR_OFF;
+	break;
+      case PROCESSOR_GFX90a:
+	flag_xnack = HSACO_ATTR_ANY;
+	break;
+      default:
+	gcc_unreachable ();
+      }
+
+  if (flag_sram_ecc == HSACO_ATTR_DEFAULT)
+    flag_sram_ecc = HSACO_ATTR_ANY;
 }
 
 /* }}}  */
@@ -358,14 +392,12 @@ gcn_handle_amdgpu_hsa_kernel_attribute (tree *node, tree name,
  
    Create target-specific __attribute__ types.  */
 
-static const struct attribute_spec gcn_attribute_table[] = {
+TARGET_GNU_ATTRIBUTES (gcn_attribute_table, {
   /* { name, min_len, max_len, decl_req, type_req, fn_type_req, handler,
      affects_type_identity } */
   {"amdgpu_hsa_kernel", 0, GCN_KERNEL_ARG_TYPES, false, true,
-   true, true, gcn_handle_amdgpu_hsa_kernel_attribute, NULL},
-  /* End element.  */
-  {NULL, 0, 0, false, false, false, false, NULL, NULL}
-};
+   true, true, gcn_handle_amdgpu_hsa_kernel_attribute, NULL}
+});
 
 /* }}}  */
 /* {{{ Registers and modes.  */
@@ -1563,10 +1595,10 @@ gcn_global_address_p (rtx addr)
     {
       rtx base = XEXP (addr, 0);
       rtx offset = XEXP (addr, 1);
-      int offsetbits = (TARGET_RDNA2 ? 11 : 12);
+      int offsetbits = (TARGET_RDNA2_PLUS ? 11 : 12);
       bool immediate_p = (CONST_INT_P (offset)
-			  && INTVAL (offset) >= -(1 << 12)
-			  && INTVAL (offset) < (1 << 12));
+			  && INTVAL (offset) >= -(1 << offsetbits)
+			  && INTVAL (offset) < (1 << offsetbits));
 
       if ((gcn_address_register_p (base, DImode, false)
 	   || gcn_vec_address_register_p (base, DImode, false))
@@ -1696,7 +1728,7 @@ gcn_addr_space_legitimate_address_p (machine_mode mode, rtx x, bool strict,
 	  rtx base = XEXP (x, 0);
 	  rtx offset = XEXP (x, 1);
 
-	  int offsetbits = (TARGET_RDNA2 ? 11 : 12);
+	  int offsetbits = (TARGET_RDNA2_PLUS ? 11 : 12);
 	  bool immediate_p = (GET_CODE (offset) == CONST_INT
 			      /* Signed 12/13-bit immediate.  */
 			      && INTVAL (offset) >= -(1 << offsetbits)
@@ -3014,6 +3046,8 @@ gcn_omp_device_kind_arch_isa (enum omp_device_kind_arch_isa trait,
 	return gcn_arch == PROCESSOR_GFX90a;
       if (strcmp (name, "gfx1030") == 0)
 	return gcn_arch == PROCESSOR_GFX1030;
+      if (strcmp (name, "gfx1100") == 0)
+	return gcn_arch == PROCESSOR_GFX1100;
       return 0;
     default:
       gcc_unreachable ();
@@ -3586,18 +3620,20 @@ gcn_expand_epilogue (void)
       /* Assume that an exit value compatible with gcn-run is expected.
          That is, the third input parameter is an int*.
 
-         We can't allocate any new registers, but the kernarg_reg is
-         dead after this, so we'll use that.  */
+         We can't allocate any new registers, but the dispatch_ptr and
+	 kernarg_reg are dead after this, so we'll use those.  */
+      rtx dispatch_ptr_reg = gen_rtx_REG (DImode, cfun->machine->args.reg
+					  [DISPATCH_PTR_ARG]);
       rtx kernarg_reg = gen_rtx_REG (DImode, cfun->machine->args.reg
 				     [KERNARG_SEGMENT_PTR_ARG]);
       rtx retptr_mem = gen_rtx_MEM (DImode,
 				    gen_rtx_PLUS (DImode, kernarg_reg,
 						  GEN_INT (16)));
       set_mem_addr_space (retptr_mem, ADDR_SPACE_SCALAR_FLAT);
-      emit_move_insn (kernarg_reg, retptr_mem);
+      emit_move_insn (dispatch_ptr_reg, retptr_mem);
 
       rtx retval_addr = gen_rtx_REG (DImode, FIRST_VPARM_REG + 2);
-      emit_move_insn (retval_addr, kernarg_reg);
+      emit_move_insn (retval_addr, dispatch_ptr_reg);
       rtx retval_mem = gen_rtx_MEM (SImode, retval_addr);
       set_mem_addr_space (retval_mem, ADDR_SPACE_FLAT);
       emit_move_insn (retval_mem, gen_rtx_REG (SImode, RETURN_VALUE_REG));
@@ -4881,6 +4917,19 @@ gcn_expand_builtin_1 (tree exp, rtx target, rtx /*subtarget */ ,
 	  }
 	return ptr;
       }
+    case GCN_BUILTIN_DISPATCH_PTR:
+      {
+	rtx ptr;
+	if (cfun->machine->args.reg[DISPATCH_PTR_ARG] >= 0)
+	   ptr = gen_rtx_REG (DImode,
+			      cfun->machine->args.reg[DISPATCH_PTR_ARG]);
+	else
+	  {
+	    ptr = gen_reg_rtx (DImode);
+	    emit_move_insn (ptr, const0_rtx);
+	  }
+	return ptr;
+      }
     case GCN_BUILTIN_FIRST_CALL_THIS_THREAD_P:
       {
 	/* Stash a marker in the unused upper 16 bits of s[0:1] to indicate
@@ -5050,7 +5099,9 @@ gcn_vectorize_vec_perm_const (machine_mode vmode, machine_mode op_mode,
 			      rtx dst, rtx src0, rtx src1,
 			      const vec_perm_indices & sel)
 {
-  if (vmode != op_mode)
+  if (vmode != op_mode
+      || !VECTOR_MODE_P (vmode)
+      || GET_MODE_INNER (vmode) == TImode)
     return false;
 
   unsigned int nelt = GET_MODE_NUNITS (vmode);
@@ -6493,6 +6544,11 @@ output_file_start (void)
       xnack = "";
       sram_ecc = "";
       break;
+    case PROCESSOR_GFX1100:
+      cpu = "gfx1100";
+      xnack = "";
+      sram_ecc = "";
+      break;
     default: gcc_unreachable ();
     }
 
@@ -6509,7 +6565,8 @@ output_file_start (void)
    comments that pass information to mkoffload.  */
 
 void
-gcn_hsa_declare_function_name (FILE *file, const char *name, tree)
+gcn_hsa_declare_function_name (FILE *file, const char *name,
+			       tree decl ATTRIBUTE_UNUSED)
 {
   int sgpr, vgpr, avgpr;
   bool xnack_enabled = TARGET_XNACK;
@@ -6540,8 +6597,10 @@ gcn_hsa_declare_function_name (FILE *file, const char *name, tree)
     if (df_regs_ever_live_p (FIRST_AVGPR_REG + avgpr))
       break;
   avgpr++;
-  vgpr = (vgpr + 3) & ~3;
-  avgpr = (avgpr + 3) & ~3;
+
+  /* The main function epilogue uses v8, but df doesn't see that.  */
+  if (vgpr < 9)
+    vgpr = 9;
 
   if (!leaf_function_p ())
     {
@@ -6554,9 +6613,18 @@ gcn_hsa_declare_function_name (FILE *file, const char *name, tree)
 	avgpr = MAX_NORMAL_AVGPR_COUNT;
     }
 
-  /* The gfx90a accum_offset field can't represent 0 registers.  */
-  if (gcn_arch == PROCESSOR_GFX90a && vgpr < 4)
-    vgpr = 4;
+  /* SIMD32 devices count double in wavefront64 mode.  */
+  if (TARGET_RDNA2_PLUS)
+    vgpr *= 2;
+
+  /* Round up to the allocation block size.  */
+  int vgpr_block_size = (TARGET_RDNA3 ? 12
+			 : TARGET_RDNA2_PLUS || TARGET_CDNA2_PLUS ? 8
+			 : 4);
+  if (vgpr % vgpr_block_size)
+    vgpr += vgpr_block_size - (vgpr % vgpr_block_size);
+  if (avgpr % vgpr_block_size)
+    avgpr += vgpr_block_size - (avgpr % vgpr_block_size);
 
   fputs ("\t.rodata\n"
 	 "\t.p2align\t6\n"
@@ -6618,7 +6686,6 @@ gcn_hsa_declare_function_name (FILE *file, const char *name, tree)
 	   "\t  .amdhsa_next_free_vgpr\t%i\n"
 	   "\t  .amdhsa_next_free_sgpr\t%i\n"
 	   "\t  .amdhsa_reserve_vcc\t1\n"
-	   "\t  .amdhsa_reserve_flat_scratch\t0\n"
 	   "\t  .amdhsa_reserve_xnack_mask\t%i\n"
 	   "\t  .amdhsa_private_segment_fixed_size\t0\n"
 	   "\t  .amdhsa_group_segment_fixed_size\t%u\n"
@@ -6628,6 +6695,10 @@ gcn_hsa_declare_function_name (FILE *file, const char *name, tree)
 	   sgpr,
 	   xnack_enabled,
 	   LDS_SIZE);
+  /* Not supported with 'architected flat scratch'.  */
+  if (gcn_arch != PROCESSOR_GFX1100)
+    fprintf (file,
+	   "\t  .amdhsa_reserve_flat_scratch\t0\n");
   if (gcn_arch == PROCESSOR_GFX90a)
     fprintf (file,
 	     "\t  .amdhsa_accum_offset\t%i\n"
@@ -6654,12 +6725,14 @@ gcn_hsa_declare_function_name (FILE *file, const char *name, tree)
 	   "            .private_segment_fixed_size: 0\n"
 	   "            .wavefront_size: 64\n"
 	   "            .sgpr_count: %i\n"
-	   "            .vgpr_count: %i\n"
+	   "            .vgpr_count: %i%s\n"
 	   "            .max_flat_workgroup_size: 1024\n",
 	   cfun->machine->kernarg_segment_byte_size,
 	   cfun->machine->kernarg_segment_alignment,
 	   LDS_SIZE,
-	   sgpr, next_free_vgpr);
+	   sgpr, next_free_vgpr,
+	   (TARGET_RDNA2_PLUS ? " ; wavefrontsize64 counts double on SIMD32"
+	    : ""));
   if (gcn_arch == PROCESSOR_GFX90a || gcn_arch == PROCESSOR_GFX908)
     fprintf (file, "            .agpr_count: %i\n", avgpr);
   fputs ("        .end_amdgpu_metadata\n", file);
@@ -6670,8 +6743,7 @@ gcn_hsa_declare_function_name (FILE *file, const char *name, tree)
   fputs ("\t.type\t", file);
   assemble_name (file, name);
   fputs (",@function\n", file);
-  assemble_name (file, name);
-  fputs (":\n", file);
+  ASM_OUTPUT_FUNCTION_LABEL (file, name, decl);
 
   /* This comment is read by mkoffload.  */
   if (flag_openacc)

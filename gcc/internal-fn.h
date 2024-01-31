@@ -1,5 +1,5 @@
 /* Internal functions.
-   Copyright (C) 2011-2023 Free Software Foundation, Inc.
+   Copyright (C) 2011-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -262,6 +262,7 @@ extern void expand_MULBITINT (internal_fn, gcall *);
 extern void expand_DIVMODBITINT (internal_fn, gcall *);
 extern void expand_FLOATTOBITINT (internal_fn, gcall *);
 extern void expand_BITINTTOFLOAT (internal_fn, gcall *);
+extern void expand_POPCOUNT (internal_fn, gcall *);
 
 extern bool vectorized_internal_fn_supported_p (internal_fn, tree);
 

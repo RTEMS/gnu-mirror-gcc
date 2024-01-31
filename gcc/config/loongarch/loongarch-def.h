@@ -1,5 +1,5 @@
 /* LoongArch definitions.
-   Copyright (C) 2021-2023 Free Software Foundation, Inc.
+   Copyright (C) 2021-2024 Free Software Foundation, Inc.
    Contributed by Loongson Ltd.
 
 This file is part of GCC.
@@ -23,12 +23,10 @@ along with GCC; see the file COPYING3.  If not see
     - ISA extensions		(isa_ext),
     - base ABI types		(abi_base),
     - ABI extension types	(abi_ext).
-
-    - code models		      (cmodel)
-    - other command-line switches     (switch)
+    - code models		(cmodel)
 
    These values are primarily used for implementing option handling
-   logic in "loongarch.opt", "loongarch-driver.c" and "loongarch-opt.c".
+   logic in "loongarch.opt", "loongarch-driver.cc" and "loongarch-opt.cc".
 
    As for the result of this option handling process, the following
    scheme is adopted to represent the final configuration:
@@ -46,42 +44,49 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef LOONGARCH_DEF_H
 #define LOONGARCH_DEF_H
 
+#if !defined(IN_LIBGCC2) && !defined(IN_TARGET_LIBS) && !defined(IN_RTS)
 #include <stdint.h>
-#include "loongarch-tune.h"
-
-#ifdef __cplusplus
-extern "C" {
 #endif
 
-/* enum isa_base */
-extern const char* loongarch_isa_base_strings[];
+#include "loongarch-def-array.h"
+#include "loongarch-tune.h"
 
-/* LoongArch V1.00.  */
-#define ISA_BASE_LA64V100     0
-/* LoongArch V1.10.  */
-#define ISA_BASE_LA64V110     1
-#define N_ISA_BASE_TYPES      2
 
-/* Unlike other arrays, this is defined in loongarch-cpu.cc.  The problem is
-   we cannot use the C++ header options.h in loongarch-def.c.  */
-extern int64_t loongarch_isa_base_features[];
+/* ISA base */
+enum {
+  ISA_BASE_LA64		= 0,  /* LoongArch64 */
+  N_ISA_BASE_TYPES	= 1
+};
 
-/* enum isa_ext_* */
-extern const char* loongarch_isa_ext_strings[];
-#define ISA_EXT_NONE	      0
-#define ISA_EXT_FPU32	      1
-#define ISA_EXT_FPU64	      2
-#define N_ISA_EXT_FPU_TYPES   3
-#define ISA_EXT_SIMD_LSX      3
-#define ISA_EXT_SIMD_LASX     4
-#define N_ISA_EXT_TYPES	      5
+extern loongarch_def_array<const char *, N_ISA_BASE_TYPES>
+  loongarch_isa_base_strings;
 
-/* enum abi_base */
-extern const char* loongarch_abi_base_strings[];
-#define ABI_BASE_LP64D	      0
-#define ABI_BASE_LP64F	      1
-#define ABI_BASE_LP64S	      2
-#define N_ABI_BASE_TYPES      3
+
+/* ISA extensions */
+enum {
+  ISA_EXT_NONE		= 0,
+  ISA_EXT_FPU32		= 1,
+  ISA_EXT_FPU64		= 2,
+  N_ISA_EXT_FPU_TYPES   = 3,
+  ISA_EXT_SIMD_LSX      = 3,
+  ISA_EXT_SIMD_LASX     = 4,
+  N_ISA_EXT_TYPES	= 5
+};
+
+extern loongarch_def_array<const char *, N_ISA_EXT_TYPES>
+  loongarch_isa_ext_strings;
+
+
+/* Base ABI */
+enum {
+  ABI_BASE_LP64D	= 0,
+  ABI_BASE_LP64F	= 1,
+  ABI_BASE_LP64S	= 2,
+  N_ABI_BASE_TYPES	= 3
+};
+
+extern loongarch_def_array<const char *, N_ABI_BASE_TYPES>
+  loongarch_abi_base_strings;
 
 #define TO_LP64_ABI_BASE(C) (C)
 
@@ -93,26 +98,38 @@ extern const char* loongarch_abi_base_strings[];
   (abi_base == ABI_BASE_LP64S)
 
 
-/* enum abi_ext */
-extern const char* loongarch_abi_ext_strings[];
-#define ABI_EXT_BASE	      0
-#define N_ABI_EXT_TYPES	      1
+/* ABI Extension */
+enum {
+  ABI_EXT_BASE		= 0,
+  N_ABI_EXT_TYPES	= 1
+};
 
-/* enum cmodel */
-extern const char* loongarch_cmodel_strings[];
-#define CMODEL_NORMAL	      0
-#define CMODEL_TINY	      1
-#define CMODEL_TINY_STATIC    2
-#define CMODEL_MEDIUM	      3
-#define CMODEL_LARGE	      4
-#define CMODEL_EXTREME	      5
-#define N_CMODEL_TYPES	      6
+extern loongarch_def_array<const char *, N_ABI_EXT_TYPES>
+  loongarch_abi_ext_strings;
 
-/* enum explicit_relocs */
-#define EXPLICIT_RELOCS_AUTO	0
-#define EXPLICIT_RELOCS_NONE	1
-#define EXPLICIT_RELOCS_ALWAYS	2
-#define N_EXPLICIT_RELOCS_TYPES	3
+
+/* Code Model */
+enum {
+  CMODEL_NORMAL		= 0,
+  CMODEL_TINY		= 1,
+  CMODEL_TINY_STATIC	= 2,
+  CMODEL_MEDIUM		= 3,
+  CMODEL_LARGE		= 4,
+  CMODEL_EXTREME	= 5,
+  N_CMODEL_TYPES	= 6
+};
+
+extern loongarch_def_array<const char *, N_CMODEL_TYPES>
+  loongarch_cmodel_strings;
+
+
+/* Explicit Reloc Type */
+enum {
+  EXPLICIT_RELOCS_AUTO	    = 0,
+  EXPLICIT_RELOCS_NONE	    = 1,
+  EXPLICIT_RELOCS_ALWAYS    = 2,
+  N_EXPLICIT_RELOCS_TYPES   = 3
+};
 
 /* The common default value for variables whose assignments
    are triggered by command-line options.  */
@@ -133,6 +150,16 @@ struct loongarch_isa
 
      Using int64_t instead of HOST_WIDE_INT for C compatibility.  */
   int64_t evolution;
+  int64_t evolution_set;
+
+  loongarch_isa () :
+    base (0), fpu (0), simd (0), evolution (0), evolution_set (0)
+  {}
+  loongarch_isa base_ (int _base) { base = _base; return *this; }
+  loongarch_isa fpu_ (int _fpu) { fpu = _fpu; return *this; }
+  loongarch_isa simd_ (int _simd) { simd = _simd; return *this; }
+  loongarch_isa evolution_ (int64_t _evolution)
+    { evolution = _evolution; return *this; }
 };
 
 struct loongarch_abi
@@ -150,27 +177,31 @@ struct loongarch_target
   int cmodel;	    /* CMODEL_ */
 };
 
-/* CPU properties.  */
-/* index */
-#define CPU_NATIVE	  0
-#define CPU_ABI_DEFAULT   1
-#define CPU_LOONGARCH64	  2
-#define CPU_LA464	  3
-#define CPU_LA664	  4
-#define N_ARCH_TYPES	  5
-#define N_TUNE_TYPES	  5
+/* CPU model */
+enum {
+  CPU_NATIVE	    = 0,
+  CPU_ABI_DEFAULT   = 1,
+  CPU_LOONGARCH64   = 2,
+  CPU_LA464	    = 3,
+  CPU_LA664	    = 4,
+  N_ARCH_TYPES	    = 5,
+  N_TUNE_TYPES	    = 5
+};
 
-/* parallel tables.  */
-extern const char* loongarch_cpu_strings[];
-extern struct loongarch_isa loongarch_cpu_default_isa[];
-extern int loongarch_cpu_issue_rate[];
-extern int loongarch_cpu_multipass_dfa_lookahead[];
+/* CPU model properties */
+extern loongarch_def_array<const char *, N_ARCH_TYPES>
+  loongarch_cpu_strings;
+extern loongarch_def_array<loongarch_isa, N_ARCH_TYPES>
+  loongarch_cpu_default_isa;
+extern loongarch_def_array<int, N_TUNE_TYPES>
+  loongarch_cpu_issue_rate;
+extern loongarch_def_array<int, N_TUNE_TYPES>
+  loongarch_cpu_multipass_dfa_lookahead;
+extern loongarch_def_array<loongarch_cache, N_TUNE_TYPES>
+  loongarch_cpu_cache;
+extern loongarch_def_array<loongarch_align, N_TUNE_TYPES>
+  loongarch_cpu_align;
+extern loongarch_def_array<loongarch_rtx_cost_data, N_TUNE_TYPES>
+  loongarch_cpu_rtx_cost_data;
 
-extern struct loongarch_cache loongarch_cpu_cache[];
-extern struct loongarch_align loongarch_cpu_align[];
-extern struct loongarch_rtx_cost_data loongarch_cpu_rtx_cost_data[];
-
-#ifdef __cplusplus
-}
-#endif
 #endif /* LOONGARCH_DEF_H */

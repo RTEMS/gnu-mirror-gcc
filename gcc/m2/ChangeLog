@@ -1,3 +1,350 @@
+2024-01-26  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* gm2-compiler/M2Check.mod (dumpIndice): New procedure.
+	(dumpIndex): New procedure.
+	(dumptInfo): New procedure.
+	(buildError4): Add comment and pass formal and actual to
+	MetaError4.  Improve text describing error.
+	(buildError2): Generate different error descriptions for
+	the three error kinds.
+	(checkConstMeta): Add block comment.  Add more meta checks
+	and call doCheckPair to complete string const checking.
+	Add tinfo parameter.
+	(checkConstEquivalence): Add tinfo parameter.
+	* gm2-compiler/M2GCCDeclare.mod (PrintVerboseFromList):
+	Print the length of a const string.
+	* gm2-compiler/M2GenGCC.mod (CodeParam): Remove parameters
+	op1, op2 and op3.
+	(doParam): Add paramtok parameter.  Use paramtok instead rather
+	than CurrentQuadToken.
+	(CodeParam): Rewrite.
+	* gm2-compiler/M2Quads.mod (CheckProcedureParameters):
+	Add comments explaining that const strings are not checked
+	in M2Quads.mod.
+	(FailParameter): Use MetaErrorT2 with tokpos rather than
+	MetaError2.
+	(doBuildBinaryOp): Assign OldPos and OperatorPos before the
+	IF block.
+	* gm2-compiler/SymbolTable.mod (PutConstString): Add call to
+	InitWhereDeclaredTok.
+
+2024-01-25  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* gm2-libs/libc.def (lseek): Change the second parameter
+	type to	CSSIZE_T and make the return value optional.
+
+2024-01-24  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/113559
+	* gm2-libs/FIO.mod (SetPositionFromBeginning): Convert pos into
+	CSSIZE_T during call to lseek.
+	(SetPositionFromEnd): Convert pos into CSSIZE_T during call to
+	lseek.
+
+2024-01-23  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR bootstrap/113554
+	* mc/mc.flex (alloca): Don't redefine.
+	(handleDate): Replace (long *)0 with (time_t *)0 when calling
+	time.
+
+2024-01-19  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* gm2-compiler/M2BasicBlock.mod (InitBasicBlocks): Rename
+	ForeachScopeBlockDo to ForeachScopeBlockDo3.
+	* gm2-compiler/M2Code.mod: Import ForeachScopeBlockDo2.
+	(OptimizeScopeBlock): Call ForeachScopeBlockDo3 for
+	procedures with three parameters and ForeachScopeBlockDo2
+	for two parameters.
+	(CodeBlock): Ditto.
+	* gm2-compiler/M2GCCDeclare.mod (DeclareTypesConstantsProcedures):
+	Rename ForeachScopeBlockDo to ForeachScopeBlockDo3.
+	* gm2-compiler/M2GenGCC.def (ConvertQuadsToTree): Remove Scope
+	parameter.
+	* gm2-compiler/M2GenGCC.mod (ConvertQuadsToTree): Remove Scope
+	parameter.
+	(MaybeDebugBuiltinMemcpy): Remove parameter tok.
+	(MaybeDebugBuiltinMemset): Remove.
+	(MakeCopyUse): Remove tokenno from call to
+	MaybeDebugBuiltinMemcpy.
+	(PerformFoldBecomes): Remove desloc and exprloc.
+	(checkArrayElements): Remove location.  Remove virtpos
+	as a parameter to MaybeDebugBuiltinMemcpy.
+	(NoWalkProcedure): Add attribute unused.
+	(CheckElementSetTypes): Remove parameter p.
+	Remove CurrentQuadToken in call to MaybeDebugBuiltinMemcpy.
+	Remove NoWalkProcedure from call to CheckElementSetTypes.
+	Remove tokenno from call to MaybeDebugBuiltinMemcpy.
+	* gm2-compiler/M2Optimize.mod (RemoveProcedures): Replace
+	two parameter indirect procedure iterator with
+	ForeachScopeBlockDo2.
+	* gm2-compiler/M2SSA.mod: Remove ForeachScopeBlockDo.
+	* gm2-compiler/M2Scope.def (ForeachScopeBlockDo2): New
+	declaration.
+	(ForeachScopeBlockDo): Rename ...
+	(ForeachScopeBlockDo3): ... to this.
+	(ScopeProcedure2): New declaration.
+	* gm2-compiler/M2Scope.mod (ForeachScopeBlockDo2): New
+	procedure.
+	(ForeachScopeBlockDo): Rename ...
+	(ForeachScopeBlockDo3): ... to this.
+
+2024-01-18  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/111956
+	* Make-lang.in (host_mc_longreal): Remove.
+	* configure: Regenerate.
+	* configure.ac (M2C_LONGREAL_FLOAT128): Remove.
+	(M2C_LONGREAL_PPC64LE): Remove.
+	* gm2-compiler/M2Options.def (SetIBMLongDouble): New procedure.
+	(GetIBMLongDouble): New procedure function.
+	(SetIEEELongDouble): New procedure.
+	(GetIEEELongDouble): New procedure function.
+	* gm2-compiler/M2Options.mod (SetIBMLongDouble): New procedure.
+	(GetIBMLongDouble): New procedure function.
+	(SetIEEELongDouble): New procedure.
+	(GetIEEELongDouble): New procedure function.
+	(InitializeLongDoubleFlags): New procedure called during
+	module block initialization.
+	* gm2-gcc/m2configure.cc: Remove duplicate includes.
+	(m2configure_M2CLongRealFloat128): Remove.
+	(m2configure_M2CLongRealIBM128): Remove.
+	(m2configure_M2CLongRealLongDouble): Remove.
+	(m2configure_M2CLongRealLongDoublePPC64LE): Remove.
+	(m2configure_TargetIEEEQuadDefault): New function.
+	* gm2-gcc/m2configure.def (M2CLongRealFloat128): Remove.
+	(M2CLongRealIBM128): Remove.
+	(M2CLongRealLongDouble): Remove.
+	(M2CLongRealLongDoublePPC64LE): Remove.
+	(TargetIEEEQuadDefault): New function.
+	* gm2-gcc/m2configure.h (m2configure_M2CLongRealFloat128): Remove.
+	(m2configure_M2CLongRealIBM128): Remove.
+	(m2configure_M2CLongRealLongDouble): Remove.
+	(m2configure_M2CLongRealLongDoublePPC64LE): Remove.
+	(m2configure_TargetIEEEQuadDefault): New function.
+	* gm2-gcc/m2options.h (M2Options_SetIBMLongDouble): New prototype.
+	(M2Options_GetIBMLongDouble): New prototype.
+	(M2Options_SetIEEELongDouble): New prototype.
+	(M2Options_GetIEEELongDouble): New prototype.
+	* gm2-gcc/m2type.cc (build_m2_long_real_node): Re-implement using
+	results of M2Options_GetIBMLongDouble and M2Options_GetIEEELongDouble.
+	* gm2-lang.cc (gm2_langhook_handle_option): Add case
+	OPT_mabi_ibmlongdouble and call M2Options_SetIBMLongDouble.
+	Add case OPT_mabi_ieeelongdouble and call M2Options_SetIEEELongDouble.
+	* gm2config.aci.in: Regenerate.
+	* gm2spec.cc (lang_specific_driver): Remove block defined by
+	M2C_LONGREAL_PPC64LE.
+	Remove case OPT_mabi_ibmlongdouble.
+	Remove case OPT_mabi_ieeelongdouble.
+
+2024-01-11  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/112946
+	* gm2-compiler/M2GenGCC.mod (IsExpressionCompatible): Import.
+	(ExpressionTypeCompatible): Import.
+	(CodeStatement): Remove op1, op2, op3 parameters from CodeSetOr,
+	CodeSetAnd, CodeSetSymmetricDifference, CodeSetLogicalDifference.
+	(checkArrayElements): Rename op1 to des and op3 to expr.
+	Use despos and exprpos instead of CurrentQuadToken.
+	(checkRecordTypes): Rename op1 to des and op2 to expr.
+	Use virtpos instead of CurrentQuadToken.
+	(checkIncorrectMeta): Ditto.
+	(checkBecomes): Rename op1 to des and op3 to expr.
+	Use virtpos instead of CurrentQuadToken.
+	(NoWalkProcedure): New procedure stub.
+	(CheckBinaryExpressionTypes): New procedure function.
+	(CheckElementSetTypes): New procedure function.
+	(CodeBinarySet): Re-write.
+	(FoldBinarySet): Re-write.
+	(CodeSetOr): Remove parameters op1, op2 and op3.
+	(CodeSetAnd): Ditto.
+	(CodeSetLogicalDifference): Ditto.
+	(CodeSetSymmetricDifference): Ditto.
+	(CodeIfIn): Call CheckBinaryExpressionTypes and
+	CheckElementSetTypes.
+	* gm2-compiler/M2Quads.mod (BuildRotateFunction): Correct
+	parameters to MakeVirtualTok to reflect parameter block
+	passed to Rotate.
+
+2024-01-09  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/112920
+	* gm2-compiler/M2GCCDeclare.mod (Group): New declaration.
+	Import MakeSubrange, MakeConstVar, MakeConstLit and DivTrunc.
+	(FreeGroup): New declaration.
+	(GlobalGroup): New declaration.
+	(ToBeSolvedByQuads): Remove.
+	(NilTypedArrays): Remove.
+	(PartiallyDeclared): Remove.
+	(HeldByAlignment): Remove.
+	(FinishedAlignment): Remove.
+	(ToDoList): Remove.
+	(DebugSet): Re-format.
+	(DebugNumber): Re-format.
+	(DebugSetNumbers): Reference sets using GlobalGroup.
+	(AddSymToWatch): Re-format.
+	(WatchIncludeList): Reference sets using GlobalGroup.
+	(WatchRemoveList): Reference sets using GlobalGroup.
+	(NewGroup): New procedure.
+	(DisposeGroup): New procedure.
+	(InitGroup): New procedure.
+	(KillGroup): New procedure.
+	(DupGroup): New procedure.
+	(EqualGroup): New procedure.
+	(LookupSet): New procedure.
+	(CanDeclareTypePartially): Reference sets using GlobalGroup.
+	(CompletelyResolved): Reference sets using GlobalGroup.
+	(IsNilTypedArrays): Reference sets using GlobalGroup.
+	(IsFullyDeclared): Reference sets using GlobalGroup.
+	(IsPartiallyDeclared): Reference sets using GlobalGroup.
+	(IsPartiallyOrFullyDeclared): Reference sets using GlobalGroup.
+	(DeclareTypeConstFully): Reference sets using GlobalGroup.
+	(bodyl): Remove.
+	(Body): Use bodyt and to lookup the required set.
+	(ForeachTryDeclare): Remove parameter l.  Lookup set instead.
+	(DeclareOutstandingTypes): Add new rules setarraynul and setfully.
+	Reference sets using GlobalGroup.
+	(ActivateWatch): New procedure.
+	(DeclareTypesConstantsProceduresInRange): Re-written to check
+	group change.
+	(DeclareTypesConstantsProcedures): Re-written to check
+	group change.
+	(DeclareBoolean): Reference sets using GlobalGroup.
+	(DeclarePackedBoolean): Ditto.
+	(DeclareDefaultConstants): Ditto.
+	(FreeGroup): Initialized.
+	(GlobalGroup): Ditto.
+	* gm2-compiler/Sets.def (EqualSet): New procedure function.
+	Remove export qualified list of identifiers.
+	* gm2-compiler/Sets.mod (EqualSet): New procedure function.
+
+2024-01-04  David Malcolm  <dmalcolm@redhat.com>
+
+	* lang.opt.urls: New file, autogenerated by
+	regenerate-opt-urls.py.
+
+2023-12-15  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/112946
+	* gm2-compiler/M2Check.mod (checkConstMeta): New procedure
+	function.
+	(checkConstEquivalence): New procedure function.
+	(doCheckPair): Add call to checkConstEquivalence.
+	* gm2-compiler/M2GenGCC.mod (ResolveConstantExpressions): Call
+	FoldBecomes with reduced parameters.
+	(FoldBecomes): Re-write.
+	(TryDeclareConst): New procedure.
+	(RemoveQuads): New procedure.
+	(DeclaredOperandsBecomes): New procedure function.
+	(TypeCheckBecomes): New procedure function.
+	(PerformFoldBecomes): New procedure.
+	* gm2-compiler/M2Range.mod (FoldAssignment): Call
+	AssignmentTypeCompatible to check des expr compatibility.
+	* gm2-compiler/M2SymInit.mod (CheckReadBeforeInitQuad): Remove
+	parameter lst.
+	(FilterCheckReadBeforeInitQuad): Remove parameter lst.
+	(CheckReadBeforeInitFirstBasicBlock): Remove parameter lst.
+	Call FilterCheckReadBeforeInitQuad without lst.
+
+2023-12-13  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/112921
+	* gm2-libs-iso/ConvStringShort.def: New file.
+	* gm2-libs-iso/ConvStringShort.mod: New file.
+	* gm2-libs-iso/ShortConv.def: New file.
+	* gm2-libs-iso/ShortConv.mod: New file.
+	* gm2-libs-iso/ShortMath.def: New file.
+	* gm2-libs-iso/ShortMath.mod: New file.
+	* gm2-libs-iso/ShortStr.def: New file.
+	* gm2-libs-iso/ShortStr.mod: New file.
+
+2023-12-12  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/112984
+	* gm2-libs-coroutines/SYSTEM.mod: Remove redundant import of memcpy.
+	* gm2-libs-iso/ClientSocket.mod: Remove redundant import of IOConsts.
+	* gm2-libs-iso/IOChan.mod: Remove redundant import of IOConsts.
+	* gm2-libs-iso/IOLink.mod: Remove redundant import of IOChan and SYSTEM.
+	* gm2-libs-iso/IOResult.mod: Remove redundant import of IOChan.
+	* gm2-libs-iso/LongIO.mod: Remove redundant import of writeString.
+	* gm2-libs-iso/LongWholeIO.mod: Remove redundant import of IOChan.
+	* gm2-libs-iso/M2RTS.mod: Remove redundant import of ADDRESS.
+	* gm2-libs-iso/MemStream.mod: Remove redundant import of ADDRESS.
+	* gm2-libs-iso/RTdata.mod: Remove redundant import of DeviceTablePtr.
+	* gm2-libs-iso/RTfio.mod: Remove redundant import of DeviceTablePtr.
+	* gm2-libs-iso/RTgen.mod: Remove redundant import of DeviceTablePtr.
+	* gm2-libs-iso/RealIO.mod: Remove redundant import of writeString.
+	* gm2-libs-iso/RndFile.mod: Remove redundant import of SYSTEM.
+	* gm2-libs-iso/SYSTEM.mod: Remove redundant import of memcpy.
+	* gm2-libs-iso/ShortWholeIO.mod: Remove redundant import of IOConsts.
+	* gm2-libs-iso/TextIO.mod: Remove redundant import of IOChan.
+	* gm2-libs-iso/TextUtil.mod: Remove redundant import of IOChan.
+	* gm2-libs-iso/WholeIO.mod: Remove redundant import of IOChan.
+	* gm2-libs-log/BitByteOps.mod: Remove redundant import of BYTE.
+	* gm2-libs-log/FileSystem.mod: Remove redundant import of BYTE and ADDRESS.
+	* gm2-libs-log/InOut.mod: Remove redundant import of String.
+	* gm2-libs-log/RealConversions.mod: Remove redundant import of StringToLongreal.
+	* gm2-libs/FIO.mod: Remove redundant import of SIZE.
+	* gm2-libs/FormatStrings.mod: Remove redundant import of String
+	and ConCatChar.
+	* gm2-libs/IO.mod: Remove redundant import of SIZE.
+	* gm2-libs/Indexing.mod: Remove redundant import of ADDRESS.
+	* gm2-libs/M2Dependent.mod: Remove redundant import of SIZE.
+	* gm2-libs/M2RTS.mod: Remove redundant import of ADDRESS.
+	* gm2-libs/OptLib.mod: Remove redundant import of DynamicStrings.
+	* gm2-libs/SYSTEM.mod: Remove redundant import of memcpy.
+	* gm2-libs/StringConvert.mod: Remove redundant import of String.
+
+2023-12-07  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/112893
+	* gm2-compiler/M2Base.mod (Ass): Extend array to include proc row
+	and column.  Allow PIM to assign cardinal variables to address
+	variables.
+	(Expr): Ditto.
+	(Comp): Ditto.
+	* gm2-compiler/M2Check.mod (getSType): New procedure function.
+	Replace all occurances of GetSType with getSType.
+	* gm2-compiler/M2GenGCC.mod (CodeParam): Rewrite format specifier
+	error message.
+	* gm2-compiler/M2Quads.mod (CheckProcTypeAndProcedure): Add tokno
+	parameter.
+	* gm2-compiler/M2Range.def (InitTypesParameterCheck): Add tokno
+	parameter.
+	(InitParameterRangeCheck): Add tokno parameter.
+	Remove EXPORT QUALIFIED list.
+	(InitParameterRangeCheck): Add tokno parameter.
+	* gm2-compiler/M2Range.mod (InitTypesParameterCheck): Add tokno
+	parameter and pass tokno to PutRangeParam.
+	(InitParameterRangeCheck): Add tokno parameter and pass tokno to
+	PutRangeParam.
+	(PutRangeParam): Add tokno parameter and assign to tokenNo.
+	(FoldTypeParam): Rewrite format string.
+
+2023-12-06  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* lang.opt (-isysroot): New.
+
+2023-12-05  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/112865
+	* gm2-compiler/M2Quads.mod (BuildReFunction): Use
+	GetDType to retrieve the type of the operand when
+	converting the complex type to its scalar equivalent.
+	(BuildImFunction): Use GetDType to retrieve the type of the
+	operand when converting the complex type to its scalar
+	equivalent.
+
+2023-12-05  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	* mc/mc.flex [__GNUC__]: Define alloca as __builtin_alloca.
+	(handleDate): Use strchr instead of index.
+
+2023-12-04  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/112825
+	* tools-src/makeSystem: Change all occurrences of -c to -S.
+
 2023-11-01  Gaius Mulley  <gaiusmod2@gmail.com>
 
 	PR modula2/102989

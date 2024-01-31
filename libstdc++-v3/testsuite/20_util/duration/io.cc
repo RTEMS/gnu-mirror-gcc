@@ -82,7 +82,8 @@ test_format()
     char fmt[] = { '{', ':', '%', c, '}' };
     try
     {
-      (void) std::vformat(std::string_view(fmt, 5), std::make_format_args(1s));
+      auto s = 1s;
+      (void) std::vformat(std::string_view(fmt, 5), std::make_format_args(s));
       // The call above should throw for any conversion-spec not in my_specs:
       VERIFY(my_specs.find(c) != my_specs.npos);
     }
@@ -95,6 +96,10 @@ test_format()
 		    "required by the chrono-specs") != s.npos);
     }
   }
+
+  std::chrono::duration<float, std::milli> d{0.5};
+  s = std::format("{}", d);
+  VERIFY( s == "0.5ms" );
 }
 
 void

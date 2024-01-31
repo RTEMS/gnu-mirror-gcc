@@ -1,5 +1,5 @@
 /* Scalar evolution detector.
-   Copyright (C) 2003-2023 Free Software Foundation, Inc.
+   Copyright (C) 2003-2024 Free Software Foundation, Inc.
    Contributed by Sebastian Pop <s.pop@laposte.net>
 
 This file is part of GCC.
@@ -2050,6 +2050,30 @@ analyze_scalar_evolution (class loop *loop, tree var)
   return res;
 }
 
+/* If CHREC doesn't overflow, set the nonwrapping flag.  */
+
+void record_nonwrapping_chrec (tree chrec)
+{
+  CHREC_NOWRAP(chrec) = 1;
+
+  if (dump_file && (dump_flags & TDF_SCEV))
+    {
+      fprintf (dump_file, "(record_nonwrapping_chrec: ");
+      print_generic_expr (dump_file, chrec);
+      fprintf (dump_file, ")\n");
+    }
+}
+
+/* Return true if CHREC's nonwrapping flag is set.  */
+
+bool nonwrapping_chrec_p (tree chrec)
+{
+  if (!chrec || TREE_CODE(chrec) != POLYNOMIAL_CHREC)
+    return false;
+
+  return CHREC_NOWRAP(chrec);
+}
+
 /* Analyzes and returns the scalar evolution of VAR address in LOOP.  */
 
 static tree
@@ -3505,7 +3529,12 @@ expression_expensive_p (tree expr, bool *cond_overflow_p)
   uint64_t expanded_size = 0;
   *cond_overflow_p = false;
   return (expression_expensive_p (expr, cond_overflow_p, cache, expanded_size)
-	  || expanded_size > cache.elements ());
+	  /* ???  Both the explicit unsharing and gimplification of expr will
+	     expand shared trees to multiple copies.
+	     Guard against exponential growth by counting the visits and
+	     comparing againt the number of original nodes.  Allow a tiny
+	     bit of duplication to catch some additional optimizations.  */
+	  || expanded_size > (cache.elements () + 1));
 }
 
 /* Match.pd function to match bitwise inductive expression.
@@ -3739,7 +3768,6 @@ final_value_replacement_loop (class loop *loop)
     split_loop_exit_edge (exit);
 
   /* Set stmt insertion pointer.  All stmts are inserted before this point.  */
-  gimple_stmt_iterator gsi = gsi_after_labels (exit->dest);
 
   class loop *ex_loop
     = superloop_at_depth (loop,
@@ -3841,10 +3869,20 @@ final_value_replacement_loop (class loop *loop)
 	  print_gimple_stmt (dump_file, phi, 0);
 	  fprintf (dump_file, " with expr: ");
 	  print_generic_expr (dump_file, def);
+	  fprintf (dump_file, "\n");
 	}
       any = true;
+      /* ???  Here we'd like to have a unshare_expr that would assign
+	 shared sub-trees to new temporary variables either gimplified
+	 to a GIMPLE sequence or to a statement list (keeping this a
+	 GENERIC interface).  */
       def = unshare_expr (def);
       remove_phi_node (&psi, false);
+
+      /* Propagate constants immediately, but leave an unused initialization
+	 around to avoid invalidating the SCEV cache.  */
+      if (CONSTANT_CLASS_P (def) && !SSA_NAME_OCCURS_IN_ABNORMAL_PHI (rslt))
+	replace_uses_by (rslt, def);
 
       /* Create the replacement statements.  */
       gimple_seq stmts;
@@ -3874,10 +3912,11 @@ final_value_replacement_loop (class loop *loop)
 	      gsi_next (&gsi2);
 	    }
 	}
+      gimple_stmt_iterator gsi = gsi_after_labels (exit->dest);
       gsi_insert_seq_before (&gsi, stmts, GSI_SAME_STMT);
       if (dump_file)
 	{
-	  fprintf (dump_file, "\n final stmt:\n  ");
+	  fprintf (dump_file, " final stmt:\n  ");
 	  print_gimple_stmt (dump_file, SSA_NAME_DEF_STMT (rslt), 0);
 	  fprintf (dump_file, "\n");
 	}

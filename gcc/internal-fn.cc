@@ -1,5 +1,5 @@
 /* Internal functions.
-   Copyright (C) 2011-2023 Free Software Foundation, Inc.
+   Copyright (C) 2011-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -102,8 +102,6 @@ lookup_hilo_internal_fn (internal_fn ifn, internal_fn *lo, internal_fn *hi)
     {
     default:
       gcc_unreachable ();
-#undef DEF_INTERNAL_FN
-#undef DEF_INTERNAL_WIDENING_OPTAB_FN
 #define DEF_INTERNAL_FN(NAME, FLAGS, TYPE)
 #define DEF_INTERNAL_WIDENING_OPTAB_FN(NAME, F, S, SO, UO, T)	\
     case IFN_##NAME:						\
@@ -111,8 +109,6 @@ lookup_hilo_internal_fn (internal_fn ifn, internal_fn *lo, internal_fn *hi)
       *hi = internal_fn (IFN_##NAME##_HI);			\
       break;
 #include "internal-fn.def"
-#undef DEF_INTERNAL_FN
-#undef DEF_INTERNAL_WIDENING_OPTAB_FN
     }
 }
 
@@ -129,8 +125,6 @@ lookup_evenodd_internal_fn (internal_fn ifn, internal_fn *even,
     {
     default:
       gcc_unreachable ();
-#undef DEF_INTERNAL_FN
-#undef DEF_INTERNAL_WIDENING_OPTAB_FN
 #define DEF_INTERNAL_FN(NAME, FLAGS, TYPE)
 #define DEF_INTERNAL_WIDENING_OPTAB_FN(NAME, F, S, SO, UO, T)	\
     case IFN_##NAME:						\
@@ -138,8 +132,6 @@ lookup_evenodd_internal_fn (internal_fn ifn, internal_fn *even,
       *odd = internal_fn (IFN_##NAME##_ODD);			\
       break;
 #include "internal-fn.def"
-#undef DEF_INTERNAL_FN
-#undef DEF_INTERNAL_WIDENING_OPTAB_FN
     }
 }
 
@@ -2984,6 +2976,10 @@ expand_partial_load_optab_fn (internal_fn ifn, gcall *stmt, convert_optab optab)
 
   mem = expand_expr (rhs, NULL_RTX, VOIDmode, EXPAND_WRITE);
   gcc_assert (MEM_P (mem));
+  /* The built MEM_REF does not accurately reflect that the load
+     is only partial.  Clear it.  */
+  set_mem_expr (mem, NULL_TREE);
+  clear_mem_offset (mem);
   target = expand_expr (lhs, NULL_RTX, VOIDmode, EXPAND_WRITE);
   create_output_operand (&ops[i++], target, TYPE_MODE (type));
   create_fixed_operand (&ops[i++], mem);
@@ -3027,6 +3023,10 @@ expand_partial_store_optab_fn (internal_fn ifn, gcall *stmt, convert_optab optab
 
   mem = expand_expr (lhs, NULL_RTX, VOIDmode, EXPAND_WRITE);
   gcc_assert (MEM_P (mem));
+  /* The built MEM_REF does not accurately reflect that the store
+     is only partial.  Clear it.  */
+  set_mem_expr (mem, NULL_TREE);
+  clear_mem_offset (mem);
   reg = expand_normal (rhs);
   create_fixed_operand (&ops[i++], mem);
   create_input_operand (&ops[i++], reg, TYPE_MODE (type));
@@ -4261,7 +4261,6 @@ widening_fn_p (code_helper code)
   internal_fn fn = as_internal_fn ((combined_fn) code);
   switch (fn)
     {
-    #undef DEF_INTERNAL_WIDENING_OPTAB_FN
     #define DEF_INTERNAL_WIDENING_OPTAB_FN(NAME, F, S, SO, UO, T) \
     case IFN_##NAME:						  \
     case IFN_##NAME##_HI:					  \
@@ -4270,7 +4269,6 @@ widening_fn_p (code_helper code)
     case IFN_##NAME##_ODD:					  \
       return true;
     #include "internal-fn.def"
-    #undef DEF_INTERNAL_WIDENING_OPTAB_FN
 
     default:
       return false;
@@ -4295,6 +4293,7 @@ set_edom_supported_p (void)
   {							\
     expand_##TYPE##_optab_fn (fn, stmt, OPTAB##_optab);	\
   }
+#define DEF_INTERNAL_INT_EXT_FN(CODE, FLAGS, OPTAB, TYPE)
 #define DEF_INTERNAL_SIGNED_OPTAB_FN(CODE, FLAGS, SELECTOR, SIGNED_OPTAB, \
 				     UNSIGNED_OPTAB, TYPE)		\
   static void								\
@@ -4305,8 +4304,6 @@ set_edom_supported_p (void)
     expand_##TYPE##_optab_fn (fn, stmt, which_optab);			\
   }
 #include "internal-fn.def"
-#undef DEF_INTERNAL_OPTAB_FN
-#undef DEF_INTERNAL_SIGNED_OPTAB_FN
 
 /* Routines to expand each internal function, indexed by function number.
    Each routine has the prototype:
@@ -4465,8 +4462,6 @@ get_len_internal_fn (internal_fn fn)
 {
   switch (fn)
     {
-#undef DEF_INTERNAL_COND_FN
-#undef DEF_INTERNAL_SIGNED_COND_FN
 #define DEF_INTERNAL_COND_FN(NAME, ...)                                        \
   case IFN_COND_##NAME:                                                        \
     return IFN_COND_LEN_##NAME;
@@ -4474,8 +4469,6 @@ get_len_internal_fn (internal_fn fn)
   case IFN_COND_##NAME:                                                        \
     return IFN_COND_LEN_##NAME;
 #include "internal-fn.def"
-#undef DEF_INTERNAL_COND_FN
-#undef DEF_INTERNAL_SIGNED_COND_FN
     default:
       return IFN_LAST;
     }
@@ -5112,4 +5105,75 @@ expand_BITINTTOFLOAT (internal_fn, gcall *stmt)
 				     arg0, ptr_mode, arg1, SImode);
   if (val != target)
     emit_move_insn (target, val);
+}
+
+void
+expand_POPCOUNT (internal_fn fn, gcall *stmt)
+{
+  if (gimple_call_num_args (stmt) == 1)
+    {
+      expand_unary_optab_fn (fn, stmt, popcount_optab);
+      return;
+    }
+  /* If .POPCOUNT call has 2 arguments, match_single_bit_test marked it
+     because the result is only used in an equality comparison against 1.
+     Use rtx costs in that case to determine if .POPCOUNT (arg) == 1
+     or (arg ^ (arg - 1)) > arg - 1 is cheaper.
+     If .POPCOUNT second argument is 0, we additionally know that arg
+     is non-zero, so use arg & (arg - 1) == 0 instead.  */
+  bool speed_p = optimize_insn_for_speed_p ();
+  tree lhs = gimple_call_lhs (stmt);
+  tree arg = gimple_call_arg (stmt, 0);
+  bool nonzero_arg = integer_zerop (gimple_call_arg (stmt, 1));
+  tree type = TREE_TYPE (arg);
+  machine_mode mode = TYPE_MODE (type);
+  do_pending_stack_adjust ();
+  start_sequence ();
+  expand_unary_optab_fn (fn, stmt, popcount_optab);
+  rtx_insn *popcount_insns = get_insns ();
+  end_sequence ();
+  start_sequence ();
+  rtx plhs = expand_normal (lhs);
+  rtx pcmp = emit_store_flag (NULL_RTX, EQ, plhs, const1_rtx, mode, 0, 0);
+  if (pcmp == NULL_RTX)
+    {
+    fail:
+      end_sequence ();
+      emit_insn (popcount_insns);
+      return;
+    }
+  rtx_insn *popcount_cmp_insns = get_insns ();
+  end_sequence ();
+  start_sequence ();
+  rtx op0 = expand_normal (arg);
+  rtx argm1 = expand_simple_binop (mode, PLUS, op0, constm1_rtx, NULL_RTX,
+				   1, OPTAB_DIRECT);
+  if (argm1 == NULL_RTX)
+    goto fail;
+  rtx argxorargm1 = expand_simple_binop (mode, nonzero_arg ? AND : XOR, op0,
+					 argm1, NULL_RTX, 1, OPTAB_DIRECT);
+  if (argxorargm1 == NULL_RTX)
+    goto fail;
+  rtx cmp;
+  if (nonzero_arg)
+    cmp = emit_store_flag (NULL_RTX, EQ, argxorargm1, const0_rtx, mode, 1, 1);
+  else
+    cmp = emit_store_flag (NULL_RTX, GTU, argxorargm1, argm1, mode, 1, 1);
+  if (cmp == NULL_RTX)
+    goto fail;
+  rtx_insn *cmp_insns = get_insns ();
+  end_sequence ();
+  unsigned popcount_cost = (seq_cost (popcount_insns, speed_p)
+			    + seq_cost (popcount_cmp_insns, speed_p));
+  unsigned cmp_cost = seq_cost (cmp_insns, speed_p);
+  if (popcount_cost <= cmp_cost)
+    emit_insn (popcount_insns);
+  else
+    {
+      emit_insn (cmp_insns);
+      plhs = expand_normal (lhs);
+      if (GET_MODE (cmp) != GET_MODE (plhs))
+	cmp = convert_to_mode (GET_MODE (plhs), cmp, 1);
+      emit_move_insn (plhs, cmp);
+    }
 }

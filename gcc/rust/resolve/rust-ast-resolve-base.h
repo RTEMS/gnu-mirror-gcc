@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2023 Free Software Foundation, Inc.
+// Copyright (C) 2020-2024 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -48,6 +48,7 @@ public:
   void visit (AST::QualifiedPathInType &);
   void visit (AST::LiteralExpr &);
   void visit (AST::AttrInputLiteral &);
+  void visit (AST::AttrInputMacro &);
   void visit (AST::MetaItemLitExpr &);
   void visit (AST::MetaItemPathLit &);
   void visit (AST::BorrowExpr &);
@@ -95,12 +96,8 @@ public:
   void visit (AST::ForLoopExpr &);
   void visit (AST::IfExpr &);
   void visit (AST::IfExprConseqElse &);
-  void visit (AST::IfExprConseqIf &);
-  void visit (AST::IfExprConseqIfLet &);
   void visit (AST::IfLetExpr &);
   void visit (AST::IfLetExprConseqElse &);
-  void visit (AST::IfLetExprConseqIf &);
-  void visit (AST::IfLetExprConseqIfLet &);
 
   void visit (AST::MatchExpr &);
   void visit (AST::AwaitExpr &);
@@ -110,7 +107,6 @@ public:
 
   void visit (AST::LifetimeWhereClauseItem &);
   void visit (AST::TypeBoundWhereClauseItem &);
-  void visit (AST::Method &);
   void visit (AST::Module &);
   void visit (AST::ExternCrate &);
 
@@ -138,6 +134,7 @@ public:
   void visit (AST::InherentImpl &);
   void visit (AST::TraitImpl &);
 
+  void visit (AST::ExternalTypeItem &);
   void visit (AST::ExternalStaticItem &);
   void visit (AST::ExternalFunctionItem &);
   void visit (AST::ExternBlock &);
@@ -157,6 +154,7 @@ public:
   void visit (AST::LiteralPattern &);
   void visit (AST::IdentifierPattern &);
   void visit (AST::WildcardPattern &);
+  void visit (AST::RestPattern &);
 
   void visit (AST::RangePatternBoundLiteral &);
   void visit (AST::RangePatternBoundPath &);
@@ -182,8 +180,7 @@ public:
 
   void visit (AST::EmptyStmt &);
   void visit (AST::LetStmt &);
-  void visit (AST::ExprStmtWithoutBlock &);
-  void visit (AST::ExprStmtWithBlock &);
+  void visit (AST::ExprStmt &);
 
   void visit (AST::TraitBound &);
   void visit (AST::ImplTraitType &);
@@ -199,6 +196,9 @@ public:
   void visit (AST::SliceType &);
   void visit (AST::InferredType &);
   void visit (AST::BareFunctionType &);
+  void visit (AST::FunctionParam &param);
+  void visit (AST::VariadicParam &param);
+  void visit (AST::SelfParam &param);
 
 protected:
   ResolverBase ()

@@ -1,5 +1,5 @@
 /* Subroutines used for code generation on IA-32.
-   Copyright (C) 1988-2023 Free Software Foundation, Inc.
+   Copyright (C) 1988-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -105,7 +105,7 @@ along with GCC; see the file COPYING3.  If not see
 static rtx legitimize_dllimport_symbol (rtx, bool);
 static rtx legitimize_pe_coff_extern_decl (rtx, bool);
 static void ix86_print_operand_address_as (FILE *, rtx, addr_space_t, bool);
-static void ix86_emit_restore_reg_using_pop (rtx);
+static void ix86_emit_restore_reg_using_pop (rtx, bool = false);
 
 
 #ifndef CHECK_STACK_LIMIT
@@ -475,7 +475,9 @@ ix86_conditional_register_usage (void)
      except fixed_regs and registers used for function return value
      since aggregate_value_p checks call_used_regs[regno] on return
      value.  */
-  if (cfun && cfun->machine->no_caller_saved_registers)
+  if (cfun
+      && (cfun->machine->call_saved_registers
+	  == TYPE_NO_CALLER_SAVED_REGISTERS))
     for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
       if (!fixed_regs[i] && !ix86_function_value_regno_p (i))
 	call_used_regs[i] = 0;
@@ -944,7 +946,8 @@ ix86_function_ok_for_sibcall (tree decl, tree exp)
 
   /* Sibling call isn't OK if there are no caller-saved registers
      since all registers must be preserved before return.  */
-  if (cfun->machine->no_caller_saved_registers)
+  if (cfun->machine->call_saved_registers
+      == TYPE_NO_CALLER_SAVED_REGISTERS)
     return false;
 
   /* If we are generating position-independent code, we cannot sibcall
@@ -976,6 +979,14 @@ ix86_function_ok_for_sibcall (tree decl, tree exp)
       type = TREE_TYPE (type);			/* function type */
       decl_or_type = type;
     }
+
+  /* Sibling call isn't OK if callee has no callee-saved registers
+     and the calling function has callee-saved registers.  */
+  if ((cfun->machine->call_saved_registers
+       != TYPE_NO_CALLEE_SAVED_REGISTERS)
+      && lookup_attribute ("no_callee_saved_registers",
+			   TYPE_ATTRIBUTES (type)))
+    return false;
 
   /* If outgoing reg parm stack space changes, we cannot do sibcall.  */
   if ((OUTGOING_REG_PARM_STACK_SPACE (type)
@@ -1137,6 +1148,12 @@ ix86_comp_type_attributes (const_tree type1, const_tree type2)
     return 0;
   if (ix86_function_regparm (type1, NULL)
       != ix86_function_regparm (type2, NULL))
+    return 0;
+
+  if (lookup_attribute ("no_callee_saved_registers",
+			TYPE_ATTRIBUTES (type1))
+      != lookup_attribute ("no_callee_saved_registers",
+			   TYPE_ATTRIBUTES (type2)))
     return 0;
 
   return 1;
@@ -1640,7 +1657,7 @@ ix86_asm_output_function_label (FILE *out_file, const char *fname,
   SUBTARGET_ASM_UNWIND_INIT (out_file);
 #endif
 
-  ASM_OUTPUT_LABEL (out_file, fname);
+  assemble_function_label_raw (out_file, fname);
 
   /* Output magic byte marker, if hot-patch attribute is set.  */
   if (is_ms_hook)
@@ -6448,7 +6465,7 @@ output_set_got (rtx dest, rtx label)
 /* Generate an "push" pattern for input ARG.  */
 
 rtx
-gen_push (rtx arg)
+gen_push (rtx arg, bool ppx_p)
 {
   struct machine_function *m = cfun->machine;
 
@@ -6459,10 +6476,10 @@ gen_push (rtx arg)
   if (REG_P (arg) && GET_MODE (arg) != word_mode)
     arg = gen_rtx_REG (word_mode, REGNO (arg));
 
-  return gen_rtx_SET (gen_rtx_MEM (word_mode,
-				   gen_rtx_PRE_DEC (Pmode,
-						    stack_pointer_rtx)),
-		      arg);
+  rtx stack = gen_rtx_MEM (word_mode,
+			   gen_rtx_PRE_DEC (Pmode,
+					    stack_pointer_rtx));
+  return ppx_p ? gen_pushp_di (stack, arg) : gen_rtx_SET (stack, arg);
 }
 
 rtx
@@ -6486,15 +6503,16 @@ gen_pushfl (void)
 /* Generate an "pop" pattern for input ARG.  */
 
 rtx
-gen_pop (rtx arg)
+gen_pop (rtx arg, bool ppx_p)
 {
   if (REG_P (arg) && GET_MODE (arg) != word_mode)
     arg = gen_rtx_REG (word_mode, REGNO (arg));
 
-  return gen_rtx_SET (arg,
-		      gen_rtx_MEM (word_mode,
-				   gen_rtx_POST_INC (Pmode,
-						     stack_pointer_rtx)));
+  rtx stack = gen_rtx_MEM (word_mode,
+			   gen_rtx_POST_INC (Pmode,
+					     stack_pointer_rtx));
+
+  return ppx_p ? gen_popp_di (arg, stack) : gen_rtx_SET (arg, stack);
 }
 
 rtx
@@ -6512,7 +6530,7 @@ gen_popfl (void)
 
 /* Generate a "push2" pattern for input ARG.  */
 rtx
-gen_push2 (rtx mem, rtx reg1, rtx reg2)
+gen_push2 (rtx mem, rtx reg1, rtx reg2, bool ppx_p = false)
 {
   struct machine_function *m = cfun->machine;
   const int offset = UNITS_PER_WORD * 2;
@@ -6527,7 +6545,8 @@ gen_push2 (rtx mem, rtx reg1, rtx reg2)
   if (REG_P (reg2) && GET_MODE (reg2) != word_mode)
     reg2 = gen_rtx_REG (word_mode, REGNO (reg2));
 
-  return gen_push2_di (mem, reg1, reg2);
+  return ppx_p ? gen_push2p_di (mem, reg1, reg2):
+		 gen_push2_di (mem, reg1, reg2);
 }
 
 /* Return >= 0 if there is an unused call-clobbered register available
@@ -6567,7 +6586,8 @@ ix86_epilogue_uses (int regno)
      and restoring registers.  Don't explicitly save SP register since
      it is always preserved.  */
   return (epilogue_completed
-	  && cfun->machine->no_caller_saved_registers
+	  && (cfun->machine->call_saved_registers
+	      == TYPE_NO_CALLER_SAVED_REGISTERS)
 	  && !fixed_regs[regno]
 	  && !STACK_REGNO_P (regno)
 	  && !MMX_REGNO_P (regno));
@@ -6583,7 +6603,8 @@ ix86_hard_regno_scratch_ok (unsigned int regno)
      as a scratch register after epilogue and use REGNO as scratch
      register only if it has been used before to avoid saving and
      restoring it.  */
-  return (!cfun->machine->no_caller_saved_registers
+  return ((cfun->machine->call_saved_registers
+	   != TYPE_NO_CALLER_SAVED_REGISTERS)
 	  || (!epilogue_completed
 	      && df_regs_ever_live_p (regno)));
 }
@@ -6593,14 +6614,21 @@ ix86_hard_regno_scratch_ok (unsigned int regno)
 bool
 ix86_save_reg (unsigned int regno, bool maybe_eh_return, bool ignore_outlined)
 {
-  /* If there are no caller-saved registers, we preserve all registers,
-     except for MMX and x87 registers which aren't supported when saving
-     and restoring registers.  Don't explicitly save SP register since
-     it is always preserved.  */
-  if (cfun->machine->no_caller_saved_registers)
+  rtx reg;
+
+  switch (cfun->machine->call_saved_registers)
     {
-      /* Don't preserve registers used for function return value.  */
-      rtx reg = crtl->return_rtx;
+    case TYPE_DEFAULT_CALL_SAVED_REGISTERS:
+      break;
+
+    case TYPE_NO_CALLER_SAVED_REGISTERS:
+      /* If there are no caller-saved registers, we preserve all
+	 registers, except for MMX and x87 registers which aren't
+	 supported when saving and restoring registers.  Don't
+	 explicitly save SP register since it is always preserved.
+
+	 Don't preserve registers used for function return value.  */
+      reg = crtl->return_rtx;
       if (reg)
 	{
 	  unsigned int i = REGNO (reg);
@@ -6616,6 +6644,9 @@ ix86_save_reg (unsigned int regno, bool maybe_eh_return, bool ignore_outlined)
 	      && !MMX_REGNO_P (regno)
 	      && (regno != HARD_FRAME_POINTER_REGNUM
 		  || !frame_pointer_needed));
+
+    case TYPE_NO_CALLEE_SAVED_REGISTERS:
+      return false;
     }
 
   if (regno == REAL_PIC_OFFSET_TABLE_REGNUM
@@ -7369,7 +7400,8 @@ ix86_emit_save_regs (void)
       for (regno = FIRST_PSEUDO_REGISTER - 1; regno >= 0; regno--)
 	if (GENERAL_REGNO_P (regno) && ix86_save_reg (regno, true, true))
 	  {
-	    insn = emit_insn (gen_push (gen_rtx_REG (word_mode, regno)));
+	    insn = emit_insn (gen_push (gen_rtx_REG (word_mode, regno),
+					TARGET_APX_PPX));
 	    RTX_FRAME_RELATED_P (insn) = 1;
 	  }
     }
@@ -7399,7 +7431,8 @@ ix86_emit_save_regs (void)
 						 gen_rtx_REG (word_mode,
 							      regno_list[0]),
 						 gen_rtx_REG (word_mode,
-							      regno_list[1])));
+							      regno_list[1]),
+						 TARGET_APX_PPX));
 		    RTX_FRAME_RELATED_P (insn) = 1;
 		    rtx dwarf = gen_rtx_SEQUENCE (VOIDmode, rtvec_alloc (3));
 
@@ -7431,7 +7464,8 @@ ix86_emit_save_regs (void)
 	      }
 	    else
 	      {
-		insn = emit_insn (gen_push (gen_rtx_REG (word_mode, regno)));
+		insn = emit_insn (gen_push (gen_rtx_REG (word_mode, regno),
+					    TARGET_APX_PPX));
 		RTX_FRAME_RELATED_P (insn) = 1;
 		aligned = true;
 	      }
@@ -7439,7 +7473,8 @@ ix86_emit_save_regs (void)
       if (loaded_regnum == 1)
 	{
 	  insn = emit_insn (gen_push (gen_rtx_REG (word_mode,
-						   regno_list[0])));
+						   regno_list[0]),
+				      TARGET_APX_PPX));
 	  RTX_FRAME_RELATED_P (insn) = 1;
 	}
     }
@@ -7711,7 +7746,8 @@ find_drap_reg (void)
 	 registers in epilogue, DRAP must not use caller-saved
 	 register in such case.  */
       if (DECL_STATIC_CHAIN (decl)
-	  || cfun->machine->no_caller_saved_registers
+	  || (cfun->machine->call_saved_registers
+	      == TYPE_NO_CALLER_SAVED_REGISTERS)
 	  || crtl->tail_call_emit)
 	return R13_REG;
 
@@ -7724,7 +7760,8 @@ find_drap_reg (void)
 	 registers in epilogue, DRAP must not use caller-saved
 	 register in such case.  */
       if (DECL_STATIC_CHAIN (decl)
-	  || cfun->machine->no_caller_saved_registers
+	  || (cfun->machine->call_saved_registers
+	      == TYPE_NO_CALLER_SAVED_REGISTERS)
 	  || crtl->tail_call_emit
 	  || crtl->calls_eh_return)
 	return DI_REG;
@@ -8601,10 +8638,11 @@ ix86_elim_entry_set_got (rtx reg)
       rtx pat = PATTERN (c_insn);
       if (GET_CODE (pat) == PARALLEL)
 	{
-	  rtx vec = XVECEXP (pat, 0, 0);
-	  if (GET_CODE (vec) == SET
-	      && XINT (XEXP (vec, 1), 1) == UNSPEC_SET_GOT
-	      && REGNO (XEXP (vec, 0)) == REGNO (reg))
+	  rtx set = XVECEXP (pat, 0, 0);
+	  if (GET_CODE (set) == SET
+	      && GET_CODE (SET_SRC (set)) == UNSPEC
+	      && XINT (SET_SRC (set), 1) == UNSPEC_SET_GOT
+	      && REGNO (SET_DEST (set)) == REGNO (reg))
 	    delete_insn (c_insn);
 	}
     }
@@ -9268,13 +9306,13 @@ ix86_expand_prologue (void)
     emit_insn (gen_prologue_use (stack_pointer_rtx));
 }
 
-/* Emit code to restore REG using a POP insn.  */
+/* Emit code to restore REG using a POP or POPP insn.  */
 
 static void
-ix86_emit_restore_reg_using_pop (rtx reg)
+ix86_emit_restore_reg_using_pop (rtx reg, bool ppx_p)
 {
   struct machine_function *m = cfun->machine;
-  rtx_insn *insn = emit_insn (gen_pop (reg));
+  rtx_insn *insn = emit_insn (gen_pop (reg, ppx_p));
 
   ix86_add_cfa_restore_note (insn, reg, m->fs.sp_offset);
   m->fs.sp_offset -= UNITS_PER_WORD;
@@ -9328,14 +9366,19 @@ ix86_emit_restore_reg_using_pop (rtx reg)
 
 /* Emit code to restore REG using a POP2 insn.  */
 static void
-ix86_emit_restore_reg_using_pop2 (rtx reg1, rtx reg2)
+ix86_emit_restore_reg_using_pop2 (rtx reg1, rtx reg2, bool ppx_p = false)
 {
   struct machine_function *m = cfun->machine;
   const int offset = UNITS_PER_WORD * 2;
+  rtx_insn *insn;
 
   rtx mem = gen_rtx_MEM (TImode, gen_rtx_POST_INC (Pmode,
 						   stack_pointer_rtx));
-  rtx_insn *insn = emit_insn (gen_pop2_di (reg1, mem, reg2));
+
+  if (ppx_p)
+    insn = emit_insn (gen_pop2p_di (reg1, mem, reg2));
+  else
+    insn = emit_insn (gen_pop2_di (reg1, mem, reg2));
 
   RTX_FRAME_RELATED_P (insn) = 1;
 
@@ -9397,13 +9440,13 @@ ix86_emit_restore_reg_using_pop2 (rtx reg1, rtx reg2)
 /* Emit code to restore saved registers using POP insns.  */
 
 static void
-ix86_emit_restore_regs_using_pop (void)
+ix86_emit_restore_regs_using_pop (bool ppx_p)
 {
   unsigned int regno;
 
   for (regno = 0; regno < FIRST_PSEUDO_REGISTER; regno++)
     if (GENERAL_REGNO_P (regno) && ix86_save_reg (regno, false, true))
-      ix86_emit_restore_reg_using_pop (gen_rtx_REG (word_mode, regno));
+      ix86_emit_restore_reg_using_pop (gen_rtx_REG (word_mode, regno), ppx_p);
 }
 
 /* Emit code to restore saved registers using POP2 insns.  */
@@ -9432,20 +9475,23 @@ ix86_emit_restore_regs_using_pop2 (void)
 		ix86_emit_restore_reg_using_pop2 (gen_rtx_REG (word_mode,
 							       regno_list[0]),
 						  gen_rtx_REG (word_mode,
-							       regno_list[1]));
+							       regno_list[1]),
+						  TARGET_APX_PPX);
 		loaded_regnum = 0;
 		regno_list[0] = regno_list[1] = -1;
 	      }
 	  }
 	else
 	  {
-	    ix86_emit_restore_reg_using_pop (gen_rtx_REG (word_mode, regno));
+	    ix86_emit_restore_reg_using_pop (gen_rtx_REG (word_mode, regno),
+					     TARGET_APX_PPX);
 	    aligned = true;
 	  }
       }
 
   if (loaded_regnum == 1)
-    ix86_emit_restore_reg_using_pop (gen_rtx_REG (word_mode, regno_list[0]));
+    ix86_emit_restore_reg_using_pop (gen_rtx_REG (word_mode, regno_list[0]),
+				     TARGET_APX_PPX);
 }
 
 /* Emit code and notes for the LEAVE instruction.  If insn is non-null,
@@ -9990,7 +10036,7 @@ ix86_expand_epilogue (int style)
       if (TARGET_APX_PUSH2POP2 && m->func_type == TYPE_NORMAL)
 	ix86_emit_restore_regs_using_pop2 ();
       else
-	ix86_emit_restore_regs_using_pop ();
+	ix86_emit_restore_regs_using_pop (TARGET_APX_PPX);
     }
 
   /* If we used a stack pointer and haven't already got rid of it,
@@ -10353,6 +10399,7 @@ ix86_expand_split_stack_prologue (void)
   rtx_code_label *label;
   rtx limit, current, allocate_rtx, call_fusage;
   rtx_insn *call_insn;
+  unsigned int scratch_regno = INVALID_REGNUM;
   rtx scratch_reg = NULL_RTX;
   rtx_code_label *varargs_label = NULL;
   rtx fn;
@@ -10375,11 +10422,16 @@ ix86_expand_split_stack_prologue (void)
 
   limit = ix86_split_stack_guard ();
 
-  if (allocate < SPLIT_STACK_AVAILABLE)
-    current = stack_pointer_rtx;
-  else
+  if (allocate >= SPLIT_STACK_AVAILABLE
+      || flag_force_indirect_call)
     {
-      unsigned int scratch_regno;
+      scratch_regno = split_stack_prologue_scratch_regno ();
+      if (scratch_regno == INVALID_REGNUM)
+	return;
+    }
+
+  if (allocate >= SPLIT_STACK_AVAILABLE)
+    {
       rtx offset;
 
       /* We need a scratch register to hold the stack pointer minus
@@ -10387,9 +10439,7 @@ ix86_expand_split_stack_prologue (void)
 	 function, the scratch register can be any caller-saved
 	 register which is not used for parameters.  */
       offset = GEN_INT (- allocate);
-      scratch_regno = split_stack_prologue_scratch_regno ();
-      if (scratch_regno == INVALID_REGNUM)
-	return;
+
       scratch_reg = gen_rtx_REG (Pmode, scratch_regno);
       if (!TARGET_64BIT || x86_64_immediate_operand (offset, Pmode))
 	{
@@ -10407,6 +10457,8 @@ ix86_expand_split_stack_prologue (void)
 	}
       current = scratch_reg;
     }
+  else
+    current = stack_pointer_rtx;
 
   ix86_expand_branch (GEU, current, limit, label);
   rtx_insn *jump_insn = get_last_insn ();
@@ -10435,8 +10487,8 @@ ix86_expand_split_stack_prologue (void)
     {
       rtx reg10, reg11;
 
-      reg10 = gen_rtx_REG (Pmode, R10_REG);
-      reg11 = gen_rtx_REG (Pmode, R11_REG);
+      reg10 = gen_rtx_REG (DImode, R10_REG);
+      reg11 = gen_rtx_REG (DImode, R11_REG);
 
       /* If this function uses a static chain, it will be in %r10.
 	 Preserve it across the call to __morestack.  */
@@ -10449,12 +10501,43 @@ ix86_expand_split_stack_prologue (void)
 	  use_reg (&call_fusage, rax);
 	}
 
-      if ((ix86_cmodel == CM_LARGE || ix86_cmodel == CM_LARGE_PIC)
-          && !TARGET_PECOFF)
+      if (flag_force_indirect_call
+	  || ix86_cmodel == CM_LARGE || ix86_cmodel == CM_LARGE_PIC)
 	{
 	  HOST_WIDE_INT argval;
 
-	  gcc_assert (Pmode == DImode);
+	  if (split_stack_fn_large == NULL_RTX)
+	    {
+	      split_stack_fn_large
+		= gen_rtx_SYMBOL_REF (Pmode, "__morestack_large_model");
+	      SYMBOL_REF_FLAGS (split_stack_fn_large) |= SYMBOL_FLAG_LOCAL;
+	    }
+
+	  fn = split_stack_fn_large;
+
+	  if (ix86_cmodel == CM_LARGE_PIC)
+	    {
+	      rtx_code_label *label;
+	      rtx x;
+
+	      gcc_assert (Pmode == DImode);
+
+	      label = gen_label_rtx ();
+	      emit_label (label);
+	      LABEL_PRESERVE_P (label) = 1;
+	      emit_insn (gen_set_rip_rex64 (reg10, label));
+	      emit_insn (gen_set_got_offset_rex64 (reg11, label));
+	      emit_insn (gen_add2_insn (reg10, reg11));
+	      x = gen_rtx_UNSPEC (Pmode, gen_rtvec (1, fn), UNSPEC_GOT);
+	      x = gen_rtx_CONST (Pmode, x);
+	      emit_move_insn (reg11, x);
+	      x = gen_rtx_PLUS (Pmode, reg10, reg11);
+	      x = gen_const_mem (Pmode, x);
+	      fn = copy_to_suggested_reg (x, reg11, Pmode);
+	    }
+	  else if (ix86_cmodel == CM_LARGE)
+	    fn = copy_to_suggested_reg (fn, reg11, Pmode);
+
 	  /* When using the large model we need to load the address
 	     into a register, and we've run out of registers.  So we
 	     switch to a different calling convention, and we call a
@@ -10463,36 +10546,6 @@ ix86_expand_split_stack_prologue (void)
 	     frame size in the lower 32 bits.  */
 	  gcc_assert ((allocate & HOST_WIDE_INT_C (0xffffffff)) == allocate);
 	  gcc_assert ((args_size & 0xffffffff) == args_size);
-
-	  if (split_stack_fn_large == NULL_RTX)
-	    {
-	      split_stack_fn_large
-		= gen_rtx_SYMBOL_REF (Pmode, "__morestack_large_model");
-	      SYMBOL_REF_FLAGS (split_stack_fn_large) |= SYMBOL_FLAG_LOCAL;
-	    }
-	  if (ix86_cmodel == CM_LARGE_PIC)
-	    {
-	      rtx_code_label *label;
-	      rtx x;
-
-	      label = gen_label_rtx ();
-	      emit_label (label);
-	      LABEL_PRESERVE_P (label) = 1;
-	      emit_insn (gen_set_rip_rex64 (reg10, label));
-	      emit_insn (gen_set_got_offset_rex64 (reg11, label));
-	      emit_insn (gen_add2_insn (reg10, reg11));
-	      x = gen_rtx_UNSPEC (Pmode, gen_rtvec (1, split_stack_fn_large),
-				  UNSPEC_GOT);
-	      x = gen_rtx_CONST (Pmode, x);
-	      emit_move_insn (reg11, x);
-	      x = gen_rtx_PLUS (Pmode, reg10, reg11);
-	      x = gen_const_mem (Pmode, x);
-	      emit_move_insn (reg11, x);
-	    }
-	  else
-	    emit_move_insn (reg11, split_stack_fn_large);
-
-	  fn = reg11;
 
 	  argval = ((args_size << 16) << 16) + allocate;
 	  emit_move_insn (reg10, GEN_INT (argval));
@@ -10508,12 +10561,40 @@ ix86_expand_split_stack_prologue (void)
     }
   else
     {
+      if (flag_force_indirect_call && flag_pic)
+	{
+	  rtx x;
+
+	  gcc_assert (Pmode == SImode);
+
+	  scratch_reg = gen_rtx_REG (Pmode, scratch_regno);
+
+	  emit_insn (gen_set_got (scratch_reg));
+	  x = gen_rtx_UNSPEC (Pmode, gen_rtvec (1, split_stack_fn),
+			      UNSPEC_GOT);
+	  x = gen_rtx_CONST (Pmode, x);
+	  x = gen_rtx_PLUS (Pmode, scratch_reg, x);
+	  x = gen_const_mem (Pmode, x);
+	  fn = copy_to_suggested_reg (x, scratch_reg, Pmode);
+	}
+
       rtx_insn *insn = emit_insn (gen_push (GEN_INT (args_size)));
       add_reg_note (insn, REG_ARGS_SIZE, GEN_INT (UNITS_PER_WORD));
       insn = emit_insn (gen_push (allocate_rtx));
       add_reg_note (insn, REG_ARGS_SIZE, GEN_INT (2 * UNITS_PER_WORD));
       pop = GEN_INT (2 * UNITS_PER_WORD);
     }
+
+  if (flag_force_indirect_call && !register_operand (fn, VOIDmode))
+    {
+      scratch_reg = gen_rtx_REG (word_mode, scratch_regno);
+
+      if (GET_MODE (fn) != word_mode)
+	fn = gen_rtx_ZERO_EXTEND (word_mode, fn);
+
+      fn = copy_to_suggested_reg (fn, scratch_reg, word_mode);
+    }
+
   call_insn = ix86_expand_call (NULL_RTX, gen_rtx_MEM (QImode, fn),
 				GEN_INT (UNITS_PER_WORD), constm1_rtx,
 				pop, false);
@@ -10558,7 +10639,6 @@ ix86_expand_split_stack_prologue (void)
      slot.  */
   if (cfun->machine->split_stack_varargs_pointer != NULL_RTX)
     {
-      unsigned int scratch_regno;
       rtx frame_reg;
       int words;
 
@@ -14989,8 +15069,12 @@ ix86_avx_u128_mode_needed (rtx_insn *insn)
 	 vzeroupper if all SSE registers are clobbered.  */
       const function_abi &abi = insn_callee_abi (insn);
       if (vzeroupper_pattern (PATTERN (insn), VOIDmode)
-	  || !hard_reg_set_subset_p (reg_class_contents[SSE_REGS],
-				     abi.mode_clobbers (V4DImode)))
+	  /* Should be safe to issue an vzeroupper before sibling_call_p.
+	     Also there not mode_exit for sibling_call, so there could be
+	     missing vzeroupper for that.  */
+	  || !(SIBLING_CALL_P (insn)
+	       || hard_reg_set_subset_p (reg_class_contents[SSE_REGS],
+					 abi.mode_clobbers (V4DImode))))
 	return AVX_U128_ANY;
 
       return AVX_U128_CLEAN;
@@ -15128,7 +15212,19 @@ ix86_avx_u128_mode_after (int mode, rtx_insn *insn)
       bool avx_upper_reg_found = false;
       note_stores (insn, ix86_check_avx_upper_stores, &avx_upper_reg_found);
 
-      return avx_upper_reg_found ? AVX_U128_DIRTY : AVX_U128_CLEAN;
+      if (avx_upper_reg_found)
+	return AVX_U128_DIRTY;
+
+      /* If the function desn't clobber any sse registers or only clobber
+	 128-bit part, Then vzeroupper isn't issued before the function exit.
+	 the status not CLEAN but ANY after the function.  */
+      const function_abi &abi = insn_callee_abi (insn);
+      if (!(SIBLING_CALL_P (insn)
+	    || hard_reg_set_subset_p (reg_class_contents[SSE_REGS],
+				      abi.mode_clobbers (V4DImode))))
+	return AVX_U128_ANY;
+
+      return  AVX_U128_CLEAN;
     }
 
   /* Otherwise, return current mode.  Remember that if insn
@@ -16152,22 +16248,6 @@ ix86_dep_by_shift_count (const_rtx set_insn, const_rtx use_insn)
 {
   return ix86_dep_by_shift_count_body (PATTERN (set_insn),
 				       PATTERN (use_insn));
-}
-
-/* Return TRUE or FALSE depending on whether the unary operator meets the
-   appropriate constraints.  */
-
-bool
-ix86_unary_operator_ok (enum rtx_code,
-			machine_mode,
-			rtx operands[2])
-{
-  /* If one of operands is memory, source and destination must match.  */
-  if ((MEM_P (operands[0])
-       || MEM_P (operands[1]))
-      && ! rtx_equal_p (operands[0], operands[1]))
-    return false;
-  return true;
 }
 
 /* Return TRUE if the operands to a vec_interleave_{high,low}v2df
@@ -19311,7 +19391,10 @@ ix86_gimple_fold_builtin (gimple_stmt_iterator *gsi)
     do_shift:
       gcc_assert (n_args >= 2);
       if (!gimple_call_lhs (stmt))
-	break;
+	{
+	  gsi_replace (gsi, gimple_build_nop (), false);
+	  return true;
+	}
       arg0 = gimple_call_arg (stmt, 0);
       arg1 = gimple_call_arg (stmt, 1);
       elems = TYPE_VECTOR_SUBPARTS (TREE_TYPE (arg0));
@@ -19457,7 +19540,10 @@ ix86_gimple_fold_builtin (gimple_stmt_iterator *gsi)
     case IX86_BUILTIN_PABSD256_MASK:
       gcc_assert (n_args >= 1);
       if (!gimple_call_lhs (stmt))
-	break;
+	{
+	  gsi_replace (gsi, gimple_build_nop (), false);
+	  return true;
+	}
       arg0 = gimple_call_arg (stmt, 0);
       elems = TYPE_VECTOR_SUBPARTS (TREE_TYPE (arg0));
       /* For masked ABS, only optimize if the mask is all ones.  */
@@ -20748,8 +20834,7 @@ ix86_hard_regno_mode_ok (unsigned int regno, machine_mode mode)
 	return MASK_PAIR_REGNO_P(regno);
 
       return ((TARGET_AVX512F && VALID_MASK_REG_MODE (mode))
-	      || (TARGET_AVX512BW && mode == SImode)
-	      || (TARGET_AVX512BW && TARGET_EVEX512 && mode == DImode));
+	      || (TARGET_AVX512BW && VALID_MASK_AVX512BW_MODE (mode)));
     }
 
   if (GET_MODE_CLASS (mode) == MODE_PARTIAL_INT)
@@ -22692,7 +22777,10 @@ x86_function_profiler (FILE *file, int labelno ATTRIBUTE_UNUSED)
   if (TARGET_64BIT)
     {
 #ifndef NO_PROFILE_COUNTERS
-      fprintf (file, "\tleaq\t%sP%d(%%rip),%%r11\n", LPREFIX, labelno);
+      if (ASSEMBLER_DIALECT == ASM_INTEL)
+	fprintf (file, "\tlea\tr11, %sP%d[rip]\n", LPREFIX, labelno);
+      else
+	fprintf (file, "\tleaq\t%sP%d(%%rip), %%r11\n", LPREFIX, labelno);
 #endif
 
       if (!TARGET_PECOFF)
@@ -22703,12 +22791,29 @@ x86_function_profiler (FILE *file, int labelno ATTRIBUTE_UNUSED)
 	      /* NB: R10 is caller-saved.  Although it can be used as a
 		 static chain register, it is preserved when calling
 		 mcount for nested functions.  */
-	      fprintf (file, "1:\tmovabsq\t$%s, %%r10\n\tcall\t*%%r10\n",
-		       mcount_name);
+	      if (ASSEMBLER_DIALECT == ASM_INTEL)
+		fprintf (file, "1:\tmovabs\tr10, OFFSET FLAT:%s\n"
+			       "\tcall\tr10\n", mcount_name);
+	      else
+		fprintf (file, "1:\tmovabsq\t$%s, %%r10\n\tcall\t*%%r10\n",
+			 mcount_name);
 	      break;
 	    case CM_LARGE_PIC:
 #ifdef NO_PROFILE_COUNTERS
-	      fprintf (file, "1:\tmovabsq\t$_GLOBAL_OFFSET_TABLE_-1b, %%r11\n");
+	      if (ASSEMBLER_DIALECT == ASM_INTEL)
+		{
+		  fprintf (file, "1:movabs\tr11, "
+				 "OFFSET FLAT:_GLOBAL_OFFSET_TABLE_-1b\n");
+		  fprintf (file, "\tlea\tr10, 1b[rip]\n");
+		  fprintf (file, "\tadd\tr10, r11\n");
+		  fprintf (file, "\tmovabs\tr11, OFFSET FLAT:%s@PLTOFF\n",
+			   mcount_name);
+		  fprintf (file, "\tadd\tr10, r11\n");
+		  fprintf (file, "\tcall\tr10\n");
+		  break;
+		}
+	      fprintf (file,
+		       "1:\tmovabsq\t$_GLOBAL_OFFSET_TABLE_-1b, %%r11\n");
 	      fprintf (file, "\tleaq\t1b(%%rip), %%r10\n");
 	      fprintf (file, "\taddq\t%%r11, %%r10\n");
 	      fprintf (file, "\tmovabsq\t$%s@PLTOFF, %%r11\n", mcount_name);
@@ -22722,7 +22827,12 @@ x86_function_profiler (FILE *file, int labelno ATTRIBUTE_UNUSED)
 	    case CM_MEDIUM_PIC:
 	      if (!ix86_direct_extern_access)
 		{
-		  fprintf (file, "1:\tcall\t*%s@GOTPCREL(%%rip)\n", mcount_name);
+		  if (ASSEMBLER_DIALECT == ASM_INTEL)
+		    fprintf (file, "1:\tcall\t[QWORD PTR %s@GOTPCREL[rip]]",
+			     mcount_name);
+		  else
+		    fprintf (file, "1:\tcall\t*%s@GOTPCREL(%%rip)\n",
+			     mcount_name);
 		  break;
 		}
 	      /* fall through */
@@ -22737,23 +22847,37 @@ x86_function_profiler (FILE *file, int labelno ATTRIBUTE_UNUSED)
   else if (flag_pic)
     {
 #ifndef NO_PROFILE_COUNTERS
-      fprintf (file, "\tleal\t%sP%d@GOTOFF(%%ebx),%%" PROFILE_COUNT_REGISTER "\n",
-	       LPREFIX, labelno);
+      if (ASSEMBLER_DIALECT == ASM_INTEL)
+	fprintf (file,
+		 "\tlea\t" PROFILE_COUNT_REGISTER ", %sP%d@GOTOFF[ebx]\n",
+		 LPREFIX, labelno);
+      else
+	fprintf (file,
+		 "\tleal\t%sP%d@GOTOFF(%%ebx), %%" PROFILE_COUNT_REGISTER "\n",
+		 LPREFIX, labelno);
 #endif
-      fprintf (file, "1:\tcall\t*%s@GOT(%%ebx)\n", mcount_name);
+      if (ASSEMBLER_DIALECT == ASM_INTEL)
+	fprintf (file, "1:\tcall\t[DWORD PTR %s@GOT[ebx]]\n", mcount_name);
+      else
+	fprintf (file, "1:\tcall\t*%s@GOT(%%ebx)\n", mcount_name);
     }
   else
     {
 #ifndef NO_PROFILE_COUNTERS
-      fprintf (file, "\tmovl\t$%sP%d,%%" PROFILE_COUNT_REGISTER "\n",
-	       LPREFIX, labelno);
+      if (ASSEMBLER_DIALECT == ASM_INTEL)
+	fprintf (file,
+		 "\tmov\t" PROFILE_COUNT_REGISTER ", OFFSET FLAT:%sP%d\n",
+		 LPREFIX, labelno);
+      else
+	fprintf (file, "\tmovl\t$%sP%d, %%" PROFILE_COUNT_REGISTER "\n",
+		 LPREFIX, labelno);
 #endif
       x86_print_call_or_nop (file, mcount_name);
     }
 
   if (flag_record_mcount
-	|| lookup_attribute ("fentry_section",
-                                DECL_ATTRIBUTES (current_function_decl)))
+      || lookup_attribute ("fentry_section",
+			   DECL_ATTRIBUTES (current_function_decl)))
     {
       const char *sname = "__mcount_loc";
 
@@ -23282,6 +23406,31 @@ x86_evex_reg_mentioned_p (rtx operands[], int nops)
   return false;
 }
 
+/* Return true when rtx operand does not contain any UNSPEC_*POFF related
+   constant to avoid APX_NDD instructions excceed encoding length limit.  */
+bool
+x86_poff_operand_p (rtx operand)
+{
+  if (GET_CODE (operand) == CONST)
+    {
+      rtx op = XEXP (operand, 0);
+      if (GET_CODE (op) == PLUS)
+	op = XEXP (op, 0);
+	
+      if (GET_CODE (op) == UNSPEC)
+	{
+	  int unspec = XINT (op, 1);
+	  return (unspec == UNSPEC_NTPOFF
+		  || unspec == UNSPEC_TPOFF
+		  || unspec == UNSPEC_DTPOFF
+		  || unspec == UNSPEC_GOTTPOFF
+		  || unspec == UNSPEC_GOTNTPOFF
+		  || unspec == UNSPEC_INDNTPOFF);
+	}
+    }
+  return false;
+}
+
 /* If profitable, negate (without causing overflow) integer constant
    of mode MODE at location LOC.  Return true in this case.  */
 bool
@@ -23632,8 +23781,9 @@ static void map_egpr_constraints (vec<const char *> &constraints)
 static rtx_insn *
 ix86_md_asm_adjust (vec<rtx> &outputs, vec<rtx> & /*inputs*/,
 		    vec<machine_mode> & /*input_modes*/,
-		    vec<const char *> &constraints, vec<rtx> &clobbers,
-		    HARD_REG_SET &clobbered_regs, location_t loc)
+		    vec<const char *> &constraints, vec<rtx> &/*uses*/,
+		    vec<rtx> &clobbers, HARD_REG_SET &clobbered_regs,
+		    location_t loc)
 {
   bool saw_asm_flag = false;
 
@@ -24514,14 +24664,33 @@ ix86_noce_conversion_profitable_p (rtx_insn *seq, struct noce_if_info *if_info)
 /* x86-specific vector costs.  */
 class ix86_vector_costs : public vector_costs
 {
-  using vector_costs::vector_costs;
+public:
+  ix86_vector_costs (vec_info *, bool);
 
   unsigned int add_stmt_cost (int count, vect_cost_for_stmt kind,
 			      stmt_vec_info stmt_info, slp_tree node,
 			      tree vectype, int misalign,
 			      vect_cost_model_location where) override;
   void finish_cost (const vector_costs *) override;
+
+private:
+
+  /* Estimate register pressure of the vectorized code.  */
+  void ix86_vect_estimate_reg_pressure ();
+  /* Number of GENERAL_REGS/SSE_REGS used in the vectorizer, it's used for
+     estimation of register pressure.
+     ??? Currently it's only used by vec_construct/scalar_to_vec
+     where we know it's not loaded from memory.  */
+  unsigned m_num_gpr_needed[3];
+  unsigned m_num_sse_needed[3];
 };
+
+ix86_vector_costs::ix86_vector_costs (vec_info* vinfo, bool costing_for_scalar)
+  : vector_costs (vinfo, costing_for_scalar),
+    m_num_gpr_needed (),
+    m_num_sse_needed ()
+{
+}
 
 /* Implement targetm.vectorize.create_costs.  */
 
@@ -24700,8 +24869,7 @@ ix86_vector_costs::add_stmt_cost (int count, vect_cost_for_stmt kind,
     }
   else if ((kind == vec_construct || kind == scalar_to_vec)
 	   && node
-	   && SLP_TREE_DEF_TYPE (node) == vect_external_def
-	   && INTEGRAL_TYPE_P (TREE_TYPE (vectype)))
+	   && SLP_TREE_DEF_TYPE (node) == vect_external_def)
     {
       stmt_cost = ix86_builtin_vectorization_cost (kind, vectype, misalign);
       unsigned i;
@@ -24737,7 +24905,15 @@ ix86_vector_costs::add_stmt_cost (int count, vect_cost_for_stmt kind,
 		  && (gimple_assign_rhs_code (def) != BIT_FIELD_REF
 		      || !VECTOR_TYPE_P (TREE_TYPE
 				(TREE_OPERAND (gimple_assign_rhs1 (def), 0))))))
-	    stmt_cost += ix86_cost->sse_to_integer;
+	    {
+	      if (fp)
+		m_num_sse_needed[where]++;
+	      else
+		{
+		  m_num_gpr_needed[where]++;
+		  stmt_cost += ix86_cost->sse_to_integer;
+		}
+	    }
 	}
       FOR_EACH_VEC_ELT (SLP_TREE_SCALAR_OPS (node), i, op)
 	if (TREE_CODE (op) == SSA_NAME)
@@ -24774,6 +24950,24 @@ ix86_vector_costs::add_stmt_cost (int count, vect_cost_for_stmt kind,
 }
 
 void
+ix86_vector_costs::ix86_vect_estimate_reg_pressure ()
+{
+  unsigned gpr_spill_cost = COSTS_N_INSNS (ix86_cost->int_store [2]) / 2;
+  unsigned sse_spill_cost = COSTS_N_INSNS (ix86_cost->sse_store[0]) / 2;
+
+  /* Any better way to have target available fp registers, currently use SSE_REGS.  */
+  unsigned target_avail_sse = TARGET_64BIT ? (TARGET_AVX512F ? 32 : 16) : 8;
+  for (unsigned i = 0; i != 3; i++)
+    {
+      if (m_num_gpr_needed[i] > target_avail_regs)
+	m_costs[i] += gpr_spill_cost * (m_num_gpr_needed[i] - target_avail_regs);
+      /* Only measure sse registers pressure.  */
+      if (TARGET_SSE && (m_num_sse_needed[i] > target_avail_sse))
+	m_costs[i] += sse_spill_cost * (m_num_sse_needed[i] - target_avail_sse);
+    }
+}
+
+void
 ix86_vector_costs::finish_cost (const vector_costs *scalar_costs)
 {
   loop_vec_info loop_vinfo = dyn_cast<loop_vec_info> (m_vinfo);
@@ -24794,6 +24988,8 @@ ix86_vector_costs::finish_cost (const vector_costs *scalar_costs)
 	      > ceil_log2 (LOOP_VINFO_INT_NITERS (loop_vinfo))))
 	m_costs[vect_body] = INT_MAX;
     }
+
+  ix86_vect_estimate_reg_pressure ();
 
   vector_costs::finish_cost (scalar_costs);
 }
@@ -25535,6 +25731,7 @@ ix86_bitint_type_info (int n, struct bitint_info *info)
     info->limb_mode = SImode;
   else
     info->limb_mode = DImode;
+  info->abi_limb_mode = info->limb_mode;
   info->big_endian = false;
   info->extended = false;
   return true;
@@ -25919,6 +26116,11 @@ ix86_run_selftests (void)
 } // namespace selftest
 
 #endif /* CHECKING_P */
+
+static const scoped_attribute_specs *const ix86_attribute_table[] =
+{
+  &ix86_gnu_attribute_table
+};
 
 /* Initialize the GCC target structure.  */
 #undef TARGET_RETURN_IN_MEMORY

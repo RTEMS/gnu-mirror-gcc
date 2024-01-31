@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-options "-march=rv32gc_zve64f_zvfh -mabi=ilp32d -O3" } */
+/* { dg-options "--param=riscv-autovec-preference=scalable -march=rv32gc_zve64f_zvfh -mabi=ilp32d -O3" } */
 
 #include "riscv_vector.h"
 
@@ -13,4 +13,4 @@ void foo(_Float16 y, int16_t z, int64_t *i64p)
 }
 
 /* { dg-final { scan-assembler-times {vsetivli\s+zero,\s*1,\s*e64,\s*m1,\s*t[au],\s*m[au]} 1 } } */
-/* { dg-final { scan-assembler-times {vsetvli\s+zero,\s*zero,\s*e16,\s*m1,\s*t[au],\s*m[au]} 1 } } */
+/* { dg-final { scan-assembler-times {vsetivli\s+zero,\s*1,\s*e16,\s*m1,\s*t[au],\s*m[au]} 1 } } */

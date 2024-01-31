@@ -1,5 +1,5 @@
 /* Core data structures for the 'tree' type.
-   Copyright (C) 1989-2023 Free Software Foundation, Inc.
+   Copyright (C) 1989-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -350,9 +350,6 @@ enum omp_clause_code {
   /* OpenMP clause: doacross ({source,sink}:vec).  */
   OMP_CLAUSE_DOACROSS,
 
-  /* OpenMP clause: indirect [(constant-integer-expression)].  */
-  OMP_CLAUSE_INDIRECT,
-
   /* Internal structure to hold OpenACC cache directive's variable-list.
      #pragma acc cache (variable-list).  */
   OMP_CLAUSE__CACHE_,
@@ -496,6 +493,9 @@ enum omp_clause_code {
 
   /* OpenMP clause: filter (integer-expression).  */
   OMP_CLAUSE_FILTER,
+
+  /* OpenMP clause: indirect [(constant-integer-expression)].  */
+  OMP_CLAUSE_INDIRECT,
 
   /* Internally used only clause, holding SIMD uid.  */
   OMP_CLAUSE__SIMDUID_,
@@ -986,12 +986,19 @@ enum annot_expr_kind {
   annot_expr_kind_last
 };
 
-/* The kind of a TREE_CLOBBER_P CONSTRUCTOR node.  */
+/* The kind of a TREE_CLOBBER_P CONSTRUCTOR node.  Other than _UNDEF, these are
+   in roughly sequential order.  */
 enum clobber_kind {
   /* Unspecified, this clobber acts as a store of an undefined value.  */
   CLOBBER_UNDEF,
-  /* This clobber ends the lifetime of the storage.  */
-  CLOBBER_EOL,
+  /* Beginning of storage duration, e.g. malloc.  */
+  CLOBBER_STORAGE_BEGIN,
+  /* Beginning of object lifetime, e.g. C++ constructor.  */
+  CLOBBER_OBJECT_BEGIN,
+  /* End of object lifetime, e.g. C++ destructor.  */
+  CLOBBER_OBJECT_END,
+  /* End of storage duration, e.g. free.  */
+  CLOBBER_STORAGE_END,
   CLOBBER_LAST
 };
 
@@ -1386,6 +1393,9 @@ struct GTY(()) tree_base {
 
        DECL_NONALIASED in
 	  VAR_DECL
+
+       CHREC_NOWRAP in
+	  POLYNOMIAL_CHREC
 
    deprecated_flag:
 

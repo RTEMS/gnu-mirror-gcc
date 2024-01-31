@@ -1,5 +1,5 @@
 /* Main parser.
-   Copyright (C) 2000-2023 Free Software Foundation, Inc.
+   Copyright (C) 2000-2024 Free Software Foundation, Inc.
    Contributed by Andy Vaught
 
 This file is part of GCC.
@@ -1364,6 +1364,8 @@ decode_omp_directive (void)
 	  prog_unit->omp_target_seen = true;
 	break;
       }
+    case ST_OMP_ALLOCATE_EXEC:
+    case ST_OMP_ALLOCATORS:
     case ST_OMP_TEAMS:
     case ST_OMP_TEAMS_DISTRIBUTE:
     case ST_OMP_TEAMS_DISTRIBUTE_SIMD:
@@ -1386,7 +1388,10 @@ decode_omp_directive (void)
 	    case EXEC_OMP_TARGET_PARALLEL_DO_SIMD:
 	    case EXEC_OMP_TARGET_PARALLEL_LOOP:
 	    case EXEC_OMP_TARGET_SIMD:
-	      stk->tail->ext.omp_clauses->contains_teams_construct = 1;
+	      if (ret == ST_OMP_ALLOCATE_EXEC || ret == ST_OMP_ALLOCATORS)
+		new_st.ext.omp_clauses->contained_in_target_construct = 1;
+	      else
+		stk->tail->ext.omp_clauses->contains_teams_construct = 1;
 	      break;
 	    default:
 	      break;
@@ -4033,6 +4038,7 @@ loop:
     default:
       gfc_error ("Unexpected %s statement in INTERFACE block at %C",
 		 gfc_ascii_statement (st));
+      current_interface = save;
       reject_statement ();
       gfc_free_namespace (gfc_current_ns);
       goto loop;
@@ -5131,7 +5137,7 @@ parse_associate (void)
   gfc_current_ns = my_ns;
   for (a = new_st.ext.block.assoc; a; a = a->next)
     {
-      gfc_symbol* sym;
+      gfc_symbol *sym, *tsym;
       gfc_expr *target;
       int rank;
 
@@ -5194,6 +5200,16 @@ parse_associate (void)
 	    {
 	      sym->ts.type = BT_DERIVED;
 	      sym->ts.u.derived = derived;
+	    }
+	  else if (target->symtree && (tsym = target->symtree->n.sym))
+	    {
+	      sym->ts = tsym->result ? tsym->result->ts : tsym->ts;
+	      if (sym->ts.type == BT_CLASS)
+		{
+		  if (CLASS_DATA (sym)->as)
+		    target->rank = CLASS_DATA (sym)->as->rank;
+		  sym->attr.class_ok = 1;
+		}
 	    }
 	}
 
@@ -5292,27 +5308,51 @@ parse_do_block (void)
   do_op = new_st.op;
   s.ext.end_do_label = new_st.label1;
 
-  if (new_st.ext.iterator != NULL)
+  if (do_op == EXEC_DO_CONCURRENT)
+    {
+      gfc_forall_iterator *fa;
+      for (fa = new_st.ext.forall_iterator; fa; fa = fa->next)
+	{
+	  /* Apply unroll only to innermost loop (first control
+	     variable).  */
+	  if (directive_unroll != -1)
+	    {
+	      fa->annot.unroll = directive_unroll;
+	      directive_unroll = -1;
+	    }
+	  if (directive_ivdep)
+	    fa->annot.ivdep = directive_ivdep;
+	  if (directive_vector)
+	    fa->annot.vector = directive_vector;
+	  if (directive_novector)
+	    fa->annot.novector = directive_novector;
+	}
+      directive_ivdep = false;
+      directive_vector = false;
+      directive_novector = false;
+      stree = NULL;
+    }
+  else if (new_st.ext.iterator != NULL)
     {
       stree = new_st.ext.iterator->var->symtree;
       if (directive_unroll != -1)
 	{
-	  new_st.ext.iterator->unroll = directive_unroll;
+	  new_st.ext.iterator->annot.unroll = directive_unroll;
 	  directive_unroll = -1;
 	}
       if (directive_ivdep)
 	{
-	  new_st.ext.iterator->ivdep = directive_ivdep;
+	  new_st.ext.iterator->annot.ivdep = directive_ivdep;
 	  directive_ivdep = false;
 	}
       if (directive_vector)
 	{
-	  new_st.ext.iterator->vector = directive_vector;
+	  new_st.ext.iterator->annot.vector = directive_vector;
 	  directive_vector = false;
 	}
       if (directive_novector)
 	{
-	  new_st.ext.iterator->novector = directive_novector;
+	  new_st.ext.iterator->annot.novector = directive_novector;
 	  directive_novector = false;
 	}
     }
@@ -7269,9 +7309,17 @@ done:
       omp_requires_mask
 	= (enum omp_requires) (omp_requires_mask | OMP_MEMORY_ORDER_ACQ_REL);
       break;
+    case OMP_REQ_ATOMIC_MEM_ORDER_ACQUIRE:
+      omp_requires_mask
+	= (enum omp_requires) (omp_requires_mask | OMP_MEMORY_ORDER_ACQUIRE);
+      break;
     case OMP_REQ_ATOMIC_MEM_ORDER_RELAXED:
       omp_requires_mask
 	= (enum omp_requires) (omp_requires_mask | OMP_MEMORY_ORDER_RELAXED);
+      break;
+    case OMP_REQ_ATOMIC_MEM_ORDER_RELEASE:
+      omp_requires_mask
+	= (enum omp_requires) (omp_requires_mask | OMP_MEMORY_ORDER_RELEASE);
       break;
     }
 

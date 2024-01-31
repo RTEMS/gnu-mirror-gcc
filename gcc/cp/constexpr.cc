@@ -2,7 +2,7 @@
    constexpr functions.  These routines are used both during actual parsing
    and during the instantiation of template functions.
 
-   Copyright (C) 1998-2023 Free Software Foundation, Inc.
+   Copyright (C) 1998-2024 Free Software Foundation, Inc.
 
    This file is part of GCC.
 
@@ -291,7 +291,7 @@ is_valid_constexpr_fn (tree fun, bool complain)
 
       /* C++14 DR 1684 removed this restriction.  */
       if (cxx_dialect < cxx14
-	  && DECL_NONSTATIC_MEMBER_FUNCTION_P (fun)
+	  && DECL_IOBJ_MEMBER_FUNCTION_P (fun)
 	  && !CLASSTYPE_LITERAL_P (DECL_CONTEXT (fun)))
 	{
 	  ret = false;
@@ -1193,13 +1193,20 @@ public:
 	return *p;
     return NULL_TREE;
   }
-  tree *get_value_ptr (tree t)
+  tree *get_value_ptr (tree t, bool initializing)
   {
     if (modifiable && !modifiable->contains (t))
       return nullptr;
     if (tree *p = values.get (t))
-      if (*p != void_node)
-	return p;
+      {
+	if (*p != void_node)
+	  return p;
+	else if (initializing)
+	  {
+	    *p = NULL_TREE;
+	    return p;
+	  }
+      }
     return nullptr;
   }
   void put_value (tree t, tree v)
@@ -1208,12 +1215,18 @@ public:
     if (!already_in_map && modifiable)
       modifiable->add (t);
   }
-  void remove_value (tree t)
+  void destroy_value (tree t)
   {
-    if (DECL_P (t))
+    if (TREE_CODE (t) == VAR_DECL
+	|| TREE_CODE (t) == PARM_DECL
+	|| TREE_CODE (t) == RESULT_DECL)
       values.put (t, void_node);
     else
       values.remove (t);
+  }
+  void clear_value (tree t)
+  {
+    values.remove (t);
   }
 };
 
@@ -1238,7 +1251,7 @@ public:
   ~modifiable_tracker ()
   {
     for (tree t: set)
-      global->remove_value (t);
+      global->clear_value (t);
     global->modifiable = nullptr;
   }
 };
@@ -1277,6 +1290,40 @@ struct constexpr_ctx {
   /* Whether __builtin_is_constant_evaluated () should be true.  */
   mce_value manifestly_const_eval;
 };
+
+/* Remove T from the global values map, checking for attempts to destroy
+   a value that has already finished its lifetime.  */
+
+static void
+destroy_value_checked (const constexpr_ctx* ctx, tree t, bool *non_constant_p)
+{
+  if (t == error_mark_node || TREE_TYPE (t) == error_mark_node)
+    return;
+
+  /* Don't error again here if we've already reported a problem.  */
+  if (!*non_constant_p
+      && DECL_P (t)
+      /* Non-trivial destructors have their lifetimes ended explicitly
+	 with a clobber, so don't worry about it here.  */
+      && (!TYPE_HAS_NONTRIVIAL_DESTRUCTOR (TREE_TYPE (t))
+	  /* ...except parameters are remapped in cxx_eval_call_expression,
+	     and the destructor call during cleanup won't be able to tell that
+	     this value has already been destroyed, so complain now.  This is
+	     not quite unobservable, but is extremely unlikely to crop up in
+	     practice; see g++.dg/cpp2a/constexpr-lifetime2.C.  */
+	  || TREE_CODE (t) == PARM_DECL)
+      && ctx->global->is_outside_lifetime (t))
+    {
+      if (!ctx->quiet)
+	{
+	  auto_diagnostic_group d;
+	  error ("destroying %qE outside its lifetime", t);
+	  inform (DECL_SOURCE_LOCATION (t), "declared here");
+	}
+      *non_constant_p = true;
+    }
+  ctx->global->destroy_value (t);
+}
 
 /* This internal flag controls whether we should avoid doing anything during
    constexpr evaluation that would cause extra DECL_UID generation, such as
@@ -1837,6 +1884,20 @@ cxx_bind_parameters_in_call (const constexpr_ctx *ctx, tree t, tree fun,
 	 TARGET_EXPR, and use its CONSTRUCTOR as the value of the parm.  */
       arg = cxx_eval_constant_expression (ctx, x, vc_prvalue,
 					  non_constant_p, overflow_p);
+      /* Check we aren't dereferencing a null pointer when calling a non-static
+	 member function, which is undefined behaviour.  */
+      if (i == 0 && DECL_OBJECT_MEMBER_FUNCTION_P (fun)
+	  && integer_zerop (arg)
+	  /* But ignore calls from within compiler-generated code, to handle
+	     cases like lambda function pointer conversion operator thunks
+	     which pass NULL as the 'this' pointer.  */
+	  && !(TREE_CODE (t) == CALL_EXPR && CALL_FROM_THUNK_P (t)))
+	{
+	  if (!ctx->quiet)
+	    error_at (cp_expr_loc_or_input_loc (x),
+		      "dereferencing a null pointer");
+	  *non_constant_p = true;
+	}
       /* Don't VERIFY_CONSTANT here.  */
       if (*non_constant_p && ctx->quiet)
 	break;
@@ -2806,6 +2867,7 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
 	  && (CALL_FROM_NEW_OR_DELETE_P (t)
 	      || is_std_allocator_allocate (ctx->call)))
 	{
+	  const bool new_op_p = IDENTIFIER_NEW_OP_P (DECL_NAME (fun));
 	  const int nargs = call_expr_nargs (t);
 	  tree arg0 = NULL_TREE;
 	  for (int i = 0; i < nargs; ++i)
@@ -2813,12 +2875,15 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
 	      tree arg = CALL_EXPR_ARG (t, i);
 	      arg = cxx_eval_constant_expression (ctx, arg, vc_prvalue,
 						  non_constant_p, overflow_p);
-	      VERIFY_CONSTANT (arg);
+	      /* Deleting a non-constant pointer has a better error message
+		 below.  */
+	      if (new_op_p || i != 0)
+		VERIFY_CONSTANT (arg);
 	      if (i == 0)
 		arg0 = arg;
 	    }
 	  gcc_assert (arg0);
-	  if (IDENTIFIER_NEW_OP_P (DECL_NAME (fun)))
+	  if (new_op_p)
 	    {
 	      tree type = build_array_type_nelts (char_type_node,
 						  tree_to_uhwi (arg0));
@@ -2867,7 +2932,7 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
 			  return t;
 			}
 		      DECL_NAME (var) = heap_deleted_identifier;
-		      ctx->global->remove_value (var);
+		      ctx->global->destroy_value (var);
 		      ctx->global->heap_dealloc_count++;
 		      return void_node;
 		    }
@@ -2890,7 +2955,7 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
 			  return t;
 			}
 		      DECL_NAME (var) = heap_deleted_identifier;
-		      ctx->global->remove_value (var);
+		      ctx->global->destroy_value (var);
 		      ctx->global->heap_dealloc_count++;
 		      return void_node;
 		    }
@@ -3128,11 +3193,11 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
 	/* OK */;
       else if (!DECL_SAVED_TREE (fun))
 	{
-	  /* When at_eof >= 2, cgraph has started throwing away
+	  /* When at_eof >= 3, cgraph has started throwing away
 	     DECL_SAVED_TREE, so fail quietly.  FIXME we get here because of
 	     late code generation for VEC_INIT_EXPR, which needs to be
 	     completely reconsidered.  */
-	  gcc_assert (at_eof >= 2 && ctx->quiet);
+	  gcc_assert (at_eof >= 3 && ctx->quiet);
 	  *non_constant_p = true;
 	}
       else if (tree copy = get_fundef_copy (new_call.fundef))
@@ -3169,6 +3234,19 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
 	      ctx->global->put_value (remapped, arg);
 	      remapped = DECL_CHAIN (remapped);
 	    }
+	  for (; remapped; remapped = TREE_CHAIN (remapped))
+	    if (DECL_NAME (remapped) == in_charge_identifier)
+	      {
+		/* FIXME destructors unnecessarily have in-charge parameters
+		   even in classes without vbases, map it to 0 for now.  */
+		gcc_assert (!CLASSTYPE_VBASECLASSES (DECL_CONTEXT (fun)));
+		ctx->global->put_value (remapped, integer_zero_node);
+	      }
+	    else
+	      {
+		gcc_assert (seen_error ());
+		*non_constant_p = true;
+	      }
 	  /* Add the RESULT_DECL to the values map, too.  */
 	  gcc_assert (!DECL_BY_REFERENCE (res));
 	  ctx->global->put_value (res, NULL_TREE);
@@ -3242,9 +3320,9 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
 				      non_constant_p, overflow_p);
 
 	  /* Remove the parms/result from the values map.  */
-	  ctx->global->remove_value (res);
+	  destroy_value_checked (ctx, res, non_constant_p);
 	  for (tree parm = parms; parm; parm = TREE_CHAIN (parm))
-	    ctx->global->remove_value (parm);
+	    destroy_value_checked (ctx, parm, non_constant_p);
 
 	  /* Free any parameter CONSTRUCTORs we aren't returning directly.  */
 	  while (!ctors->is_empty ())
@@ -5644,6 +5722,11 @@ cxx_fold_indirect_ref_1 (const constexpr_ctx *ctx, location_t loc, tree type,
 	      }
 	  }
 
+      /* Handle conversion to "as base" type.  */
+      if (CLASS_TYPE_P (optype)
+	  && CLASSTYPE_AS_BASE (optype) == type)
+	return op;
+
       /* Handle conversion to an empty base class, which is represented with a
 	 NOP_EXPR.  Do this before spelunking into the non-empty subobjects,
 	 which is likely to be a waste of time (109678).  */
@@ -5895,7 +5978,7 @@ outside_lifetime_error (location_t loc, tree r)
     }
   else
     {
-      error_at (loc, "accessing object outside its lifetime");
+      error_at (loc, "accessing %qE outside its lifetime", r);
       inform (DECL_SOURCE_LOCATION (r), "declared here");
     }
 }
@@ -6112,8 +6195,10 @@ cxx_eval_store_expression (const constexpr_ctx *ctx, tree t,
   constexpr_ctx new_ctx = *ctx;
 
   tree init = TREE_OPERAND (t, 1);
-  if (TREE_CLOBBER_P (init))
-    /* Just ignore clobbers.  */
+
+  if (TREE_CLOBBER_P (init)
+      && CLOBBER_KIND (init) < CLOBBER_OBJECT_END)
+    /* Only handle clobbers ending the lifetime of objects.  */
     return void_node;
 
   /* First we figure out where we're storing to.  */
@@ -6123,7 +6208,7 @@ cxx_eval_store_expression (const constexpr_ctx *ctx, tree t,
 
   tree type = TREE_TYPE (target);
   bool preeval = SCALAR_TYPE_P (type) || TREE_CODE (t) == MODIFY_EXPR;
-  if (preeval)
+  if (preeval && !TREE_CLOBBER_P (init))
     {
       /* Evaluate the value to be stored without knowing what object it will be
 	 stored in, so that any side-effects happen first.  */
@@ -6231,11 +6316,18 @@ cxx_eval_store_expression (const constexpr_ctx *ctx, tree t,
       && const_object_being_modified == NULL_TREE)
     const_object_being_modified = object;
 
+  if (DECL_P (object)
+      && TREE_CLOBBER_P (init)
+      && DECL_NAME (object) == heap_deleted_identifier)
+    /* Ignore clobbers of deleted allocations for now; we'll get a better error
+       message later when operator delete is called.  */
+    return void_node;
+
   /* And then find/build up our initializer for the path to the subobject
      we're initializing.  */
   tree *valp;
   if (DECL_P (object))
-    valp = ctx->global->get_value_ptr (object);
+    valp = ctx->global->get_value_ptr (object, TREE_CODE (t) == INIT_EXPR);
   else
     valp = NULL;
   if (!valp)
@@ -6243,10 +6335,45 @@ cxx_eval_store_expression (const constexpr_ctx *ctx, tree t,
       /* A constant-expression cannot modify objects from outside the
 	 constant-expression.  */
       if (!ctx->quiet)
-	error ("modification of %qE is not a constant expression", object);
+	{
+	  auto_diagnostic_group d;
+	  if (DECL_P (object) && DECL_NAME (object) == heap_deleted_identifier)
+	    {
+	      error ("modification of allocated storage after deallocation "
+		     "is not a constant expression");
+	      inform (DECL_SOURCE_LOCATION (object), "allocated here");
+	    }
+	  else if (DECL_P (object) && ctx->global->is_outside_lifetime (object))
+	    {
+	      if (TREE_CLOBBER_P (init))
+		error ("destroying %qE outside its lifetime", object);
+	      else
+		error ("modification of %qE outside its lifetime "
+		       "is not a constant expression", object);
+	      inform (DECL_SOURCE_LOCATION (object), "declared here");
+	    }
+	  else
+	    {
+	      if (TREE_CLOBBER_P (init))
+		error ("destroying %qE from outside current evaluation "
+		       "is not a constant expression", object);
+	      else
+		error ("modification of %qE from outside current evaluation "
+		       "is not a constant expression", object);
+	    }
+	}
       *non_constant_p = true;
       return t;
     }
+
+  /* Handle explicit end-of-lifetime.  */
+  if (TREE_CLOBBER_P (init))
+    {
+      if (refs->is_empty ())
+	ctx->global->destroy_value (object);
+      return void_node;
+    }
+
   type = TREE_TYPE (object);
   bool no_zero_init = true;
 
@@ -6520,7 +6647,7 @@ cxx_eval_store_expression (const constexpr_ctx *ctx, tree t,
       /* The hash table might have moved since the get earlier, and the
 	 initializer might have mutated the underlying CONSTRUCTORs, so we must
 	 recompute VALP. */
-      valp = ctx->global->get_value_ptr (object);
+      valp = ctx->global->get_value_ptr (object, TREE_CODE (t) == INIT_EXPR);
       for (unsigned i = 0; i < vec_safe_length (indexes); i++)
 	{
 	  ctors[i] = valp;
@@ -7336,7 +7463,9 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
       if (TREE_CODE (r) == TARGET_EXPR
 	  && TREE_CODE (TARGET_EXPR_INITIAL (r)) == CONSTRUCTOR)
 	r = TARGET_EXPR_INITIAL (r);
-      if (DECL_P (r))
+      if (DECL_P (r)
+	  /* P2280 allows references to unknown.  */
+	  && !(VAR_P (t) && TYPE_REF_P (TREE_TYPE (t))))
 	{
 	  if (!ctx->quiet)
 	    non_const_var_error (loc, r, /*fundef_p*/false);
@@ -7378,6 +7507,10 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
 	  r = build_constructor (TREE_TYPE (t), NULL);
 	  TREE_CONSTANT (r) = true;
 	}
+      else if (TYPE_REF_P (TREE_TYPE (t)))
+	/* P2280 allows references to unknown...  */;
+      else if (is_this_parameter (t))
+	/* ...as well as the this pointer.  */;
       else
 	{
 	  if (!ctx->quiet)
@@ -7631,7 +7764,7 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
 	/* Forget SAVE_EXPRs and TARGET_EXPRs created by this
 	   full-expression.  */
 	for (tree save_expr : save_exprs)
-	  ctx->global->remove_value (save_expr);
+	  destroy_value_checked (ctx, save_expr, non_constant_p);
       }
       break;
 
@@ -8184,13 +8317,18 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
 				      non_constant_p, overflow_p, jump_target);
 
     case BIND_EXPR:
+      /* Pre-emptively clear the vars declared by this BIND_EXPR from the value
+	 map, so that when checking whether they're already destroyed later we
+	 don't get confused by remnants of previous calls.  */
+      for (tree decl = BIND_EXPR_VARS (t); decl; decl = DECL_CHAIN (decl))
+	ctx->global->clear_value (decl);
       r = cxx_eval_constant_expression (ctx, BIND_EXPR_BODY (t),
 					lval,
 					non_constant_p, overflow_p,
 					jump_target);
       for (tree decl = BIND_EXPR_VARS (t); decl; decl = DECL_CHAIN (decl))
-	ctx->global->remove_value (decl);
-      return r;
+	destroy_value_checked (ctx, decl, non_constant_p);
+      break;
 
     case PREINCREMENT_EXPR:
     case POSTINCREMENT_EXPR:
@@ -8645,7 +8783,21 @@ cxx_eval_outermost_constant_expr (tree t, bool allow_non_constant,
 	}
       if (!object)
 	{
-	  if (TREE_CODE (t) == TARGET_EXPR)
+	  if (TREE_CODE (t) == CALL_EXPR)
+	    {
+	      /* If T is calling a constructor to initialize an object, reframe
+		 it as an AGGR_INIT_EXPR to avoid trying to modify an object
+		 from outside the constant evaluation, which will fail even if
+		 the value is actually constant (is_constant_evaluated3.C).  */
+	      tree fn = cp_get_callee_fndecl_nofold (t);
+	      if (fn && DECL_CONSTRUCTOR_P (fn))
+		{
+		  object = CALL_EXPR_ARG (t, 0);
+		  object = build_fold_indirect_ref (object);
+		  r = build_aggr_init_expr (type, r);
+		}
+	    }
+	  else if (TREE_CODE (t) == TARGET_EXPR)
 	    object = TARGET_EXPR_SLOT (t);
 	  else if (TREE_CODE (t) == AGGR_INIT_EXPR)
 	    object = AGGR_INIT_EXPR_SLOT (t);
@@ -9381,7 +9533,8 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
        available, so we don't bother with switch tracking.  */
     return true;
 
-  if (TREE_THIS_VOLATILE (t) && want_rval)
+  if (TREE_THIS_VOLATILE (t) && want_rval
+      && !FUNC_OR_METHOD_TYPE_P (TREE_TYPE (t)))
     {
       if (flags & tf_error)
 	constexpr_error (loc, fundef_p, "lvalue-to-rvalue conversion of "
@@ -9952,6 +10105,7 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
     case OACC_ENTER_DATA:
     case OACC_EXIT_DATA:
     case OACC_UPDATE:
+    case OMP_ARRAY_SECTION:
       /* GCC internal stuff.  */
     case VA_ARG_EXPR:
     case TRANSACTION_EXPR:

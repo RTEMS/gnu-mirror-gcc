@@ -1,5 +1,5 @@
 ;; Constraint definitions for IA-32 and x86-64.
-;; Copyright (C) 2006-2023 Free Software Foundation, Inc.
+;; Copyright (C) 2006-2024 Free Software Foundation, Inc.
 ;;
 ;; This file is part of GCC.
 ;;
@@ -348,6 +348,10 @@
    to double word size."
   (match_operand 0 "x86_64_dwzext_immediate_operand"))
 
+(define_constraint "Ws"
+  "A symbolic reference or label reference."
+  (match_code "const,symbol_ref,label_ref"))
+
 (define_constraint "Z"
   "32-bit unsigned integer constant, or a symbolic reference known
    to fit that range (for immediate operands in zero-extending x86-64
@@ -433,3 +437,8 @@
 
 (define_register_constraint  "jc"
  "TARGET_APX_EGPR && !TARGET_AVX ? GENERAL_GPR16 : GENERAL_REGS")
+
+(define_constraint  "je"
+  "@internal constant that do not allow any unspec global offsets"
+  (and (match_operand 0 "x86_64_immediate_operand")
+       (match_test "!x86_poff_operand_p (op)")))

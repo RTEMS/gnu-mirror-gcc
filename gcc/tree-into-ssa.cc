@@ -1,5 +1,5 @@
 /* Rewrite a program in Normal form into SSA.
-   Copyright (C) 2001-2023 Free Software Foundation, Inc.
+   Copyright (C) 2001-2024 Free Software Foundation, Inc.
    Contributed by Diego Novillo <dnovillo@redhat.com>
 
 This file is part of GCC.
@@ -2499,7 +2499,7 @@ public:
   /* opt_pass methods: */
   bool gate (function *fun) final override
     {
-      /* Do nothing for funcions that was produced already in SSA form.  */
+      /* Do nothing for functions that were produced already in SSA form.  */
       return !(fun->curr_properties & PROP_ssa);
     }
 

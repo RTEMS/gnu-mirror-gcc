@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---           Copyright (C) 2020-2023, Free Software Foundation, Inc.        --
+--           Copyright (C) 2020-2024, Free Software Foundation, Inc.        --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -96,6 +96,8 @@ package Einfo.Utils is
    function Is_Access_Type                      (Id : E) return B with Inline;
    function Is_Access_Protected_Subprogram_Type (Id : E) return B with Inline;
    function Is_Access_Subprogram_Type           (Id : E) return B with Inline;
+   function Is_Address_Compatible_Type          (Id : E) return B with Inline;
+   --  Check whether the type represents an address
    function Is_Aggregate_Type                   (Id : E) return B with Inline;
    function Is_Anonymous_Access_Type            (Id : E) return B with Inline;
    function Is_Array_Type                       (Id : E) return B with Inline;

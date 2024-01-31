@@ -1,5 +1,5 @@
 /* Interprocedural constant propagation
-   Copyright (C) 2005-2023 Free Software Foundation, Inc.
+   Copyright (C) 2005-2024 Free Software Foundation, Inc.
 
    Contributed by Razya Ladelsky <RAZYA@il.ibm.com> and Martin Jambor
    <mjambor@suse.cz>
@@ -1926,7 +1926,8 @@ ipa_vr_operation_and_type_effects (vrange &dst_vr,
   Value_Range varying (dst_type);
   varying.set_varying (dst_type);
 
-  return (handler.fold_range (dst_vr, dst_type, src_vr, varying)
+  return (handler.operand_check_p (dst_type, src_type, dst_type)
+	  && handler.fold_range (dst_vr, dst_type, src_vr, varying)
 	  && !dst_vr.varying_p ()
 	  && !dst_vr.undefined_p ());
 }
@@ -2297,7 +2298,7 @@ ipcp_lattice<valtype>::add_value (valtype newval, cgraph_edge *cs,
 	return false;
       }
 
-  if (!same_lat_gen_level && values_count == opt_for_fn (cs->caller->decl,
+  if (!same_lat_gen_level && values_count >= opt_for_fn (cs->callee->decl,
 						param_ipa_cp_value_list_size))
     {
       /* We can only free sources, not the values themselves, because sources

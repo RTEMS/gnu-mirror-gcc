@@ -1,5 +1,5 @@
 ;;  Mips.md	     Machine Description for MIPS based processors
-;;  Copyright (C) 1989-2023 Free Software Foundation, Inc.
+;;  Copyright (C) 1989-2024 Free Software Foundation, Inc.
 ;;  Contributed by   A. Lichnewsky, lich@inria.inria.fr
 ;;  Changes by       Michael Meissner, meissner@osf.org
 ;;  64-bit r4000 support by Ian Lance Taylor, ian@cygnus.com, and
@@ -311,6 +311,10 @@
 ;; "10" specifies MEMMODEL_ACQ_REL,
 ;; "11" specifies MEMMODEL_ACQUIRE.
 (define_attr "sync_memmodel" "" (const_int 10))
+
+;; Performance ratio.  Add this attr to the slow INSNs.
+;; Used by mips_insn_cost.
+(define_attr "perf_ratio" "" (const_int 0))
 
 ;; Accumulator operand for madd patterns.
 (define_attr "accum_in" "none,0,1,2,3,4,5" (const_string "none"))
@@ -3436,16 +3440,16 @@
    (set_attr "compression" "micromips,*,*")
    (set_attr "mode" "<MODE>")])
 
-(define_insn "*ior<mode>3_mips16_asmacro"
-  [(set (match_operand:GPR 0 "register_operand" "=d,d")
-	(ior:GPR (match_operand:GPR 1 "register_operand" "%0,0")
-		 (match_operand:GPR 2 "uns_arith_operand" "d,K")))]
+(define_insn "*iorsi3_mips16_asmacro"
+  [(set (match_operand:SI 0 "register_operand" "=d,d")
+	(ior:SI (match_operand:SI 1 "register_operand" "%0,0")
+		(match_operand:SI 2 "uns_arith_operand" "d,K")))]
   "ISA_HAS_MIPS16E2"
   "@
    or\t%0,%2
    ori\t%0,%x2"
    [(set_attr "alu_type" "or")
-    (set_attr "mode" "<MODE>")
+    (set_attr "mode" "SI")
     (set_attr "extended_mips16" "*,yes")])
 
 (define_insn "*ior<mode>3_mips16"
@@ -4415,6 +4419,30 @@
   [(set_attr "type"     "arith")
    (set_attr "mode"     "SI")])
 
+(define_insn "*insqisi_extended"
+  [(set (match_operand:DI 0 "register_operand" "=d")
+    (sign_extend:DI
+      (ior:SI (and:SI (subreg:SI (match_dup 0) 0)
+		(const_int 16777215))
+	      (ashift:SI
+		(subreg:SI (match_operand:QI 1 "register_operand" "d") 0)
+		(const_int 24)))))]
+  "TARGET_64BIT && !TARGET_MIPS16 && ISA_HAS_EXT_INS"
+  "ins\t%0,%1,24,8"
+  [(set_attr "mode" "SI")
+   (set_attr "perf_ratio" "1")])
+
+(define_insn "*inshisi_extended"
+  [(set (match_operand:DI 0 "register_operand" "=d")
+    (sign_extend:DI
+      (ior:SI
+	(ashift:SI (subreg:SI (match_operand:HI 1 "register_operand" "d") 0)
+	  (const_int 16))
+	(zero_extend:SI (subreg:HI (match_dup 0) 0)))))]
+  "TARGET_64BIT && !TARGET_MIPS16 && ISA_HAS_EXT_INS"
+  "ins\t%0,%1,16,16"
+  [(set_attr "mode" "SI")
+   (set_attr "perf_ratio" "1")])
 
 (define_expand "insvmisalign<mode>"
   [(set (zero_extract:GPR (match_operand:BLK 0 "memory_operand")

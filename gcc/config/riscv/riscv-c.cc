@@ -1,5 +1,5 @@
 /* RISC-V-specific code for C family languages.
-   Copyright (C) 2011-2023 Free Software Foundation, Inc.
+   Copyright (C) 2011-2024 Free Software Foundation, Inc.
    Contributed by Andrew Waterman (andrew@sifive.com).
 
 This file is part of GCC.
@@ -51,7 +51,7 @@ riscv_cpu_cpp_builtins (cpp_reader *pfile)
     builtin_define ("__riscv_compressed");
 
   if (TARGET_RVE)
-    builtin_define ("__riscv_32e");
+    builtin_define (TARGET_64BIT ? "__riscv_64e" : "__riscv_32e");
 
   if (TARGET_ATOMIC)
     builtin_define ("__riscv_atomic");
@@ -76,6 +76,7 @@ riscv_cpu_cpp_builtins (cpp_reader *pfile)
   switch (riscv_abi)
     {
     case ABI_ILP32E:
+    case ABI_LP64E:
       builtin_define ("__riscv_abi_rve");
       gcc_fallthrough ();
 
@@ -99,6 +100,10 @@ riscv_cpu_cpp_builtins (cpp_reader *pfile)
     {
     case CM_MEDLOW:
       builtin_define ("__riscv_cmodel_medlow");
+      break;
+
+    case CM_LARGE:
+      builtin_define ("__riscv_cmodel_large");
       break;
 
     case CM_PIC:
@@ -136,6 +141,10 @@ riscv_cpu_cpp_builtins (cpp_reader *pfile)
       builtin_define_with_int_value ("__riscv_v_intrinsic",
 				     riscv_ext_version_value (0, 11));
     }
+
+   if (TARGET_XTHEADVECTOR)
+     builtin_define_with_int_value ("__riscv_th_v_intrinsic",
+				     riscv_ext_version_value (0, 11));
 
   /* Define architecture extension test macros.  */
   builtin_define_with_int_value ("__riscv_arch_test", 1);
@@ -186,12 +195,13 @@ riscv_pragma_intrinsic (cpp_reader *)
 
   const char *name = TREE_STRING_POINTER (x);
 
-  if (strcmp (name, "vector") == 0)
+  if (strcmp (name, "vector") == 0
+      || strcmp (name, "xtheadvector") == 0)
     {
       if (!TARGET_VECTOR)
 	{
-	  error ("%<#pragma riscv intrinsic%> option %qs needs 'V' extension "
-		 "enabled",
+	  error ("%<#pragma riscv intrinsic%> option %qs needs 'V' or "
+		 "'XTHEADVECTOR' extension enabled",
 		 name);
 	  return;
 	}

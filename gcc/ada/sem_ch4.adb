@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -2304,7 +2304,9 @@ package body Sem_Ch4 is
             while Present (It.Nam) loop
                T := It.Typ;
 
-               if No (First_Formal (Base_Type (Designated_Type (T)))) then
+               if Is_Access_Type (T)
+                 and then No (First_Formal (Base_Type (Designated_Type (T))))
+               then
                   Set_Etype (P, T);
                else
                   Remove_Interp (I);
@@ -6025,17 +6027,17 @@ package body Sem_Ch4 is
                      --  Emit appropriate message. The node will be replaced
                      --  by an appropriate raise statement.
 
-                     --  Note that in SPARK mode, as with all calls to apply a
-                     --  compile time constraint error, this will be made into
-                     --  an error to simplify the processing of the formal
-                     --  verification backend.
+                     --  Note that in GNATprove mode, as with all calls to
+                     --  apply a compile time constraint error, this will be
+                     --  made into an error to simplify the processing of the
+                     --  formal verification backend.
 
                      Apply_Compile_Time_Constraint_Error
                        (N, "component not present in }??",
                         CE_Discriminant_Check_Failed,
                         Ent          => Prefix_Type,
                         Emit_Message =>
-                          SPARK_Mode = On or not In_Instance_Not_Visible);
+                          GNATprove_Mode or not In_Instance_Not_Visible);
                      return;
                   end if;
 
@@ -8473,9 +8475,21 @@ package body Sem_Ch4 is
             --  resolution does not depend on the type of the parameter that
             --  includes the indexing operation.
 
-            elsif Nkind (Parent (Par)) in N_Subprogram_Call
-              and then Is_Entity_Name (Name (Parent (Par)))
-            then
+            elsif Nkind (Parent (Par)) in N_Subprogram_Call then
+
+               if not Is_Entity_Name (Name (Parent (Par))) then
+
+                  --  ??? We don't know what to do with an N_Selected_Component
+                  --  node for a prefixed-notation call to AA.BB where AA's
+                  --  type is known, but BB has not yet been resolved. In that
+                  --  case, the preceding Is_Entity_Name call returns False.
+                  --  Incorrectly returning False here will usually work
+                  --  better than incorrectly returning True, so that's what
+                  --  we do for now.
+
+                  return False;
+               end if;
+
                declare
                   Proc : Entity_Id;
 

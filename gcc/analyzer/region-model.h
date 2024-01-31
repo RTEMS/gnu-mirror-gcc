@@ -1,5 +1,5 @@
 /* Classes for modeling the state of memory.
-   Copyright (C) 2019-2023 Free Software Foundation, Inc.
+   Copyright (C) 2019-2024 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -175,6 +175,8 @@ public:
   void dump_to_pp (pretty_printer *pp, bool simple, bool multiline) const;
   void dump (bool simple) const;
 
+  json::object *to_json () const;
+
   bool can_merge_with_p (const region_to_value_map &other,
 			 region_to_value_map *out) const;
 
@@ -277,6 +279,8 @@ class region_model
   void dump (bool simple) const;
 
   void debug () const;
+
+  json::object *to_json () const;
 
   void validate () const;
 
@@ -482,6 +486,10 @@ class region_model
 					  tree expr,
 					  const svalue **out_sval,
 					  region_model_context *ctxt) const;
+  const svalue *scan_for_null_terminator_1 (const region *reg,
+					    tree expr,
+					    const svalue **out_sval,
+					    region_model_context *ctxt) const;
 
   bool region_exists_p (const region *reg) const;
 

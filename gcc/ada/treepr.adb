@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -328,8 +328,6 @@ package body Treepr is
             return "Has_RACW";
          when F_Ignore_SPARK_Mode_Pragmas =>
             return "Ignore_SPARK_Mode_Pragmas";
-         when F_Is_Constr_Subt_For_UN_Aliased =>
-            return "Is_Constr_Subt_For_UN_Aliased";
          when F_Is_CPP_Class =>
             return "Is_CPP_Class";
          when F_Is_CUDA_Kernel =>

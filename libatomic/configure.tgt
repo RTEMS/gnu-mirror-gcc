@@ -1,5 +1,5 @@
 # -*- shell-script -*-
-#  Copyright (C) 2012-2023 Free Software Foundation, Inc.
+#  Copyright (C) 2012-2024 Free Software Foundation, Inc.
 #  Contributed by Richard Henderson <rth@redhat.com>.
 #
 #  This file is part of the GNU Atomic Library (libatomic).
@@ -194,7 +194,7 @@ esac
 # The type may be different on different architectures.
 case "${target}" in
   aarch64*-*-*)
-	IFUNC_RESOLVER_ARGS="uint64_t hwcap"
+	IFUNC_RESOLVER_ARGS="uint64_t hwcap, const __ifunc_arg_t *features"
 	;;
   *)
 	IFUNC_RESOLVER_ARGS="void"

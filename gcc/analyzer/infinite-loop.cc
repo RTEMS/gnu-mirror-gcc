@@ -1,5 +1,5 @@
 /* Detection of infinite loops.
-   Copyright (C) 2022-2023 Free Software Foundation, Inc.
+   Copyright (C) 2022-2024 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -32,7 +32,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "diagnostic-core.h"
 #include "diagnostic-event-id.h"
 #include "diagnostic-path.h"
-#include "diagnostic-metadata.h"
 #include "function.h"
 #include "pretty-print.h"
 #include "sbitmap.h"
@@ -72,7 +71,7 @@ struct infinite_loop
 {
   infinite_loop (const exploded_node &enode,
 		location_t loc,
-		std::vector<const exploded_edge *> eedges,
+		std::vector<const exploded_edge *> &&eedges,
 		logger *logger)
   : m_enode (enode),
     m_loc (loc),
@@ -178,13 +177,11 @@ public:
     return OPT_Wanalyzer_infinite_loop;
   }
 
-  bool emit (rich_location *rich_loc, logger *) final override
+  bool emit (diagnostic_emission_context &ctxt) final override
   {
     /* "CWE-835: Loop with Unreachable Exit Condition ('Infinite Loop')". */
-    diagnostic_metadata m;
-    m.add_cwe (835);
-    return warning_meta (rich_loc, m, get_controlling_option (),
-			 "infinite loop");
+    ctxt.add_cwe (835);
+    return ctxt.warn ("infinite loop");
   }
 
   bool maybe_add_custom_events_for_superedge (const exploded_edge &,
@@ -426,9 +423,9 @@ starts_infinite_loop_p (const exploded_node &enode,
 		  free (filename);
 		}
 	      return ::make_unique<infinite_loop> (enode,
-						  first_loc,
-						  eedges,
-						  logger);
+						   first_loc,
+						   std::move (eedges),
+						   logger);
 	    }
 	  else
 	    {

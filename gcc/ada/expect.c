@@ -6,7 +6,7 @@
  *                                                                          *
  *                          C Implementation File                           *
  *                                                                          *
- *                     Copyright (C) 2001-2023, AdaCore                     *
+ *                     Copyright (C) 2001-2024, AdaCore                     *
  *                                                                          *
  * GNAT is free software;  you can  redistribute it  and/or modify it under *
  * terms of the  GNU General Public License as published  by the Free Soft- *
@@ -41,6 +41,7 @@
 
 #include "adaint.h"
 #include <sys/types.h>
+#include <string.h>
 
 #if defined (__vxworks) && defined (__RTP__)
 # include <wait.h>

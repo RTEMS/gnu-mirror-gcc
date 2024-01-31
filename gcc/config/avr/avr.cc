@@ -1,5 +1,5 @@
 /* Subroutines for insn-output.cc for ATMEL AVR micro controllers
-   Copyright (C) 1998-2023 Free Software Foundation, Inc.
+   Copyright (C) 1998-2024 Free Software Foundation, Inc.
    Contributed by Denis Chertykov (chertykov@gmail.com)
 
    This file is part of GCC.
@@ -220,6 +220,7 @@ static GTY(()) rtx xstring_e;
 
 /* Current architecture.  */
 const avr_arch_t *avr_arch;
+enum avr_arch_id avr_arch_index;
 
 /* Unnamed sections associated to __attribute__((progmem)) aka. PROGMEM
    or to address space __flash* or __memx.  Only used as singletons inside
@@ -229,9 +230,10 @@ static GTY(()) section *progmem_section[ADDR_SPACE_COUNT];
 /* Condition for insns/expanders from avr-dimode.md.  */
 bool avr_have_dimode = true;
 
-/* To track if code will use .bss and/or .data.  */
+/* To track if code will use .bss, .data, .rodata.  */
 bool avr_need_clear_bss_p = false;
 bool avr_need_copy_data_p = false;
+bool avr_has_rodata_p = false;
 
 
 /* Transform UP into lowercase and write the result to LO.
@@ -1059,6 +1061,7 @@ avr_set_core_architecture (void)
 	       && mcu->macro == NULL)
         {
           avr_arch = &avr_arch_types[mcu->arch_id];
+	  avr_arch_index = mcu->arch_id;
           if (avr_n_flash < 0)
             avr_n_flash = 1 + (mcu->flash_size - 1) / 0x10000;
 
@@ -10359,6 +10362,10 @@ avr_handle_addr_attribute (tree *node, tree name, tree args,
 			   int flags ATTRIBUTE_UNUSED, bool *no_add)
 {
   bool io_p = startswith (IDENTIFIER_POINTER (name), "io");
+  HOST_WIDE_INT io_start = avr_arch->sfr_offset;
+  HOST_WIDE_INT io_end = strcmp (IDENTIFIER_POINTER (name), "io_low") == 0
+    ? io_start + 0x1f
+    : io_start + 0x3f;
   location_t loc = DECL_SOURCE_LOCATION (*node);
 
   if (!VAR_P (*node))
@@ -10382,12 +10389,10 @@ avr_handle_addr_attribute (tree *node, tree name, tree args,
 	}
       else if (io_p
 	       && (!tree_fits_shwi_p (arg)
-		   || !(strcmp (IDENTIFIER_POINTER (name), "io_low") == 0
-			? low_io_address_operand : io_address_operand)
-			 (GEN_INT (TREE_INT_CST_LOW (arg)), QImode)))
+		   || ! IN_RANGE (TREE_INT_CST_LOW (arg), io_start, io_end)))
 	{
-	  warning_at (loc, OPT_Wattributes, "%qE attribute address "
-		      "out of range", name);
+	  warning_at (loc, OPT_Wattributes, "%qE attribute address out of range"
+		      " 0x%x%s0x%x", name, (int) io_start, "...", (int) io_end);
 	  *no_add = true;
 	}
       else
@@ -10413,6 +10418,12 @@ avr_handle_addr_attribute (tree *node, tree name, tree args,
     warning_at (loc, OPT_Wattributes, "%qE attribute on non-volatile variable",
 		name);
 
+  // Optimizers must not draw any conclusions from "static int addr;" etc.
+  // because the contents of `addr' are not given by its initializer but
+  // by the contents at the address as specified by the attribute.
+  if (VAR_P (*node) && ! *no_add)
+    TREE_THIS_VOLATILE (*node) = 1;
+
   return NULL_TREE;
 }
 
@@ -10430,7 +10441,6 @@ avr_eval_addr_attrib (rtx x)
 	  attr = lookup_attribute ("io", DECL_ATTRIBUTES (decl));
           if (!attr || !TREE_VALUE (attr))
             attr = lookup_attribute ("io_low", DECL_ATTRIBUTES (decl));
-	  gcc_assert (attr);
 	}
       if (!attr || !TREE_VALUE (attr))
 	attr = lookup_attribute ("address", DECL_ATTRIBUTES (decl));
@@ -10442,7 +10452,7 @@ avr_eval_addr_attrib (rtx x)
 
 
 /* AVR attributes.  */
-static const struct attribute_spec avr_attribute_table[] =
+TARGET_GNU_ATTRIBUTES (avr_attribute_table,
 {
   /* { name, min_len, max_len, decl_req, type_req, fn_type_req,
        affects_type_identity, handler, exclude } */
@@ -10467,9 +10477,8 @@ static const struct attribute_spec avr_attribute_table[] =
   { "address",   1, 1, true, false, false,  false,
     avr_handle_addr_attribute, NULL },
   { "absdata",   0, 0, true, false, false,  false,
-    avr_handle_absdata_attribute, NULL },
-  { NULL,        0, 0, false, false, false, false, NULL, NULL }
-};
+    avr_handle_absdata_attribute, NULL }
+});
 
 
 /* Return true if we support address space AS for the architecture in effect
@@ -10687,6 +10696,17 @@ avr_pgm_check_var_decl (tree node)
 static void
 avr_insert_attributes (tree node, tree *attributes)
 {
+  if (VAR_P (node)
+      && ! TREE_STATIC (node)
+      && ! DECL_EXTERNAL (node))
+    {
+      const char *names[] = { "io", "io_low", "address", NULL };
+      for (const char **p = names; *p; ++p)
+	if (lookup_attribute (*p, *attributes))
+	  error ("variable %q+D with attribute %qs must be located in "
+		 "static storage", node, *p);
+    }
+
   avr_pgm_check_var_decl (node);
 
   if (TARGET_MAIN_IS_OS_TASK
@@ -10741,43 +10761,60 @@ avr_insert_attributes (tree node, tree *attributes)
     }
 }
 
+#ifdef HAVE_LD_AVR_AVRXMEGA2_FLMAP
+static const bool have_avrxmega2_flmap = true;
+#else
+static const bool have_avrxmega2_flmap = false;
+#endif
+
+#ifdef HAVE_LD_AVR_AVRXMEGA4_FLMAP
+static const bool have_avrxmega4_flmap = true;
+#else
+static const bool have_avrxmega4_flmap = false;
+#endif
+
+#ifdef HAVE_LD_AVR_AVRXMEGA3_RODATA_IN_FLASH
+static const bool have_avrxmega3_rodata_in_flash = true;
+#else
+static const bool have_avrxmega3_rodata_in_flash = false;
+#endif
+
+
+static bool
+avr_rodata_in_flash_p ()
+{
+  switch (avr_arch_index)
+    {
+    default:
+      break;
+
+    case ARCH_AVRTINY:
+      return true;
+
+    case ARCH_AVRXMEGA3:
+      return have_avrxmega3_rodata_in_flash;
+
+    case ARCH_AVRXMEGA2:
+      return avr_flmap && have_avrxmega2_flmap && avr_rodata_in_ram != 1;
+
+    case ARCH_AVRXMEGA4:
+      return avr_flmap && have_avrxmega4_flmap && avr_rodata_in_ram != 1;
+    }
+
+  return false;
+}
+
 
 /* Implement `ASM_OUTPUT_ALIGNED_DECL_LOCAL'.  */
 /* Implement `ASM_OUTPUT_ALIGNED_DECL_COMMON'.  */
 /* Track need of __do_clear_bss.  */
 
 void
-avr_asm_output_aligned_decl_common (FILE * stream,
-                                    tree decl,
-                                    const char *name,
-                                    unsigned HOST_WIDE_INT size,
-                                    unsigned int align, bool local_p)
+avr_asm_output_aligned_decl_common (FILE *stream, tree /* decl */,
+				    const char *name,
+				    unsigned HOST_WIDE_INT size,
+				    unsigned int align, bool local_p)
 {
-  rtx mem = decl == NULL_TREE ? NULL_RTX : DECL_RTL (decl);
-  rtx symbol;
-
-  if (mem != NULL_RTX && MEM_P (mem)
-      && SYMBOL_REF_P ((symbol = XEXP (mem, 0)))
-      && (SYMBOL_REF_FLAGS (symbol) & (SYMBOL_FLAG_IO | SYMBOL_FLAG_ADDRESS)))
-    {
-      if (!local_p)
-	{
-	  fprintf (stream, "\t.globl\t");
-	  assemble_name (stream, name);
-	  fprintf (stream, "\n");
-	}
-      if (SYMBOL_REF_FLAGS (symbol) & SYMBOL_FLAG_ADDRESS)
-	{
-	  assemble_name (stream, name);
-	  fprintf (stream, " = %ld\n",
-		   (long) INTVAL (avr_eval_addr_attrib (symbol)));
-	}
-      else if (local_p)
-	error_at (DECL_SOURCE_LOCATION (decl),
-		  "static IO declaration for %q+D needs an address", decl);
-      return;
-    }
-
   /* __gnu_lto_slim is just a marker for the linker injected by toplev.cc.
      There is no need to trigger __do_clear_bss code for them.  */
 
@@ -10790,6 +10827,9 @@ avr_asm_output_aligned_decl_common (FILE * stream,
     ASM_OUTPUT_ALIGNED_COMMON (stream, name, size, align);
 }
 
+
+/* Implement `ASM_OUTPUT_ALIGNED_BSS'.  */
+
 void
 avr_asm_asm_output_aligned_bss (FILE *file, tree decl, const char *name,
 				unsigned HOST_WIDE_INT size, int align,
@@ -10797,20 +10837,10 @@ avr_asm_asm_output_aligned_bss (FILE *file, tree decl, const char *name,
 				  (FILE *, tree, const char *,
 				   unsigned HOST_WIDE_INT, int))
 {
-  rtx mem = decl == NULL_TREE ? NULL_RTX : DECL_RTL (decl);
-  rtx symbol;
+  if (!startswith (name, "__gnu_lto"))
+    avr_need_clear_bss_p = true;
 
-  if (mem != NULL_RTX && MEM_P (mem)
-      && SYMBOL_REF_P ((symbol = XEXP (mem, 0)))
-      && (SYMBOL_REF_FLAGS (symbol) & (SYMBOL_FLAG_IO | SYMBOL_FLAG_ADDRESS)))
-    {
-      if (!(SYMBOL_REF_FLAGS (symbol) & SYMBOL_FLAG_ADDRESS))
-	error_at (DECL_SOURCE_LOCATION (decl),
-		  "IO definition for %q+D needs an address", decl);
-      avr_asm_output_aligned_decl_common (file, decl, name, size, align, false);
-    }
-  else
-    default_func (file, decl, name, size, align);
+  default_func (file, decl, name, size, align);
 }
 
 
@@ -10849,21 +10879,72 @@ avr_output_progmem_section_asm_op (const char *data)
 }
 
 
+/* A noswitch section callback to output symbol definitions for
+   attributes "io", "io_low" and "address".  */
+
+static bool
+avr_output_addr_attrib (tree decl, const char *name,
+			unsigned HOST_WIDE_INT /* size */,
+			unsigned HOST_WIDE_INT /* align */)
+{
+  gcc_assert (DECL_RTL_SET_P (decl));
+
+  FILE *stream = asm_out_file;
+  bool local_p = ! DECL_WEAK (decl) && ! TREE_PUBLIC (decl);
+  rtx symbol, mem = DECL_RTL (decl);
+
+  if (mem != NULL_RTX && MEM_P (mem)
+      && SYMBOL_REF_P ((symbol = XEXP (mem, 0)))
+      && (SYMBOL_REF_FLAGS (symbol) & (SYMBOL_FLAG_IO | SYMBOL_FLAG_ADDRESS)))
+    {
+      if (! local_p)
+	{
+	  fprintf (stream, "\t%s\t", DECL_WEAK (decl) ? ".weak" : ".globl");
+	  assemble_name (stream, name);
+	  fprintf (stream, "\n");
+	}
+
+      if (SYMBOL_REF_FLAGS (symbol) & SYMBOL_FLAG_ADDRESS)
+	{
+	  assemble_name (stream, name);
+	  fprintf (stream, " = %ld\n",
+		   (long) INTVAL (avr_eval_addr_attrib (symbol)));
+	}
+      else if (local_p)
+	{
+	  const char *names[] = { "io", "io_low", "address", NULL };
+	  for (const char **p = names; *p; ++p)
+	    if (lookup_attribute (*p, DECL_ATTRIBUTES (decl)))
+	      {
+		error ("static attribute %qs declaration for %q+D needs an "
+		       "address", *p, decl);
+		break;
+	      }
+	}
+
+      return true;
+    }
+
+  gcc_unreachable();
+
+  return false;
+}
+
+
 /* Implement `TARGET_ASM_INIT_SECTIONS'.  */
 
 static void
 avr_asm_init_sections (void)
 {
-  /* Override section callbacks to keep track of `avr_need_clear_bss_p'
-     resp. `avr_need_copy_data_p'.  If flash is not mapped to RAM then
-     we have also to track .rodata because it is located in RAM then.  */
+  /* Override section callbacks to keep track of `avr_need_clear_bss_p',
+     `avr_need_copy_data_p' and `avr_has_rodata_p'.
+     Track also .rodata for the case when .rodata is located in RAM.  */
 
-#if defined HAVE_LD_AVR_AVRXMEGA3_RODATA_IN_FLASH
-  if (avr_arch->flash_pm_offset == 0)
-#endif
+  if (! avr_rodata_in_flash_p ())
     readonly_data_section->unnamed.callback = avr_output_data_section_asm_op;
   data_section->unnamed.callback = avr_output_data_section_asm_op;
   bss_section->unnamed.callback = avr_output_bss_section_asm_op;
+  tls_comm_section->noswitch.callback = avr_output_addr_attrib;
 }
 
 
@@ -10900,13 +10981,9 @@ avr_asm_named_section (const char *name, unsigned int flags, tree decl)
     avr_need_copy_data_p = (startswith (name, ".data")
 			    || startswith (name, ".gnu.linkonce.d"));
 
-  if (!avr_need_copy_data_p
-#if defined HAVE_LD_AVR_AVRXMEGA3_RODATA_IN_FLASH
-      && avr_arch->flash_pm_offset == 0
-#endif
-      )
-    avr_need_copy_data_p = (startswith (name, ".rodata")
-			    || startswith (name, ".gnu.linkonce.r"));
+  if (!avr_has_rodata_p)
+    avr_has_rodata_p = (startswith (name, ".rodata")
+			 || startswith (name, ".gnu.linkonce.r"));
 
   if (!avr_need_clear_bss_p)
     avr_need_clear_bss_p = startswith (name, ".bss");
@@ -11046,15 +11123,17 @@ avr_encode_section_info (tree decl, rtx rtl, int new_decl_p)
 
       tree io_low_attr = lookup_attribute ("io_low", attr);
       tree io_attr = lookup_attribute ("io", attr);
+      tree address_attr = lookup_attribute ("address", attr);
 
       if (io_low_attr
 	  && TREE_VALUE (io_low_attr) && TREE_VALUE (TREE_VALUE (io_low_attr)))
-	addr_attr = io_attr;
+	addr_attr = io_low_attr;
       else if (io_attr
 	       && TREE_VALUE (io_attr) && TREE_VALUE (TREE_VALUE (io_attr)))
 	addr_attr = io_attr;
       else
-	addr_attr = lookup_attribute ("address", attr);
+	addr_attr = address_attr;
+
       if (io_low_attr
 	  || (io_attr && addr_attr
               && low_io_address_operand
@@ -11069,6 +11148,36 @@ avr_encode_section_info (tree decl, rtx rtl, int new_decl_p)
 	 don't use the exact value for constant propagation.  */
       if (addr_attr && !DECL_EXTERNAL (decl))
 	SYMBOL_REF_FLAGS (sym) |= SYMBOL_FLAG_ADDRESS;
+
+      if (io_attr || io_low_attr || address_attr)
+	{
+	  if (DECL_INITIAL (decl))
+	    {
+	      /* Initializers are not yet parsed in TARGET_INSERT_ATTRIBUTES,
+		 hence deny initializers now.  The values of symbols with an
+		 address attribute are determined by the attribute, not by
+		 some initializer.  */
+
+	      error ("variable %q+D with attribute %qs must not have an "
+		     "initializer", decl,
+		     io_low_attr ? "io_low" : io_attr ? "io" : "address");
+	    }
+	  else
+	    {
+	      /* PR112952: The only way to output a variable declaration in a
+		 custom manner is by means of a noswitch section callback.
+		 There are only three noswitch sections: comm_section,
+		 lcomm_section and tls_comm_section.  And there is no way to
+		 wire a custom noswitch section to a decl.  As lcomm_section
+		 is bypassed with -fdata-sections -fno-common, there is no
+		 other way than making use of tls_comm_section.  As we are
+		 using that section anyway, also use it in the public case.  */
+
+	      DECL_COMMON (decl) = 1;
+	      set_decl_section_name (decl, (const char*) nullptr);
+	      set_decl_tls_model (decl, (tls_model) 2);
+	    }
+	}
     }
 
   if (AVR_TINY
@@ -11204,7 +11313,8 @@ avr_file_end (void)
      linking in the initialization code from libgcc if resp.
      sections are empty, see PR18145.  */
 
-  if (avr_need_copy_data_p)
+  if (avr_need_copy_data_p
+      || (avr_has_rodata_p && ! avr_rodata_in_flash_p ()))
     fputs (".global __do_copy_data\n", asm_out_file);
 
   if (avr_need_clear_bss_p)
@@ -15086,6 +15196,7 @@ static rtx_insn *
 avr_md_asm_adjust (vec<rtx> &/*outputs*/, vec<rtx> &/*inputs*/,
                    vec<machine_mode> & /*input_modes*/,
                    vec<const char *> &/*constraints*/,
+		   vec<rtx> &/*uses*/,
                    vec<rtx> &clobbers, HARD_REG_SET &clobbered_regs,
 		   location_t /*loc*/)
 {
@@ -15308,6 +15419,12 @@ avr_float_lib_compare_returns_bool (machine_mode mode, enum rtx_code)
 
 #undef  TARGET_CANONICALIZE_COMPARISON
 #define TARGET_CANONICALIZE_COMPARISON avr_canonicalize_comparison
+
+/* According to the opening comment in PR86772, the following applies:
+  "If the port does not (and never will in the future) need to mitigate
+   against unsafe speculation."  */
+#undef  TARGET_HAVE_SPECULATION_SAFE_VALUE
+#define TARGET_HAVE_SPECULATION_SAFE_VALUE speculation_safe_value_not_needed
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

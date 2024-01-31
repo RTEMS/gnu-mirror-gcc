@@ -1,5 +1,5 @@
 /* Library interface to C++ front end.
-   Copyright (C) 2014-2023 Free Software Foundation, Inc.
+   Copyright (C) 2014-2024 Free Software Foundation, Inc.
 
    This file is part of GCC.  As it interacts with GDB through libcc1,
    they all become a single program as regards the GNU GPL's requirements.
@@ -468,7 +468,7 @@ plugin_pragma_push_user_expression (cpp_reader *)
 	}
     }
 
-  if (unchanged_cfun || DECL_NONSTATIC_MEMBER_FUNCTION_P (changed_func_decl))
+  if (unchanged_cfun || DECL_OBJECT_MEMBER_FUNCTION_P (changed_func_decl))
     {
       /* Check whether the oracle supplies us with a "this", and if
 	 so, arrange for data members and this itself to be

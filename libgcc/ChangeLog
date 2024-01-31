@@ -1,3 +1,230 @@
+2024-01-30  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR libgcc/113403
+	* config.host: Build libheap_t.a for i686/x86_64 Darwin.
+	* config/aarch64/heap-trampoline.c (HEAP_T_ATTR): New.
+	(allocate_tramp_ctrl): Allow a target to build this as a weak def.
+	(__gcc_nested_func_ptr_created): Likewise.
+	* config/i386/heap-trampoline.c (HEAP_T_ATTR): New.
+	(allocate_tramp_ctrl): Allow a target to build this as a weak def.
+	(__gcc_nested_func_ptr_created): Likewise.
+	* config/t-darwin: Build libheap_t.a (a CRT with heap trampoline
+	support).
+
+2024-01-30  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR libgcc/113403
+	* config/aarch64/t-heap-trampoline: Move the heap trampoline
+	support functions from libgcc.a to libgcc_eh.a.
+	* config/i386/t-heap-trampoline: Likewise.
+
+2024-01-28  Iain Sandoe  <iain@sandoe.co.uk>
+	    Jakub Jelinek   <jakub@redhat.com>
+
+	PR libgcc/113402
+	* config/aarch64/heap-trampoline.c: Rename
+	__builtin_nested_func_ptr_created to __gcc_nested_func_ptr_created and
+	__builtin_nested_func_ptr_deleted to __gcc_nested_func_ptr_deleted.
+	* config/i386/heap-trampoline.c: Likewise.
+	* libgcc2.h: Likewise.
+	* libgcc-std.ver.in (GCC_7.0.0): Likewise and then move
+	__gcc_nested_func_ptr_created and
+	__gcc_nested_func_ptr_deleted from this symbol version to ...
+	(GCC_14.0.0): ... this one.
+
+2024-01-26  Andrew Stubbs  <ams@baylibre.com>
+
+	* config/gcn/amdgcn_veclib.h (CDNA3_PLUS): Handle RDNA3.
+
+2024-01-23  Zac Walker  <zacwalker@microsoft.com>
+
+	* config/aarch64/aarch64-asm.h (HIDDEN, SYMBOL_SIZE, SYMBOL_TYPE)
+	(ENTRY_ALIGN, GNU_PROPERTY): New macros.
+	* config/aarch64/__arm_sme_state.S: Use them.
+	* config/aarch64/__arm_tpidr2_save.S: Likewise.
+	* config/aarch64/__arm_za_disable.S: Likewise.
+	* config/aarch64/crti.S: Likewise.
+	* config/aarch64/lse.S: Likewise.
+
+2024-01-12  Jakub Jelinek  <jakub@redhat.com>
+
+	* libgcc2.h (UBILtype): New typedef with may_alias attribute.
+	(__mulbitint3, __divmodbitint4): Use UBILtype * instead of
+	UWtype * and const UBILtype * instead of const UWtype *.
+	* libgcc2.c (bitint_reduce_prec, bitint_mul_1, bitint_addmul_1,
+	__mulbitint3, bitint_negate, bitint_submul_1, __divmodbitint4):
+	Likewise.
+	* soft-fp/bitint.h (UBILtype): Change define into a typedef with
+	may_alias attribute.
+
+2024-01-12  Sandra Loosemore  <sandra@codesourcery.com>
+
+	* unwind-dw2-fde-dip.c (_Unwind_Find_FDE): Do not try to use
+	_dl_find_object on nios2; it doesn't work.
+
+2023-12-23  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* c++-minimal/README: New.
+	* c++-minimal/guard.c: New.
+	* config/gcn/t-amdgcn (LIB2ADD): Add it.
+	* config/nvptx/t-nvptx (LIB2ADD): Likewise.
+
+2023-12-20  Alexandre Oliva  <oliva@adacore.com>
+
+	PR middle-end/112917
+	* config.host (sparc, sparc64): Enable...
+	* config/sparc/t-sparc: ... this new fragment.
+
+2023-12-20  Alexandre Oliva  <oliva@adacore.com>
+
+	* strub.c (ATTRIBUTE_NOINLINE): New.
+	(ATTRIBUTE_STRUB_CALLABLE): Add it.
+	(__strub_dummy_force_no_leaf): Drop it.
+
+2023-12-16  Andrew Carlotti  <andrew.carlotti@arm.com>
+
+	* config/aarch64/cpuinfo.c (enum CPUFeatures): Move to shared
+	copy in gcc/common
+
+2023-12-16  Andrew Carlotti  <andrew.carlotti@arm.com>
+	    Pavel Iliin  <Pavel.Iliin@arm.com>
+
+	* config/aarch64/t-aarch64: Include cpuinfo.c
+	* config/aarch64/cpuinfo.c: New file
+	(__init_cpu_features_constructor) New.
+	(__init_cpu_features_resolver) New.
+	(__init_cpu_features) New.
+
+2023-12-11  Lipeng Zhu  <lipeng.zhu@intel.com>
+
+	* gthr-posix.h (__GTHREAD_RWLOCK_INIT): New macro.
+	(__gthrw): New function.
+	(__gthread_rwlock_rdlock): New function.
+	(__gthread_rwlock_tryrdlock): New function.
+	(__gthread_rwlock_wrlock): New function.
+	(__gthread_rwlock_trywrlock): New function.
+	(__gthread_rwlock_unlock): New function.
+
+2023-12-08  Florian Weimer  <fweimer@redhat.com>
+
+	* libgcov-interface.c (__gcov_fork): Use __builtin_fork instead
+	of fork.
+
+2023-12-08  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	* config.in: Regenerate.
+
+2023-12-08  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	* config/aarch64/__arm_za_disable.S: Add hidden alias.
+	* config/aarch64/aarch64-unwind.h: Reset the SME state before
+	EH return via the _Unwind_Frames_Extra hook.
+
+2023-12-08  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	* config/aarch64/t-aarch64: Add sources to the build.
+	* config/aarch64/__aarch64_have_sme.c: New file.
+	* config/aarch64/__arm_sme_state.S: New file.
+	* config/aarch64/__arm_tpidr2_restore.S: New file.
+	* config/aarch64/__arm_tpidr2_save.S: New file.
+	* config/aarch64/__arm_za_disable.S: New file.
+	* config/aarch64/aarch64-asm.h: New file.
+	* config/aarch64/libgcc-sme.ver: New file.
+
+2023-12-08  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	* config.in: Undef HAVE___GETAUXVAL.
+	* configure: Regenerate.
+	* configure.ac: Check for __getauxval.
+
+2023-12-08  Szabolcs Nagy  <szabolcs.nagy@arm.com>
+
+	* config.in: Undef HAVE_AS_VARIANT_PCS.
+	* configure: Regenerate.
+	* configure.ac: Check for .variant_pcs.
+
+2023-12-07  Alexandre Oliva  <oliva@adacore.com>
+
+	* configure.ac: Check for strub support.
+	* configure: Rebuilt.
+	* Makefile.in: Compile strub.c conditionally.
+
+2023-12-06  Thomas Schwinge  <thomas@codesourcery.com>
+	    Jakub Jelinek  <jakub@redhat.com>
+
+	PR libgcc/109289
+	* emutls.c: Add GCC diagnostic ignored "-Wbuiltin-declaration-mismatch"
+	pragma.
+
+2023-12-06  Alexandre Oliva  <oliva@adacore.com>
+
+	* Makefile.in (LIB2ADD): Add strub.c.
+	* libgcc2.h (__strub_enter, __strub_update, __strub_leave):
+	Declare.
+	* strub.c: New.
+	* libgcc-std.ver.in (__strub_enter): Add to GCC_14.0.0.
+	(__strub_update, __strub_leave): Likewise.
+
+2023-12-03  Jeff Law  <jlaw@ventanamicro.com>
+
+	* unwind-pe.h (_Unwind_gnu_Find_got): Add prototype.
+
+2023-12-03  Jeff Law  <jlaw@ventanamicro.com>
+
+	* config/rx/rx-abi-functions.c (__ltdf2, __gtdf2): Add prototype.
+	(__ledf2, __gedf2, __eqdf2, __nedf2): Likewise.
+	(__ltsf2, __gtsf2, __lesf2, __gesf2, __eqsf2, __nesf2): Likewise.
+
+2023-12-03  Jeff Law  <jlaw@ventanamicro.com>
+
+	* config/frv/frvbegin.c (atexit): Add prototype.
+
+2023-12-01  Alexandre Oliva  <oliva@adacore.com>
+
+	* libgcc-std.ver.in (__hardcfr_check): Add to GCC_14.0.0.
+
+2023-12-01  Sebastian Huber  <sebastian.huber@embedded-brains.de>
+
+	PR target/112777
+	* libgcov.h (GCOV_SUPPORTS_ATOMIC):  Honor that __LIBGCC_HAVE_LIBATOMIC is
+	always defined as either 0 or 1.
+
+2023-12-01  Florian Weimer  <fweimer@redhat.com>
+
+	* config/aarch64/linux-unwind.h
+	(aarch64_fallback_frame_state): Add cast to the expected type
+	in sc assignment.
+
+2023-11-30  Wilco Dijkstra  <wilco.dijkstra@arm.com>
+
+	PR target/111404
+	* config/aarch64/lse.S (__aarch64_cas16_acq_rel): Execute STLXP using
+	either new value or loaded value.
+
+2023-11-27  Richard Earnshaw  <rearnsha@arm.com>
+
+	* config/arm/lib1funcs.S (__sync_synchronize): Adjust warning message.
+
+2023-11-24  Richard Earnshaw  <rearnsha@arm.com>
+
+	* config.host (arm*-*-eabi* | arm*-*-rtems*):
+	Add arm/t-sync to the makefile rules.
+	* config/arm/lib1funcs.S (__sync_synchronize_none)
+	(__sync_synchronize_cp15dmb, __sync_synchronize_dmb)
+	(__sync_synchronize): New functions.
+	* config/arm/t-sync: New file.
+	* config/arm/sync-none.specs: Likewise.
+	* config/arm/sync-dmb.specs: Likewise.
+	* config/arm/sync-cp15dmb.specs: Likewise.
+
+2023-11-23  Jose E. Marchesi  <jose.marchesi@oracle.com>
+
+	* hardcfr.c (__hardcfr_check_fail): Mark as always_inline.
+
+2023-11-21  Jakub Jelinek  <jakub@redhat.com>
+
+	* libgcov.h (GCOV_SUPPORTS_ATOMIC): Formatting fixes.
+
 2023-11-18  Sebastian Huber  <sebastian.huber@embedded-brains.de>
 
 	* libgcov.h (GCOV_SUPPORTS_ATOMIC): Always define it.
@@ -13196,7 +13423,7 @@
 	shared-object.mk, siditi-object.mk, static-object.mk: New files.
 	* configure: Generated.
 
-Copyright (C) 2007-2023 Free Software Foundation, Inc.
+Copyright (C) 2007-2024 Free Software Foundation, Inc.
 
 Copying and distribution of this file, with or without modification,
 are permitted in any medium without royalty provided the copyright

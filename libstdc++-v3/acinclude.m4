@@ -49,7 +49,7 @@ AC_DEFUN([GLIBCXX_CONFIGURE], [
   # Keep these sync'd with the list in Makefile.am.  The first provides an
   # expandable list at autoconf time; the second provides an expandable list
   # (i.e., shell variable) at configure time.
-  m4_define([glibcxx_SUBDIRS],[include libsupc++ src src/c++98 src/c++11 src/c++17 src/c++20 src/c++23 src/filesystem src/libbacktrace src/experimental doc po testsuite python])
+  m4_define([glibcxx_SUBDIRS],[include libsupc++ src src/c++98 src/c++11 src/c++17 src/c++20 src/c++23 src/c++26 src/filesystem src/libbacktrace src/experimental doc po testsuite python])
   SUBDIRS='glibcxx_SUBDIRS'
 
   # These need to be absolute paths, yet at the same time need to
@@ -5803,6 +5803,7 @@ AC_LANG_SAVE
   AC_TRY_COMPILE([
   #if defined(_WIN32) && !defined(__CYGWIN__)
   # include <stdint.h>
+  # include <stdio.h>
   # include <io.h>
   #endif
   ],[
@@ -5811,11 +5812,39 @@ AC_LANG_SAVE
     intptr_t crt_handle = _get_osfhandle(fd);
     void* win32_handle = reinterpret_cast<void*>(crt_handle);
   ], [ac_get_osfhandle=yes], [ac_get_osfhandle=no])
-  if test "$ac_objext" = yes; then
+  if test "$ac_get_osfhandle" = yes; then
     AC_DEFINE_UNQUOTED(_GLIBCXX_USE__GET_OSFHANDLE, 1,
       [Define if _get_osfhandle should be used for filebuf::native_handle().])
   fi
   AC_MSG_RESULT($ac_get_osfhandle)
+
+  AC_LANG_RESTORE
+])
+
+dnl
+dnl Check whether the dependencies for std::text_encoding are available.
+dnl
+dnl Defines:
+dnl   _GLIBCXX_USE_NL_LANGINFO_L if nl_langinfo_l is in <langinfo.h>.
+dnl
+AC_DEFUN([GLIBCXX_CHECK_TEXT_ENCODING], [
+AC_LANG_SAVE
+  AC_LANG_CPLUSPLUS
+
+  AC_MSG_CHECKING([whether nl_langinfo_l is defined in <langinfo.h>])
+  AC_TRY_COMPILE([
+  #include <locale.h>
+  #include <langinfo.h>
+  ],[
+    locale_t loc = newlocale(LC_ALL_MASK, "", (locale_t)0);
+    const char* enc = nl_langinfo_l(CODESET, loc);
+    freelocale(loc);
+  ], [ac_nl_langinfo_l=yes], [ac_nl_langinfo_l=no])
+  AC_MSG_RESULT($ac_nl_langinfo_l)
+  if test "$ac_nl_langinfo_l" = yes; then
+    AC_DEFINE_UNQUOTED(_GLIBCXX_USE_NL_LANGINFO_L, 1,
+      [Define if nl_langinfo_l should be used for std::text_encoding.])
+  fi
 
   AC_LANG_RESTORE
 ])

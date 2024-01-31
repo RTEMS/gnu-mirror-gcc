@@ -1,5 +1,5 @@
 /* Top level of GCC compilers (cc1, cc1plus, etc.)
-   Copyright (C) 1987-2023 Free Software Foundation, Inc.
+   Copyright (C) 1987-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -75,6 +75,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "symbol-summary.h"
 #include "tree-vrp.h"
 #include "ipa-prop.h"
+#include "ipa-utils.h"
 #include "gcse.h"
 #include "omp-offload.h"
 #include "edit-context.h"
@@ -1044,12 +1045,13 @@ general_init (const char *argv0, bool init_signals)
   global_dc->m_show_column
     = global_options_init.x_flag_show_column;
   global_dc->m_internal_error = internal_error_function;
+  const unsigned lang_mask = lang_hooks.option_lang_mask ();
   global_dc->set_option_hooks (option_enabled,
 			       &global_options,
 			       option_name,
 			       get_option_url,
-			       lang_hooks.option_lang_mask ());
-  global_dc->set_urlifier (make_gcc_urlifier ());
+			       lang_mask);
+  global_dc->set_urlifier (make_gcc_urlifier (lang_mask));
 
   if (init_signals)
     {
@@ -1568,6 +1570,13 @@ process_options ()
       flag_associative_math = 0;
     }
 
+  if (flag_hardened && !HAVE_FHARDENED_SUPPORT)
+    {
+      warning_at (UNKNOWN_LOCATION, 0,
+		  "%<-fhardened%> not supported for this target");
+      flag_hardened = 0;
+    }
+
   /* -fstack-clash-protection is not currently supported on targets
      where the stack grows up.  */
   if (flag_stack_clash_protection && !STACK_GROWS_DOWNWARD)
@@ -1576,6 +1585,19 @@ process_options ()
 		  "%<-fstack-clash-protection%> is not supported on targets "
 		  "where the stack grows from lower to higher addresses");
       flag_stack_clash_protection = 0;
+    }
+  else if (flag_hardened)
+    {
+      if (!flag_stack_clash_protection
+	   /* Don't enable -fstack-clash-protection when -fstack-check=
+	      is used: it would result in confusing errors.  */
+	   && flag_stack_check == NO_STACK_CHECK)
+	flag_stack_clash_protection = 1;
+      else if (flag_stack_check != NO_STACK_CHECK)
+	warning_at (UNKNOWN_LOCATION, OPT_Whardened,
+		    "%<-fstack-clash-protection%> is not enabled by "
+		    "%<-fhardened%> because %<-fstack-check%> was "
+		    "specified on the command line");
     }
 
   /* We cannot support -fstack-check= and -fstack-clash-protection at
@@ -1592,8 +1614,9 @@ process_options ()
      target already uses a soft frame pointer, the transition is trivial.  */
   if (!FRAME_GROWS_DOWNWARD && flag_stack_protect)
     {
-      warning_at (UNKNOWN_LOCATION, 0,
-		  "%<-fstack-protector%> not supported for this target");
+      if (!flag_stack_protector_set_by_fhardened_p)
+	warning_at (UNKNOWN_LOCATION, 0,
+		    "%<-fstack-protector%> not supported for this target");
       flag_stack_protect = 0;
     }
   if (!flag_stack_protect)
@@ -2300,11 +2323,8 @@ toplev::main (int argc, char **argv)
      emit some diagnostics here.  */
   invoke_plugin_callbacks (PLUGIN_FINISH, NULL);
 
-  if (flag_diagnostics_generate_patch)
+  if (auto edit_context_ptr = global_dc->get_edit_context ())
     {
-      auto edit_context_ptr = global_dc->get_edit_context ();
-      gcc_assert (edit_context_ptr);
-
       pretty_printer pp;
       pp_show_color (&pp) = pp_show_color (global_dc->printer);
       edit_context_ptr->print_diff (&pp, true);
@@ -2337,7 +2357,11 @@ toplev::finalize (void)
   ipa_fnsummary_cc_finalize ();
   ipa_modref_cc_finalize ();
   ipa_edge_modifications_finalize ();
+  ipa_icf_cc_finalize ();
 
+  ipa_prop_cc_finalize ();
+  ipa_profile_cc_finalize ();
+  ipa_sra_cc_finalize ();
   cgraph_cc_finalize ();
   cgraphunit_cc_finalize ();
   symtab_thunks_cc_finalize ();

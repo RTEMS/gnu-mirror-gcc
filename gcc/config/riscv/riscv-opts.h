@@ -1,5 +1,5 @@
 /* Definition of RISC-V target for GNU compiler.
-   Copyright (C) 2016-2023 Free Software Foundation, Inc.
+   Copyright (C) 2016-2024 Free Software Foundation, Inc.
    Contributed by Andrew Waterman (andrew@sifive.com).
 
 This file is part of GCC.
@@ -27,6 +27,7 @@ enum riscv_abi_type {
   ABI_ILP32F,
   ABI_ILP32D,
   ABI_LP64,
+  ABI_LP64E,
   ABI_LP64F,
   ABI_LP64D
 };
@@ -35,6 +36,7 @@ extern enum riscv_abi_type riscv_abi;
 enum riscv_code_model {
   CM_MEDLOW,
   CM_MEDANY,
+  CM_LARGE,
   CM_PIC
 };
 extern enum riscv_code_model riscv_cmodel;
@@ -103,15 +105,26 @@ enum riscv_entity
 };
 
 /* RISC-V stringop strategy. */
-enum riscv_stringop_strategy_enum {
-  /* Use scalar or vector instructions. */
-  USE_AUTO,
-  /* Always use a library call. */
-  USE_LIBCALL,
-  /* Only use scalar instructions. */
-  USE_SCALAR,
-  /* Only use vector instructions. */
-  USE_VECTOR
+enum stringop_strategy_enum {
+  /* No expansion. */
+  STRATEGY_LIBCALL = 1,
+  /* Use scalar expansion if possible. */
+  STRATEGY_SCALAR = 2,
+  /* Only vector expansion if possible. */
+  STRATEGY_VECTOR = 4,
+  /* Use any. */
+  STRATEGY_AUTO = STRATEGY_SCALAR | STRATEGY_VECTOR
+};
+
+/* Behavior of VSETVL Pass.  */
+enum vsetvl_strategy_enum {
+  /* Optimized: Run LCM dataflow analysis to reduce vsetvl* insns and
+     delete any redundant ones generated in the process.  */
+  VSETVL_OPT,
+  /* Simple: Insert a vsetvl* instruction for each Vector instruction.  */
+  VSETVL_SIMPLE,
+  /* No fusion: Disable Phase 2 earliest global fusion.  */
+  VSETVL_OPT_NO_FUSION,
 };
 
 #define TARGET_ZICOND_LIKE (TARGET_ZICOND || (TARGET_XVENTANACONDOPS && TARGET_64BIT))

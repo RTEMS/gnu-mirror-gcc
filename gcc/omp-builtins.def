@@ -1,6 +1,6 @@
 /* This file contains the definitions and documentation for the
    Offloading and Multi Processing builtins used in the GNU compiler.
-   Copyright (C) 2005-2023 Free Software Foundation, Inc.
+   Copyright (C) 2005-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -467,6 +467,9 @@ DEF_GOMP_BUILTIN (BUILT_IN_GOMP_WORKSHARE_TASK_REDUCTION_UNREGISTER,
 DEF_GOMP_BUILTIN (BUILT_IN_GOMP_ALLOC,
 		  "GOMP_alloc", BT_FN_PTR_SIZE_SIZE_PTRMODE,
 		  ATTR_ALLOC_WARN_UNUSED_RESULT_SIZE_2_NOTHROW_LIST)
+DEF_GOMP_BUILTIN (BUILT_IN_GOMP_REALLOC,
+		  "omp_realloc", BT_FN_PTR_PTR_SIZE_PTRMODE_PTRMODE,
+		  ATTR_ALLOC_WARN_UNUSED_RESULT_SIZE_2_NOTHROW_LEAF_LIST)
 DEF_GOMP_BUILTIN (BUILT_IN_GOMP_FREE,
 		  "GOMP_free", BT_FN_VOID_PTR_PTRMODE, ATTR_NOTHROW_LEAF_LIST)
 DEF_GOMP_BUILTIN (BUILT_IN_GOMP_WARNING, "GOMP_warning",

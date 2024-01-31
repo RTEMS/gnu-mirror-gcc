@@ -1,5 +1,5 @@
 /* Fold a constant sub-tree into a single node for C-compiler
-   Copyright (C) 1987-2023 Free Software Foundation, Inc.
+   Copyright (C) 1987-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -1343,6 +1343,29 @@ distributes_over_addition_p (tree_code op, int opno)
     }
 }
 
+/* OP is the INDEXth operand to CODE (counting from zero) and OTHER_OP
+   is the other operand.  Try to use the value of OP to simplify the
+   operation in one step, without having to process individual elements.  */
+static tree
+simplify_const_binop (tree_code code, tree op, tree other_op,
+		      int index ATTRIBUTE_UNUSED)
+{
+  /* AND, IOR as well as XOR with a zerop can be simplified directly.  */
+  if (TREE_CODE (op) == VECTOR_CST && TREE_CODE (other_op) == VECTOR_CST)
+    {
+      if (integer_zerop (other_op))
+	{
+	  if (code == BIT_IOR_EXPR || code == BIT_XOR_EXPR)
+	    return op;
+	  else if (code == BIT_AND_EXPR)
+	    return other_op;
+	}
+    }
+
+  return NULL_TREE;
+}
+
+
 /* Combine two constants ARG1 and ARG2 under operation CODE to produce a new
    constant.  We assume ARG1 and ARG2 have the same data type, or at least
    are the same kind of constant and the same machine mode.  Return zero if
@@ -1645,6 +1668,14 @@ const_binop (enum tree_code code, tree arg1, tree arg2)
       if (real && imag)
 	return build_complex (type, real, imag);
     }
+
+  tree simplified;
+  if ((simplified = simplify_const_binop (code, arg1, arg2, 0)))
+    return simplified;
+
+  if (commutative_tree_code (code)
+      && (simplified = simplify_const_binop (code, arg2, arg1, 1)))
+    return simplified;
 
   if (TREE_CODE (arg1) == VECTOR_CST
       && TREE_CODE (arg2) == VECTOR_CST
@@ -8773,8 +8804,7 @@ native_interpret_int (tree type, const unsigned char *ptr, int len)
   else
     total_bytes = GET_MODE_SIZE (SCALAR_INT_TYPE_MODE (type));
 
-  if (total_bytes > len
-      || total_bytes * BITS_PER_UNIT > HOST_BITS_PER_DOUBLE_INT)
+  if (total_bytes > len)
     return NULL_TREE;
 
   wide_int result = wi::from_buffer (ptr, total_bytes);
@@ -9329,9 +9359,10 @@ fold_view_convert_vector_encoding (tree type, tree expr)
 static tree
 fold_view_convert_expr (tree type, tree expr)
 {
-  /* We support up to 1024-bit values (for GCN/RISC-V V128QImode).  */
   unsigned char buffer[128];
+  unsigned char *buf;
   int len;
+  HOST_WIDE_INT l;
 
   /* Check that the host and target are sane.  */
   if (CHAR_BIT != 8 || BITS_PER_UNIT != 8)
@@ -9341,11 +9372,23 @@ fold_view_convert_expr (tree type, tree expr)
     if (tree res = fold_view_convert_vector_encoding (type, expr))
       return res;
 
-  len = native_encode_expr (expr, buffer, sizeof (buffer));
+  l = int_size_in_bytes (type);
+  if (l > (int) sizeof (buffer)
+      && l <= WIDE_INT_MAX_PRECISION / BITS_PER_UNIT)
+    {
+      buf = XALLOCAVEC (unsigned char, l);
+      len = l;
+    }
+  else
+    {
+      buf = buffer;
+      len = sizeof (buffer);
+    }
+  len = native_encode_expr (expr, buf, len);
   if (len == 0)
     return NULL_TREE;
 
-  return native_interpret_expr (type, buffer, len);
+  return native_interpret_expr (type, buf, len);
 }
 
 /* Build an expression for the address of T.  Folds away INDIRECT_REF
@@ -10803,27 +10846,38 @@ fold_vec_perm_cst (tree type, tree arg0, tree arg1, const vec_perm_indices &sel,
   unsigned res_npatterns, res_nelts_per_pattern;
   unsigned HOST_WIDE_INT res_nelts;
 
-  /* (1) If SEL is a suitable mask as determined by
-     valid_mask_for_fold_vec_perm_cst_p, then:
-     res_npatterns = max of npatterns between ARG0, ARG1, and SEL
-     res_nelts_per_pattern = max of nelts_per_pattern between
-			     ARG0, ARG1 and SEL.
-     (2) If SEL is not a suitable mask, and TYPE is VLS then:
-     res_npatterns = nelts in result vector.
-     res_nelts_per_pattern = 1.
-     This exception is made so that VLS ARG0, ARG1 and SEL work as before.  */
+  /* First try to implement the fold in a VLA-friendly way.
+
+     (1) If the selector is simply a duplication of N elements, the
+	 result is likewise a duplication of N elements.
+
+     (2) If the selector is N elements followed by a duplication
+	 of N elements, the result is too.
+
+     (3) If the selector is N elements followed by an interleaving
+	 of N linear series, the situation is more complex.
+
+	 valid_mask_for_fold_vec_perm_cst_p detects whether we
+	 can handle this case.  If we can, then each of the N linear
+	 series either (a) selects the same element each time or
+	 (b) selects a linear series from one of the input patterns.
+
+	 If (b) holds for one of the linear series, the result
+	 will contain a linear series, and so the result will have
+	 the same shape as the selector.  If (a) holds for all of
+	 the linear series, the result will be the same as (2) above.
+
+	 (b) can only hold if one of the input patterns has a
+	 stepped encoding.  */
+
   if (valid_mask_for_fold_vec_perm_cst_p (arg0, arg1, sel, reason))
     {
-      res_npatterns
-	= std::max (VECTOR_CST_NPATTERNS (arg0),
-		    std::max (VECTOR_CST_NPATTERNS (arg1),
-			      sel.encoding ().npatterns ()));
-
-      res_nelts_per_pattern
-	= std::max (VECTOR_CST_NELTS_PER_PATTERN (arg0),
-		    std::max (VECTOR_CST_NELTS_PER_PATTERN (arg1),
-			      sel.encoding ().nelts_per_pattern ()));
-
+      res_npatterns = sel.encoding ().npatterns ();
+      res_nelts_per_pattern = sel.encoding ().nelts_per_pattern ();
+      if (res_nelts_per_pattern == 3
+	  && VECTOR_CST_NELTS_PER_PATTERN (arg0) < 3
+	  && VECTOR_CST_NELTS_PER_PATTERN (arg1) < 3)
+	res_nelts_per_pattern = 2;
       res_nelts = res_npatterns * res_nelts_per_pattern;
     }
   else if (TYPE_VECTOR_SUBPARTS (type).is_constant (&res_nelts))
@@ -12066,33 +12120,6 @@ fold_binary_loc (location_t loc, enum tree_code code, tree type,
       goto bit_rotate;
 
     case BIT_AND_EXPR:
-      /* Fold (X ^ 1) & 1 as (X & 1) == 0.  */
-      if (TREE_CODE (arg0) == BIT_XOR_EXPR
-	  && INTEGRAL_TYPE_P (type)
-	  && integer_onep (TREE_OPERAND (arg0, 1))
-	  && integer_onep (arg1))
-	{
-	  tree tem2;
-	  tem = TREE_OPERAND (arg0, 0);
-	  tem2 = fold_convert_loc (loc, TREE_TYPE (tem), arg1);
-	  tem2 = fold_build2_loc (loc, BIT_AND_EXPR, TREE_TYPE (tem),
-				  tem, tem2);
-	  return fold_build2_loc (loc, EQ_EXPR, type, tem2,
-				  build_zero_cst (TREE_TYPE (tem)));
-	}
-      /* Fold ~X & 1 as (X & 1) == 0.  */
-      if (TREE_CODE (arg0) == BIT_NOT_EXPR
-	  && INTEGRAL_TYPE_P (type)
-	  && integer_onep (arg1))
-	{
-	  tree tem2;
-	  tem = TREE_OPERAND (arg0, 0);
-	  tem2 = fold_convert_loc (loc, TREE_TYPE (tem), arg1);
-	  tem2 = fold_build2_loc (loc, BIT_AND_EXPR, TREE_TYPE (tem),
-				  tem, tem2);
-	  return fold_build2_loc (loc, EQ_EXPR, type, tem2,
-				  build_zero_cst (TREE_TYPE (tem)));
-	}
       /* Fold !X & 1 as X == 0.  */
       if (TREE_CODE (arg0) == TRUTH_NOT_EXPR
 	  && integer_onep (arg1))
@@ -12916,7 +12943,8 @@ fold_binary_loc (location_t loc, enum tree_code code, tree type,
 	if (element_precision (TREE_TYPE (targ1)) > element_precision (newtype))
 	  newtype = TREE_TYPE (targ1);
 
-	if (element_precision (newtype) < element_precision (TREE_TYPE (arg0)))
+	if (element_precision (newtype) < element_precision (TREE_TYPE (arg0))
+	    && (!VECTOR_TYPE_P (type) || is_truth_type_for (newtype, type)))
 	  return fold_build2_loc (loc, code, type,
 			      fold_convert_loc (loc, newtype, targ0),
 			      fold_convert_loc (loc, newtype, targ1));
@@ -14552,7 +14580,7 @@ multiple_of_p (tree type, const_tree top, const_tree bottom, bool nowrap)
 	      && TREE_CODE (op2) == INTEGER_CST
 	      && integer_pow2p (bottom)
 	      && wi::multiple_of_p (wi::to_widest (op2),
-				    wi::to_widest (bottom), UNSIGNED))
+				    wi::to_widest (bottom), SIGNED))
 	    return true;
 
 	  op1 = gimple_assign_rhs1 (stmt);
@@ -17622,6 +17650,29 @@ test_nunits_min_2 (machine_mode vmode)
 	tree expected_res[] = { ARG0(0), ARG1(0), ARG1(1) };
 	validate_res (1, 3, res, expected_res);
       }
+
+      /* Case 8: Same as aarch64/sve/slp_3.c:
+	 arg0, arg1 are dup vectors.
+	 sel = { 0, len, 1, len+1, 2, len+2, ... } // (2, 3)
+	 So res = { arg0[0], arg1[0], ... } // (2, 1)
+
+	 In this case, since the input vectors are dup, only the first two
+	 elements per pattern in sel are considered significant.  */
+      {
+	tree arg0 = build_vec_cst_rand (vmode, 1, 1);
+	tree arg1 = build_vec_cst_rand (vmode, 1, 1);
+	poly_uint64 len = TYPE_VECTOR_SUBPARTS (TREE_TYPE (arg0));
+
+	vec_perm_builder builder (len, 2, 3);
+	poly_uint64 mask_elems[] = { 0, len, 1, len + 1, 2, len + 2 };
+	builder_push_elems (builder, mask_elems);
+
+	vec_perm_indices sel (builder, 2, len);
+	tree res = fold_vec_perm_cst (TREE_TYPE (arg0), arg0, arg1, sel);
+
+	tree expected_res[] = { ARG0(0), ARG1(0) };
+	validate_res (2, 1, res, expected_res);
+      }
     }
 }
 
@@ -17789,6 +17840,44 @@ test_nunits_min_4 (machine_mode vmode)
 
 	ASSERT_TRUE (res == NULL_TREE);
 	ASSERT_TRUE (!strcmp (reason, "step is not multiple of npatterns"));
+      }
+
+      /* Case 8: PR111754: When input vector is not a stepped sequence,
+	 check that the result is not a stepped sequence either, even
+	 if sel has a stepped sequence.  */
+      {
+	tree arg0 = build_vec_cst_rand (vmode, 1, 2);
+	poly_uint64 len = TYPE_VECTOR_SUBPARTS (TREE_TYPE (arg0));
+
+	vec_perm_builder builder (len, 1, 3);
+	poly_uint64 mask_elems[] = { 0, 1, 2 };
+	builder_push_elems (builder, mask_elems);
+
+	vec_perm_indices sel (builder, 1, len);
+	tree res = fold_vec_perm_cst (TREE_TYPE (arg0), arg0, arg0, sel);
+
+	tree expected_res[] = { ARG0(0), ARG0(1) };
+	validate_res (sel.encoding ().npatterns (), 2, res, expected_res);
+      }
+
+      /* Case 9: If sel doesn't contain a stepped sequence,
+	 check that the result has same encoding as sel, irrespective
+	 of shape of input vectors.  */
+      {
+	tree arg0 = build_vec_cst_rand (vmode, 1, 3, 1);
+	tree arg1 = build_vec_cst_rand (vmode, 1, 3, 1);
+	poly_uint64 len = TYPE_VECTOR_SUBPARTS (TREE_TYPE (arg0));
+
+	vec_perm_builder builder (len, 1, 2);
+	poly_uint64 mask_elems[] = { 0, len };
+	builder_push_elems (builder, mask_elems);
+
+	vec_perm_indices sel (builder, 2, len);
+	tree res = fold_vec_perm_cst (TREE_TYPE (arg0), arg0, arg1, sel);
+
+	tree expected_res[] = { ARG0(0), ARG1(0) };
+	validate_res (sel.encoding ().npatterns (),
+		      sel.encoding ().nelts_per_pattern (), res, expected_res);
       }
     }
 }

@@ -1,5 +1,5 @@
 /* Subroutines used by or related to instruction recognition.
-   Copyright (C) 1987-2023 Free Software Foundation, Inc.
+   Copyright (C) 1987-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -1990,13 +1990,17 @@ asm_noperands (const_rtx body)
 	{
 	  /* Multiple output operands, or 1 output plus some clobbers:
 	     body is
-	     [(set OUTPUT (asm_operands ...))... (clobber (reg ...))...].  */
-	  /* Count backwards through CLOBBERs to determine number of SETs.  */
+	     [(set OUTPUT (asm_operands ...))...
+	      (use (reg ...))...
+	      (clobber (reg ...))...].  */
+	  /* Count backwards through USEs and CLOBBERs to determine
+	     number of SETs.  */
 	  for (i = XVECLEN (body, 0); i > 0; i--)
 	    {
 	      if (GET_CODE (XVECEXP (body, 0, i - 1)) == SET)
 		break;
-	      if (GET_CODE (XVECEXP (body, 0, i - 1)) != CLOBBER)
+	      if (GET_CODE (XVECEXP (body, 0, i - 1)) != USE
+		  && GET_CODE (XVECEXP (body, 0, i - 1)) != CLOBBER)
 		return -1;
 	    }
 
@@ -2023,10 +2027,13 @@ asm_noperands (const_rtx body)
       else
 	{
 	  /* 0 outputs, but some clobbers:
-	     body is [(asm_operands ...) (clobber (reg ...))...].  */
+	     body is [(asm_operands ...)
+		      (use (reg ...))...
+		      (clobber (reg ...))...].  */
 	  /* Make sure all the other parallel things really are clobbers.  */
 	  for (i = XVECLEN (body, 0) - 1; i > 0; i--)
-	    if (GET_CODE (XVECEXP (body, 0, i)) != CLOBBER)
+	    if (GET_CODE (XVECEXP (body, 0, i)) != USE
+		&& GET_CODE (XVECEXP (body, 0, i)) != CLOBBER)
 	      return -1;
 	}
     }
@@ -2093,7 +2100,8 @@ decode_asm_operands (rtx body, rtx *operands, rtx **operand_locs,
 	       the SETs.  Their constraints are in the ASM_OPERANDS itself.  */
 	    for (i = 0; i < nparallel; i++)
 	      {
-		if (GET_CODE (XVECEXP (body, 0, i)) == CLOBBER)
+		if (GET_CODE (XVECEXP (body, 0, i)) == USE
+		    || GET_CODE (XVECEXP (body, 0, i)) == CLOBBER)
 		  break;		/* Past last SET */
 		gcc_assert (GET_CODE (XVECEXP (body, 0, i)) == SET);
 		if (operands)
@@ -2857,6 +2865,7 @@ preprocess_constraints (int n_operands, int n_alternatives,
       for (j = 0; j < n_alternatives; j++, op_alt += n_operands)
 	{
 	  op_alt[i].cl = NO_REGS;
+	  op_alt[i].register_filters = 0;
 	  op_alt[i].constraint = p;
 	  op_alt[i].matches = -1;
 	  op_alt[i].matched = -1;
@@ -2919,7 +2928,12 @@ preprocess_constraints (int n_operands, int n_alternatives,
 		    case CT_REGISTER:
 		      cl = reg_class_for_constraint (cn);
 		      if (cl != NO_REGS)
-			op_alt[i].cl = reg_class_subunion[op_alt[i].cl][cl];
+			{
+			  op_alt[i].cl = reg_class_subunion[op_alt[i].cl][cl];
+			  auto filter_id = get_register_filter_id (cn);
+			  if (filter_id >= 0)
+			    op_alt[i].register_filters |= 1U << filter_id;
+			}
 		      break;
 
 		    case CT_CONST_INT:
@@ -3185,13 +3199,17 @@ constrain_operands (int strict, alternative_mask alternatives)
 		   strictly valid, i.e., that all pseudos requiring hard regs
 		   have gotten them.  We also want to make sure we have a
 		   valid mode.  */
-		if ((GET_MODE (op) == VOIDmode
-		     || SCALAR_INT_MODE_P (GET_MODE (op)))
-		    && (strict <= 0
-			|| (strict_memory_address_p
-			     (recog_data.operand_mode[opno], op))))
-		  win = true;
-		break;
+		{
+		  auto mem_mode = (recog_data.is_asm
+				   ? VOIDmode
+				   : recog_data.operand_mode[opno]);
+		  if ((GET_MODE (op) == VOIDmode
+		       || SCALAR_INT_MODE_P (GET_MODE (op)))
+		      && (strict <= 0
+			  || strict_memory_address_p (mem_mode, op)))
+		    win = true;
+		  break;
+		}
 
 		/* No need to check general_operand again;
 		   it was done in insn-recog.cc.  Well, except that reload
@@ -3219,13 +3237,17 @@ constrain_operands (int strict, alternative_mask alternatives)
 		  enum reg_class cl = reg_class_for_constraint (cn);
 		  if (cl != NO_REGS)
 		    {
+		      auto *filter = get_register_filter (cn);
 		      if (strict < 0
 			  || (strict == 0
 			      && REG_P (op)
 			      && REGNO (op) >= FIRST_PSEUDO_REGISTER)
 			  || (strict == 0 && GET_CODE (op) == SCRATCH)
 			  || (REG_P (op)
-			      && reg_fits_class_p (op, cl, offset, mode)))
+			      && reg_fits_class_p (op, cl, offset, mode)
+			      && (!filter
+				  || TEST_HARD_REG_BIT (*filter,
+							REGNO (op) + offset))))
 			win = true;
 		    }
 

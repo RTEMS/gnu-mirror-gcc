@@ -1,5 +1,5 @@
 // On-the-side RTL SSA representation                               -*- C++ -*-
-// Copyright (C) 2020-2023 Free Software Foundation, Inc.
+// Copyright (C) 2020-2024 Free Software Foundation, Inc.
 //
 // This file is part of GCC.
 //
@@ -50,6 +50,7 @@
 #include "mux-utils.h"
 #include "rtlanal.h"
 #include "cfgbuild.h"
+#include "hash-set.h"
 
 // Provides the global crtl->ssa.
 #include "memmodel.h"

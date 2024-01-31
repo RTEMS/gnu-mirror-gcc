@@ -1,5 +1,5 @@
 /* The analysis "engine".
-   Copyright (C) 2019-2023 Free Software Foundation, Inc.
+   Copyright (C) 2019-2024 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -179,7 +179,7 @@ on_liveness_change (const svalue_set &live_svalues,
 		    const region_model *model)
 {
   for (sm_state_map *smap : m_new_state->m_checker_states)
-    smap->on_liveness_change (live_svalues, model, this);
+    smap->on_liveness_change (live_svalues, model, m_ext_state, this);
 }
 
 void
@@ -472,6 +472,11 @@ public:
   void set_global_state (state_machine::state_t state) final override
   {
     m_new_state->m_checker_states[m_sm_idx]->set_global_state (state);
+  }
+
+  void clear_all_per_svalue_state () final override
+  {
+    m_new_state->m_checker_states[m_sm_idx]->clear_all_per_svalue_state ();
   }
 
   void on_custom_transition (custom_transition *transition) final override
@@ -1811,13 +1816,11 @@ public:
     return OPT_Wanalyzer_stale_setjmp_buffer;
   }
 
-  bool emit (rich_location *richloc, logger *) final override
+  bool emit (diagnostic_emission_context &ctxt) final override
   {
-    return warning_at
-      (richloc, get_controlling_option (),
-       "%qs called after enclosing function of %qs has returned",
-       get_user_facing_name (m_longjmp_call),
-       get_user_facing_name (m_setjmp_call));
+    return ctxt.warn ("%qs called after enclosing function of %qs has returned",
+		      get_user_facing_name (m_longjmp_call),
+		      get_user_facing_name (m_setjmp_call));
   }
 
   const char *get_kind () const final override
@@ -3982,10 +3985,9 @@ public:
     return OPT_Wanalyzer_jump_through_null;
   }
 
-  bool emit (rich_location *rich_loc, logger *) final override
+  bool emit (diagnostic_emission_context &ctxt) final override
   {
-    return warning_at (rich_loc, get_controlling_option (),
-		       "jump through null pointer");
+    return ctxt.warn ("jump through null pointer");
   }
 
   label_text describe_final_event (const evdesc::final_event &ev) final override
@@ -4873,6 +4875,7 @@ feasibility_state::feasibility_state (const region_model &model,
 : m_model (model),
   m_snodes_visited (sg.m_nodes.length ())
 {
+  bitmap_clear (m_snodes_visited);
 }
 
 feasibility_state &
@@ -6071,7 +6074,7 @@ dump_analyzer_json (const supergraph &sg,
   toplev_obj->set ("egraph", eg.to_json ());
 
   pretty_printer pp;
-  toplev_obj->print (&pp);
+  toplev_obj->print (&pp, flag_diagnostics_json_formatting);
   pp_formatted_text (&pp);
 
   delete toplev_obj;

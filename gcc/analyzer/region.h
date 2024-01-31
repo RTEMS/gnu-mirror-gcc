@@ -1,5 +1,5 @@
 /* Regions of memory.
-   Copyright (C) 2019-2023 Free Software Foundation, Inc.
+   Copyright (C) 2019-2024 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -198,6 +198,10 @@ public:
   /* Get a symbolic value describing the size of this region in bytes
      (which could be "unknown").  */
   virtual const svalue *get_byte_size_sval (region_model_manager *mgr) const;
+
+  /* Get a symbolic value describing the size of this region in bits
+     (which could be "unknown").  */
+  virtual const svalue *get_bit_size_sval (region_model_manager *mgr) const;
 
   /* Attempt to get the offset in bits of this region relative to its parent.
      If successful, return true and write to *OUT.
@@ -969,13 +973,15 @@ public:
   void dump_to_pp (pretty_printer *pp, bool simple) const final override;
 
   const svalue *get_byte_offset () const { return m_byte_offset; }
+  const svalue *get_bit_offset (region_model_manager *mgr) const;
 
   bool get_relative_concrete_offset (bit_offset_t *out) const final override;
   const svalue *get_relative_symbolic_offset (region_model_manager *mgr)
     const final override;
   const svalue * get_byte_size_sval (region_model_manager *mgr)
     const final override;
-
+  const svalue * get_bit_size_sval (region_model_manager *mgr)
+    const final override;
 
 private:
   const svalue *m_byte_offset;
@@ -1069,6 +1075,9 @@ public:
   {
     return m_byte_size_sval;
   }
+
+  const svalue *
+  get_bit_size_sval (region_model_manager *) const final override;
 
 private:
   const svalue *m_byte_size_sval;
@@ -1304,6 +1313,7 @@ public:
   bool get_byte_size (byte_size_t *out) const final override;
   bool get_bit_size (bit_size_t *out) const final override;
   const svalue *get_byte_size_sval (region_model_manager *mgr) const final override;
+  const svalue *get_bit_size_sval (region_model_manager *mgr) const final override;
   bool get_relative_concrete_offset (bit_offset_t *out) const final override;
   const svalue *get_relative_symbolic_offset (region_model_manager *mgr)
     const final override;

@@ -1,5 +1,5 @@
 /* Definitions of target machine for GCC for IA-32.
-   Copyright (C) 1988-2023 Free Software Foundation, Inc.
+   Copyright (C) 1988-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -54,6 +54,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define TARGET_APX_EGPR (ix86_apx_features & apx_egpr)
 #define TARGET_APX_PUSH2POP2 (ix86_apx_features & apx_push2pop2)
 #define TARGET_APX_NDD (ix86_apx_features & apx_ndd)
+#define TARGET_APX_PPX (ix86_apx_features & apx_ppx)
 
 #include "config/vxworks-dummy.h"
 
@@ -2374,13 +2375,13 @@ constexpr wide_int_bitmask PTA_SKYLAKE = PTA_BROADWELL | PTA_AES
   | PTA_CLFLUSHOPT | PTA_XSAVEC | PTA_XSAVES | PTA_SGX;
 constexpr wide_int_bitmask PTA_SKYLAKE_AVX512 = PTA_SKYLAKE | PTA_AVX512F
   | PTA_AVX512CD | PTA_AVX512VL | PTA_AVX512BW | PTA_AVX512DQ | PTA_PKU
-  | PTA_CLWB;
+  | PTA_CLWB | PTA_EVEX512;
 constexpr wide_int_bitmask PTA_CASCADELAKE = PTA_SKYLAKE_AVX512
   | PTA_AVX512VNNI;
 constexpr wide_int_bitmask PTA_COOPERLAKE = PTA_CASCADELAKE | PTA_AVX512BF16;
 constexpr wide_int_bitmask PTA_CANNONLAKE = PTA_SKYLAKE | PTA_AVX512F
   | PTA_AVX512CD | PTA_AVX512VL | PTA_AVX512BW | PTA_AVX512DQ | PTA_PKU
-  | PTA_AVX512VBMI | PTA_AVX512IFMA | PTA_SHA;
+  | PTA_AVX512VBMI | PTA_AVX512IFMA | PTA_SHA | PTA_EVEX512;
 constexpr wide_int_bitmask PTA_ICELAKE_CLIENT = PTA_CANNONLAKE | PTA_AVX512VNNI
   | PTA_GFNI | PTA_VAES | PTA_AVX512VBMI2 | PTA_VPCLMULQDQ | PTA_AVX512BITALG
   | PTA_RDPID | PTA_AVX512VPOPCNTDQ;
@@ -2415,7 +2416,7 @@ constexpr wide_int_bitmask PTA_GRANITERAPIDS = PTA_SAPPHIRERAPIDS | PTA_AMX_FP16
   | PTA_PREFETCHI;
 constexpr wide_int_bitmask PTA_GRANITERAPIDS_D = PTA_GRANITERAPIDS
   | PTA_AMX_COMPLEX;
-constexpr wide_int_bitmask PTA_GRANDRIDGE = PTA_SIERRAFOREST | PTA_RAOINT;
+constexpr wide_int_bitmask PTA_GRANDRIDGE = PTA_SIERRAFOREST;
 constexpr wide_int_bitmask PTA_ARROWLAKE = PTA_ALDERLAKE | PTA_AVXIFMA
   | PTA_AVXVNNIINT8 | PTA_AVXNECONVERT | PTA_CMPCCXADD | PTA_UINTR;
 constexpr wide_int_bitmask PTA_ARROWLAKE_S = PTA_ARROWLAKE | PTA_AVXVNNIINT16
@@ -2440,7 +2441,7 @@ constexpr wide_int_bitmask PTA_ZNVER3 = PTA_ZNVER2 | PTA_VAES | PTA_VPCLMULQDQ
 constexpr wide_int_bitmask PTA_ZNVER4 = PTA_ZNVER3 | PTA_AVX512F | PTA_AVX512DQ
   | PTA_AVX512IFMA | PTA_AVX512CD | PTA_AVX512BW | PTA_AVX512VL
   | PTA_AVX512BF16 | PTA_AVX512VBMI | PTA_AVX512VBMI2 | PTA_GFNI
-  | PTA_AVX512VNNI | PTA_AVX512BITALG | PTA_AVX512VPOPCNTDQ;
+  | PTA_AVX512VNNI | PTA_AVX512BITALG | PTA_AVX512VPOPCNTDQ | PTA_EVEX512;
 
 constexpr wide_int_bitmask PTA_LUJIAZUI = PTA_64BIT | PTA_MMX | PTA_SSE | PTA_SSE2
   | PTA_SSE3 | PTA_CX16 | PTA_ABM | PTA_SSSE3 | PTA_SSE4_1 | PTA_SSE4_2 | PTA_AES
@@ -2723,6 +2724,17 @@ enum function_type
   TYPE_EXCEPTION
 };
 
+enum call_saved_registers_type
+{
+  TYPE_DEFAULT_CALL_SAVED_REGISTERS = 0,
+  /* The current function is a function specified with the "interrupt"
+     or "no_caller_saved_registers" attribute.  */
+  TYPE_NO_CALLER_SAVED_REGISTERS,
+  /* The current function is a function specified with the "noreturn"
+     or "no_callee_saved_registers" attribute.  */
+  TYPE_NO_CALLEE_SAVED_REGISTERS
+};
+
 enum queued_insn_type
 {
   TYPE_NONE = 0,
@@ -2792,9 +2804,8 @@ struct GTY(()) machine_function {
   /* How to generate function return.  */
   ENUM_BITFIELD(indirect_branch) function_return_type : 3;
 
-  /* If true, the current function is a function specified with
-     the "interrupt" or "no_caller_saved_registers" attribute.  */
-  BOOL_BITFIELD no_caller_saved_registers : 1;
+  /* Call saved registers type.  */
+  ENUM_BITFIELD(call_saved_registers_type) call_saved_registers : 2;
 
   /* If true, there is register available for argument passing.  This
      is used only in ix86_function_ok_for_sibcall by 32-bit to determine

@@ -1,5 +1,5 @@
 /* Definitions of target machine for GNU compiler.  MIPS version.
-   Copyright (C) 1989-2023 Free Software Foundation, Inc.
+   Copyright (C) 1989-2024 Free Software Foundation, Inc.
    Contributed by A. Lichnewsky (lich@inria.inria.fr).
    Changed by Michael Meissner	(meissner@osf.org).
    64-bit r4000 support by Ian Lance Taylor (ian@cygnus.com) and
@@ -144,6 +144,14 @@ struct mips_cpu_info {
 #define ISA_HAS_JRC ((ISA_HAS_COMPACT_BRANCHES		\
 		      || TARGET_MICROMIPS)		\
 		     && mips_cb != MIPS_CB_NEVER)
+
+/* True if assembler support %gp_rel etc.  */
+#define TARGET_EXPLICIT_RELOCS \
+  (mips_opt_explicit_relocs >= MIPS_EXPLICIT_RELOCS_BASE)
+
+/* True if assembler support %pcrel_hi/%pcrel_lo.  */
+#define TARGET_EXPLICIT_RELOCS_PCREL \
+  (mips_opt_explicit_relocs >= MIPS_EXPLICIT_RELOCS_PCREL)
 
 /* True if the output file is marked as ".abicalls; .option pic0"
    (-call_nonpic).  */

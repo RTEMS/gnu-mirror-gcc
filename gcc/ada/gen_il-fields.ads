@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 2020-2023, Free Software Foundation, Inc.         --
+--          Copyright (C) 2020-2024, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -66,7 +66,7 @@ package Gen_IL.Fields is
       Acts_As_Spec,
       Actual_Designated_Subtype,
       Address_Warning_Posted,
-      Aggregate_Bounds,
+      Aggregate_Bounds_Or_Ancestor_Type,
       Aliased_Present,
       All_Others,
       All_Present,
@@ -255,7 +255,6 @@ package Gen_IL.Fields is
       Is_Entry_Barrier_Function,
       Is_Expanded_Build_In_Place_Call,
       Is_Expanded_Contract,
-      Is_Finalization_Wrapper,
       Is_Folded_In_Parser,
       Is_Generic_Contract_Pragma,
       Is_Homogeneous_Aggregate,
@@ -687,8 +686,8 @@ package Gen_IL.Fields is
       Is_Compilation_Unit,
       Is_Completely_Hidden,
       Is_Concurrent_Record_Type,
+      Is_Constr_Array_Subt_With_Bounds,
       Is_Constr_Subt_For_U_Nominal,
-      Is_Constr_Subt_For_UN_Aliased,
       Is_Constrained,
       Is_Constructor,
       Is_Controlled_Active,
@@ -722,8 +721,8 @@ package Gen_IL.Fields is
       Is_Hidden,
       Is_Hidden_Non_Overridden_Subpgm,
       Is_Hidden_Open_Scope,
+      Is_Ignored_For_Finalization,
       Is_Ignored_Ghost_Entity,
-      Is_Ignored_Transient,
       Is_Immediately_Visible,
       Is_Implementation_Defined,
       Is_Imported,

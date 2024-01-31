@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2023 Free Software Foundation, Inc.
+// Copyright (C) 2020-2024 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -20,6 +20,7 @@
 #define RUST_HIR_TYPE_CHECK_IMPLITEM_H
 
 #include "rust-hir-type-check-base.h"
+#include "rust-hir-visitor.h"
 
 namespace Rust {
 namespace Resolver {

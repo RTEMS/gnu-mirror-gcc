@@ -1,5 +1,5 @@
 /* Subroutines used for code generation on IBM S/390 and zSeries
-   Copyright (C) 1999-2023 Free Software Foundation, Inc.
+   Copyright (C) 1999-2024 Free Software Foundation, Inc.
    Contributed by Hartmut Penner (hpenner@de.ibm.com) and
                   Ulrich Weigand (uweigand@de.ibm.com) and
                   Andreas Krebbel (Andreas.Krebbel@de.ibm.com).
@@ -815,8 +815,8 @@ s390_const_operand_ok (tree arg, int argnum, int op_flags, tree decl)
 {
   if (O_UIMM_P (op_flags))
     {
-      unsigned HOST_WIDE_INT bitwidths[] = { 1, 2, 3, 4, 5, 8, 12, 16, 32, 64,  4 };
-      unsigned HOST_WIDE_INT bitmasks[]  = { 0, 0, 0, 0, 0, 0,  0,  0,  0,  0, 12 };
+      unsigned HOST_WIDE_INT bitwidths[] = { 1, 2, 3, 4, 5, 8, 12, 16, 32, 4 };
+      unsigned HOST_WIDE_INT bitmasks[]  = { 0, 0, 0, 0, 0, 0,  0,  0,  0, 12 };
       unsigned HOST_WIDE_INT bitwidth = bitwidths[op_flags - O_U1];
       unsigned HOST_WIDE_INT bitmask = bitmasks[op_flags - O_U1];
 
@@ -824,7 +824,7 @@ s390_const_operand_ok (tree arg, int argnum, int op_flags, tree decl)
       gcc_assert(ARRAY_SIZE(bitmasks) == (O_M12 - O_U1 + 1));
 
       if (!tree_fits_uhwi_p (arg)
-	  || tree_to_uhwi (arg) > ((HOST_WIDE_INT_1U << (bitwidth - 1) << 1) - 1)
+	  || tree_to_uhwi (arg) > (HOST_WIDE_INT_1U << bitwidth) - 1
 	  || (bitmask && tree_to_uhwi (arg) & ~bitmask))
 	{
 	  if (bitmask)
@@ -1303,7 +1303,7 @@ s390_handle_string_attribute (tree *node, tree name ATTRIBUTE_UNUSED,
   return NULL_TREE;
 }
 
-static const struct attribute_spec s390_attribute_table[] = {
+TARGET_GNU_ATTRIBUTES (s390_attribute_table, {
   { "hotpatch", 2, 2, true, false, false, false,
     s390_handle_hotpatch_attribute, NULL },
   { "s390_vector_bool", 0, 0, false, true, false, true,
@@ -1319,11 +1319,8 @@ static const struct attribute_spec s390_attribute_table[] = {
   { "function_return_reg", 1, 1, true, false, false, false,
     s390_handle_string_attribute, NULL },
   { "function_return_mem", 1, 1, true, false, false, false,
-    s390_handle_string_attribute, NULL },
-
-  /* End element.  */
-  { NULL,        0, 0, false, false, false, false, NULL, NULL }
-};
+    s390_handle_string_attribute, NULL }
+});
 
 /* Return the alignment for LABEL.  We default to the -falign-labels
    value except for the literal pool base label.  */
@@ -1872,6 +1869,97 @@ s390_canonicalize_comparison (int *code, rtx *op0, rtx *op1,
 	    *op1 = gen_rtx_CONST_INT (VOIDmode, 1 << (3 - INTVAL (*op1)));
 	  *op0 = XVECEXP (*op0, 0, 0);
 	  *code = new_code;
+	}
+    }
+  /* Remove UNSPEC_CC_TO_INT from connectives.  This happens for
+     checks against multiple condition codes. */
+  if (GET_CODE (*op0) == AND
+      && GET_CODE (XEXP (*op0, 0)) == UNSPEC
+      && XINT (XEXP (*op0, 0), 1) == UNSPEC_CC_TO_INT
+      && XVECLEN (XEXP (*op0, 0), 0) == 1
+      && REGNO (XVECEXP (XEXP (*op0, 0), 0, 0)) == CC_REGNUM
+      && CONST_INT_P (XEXP (*op0, 1))
+      && CONST_INT_P (*op1)
+      && INTVAL (XEXP (*op0, 1)) == -3
+      && *code == EQ)
+    {
+      if (INTVAL (*op1) == 0)
+	{
+	  /* case cc == 0 || cc = 2 => mask = 0xa */
+	  *op0 = XVECEXP (XEXP (*op0, 0), 0, 0);
+	  *op1 = gen_rtx_CONST_INT (VOIDmode, 0xa);
+	}
+      else if (INTVAL (*op1) == 1)
+	{
+	  /* case cc == 1 || cc == 3 => mask = 0x5 */
+	  *op0 = XVECEXP (XEXP (*op0, 0), 0, 0);
+	  *op1 = gen_rtx_CONST_INT (VOIDmode, 0x5);
+	}
+    }
+  if (GET_CODE (*op0) == PLUS
+      && GET_CODE (XEXP (*op0, 0)) == UNSPEC
+      && XINT (XEXP (*op0, 0), 1) == UNSPEC_CC_TO_INT
+      && XVECLEN (XEXP (*op0, 0), 0) == 1
+      && REGNO (XVECEXP (XEXP (*op0, 0), 0, 0)) == CC_REGNUM
+      && CONST_INT_P (XEXP (*op0, 1))
+      && CONST_INT_P (*op1)
+      && (*code == LEU || *code == GTU))
+    {
+      if (INTVAL (*op1) == 1)
+	{
+	  if (INTVAL (XEXP (*op0, 1)) == -1)
+	    {
+	      /* case cc == 1 || cc == 2 => mask = 0x6 */
+	      *op0 = XVECEXP (XEXP (*op0, 0), 0, 0);
+	      *op1 = gen_rtx_CONST_INT (VOIDmode, 0x6);
+	      *code = *code == GTU ? NE : EQ;
+	    }
+	  else if (INTVAL (XEXP (*op0, 1)) == -2)
+	    {
+	      /* case cc == 2 || cc == 3 => mask = 0x3 */
+	      *op0 = XVECEXP (XEXP (*op0, 0), 0, 0);
+	      *op1 = gen_rtx_CONST_INT (VOIDmode, 0x3);
+	      *code = *code == GTU ? NE : EQ;
+	    }
+	}
+      else if (INTVAL (*op1) == 2
+	       && INTVAL (XEXP (*op0, 1)) == -1)
+	{
+	  /* case cc == 1 || cc == 2 || cc == 3 => mask = 0x7 */
+	  *op0 = XVECEXP (XEXP (*op0, 0), 0, 0);
+	  *op1 = gen_rtx_CONST_INT (VOIDmode, 0x7);
+	  *code = *code == GTU ? NE : EQ;
+	}
+    }
+  else if (*code == LEU || *code == GTU)
+    {
+      if (GET_CODE (*op0) == UNSPEC
+	  && XINT (*op0, 1) == UNSPEC_CC_TO_INT
+	  && XVECLEN (*op0, 0) == 1
+	  && REGNO (XVECEXP (*op0, 0, 0)) == CC_REGNUM
+	  && CONST_INT_P (*op1))
+	{
+	  if (INTVAL (*op1) == 1)
+	    {
+	      /* case cc == 0 || cc == 1 => mask = 0xc */
+	      *op0 = XVECEXP (*op0, 0, 0);
+	      *op1 = gen_rtx_CONST_INT (VOIDmode, 0xc);
+	      *code = *code == GTU ? NE : EQ;
+	    }
+	  else if (INTVAL (*op1) == 2)
+	    {
+	      /* case cc == 0 || cc == 1 || cc == 2 => mask = 0xd */
+	      *op0 = XVECEXP (*op0, 0, 0);
+	      *op1 = gen_rtx_CONST_INT (VOIDmode, 0xd);
+	      *code = *code == GTU ? NE : EQ;
+	    }
+	  else if (INTVAL (*op1) == 3)
+	    {
+	      /* always true */
+	      *op0 = const0_rtx;
+	      *op1 = const0_rtx;
+	      *code = *code == GTU ? NE : EQ;
+	    }
 	}
     }
 
@@ -8235,7 +8323,7 @@ s390_asm_output_function_label (FILE *out_file, const char *fname,
       asm_fprintf (out_file, "\t# fn:%s wd%d\n", fname,
 		   s390_warn_dynamicstack_p);
     }
-  ASM_OUTPUT_LABEL (out_file, fname);
+  assemble_function_label_raw (out_file, fname);
   if (hw_after > 0)
     asm_fprintf (out_file,
 		 "\t# post-label NOPs for hotpatch (%d halfwords)\n",
@@ -12559,7 +12647,8 @@ s390_invalid_arg_for_unprototyped_fn (const_tree typelist, const_tree funcdecl, 
 	   && VECTOR_TYPE_P (TREE_TYPE (val))
 	   && (funcdecl == NULL_TREE
 	       || (TREE_CODE (funcdecl) == FUNCTION_DECL
-		   && DECL_BUILT_IN_CLASS (funcdecl) != BUILT_IN_MD)))
+		   && DECL_BUILT_IN_CLASS (funcdecl) != BUILT_IN_MD
+		   && !fndecl_built_in_p (funcdecl, BUILT_IN_CLASSIFY_TYPE))))
 	  ? N_("vector argument passed to unprototyped function")
 	  : NULL);
 }
@@ -13713,10 +13802,8 @@ s390_encode_section_info (tree decl, rtx rtl, int first)
 	 byte aligned as mandated by our ABI.  This behavior can be
 	 overridden for external symbols with the -munaligned-symbols
 	 switch.  */
-      if (DECL_ALIGN (decl) % 16
-	  && (DECL_USER_ALIGN (decl)
-	      || (!SYMBOL_REF_LOCAL_P (XEXP (rtl, 0))
-		  && s390_unaligned_symbols_p)))
+      if ((DECL_USER_ALIGN (decl) && DECL_ALIGN (decl) % 16)
+	  || (s390_unaligned_symbols_p && !decl_binds_to_current_def_p (decl)))
 	SYMBOL_FLAG_SET_NOTALIGN2 (XEXP (rtl, 0));
       else if (DECL_ALIGN (decl) % 32)
 	SYMBOL_FLAG_SET_NOTALIGN4 (XEXP (rtl, 0));
@@ -17424,23 +17511,62 @@ s390_hard_fp_reg_p (rtx x)
 static rtx_insn *
 s390_md_asm_adjust (vec<rtx> &outputs, vec<rtx> &inputs,
 		    vec<machine_mode> &input_modes,
-		    vec<const char *> &constraints, vec<rtx> & /*clobbers*/,
-		    HARD_REG_SET & /*clobbered_regs*/, location_t /*loc*/)
+		    vec<const char *> &constraints,
+		    vec<rtx> &/*uses*/, vec<rtx> &/*clobbers*/,
+		    HARD_REG_SET &clobbered_regs, location_t loc)
 {
-  if (!TARGET_VXE)
-    /* Long doubles are stored in FPR pairs - nothing to do.  */
-    return NULL;
 
   rtx_insn *after_md_seq = NULL, *after_md_end = NULL;
+  bool saw_cc = false;
 
   unsigned ninputs = inputs.length ();
   unsigned noutputs = outputs.length ();
   for (unsigned i = 0; i < noutputs; i++)
     {
+      const char *constraint = constraints[i];
+      if (strncmp (constraint, "=@cc", 4) == 0)
+	{
+	  if (constraint[4] != 0)
+	    {
+	      error_at (loc, "invalid cc output constraint: %qs", constraint);
+	      continue;
+	    }
+	  if (saw_cc)
+	    {
+	      error_at (loc, "multiple cc output constraints not supported");
+	      continue;
+	    }
+	  if (TEST_HARD_REG_BIT (clobbered_regs, CC_REGNUM))
+	    {
+	      error_at (loc, "%<asm%> specifier for cc output conflicts with %<asm%> clobber list");
+	      continue;
+	    }
+	  rtx dest = outputs[i];
+	  if (GET_MODE (dest) != SImode)
+	    {
+	      error ("invalid type for cc output constraint");
+	      continue;
+	    }
+	  saw_cc = true;
+	  constraints[i] = "=c";
+	  outputs[i] = gen_rtx_REG (CCRAWmode, CC_REGNUM);
+
+	  push_to_sequence2 (after_md_seq, after_md_end);
+	  emit_insn (gen_rtx_SET (dest,
+				  gen_rtx_UNSPEC (SImode,
+						  gen_rtvec (1, outputs[i]),
+						  UNSPEC_CC_TO_INT)));
+	  after_md_seq = get_insns ();
+	  after_md_end = get_last_insn ();
+	  end_sequence ();
+	  continue;
+	}
+      if (!TARGET_VXE)
+	/* Long doubles are stored in FPR pairs - nothing to do.  */
+	continue;
       if (GET_MODE (outputs[i]) != TFmode)
 	/* Not a long double - nothing to do.  */
 	continue;
-      const char *constraint = constraints[i];
       bool allows_mem, allows_reg, is_inout;
       bool ok = parse_output_constraint (&constraint, i, ninputs, noutputs,
 					 &allows_mem, &allows_reg, &is_inout);
@@ -17474,6 +17600,10 @@ s390_md_asm_adjust (vec<rtx> &outputs, vec<rtx> &inputs,
       end_sequence ();
       outputs[i] = fprx2;
     }
+
+  if (!TARGET_VXE)
+    /* Long doubles are stored in FPR pairs - nothing left to do.  */
+    return after_md_seq;
 
   for (unsigned i = 0; i < ninputs; i++)
     {
@@ -17737,33 +17867,45 @@ expand_perm_as_a_vlbr_vstbr_candidate (const struct expand_vec_perm_d &d)
 
   if (memcmp (d.perm, perm[0], MAX_VECT_LEN) == 0)
     {
-      rtx target = gen_rtx_SUBREG (V8HImode, d.target, 0);
-      rtx op0 = gen_rtx_SUBREG (V8HImode, d.op0, 0);
-      emit_insn (gen_bswapv8hi (target, op0));
+      if (!d.testing_p)
+	{
+	  rtx target = gen_rtx_SUBREG (V8HImode, d.target, 0);
+	  rtx op0 = gen_rtx_SUBREG (V8HImode, d.op0, 0);
+	  emit_insn (gen_bswapv8hi (target, op0));
+	}
       return true;
     }
 
   if (memcmp (d.perm, perm[1], MAX_VECT_LEN) == 0)
     {
-      rtx target = gen_rtx_SUBREG (V4SImode, d.target, 0);
-      rtx op0 = gen_rtx_SUBREG (V4SImode, d.op0, 0);
-      emit_insn (gen_bswapv4si (target, op0));
+      if (!d.testing_p)
+	{
+	  rtx target = gen_rtx_SUBREG (V4SImode, d.target, 0);
+	  rtx op0 = gen_rtx_SUBREG (V4SImode, d.op0, 0);
+	  emit_insn (gen_bswapv4si (target, op0));
+	}
       return true;
     }
 
   if (memcmp (d.perm, perm[2], MAX_VECT_LEN) == 0)
     {
-      rtx target = gen_rtx_SUBREG (V2DImode, d.target, 0);
-      rtx op0 = gen_rtx_SUBREG (V2DImode, d.op0, 0);
-      emit_insn (gen_bswapv2di (target, op0));
+      if (!d.testing_p)
+	{
+	  rtx target = gen_rtx_SUBREG (V2DImode, d.target, 0);
+	  rtx op0 = gen_rtx_SUBREG (V2DImode, d.op0, 0);
+	  emit_insn (gen_bswapv2di (target, op0));
+	}
       return true;
     }
 
   if (memcmp (d.perm, perm[3], MAX_VECT_LEN) == 0)
     {
-      rtx target = gen_rtx_SUBREG (V1TImode, d.target, 0);
-      rtx op0 = gen_rtx_SUBREG (V1TImode, d.op0, 0);
-      emit_insn (gen_bswapv1ti (target, op0));
+      if (!d.testing_p)
+	{
+	  rtx target = gen_rtx_SUBREG (V1TImode, d.target, 0);
+	  rtx op0 = gen_rtx_SUBREG (V1TImode, d.op0, 0);
+	  emit_insn (gen_bswapv1ti (target, op0));
+	}
       return true;
     }
 

@@ -1,5 +1,5 @@
 /* Language-dependent hooks for C++.
-   Copyright (C) 2001-2023 Free Software Foundation, Inc.
+   Copyright (C) 2001-2024 Free Software Foundation, Inc.
    Contributed by Alexandre Oliva  <aoliva@redhat.com>
 
 This file is part of GCC.
@@ -117,6 +117,15 @@ objcp_tsubst_expr (tree /*t*/, tree /*args*/, tsubst_flags_t /*complain*/,
 		   tree /*in_decl*/)
 {
   return NULL_TREE;
+}
+
+/* Implement c-family hook to add language-specific features
+   for __has_{feature,extension}.  */
+
+void
+c_family_register_lang_features ()
+{
+  cp_register_features ();
 }
 
 static const char *

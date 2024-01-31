@@ -1,5 +1,5 @@
 /* Language-independent diagnostic subroutines for the GNU Compiler Collection
-   Copyright (C) 1999-2023 Free Software Foundation, Inc.
+   Copyright (C) 1999-2024 Free Software Foundation, Inc.
    Contributed by Gabriel Dos Reis <gdr@codesourcery.com>
 
 This file is part of GCC.
@@ -558,14 +558,12 @@ maybe_line_and_column (int line, int col)
   return result;
 }
 
-/* Return a malloc'd string describing a location e.g. "foo.c:42:10".
-   The caller is responsible for freeing the memory.  */
+/* Return a string describing a location e.g. "foo.c:42:10".  */
 
-static char *
-diagnostic_get_location_text (diagnostic_context *context,
-			      expanded_location s)
+label_text
+diagnostic_context::get_location_text (const expanded_location &s) const
 {
-  pretty_printer *pp = context->printer;
+  pretty_printer *pp = this->printer;
   const char *locus_cs = colorize_start (pp_show_color (pp), "locus");
   const char *locus_ce = colorize_stop (pp_show_color (pp));
   const char *file = s.file ? s.file : progname;
@@ -574,13 +572,13 @@ diagnostic_get_location_text (diagnostic_context *context,
   if (strcmp (file, special_fname_builtin ()))
     {
       line = s.line;
-      if (context->m_show_column)
-	col = context->converted_column (s);
+      if (m_show_column)
+	col = this->converted_column (s);
     }
 
   const char *line_col = maybe_line_and_column (line, col);
-  return build_message_string ("%s%s%s:%s", locus_cs, file,
-			       line_col, locus_ce);
+  return label_text::take (build_message_string ("%s%s%s:%s", locus_cs, file,
+						 line_col, locus_ce));
 }
 
 static const char *const diagnostic_kind_text[] = {
@@ -610,12 +608,11 @@ diagnostic_build_prefix (diagnostic_context *context,
       text_ce = colorize_stop (pp_show_color (pp));
     }
 
-  expanded_location s = diagnostic_expand_location (diagnostic);
-  char *location_text = diagnostic_get_location_text (context, s);
+  const expanded_location s = diagnostic_expand_location (diagnostic);
+  label_text location_text = context->get_location_text (s);
 
-  char *result = build_message_string ("%s %s%s%s", location_text,
+  char *result = build_message_string ("%s %s%s%s", location_text.get (),
 				       text_cs, text, text_ce);
-  free (location_text);
   return result;
 }
 
@@ -1080,7 +1077,7 @@ diagnostic_path::interprocedural_p () const
 
 void
 default_diagnostic_starter (diagnostic_context *context,
-			    diagnostic_info *diagnostic)
+			    const diagnostic_info *diagnostic)
 {
   diagnostic_report_current_module (context, diagnostic_location (diagnostic));
   pp_set_prefix (context->printer, diagnostic_build_prefix (context,
@@ -1091,15 +1088,14 @@ void
 default_diagnostic_start_span_fn (diagnostic_context *context,
 				  expanded_location exploc)
 {
-  char *text = diagnostic_get_location_text (context, exploc);
-  pp_string (context->printer, text);
-  free (text);
+  label_text text = context->get_location_text (exploc);
+  pp_string (context->printer, text.get ());
   pp_newline (context->printer);
 }
 
 void
 default_diagnostic_finalizer (diagnostic_context *context,
-			      diagnostic_info *diagnostic,
+			      const diagnostic_info *diagnostic,
 			      diagnostic_t)
 {
   char *saved_prefix = pp_take_prefix (context->printer);
@@ -1606,15 +1602,15 @@ diagnostic_context::report_diagnostic (diagnostic_info *diagnostic)
   m_diagnostic_groups.m_emission_count++;
 
   pp_format (this->printer, &diagnostic->message, m_urlifier);
-  m_output_format->on_begin_diagnostic (diagnostic);
-  pp_output_formatted_text (this->printer);
+  m_output_format->on_begin_diagnostic (*diagnostic);
+  pp_output_formatted_text (this->printer, m_urlifier);
   if (m_show_cwe)
     print_any_cwe (*diagnostic);
   if (m_show_rules)
     print_any_rules (*diagnostic);
   if (m_show_option_requested)
     print_option_information (*diagnostic, orig_diag_kind);
-  m_output_format->on_end_diagnostic (diagnostic, orig_diag_kind);
+  m_output_format->on_end_diagnostic (*diagnostic, orig_diag_kind);
   switch (m_extra_output_kind)
     {
     default:
@@ -1836,6 +1832,18 @@ emit_diagnostic_valist (diagnostic_t kind, location_t location, int opt,
 {
   rich_location richloc (line_table, location);
   return diagnostic_impl (&richloc, NULL, opt, gmsgid, ap, kind);
+}
+
+/* As above, but with rich_location and metadata.  */
+
+bool
+emit_diagnostic_valist (diagnostic_t kind,
+			rich_location *richloc,
+			const diagnostic_metadata *metadata,
+			int opt,
+			const char *gmsgid, va_list *ap)
+{
+  return diagnostic_impl (richloc, metadata, opt, gmsgid, ap, kind);
 }
 
 /* An informative note at LOCATION.  Use this for additional details on an error
@@ -2388,16 +2396,17 @@ diagnostic_text_output_format::~diagnostic_text_output_format ()
 }
 
 void
-diagnostic_text_output_format::on_begin_diagnostic (diagnostic_info *diagnostic)
+diagnostic_text_output_format::on_begin_diagnostic (const diagnostic_info &diagnostic)
 {
-  (*diagnostic_starter (&m_context)) (&m_context, diagnostic);
+  (*diagnostic_starter (&m_context)) (&m_context, &diagnostic);
 }
 
 void
-diagnostic_text_output_format::on_end_diagnostic (diagnostic_info *diagnostic,
+diagnostic_text_output_format::on_end_diagnostic (const diagnostic_info &diagnostic,
 						  diagnostic_t orig_diag_kind)
 {
-  (*diagnostic_finalizer (&m_context)) (&m_context, diagnostic, orig_diag_kind);
+  (*diagnostic_finalizer (&m_context)) (&m_context, &diagnostic,
+					orig_diag_kind);
 }
 
 void
@@ -2420,7 +2429,8 @@ diagnostic_text_output_format::on_diagram (const diagnostic_diagram &diagram)
 void
 diagnostic_output_format_init (diagnostic_context *context,
 			       const char *base_file_name,
-			       enum diagnostics_output_format format)
+			       enum diagnostics_output_format format,
+			       bool json_formatting)
 {
   switch (format)
     {
@@ -2431,19 +2441,25 @@ diagnostic_output_format_init (diagnostic_context *context,
       break;
 
     case DIAGNOSTICS_OUTPUT_FORMAT_JSON_STDERR:
-      diagnostic_output_format_init_json_stderr (context);
+      diagnostic_output_format_init_json_stderr (context,
+						 json_formatting);
       break;
 
     case DIAGNOSTICS_OUTPUT_FORMAT_JSON_FILE:
-      diagnostic_output_format_init_json_file (context, base_file_name);
+      diagnostic_output_format_init_json_file (context,
+					       json_formatting,
+					       base_file_name);
       break;
 
     case DIAGNOSTICS_OUTPUT_FORMAT_SARIF_STDERR:
-      diagnostic_output_format_init_sarif_stderr (context);
+      diagnostic_output_format_init_sarif_stderr (context,
+						  json_formatting);
       break;
 
     case DIAGNOSTICS_OUTPUT_FORMAT_SARIF_FILE:
-      diagnostic_output_format_init_sarif_file (context, base_file_name);
+      diagnostic_output_format_init_sarif_file (context,
+						json_formatting,
+						base_file_name);
       break;
     }
 }
@@ -2852,9 +2868,8 @@ assert_location_text (const char *expected_loc_text,
   xloc.data = NULL;
   xloc.sysp = false;
 
-  char *actual_loc_text = diagnostic_get_location_text (&dc, xloc);
-  ASSERT_STREQ (expected_loc_text, actual_loc_text);
-  free (actual_loc_text);
+  label_text actual_loc_text = dc.get_location_text (xloc);
+  ASSERT_STREQ (expected_loc_text, actual_loc_text.get ());
 }
 
 /* Verify that diagnostic_get_location_text works as expected.  */

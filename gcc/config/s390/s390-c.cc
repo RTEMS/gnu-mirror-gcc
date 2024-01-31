@@ -1,6 +1,6 @@
 /* Language specific subroutines used for code generation on IBM S/390
    and zSeries
-   Copyright (C) 2015-2023 Free Software Foundation, Inc.
+   Copyright (C) 2015-2024 Free Software Foundation, Inc.
 
    Contributed by Andreas Krebbel (Andreas.Krebbel@de.ibm.com).
 
@@ -409,6 +409,7 @@ s390_cpu_cpp_builtins (cpp_reader *pfile)
     cpp_define (pfile, "__LONG_DOUBLE_128__");
   cl_target_option_save (&opts, &global_options, &global_options_set);
   s390_cpu_cpp_builtins_internal (pfile, &opts, NULL);
+  cpp_define (pfile, "__GCC_ASM_FLAG_OUTPUTS__");
 }
 
 #if S390_USE_TARGET_ATTRIBUTE

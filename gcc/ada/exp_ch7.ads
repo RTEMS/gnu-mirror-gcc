@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -176,6 +176,12 @@ package Exp_Ch7 is
    --  triggered by an abort, E_Id denotes the defining identifier of a local
    --  exception occurrence, Raised_Id is the entity of a local boolean flag.
 
+   procedure Expand_Cleanup_Actions (N : Node_Id);
+   --  Expand the necessary stuff into a scope to enable finalization of local
+   --  objects and deallocation of transient data when exiting the scope. N is
+   --  one of N_Block_Statement, N_Subprogram_Body, N_Task_Body, N_Entry_Body,
+   --  or N_Extended_Return_Statement.
+
    function Make_Adjust_Call
      (Obj_Ref   : Node_Id;
       Typ       : Entity_Id;
@@ -274,12 +280,6 @@ package Exp_Ch7 is
    --------------------------------
    -- Transient Scope Management --
    --------------------------------
-
-   procedure Expand_Cleanup_Actions (N : Node_Id);
-   --  Expand the necessary stuff into a scope to enable finalization of local
-   --  objects and deallocation of transient data when exiting the scope. N is
-   --  one of N_Block_Statement, N_Subprogram_Body, N_Task_Body, N_Entry_Body,
-   --  or N_Extended_Return_Statement.
 
    procedure Establish_Transient_Scope
      (N                : Node_Id;

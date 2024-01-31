@@ -1,5 +1,5 @@
 /* Definitions for C parsing and type checking.
-   Copyright (C) 1987-2023 Free Software Foundation, Inc.
+   Copyright (C) 1987-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -656,7 +656,8 @@ extern void finish_decl (tree, location_t, tree, tree, tree);
 extern tree finish_enum (tree, tree, tree);
 extern void finish_function (location_t = input_location);
 extern tree finish_struct (location_t, tree, tree, tree,
-			   class c_struct_parse_info *);
+			   class c_struct_parse_info *,
+			   tree *expr = NULL);
 extern tree c_simulate_enum_decl (location_t, const char *,
 				  vec<string_int_pair> *);
 extern tree c_simulate_record_decl (location_t, const char *,
@@ -682,7 +683,8 @@ extern void c_warn_unused_attributes (tree);
 extern tree c_warn_type_attributes (tree);
 extern void shadow_tag (const struct c_declspecs *);
 extern void shadow_tag_warned (const struct c_declspecs *, int);
-extern tree start_enum (location_t, struct c_enum_contents *, tree, tree);
+extern tree start_enum (location_t, struct c_enum_contents *, tree, tree,
+			bool potential_nesting_p);
 extern bool start_function (struct c_declspecs *, struct c_declarator *, tree);
 extern tree start_decl (struct c_declarator *, struct c_declspecs *, bool,
 			tree, bool = true, location_t * = NULL);
@@ -735,6 +737,7 @@ extern int in_alignof;
 extern int in_sizeof;
 extern int in_typeof;
 extern bool c_in_omp_for;
+extern bool c_omp_array_section_p;
 
 extern tree c_last_sizeof_arg;
 extern location_t c_last_sizeof_loc;
@@ -752,10 +755,13 @@ bool c_type_variably_modified_p (tree t)
 
 
 extern bool char_type_p (tree);
-extern tree c_objc_common_truthvalue_conversion (location_t, tree);
+extern tree c_objc_common_truthvalue_conversion (location_t, tree,
+						 tree = integer_type_node);
 extern tree require_complete_type (location_t, tree);
 extern bool same_translation_unit_p (const_tree, const_tree);
 extern int comptypes (tree, tree);
+extern bool comptypes_same_p (tree, tree);
+extern bool comptypes_equiv_p (tree, tree);
 extern int comptypes_check_different_types (tree, tree, bool *);
 extern int comptypes_check_enum_int (tree, tree, bool *);
 extern bool c_mark_addressable (tree, bool = false);
@@ -773,6 +779,7 @@ extern tree composite_type (tree, tree);
 extern tree build_component_ref (location_t, tree, tree, location_t,
 				 location_t);
 extern tree build_array_ref (location_t, tree, tree);
+extern tree build_omp_array_section (location_t, tree, tree, tree);
 extern tree build_external_ref (location_t, tree, bool, tree *);
 extern void pop_maybe_used (bool);
 extern struct c_expr c_expr_sizeof_expr (location_t, struct c_expr);
@@ -909,6 +916,8 @@ set_c_expr_source_range (c_expr *expr,
 extern vec<tree> incomplete_record_decls;
 
 extern const char *c_get_sarif_source_language (const char *filename);
+
+extern const struct scoped_attribute_specs std_attribute_table;
 
 #if CHECKING_P
 namespace selftest {

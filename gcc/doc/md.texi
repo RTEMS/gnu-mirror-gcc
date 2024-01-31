@@ -1,4 +1,4 @@
-@c Copyright (C) 1988-2023 Free Software Foundation, Inc.
+@c Copyright (C) 1988-2024 Free Software Foundation, Inc.
 @c This is part of the GCC manual.
 @c For copying conditions, see the file gcc.texi.
 
@@ -2881,7 +2881,7 @@ $r1h
 @item LoongArch---@file{config/loongarch/constraints.md}
 @table @code
 @item f
-A floating-point register (if available).
+A floating-point or vector register (if available).
 @item k
 A memory operand whose address is formed by a base register and
 (optionally scaled) index register.
@@ -4275,6 +4275,10 @@ require non-@code{VOIDmode} immediate operands).
 128-bit integer constant where both the high and low 64-bit word
 satisfy the @code{e} constraint.
 
+@item Ws
+A symbolic reference or label reference.
+You can use the @code{%p} modifier to print the raw symbol.
+
 @item Z
 32-bit unsigned integer constant, or a symbolic reference known
 to fit that range (for immediate operands in zero-extending x86-64
@@ -4516,8 +4520,8 @@ Register constraints correspond directly to register classes.
 @xref{Register Classes}.  There is thus not much flexibility in their
 definitions.
 
-@deffn {MD Expression} define_register_constraint name regclass docstring
-All three arguments are string constants.
+@deffn {MD Expression} define_register_constraint name regclass docstring [filter]
+All arguments are string constants.
 @var{name} is the name of the constraint, as it will appear in
 @code{match_operand} expressions.  If @var{name} is a multi-letter
 constraint its length shall be the same for all constraints starting
@@ -4528,6 +4532,43 @@ If it is an expression, it must have no side effects, and it cannot
 look at the operand.  The usual use of expressions is to map some
 register constraints to @code{NO_REGS} when the register class
 is not available on a given subarchitecture.
+
+If an operand occupies multiple hard registers, the constraint
+requires all of those registers to belong to @var{regclass}.
+For example, if @var{regclass} is @code{GENERAL_REGS} and
+@code{GENERAL_REGS} contains registers @code{r0} to @code{r15},
+the constraint does not allow @var{r15} to be used for modes
+that occupy more than one register.
+
+@cindex @code{TARGET_HARD_REGNO_MODE_OK} and constraints
+The choice of register is also constrained by @code{TARGET_HARD_REGNO_MODE_OK}.
+For example, if @code{TARGET_HARD_REGNO_MODE_OK} disallows @samp{(reg:DI r1)},
+that requirement applies to all constraints whose classes include @code{r1}.
+
+However, it is sometimes useful to impose extra operand-specific
+requirements on the register number.  For example, a target might not
+want to prevent @emph{all} odd-even pairs from holding @code{DImode}
+values, but it might still need to prevent specific operands from
+having an odd-numbered register.  The optional @var{filter} argument
+exists for such cases.  When given, @var{filter} is a C++ expression
+that evaluates to true if @code{regno} is a valid register for the
+operand.  If an operand occupies multiple registers, the condition
+applies only to the first register.
+
+For example:
+
+@smallexample
+(define_register_constraint "e" "GENERAL_REGS" "..." "regno % 2 == 0")
+@end smallexample
+
+defines a constraint that requires an even-numbered general register.
+
+Filter conditions that impose an alignment are encouraged to test
+the alignment of @code{regno} itself, as in the example, rather than
+calculate an offset relative to the start of the class.  If it is
+sometimes necessary for a register of class @var{c} to be aligned
+to @var{n}, the first register in @var{c} should itself by divisible
+by @var{n}.
 
 @var{docstring} is a sentence documenting the meaning of the
 constraint.  Docstrings are explained further below.
@@ -6878,8 +6919,9 @@ individually copied data units in the block.
 
 The @code{cpymem@var{m}} patterns need not give special consideration
 to the possibility that the source and destination strings might
-overlap. These patterns are used to do inline expansion of
-@code{__builtin_memcpy}.
+overlap.  An exception is the case where source and destination are
+equal, this case needs to be handled correctly.
+These patterns are used to do inline expansion of @code{__builtin_memcpy}.
 
 @cindex @code{movmem@var{m}} instruction pattern
 @item @samp{movmem@var{m}}
@@ -7277,6 +7319,7 @@ form of @samp{@var{op}@var{mode}2}.
 @cindex @code{cond_smax@var{mode}} instruction pattern
 @cindex @code{cond_umin@var{mode}} instruction pattern
 @cindex @code{cond_umax@var{mode}} instruction pattern
+@cindex @code{cond_copysign@var{mode}} instruction pattern
 @cindex @code{cond_fmin@var{mode}} instruction pattern
 @cindex @code{cond_fmax@var{mode}} instruction pattern
 @cindex @code{cond_ashl@var{mode}} instruction pattern
@@ -7296,6 +7339,7 @@ form of @samp{@var{op}@var{mode}2}.
 @itemx @samp{cond_smax@var{mode}}
 @itemx @samp{cond_umin@var{mode}}
 @itemx @samp{cond_umax@var{mode}}
+@itemx @samp{cond_copysign@var{mode}}
 @itemx @samp{cond_fmin@var{mode}}
 @itemx @samp{cond_fmax@var{mode}}
 @itemx @samp{cond_ashl@var{mode}}
@@ -7332,6 +7376,8 @@ integer if @var{m} is scalar, otherwise it has the mode returned by
 form of @samp{@var{op}@var{mode}3}.  As an exception, the vector forms
 of shifts correspond to patterns like @code{vashl@var{mode}3} rather
 than patterns like @code{ashl@var{mode}3}.
+
+@samp{cond_copysign@var{mode}} is only defined for floating point modes.
 
 @cindex @code{cond_fma@var{mode}} instruction pattern
 @cindex @code{cond_fms@var{mode}} instruction pattern
@@ -7394,6 +7440,7 @@ form of @samp{@var{op}@var{mode}2}.
 @cindex @code{cond_len_smax@var{mode}} instruction pattern
 @cindex @code{cond_len_umin@var{mode}} instruction pattern
 @cindex @code{cond_len_umax@var{mode}} instruction pattern
+@cindex @code{cond_len_copysign@var{mode}} instruction pattern
 @cindex @code{cond_len_fmin@var{mode}} instruction pattern
 @cindex @code{cond_len_fmax@var{mode}} instruction pattern
 @cindex @code{cond_len_ashl@var{mode}} instruction pattern
@@ -7413,6 +7460,7 @@ form of @samp{@var{op}@var{mode}2}.
 @itemx @samp{cond_len_smax@var{mode}}
 @itemx @samp{cond_len_umin@var{mode}}
 @itemx @samp{cond_len_umax@var{mode}}
+@itemx @samp{cond_len_copysign@var{mode}}
 @itemx @samp{cond_len_fmin@var{mode}}
 @itemx @samp{cond_len_fmax@var{mode}}
 @itemx @samp{cond_len_ashl@var{mode}}
@@ -7440,10 +7488,12 @@ integer if @var{m} is scalar, otherwise it has the mode returned by
 @code{TARGET_VECTORIZE_GET_MASK_MODE}.  Operand 5 has whichever
 integer mode the target prefers.
 
-@samp{cond_@var{op}@var{mode}} generally corresponds to a conditional
+@samp{cond_len_@var{op}@var{mode}} generally corresponds to a conditional
 form of @samp{@var{op}@var{mode}3}.  As an exception, the vector forms
 of shifts correspond to patterns like @code{vashl@var{mode}3} rather
 than patterns like @code{ashl@var{mode}3}.
+
+@samp{cond_len_copysign@var{mode}} is only defined for floating point modes.
 
 @cindex @code{cond_len_fma@var{mode}} instruction pattern
 @cindex @code{cond_len_fms@var{mode}} instruction pattern

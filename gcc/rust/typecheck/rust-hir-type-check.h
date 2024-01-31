@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2023 Free Software Foundation, Inc.
+// Copyright (C) 2020-2024 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -19,8 +19,6 @@
 #ifndef RUST_HIR_TYPE_CHECK
 #define RUST_HIR_TYPE_CHECK
 
-#include "rust-type-util.h"
-#include "rust-hir-full-decls.h"
 #include "rust-hir-map.h"
 #include "rust-tyty.h"
 #include "rust-hir-trait-reference.h"
@@ -37,11 +35,19 @@ public:
     ITEM,
     IMPL_ITEM,
     TRAIT_ITEM,
+    ERROR
   };
 
   TypeCheckContextItem (HIR::Function *item);
   TypeCheckContextItem (HIR::ImplBlock *impl_block, HIR::Function *item);
   TypeCheckContextItem (HIR::TraitItemFunc *trait_item);
+  TypeCheckContextItem (const TypeCheckContextItem &other);
+
+  TypeCheckContextItem &operator= (const TypeCheckContextItem &other);
+
+  static TypeCheckContextItem get_error ();
+
+  bool is_error () const;
 
   ItemType get_type () const;
 
@@ -53,7 +59,11 @@ public:
 
   TyTy::FnType *get_context_type ();
 
+  DefId get_defid () const;
+
 private:
+  TypeCheckContextItem ();
+
   union Item
   {
     HIR::Function *item;
@@ -84,21 +94,23 @@ public:
 		    TyTy::BaseType *type);
   void insert_implicit_type (TyTy::BaseType *type);
   bool lookup_type (HirId id, TyTy::BaseType **type) const;
+  void clear_type (TyTy::BaseType *ty);
 
   void insert_implicit_type (HirId id, TyTy::BaseType *type);
 
   void insert_type_by_node_id (NodeId ref, HirId id);
   bool lookup_type_by_node_id (NodeId ref, HirId *id);
 
+  bool have_function_context () const;
   TyTy::BaseType *peek_return_type ();
-  TypeCheckContextItem &peek_context ();
+  TypeCheckContextItem peek_context ();
   void push_return_type (TypeCheckContextItem item,
 			 TyTy::BaseType *return_type);
   void pop_return_type ();
   void iterate (std::function<bool (HirId, TyTy::BaseType *)> cb);
 
   bool have_loop_context () const;
-  void push_new_loop_context (HirId id, Location locus);
+  void push_new_loop_context (HirId id, location_t locus);
   void push_new_while_loop_context (HirId id);
   TyTy::BaseType *peek_loop_context ();
   TyTy::BaseType *pop_loop_context ();

@@ -1,6 +1,6 @@
 (* M2Dependent.mod implements the run time module dependencies.
 
-Copyright (C) 2022-2023 Free Software Foundation, Inc.
+Copyright (C) 2022-2024 Free Software Foundation, Inc.
 Contributed by Gaius Mulley <gaius.mulley@southwales.ac.uk>.
 
 This file is part of GNU Modula-2.
@@ -29,7 +29,7 @@ IMPLEMENTATION MODULE M2Dependent ;
 
 FROM libc IMPORT abort, exit, write, getenv, printf, snprintf, strncpy ;
 FROM ASCII IMPORT nul, nl ;
-FROM SYSTEM IMPORT ADR, SIZE ;
+FROM SYSTEM IMPORT ADR ;
 FROM Storage IMPORT ALLOCATE ;
 FROM StrLib IMPORT StrCopy, StrLen, StrEqual ;
 

@@ -69,6 +69,7 @@ import dmd.initsem;
 import dmd.location;
 import dmd.mtype;
 import dmd.opover;
+import dmd.optimize;
 import dmd.root.array;
 import dmd.common.outbuffer;
 import dmd.rootobject;
@@ -745,7 +746,7 @@ extern (C++) final class TemplateDeclaration : ScopeDsymbol
         OutBuffer buf;
         HdrGenState hgs;
 
-        buf.writestring(ident.toString());
+        buf.writestring(ident == Id.ctor ? "this" : ident.toString());
         buf.writeByte('(');
         foreach (i, const tp; *parameters)
         {
@@ -762,6 +763,11 @@ extern (C++) final class TemplateDeclaration : ScopeDsymbol
             {
                 TypeFunction tf = cast(TypeFunction)fd.type;
                 buf.writestring(parametersTypeToChars(tf.parameterList));
+                if (tf.mod)
+                {
+                    buf.writeByte(' ');
+                    buf.MODtoBuffer(tf.mod);
+                }
             }
         }
 
@@ -7509,7 +7515,12 @@ extern (C++) class TemplateInstance : ScopeDsymbol
         }
         //printf("\t-. mi = %s\n", mi.toPrettyChars());
 
-        assert(!memberOf || (!memberOf.isRoot() && mi.isRoot()), "can only re-append from non-root to root module");
+        if (memberOf) // already appended to some module
+        {
+            assert(mi.isRoot(), "can only re-append to a root module");
+            if (memberOf.isRoot())
+                return null; // no need to move to another root module
+        }
 
         Dsymbols* a = mi.members;
         a.push(this);

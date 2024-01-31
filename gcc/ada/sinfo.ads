@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -844,6 +844,11 @@ package Sinfo is
    --    not normally handled (in particular the tasking abort signal). This
    --    is used for translation of the at end handler into a normal exception
    --    handler.
+
+   --  Ancestor_Type
+   --    Present in record N_Aggregate nodes. Used to store the first global
+   --    ancestor of the type of the aggregate in a generic context, if any,
+   --    when the type is a derived tagged type. Otherwise Empty.
 
    --  Aspect_On_Partial_View
    --    Present on an N_Aspect_Specification node. For an aspect that applies
@@ -1722,12 +1727,6 @@ package Sinfo is
    --  Is_Expanded_Contract
    --    Present in N_Contract nodes. Set if the contract has already undergone
    --    expansion activities.
-
-   --  Is_Finalization_Wrapper
-   --    This flag is present in N_Block_Statement nodes. It is set when the
-   --    block acts as a wrapper of a handled construct which has controlled
-   --    objects. The wrapper prevents interference between exception handlers
-   --    and At_End handlers.
 
    --  Is_Generic_Contract_Pragma
    --    This flag is present in N_Pragma nodes. It is set when the pragma is
@@ -4087,7 +4086,7 @@ package Sinfo is
       --  Expressions (set to No_List if none or null record case)
       --  Component_Associations (set to No_List if none)
       --  Null_Record_Present
-      --  Aggregate_Bounds
+      --  Aggregate_Bounds (array) or Ancestor_Type (record)
       --  Associated_Node
       --  Compile_Time_Known_Aggregate
       --  Expansion_Delayed
@@ -5238,7 +5237,6 @@ package Sinfo is
       --  Is_Task_Allocation_Block
       --  Exception_Junk
       --  Is_Abort_Block
-      --  Is_Finalization_Wrapper
       --  Is_Initialization_Block
       --  Is_Task_Master
       --  At_End_Proc (set to Empty if no clean up procedure)

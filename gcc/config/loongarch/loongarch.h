@@ -1,5 +1,5 @@
 /* Definitions of target machine for GNU compiler.  LoongArch version.
-   Copyright (C) 2021-2023 Free Software Foundation, Inc.
+   Copyright (C) 2021-2024 Free Software Foundation, Inc.
    Contributed by Loongson Ltd.
    Based on MIPS and RISC-V target for GNU compiler.
 
@@ -288,9 +288,11 @@ along with GCC; see the file COPYING3.  If not see
 /* Define if loading short immediate values into registers sign extends.  */
 #define SHORT_IMMEDIATES_SIGN_EXTEND 1
 
-/* The clz.{w/d} instructions have the natural values at 0.  */
+/* The clz.{w/d}, ctz.{w/d} instructions have the natural values at 0.  */
 
 #define CLZ_DEFINED_VALUE_AT_ZERO(MODE, VALUE) \
+  ((VALUE) = GET_MODE_UNIT_BITSIZE (MODE), 2)
+#define CTZ_DEFINED_VALUE_AT_ZERO(MODE, VALUE) \
   ((VALUE) = GET_MODE_UNIT_BITSIZE (MODE), 2)
 
 /* Standard register usage.  */
@@ -700,6 +702,24 @@ enum reg_class
    && (GET_MODE_CLASS (MODE) == MODE_VECTOR_INT		\
        || GET_MODE_CLASS (MODE) == MODE_VECTOR_FLOAT))
 
+#define RECIP_MASK_NONE         0x00
+#define RECIP_MASK_DIV          0x01
+#define RECIP_MASK_SQRT         0x02
+#define RECIP_MASK_RSQRT        0x04
+#define RECIP_MASK_VEC_DIV      0x08
+#define RECIP_MASK_VEC_SQRT     0x10
+#define RECIP_MASK_VEC_RSQRT    0x20
+#define RECIP_MASK_ALL (RECIP_MASK_DIV | RECIP_MASK_SQRT \
+			| RECIP_MASK_RSQRT | RECIP_MASK_VEC_SQRT \
+			| RECIP_MASK_VEC_DIV | RECIP_MASK_VEC_RSQRT)
+
+#define TARGET_RECIP_DIV        ((recip_mask & RECIP_MASK_DIV) != 0 || TARGET_uARCH_LA664)
+#define TARGET_RECIP_SQRT       ((recip_mask & RECIP_MASK_SQRT) != 0 || TARGET_uARCH_LA664)
+#define TARGET_RECIP_RSQRT      ((recip_mask & RECIP_MASK_RSQRT) != 0 || TARGET_uARCH_LA664)
+#define TARGET_RECIP_VEC_DIV    ((recip_mask & RECIP_MASK_VEC_DIV) != 0 || TARGET_uARCH_LA664)
+#define TARGET_RECIP_VEC_SQRT   ((recip_mask & RECIP_MASK_VEC_SQRT) != 0 || TARGET_uARCH_LA664)
+#define TARGET_RECIP_VEC_RSQRT  ((recip_mask & RECIP_MASK_VEC_RSQRT) != 0 || TARGET_uARCH_LA664)
+
 /* 1 if N is a possible register number for function argument passing.
    We have no FP argument registers when soft-float.  */
 
@@ -848,7 +868,8 @@ typedef struct {
 /* A C expression for the cost of a branch instruction.  A value of
    1 is the default; other values are interpreted relative to that.  */
 
-#define BRANCH_COST(speed_p, predictable_p) loongarch_branch_cost
+#define BRANCH_COST(speed_p, predictable_p) la_branch_cost
+#define LOGICAL_OP_NON_SHORT_CIRCUIT 0
 
 /* Return the asm template for a conditional branch instruction.
    OPCODE is the opcode's mnemonic and OPERANDS is the asm template for
@@ -1239,8 +1260,3 @@ struct GTY (()) machine_function
 
 #define TARGET_EXPLICIT_RELOCS \
   (la_opt_explicit_relocs == EXPLICIT_RELOCS_ALWAYS)
-
-#define CLZ_DEFINED_VALUE_AT_ZERO(MODE, VALUE) \
-  ((VALUE) = GET_MODE_UNIT_BITSIZE (MODE), 2)
-#define CTZ_DEFINED_VALUE_AT_ZERO(MODE, VALUE) \
-  ((VALUE) = GET_MODE_UNIT_BITSIZE (MODE), 2)

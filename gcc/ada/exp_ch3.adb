@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -8107,8 +8107,7 @@ package body Exp_Ch3 is
                 --  initialization expression has an unconstrained subtype too,
                 --  because the bounds must be present within X.
 
-                and then not (Is_Array_Type (Typ)
-                               and then Is_Constr_Subt_For_UN_Aliased (Typ)
+                and then not (Is_Constr_Array_Subt_With_Bounds (Typ)
                                and then Is_Constrained (Etype (Expr_Q)))
 
                 --  We may use a renaming if the initialization expression is a

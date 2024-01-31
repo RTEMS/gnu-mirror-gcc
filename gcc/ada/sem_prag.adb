@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -283,8 +283,7 @@ package body Sem_Prag is
    function Is_Unconstrained_Or_Tagged_Item (Item : Entity_Id) return Boolean;
    --  Subsidiary to Collect_Subprogram_Inputs_Outputs and the analysis of
    --  pragma Depends. Determine whether the type of dependency item Item is
-   --  tagged, unconstrained array, unconstrained record or a record with at
-   --  least one unconstrained component.
+   --  tagged, unconstrained array or unconstrained record.
 
    procedure Record_Possible_Body_Reference
      (State_Id : Entity_Id;
@@ -2827,21 +2826,6 @@ package body Sem_Prag is
                      SPARK_Msg_N ("\use its constituents instead", Item);
                      return;
 
-                  --  An external state which has Async_Writers or
-                  --  Effective_Reads enabled cannot appear as a global item
-                  --  of a nonvolatile function (SPARK RM 7.1.3(8)).
-
-                  elsif Is_External_State (Item_Id)
-                    and then (Async_Writers_Enabled (Item_Id)
-                               or else Effective_Reads_Enabled (Item_Id))
-                    and then Ekind (Spec_Id) in E_Function | E_Generic_Function
-                    and then not Is_Volatile_Function (Spec_Id)
-                  then
-                     SPARK_Msg_NE
-                       ("external state & cannot act as global item of "
-                        & "nonvolatile function", Item, Item_Id);
-                     return;
-
                   --  If the reference to the abstract state appears in an
                   --  enclosing package body that will eventually refine the
                   --  state, record the reference for future checks.
@@ -2892,50 +2876,6 @@ package body Sem_Prag is
                      SPARK_Msg_NE
                        ("loop parameter & cannot act as output",
                         Item, Item_Id);
-                     return;
-                  end if;
-
-               --  Variable related checks. These are only relevant when
-               --  SPARK_Mode is on as they are not standard Ada legality
-               --  rules.
-
-               elsif SPARK_Mode = On
-                 and then Ekind (Item_Id) = E_Variable
-                 and then Is_Effectively_Volatile_For_Reading (Item_Id)
-               then
-                  --  The current instance of a protected unit is not an
-                  --  effectively volatile object, unless the protected unit
-                  --  is already volatile for another reason (SPARK RM 7.1.2).
-
-                  if Is_Single_Protected_Object (Item_Id)
-                    and then Is_CCT_Instance (Etype (Item_Id), Spec_Id)
-                    and then not Is_Effectively_Volatile_For_Reading
-                      (Item_Id, Ignore_Protected => True)
-                  then
-                     null;
-
-                  --  An effectively volatile object for reading cannot appear
-                  --  as a global item of a nonvolatile function (SPARK RM
-                  --  7.1.3(8)).
-
-                  elsif Ekind (Spec_Id) in E_Function | E_Generic_Function
-                    and then not Is_Volatile_Function (Spec_Id)
-                  then
-                     Error_Msg_NE
-                       ("volatile object & cannot act as global item of a "
-                        & "function", Item, Item_Id);
-                     return;
-
-                  --  An effectively volatile object with external property
-                  --  Effective_Reads set to True must have mode Output or
-                  --  In_Out (SPARK RM 7.1.3(10)).
-
-                  elsif Effective_Reads_Enabled (Item_Id)
-                    and then Global_Mode = Name_Input
-                  then
-                     Error_Msg_NE
-                       ("volatile object & with property Effective_Reads must "
-                        & "have mode In_Out or Output", Item, Item_Id);
                      return;
                   end if;
                end if;
@@ -8126,27 +8066,6 @@ package body Sem_Prag is
              Get_Aspect_Id (Corresponding_Aspect (N)) = Aspect_Full_Access_Only
          then
             Check_Full_Access_Only (E);
-         end if;
-
-         --  The following check is only relevant when SPARK_Mode is on as
-         --  this is not a standard Ada legality rule. Pragma Volatile can
-         --  only apply to a full type declaration or an object declaration
-         --  (SPARK RM 7.1.3(2)). Original_Node is necessary to account for
-         --  untagged derived types that are rewritten as subtypes of their
-         --  respective root types.
-
-         if SPARK_Mode = On
-           and then Prag_Id = Pragma_Volatile
-           and then Nkind (Original_Node (Decl)) not in
-                      N_Full_Type_Declaration        |
-                      N_Formal_Type_Declaration      |
-                      N_Object_Declaration           |
-                      N_Single_Protected_Declaration |
-                      N_Single_Task_Declaration
-         then
-            Error_Pragma_Arg
-              ("argument of pragma % must denote a full type or object "
-               & "declaration", Arg1);
          end if;
 
          --  Deal with the case where the pragma/attribute is applied to a type
@@ -13425,7 +13344,7 @@ package body Sem_Prag is
             Analyze_If_Present (Pragma_Side_Effects);
 
             --  Pragma Always_Terminates is not allowed on functions without
-            --  side-effects.
+            --  side effects.
 
             if Ekind (Spec_Id) in E_Function | E_Generic_Function
               and then not Is_Function_With_Side_Effects (Spec_Id)
@@ -16989,7 +16908,7 @@ package body Sem_Prag is
             Analyze_If_Present (Pragma_Side_Effects);
 
             --  Pragma Exceptional_Cases is not allowed on functions without
-            --  side-effects.
+            --  side effects.
 
             if Ekind (Spec_Id) in E_Function | E_Generic_Function
               and then not Is_Function_With_Side_Effects (Spec_Id)
@@ -23072,7 +22991,7 @@ package body Sem_Prag is
 
             Analyze_If_Present (Pragma_Side_Effects);
 
-            --  A function with side-effects shall not have a Pure_Function
+            --  A function with side effects shall not have a Pure_Function
             --  aspect or pragma (SPARK RM 6.1.11(5)).
 
             if Is_Function_With_Side_Effects (E) then
@@ -23455,15 +23374,13 @@ package body Sem_Prag is
             Analyze_If_Present (Pragma_SPARK_Mode);
 
             --  State refinement is allowed only when the corresponding package
-            --  declaration has non-null pragma Abstract_State. Refinement not
-            --  enforced when SPARK checks are suppressed (SPARK RM 7.2.2(3)).
+            --  declaration has non-null pragma Abstract_State (SPARK RM
+            --  7.2.2(3)).
 
-            if SPARK_Mode /= Off
-              and then
-                (No (Abstract_States (Spec_Id))
-                  or else Has_Null_Abstract_State (Spec_Id))
+            if No (Abstract_States (Spec_Id))
+              or else Has_Null_Abstract_State (Spec_Id)
             then
-               Error_Msg_NE
+               SPARK_Msg_NE
                  ("useless refinement, package & does not define abstract "
                   & "states", N, Spec_Id);
                return;
@@ -23949,8 +23866,8 @@ package body Sem_Prag is
 
             Add_Contract_Item (N, Spec_Id);
 
-            --  A function with side-effects cannot override a function without
-            --  side-effects (SPARK RM 7.1.2(16)). Overriding checks are
+            --  A function with side effects cannot override a function without
+            --  side effects (SPARK RM 7.1.2(16)). Overriding checks are
             --  usually performed in New_Overloaded_Entity, however at
             --  that point the pragma has not been processed yet.
 
@@ -23960,7 +23877,7 @@ package body Sem_Prag is
               and then not Is_Function_With_Side_Effects (Over_Id)
             then
                Error_Msg_N
-                 ("incompatible declaration of side-effects for function",
+                 ("incompatible declaration of side effects for function",
                   Spec_Id);
 
                Error_Msg_Sloc := Sloc (Over_Id);
@@ -33039,36 +32956,7 @@ package body Sem_Prag is
    function Is_Unconstrained_Or_Tagged_Item
      (Item : Entity_Id) return Boolean
    is
-      function Has_Unconstrained_Component (Typ : Entity_Id) return Boolean;
-      --  Determine whether record type Typ has at least one unconstrained
-      --  component.
-
-      ---------------------------------
-      -- Has_Unconstrained_Component --
-      ---------------------------------
-
-      function Has_Unconstrained_Component (Typ : Entity_Id) return Boolean is
-         Comp : Entity_Id;
-
-      begin
-         Comp := First_Component (Typ);
-         while Present (Comp) loop
-            if Is_Unconstrained_Or_Tagged_Item (Comp) then
-               return True;
-            end if;
-
-            Next_Component (Comp);
-         end loop;
-
-         return False;
-      end Has_Unconstrained_Component;
-
-      --  Local variables
-
       Typ : constant Entity_Id := Etype (Item);
-
-   --  Start of processing for Is_Unconstrained_Or_Tagged_Item
-
    begin
       if Is_Tagged_Type (Typ) then
          return True;
@@ -33077,11 +32965,7 @@ package body Sem_Prag is
          return True;
 
       elsif Is_Record_Type (Typ) then
-         if Has_Discriminants (Typ) and then not Is_Constrained (Typ) then
-            return True;
-         else
-            return Has_Unconstrained_Component (Typ);
-         end if;
+         return Has_Discriminants (Typ) and then not Is_Constrained (Typ);
 
       elsif Is_Private_Type (Typ) and then Has_Discriminants (Typ) then
          return True;
@@ -33972,6 +33856,16 @@ package body Sem_Prag is
    --  Start of processing for Validate_Compile_Time_Warning_Errors
 
    begin
+
+      --  These error/warning messages were deferred because they could not be
+      --  evaluated in the front-end and they needed additional information
+      --  from the back-end. There is no reason to run these checks again if
+      --  the back-end was not activated by this point.
+
+      if not Generating_Code then
+         return;
+      end if;
+
       Expander_Mode_Save_And_Set (False);
       In_Compile_Time_Warning_Or_Error := True;
 

@@ -1,5 +1,5 @@
 /* VSETVL pass for RISC-V 'V' Extension for GNU compiler.
-   Copyright (C) 2022-2023 Free Software Foundation, Inc.
+   Copyright (C) 2022-2024 Free Software Foundation, Inc.
    Contributed by Juzhe Zhong (juzhe.zhong@rivai.ai), RiVAI Technologies Ltd.
 
 This file is part of GCC.
@@ -85,6 +85,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "predict.h"
 #include "profile-count.h"
 #include "gcse.h"
+#include "cfgloop.h"
 
 using namespace rtl_ssa;
 using namespace riscv_vector;
@@ -579,6 +580,8 @@ extract_single_source (set_info *set)
   if (!set->insn ()->is_phi ())
     return nullptr;
   hash_set<set_info *> sets = get_all_sets (set, true, false, true);
+  if (sets.is_empty ())
+    return nullptr;
 
   insn_info *first_insn = (*sets.begin ())->insn ();
   if (first_insn->is_artificial ())
@@ -606,22 +609,6 @@ same_equiv_note_p (set_info *set1, set_info *set2)
   return source_equal_p (insn1, insn2);
 }
 
-static unsigned
-get_expr_id (unsigned bb_index, unsigned regno, unsigned num_bbs)
-{
-  return regno * num_bbs + bb_index;
-}
-static unsigned
-get_regno (unsigned expr_id, unsigned num_bb)
-{
-  return expr_id / num_bb;
-}
-static unsigned
-get_bb_index (unsigned expr_id, unsigned num_bb)
-{
-  return expr_id % num_bb;
-}
-
 /* Return true if the SET result is not used by any instructions.  */
 static bool
 has_no_uses (basic_block cfg_bb, rtx_insn *rinsn, int regno)
@@ -636,6 +623,52 @@ has_no_uses (basic_block cfg_bb, rtx_insn *rinsn, int regno)
       return false;
 
   return true;
+}
+
+/* Return true for the special block that we can't apply LCM optimization.  */
+static bool
+invalid_opt_bb_p (basic_block cfg_bb)
+{
+  edge e;
+  edge_iterator ei;
+
+  /* We don't do LCM optimizations on complex edges.  */
+  FOR_EACH_EDGE (e, ei, cfg_bb->preds)
+    if (e->flags & EDGE_COMPLEX)
+      return true;
+
+  /* We only do LCM optimizations on blocks that are post dominated by
+     EXIT block, that is, we don't do LCM optimizations on infinite loop.  */
+  FOR_EACH_EDGE (e, ei, cfg_bb->succs)
+    if (e->flags & EDGE_FAKE)
+      return true;
+
+  return false;
+}
+
+/* Get all predecessors of BB.  */
+static hash_set<basic_block>
+get_all_predecessors (basic_block bb)
+{
+  hash_set<basic_block> blocks;
+  auto_vec<basic_block> work_list;
+  hash_set<basic_block> visited_list;
+  work_list.safe_push (bb);
+
+  while (!work_list.is_empty ())
+    {
+      basic_block new_bb = work_list.pop ();
+      visited_list.add (new_bb);
+      edge e;
+      edge_iterator ei;
+      FOR_EACH_EDGE (e, ei, new_bb->preds)
+	{
+	  if (!visited_list.contains (e->src))
+	    work_list.safe_push (e->src);
+	  blocks.add (e->src);
+	}
+    }
+  return blocks;
 }
 
 /* This flags indicates the minimum demand of the vl and vtype values by the
@@ -987,11 +1020,11 @@ public:
 
     /* Determine the demand info of the RVV insn.  */
     m_max_sew = get_max_int_sew ();
-    unsigned demand_flags = 0;
+    unsigned dflags = 0;
     if (vector_config_insn_p (insn->rtl ()))
       {
-	demand_flags |= demand_flags::DEMAND_AVL_P;
-	demand_flags |= demand_flags::DEMAND_RATIO_P;
+	dflags |= demand_flags::DEMAND_AVL_P;
+	dflags |= demand_flags::DEMAND_RATIO_P;
       }
     else
       {
@@ -1006,39 +1039,39 @@ public:
 		   available.
 		 */
 		if (has_non_zero_avl ())
-		  demand_flags |= demand_flags::DEMAND_NON_ZERO_AVL_P;
+		  dflags |= demand_flags::DEMAND_NON_ZERO_AVL_P;
 		else
-		  demand_flags |= demand_flags::DEMAND_AVL_P;
+		  dflags |= demand_flags::DEMAND_AVL_P;
 	      }
 	    else
-	      demand_flags |= demand_flags::DEMAND_AVL_P;
+	      dflags |= demand_flags::DEMAND_AVL_P;
 	  }
 
 	if (get_attr_ratio (insn->rtl ()) != INVALID_ATTRIBUTE)
-	  demand_flags |= demand_flags::DEMAND_RATIO_P;
+	  dflags |= demand_flags::DEMAND_RATIO_P;
 	else
 	  {
 	    if (scalar_move_insn_p (insn->rtl ()) && m_ta)
 	      {
-		demand_flags |= demand_flags::DEMAND_GE_SEW_P;
+		dflags |= demand_flags::DEMAND_GE_SEW_P;
 		m_max_sew = get_attr_type (insn->rtl ()) == TYPE_VFMOVFV
 			      ? get_max_float_sew ()
 			      : get_max_int_sew ();
 	      }
 	    else
-	      demand_flags |= demand_flags::DEMAND_SEW_P;
+	      dflags |= demand_flags::DEMAND_SEW_P;
 
 	    if (!ignore_vlmul_insn_p (insn->rtl ()))
-	      demand_flags |= demand_flags::DEMAND_LMUL_P;
+	      dflags |= demand_flags::DEMAND_LMUL_P;
 	  }
 
 	if (!m_ta)
-	  demand_flags |= demand_flags::DEMAND_TAIL_POLICY_P;
+	  dflags |= demand_flags::DEMAND_TAIL_POLICY_P;
 	if (!m_ma)
-	  demand_flags |= demand_flags::DEMAND_MASK_POLICY_P;
+	  dflags |= demand_flags::DEMAND_MASK_POLICY_P;
       }
 
-    normalize_demand (demand_flags);
+    normalize_demand (dflags);
 
     /* Optimize AVL from the vsetvl instruction.  */
     insn_info *def_insn = extract_single_source (get_avl_def ());
@@ -1116,6 +1149,27 @@ public:
       return gen_vsetvl (Pmode, get_vl (), avl, sew, vlmul, ta, ma);
     else
       return gen_vsetvl_discard_result (Pmode, avl, sew, vlmul, ta, ma);
+  }
+
+  /* Return true that the non-AVL operands of THIS will be modified
+     if we fuse the VL modification from OTHER into THIS.  */
+  bool vl_modify_non_avl_op_p (const vsetvl_info &other) const
+  {
+    /* We don't need to worry about any operands from THIS be
+       modified by OTHER vsetvl since we OTHER vsetvl doesn't
+       modify any operand.  */
+    if (!other.has_vl ())
+      return false;
+
+    /* THIS VL operand always preempt OTHER VL operand.  */
+    if (this->has_vl ())
+      return false;
+
+    /* If THIS has non IMM AVL and THIS is AVL compatible with
+       OTHER, the AVL value of THIS is same as VL value of OTHER.  */
+    if (!this->has_imm_avl ())
+      return false;
+    return find_access (this->get_insn ()->uses (), REGNO (other.get_vl ()));
   }
 
   bool operator== (const vsetvl_info &other) const
@@ -1219,9 +1273,7 @@ public:
   vsetvl_info global_info;
   bb_info *bb;
 
-  bool full_available;
-
-  vsetvl_block_info () : bb (nullptr), full_available (false)
+  vsetvl_block_info () : bb (nullptr)
   {
     local_infos.safe_grow_cleared (0);
     global_info.set_empty ();
@@ -1284,9 +1336,6 @@ public:
 class demand_system
 {
 private:
-  sbitmap *m_avl_def_in;
-  sbitmap *m_avl_def_out;
-
   /* predictors.  */
 
   inline bool always_true (const vsetvl_info &prev ATTRIBUTE_UNUSED,
@@ -1433,9 +1482,23 @@ private:
 
   inline bool modify_or_use_vl_p (insn_info *i, const vsetvl_info &info)
   {
-    return info.has_vl ()
-	   && (find_access (i->uses (), REGNO (info.get_vl ()))
-	       || find_access (i->defs (), REGNO (info.get_vl ())));
+    if (info.has_vl ())
+      {
+	if (find_access (i->defs (), REGNO (info.get_vl ())))
+	  return true;
+	if (find_access (i->uses (), REGNO (info.get_vl ())))
+	  {
+	    resource_info resource = full_register (REGNO (info.get_vl ()));
+	    def_lookup dl1 = crtl->ssa->find_def (resource, i);
+	    def_lookup dl2 = crtl->ssa->find_def (resource, info.get_insn ());
+	    if (dl1.matching_set () || dl2.matching_set ())
+	      return true;
+	    /* If their VLs are coming from same def, we still want to fuse
+	       their VSETVL demand info to gain better performance.  */
+	    return dl1.prev_def (i) != dl2.prev_def (i);
+	  }
+      }
+    return false;
   }
   inline bool modify_avl_p (insn_info *i, const vsetvl_info &info)
   {
@@ -1482,9 +1545,6 @@ private:
   inline bool avl_equal_p (const vsetvl_info &prev, const vsetvl_info &next)
   {
     gcc_assert (prev.valid_p () && next.valid_p ());
-
-    if (prev.get_ratio () != next.get_ratio ())
-      return false;
 
     if (next.has_vl () && next.vl_used_by_non_rvv_insn_p ())
       return false;
@@ -1604,7 +1664,7 @@ private:
   }
   inline void use_max_sew (vsetvl_info &prev, const vsetvl_info &next)
   {
-    auto max_sew = std::max (prev.get_sew (), next.get_sew ());
+    int max_sew = MAX (prev.get_sew (), next.get_sew ());
     prev.set_sew (max_sew);
     use_min_of_max_sew (prev, next);
   }
@@ -1638,7 +1698,7 @@ private:
   inline void use_max_sew_and_lmul_with_prev_ratio (vsetvl_info &prev,
 						    const vsetvl_info &next)
   {
-    auto max_sew = std::max (prev.get_sew (), next.get_sew ());
+    int max_sew = MAX (prev.get_sew (), next.get_sew ());
     prev.set_vlmul (calculate_vlmul (max_sew, prev.get_ratio ()));
     prev.set_sew (max_sew);
   }
@@ -1679,14 +1739,6 @@ private:
   }
 
 public:
-  demand_system () : m_avl_def_in (nullptr), m_avl_def_out (nullptr) {}
-
-  void set_avl_in_out_data (sbitmap *m_avl_def_in, sbitmap *m_avl_def_out)
-  {
-    m_avl_def_in = m_avl_def_in;
-    m_avl_def_out = m_avl_def_out;
-  }
-
   /* Can we move vsetvl info between prev_insn and next_insn safe? */
   bool avl_vl_unmodified_between_p (insn_info *prev_insn, insn_info *next_insn,
 				    const vsetvl_info &info,
@@ -1702,7 +1754,7 @@ public:
 	for (insn_info *i = next_insn->prev_nondebug_insn (); i != prev_insn;
 	     i = i->prev_nondebug_insn ())
 	  {
-	    // no def amd use of vl
+	    // no def and use of vl
 	    if (!ignore_vl && modify_or_use_vl_p (i, info))
 	      return false;
 
@@ -1714,32 +1766,66 @@ public:
       }
     else
       {
+	basic_block prev_cfg_bb = prev_insn->bb ()->cfg_bb ();
 	if (!ignore_vl && info.has_vl ())
 	  {
-	    bitmap live_out = df_get_live_out (prev_insn->bb ()->cfg_bb ());
+	    bitmap live_out = df_get_live_out (prev_cfg_bb);
 	    if (bitmap_bit_p (live_out, REGNO (info.get_vl ())))
 	      return false;
 	  }
 
-	if (info.has_nonvlmax_reg_avl () && m_avl_def_in && m_avl_def_out)
+	/* Find set_info at location of PREV_INSN and NEXT_INSN, Return
+	   false if those 2 set_info are different.
+
+	     PREV_INSN --- multiple nested blocks --- NEXT_INSN.
+
+	   Return false if there is any modifications of AVL inside those
+	   multiple nested blocks.  */
+	if (info.has_nonvlmax_reg_avl ())
 	  {
-	    bool has_avl_out = false;
-	    unsigned regno = REGNO (info.get_avl ());
-	    unsigned expr_id;
-	    sbitmap_iterator sbi;
-	    EXECUTE_IF_SET_IN_BITMAP (m_avl_def_out[prev_insn->bb ()->index ()],
-				      0, expr_id, sbi)
-	      {
-		if (get_regno (expr_id, last_basic_block_for_fn (cfun))
-		    != regno)
-		  continue;
-		has_avl_out = true;
-		if (!bitmap_bit_p (m_avl_def_in[next_insn->bb ()->index ()],
-				   expr_id))
-		  return false;
-	      }
-	    if (!has_avl_out)
+	    resource_info resource = full_register (REGNO (info.get_avl ()));
+	    def_lookup dl1 = crtl->ssa->find_def (resource, prev_insn);
+	    def_lookup dl2 = crtl->ssa->find_def (resource, next_insn);
+	    if (dl2.matching_set ())
 	      return false;
+
+	    auto is_phi_or_real
+	      = [&] (insn_info *h) { return h->is_real () || h->is_phi (); };
+
+	    def_info *def1 = dl1.matching_set_or_last_def_of_prev_group ();
+	    def_info *def2 = dl2.prev_def (next_insn);
+	    set_info *set1 = safe_dyn_cast<set_info *> (def1);
+	    set_info *set2 = safe_dyn_cast<set_info *> (def2);
+	    if (!set1 || !set2)
+	      return false;
+
+	    auto is_same_ultimate_def = [&] (set_info *s1, set_info *s2) {
+	      return s1->insn ()->is_phi () && s2->insn ()->is_phi ()
+		     && look_through_degenerate_phi (s1)
+			  == look_through_degenerate_phi (s2);
+	    };
+
+	    if (set1 != set2 && !is_same_ultimate_def (set1, set2))
+	      {
+		if (!is_phi_or_real (set1->insn ())
+		    || !is_phi_or_real (set2->insn ()))
+		  return false;
+
+		if (set1->insn ()->is_real () && set2->insn ()->is_phi ())
+		  {
+		    hash_set<set_info *> sets
+		      = get_all_sets (set2, true, false, true);
+		    if (!sets.contains (set1))
+		      return false;
+		  }
+		else
+		  {
+		    insn_info *def_insn1 = extract_single_source (set1);
+		    insn_info *def_insn2 = extract_single_source (set2);
+		    if (!def_insn1 || !def_insn2 || def_insn1 != def_insn2)
+		      return false;
+		  }
+	      }
 	  }
 
 	for (insn_info *i = next_insn; i != next_insn->bb ()->head_insn ();
@@ -1875,6 +1961,20 @@ public:
     gcc_unreachable ();
   }
 
+  bool vl_not_in_conflict_p (const vsetvl_info &prev, const vsetvl_info &next)
+  {
+    /* We don't fuse this following case:
+
+	li a5, -1
+	vmv.s.x v0, a5         -- PREV
+	vsetvli a5, ...        -- NEXT
+
+       Don't fuse NEXT into PREV.
+    */
+    return !prev.vl_modify_non_avl_op_p (next)
+	   && !next.vl_modify_non_avl_op_p (prev);
+  }
+
   bool avl_compatible_p (const vsetvl_info &prev, const vsetvl_info &next)
   {
     gcc_assert (prev.valid_p () && next.valid_p ());
@@ -1932,7 +2032,8 @@ public:
   {
     bool compatible_p = sew_lmul_compatible_p (prev, next)
 			&& policy_compatible_p (prev, next)
-			&& avl_compatible_p (prev, next);
+			&& avl_compatible_p (prev, next)
+			&& vl_not_in_conflict_p (prev, next);
     return compatible_p;
   }
 
@@ -1940,7 +2041,8 @@ public:
   {
     bool available_p = sew_lmul_available_p (prev, next)
 		       && policy_available_p (prev, next)
-		       && avl_available_p (prev, next);
+		       && avl_available_p (prev, next)
+		       && vl_not_in_conflict_p (prev, next);
     gcc_assert (!available_p || compatible_p (prev, next));
     return available_p;
   }
@@ -1963,9 +2065,6 @@ private:
   auto_vec<vsetvl_block_info> m_vector_block_infos;
 
   /* data for avl reaching defintion.  */
-  sbitmap m_avl_regs;
-  sbitmap *m_avl_def_in;
-  sbitmap *m_avl_def_out;
   sbitmap *m_reg_def_loc;
 
   /* data for vsetvl info reaching defintion.  */
@@ -2023,7 +2122,7 @@ private:
     gcc_unreachable ();
   }
 
-  bool anticpatable_exp_p (const vsetvl_info &header_info)
+  bool anticipated_exp_p (const vsetvl_info &header_info)
   {
     if (!header_info.has_nonvlmax_reg_avl () && !header_info.has_vl ())
       return true;
@@ -2174,7 +2273,23 @@ private:
     return true;
   }
 
-  bool preds_has_same_avl_p (const vsetvl_info &curr_info)
+  bool has_compatible_reaching_vsetvl_p (vsetvl_info info)
+  {
+    unsigned int index;
+    sbitmap_iterator sbi;
+    EXECUTE_IF_SET_IN_BITMAP (m_vsetvl_def_in[info.get_bb ()->index ()], 0,
+			      index, sbi)
+      {
+	const auto prev_info = *m_vsetvl_def_exprs[index];
+	if (!prev_info.valid_p ())
+	  continue;
+	if (m_dem.compatible_p (prev_info, info))
+	  return true;
+      }
+    return false;
+  }
+
+  bool preds_all_same_avl_and_ratio_p (const vsetvl_info &curr_info)
   {
     gcc_assert (
       !bitmap_empty_p (m_vsetvl_def_in[curr_info.get_bb ()->index ()]));
@@ -2186,7 +2301,8 @@ private:
       {
 	const vsetvl_info &prev_info = *m_vsetvl_def_exprs[expr_index];
 	if (!prev_info.valid_p ()
-	    || !m_dem.avl_available_p (prev_info, curr_info))
+	    || !m_dem.avl_available_p (prev_info, curr_info)
+	    || prev_info.get_ratio () != curr_info.get_ratio ())
 	  return false;
       }
 
@@ -2195,13 +2311,15 @@ private:
 
 public:
   pre_vsetvl ()
-    : m_avl_def_in (nullptr), m_avl_def_out (nullptr),
-      m_vsetvl_def_in (nullptr), m_vsetvl_def_out (nullptr), m_avloc (nullptr),
+    : m_vsetvl_def_in (nullptr), m_vsetvl_def_out (nullptr), m_avloc (nullptr),
       m_avin (nullptr), m_avout (nullptr), m_kill (nullptr), m_antloc (nullptr),
       m_transp (nullptr), m_insert (nullptr), m_del (nullptr), m_edges (nullptr)
   {
     /* Initialization of RTL_SSA.  */
     calculate_dominance_info (CDI_DOMINATORS);
+    loop_optimizer_init (LOOPS_NORMAL);
+    /* Create FAKE edges for infinite loops.  */
+    connect_infinite_loops_to_exit ();
     df_analyze ();
     crtl->ssa = new function_info (cfun);
     m_vector_block_infos.safe_grow_cleared (last_basic_block_for_fn (cfun));
@@ -2212,20 +2330,14 @@ public:
   void finish ()
   {
     free_dominance_info (CDI_DOMINATORS);
+    loop_optimizer_finalize ();
     if (crtl->ssa->perform_pending_updates ())
       cleanup_cfg (0);
     delete crtl->ssa;
     crtl->ssa = nullptr;
 
-    if (m_avl_regs)
-      sbitmap_free (m_avl_regs);
     if (m_reg_def_loc)
       sbitmap_vector_free (m_reg_def_loc);
-
-    if (m_avl_def_in)
-      sbitmap_vector_free (m_avl_def_in);
-    if (m_avl_def_out)
-      sbitmap_vector_free (m_avl_def_out);
 
     if (m_vsetvl_def_in)
       sbitmap_vector_free (m_vsetvl_def_in);
@@ -2253,12 +2365,12 @@ public:
       free_edge_list (m_edges);
   }
 
-  void compute_avl_def_data ();
   void compute_vsetvl_def_data ();
+  void compute_transparent (const bb_info *);
   void compute_lcm_local_properties ();
 
   void fuse_local_vsetvl_info ();
-  bool earliest_fuse_vsetvl_info ();
+  bool earliest_fuse_vsetvl_info (int iter);
   void pre_global_vsetvl_info ();
   void emit_vsetvl ();
   void cleaup ();
@@ -2291,114 +2403,6 @@ public:
       }
   }
 };
-
-void
-pre_vsetvl::compute_avl_def_data ()
-{
-  if (bitmap_empty_p (m_avl_regs))
-    return;
-
-  unsigned num_regs = GP_REG_LAST + 1;
-  unsigned num_bbs = last_basic_block_for_fn (cfun);
-
-  sbitmap *avl_def_loc_temp = sbitmap_vector_alloc (num_bbs, num_regs);
-  for (const bb_info *bb : crtl->ssa->bbs ())
-    {
-      bitmap_and (avl_def_loc_temp[bb->index ()], m_avl_regs,
-		  m_reg_def_loc[bb->index ()]);
-
-      vsetvl_block_info &block_info = get_block_info (bb);
-      if (block_info.has_info ())
-	{
-	  vsetvl_info &footer_info = block_info.get_exit_info ();
-	  gcc_assert (footer_info.valid_p ());
-	  if (footer_info.has_vl ())
-	    bitmap_set_bit (avl_def_loc_temp[bb->index ()],
-			    REGNO (footer_info.get_vl ()));
-	}
-    }
-
-  if (m_avl_def_in)
-    sbitmap_vector_free (m_avl_def_in);
-  if (m_avl_def_out)
-    sbitmap_vector_free (m_avl_def_out);
-
-  unsigned num_exprs = num_bbs * num_regs;
-  sbitmap *avl_def_loc = sbitmap_vector_alloc (num_bbs, num_exprs);
-  sbitmap *m_kill = sbitmap_vector_alloc (num_bbs, num_exprs);
-  m_avl_def_in = sbitmap_vector_alloc (num_bbs, num_exprs);
-  m_avl_def_out = sbitmap_vector_alloc (num_bbs, num_exprs);
-
-  bitmap_vector_clear (avl_def_loc, num_bbs);
-  bitmap_vector_clear (m_kill, num_bbs);
-  bitmap_vector_clear (m_avl_def_out, num_bbs);
-
-  unsigned regno;
-  sbitmap_iterator sbi;
-  for (const bb_info *bb : crtl->ssa->bbs ())
-    EXECUTE_IF_SET_IN_BITMAP (avl_def_loc_temp[bb->index ()], 0, regno, sbi)
-      {
-	bitmap_set_bit (avl_def_loc[bb->index ()],
-			get_expr_id (bb->index (), regno, num_bbs));
-	bitmap_set_range (m_kill[bb->index ()], regno * num_bbs, num_bbs);
-      }
-
-  basic_block entry = ENTRY_BLOCK_PTR_FOR_FN (cfun);
-  EXECUTE_IF_SET_IN_BITMAP (m_avl_regs, 0, regno, sbi)
-    bitmap_set_bit (m_avl_def_out[entry->index],
-		    get_expr_id (entry->index, regno, num_bbs));
-
-  compute_reaching_defintion (avl_def_loc, m_kill, m_avl_def_in, m_avl_def_out);
-
-  if (dump_file && (dump_flags & TDF_DETAILS))
-    {
-      fprintf (dump_file,
-	       "  Compute avl reaching defition data (num_bbs %d, num_regs "
-	       "%d):\n\n",
-	       num_bbs, num_regs);
-      fprintf (dump_file, "    avl_regs: ");
-      dump_bitmap_file (dump_file, m_avl_regs);
-      fprintf (dump_file, "\n    bitmap data:\n");
-      for (const bb_info *bb : crtl->ssa->bbs ())
-	{
-	  unsigned int i = bb->index ();
-	  fprintf (dump_file, "      BB %u:\n", i);
-	  fprintf (dump_file, "        avl_def_loc:");
-	  unsigned expr_id;
-	  sbitmap_iterator sbi;
-	  EXECUTE_IF_SET_IN_BITMAP (avl_def_loc[i], 0, expr_id, sbi)
-	    {
-	      fprintf (dump_file, " (r%u,bb%u)", get_regno (expr_id, num_bbs),
-		       get_bb_index (expr_id, num_bbs));
-	    }
-	  fprintf (dump_file, "\n        kill:");
-	  EXECUTE_IF_SET_IN_BITMAP (m_kill[i], 0, expr_id, sbi)
-	    {
-	      fprintf (dump_file, " (r%u,bb%u)", get_regno (expr_id, num_bbs),
-		       get_bb_index (expr_id, num_bbs));
-	    }
-	  fprintf (dump_file, "\n        avl_def_in:");
-	  EXECUTE_IF_SET_IN_BITMAP (m_avl_def_in[i], 0, expr_id, sbi)
-	    {
-	      fprintf (dump_file, " (r%u,bb%u)", get_regno (expr_id, num_bbs),
-		       get_bb_index (expr_id, num_bbs));
-	    }
-	  fprintf (dump_file, "\n        avl_def_out:");
-	  EXECUTE_IF_SET_IN_BITMAP (m_avl_def_out[i], 0, expr_id, sbi)
-	    {
-	      fprintf (dump_file, " (r%u,bb%u)", get_regno (expr_id, num_bbs),
-		       get_bb_index (expr_id, num_bbs));
-	    }
-	  fprintf (dump_file, "\n");
-	}
-    }
-
-  sbitmap_vector_free (avl_def_loc);
-  sbitmap_vector_free (m_kill);
-  sbitmap_vector_free (avl_def_loc_temp);
-
-  m_dem.set_avl_in_out_data (m_avl_def_in, m_avl_def_out);
-}
 
 void
 pre_vsetvl::compute_vsetvl_def_data ()
@@ -2441,20 +2445,16 @@ pre_vsetvl::compute_vsetvl_def_data ()
 	{
 	  for (unsigned i = 0; i < m_vsetvl_def_exprs.length (); i += 1)
 	    {
-	      const vsetvl_info &info = *m_vsetvl_def_exprs[i];
-	      if (!info.has_nonvlmax_reg_avl ())
-		continue;
-	      unsigned int regno;
-	      sbitmap_iterator sbi;
-	      EXECUTE_IF_SET_IN_BITMAP (m_reg_def_loc[bb->index ()], 0, regno,
-					sbi)
-		if (regno == REGNO (info.get_avl ()))
-		  {
-		    bitmap_set_bit (m_kill[bb->index ()], i);
-		    bitmap_set_bit (def_loc[bb->index ()],
-				    get_expr_index (m_vsetvl_def_exprs,
-						    m_unknow_info));
-		  }
+	      auto *info = m_vsetvl_def_exprs[i];
+	      if (info->has_nonvlmax_reg_avl ()
+		  && bitmap_bit_p (m_reg_def_loc[bb->index ()],
+				   REGNO (info->get_avl ())))
+		{
+		  bitmap_set_bit (m_kill[bb->index ()], i);
+		  bitmap_set_bit (def_loc[bb->index ()],
+				  get_expr_index (m_vsetvl_def_exprs,
+						  m_unknow_info));
+		}
 	    }
 	  continue;
 	}
@@ -2501,36 +2501,38 @@ pre_vsetvl::compute_vsetvl_def_data ()
 	}
     }
 
-  for (const bb_info *bb : crtl->ssa->bbs ())
-    {
-      vsetvl_block_info &block_info = get_block_info (bb);
-      if (block_info.empty_p ())
-	continue;
-      vsetvl_info &curr_info = block_info.get_entry_info ();
-      if (!curr_info.valid_p ())
-	continue;
-
-      unsigned int expr_index;
-      sbitmap_iterator sbi;
-      gcc_assert (
-	!bitmap_empty_p (m_vsetvl_def_in[curr_info.get_bb ()->index ()]));
-      bool full_available = true;
-      EXECUTE_IF_SET_IN_BITMAP (m_vsetvl_def_in[bb->index ()], 0, expr_index,
-				sbi)
-	{
-	  vsetvl_info &prev_info = *m_vsetvl_def_exprs[expr_index];
-	  if (!prev_info.valid_p ()
-	      || !m_dem.available_p (prev_info, curr_info))
-	    {
-	      full_available = false;
-	      break;
-	    }
-	}
-      block_info.full_available = full_available;
-    }
-
   sbitmap_vector_free (def_loc);
   sbitmap_vector_free (m_kill);
+}
+
+/* Subroutine of compute_lcm_local_properties which Compute local transparent
+   BB. Note that the compile time is very sensitive to compute_transparent and
+   compute_lcm_local_properties, any change of these 2 functions should be
+   aware of the compile time changing of the program which has a large number of
+   blocks, e.g SPEC 2017 wrf.
+
+   Current compile time profile of SPEC 2017 wrf:
+
+     1. scheduling - 27%
+     2. machine dep reorg (VSETVL PASS) - 18%
+
+   VSETVL pass should not spend more time than scheduling in compilation.  */
+void
+pre_vsetvl::compute_transparent (const bb_info *bb)
+{
+  int num_exprs = m_exprs.length ();
+  unsigned bb_index = bb->index ();
+  for (int i = 0; i < num_exprs; i++)
+    {
+      auto *info = m_exprs[i];
+      if (info->has_nonvlmax_reg_avl ()
+	  && bitmap_bit_p (m_reg_def_loc[bb_index], REGNO (info->get_avl ())))
+	bitmap_clear_bit (m_transp[bb_index], i);
+      else if (info->has_vl ()
+	       && bitmap_bit_p (m_reg_def_loc[bb_index],
+				REGNO (info->get_vl ())))
+	bitmap_clear_bit (m_transp[bb_index], i);
+    }
 }
 
 /* Compute the local properties of each recorded expression.
@@ -2560,8 +2562,10 @@ pre_vsetvl::compute_lcm_local_properties ()
       vsetvl_info &header_info = block_info.get_entry_info ();
       vsetvl_info &footer_info = block_info.get_exit_info ();
       gcc_assert (footer_info.valid_p () || footer_info.unknown_p ());
-      add_expr (m_exprs, header_info);
-      add_expr (m_exprs, footer_info);
+      if (header_info.valid_p ())
+	add_expr (m_exprs, header_info);
+      if (footer_info.valid_p ())
+	add_expr (m_exprs, footer_info);
     }
 
   int num_exprs = m_exprs.length ();
@@ -2587,7 +2591,7 @@ pre_vsetvl::compute_lcm_local_properties ()
 
   bitmap_vector_clear (m_avloc, last_basic_block_for_fn (cfun));
   bitmap_vector_clear (m_antloc, last_basic_block_for_fn (cfun));
-  bitmap_vector_clear (m_transp, last_basic_block_for_fn (cfun));
+  bitmap_vector_ones (m_transp, last_basic_block_for_fn (cfun));
 
   /* -  If T is locally available at the end of a block, then T' must be
 	available at the end of the same block. Since some optimization has
@@ -2613,80 +2617,40 @@ pre_vsetvl::compute_lcm_local_properties ()
 
       /* Compute m_transp */
       if (block_info.empty_p ())
+	compute_transparent (bb);
+      else
 	{
-	  bitmap_ones (m_transp[bb_index]);
-	  for (int i = 0; i < num_exprs; i += 1)
-	    {
-	      const vsetvl_info &info = *m_exprs[i];
-	      if (!info.has_nonvlmax_reg_avl () && !info.has_vl ())
-		continue;
+	  bitmap_clear (m_transp[bb_index]);
+	  vsetvl_info &header_info = block_info.get_entry_info ();
+	  vsetvl_info &footer_info = block_info.get_exit_info ();
 
-	      if (info.has_nonvlmax_reg_avl ())
-		{
-		  unsigned int regno;
-		  sbitmap_iterator sbi;
-		  EXECUTE_IF_SET_IN_BITMAP (m_reg_def_loc[bb->index ()], 0,
-					    regno, sbi)
-		    {
-		      if (regno == REGNO (info.get_avl ()))
-			bitmap_clear_bit (m_transp[bb->index ()], i);
-		    }
-		}
+	  if (header_info.valid_p () && anticipated_exp_p (header_info))
+	    bitmap_set_bit (m_antloc[bb_index],
+			    get_expr_index (m_exprs, header_info));
 
-	      for (const insn_info *insn : bb->real_nondebug_insns ())
-		{
-		  if ((info.has_nonvlmax_reg_avl ()
-		       && find_access (insn->defs (), REGNO (info.get_avl ())))
-		      || (info.has_vl ()
-			  && find_access (insn->uses (),
-					  REGNO (info.get_vl ()))))
-		    {
-		      bitmap_clear_bit (m_transp[bb_index], i);
-		      break;
-		    }
-		}
-	    }
-
-	  continue;
+	  if (footer_info.valid_p ())
+	    for (int i = 0; i < num_exprs; i += 1)
+	      {
+		const vsetvl_info &info = *m_exprs[i];
+		if (!info.valid_p ())
+		  continue;
+		if (available_exp_p (footer_info, info))
+		  bitmap_set_bit (m_avloc[bb_index], i);
+	      }
 	}
 
-      vsetvl_info &header_info = block_info.get_entry_info ();
-      vsetvl_info &footer_info = block_info.get_exit_info ();
+      if (invalid_opt_bb_p (bb->cfg_bb ()))
+	{
+	  bitmap_clear (m_antloc[bb_index]);
+	  bitmap_clear (m_transp[bb_index]);
+	}
 
-      if (header_info.valid_p ()
-	  && (anticpatable_exp_p (header_info) || block_info.full_available))
-	bitmap_set_bit (m_antloc[bb_index],
-			get_expr_index (m_exprs, header_info));
+      /* Compute ae_kill for each basic block using:
 
-      if (footer_info.valid_p ())
-	for (int i = 0; i < num_exprs; i += 1)
-	  {
-	    const vsetvl_info &info = *m_exprs[i];
-	    if (!info.valid_p ())
-	      continue;
-	    if (available_exp_p (footer_info, info))
-	      bitmap_set_bit (m_avloc[bb_index], i);
-	  }
-    }
-
-  for (const bb_info *bb : crtl->ssa->bbs ())
-    {
-      unsigned bb_index = bb->index ();
+	 ~(TRANSP | COMP)
+      */
       bitmap_ior (m_kill[bb_index], m_transp[bb_index], m_avloc[bb_index]);
       bitmap_not (m_kill[bb_index], m_kill[bb_index]);
-    }
-
-  for (const bb_info *bb : crtl->ssa->bbs ())
-    {
-      unsigned bb_index = bb->index ();
-      edge e;
-      edge_iterator ei;
-      FOR_EACH_EDGE (e, ei, bb->cfg_bb ()->preds)
-	if (e->flags & EDGE_COMPLEX)
-	  {
-	    bitmap_clear (m_antloc[bb_index]);
-	    bitmap_clear (m_transp[bb_index]);
-	  }
     }
 }
 
@@ -2747,6 +2711,23 @@ pre_vsetvl::fuse_local_vsetvl_info ()
 		      curr_info.dump (dump_file, "        ");
 		      fprintf (dump_file, "\n");
 		    }
+		  /* Even though prev_info is available with curr_info,
+		     we need to update the MAX_SEW of prev_info since
+		     we don't check MAX_SEW in available_p check.
+
+		     prev_info:
+		     Demand fields: demand_ratio_and_ge_sew demand_avl
+		     SEW=16, VLMUL=mf4, RATIO=64, MAX_SEW=64
+
+		     curr_info:
+		     Demand fields: demand_ge_sew demand_non_zero_avl
+		     SEW=16, VLMUL=m1, RATIO=16, MAX_SEW=32
+
+		     In the example above, prev_info is available with
+		     curr_info, we need to update prev_info MAX_SEW from
+		     64 into 32.  */
+		  prev_info.set_max_sew (
+		    MIN (prev_info.get_max_sew (), curr_info.get_max_sew ()));
 		  if (!curr_info.vl_used_by_non_rvv_insn_p ()
 		      && vsetvl_insn_p (curr_info.get_insn ()->rtl ()))
 		    m_delete_list.safe_push (curr_info);
@@ -2795,29 +2776,12 @@ pre_vsetvl::fuse_local_vsetvl_info ()
       if (prev_info.valid_p () || prev_info.unknown_p ())
 	block_info.local_infos.safe_push (prev_info);
     }
-
-  m_avl_regs = sbitmap_alloc (GP_REG_LAST + 1);
-  bitmap_clear (m_avl_regs);
-  for (const bb_info *bb : crtl->ssa->bbs ())
-    {
-      vsetvl_block_info &block_info = get_block_info (bb);
-      if (block_info.empty_p ())
-	continue;
-
-      vsetvl_info &header_info = block_info.get_entry_info ();
-      if (header_info.valid_p () && header_info.has_nonvlmax_reg_avl ())
-	{
-	  gcc_assert (GP_REG_P (REGNO (header_info.get_avl ())));
-	  bitmap_set_bit (m_avl_regs, REGNO (header_info.get_avl ()));
-	}
-    }
 }
 
 
 bool
-pre_vsetvl::earliest_fuse_vsetvl_info ()
+pre_vsetvl::earliest_fuse_vsetvl_info (int iter)
 {
-  compute_avl_def_data ();
   compute_vsetvl_def_data ();
   compute_lcm_local_properties ();
 
@@ -2838,7 +2802,8 @@ pre_vsetvl::earliest_fuse_vsetvl_info ()
 
   if (dump_file && (dump_flags & TDF_DETAILS))
     {
-      fprintf (dump_file, "\n  Compute LCM earliest insert data:\n\n");
+      fprintf (dump_file, "\n  Compute LCM earliest insert data (lift %d):\n\n",
+	       iter);
       fprintf (dump_file, "    Expression List (%u):\n", num_exprs);
       for (unsigned i = 0; i < num_exprs; i++)
 	{
@@ -2886,7 +2851,7 @@ pre_vsetvl::earliest_fuse_vsetvl_info ()
 
   if (dump_file && (dump_flags & TDF_DETAILS))
     {
-      fprintf (dump_file, "    Fused global info result:\n");
+      fprintf (dump_file, "    Fused global info result (lift %d):\n", iter);
     }
 
   bool changed = false;
@@ -2901,43 +2866,27 @@ pre_vsetvl::earliest_fuse_vsetvl_info ()
       EXECUTE_IF_SET_IN_BITMAP (e, 0, expr_index, sbi)
 	{
 	  vsetvl_info &curr_info = *m_exprs[expr_index];
-	  if (!curr_info.valid_p ())
-	    continue;
-
 	  edge eg = INDEX_EDGE (m_edges, ed);
-	  if (eg->probability == profile_probability::never ())
-	    continue;
-	  if (eg->src == ENTRY_BLOCK_PTR_FOR_FN (cfun)
-	      || eg->dest == EXIT_BLOCK_PTR_FOR_FN (cfun))
-	    continue;
-
 	  vsetvl_block_info &src_block_info = get_block_info (eg->src);
 	  vsetvl_block_info &dest_block_info = get_block_info (eg->dest);
 
-	  if (src_block_info.probability
-	      == profile_probability::uninitialized ())
+	  if (!curr_info.valid_p ()
+	      || eg->probability == profile_probability::never ()
+	      || src_block_info.probability
+		   == profile_probability::uninitialized ()
+	      /* When multiple set bits in earliest edge, such edge may
+		 have infinite loop in preds or succs or multiple conflict
+		 vsetvl expression which make such edge is unrelated.  We
+		 don't perform fusion for such situation.  */
+	      || bitmap_count_bits (e) != 1)
 	    continue;
 
 	  if (src_block_info.empty_p ())
 	    {
 	      vsetvl_info new_curr_info = curr_info;
 	      new_curr_info.set_bb (crtl->ssa->bb (eg->dest));
-	      bool has_compatible_p = false;
-	      unsigned int def_expr_index;
-	      sbitmap_iterator sbi2;
-	      EXECUTE_IF_SET_IN_BITMAP (
-		m_vsetvl_def_in[new_curr_info.get_bb ()->index ()], 0,
-		def_expr_index, sbi2)
-		{
-		  vsetvl_info &prev_info = *m_vsetvl_def_exprs[def_expr_index];
-		  if (!prev_info.valid_p ())
-		    continue;
-		  if (m_dem.compatible_p (prev_info, new_curr_info))
-		    {
-		      has_compatible_p = true;
-		      break;
-		    }
-		}
+	      bool has_compatible_p
+		= has_compatible_reaching_vsetvl_p (new_curr_info);
 	      if (!has_compatible_p)
 		{
 		  if (dump_file && (dump_flags & TDF_DETAILS))
@@ -2989,20 +2938,22 @@ pre_vsetvl::earliest_fuse_vsetvl_info ()
 		  if (src_block_info.has_info ())
 		    src_block_info.probability += dest_block_info.probability;
 		}
-	      else if (src_block_info.has_info ()
-		       && !m_dem.compatible_p (prev_info, curr_info))
+	      else
 		{
 		  /* Cancel lift up if probabilities are equal.  */
-		  if (successors_probability_equal_p (eg->src))
+		  if (successors_probability_equal_p (eg->src)
+		      || (dest_block_info.probability
+			    > src_block_info.probability
+			  && !has_compatible_reaching_vsetvl_p (curr_info)))
 		    {
 		      if (dump_file && (dump_flags & TDF_DETAILS))
 			{
 			  fprintf (dump_file,
-				   "      Change empty bb %u to from:",
+				   "      Reset bb %u:",
 				   eg->src->index);
 			  prev_info.dump (dump_file, "        ");
-			  fprintf (dump_file,
-				   "        to (higher probability):");
+			  fprintf (dump_file, "	due to (same probability or no "
+					      "compatible reaching):");
 			  curr_info.dump (dump_file, "        ");
 			}
 		      src_block_info.set_empty_info ();
@@ -3017,7 +2968,7 @@ pre_vsetvl::earliest_fuse_vsetvl_info ()
 		      if (dump_file && (dump_flags & TDF_DETAILS))
 			{
 			  fprintf (dump_file,
-				   "      Change empty bb %u to from:",
+				   "      Change bb %u from:",
 				   eg->src->index);
 			  prev_info.dump (dump_file, "        ");
 			  fprintf (dump_file,
@@ -3034,29 +2985,27 @@ pre_vsetvl::earliest_fuse_vsetvl_info ()
 	    {
 	      vsetvl_info &prev_info = src_block_info.get_exit_info ();
 	      if (!prev_info.valid_p ()
-		  || m_dem.available_p (prev_info, curr_info))
+		  || m_dem.available_p (prev_info, curr_info)
+		  || !m_dem.compatible_p (prev_info, curr_info))
 		continue;
 
-	      if (m_dem.compatible_p (prev_info, curr_info))
+	      if (dump_file && (dump_flags & TDF_DETAILS))
 		{
-		  if (dump_file && (dump_flags & TDF_DETAILS))
-		    {
-		      fprintf (dump_file, "    Fuse curr info since prev info "
-					  "compatible with it:\n");
-		      fprintf (dump_file, "      prev_info: ");
-		      prev_info.dump (dump_file, "        ");
-		      fprintf (dump_file, "      curr_info: ");
-		      curr_info.dump (dump_file, "        ");
-		    }
-		  m_dem.merge (prev_info, curr_info);
-		  if (dump_file && (dump_flags & TDF_DETAILS))
-		    {
-		      fprintf (dump_file, "      prev_info after fused: ");
-		      prev_info.dump (dump_file, "        ");
-		      fprintf (dump_file, "\n");
-		    }
-		  changed = true;
+		  fprintf (dump_file, "    Fuse curr info since prev info "
+				      "compatible with it:\n");
+		  fprintf (dump_file, "      prev_info: ");
+		  prev_info.dump (dump_file, "        ");
+		  fprintf (dump_file, "      curr_info: ");
+		  curr_info.dump (dump_file, "        ");
 		}
+	      m_dem.merge (prev_info, curr_info);
+	      if (dump_file && (dump_flags & TDF_DETAILS))
+		{
+		  fprintf (dump_file, "      prev_info after fused: ");
+		  prev_info.dump (dump_file, "        ");
+		  fprintf (dump_file, "\n");
+		}
+	      changed = true;
 	    }
 	}
     }
@@ -3077,7 +3026,6 @@ pre_vsetvl::earliest_fuse_vsetvl_info ()
 void
 pre_vsetvl::pre_global_vsetvl_info ()
 {
-  compute_avl_def_data ();
   compute_vsetvl_def_data ();
   compute_lcm_local_properties ();
 
@@ -3145,6 +3093,53 @@ pre_vsetvl::pre_global_vsetvl_info ()
       const vsetvl_block_info &block_info = get_block_info (info.get_bb ());
       gcc_assert (block_info.get_entry_info () == info);
       info.set_delete ();
+      if (dump_file && (dump_flags & TDF_DETAILS))
+	{
+	  fprintf (dump_file,
+		   "\nLCM deleting vsetvl of block %d, it has predecessors: \n",
+		   bb->index ());
+	  hash_set<basic_block> all_preds
+	    = get_all_predecessors (bb->cfg_bb ());
+	  int i = 0;
+	  for (const auto pred : all_preds)
+	    {
+	      fprintf (dump_file, "%d ", pred->index);
+	      i++;
+	      if (i % 32 == 0)
+		fprintf (dump_file, "\n");
+	    }
+	  fprintf (dump_file, "\n");
+	}
+    }
+
+  /* Remove vsetvl infos if all precessors are available to the block.  */
+  for (const bb_info *bb : crtl->ssa->bbs ())
+    {
+      vsetvl_block_info &block_info = get_block_info (bb);
+      if (block_info.empty_p ())
+	continue;
+      vsetvl_info &curr_info = block_info.get_entry_info ();
+      if (!curr_info.valid_p ())
+	continue;
+
+      unsigned int expr_index;
+      sbitmap_iterator sbi;
+      gcc_assert (
+	!bitmap_empty_p (m_vsetvl_def_in[curr_info.get_bb ()->index ()]));
+      bool full_available = true;
+      EXECUTE_IF_SET_IN_BITMAP (m_vsetvl_def_in[bb->index ()], 0, expr_index,
+				sbi)
+	{
+	  vsetvl_info &prev_info = *m_vsetvl_def_exprs[expr_index];
+	  if (!prev_info.valid_p ()
+	      || !m_dem.available_p (prev_info, curr_info))
+	    {
+	      full_available = false;
+	      break;
+	    }
+	}
+      if (full_available)
+	curr_info.set_delete ();
     }
 
   for (const bb_info *bb : crtl->ssa->bbs ())
@@ -3160,7 +3155,7 @@ pre_vsetvl::pre_global_vsetvl_info ()
 	  curr_info = block_info.local_infos[0];
 	}
       if (curr_info.valid_p () && !curr_info.vl_used_by_non_rvv_insn_p ()
-	  && preds_has_same_avl_p (curr_info))
+	  && preds_all_same_avl_and_ratio_p (curr_info))
 	curr_info.set_change_vtype_only ();
 
       vsetvl_info prev_info = vsetvl_info ();
@@ -3168,7 +3163,8 @@ pre_vsetvl::pre_global_vsetvl_info ()
       for (auto &curr_info : block_info.local_infos)
 	{
 	  if (prev_info.valid_p () && curr_info.valid_p ()
-	      && m_dem.avl_available_p (prev_info, curr_info))
+	      && m_dem.avl_available_p (prev_info, curr_info)
+	      && prev_info.get_ratio () == curr_info.get_ratio ())
 	    curr_info.set_change_vtype_only ();
 	  prev_info = curr_info;
 	}
@@ -3180,6 +3176,10 @@ pre_vsetvl::emit_vsetvl ()
 {
   bool need_commit = false;
 
+  /* Fake edge is created by connect infinite loops to exit function.
+     We should commit vsetvl edge after fake edges removes, otherwise,
+     it will cause ICE.  */
+  remove_fake_exit_edges ();
   for (const bb_info *bb : crtl->ssa->bbs ())
     {
       for (const auto &curr_info : get_block_info (bb).local_infos)
@@ -3269,15 +3269,11 @@ pre_vsetvl::emit_vsetvl ()
     {
       edge eg = INDEX_EDGE (m_edges, ed);
       sbitmap i = m_insert[ed];
-      if (bitmap_count_bits (i) < 1)
-	continue;
-
-      if (bitmap_count_bits (i) > 1)
+      if (bitmap_count_bits (i) != 1)
 	/* For code with infinite loop (e.g. pr61634.c), The data flow is
 	   completely wrong.  */
 	continue;
 
-      gcc_assert (bitmap_count_bits (i) == 1);
       unsigned expr_index = bitmap_first_set_bit (i);
       const vsetvl_info &info = *m_exprs[expr_index];
       gcc_assert (info.valid_p ());
@@ -3382,7 +3378,7 @@ const pass_data pass_data_vsetvl = {
   RTL_PASS,	 /* type */
   "vsetvl",	 /* name */
   OPTGROUP_NONE, /* optinfo_flags */
-  TV_NONE,	 /* tv_id */
+  TV_MACH_DEP,	 /* tv_id */
   0,		 /* properties_required */
   0,		 /* properties_provided */
   0,		 /* properties_destroyed */
@@ -3452,16 +3448,18 @@ pass_vsetvl::lazy_vsetvl ()
   /* Phase 2:  Fuse header and footer vsetvl infos between basic blocks.  */
   if (dump_file)
     fprintf (dump_file, "\nPhase 2: Lift up vsetvl info.\n\n");
-  bool changed;
-  int fused_count = 0;
-  do
+  if (vsetvl_strategy != VSETVL_OPT_NO_FUSION)
     {
-      if (dump_file)
-	fprintf (dump_file, "  Try lift up %d.\n\n", fused_count);
-      changed = pre.earliest_fuse_vsetvl_info ();
-      fused_count += 1;
-  } while (changed);
-
+      bool changed = true;
+      int fused_count = 0;
+      do
+	{
+	  if (dump_file)
+	    fprintf (dump_file, "  Try lift up %d.\n\n", fused_count);
+	  changed = pre.earliest_fuse_vsetvl_info (fused_count);
+	  fused_count += 1;
+      } while (changed);
+    }
   if (dump_file && (dump_flags & TDF_DETAILS))
     pre.dump (dump_file, "phase 2");
 
@@ -3502,7 +3500,7 @@ pass_vsetvl::execute (function *)
   if (!has_vector_insn (cfun))
     return 0;
 
-  if (!optimize)
+  if (!optimize || vsetvl_strategy == VSETVL_SIMPLE)
     simple_vsetvl ();
   else
     lazy_vsetvl ();

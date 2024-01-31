@@ -1,6 +1,6 @@
 // Components for manipulating non-owning sequences of objects -*- C++ -*-
 
-// Copyright (C) 2019-2023 Free Software Foundation, Inc.
+// Copyright (C) 2019-2024 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -284,6 +284,16 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       operator[](size_type __idx) const noexcept
       {
 	__glibcxx_assert(__idx < size());
+	return *(this->_M_ptr + __idx);
+      }
+
+      [[nodiscard]]
+      constexpr reference
+      at(size_type __idx) const
+      {
+	if (__idx >= size())
+	  __throw_out_of_range_fmt(__N("span::at(%zu) out-of-range for span "
+				       "of size %zu"), __idx, this->size());
 	return *(this->_M_ptr + __idx);
       }
 

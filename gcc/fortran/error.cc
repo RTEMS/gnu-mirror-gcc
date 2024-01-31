@@ -1,5 +1,5 @@
 /* Handle errors.
-   Copyright (C) 2000-2023 Free Software Foundation, Inc.
+   Copyright (C) 2000-2024 Free Software Foundation, Inc.
    Contributed by Andy Vaught & Niels Kristian Bech Jensen
 
 This file is part of GCC.
@@ -980,7 +980,11 @@ char const*
 notify_std_msg(int std)
 {
 
-  if (std & GFC_STD_F2018_DEL)
+  if (std & GFC_STD_F2023_DEL)
+    return _("Prohibited in Fortran 2023:");
+  else if (std & GFC_STD_F2023)
+    return _("Fortran 2023:");
+  else if (std & GFC_STD_F2018_DEL)
     return _("Fortran 2018 deleted feature:");
   else if (std & GFC_STD_F2018_OBS)
     return _("Fortran 2018 obsolescent feature:");
@@ -1203,7 +1207,7 @@ gfc_diagnostic_build_locus_prefix (diagnostic_context *context,
 */
 static void
 gfc_diagnostic_starter (diagnostic_context *context,
-			diagnostic_info *diagnostic)
+			const diagnostic_info *diagnostic)
 {
   char * kind_prefix = gfc_diagnostic_build_kind_prefix (context, diagnostic);
 
@@ -1279,7 +1283,7 @@ gfc_diagnostic_start_span (diagnostic_context *context,
 
 static void
 gfc_diagnostic_finalizer (diagnostic_context *context,
-			  diagnostic_info *diagnostic ATTRIBUTE_UNUSED,
+			  const diagnostic_info *diagnostic ATTRIBUTE_UNUSED,
 			  diagnostic_t orig_diag_kind ATTRIBUTE_UNUSED)
 {
   pp_destroy_prefix (context->printer);

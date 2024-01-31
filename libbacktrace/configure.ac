@@ -1,5 +1,5 @@
 # configure.ac -- Backtrace configure script.
-# Copyright (C) 2012-2023 Free Software Foundation, Inc.
+# Copyright (C) 2012-2024 Free Software Foundation, Inc.
 
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are
@@ -378,6 +378,8 @@ fi
 if test "$have_loadquery" = "yes"; then
   AC_DEFINE(HAVE_LOADQUERY, 1, [Define if AIX loadquery is available.])
 fi
+
+AC_CHECK_HEADERS(windows.h)
 
 # Check for the fcntl function.
 if test -n "${with_target_subdir}"; then

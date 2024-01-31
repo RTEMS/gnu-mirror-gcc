@@ -1,5 +1,5 @@
 /* Automatic generation of links into GCC's documentation.
-   Copyright (C) 2023 Free Software Foundation, Inc.
+   Copyright (C) 2023-2024 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -21,6 +21,6 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_GCC_URLIFIER_H
 #define GCC_GCC_URLIFIER_H
 
-extern urlifier *make_gcc_urlifier ();
+extern urlifier *make_gcc_urlifier (unsigned int lang_mask);
 
 #endif /* GCC_GCC_URLIFIER_H */

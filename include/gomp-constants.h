@@ -1,6 +1,6 @@
 /* Communication between GCC and libgomp.
 
-   Copyright (C) 2014-2023 Free Software Foundation, Inc.
+   Copyright (C) 2014-2024 Free Software Foundation, Inc.
 
    Contributed by Mentor Embedded.
 
@@ -152,6 +152,12 @@ enum gomp_map_kind
        (address of the first adjacent entry) and highest needed address
        (address of the last adjacent entry plus its size).  */
     GOMP_MAP_STRUCT =			(GOMP_MAP_FLAG_SPECIAL_2
+					 | GOMP_MAP_FLAG_SPECIAL | 0),
+    /* As above, but followed by an unordered list of adjacent entries.
+       At present, this is used only to diagnose incorrect usage of variable
+       indices into arrays of structs.  */
+    GOMP_MAP_STRUCT_UNORD =		(GOMP_MAP_FLAG_SPECIAL_4
+					 | GOMP_MAP_FLAG_SPECIAL_2
 					 | GOMP_MAP_FLAG_SPECIAL | 0),
     /* On a location of a pointer/reference that is assumed to be already mapped
        earlier, store the translated address of the preceeding mapping.

@@ -1,5 +1,5 @@
 # libgcc host-specific configuration file.
-# Copyright (C) 1997-2023 Free Software Foundation, Inc.
+# Copyright (C) 1997-2024 Free Software Foundation, Inc.
 
 #This file is part of GCC.
 
@@ -199,9 +199,11 @@ riscv*-*-*)
 	;;
 sparc64*-*-*)
 	cpu_type=sparc
+	tmake_file="${tmake_file} sparc/t-sparc"
 	;;
 sparc*-*-*)
 	cpu_type=sparc
+	tmake_file="${tmake_file} sparc/t-sparc"
 	;;
 s390*-*-*)
 	cpu_type=s390
@@ -554,7 +556,7 @@ arm*-*-eabi* | arm*-*-symbianelf* | arm*-*-rtems*)
 	tm_file="$tm_file arm/bpabi-lib.h"
 	case ${host} in
 	arm*-*-eabi* | arm*-*-rtems*)
-	  tmake_file="${tmake_file} arm/t-bpabi t-crtfm"
+	  tmake_file="${tmake_file} arm/t-bpabi arm/t-sync t-crtfm"
 	  extra_parts="crtbegin.o crtend.o crti.o crtn.o"
 	  ;;
 	arm*-*-symbianelf*)
@@ -713,12 +715,15 @@ hppa*-*-netbsd*)
 i[34567]86-*-darwin*)
 	tmake_file="$tmake_file i386/t-crtpc t-crtfm i386/t-msabi"
 	tm_file="$tm_file i386/darwin-lib.h"
-	extra_parts="$extra_parts crtprec32.o crtprec64.o crtprec80.o crtfastmath.o"
+	extra_parts="$extra_parts crtprec32.o crtprec64.o crtprec80.o"
+	extra_parts="$extra_parts crtfastmath.o libheapt_w.a"
+	tmake_file="${tmake_file} i386/t-heap-trampoline"
 	;;
 x86_64-*-darwin*)
 	tmake_file="$tmake_file i386/t-crtpc t-crtfm i386/t-msabi"
 	tm_file="$tm_file i386/darwin-lib.h"
-	extra_parts="$extra_parts crtprec32.o crtprec64.o crtprec80.o crtfastmath.o"
+	extra_parts="$extra_parts crtprec32.o crtprec64.o crtprec80.o"
+	extra_parts="$extra_parts crtfastmath.o libheapt_w.a"
 	tmake_file="${tmake_file} i386/t-heap-trampoline"
 	;;
 i[34567]86-*-elfiamcu)

@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2023 Free Software Foundation, Inc.
+// Copyright (C) 2020-2024 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -40,7 +40,7 @@ public:
   std::string as_string () const;
 
   bool fill_param_ty (SubstitutionArgumentMappings &subst_mappings,
-		      Location locus);
+		      location_t locus);
 
   SubstitutionParamMapping clone () const;
 
@@ -56,7 +56,7 @@ public:
 
   bool needs_substitution () const;
 
-  Location get_param_locus () const;
+  location_t get_param_locus () const;
 
   bool param_has_default_ty () const;
 
@@ -87,6 +87,8 @@ public:
 
   const SubstitutionParamMapping *get_param_mapping () const;
 
+  const ParamType *get_param_ty () const;
+
   static SubstitutionArg error ();
 
   bool is_error () const;
@@ -97,6 +99,7 @@ public:
 
 private:
   const SubstitutionParamMapping *param;
+  const ParamType *original_param;
   BaseType *argument;
 };
 
@@ -107,9 +110,10 @@ class SubstitutionArgumentMappings
 public:
   SubstitutionArgumentMappings (std::vector<SubstitutionArg> mappings,
 				std::map<std::string, BaseType *> binding_args,
-				Location locus,
+				location_t locus,
 				ParamSubstCb param_subst_cb = nullptr,
-				bool trait_item_flag = false);
+				bool trait_item_flag = false,
+				bool error_flag = false);
 
   SubstitutionArgumentMappings (const SubstitutionArgumentMappings &other);
   SubstitutionArgumentMappings &
@@ -120,6 +124,7 @@ public:
     = default;
 
   static SubstitutionArgumentMappings error ();
+  static SubstitutionArgumentMappings empty ();
 
   bool is_error () const;
 
@@ -133,7 +138,7 @@ public:
   // ParamTy
   bool is_concrete () const;
 
-  Location get_locus () const;
+  location_t get_locus () const;
 
   size_t size () const;
 
@@ -158,9 +163,10 @@ public:
 private:
   std::vector<SubstitutionArg> mappings;
   std::map<std::string, BaseType *> binding_args;
-  Location locus;
+  location_t locus;
   ParamSubstCb param_subst_cb;
   bool trait_item_flag;
+  bool error_flag;
 };
 
 class SubstitutionRef
@@ -291,12 +297,13 @@ public:
   SubstitutionArgumentMappings solve_mappings_from_receiver_for_self (
     SubstitutionArgumentMappings &mappings) const;
 
-  // TODO comment
-  SubstitutionArgumentMappings
-  solve_missing_mappings_from_this (SubstitutionRef &ref, SubstitutionRef &to);
-
-  // TODO comment
-  BaseType *infer_substitions (Location locus);
+  // Given a type such as:
+  //
+  //   fn<X,Y>(a:&X, b:Y) -> (...)
+  //
+  // This function will inject implicit inference variables for the type
+  // parameters X and Y
+  BaseType *infer_substitions (location_t locus);
 
   // this clears any possible projections from higher ranked trait bounds which
   // could be hanging around from a previous resolution
@@ -314,10 +321,6 @@ public:
   SubstitutionArgumentMappings get_used_arguments () const;
 
 protected:
-  Resolver::AssociatedImplTrait *lookup_associated_impl (
-    const SubstitutionParamMapping &subst, const TypeBoundPredicate &bound,
-    const TyTy::BaseType *binding, bool *error_flag) const;
-
   std::vector<SubstitutionParamMapping> substitutions;
   SubstitutionArgumentMappings used_arguments;
 };

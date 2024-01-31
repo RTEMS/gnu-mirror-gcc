@@ -1,5 +1,5 @@
 /* Implement classes and message passing for Objective C.
-   Copyright (C) 1992-2023 Free Software Foundation, Inc.
+   Copyright (C) 1992-2024 Free Software Foundation, Inc.
    Contributed by Steve Naroff.
 
 This file is part of GCC.
@@ -345,6 +345,11 @@ bool
 objc_init (void)
 {
   bool ok;
+
+  /* Set up stuff used by the preprocessor as well as FE parser.  */
+  interface_hash_init ();
+  hash_init ();
+
 #ifdef OBJCPLUS
   if (cxx_init () == false)
 #else
@@ -374,8 +379,6 @@ objc_init (void)
 
   /* Set up stuff used by FE parser and all runtimes.  */
   errbuf = XNEWVEC (char, 1024 * 10);
-  interface_hash_init ();
-  hash_init ();
   objc_encoding_init ();
   /* ... and then check flags and set-up for the selected runtime ... */
   if (flag_next_runtime && flag_objc_abi >= 2)
@@ -10340,5 +10343,51 @@ objc_common_init_ts (void)
   MARK_TS_TYPED (PROPERTY_REF);
 }
 
+/* Information for Objective-C-specific features known to __has_feature.  */
+
+struct objc_feature_info
+{
+  typedef bool (*predicate_t) ();
+
+  const char *ident;
+  predicate_t predicate;
+
+  constexpr objc_feature_info (const char *name)
+    : ident (name), predicate (nullptr) {}
+  constexpr objc_feature_info (const char *name, predicate_t p)
+    : ident (name), predicate (p) {}
+
+  bool has_feature () const
+    {
+      return predicate ? predicate () : true;
+    }
+};
+
+static bool objc_nonfragile_abi_p ()
+{
+  return flag_next_runtime && flag_objc_abi >= 2;
+}
+
+static constexpr objc_feature_info objc_features[] =
+{
+  { "objc_default_synthesize_properties" },
+  { "objc_instancetype" },
+  { "objc_nonfragile_abi", objc_nonfragile_abi_p }
+};
+
+/* Register Objective-C-specific features for __has_feature.  */
+
+void
+objc_common_register_features ()
+{
+  for (unsigned i = 0; i < ARRAY_SIZE (objc_features); i++)
+    {
+      const objc_feature_info *info = objc_features + i;
+      if (!info->has_feature ())
+	continue;
+
+      c_common_register_feature (info->ident, true);
+    }
+}
 
 #include "gt-objc-objc-act.h"

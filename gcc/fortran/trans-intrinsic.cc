@@ -1,5 +1,5 @@
 /* Intrinsic translation
-   Copyright (C) 2002-2023 Free Software Foundation, Inc.
+   Copyright (C) 2002-2024 Free Software Foundation, Inc.
    Contributed by Paul Brook <paul@nowt.org>
    and Steven Bosscher <s.bosscher@student.tudelft.nl>
 
@@ -6863,8 +6863,22 @@ gfc_conv_intrinsic_ishftc (gfc_se * se, gfc_expr * expr)
 
   if (num_args == 3)
     {
+      gfc_expr *size = expr->value.function.actual->next->next->expr;
+
       /* Use a library function for the 3 parameter version.  */
       tree int4type = gfc_get_int_type (4);
+
+      /* Treat optional SIZE argument when it is passed as an optional
+	 dummy.  If SIZE is absent, the default value is BIT_SIZE(I).  */
+      if (size->expr_type == EXPR_VARIABLE
+	  && size->symtree->n.sym->attr.dummy
+	  && size->symtree->n.sym->attr.optional)
+	{
+	  tree type_of_size = TREE_TYPE (args[2]);
+	  args[2] = build3_loc (input_location, COND_EXPR, type_of_size,
+				gfc_conv_expr_present (size->symtree->n.sym),
+				args[2], fold_convert (type_of_size, nbits));
+	}
 
       /* We convert the first argument to at least 4 bytes, and
 	 convert back afterwards.  This removes the need for library
@@ -8025,9 +8039,6 @@ gfc_conv_intrinsic_size (gfc_se * se, gfc_expr * expr)
 	  argse.data_not_needed = 1;
 	  gfc_conv_expr (&argse, actual->expr);
 	  gfc_add_block_to_block (&se->pre, &argse.pre);
-	  cond = fold_build2_loc (input_location, NE_EXPR, logical_type_node,
-				  argse.expr, null_pointer_node);
-	  cond = gfc_evaluate_now (cond, &se->pre);
 	  /* 'block2' contains the arg2 absent case, 'block' the arg2 present
 	      case; size_var can be used in both blocks. */
 	  tree size_var = gfc_create_var (TREE_TYPE (size), "size");
@@ -8038,6 +8049,7 @@ gfc_conv_intrinsic_size (gfc_se * se, gfc_expr * expr)
 	  tmp = fold_build2_loc (input_location, MODIFY_EXPR,
 				 TREE_TYPE (size_var), size_var, size);
 	  gfc_add_expr_to_block (&block2, tmp);
+	  cond = gfc_conv_expr_present (actual->expr->symtree->n.sym);
 	  tmp = build3_v (COND_EXPR, cond, gfc_finish_block (&block),
 			  gfc_finish_block (&block2));
 	  gfc_add_expr_to_block (&se->pre, tmp);
@@ -12819,9 +12831,8 @@ conv_intrinsic_move_alloc (gfc_code *code)
 	  gfc_add_expr_to_block (&block, tmp);
 	}
 
-      tmp = gfc_conv_descriptor_data_get (to_se.expr);
-      tmp = gfc_deallocate_with_status (tmp, NULL_TREE, NULL_TREE, NULL_TREE,
-					NULL_TREE, true, to_expr,
+      tmp = gfc_deallocate_with_status (to_se.expr, NULL_TREE, NULL_TREE,
+					NULL_TREE, NULL_TREE, true, to_expr,
 					GFC_CAF_COARRAY_NOCOARRAY);
       gfc_add_expr_to_block (&block, tmp);
     }

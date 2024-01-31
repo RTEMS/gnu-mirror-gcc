@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2023, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -3620,10 +3620,6 @@ package body Sem_Res is
       --  interpretation, but the form of the actual can only be determined
       --  once the primitive operation is identified.
 
-      procedure Flag_Effectively_Volatile_Objects (Expr : Node_Id);
-      --  Emit an error concerning the illegal usage of an effectively volatile
-      --  object for reading in interfering context (SPARK RM 7.1.3(10)).
-
       procedure Insert_Default;
       --  If the actual is missing in a call, insert in the actuals list
       --  an instance of the default expression. The insertion is always
@@ -3874,68 +3870,6 @@ package body Sem_Res is
          end if;
       end Check_Prefixed_Call;
 
-      ---------------------------------------
-      -- Flag_Effectively_Volatile_Objects --
-      ---------------------------------------
-
-      procedure Flag_Effectively_Volatile_Objects (Expr : Node_Id) is
-         function Flag_Object (N : Node_Id) return Traverse_Result;
-         --  Determine whether arbitrary node N denotes an effectively volatile
-         --  object for reading and if it does, emit an error.
-
-         -----------------
-         -- Flag_Object --
-         -----------------
-
-         function Flag_Object (N : Node_Id) return Traverse_Result is
-            Id : Entity_Id;
-
-         begin
-            case Nkind (N) is
-               --  Do not consider nested function calls because they have
-               --  already been processed during their own resolution.
-
-               when N_Function_Call =>
-                  return Skip;
-
-               when N_Identifier | N_Expanded_Name =>
-                  Id := Entity (N);
-
-                  --  Identifiers of components and discriminants are not names
-                  --  in the sense of Ada RM 4.1. They can only occur as a
-                  --  selector_name in selected_component or as a choice in
-                  --  component_association.
-
-                  if Present (Id)
-                    and then Is_Object (Id)
-                    and then Ekind (Id) not in E_Component | E_Discriminant
-                    and then Is_Effectively_Volatile_For_Reading (Id)
-                    and then
-                      not Is_OK_Volatile_Context (Context       => Parent (N),
-                                                  Obj_Ref       => N,
-                                                  Check_Actuals => True)
-                  then
-                     Error_Msg_Code := GEC_Volatile_Non_Interfering_Context;
-                     Error_Msg_N
-                       ("volatile object cannot appear in this context '[[]']",
-                        N);
-                  end if;
-
-                  return Skip;
-
-               when others =>
-                  return OK;
-            end case;
-         end Flag_Object;
-
-         procedure Flag_Objects is new Traverse_Proc (Flag_Object);
-
-      --  Start of processing for Flag_Effectively_Volatile_Objects
-
-      begin
-         Flag_Objects (Expr);
-      end Flag_Effectively_Volatile_Objects;
-
       --------------------
       -- Insert_Default --
       --------------------
@@ -4017,12 +3951,20 @@ package body Sem_Res is
                   Analyze_And_Resolve (Actval, Base_Type (Etype (Actval)));
 
                --  Resolve entities with their own type, which may differ from
-               --  the type of a reference in a generic context (the view
-               --  swapping mechanism did not anticipate the re-analysis of
-               --  default values in calls).
+               --  the type of a reference in a generic context because of the
+               --  trick used in Save_Global_References.Set_Global_Type to set
+               --  full views forcefully, which did not anticipate the need to
+               --  re-analyze default values in calls.
 
                elsif Is_Entity_Name (Actval) then
                   Analyze_And_Resolve (Actval, Etype (Entity (Actval)));
+
+               --  Ditto for calls whose name is an entity, for the same reason
+
+               elsif Nkind (Actval) = N_Function_Call
+                 and then Is_Entity_Name (Name (Actval))
+               then
+                  Analyze_And_Resolve (Actval, Etype (Entity (Name (Actval))));
 
                else
                   Analyze_And_Resolve (Actval, Etype (Actval));
@@ -4793,7 +4735,7 @@ package body Sem_Res is
                --  leads to an infinite recursion.
 
                if Predicate_Tests_On_Arguments (Nam) then
-                  Apply_Predicate_Check (A, F_Typ, Nam);
+                  Apply_Predicate_Check (A, F_Typ, Fun => Nam);
                end if;
 
                --  Apply required constraint checks
@@ -5118,22 +5060,6 @@ package body Sem_Res is
 
             if Ekind (F) /= E_Out_Parameter then
                Check_Unset_Reference (A);
-            end if;
-
-            --  The following checks are only relevant when SPARK_Mode is on as
-            --  they are not standard Ada legality rule. Internally generated
-            --  temporaries are ignored.
-
-            if SPARK_Mode = On and then Comes_From_Source (A) then
-
-               --  Inspect the expression and flag each effectively volatile
-               --  object for reading as illegal because it appears within
-               --  an interfering context. Note that this is usually done
-               --  in Resolve_Entity_Name, but when the effectively volatile
-               --  object for reading appears as an actual in a call, the call
-               --  must be resolved first.
-
-               Flag_Effectively_Volatile_Objects (A);
             end if;
 
             --  A formal parameter of a specific tagged type whose related
@@ -7267,7 +7193,7 @@ package body Sem_Res is
       --  In GNATprove mode, expansion is disabled, but we want to inline some
       --  subprograms to facilitate formal verification. Indirect calls through
       --  a subprogram type or within a generic cannot be inlined. Inlining is
-      --  performed only for calls subject to SPARK_Mode on.
+      --  performed only for calls subject to SPARK_Mode => On.
 
       elsif GNATprove_Mode
         and then SPARK_Mode = On
@@ -7280,10 +7206,13 @@ package body Sem_Res is
          if Nkind (Nam_Decl) = N_Subprogram_Declaration then
             Body_Id := Corresponding_Body (Nam_Decl);
 
-            --  Nothing to do if the subprogram is not eligible for inlining in
-            --  GNATprove mode, or inlining is disabled with switch -gnatdm
+            --  Nothing to do if the subprogram is not inlined (because it is
+            --  recursive, directly or indirectly), or is not eligible for
+            --  inlining GNATprove mode (because of properties of the
+            --  subprogram itself), or inlining has been disabled with switch
+            --  -gnatdm.
 
-            if not Is_Inlined_Always (Nam_UA)
+            if not Is_Inlined (Nam_UA)
               or else not Can_Be_Inlined_In_GNATprove_Mode (Nam_UA, Body_Id)
               or else Debug_Flag_M
             then
@@ -7861,14 +7790,6 @@ package body Sem_Res is
       --  Determine whether Expr is part of an N_Attribute_Reference
       --  expression.
 
-      function In_Attribute_Old (Expr : Node_Id) return Boolean;
-      --  Determine whether Expr is in attribute Old
-
-      function Within_Exceptional_Cases_Consequence
-        (Expr : Node_Id)
-         return Boolean;
-      --  Determine whether Expr is part of an Exceptional_Cases consequence
-
       ----------------------------------------
       -- Is_Assignment_Or_Object_Expression --
       ----------------------------------------
@@ -7910,31 +7831,6 @@ package body Sem_Res is
          end if;
       end Is_Assignment_Or_Object_Expression;
 
-      ----------------------
-      -- In_Attribute_Old --
-      ----------------------
-
-      function In_Attribute_Old (Expr : Node_Id) return Boolean is
-         N : Node_Id := Expr;
-      begin
-         while Present (N) loop
-            if Nkind (N) = N_Attribute_Reference
-              and then Attribute_Name (N) = Name_Old
-            then
-               return True;
-
-            --  Prevent the search from going too far
-
-            elsif Is_Body_Or_Package_Declaration (N) then
-               return False;
-            end if;
-
-            N := Parent (N);
-         end loop;
-
-         return False;
-      end In_Attribute_Old;
-
       -----------------------------
       -- Is_Attribute_Expression --
       -----------------------------
@@ -7957,39 +7853,6 @@ package body Sem_Res is
 
          return False;
       end Is_Attribute_Expression;
-
-      ------------------------------------------
-      -- Within_Exceptional_Cases_Consequence --
-      ------------------------------------------
-
-      function Within_Exceptional_Cases_Consequence
-        (Expr : Node_Id)
-         return Boolean
-      is
-         Context : Node_Id := Parent (Expr);
-      begin
-         while Present (Context) loop
-            if Nkind (Context) = N_Pragma then
-
-               --  In Exceptional_Cases references to formal parameters are
-               --  only allowed within consequences, so it is enough to
-               --  recognize the pragma itself.
-
-               if Get_Pragma_Id (Context) = Pragma_Exceptional_Cases then
-                  return True;
-               end if;
-
-            --  Prevent the search from going too far
-
-            elsif Is_Body_Or_Package_Declaration (Context) then
-               return False;
-            end if;
-
-            Context := Parent (Context);
-         end loop;
-
-         return False;
-      end Within_Exceptional_Cases_Consequence;
 
       --  Local variables
 
@@ -8121,53 +7984,6 @@ package body Sem_Res is
          --  they are not standard Ada legality rules.
 
          if SPARK_Mode = On then
-
-            --  An effectively volatile object for reading must appear in
-            --  non-interfering context (SPARK RM 7.1.3(10)).
-
-            if Is_Object (E)
-              and then Is_Effectively_Volatile_For_Reading (E)
-              and then
-                not Is_OK_Volatile_Context (Par, N, Check_Actuals => False)
-            then
-               Error_Msg_Code := GEC_Volatile_Non_Interfering_Context;
-               SPARK_Msg_N
-                 ("volatile object cannot appear in this context '[[]']", N);
-            end if;
-
-            --  Parameters of modes OUT or IN OUT of the subprogram shall not
-            --  occur in the consequences of an exceptional contract unless
-            --  they are either passed by reference or occur in the prefix
-            --  of a reference to the 'Old attribute. For convenience, we also
-            --  allow them as prefixes of attributes that do not actually read
-            --  data from the object.
-
-            if Ekind (E) in E_Out_Parameter | E_In_Out_Parameter
-              and then Scope (E) = Current_Scope_No_Loops
-              and then Within_Exceptional_Cases_Consequence (N)
-              and then not In_Attribute_Old (N)
-              and then not (Nkind (Parent (N)) = N_Attribute_Reference
-                              and then
-                            Attribute_Name (Parent (N)) in Name_Constrained
-                                                         | Name_First
-                                                         | Name_Last
-                                                         | Name_Length
-                                                         | Name_Range)
-              and then not Is_By_Reference_Type (Etype (E))
-              and then not Is_Aliased (E)
-            then
-               if Ekind (E) = E_Out_Parameter then
-                  Error_Msg_N
-                    ("formal parameter of mode `OUT` cannot appear " &
-                       "in consequence of Exceptional_Cases", N);
-               else
-                  Error_Msg_N
-                    ("formal parameter of mode `IN OUT` cannot appear " &
-                       "in consequence of Exceptional_Cases", N);
-               end if;
-               Error_Msg_N
-                 ("\only parameters passed by reference are allowed", N);
-            end if;
 
             --  Check for possible elaboration issues with respect to reads of
             --  variables. The act of renaming the variable is not considered a

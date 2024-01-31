@@ -1,5 +1,5 @@
 /* Backend function setup
-   Copyright (C) 2002-2023 Free Software Foundation, Inc.
+   Copyright (C) 2002-2024 Free Software Foundation, Inc.
    Contributed by Paul Brook
 
 This file is part of GCC.
@@ -4350,7 +4350,7 @@ gfc_init_default_dt (gfc_symbol * sym, stmtblock_t * block, bool dealloc)
 
 
 /* Initialize INTENT(OUT) derived type dummies.  As well as giving
-   them their default initializer, if they do not have allocatable
+   them their default initializer, if they have allocatable
    components, they have their allocatable components deallocated.  */
 
 static void

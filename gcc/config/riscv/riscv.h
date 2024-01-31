@@ -1,5 +1,5 @@
 /* Definition of RISC-V target for GNU compiler.
-   Copyright (C) 2011-2023 Free Software Foundation, Inc.
+   Copyright (C) 2011-2024 Free Software Foundation, Inc.
    Contributed by Andrew Waterman (andrew@sifive.com).
    Based on MIPS target for GNU compiler.
 
@@ -170,7 +170,7 @@ ASM_MISA_SPEC
 /* The largest type that can be passed in floating-point registers.  */
 #define UNITS_PER_FP_ARG						\
   ((riscv_abi == ABI_ILP32 || riscv_abi == ABI_ILP32E			\
-    || riscv_abi == ABI_LP64)						\
+    || riscv_abi == ABI_LP64 || riscv_abi == ABI_LP64E)			\
    ? 0 									\
    : ((riscv_abi == ABI_ILP32F || riscv_abi == ABI_LP64F) ? 4 : 8))
 
@@ -193,10 +193,15 @@ ASM_MISA_SPEC
 
 /* The smallest supported stack boundary the calling convention supports.  */
 #define STACK_BOUNDARY \
-  (riscv_abi == ABI_ILP32E ? BITS_PER_WORD : 2 * BITS_PER_WORD)
+  (riscv_abi == ABI_ILP32E || riscv_abi == ABI_LP64E \
+   ? BITS_PER_WORD \
+   : 2 * BITS_PER_WORD)
 
 /* The ABI stack alignment.  */
-#define ABI_STACK_BOUNDARY (riscv_abi == ABI_ILP32E ? BITS_PER_WORD : 128)
+#define ABI_STACK_BOUNDARY \
+  (riscv_abi == ABI_ILP32E || riscv_abi == ABI_LP64E \
+   ? BITS_PER_WORD \
+   : 128)
 
 /* There is no point aligning anything to a rounder boundary than this.  */
 #define BIGGEST_ALIGNMENT 128
@@ -629,6 +634,9 @@ enum reg_class
   (!SMALL_OPERAND (VALUE)						\
    && SMALL_OPERAND (VALUE & ~(HOST_WIDE_INT_1U << floor_log2 (VALUE))))
 
+/* True if bit BIT is set in VALUE.  */
+#define BITSET_P(VALUE, BIT) (((VALUE) & (1ULL << (BIT))) != 0)
+
 /* Stack layout; function entry, exit and calling.  */
 
 #define STACK_GROWS_DOWNWARD 1
@@ -669,7 +677,10 @@ enum reg_class
 #define GP_RETURN GP_ARG_FIRST
 #define FP_RETURN (UNITS_PER_FP_ARG == 0 ? GP_RETURN : FP_ARG_FIRST)
 
-#define MAX_ARGS_IN_REGISTERS (riscv_abi == ABI_ILP32E ? 6 : 8)
+#define MAX_ARGS_IN_REGISTERS \
+  (riscv_abi == ABI_ILP32E || riscv_abi == ABI_LP64E \
+   ? 6 \
+   : 8)
 
 #define MAX_ARGS_IN_VECTOR_REGISTERS (16)
 #define MAX_ARGS_IN_MASK_REGISTERS (1)
@@ -724,8 +735,6 @@ typedef struct {
 
   /* Number of floating-point registers used so far, likewise.  */
   unsigned int num_fprs;
-
-  int rvv_psabi_warning;
 
   /* Number of mask registers used so far, up to MAX_ARGS_IN_MASK_REGISTERS.  */
   unsigned int num_mrs;
@@ -817,6 +826,10 @@ extern enum riscv_cc get_riscv_cc (const rtx use);
     else								\
       asm_fprintf ((FILE), "%U%s", (NAME));				\
   } while (0)
+
+#undef ASM_OUTPUT_OPCODE
+#define ASM_OUTPUT_OPCODE(STREAM, PTR)	\
+  (PTR) = riscv_asm_output_opcode(STREAM, PTR)
 
 #define JUMP_TABLES_IN_TEXT_SECTION 0
 #define CASE_VECTOR_MODE SImode
@@ -1138,6 +1151,7 @@ extern poly_int64 riscv_v_adjust_bytesize (enum machine_mode, int);
   "%{mabi=ilp32f:ilp32f}" \
   "%{mabi=ilp32d:ilp32d}" \
   "%{mabi=lp64:lp64}" \
+  "%{mabi=lp64e:lp64e}" \
   "%{mabi=lp64f:lp64f}" \
   "%{mabi=lp64d:lp64d}" \
 

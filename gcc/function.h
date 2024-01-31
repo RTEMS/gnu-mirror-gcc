@@ -1,5 +1,5 @@
 /* Structure for saving state for a nested function.
-   Copyright (C) 1989-2023 Free Software Foundation, Inc.
+   Copyright (C) 1989-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -516,6 +516,17 @@ set_loops_for_fn (struct function *fn, struct loops *loops)
 {
   gcc_checking_assert (fn->x_current_loops == NULL || loops == NULL);
   fn->x_current_loops = loops;
+}
+
+/* Get a new unique dependence clique or zero if none is left.  */
+
+inline unsigned short
+get_new_clique (function *fn)
+{
+  unsigned short clique = fn->last_clique + 1;
+  if (clique != 0)
+    fn->last_clique = clique;
+  return clique;
 }
 
 /* For backward compatibility... eventually these should all go away.  */

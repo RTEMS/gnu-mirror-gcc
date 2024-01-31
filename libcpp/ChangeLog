@@ -1,3 +1,48 @@
+2024-01-04  Raiki Tamura  <tamaron1203@gmail.com>
+
+	* charset.cc (cpp_check_xid_property): New.
+	* include/cpplib.h
+	(cpp_check_xid_property): New.
+	(enum cpp_xid_property): New.
+
+2023-12-13  Jakub Jelinek  <jakub@redhat.com>
+
+	PR preprocessor/112956
+	* lex.cc (_cpp_lex_direct): Initialize c to 0.
+	For CPP_PRAGMA_EOL tokens and if c == 0 also for CPP_EOF
+	set result->src_loc to highest locus.
+
+2023-11-28  Lewis Hyatt  <lhyatt@gmail.com>
+
+	PR preprocessor/112701
+	* expr.cc (num_div_op): Set unsignedp appropriately when returning a
+	stub value for divide by 0.
+
+2023-11-27  Alex Coplan  <alex.coplan@arm.com>
+	    Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR c++/60512
+	* include/cpplib.h (struct cpp_callbacks): Add has_feature.
+	(enum cpp_builtin_type): Add BT_HAS_{FEATURE,EXTENSION}.
+	* init.cc: Add __has_{feature,extension}.
+	* macro.cc (_cpp_builtin_macro_text): Handle
+	BT_HAS_{FEATURE,EXTENSION}.
+
+2023-11-24  Alexander Monakov  <amonakov@ispras.ru>
+
+	* config.in: Regenerate.
+	* configure: Regenerate.
+	* configure.ac (ENABLE_VALGRIND_CHECKING): Delete.
+	(ENABLE_VALGRIND_ANNOTATIONS): Rename to
+	ENABLE_VALGRIND_WORKAROUNDS.  Delete Valgrind header checks.
+	* lex.cc (new_buff): Adjust for renaming.
+	(_cpp_free_buff): Ditto.
+
+2023-11-20  Marc Poulhiès  <dkm@kataplop.net>
+
+	* macro.cc (parse_params): Fix typo in variadic.
+	(create_iso_definition): Likewise.
+
 2023-11-19  David Malcolm  <dmalcolm@redhat.com>
 
 	* Makefile.in (TAGS_SOURCES): Add "include/rich-location.h".
@@ -7935,7 +7980,7 @@
 	* include/symtab.h: Moved from gcc/hashtable.h.  Change header
 	guard name.
 
-Copyright (C) 2004-2023 Free Software Foundation, Inc.
+Copyright (C) 2004-2024 Free Software Foundation, Inc.
 
 Copying and distribution of this file, with or without modification,
 are permitted in any medium without royalty provided the copyright

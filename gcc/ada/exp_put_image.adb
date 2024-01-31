@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---             Copyright (C) 2020-2023, Free Software Foundation, Inc.      --
+--             Copyright (C) 2020-2024, Free Software Foundation, Inc.      --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -1023,7 +1023,7 @@ package body Exp_Put_Image is
             null;
          elsif Is_Derived_Type (Typ) then
             return Put_Image_Enabled (Etype (Base_Type (Typ)));
-         elsif In_Predefined_Unit (Typ) then
+         elsif Is_Predefined_Unit (Get_Code_Unit (Typ)) then
             return False;
          end if;
       end if;

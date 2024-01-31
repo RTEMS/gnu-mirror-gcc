@@ -1,5 +1,5 @@
 ;; Predicate definitions for HP PA-RISC.
-;; Copyright (C) 2005-2023 Free Software Foundation, Inc.
+;; Copyright (C) 2005-2024 Free Software Foundation, Inc.
 ;;
 ;; This file is part of GCC.
 ;;
@@ -308,6 +308,13 @@
 
   if (reg_plus_base_memory_operand (op, mode))
     {
+      /* There is no support for handling secondary reloads of integer
+	 REG+D instructions in pa_emit_move_sequence.  Further, the Q
+	 constraint is used in more than simple move instructions.  So,
+	 we must return true and let reload handle the reload.  */
+      if (reload_in_progress)
+	return true;
+
       /* Extract CONST_INT operand.  */
       if (GET_CODE (op) == SUBREG)
 	op = SUBREG_REG (op);

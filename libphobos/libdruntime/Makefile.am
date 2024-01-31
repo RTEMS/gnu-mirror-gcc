@@ -1,5 +1,5 @@
 # Makefile for the D runtime library.
-# Copyright (C) 2012-2023 Free Software Foundation, Inc.
+# Copyright (C) 2012-2024 Free Software Foundation, Inc.
 #
 # GCC is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -82,6 +82,9 @@ if DRUNTIME_CPU_AARCH64
 endif
 if DRUNTIME_CPU_ARM
     DRUNTIME_SOURCES_CONFIGURED += config/arm/switchcontext.S
+endif
+if DRUNTIME_CPU_LOONGARCH
+    DRUNTIME_SOURCES_CONFIGURED += config/loongarch/switchcontext.S
 endif
 if DRUNTIME_CPU_MIPS
     DRUNTIME_SOURCES_CONFIGURED += config/mips/switchcontext.S

@@ -1,5 +1,5 @@
 /* Subroutines for loongarch-specific option handling.
-   Copyright (C) 2021-2023 Free Software Foundation, Inc.
+   Copyright (C) 2021-2024 Free Software Foundation, Inc.
    Contributed by Loongson Ltd.
 
 This file is part of GCC.
@@ -140,7 +140,9 @@ static int with_default_simd = 0;
 void
 loongarch_init_target (struct loongarch_target *target,
 		       int cpu_arch, int cpu_tune, int fpu, int simd,
-		       int abi_base, int abi_ext, int cmodel)
+		       int abi_base, int abi_ext, int cmodel,
+		       HOST_WIDE_INT isa_evolution,
+		       HOST_WIDE_INT isa_evolution_set)
 {
   if (!target)
     return;
@@ -148,6 +150,8 @@ loongarch_init_target (struct loongarch_target *target,
   target->cpu_tune = cpu_tune;
   target->isa.fpu = fpu;
   target->isa.simd = simd;
+  target->isa.evolution = isa_evolution;
+  target->isa.evolution_set = isa_evolution_set;
   target->abi.base = abi_base;
   target->abi.ext = abi_ext;
   target->cmodel = cmodel;
@@ -163,6 +167,7 @@ loongarch_config_target (struct loongarch_target *target,
 			 int follow_multilib_list_p)
 {
   struct loongarch_target t;
+
   if (!target)
     return;
 
@@ -182,6 +187,9 @@ loongarch_config_target (struct loongarch_target *target,
       M_OPT_ABSENT (target->cmodel)	  ? 0 : 1,
       M_OPT_ABSENT (target->abi.base)	  ? 0 : 1,
   };
+
+  int64_t isa_evolution = target->isa.evolution;
+  int64_t isa_evolution_set = target->isa.evolution_set;
 
   /* 1.  Target ABI */
   if (constrained.abi_base)
@@ -283,9 +291,6 @@ config_target_isa:
 
   /* Get default ISA from "-march" or its default value.  */
   t.isa = loongarch_cpu_default_isa[t.cpu_arch];
-
-  if (t.cpu_arch != CPU_NATIVE)
-    t.isa.evolution |= loongarch_isa_base_features[t.isa.base];
 
   /* Apply incremental changes.  */
   /* "-march=native" overrides the default FPU type.  */
@@ -396,6 +401,13 @@ config_target_isa:
 	}
     }
 
+  /* Apply the ISA evolution feature switches from the user.  */
+  HOST_WIDE_INT isa_evolution_orig = t.isa.evolution;
+  t.isa.evolution &= ~(~isa_evolution & isa_evolution_set);
+  t.isa.evolution |= isa_evolution & isa_evolution_set;
+
+  /* evolution_set means "what's different from the -march default".  */
+  t.isa.evolution_set = isa_evolution_orig ^ t.isa.evolution;
 
   /* 4.  ABI-ISA compatibility */
   /* Note:
@@ -555,17 +567,17 @@ isa_default_abi (const struct loongarch_isa *isa)
   switch (isa->fpu)
     {
       case ISA_EXT_FPU64:
-	if (isa->base >= ISA_BASE_LA64V100)
+	if (isa->base >= ISA_BASE_LA64)
 	  abi.base = ABI_BASE_LP64D;
 	break;
 
       case ISA_EXT_FPU32:
-	if (isa->base >= ISA_BASE_LA64V100)
+	if (isa->base >= ISA_BASE_LA64)
 	  abi.base = ABI_BASE_LP64F;
 	break;
 
       case ISA_EXT_NONE:
-	if (isa->base >= ISA_BASE_LA64V100)
+	if (isa->base >= ISA_BASE_LA64)
 	  abi.base = ABI_BASE_LP64S;
 	break;
 
@@ -584,8 +596,8 @@ isa_base_compat_p (const struct loongarch_isa *set1,
 {
   switch (set2->base)
     {
-      case ISA_BASE_LA64V100:
-	return (set1->base >= ISA_BASE_LA64V100);
+      case ISA_BASE_LA64:
+	return (set1->base >= ISA_BASE_LA64);
 
       default:
 	gcc_unreachable ();
@@ -657,12 +669,18 @@ abi_str (struct loongarch_abi abi)
 		     strlen (loongarch_abi_base_strings[abi.base]));
   else
     {
+      /* This situation has not yet occurred, so in order to avoid the
+	 -Warray-bounds warning during C++ syntax checking, this part
+	 of the code is commented first.  */
+      /*
       APPEND_STRING (loongarch_abi_base_strings[abi.base])
       APPEND1 ('/')
       APPEND_STRING (loongarch_abi_ext_strings[abi.ext])
       APPEND1 ('\0')
 
       return XOBFINISH (&msg_obstack, const char *);
+      */
+      gcc_unreachable ();
     }
 }
 
@@ -767,7 +785,15 @@ loongarch_update_gcc_opt_status (struct loongarch_target *target,
   opts->x_la_opt_cpu_arch = target->cpu_arch;
   opts->x_la_opt_cpu_tune = target->cpu_tune;
 
+  /* status of -mcmodel */
+  opts->x_la_opt_cmodel = target->cmodel;
+
   /* status of -mfpu */
   opts->x_la_opt_fpu = target->isa.fpu;
+
+  /* status of -msimd */
   opts->x_la_opt_simd = target->isa.simd;
+
+  /* ISA evolution features */
+  opts->x_la_isa_evolution = target->isa.evolution;
 }

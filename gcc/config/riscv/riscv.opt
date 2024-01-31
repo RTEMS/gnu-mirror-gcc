@@ -1,6 +1,6 @@
 ; Options for the RISC-V port of the compiler
 ;
-; Copyright (C) 2011-2023 Free Software Foundation, Inc.
+; Copyright (C) 2011-2024 Free Software Foundation, Inc.
 ;
 ; This file is part of GCC.
 ;
@@ -65,6 +65,9 @@ EnumValue
 Enum(abi_type) String(lp64) Value(ABI_LP64)
 
 EnumValue
+Enum(abi_type) String(lp64e) Value(ABI_LP64E)
+
+EnumValue
 Enum(abi_type) String(lp64f) Value(ABI_LP64F)
 
 EnumValue
@@ -100,7 +103,7 @@ Target Mask(SAVE_RESTORE)
 Use smaller but slower prologue and epilogue code.
 
 mshorten-memrefs
-Target Bool Var(riscv_mshorten_memrefs) Init(1)
+Target Var(riscv_mshorten_memrefs) Init(1)
 Convert BASE + LARGE_OFFSET addresses to NEW_BASE + SMALL_OFFSET to allow more
 memory accesses to be generated as compressed instructions.  Currently targets
 32-bit integer load/stores.
@@ -123,17 +126,20 @@ Enum(code_model) String(medlow) Value(CM_MEDLOW)
 EnumValue
 Enum(code_model) String(medany) Value(CM_MEDANY)
 
+EnumValue
+Enum(code_model) String(large) Value(CM_LARGE)
+
 mexplicit-relocs
 Target Mask(EXPLICIT_RELOCS)
 Use %reloc() operators, rather than assembly macros, to load addresses.
 
 mrelax
-Target Bool Var(riscv_mrelax) Init(1)
+Target Var(riscv_mrelax) Init(1)
 Take advantage of linker relaxations to reduce the number of instructions
 required to materialize symbol addresses.
 
 mcsr-check
-Target Bool Var(riscv_mcsr_check) Init(0)
+Target Var(riscv_mcsr_check) Init(0)
 Enable the CSR checking for the ISA-dependent CRS and the read-only CSR.
 The ISA-dependent CSR are only valid when the specific ISA is set.  The
 read-only CSR can not be written by the CSR instructions.
@@ -282,6 +288,8 @@ Mask(VECTOR_ELEN_FP_64) Var(riscv_vector_elen_flags)
 
 Mask(VECTOR_ELEN_FP_16) Var(riscv_vector_elen_flags)
 
+Mask(VECTOR_ELEN_BF_16) Var(riscv_vector_elen_flags)
+
 TargetVariable
 int riscv_zvl_flags
 
@@ -315,6 +323,8 @@ int riscv_zvb_subext
 Mask(ZVBB) Var(riscv_zvb_subext)
 
 Mask(ZVBC) Var(riscv_zvb_subext)
+
+Mask(ZVKB) Var(riscv_zvb_subext)
 
 TargetVariable
 int riscv_zvk_subext
@@ -360,6 +370,8 @@ int riscv_zf_subext
 Mask(ZFHMIN)  Var(riscv_zf_subext)
 
 Mask(ZFH)     Var(riscv_zf_subext)
+
+Mask(ZVFBFMIN) Var(riscv_zf_subext)
 
 Mask(ZVFHMIN) Var(riscv_zf_subext)
 
@@ -411,6 +423,10 @@ Mask(XCVMAC) Var(riscv_xcv_subext)
 
 Mask(XCVALU) Var(riscv_xcv_subext)
 
+Mask(XCVELW) Var(riscv_xcv_subext)
+
+Mask(XCVSIMD) Var(riscv_xcv_subext)
+
 TargetVariable
 int riscv_xthead_subext
 
@@ -438,6 +454,8 @@ Mask(XTHEADMEMPAIR) Var(riscv_xthead_subext)
 
 Mask(XTHEADSYNC)    Var(riscv_xthead_subext)
 
+Mask(XTHEADVECTOR)  Var(riscv_xthead_subext)
+
 TargetVariable
 int riscv_xventana_subext
 
@@ -460,20 +478,24 @@ misa-spec=
 Target RejectNegative Joined Enum(isa_spec_class) Var(riscv_isa_spec) Init(TARGET_DEFAULT_ISA_SPEC)
 Set the version of RISC-V ISA spec.
 
+mmovcc
+Target Var(TARGET_MOVCC)
+Enable conditional moves unconditionally.
+
 minline-atomics
 Target Var(TARGET_INLINE_SUBWORD_ATOMIC) Init(1)
 Always inline subword atomic operations.
 
 minline-strcmp
-Target Bool Var(riscv_inline_strcmp) Init(0)
+Target Var(riscv_inline_strcmp) Init(0)
 Inline strcmp calls if possible.
 
 minline-strncmp
-Target Bool Var(riscv_inline_strncmp) Init(0)
+Target Var(riscv_inline_strncmp) Init(0)
 Inline strncmp calls if possible.
 
 minline-strlen
-Target Bool Var(riscv_inline_strlen) Init(0)
+Target Var(riscv_inline_strlen) Init(0)
 Inline strlen calls if possible.
 
 -param=riscv-strcmp-inline-limit=
@@ -523,27 +545,39 @@ Target RejectNegative Joined Enum(riscv_autovec_lmul) Var(riscv_autovec_lmul) In
 madjust-lmul-cost
 Target Var(TARGET_ADJUST_LMUL_COST) Init(0)
 
--param=riscv-vector-abi
-Target Undocumented Bool Var(riscv_vector_abi) Init(0)
-Enable the use of vector registers for function arguments and return value.
-This is an experimental switch and may be subject to change in the future.
+Enum
+Name(vsetvl_strategy) Type(enum vsetvl_strategy_enum)
+Valid arguments to -param=vsetvl-strategy=:
+
+EnumValue
+Enum(vsetvl_strategy) String(optim) Value(VSETVL_OPT)
+
+EnumValue
+Enum(vsetvl_strategy) String(simple) Value(VSETVL_SIMPLE)
+
+EnumValue
+Enum(vsetvl_strategy) String(optim-no-fusion) Value(VSETVL_OPT_NO_FUSION)
+
+-param=vsetvl-strategy=
+Target Undocumented RejectNegative Joined Enum(vsetvl_strategy) Var(vsetvl_strategy) Init(VSETVL_OPT)
+-param=vsetvl-strategy=<string>	Set the optimization level of VSETVL insert pass.
 
 Enum
-Name(riscv_stringop_strategy) Type(enum riscv_stringop_strategy_enum)
-Valid arguments to -mmemcpy-strategy=:
+Name(stringop_strategy) Type(enum stringop_strategy_enum)
+Valid arguments to -mstringop-strategy=:
 
 EnumValue
-Enum(riscv_stringop_strategy) String(auto) Value(USE_AUTO)
+Enum(stringop_strategy) String(auto) Value(STRATEGY_AUTO)
 
 EnumValue
-Enum(riscv_stringop_strategy) String(libcall) Value(USE_LIBCALL)
+Enum(stringop_strategy) String(libcall) Value(STRATEGY_LIBCALL)
 
 EnumValue
-Enum(riscv_stringop_strategy) String(scalar) Value(USE_SCALAR)
+Enum(stringop_strategy) String(scalar) Value(STRATEGY_SCALAR)
 
 EnumValue
-Enum(riscv_stringop_strategy) String(vector) Value(USE_VECTOR)
+Enum(stringop_strategy) String(vector) Value(STRATEGY_VECTOR)
 
-mmemcpy-strategy=
-Target RejectNegative Joined Enum(riscv_stringop_strategy) Var(riscv_memcpy_strategy) Init(USE_AUTO)
-Specify memcpy expansion strategy.
+mstringop-strategy=
+Target RejectNegative Joined Enum(stringop_strategy) Var(stringop_strategy) Init(STRATEGY_AUTO)
+Specify stringop expansion strategy.

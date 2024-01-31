@@ -1,5 +1,5 @@
 /* Subroutines for insn-output.cc for HPPA.
-   Copyright (C) 1992-2023 Free Software Foundation, Inc.
+   Copyright (C) 1992-2024 Free Software Foundation, Inc.
    Contributed by Tim Moore (moore@cs.utah.edu), based on sparc.cc
 
 This file is part of GCC.
@@ -556,6 +556,10 @@ pa_option_override (void)
      code when in 64bit mode.  */
   if (flag_pic == 1 || TARGET_64BIT)
     flag_pic = 2;
+
+  /* 64-bit target is always PIE.  */
+  if (TARGET_64BIT)
+    flag_pie = 2;
 
   /* Disable -freorder-blocks-and-partition as we don't support hot and
      cold partitioning.  */
@@ -1872,9 +1876,7 @@ pa_emit_move_sequence (rtx *operands, machine_mode mode, rtx scratch_reg)
 
       if (reg_plus_base_memory_operand (op1, GET_MODE (op1)))
 	{
-	  if (!(TARGET_PA_20
-		&& !TARGET_ELF32
-		&& INT_14_BITS (XEXP (XEXP (op1, 0), 1)))
+	  if (!(INT14_OK_STRICT && INT_14_BITS (XEXP (XEXP (op1, 0), 1)))
 	      && !INT_5_BITS (XEXP (XEXP (op1, 0), 1)))
 	    {
 	      /* SCRATCH_REG will hold an address and maybe the actual data.
@@ -1923,9 +1925,7 @@ pa_emit_move_sequence (rtx *operands, machine_mode mode, rtx scratch_reg)
 
       if (reg_plus_base_memory_operand (op0, GET_MODE (op0)))
 	{
-	  if (!(TARGET_PA_20
-		&& !TARGET_ELF32
-		&& INT_14_BITS (XEXP (XEXP (op0, 0), 1)))
+	  if (!(INT14_OK_STRICT && INT_14_BITS (XEXP (XEXP (op0, 0), 1)))
 	      && !INT_5_BITS (XEXP (XEXP (op0, 0), 1)))
 	    {
 	      /* SCRATCH_REG will hold an address and maybe the actual data.
@@ -3995,7 +3995,8 @@ pa_output_function_label (FILE *file)
   /* The function's label and associated .PROC must never be
      separated and must be output *after* any profiling declarations
      to avoid changing spaces/subspaces within a procedure.  */
-  ASM_OUTPUT_LABEL (file, XSTR (XEXP (DECL_RTL (current_function_decl), 0), 0));
+  const char *name = XSTR (XEXP (DECL_RTL (current_function_decl), 0), 0);
+  ASM_OUTPUT_FUNCTION_LABEL (file, name, current_function_decl);
   fputs ("\t.PROC\n", file);
 
   /* pa_expand_prologue does the dirty work now.  We just need

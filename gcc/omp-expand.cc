@@ -2,7 +2,7 @@
    directives to separate functions, converts others into explicit calls to the
    runtime library (libgomp) and so forth
 
-Copyright (C) 2005-2023 Free Software Foundation, Inc.
+Copyright (C) 2005-2024 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -3416,8 +3416,9 @@ expand_omp_ordered_sink (gimple_stmt_iterator *gsi, struct omp_for_data *fd,
 	      forward = tree_int_cst_sgn (step) != -1;
 	    }
 	  if (forward ^ OMP_CLAUSE_DOACROSS_SINK_NEGATIVE (deps))
-	    warning_at (loc, 0, "%qs clause with %<sink%> modifier "
-				"waiting for lexically later iteration",
+	    warning_at (loc, OPT_Wopenmp,
+			"%qs clause with %<sink%> modifier "
+			"waiting for lexically later iteration",
 			OMP_CLAUSE_DOACROSS_DEPEND (c)
 			? "depend" : "doacross");
 	  break;
@@ -3555,9 +3556,9 @@ expand_omp_ordered_sink (gimple_stmt_iterator *gsi, struct omp_for_data *fd,
 			       build_int_cst (itype, 0));
 	  if (integer_zerop (t) && !warned_step)
 	    {
-	      warning_at (loc, 0, "%qs clause with %<sink%> modifier "
-				  "refers to iteration never in the iteration "
-				  "space",
+	      warning_at (loc, OPT_Wopenmp,
+			  "%qs clause with %<sink%> modifier refers to "
+			  "iteration never in the iteration space",
 			  OMP_CLAUSE_DOACROSS_DEPEND (c)
 			  ? "depend" : "doacross");
 	      warned_step = true;
@@ -4074,7 +4075,7 @@ expand_omp_for_generic (struct omp_region *region,
 
   /* See if we need to bias by LLONG_MIN.  */
   if (fd->iter_type == long_long_unsigned_type_node
-      && TREE_CODE (type) == INTEGER_TYPE
+      && (TREE_CODE (type) == INTEGER_TYPE || TREE_CODE (type) == BITINT_TYPE)
       && !TYPE_UNSIGNED (type)
       && fd->ordered == 0)
     {
@@ -7190,7 +7191,7 @@ expand_omp_taskloop_for_outer (struct omp_region *region,
 
   /* See if we need to bias by LLONG_MIN.  */
   if (fd->iter_type == long_long_unsigned_type_node
-      && TREE_CODE (type) == INTEGER_TYPE
+      && (TREE_CODE (type) == INTEGER_TYPE || TREE_CODE (type) == BITINT_TYPE)
       && !TYPE_UNSIGNED (type))
     {
       tree n1, n2;
@@ -7351,7 +7352,7 @@ expand_omp_taskloop_for_inner (struct omp_region *region,
 
   /* See if we need to bias by LLONG_MIN.  */
   if (fd->iter_type == long_long_unsigned_type_node
-      && TREE_CODE (type) == INTEGER_TYPE
+      && (TREE_CODE (type) == INTEGER_TYPE || TREE_CODE (type) == BITINT_TYPE)
       && !TYPE_UNSIGNED (type))
     {
       tree n1, n2;

@@ -1,5 +1,5 @@
 /* d-tree.h -- Definitions and declarations for code generation.
-   Copyright (C) 2006-2023 Free Software Foundation, Inc.
+   Copyright (C) 2006-2024 Free Software Foundation, Inc.
 
 GCC is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -520,8 +520,8 @@ extern tree insert_decl_attribute (tree, const char *, tree = NULL_TREE);
 extern void apply_user_attributes (Dsymbol *, tree);
 
 /* In d-builtins.cc.  */
-extern const attribute_spec d_langhook_attribute_table[];
-extern const attribute_spec d_langhook_common_attribute_table[];
+extern const struct scoped_attribute_specs d_langhook_gnu_attribute_table;
+extern const struct scoped_attribute_specs d_langhook_common_attribute_table;
 extern Type *build_frontend_type (tree);
 
 extern tree d_builtin_function (tree);

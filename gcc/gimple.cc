@@ -1,6 +1,6 @@
 /* Gimple IR support functions.
 
-   Copyright (C) 2007-2023 Free Software Foundation, Inc.
+   Copyright (C) 2007-2024 Free Software Foundation, Inc.
    Contributed by Aldy Hernandez <aldyh@redhat.com>
 
 This file is part of GCC.
@@ -2988,6 +2988,8 @@ nonfreeing_call_p (gimple *call)
 	case BUILT_IN_TM_FREE:
 	case BUILT_IN_REALLOC:
 	case BUILT_IN_STACK_RESTORE:
+	case BUILT_IN_GOMP_FREE:
+	case BUILT_IN_GOMP_REALLOC:
 	  return false;
 	default:
 	  return true;

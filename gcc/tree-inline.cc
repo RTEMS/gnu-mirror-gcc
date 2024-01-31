@@ -1,5 +1,5 @@
 /* Tree inlining.
-   Copyright (C) 2001-2023 Free Software Foundation, Inc.
+   Copyright (C) 2001-2024 Free Software Foundation, Inc.
    Contributed by Alexandre Oliva <aoliva@redhat.com>
 
 This file is part of GCC.
@@ -1002,7 +1002,7 @@ remap_dependence_clique (copy_body_data *id, unsigned short clique)
       /* Clique 1 is reserved for local ones set by PTA.  */
       if (cfun->last_clique == 0)
 	cfun->last_clique = 1;
-      newc = ++cfun->last_clique;
+      newc = get_new_clique (cfun);
     }
   return newc;
 }
@@ -2988,20 +2988,19 @@ redirect_all_calls (copy_body_data * id, basic_block bb)
 	  struct cgraph_edge *edge = id->dst_node->get_edge (stmt);
 	  if (edge)
 	    {
+	      if (!id->killed_new_ssa_names)
+		id->killed_new_ssa_names = new hash_set<tree> (16);
 	      gimple *new_stmt
-		= cgraph_edge::redirect_call_stmt_to_callee (edge);
-	      /* If IPA-SRA transformation, run as part of edge redirection,
-		 removed the LHS because it is unused, save it to
-		 killed_new_ssa_names so that we can prune it from debug
-		 statements.  */
+		= cgraph_edge::redirect_call_stmt_to_callee (edge,
+		    id->killed_new_ssa_names);
 	      if (old_lhs
 		  && TREE_CODE (old_lhs) == SSA_NAME
 		  && !gimple_call_lhs (new_stmt))
-		{
-		  if (!id->killed_new_ssa_names)
-		    id->killed_new_ssa_names = new hash_set<tree> (16);
-		  id->killed_new_ssa_names->add (old_lhs);
-		}
+		/* In case of IPA-SRA removing the LHS, the name should have
+		   been already added to the hash.  But in case of redirecting
+		   to builtin_unreachable it was not and the name still should
+		   be pruned from debug statements.  */
+		id->killed_new_ssa_names->add (old_lhs);
 
 	      if (stmt == last && id->call_stmt && maybe_clean_eh_stmt (stmt))
 		gimple_purge_dead_eh_edges (bb);
@@ -3328,8 +3327,12 @@ copy_body (copy_body_data *id,
   body = copy_cfg_body (id, entry_block_map, exit_block_map,
 			new_entry);
   copy_debug_stmts (id);
-  delete id->killed_new_ssa_names;
-  id->killed_new_ssa_names = NULL;
+  if (id->killed_new_ssa_names)
+    {
+      ipa_release_ssas_in_hash (id->killed_new_ssa_names);
+      delete id->killed_new_ssa_names;
+      id->killed_new_ssa_names = NULL;
+    }
 
   return body;
 }
@@ -3680,6 +3683,10 @@ initialize_inlined_parameters (copy_body_data *id, gimple *stmt,
 
       setup_one_parameter (id, p, static_chain, fn, bb, &vars);
     }
+
+  /* Reverse so the variables appear in the correct order in DWARF
+     debug info.  */
+  vars = nreverse (vars);
 
   declare_inline_vars (id->block, vars);
 }
@@ -4098,17 +4105,16 @@ inline_forbidden_p (tree fndecl)
 static bool
 function_attribute_inlinable_p (const_tree fndecl)
 {
-  if (targetm.attribute_table)
+  for (auto scoped_attributes : targetm.attribute_table)
     {
       const_tree a;
 
       for (a = DECL_ATTRIBUTES (fndecl); a; a = TREE_CHAIN (a))
 	{
 	  const_tree name = get_attribute_name (a);
-	  int i;
 
-	  for (i = 0; targetm.attribute_table[i].name != NULL; i++)
-	    if (is_attribute_p (targetm.attribute_table[i].name, name))
+	  for (const attribute_spec &attribute : scoped_attributes->attributes)
+	    if (is_attribute_p (attribute.name, name))
 	      return targetm.function_attribute_inlinable_p (fndecl);
 	}
     }
@@ -5137,7 +5143,8 @@ expand_call_inline (basic_block bb, gimple *stmt, copy_body_data *id,
 	      && !is_gimple_reg (*varp)
 	      && !(id->debug_map && id->debug_map->get (p)))
 	    {
-	      tree clobber = build_clobber (TREE_TYPE (*varp), CLOBBER_EOL);
+	      tree clobber = build_clobber (TREE_TYPE (*varp),
+					    CLOBBER_STORAGE_END);
 	      gimple *clobber_stmt;
 	      clobber_stmt = gimple_build_assign (*varp, clobber);
 	      gimple_set_location (clobber_stmt, gimple_location (stmt));
@@ -5147,7 +5154,10 @@ expand_call_inline (basic_block bb, gimple *stmt, copy_body_data *id,
 
   /* Reset the escaped solution.  */
   if (cfun->gimple_df)
-    pt_solution_reset (&cfun->gimple_df->escaped);
+    {
+      pt_solution_reset (&cfun->gimple_df->escaped);
+      pt_solution_reset (&cfun->gimple_df->escaped_return);
+    }
 
   /* Add new automatic variables to IFN_GOMP_SIMT_ENTER arguments.  */
   if (id->dst_simt_vars && id->dst_simt_vars->length () > 0)
@@ -5206,7 +5216,8 @@ expand_call_inline (basic_block bb, gimple *stmt, copy_body_data *id,
 	  && !is_gimple_reg (id->retvar)
 	  && !stmt_ends_bb_p (stmt))
 	{
-	  tree clobber = build_clobber (TREE_TYPE (id->retvar), CLOBBER_EOL);
+	  tree clobber = build_clobber (TREE_TYPE (id->retvar),
+					CLOBBER_STORAGE_END);
 	  gimple *clobber_stmt;
 	  clobber_stmt = gimple_build_assign (id->retvar, clobber);
 	  gimple_set_location (clobber_stmt, gimple_location (old_stmt));

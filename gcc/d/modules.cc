@@ -1,5 +1,5 @@
 /* modules.cc -- D module initialization and termination.
-   Copyright (C) 2013-2023 Free Software Foundation, Inc.
+   Copyright (C) 2013-2024 Free Software Foundation, Inc.
 
 GCC is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -503,7 +503,7 @@ layout_moduleinfo_fields (Module *decl, tree type)
   if (decl->sshareddtor)
     layout_moduleinfo_field (ptr_type_node, type, offset);
 
-  if (decl->findGetMembers ())
+  if (findGetMembers (decl))
     layout_moduleinfo_field (ptr_type_node, type, offset);
 
   if (decl->sictor)
@@ -571,7 +571,7 @@ layout_moduleinfo (Module *decl)
 	aimports_dim--;
     }
 
-  sgetmembers = decl->findGetMembers ();
+  sgetmembers = findGetMembers (decl);
 
   size_t flags = 0;
   if (decl->sctor)
