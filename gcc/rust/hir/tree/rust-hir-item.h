@@ -443,6 +443,8 @@ public:
   // Returns whether the self-param has a valid lifetime.
   bool has_lifetime () const { return !lifetime.is_error (); }
 
+  const Lifetime &get_lifetime () const { return lifetime; }
+
   // Returns whether the self-param is in an error state.
   bool is_error () const { return self_kind == ImplicitSelfKind::NONE; }
 
@@ -481,24 +483,26 @@ public:
 struct FunctionQualifiers
 {
 private:
-  AsyncConstStatus const_status;
+  Async async_status;
+  Const const_status;
   Unsafety unsafety;
   bool has_extern;
   ABI abi;
 
 public:
-  FunctionQualifiers (AsyncConstStatus const_status, Unsafety unsafety,
+  FunctionQualifiers (Async async_status, Const const_status, Unsafety unsafety,
 		      bool has_extern, ABI abi)
-    : const_status (const_status), unsafety (unsafety), has_extern (has_extern),
-      abi (abi)
+    : async_status (async_status), const_status (const_status),
+      unsafety (unsafety), has_extern (has_extern), abi (abi)
   {}
 
   std::string as_string () const;
 
-  AsyncConstStatus get_status () const { return const_status; }
+  Const get_const_status () const { return const_status; }
 
-  bool is_const () const { return const_status == AsyncConstStatus::CONST_FN; }
+  bool is_const () const { return const_status == Const::Yes; }
   bool is_unsafe () const { return unsafety == Unsafety::Unsafe; }
+  bool is_async () const { return async_status == Async::Yes; }
 
   ABI get_abi () const { return abi; }
 };

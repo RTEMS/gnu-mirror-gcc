@@ -17,6 +17,7 @@
 // <http://www.gnu.org/licenses/>.
 #include "rust-ast-collector.h"
 #include "rust-item.h"
+#include "rust-keyword-values.h"
 
 namespace Rust {
 namespace AST {
@@ -191,7 +192,7 @@ TokenCollector::visit (SimplePathSegment &segment)
     {
       push (Rust::Token::make (SUPER, segment.get_locus ()));
     }
-  else if (segment.is_lower_self ())
+  else if (segment.is_lower_self_seg ())
     {
       push (Rust::Token::make (SELF, segment.get_locus ()));
     }
@@ -316,23 +317,15 @@ TokenCollector::visit (FunctionQualifiers &qualifiers)
   //    `const`? `async`? `unsafe`? (`extern` Abi?)?
   //    unsafe? (extern Abi?)?
 
-  switch (qualifiers.get_const_status ())
-    {
-    case NONE:
-      break;
-    case CONST_FN:
-      push (Rust::Token::make (CONST, qualifiers.get_locus ()));
-      break;
-    case ASYNC_FN:
-      push (Rust::Token::make (ASYNC, qualifiers.get_locus ()));
-      break;
-    }
-
+  if (qualifiers.is_async ())
+    push (Rust::Token::make (ASYNC, qualifiers.get_locus ()));
+  if (qualifiers.is_const ())
+    push (Rust::Token::make (CONST, qualifiers.get_locus ()));
   if (qualifiers.is_unsafe ())
     push (Rust::Token::make (UNSAFE, qualifiers.get_locus ()));
   if (qualifiers.is_extern ())
     {
-      push (Rust::Token::make (EXTERN_TOK, qualifiers.get_locus ()));
+      push (Rust::Token::make (EXTERN_KW, qualifiers.get_locus ()));
       if (qualifiers.has_abi ())
 	{
 	  push (Rust::Token::make_string (UNDEF_LOCATION,
@@ -461,11 +454,11 @@ TokenCollector::visit (Lifetime &lifetime)
       break;
     case Lifetime::LifetimeType::STATIC:
       push (Rust::Token::make_lifetime (lifetime.get_locus (),
-					std::move ("static")));
+					Values::Keywords::STATIC_KW));
       break;
     case Lifetime::LifetimeType::WILDCARD:
-      push (
-	Rust::Token::make_lifetime (lifetime.get_locus (), std::move ("_")));
+      push (Rust::Token::make_lifetime (lifetime.get_locus (),
+					Values::Keywords::UNDERSCORE));
       break;
     }
 }
@@ -787,9 +780,9 @@ TokenCollector::visit (Literal &lit, location_t locus)
 				     lit.get_type_hint ()));
       break;
       case Literal::LitType::BOOL: {
-	if (value == "false")
+	if (value == Values::Keywords::FALSE_LITERAL)
 	  push (Rust::Token::make (FALSE_LITERAL, locus));
-	else if (value == "true")
+	else if (value == Values::Keywords::TRUE_LITERAL)
 	  push (Rust::Token::make (TRUE_LITERAL, locus));
 	else
 	  rust_unreachable (); // Not a boolean
@@ -1323,7 +1316,7 @@ TokenCollector::visit (RangeToInclExpr &expr)
 void
 TokenCollector::visit (ReturnExpr &expr)
 {
-  push (Rust::Token::make (RETURN_TOK, expr.get_locus ()));
+  push (Rust::Token::make (RETURN_KW, expr.get_locus ()));
   if (expr.has_returned_expr ())
     visit (expr.get_returned_expr ());
 }
@@ -1463,7 +1456,7 @@ TokenCollector::visit (MatchCase &match_case)
 void
 TokenCollector::visit (MatchExpr &expr)
 {
-  push (Rust::Token::make (MATCH_TOK, expr.get_locus ()));
+  push (Rust::Token::make (MATCH_KW, expr.get_locus ()));
   visit (expr.get_scrutinee_expr ());
   push (Rust::Token::make (LEFT_CURLY, UNDEF_LOCATION));
   newline ();
@@ -1484,7 +1477,7 @@ TokenCollector::visit (AwaitExpr &expr)
   visit (expr.get_awaited_expr ());
   push (Rust::Token::make (DOT, expr.get_locus ()));
   // TODO: Check status of await keyword (Context dependant ?)
-  push (Rust::Token::make_identifier (UNDEF_LOCATION, "await"));
+  push (Rust::Token::make_identifier (UNDEF_LOCATION, Values::Keywords::AWAIT));
 }
 
 void
@@ -1609,7 +1602,7 @@ void
 TokenCollector::visit (ExternCrate &crate)
 {
   visit_items_as_lines (crate.get_outer_attrs ());
-  push (Rust::Token::make (EXTERN_TOK, crate.get_locus ()));
+  push (Rust::Token::make (EXTERN_KW, crate.get_locus ()));
   push (Rust::Token::make (CRATE, UNDEF_LOCATION));
   auto ref = crate.get_referenced_crate ();
   push (Rust::Token::make_identifier (UNDEF_LOCATION, std::move (ref)));
@@ -1717,7 +1710,7 @@ TokenCollector::visit (Function &function)
   auto qualifiers = function.get_qualifiers ();
   visit (qualifiers);
 
-  push (Rust::Token::make (FN_TOK, function.get_locus ()));
+  push (Rust::Token::make (FN_KW, function.get_locus ()));
   auto name = function.get_function_name ().as_string ();
   push (Rust::Token::make_identifier (UNDEF_LOCATION, std::move (name)));
   if (function.has_generics ())
@@ -1737,11 +1730,10 @@ TokenCollector::visit (Function &function)
   if (function.has_where_clause ())
     visit (function.get_where_clause ());
 
-  auto &block = function.get_definition ();
-  if (!block)
-    push (Rust::Token::make (SEMICOLON, UNDEF_LOCATION));
+  if (function.has_body ())
+    visit (*function.get_definition ());
   else
-    visit (block);
+    push (Rust::Token::make (SEMICOLON, UNDEF_LOCATION));
   newline ();
 }
 
@@ -1778,7 +1770,7 @@ TokenCollector::visit (StructStruct &struct_item)
   if (struct_item.has_visibility ())
     visit (struct_item.get_visibility ());
   auto struct_name = struct_item.get_identifier ().as_string ();
-  push (Rust::Token::make (STRUCT_TOK, struct_item.get_locus ()));
+  push (Rust::Token::make (STRUCT_KW, struct_item.get_locus ()));
   push (Rust::Token::make_identifier (UNDEF_LOCATION, std::move (struct_name)));
 
   if (struct_item.has_generics ())
@@ -1800,7 +1792,7 @@ TokenCollector::visit (TupleStruct &tuple_struct)
 {
   visit_items_as_lines (tuple_struct.get_outer_attrs ());
   auto struct_name = tuple_struct.get_identifier ().as_string ();
-  push (Rust::Token::make (STRUCT_TOK, tuple_struct.get_locus ()));
+  push (Rust::Token::make (STRUCT_KW, tuple_struct.get_locus ()));
   push (Rust::Token::make_identifier (UNDEF_LOCATION, std::move (struct_name)));
   if (tuple_struct.has_generics ())
     visit (tuple_struct.get_generic_params ());
@@ -1856,7 +1848,7 @@ TokenCollector::visit (Enum &enumeration)
   visit_items_as_lines (enumeration.get_outer_attrs ());
   if (enumeration.has_visibility ())
     visit (enumeration.get_visibility ());
-  push (Rust::Token::make (ENUM_TOK, enumeration.get_locus ()));
+  push (Rust::Token::make (ENUM_KW, enumeration.get_locus ()));
   auto id = enumeration.get_identifier ().as_string ();
   push (
     Rust::Token::make_identifier (enumeration.get_locus (), std::move (id)));
@@ -1874,7 +1866,8 @@ TokenCollector::visit (Union &union_item)
 {
   visit_items_as_lines (union_item.get_outer_attrs ());
   auto id = union_item.get_identifier ().as_string ();
-  push (Rust::Token::make_identifier (union_item.get_locus (), "union"));
+  push (Rust::Token::make_identifier (union_item.get_locus (),
+				      Values::WeakKeywords::UNION));
   push (Rust::Token::make_identifier (UNDEF_LOCATION, std::move (id)));
 
   if (union_item.has_generics ())
@@ -1915,7 +1908,7 @@ void
 TokenCollector::visit (StaticItem &item)
 {
   visit_items_as_lines (item.get_outer_attrs ());
-  push (Rust::Token::make (STATIC_TOK, item.get_locus ()));
+  push (Rust::Token::make (STATIC_KW, item.get_locus ()));
   if (item.is_mutable ())
     push (Rust::Token::make (MUT, UNDEF_LOCATION));
 
@@ -1961,7 +1954,7 @@ TokenCollector::visit (TraitItemFunc &item)
   auto func = item.get_trait_function_decl ();
   auto id = func.get_identifier ().as_string ();
 
-  push (Rust::Token::make (FN_TOK, item.get_locus ()));
+  push (Rust::Token::make (FN_KW, item.get_locus ()));
   push (Rust::Token::make_identifier (UNDEF_LOCATION, std::move (id)));
   push (Rust::Token::make (LEFT_PAREN, UNDEF_LOCATION));
 
@@ -2000,7 +1993,7 @@ TokenCollector::visit (TraitItemMethod &item)
   auto method = item.get_trait_method_decl ();
   auto id = method.get_identifier ().as_string ();
 
-  push (Rust::Token::make (FN_TOK, item.get_locus ()));
+  push (Rust::Token::make (FN_KW, item.get_locus ()));
   push (Rust::Token::make_identifier (UNDEF_LOCATION, std::move (id)));
   push (Rust::Token::make (LEFT_PAREN, UNDEF_LOCATION));
 
@@ -2112,7 +2105,7 @@ TokenCollector::visit (ExternalStaticItem &item)
   visit_items_as_lines (item.get_outer_attrs ());
   if (item.has_visibility ())
     visit (item.get_visibility ());
-  push (Rust::Token::make (STATIC_TOK, item.get_locus ()));
+  push (Rust::Token::make (STATIC_KW, item.get_locus ()));
   if (item.is_mut ())
     push (Rust::Token::make (MUT, UNDEF_LOCATION));
   push (Rust::Token::make_identifier (UNDEF_LOCATION, std::move (id)));
@@ -2131,7 +2124,7 @@ TokenCollector::visit (ExternalFunctionItem &function)
 
   auto id = function.get_identifier ().as_string ();
 
-  push (Rust::Token::make (FN_TOK, function.get_locus ()));
+  push (Rust::Token::make (FN_KW, function.get_locus ()));
   push (Rust::Token::make_identifier (UNDEF_LOCATION, std::move (id)));
   if (function.has_generics ())
     visit (function.get_generic_params ());
@@ -2152,7 +2145,7 @@ void
 TokenCollector::visit (ExternBlock &block)
 {
   visit_items_as_lines (block.get_outer_attrs ());
-  push (Rust::Token::make (EXTERN_TOK, block.get_locus ()));
+  push (Rust::Token::make (EXTERN_KW, block.get_locus ()));
 
   if (block.has_abi ())
     {
@@ -2255,7 +2248,8 @@ TokenCollector::visit (MacroRulesDefinition &rules_def)
 
   auto rule_name = rules_def.get_rule_name ().as_string ();
 
-  push (Rust::Token::make_identifier (rules_def.get_locus (), "macro_rules"));
+  push (Rust::Token::make_identifier (rules_def.get_locus (),
+				      Values::WeakKeywords::MACRO_RULES));
   push (Rust::Token::make (EXCLAM, UNDEF_LOCATION));
 
   push (Rust::Token::make_identifier (UNDEF_LOCATION, std::move (rule_name)));
@@ -2821,7 +2815,7 @@ TokenCollector::visit (BareFunctionType &type)
 
   visit (type.get_function_qualifiers ());
 
-  push (Rust::Token::make (FN_TOK, type.get_locus ()));
+  push (Rust::Token::make (FN_KW, type.get_locus ()));
   push (Rust::Token::make (LEFT_PAREN, UNDEF_LOCATION));
 
   visit_items_joined_by_separator (type.get_function_params (), COMMA);

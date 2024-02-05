@@ -17,9 +17,12 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef RUST_PARSE_H
 #define RUST_PARSE_H
 
+#include "rust-item.h"
 #include "rust-lex.h"
 #include "rust-ast-full.h"
 #include "rust-diagnostics.h"
+
+#include "expected.h"
 
 namespace Rust {
 /* HACK: used to resolve the expression-or-statement problem at the end of a
@@ -92,6 +95,12 @@ struct ParseRestrictions
   bool allow_close_after_expr_stmt = false;
 };
 
+enum ParseSelfError
+{
+  SELF_PTR,
+  PARSING,
+  NOT_SELF,
+};
 // Parser implementation for gccrs.
 // TODO: if updated to C++20, ManagedTokenSource would be useful as a concept
 template <typename ManagedTokenSource> class Parser
@@ -161,8 +170,8 @@ public:
   std::unique_ptr<AST::Type> parse_type (bool save_errors = true);
   std::unique_ptr<AST::ExternalItem> parse_external_item ();
   std::unique_ptr<AST::TraitItem> parse_trait_item ();
-  std::unique_ptr<AST::InherentImplItem> parse_inherent_impl_item ();
-  std::unique_ptr<AST::TraitImplItem> parse_trait_impl_item ();
+  std::unique_ptr<AST::AssociatedItem> parse_inherent_impl_item ();
+  std::unique_ptr<AST::AssociatedItem> parse_trait_impl_item ();
   AST::PathInExpression parse_path_in_expression ();
   std::vector<std::unique_ptr<AST::LifetimeParam>> parse_lifetime_params ();
   AST::Visibility parse_visibility ();
@@ -279,11 +288,13 @@ private:
   std::unique_ptr<AST::Param> parse_function_param ();
   std::unique_ptr<AST::Type> parse_function_return_type ();
   AST::WhereClause parse_where_clause ();
-  std::unique_ptr<AST::WhereClauseItem> parse_where_clause_item ();
+  std::unique_ptr<AST::WhereClauseItem> parse_where_clause_item (
+    const std::vector<AST::LifetimeParam> &global_for_lifetimes);
   std::unique_ptr<AST::LifetimeWhereClauseItem>
   parse_lifetime_where_clause_item ();
   std::unique_ptr<AST::TypeBoundWhereClauseItem>
-  parse_type_bound_where_clause_item ();
+  parse_type_bound_where_clause_item (
+    const std::vector<AST::LifetimeParam> &global_for_lifetimes);
   std::vector<AST::LifetimeParam> parse_for_lifetimes ();
   template <typename EndTokenPred>
   std::vector<std::unique_ptr<AST::TypeParamBound>>
@@ -294,7 +305,7 @@ private:
   std::vector<AST::Lifetime> parse_lifetime_bounds ();
   template <typename EndTokenPred>
   std::vector<AST::Lifetime> parse_lifetime_bounds (EndTokenPred is_end_token);
-  AST::Lifetime parse_lifetime ();
+  AST::Lifetime parse_lifetime (bool allow_elided);
   AST::Lifetime lifetime_from_token (const_TokenPtr tok);
   std::unique_ptr<AST::ExternalTypeItem>
   parse_external_type_item (AST::Visibility vis, AST::AttrVec outer_attrs);
@@ -331,21 +342,25 @@ private:
   std::unique_ptr<AST::Trait> parse_trait (AST::Visibility vis,
 					   AST::AttrVec outer_attrs);
   std::unique_ptr<AST::TraitItemType>
-  parse_trait_type (AST::AttrVec outer_attrs);
+  parse_trait_type (AST::AttrVec outer_attrs, AST::Visibility);
   std::unique_ptr<AST::TraitItemConst>
   parse_trait_const (AST::AttrVec outer_attrs);
-  std::unique_ptr<AST::Param> parse_self_param ();
+
+  tl::expected<std::unique_ptr<AST::Param>, ParseSelfError> parse_self_param ();
+
   std::unique_ptr<AST::Impl> parse_impl (AST::Visibility vis,
 					 AST::AttrVec outer_attrs);
-  std::unique_ptr<AST::InherentImplItem>
+  std::unique_ptr<AST::AssociatedItem>
   parse_inherent_impl_function_or_method (AST::Visibility vis,
 					  AST::AttrVec outer_attrs);
-  std::unique_ptr<AST::TraitImplItem>
+  std::unique_ptr<AST::AssociatedItem>
   parse_trait_impl_function_or_method (AST::Visibility vis,
 				       AST::AttrVec outer_attrs);
   std::unique_ptr<AST::ExternBlock>
   parse_extern_block (AST::Visibility vis, AST::AttrVec outer_attrs);
   std::unique_ptr<AST::Function> parse_method ();
+  std::unique_ptr<AST::Function> parse_async_item (AST::Visibility vis,
+						   AST::AttrVec outer_attrs);
 
   // Expression-related (Pratt parsed)
   std::unique_ptr<AST::Expr>

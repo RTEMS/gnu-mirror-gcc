@@ -50,15 +50,22 @@ public:
   void visit (AST::Module &) override;
 
   void visit (AST::MacroInvocation &) override;
-  void visit (AST::UseDeclaration &) override;
-  void visit (AST::UseTreeRebind &) override;
-  void visit (AST::UseTreeList &) override;
-  void visit (AST::UseTreeGlob &) override;
+
   void visit (AST::Function &) override;
   void visit (AST::StructStruct &) override;
 
 private:
   void visit_attributes (std::vector<AST::Attribute> &attrs);
+
+  /**
+   * Insert a resolved macro invocation into the mappings once, meaning that we
+   * can call this function each time the early name resolution pass is underway
+   * and it will not trigger assertions for already resolved invocations.
+   */
+  // TODO: Rename
+  void insert_once (AST::MacroInvocation &invocation, NodeId resolved);
+  // TODO: Rename
+  void insert_once (AST::MacroRulesDefinition &definition);
 
   /**
    * Macros can either be resolved through textual scoping or regular path

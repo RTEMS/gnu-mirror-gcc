@@ -21,6 +21,10 @@
 namespace Rust {
 namespace Resolver2_0 {
 
+NameResolutionContext::NameResolutionContext ()
+  : mappings (*Analysis::Mappings::get ())
+{}
+
 tl::expected<NodeId, DuplicateNameError>
 NameResolutionContext::insert (Identifier name, NodeId id, Namespace ns)
 {
@@ -37,6 +41,15 @@ NameResolutionContext::insert (Identifier name, NodeId id, Namespace ns)
       // return labels.insert (name, id);
       rust_unreachable ();
     }
+}
+
+void
+NameResolutionContext::map_usage (NodeId usage, NodeId definition)
+{
+  auto inserted = resolved_nodes.emplace (usage, definition).second;
+
+  // is that valid?
+  rust_assert (inserted);
 }
 
 void

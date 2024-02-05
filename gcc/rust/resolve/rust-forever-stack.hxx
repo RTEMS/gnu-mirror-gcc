@@ -66,8 +66,8 @@ ForeverStack<N>::push_inner (Rib rib, Link link)
   // the iterator and a boolean. If the value already exists, the iterator
   // points to it. Otherwise, it points to the newly emplaced value, so we can
   // just update our cursor().
-  auto emplace
-    = cursor ().children.emplace (std::make_pair (link, Node (rib, cursor ())));
+  auto emplace = cursor ().children.emplace (
+    std::make_pair (link, Node (rib, link.id, cursor ())));
 
   auto it = emplace.first;
   auto existed = !emplace.second;
@@ -211,13 +211,6 @@ template <Namespace N>
 tl::optional<NodeId>
 ForeverStack<N>::get (const Identifier &name)
 {
-  return tl::nullopt;
-}
-
-template <>
-inline tl::optional<NodeId>
-ForeverStack<Namespace::Macros>::get (const Identifier &name)
-{
   tl::optional<NodeId> resolved_node = tl::nullopt;
 
   // TODO: Can we improve the API? have `reverse_iter` return an optional?
@@ -226,15 +219,42 @@ ForeverStack<Namespace::Macros>::get (const Identifier &name)
 
     return candidate.map_or (
       [&resolved_node] (NodeId found) {
-	// macro resolving does not need to care about various ribs - they are
-	// available from all contexts if defined in the current scope, or an
-	// outermore one. so if we do have a candidate, we can return it
+	// for most namespaces, we do not need to care about various ribs - they
+	// are available from all contexts if defined in the current scope, or
+	// an outermore one. so if we do have a candidate, we can return it
 	// directly and stop iterating
 	resolved_node = found;
 
 	return KeepGoing::No;
       },
       // if there was no candidate, we keep iterating
+      KeepGoing::Yes);
+  });
+
+  return resolved_node;
+}
+
+template <>
+tl::optional<NodeId> inline ForeverStack<Namespace::Labels>::get (
+  const Identifier &name)
+{
+  tl::optional<NodeId> resolved_node = tl::nullopt;
+
+  reverse_iter ([&resolved_node, &name] (Node &current) {
+    // looking up for labels cannot go through function ribs
+    // TODO: What other ribs?
+    if (current.rib.kind == Rib::Kind::Function)
+      return KeepGoing::No;
+
+    auto candidate = current.rib.get (name.as_string ());
+
+    // FIXME: Factor this in a function with the generic `get`
+    return candidate.map_or (
+      [&resolved_node] (NodeId found) {
+	resolved_node = found;
+
+	return KeepGoing::No;
+      },
       KeepGoing::Yes);
   });
 
@@ -278,9 +298,9 @@ ForeverStack<N>::find_closest_module (Node &starting_point)
 
 /* If a the given condition is met, emit an error about misused leading path
  * segments */
+template <typename S>
 static inline bool
-check_leading_kw_at_start (const AST::SimplePathSegment &segment,
-			   bool condition)
+check_leading_kw_at_start (const S &segment, bool condition)
 {
   if (condition)
     rust_error_at (
@@ -297,9 +317,10 @@ check_leading_kw_at_start (const AST::SimplePathSegment &segment,
 // `super` segment, we go back to the cursor's parent until we reach the
 // correct one or the root.
 template <Namespace N>
-tl::optional<std::vector<AST::SimplePathSegment>::const_iterator>
-ForeverStack<N>::find_starting_point (
-  const std::vector<AST::SimplePathSegment> &segments, Node &starting_point)
+template <typename S>
+tl::optional<typename std::vector<S>::const_iterator>
+ForeverStack<N>::find_starting_point (const std::vector<S> &segments,
+				      Node &starting_point)
 {
   auto iterator = segments.begin ();
 
@@ -312,8 +333,9 @@ ForeverStack<N>::find_starting_point (
 
   for (; !is_last (iterator, segments); iterator++)
     {
-      auto seg = *iterator;
-      auto is_self_or_crate = seg.is_crate_path_seg () || seg.is_lower_self ();
+      auto &seg = *iterator;
+      auto is_self_or_crate
+	= seg.is_crate_path_seg () || seg.is_lower_self_seg ();
 
       // if we're after the first path segment and meet `self` or `crate`, it's
       // an error - we should only be seeing `super` keywords at this point
@@ -327,7 +349,7 @@ ForeverStack<N>::find_starting_point (
 	  iterator++;
 	  break;
 	}
-      if (seg.is_lower_self ())
+      if (seg.is_lower_self_seg ())
 	{
 	  // do nothing and exit
 	  iterator++;
@@ -356,10 +378,11 @@ ForeverStack<N>::find_starting_point (
 }
 
 template <Namespace N>
+template <typename S>
 tl::optional<typename ForeverStack<N>::Node &>
 ForeverStack<N>::resolve_segments (
-  Node &starting_point, const std::vector<AST::SimplePathSegment> &segments,
-  std::vector<AST::SimplePathSegment>::const_iterator iterator)
+  Node &starting_point, const std::vector<S> &segments,
+  typename std::vector<S>::const_iterator iterator)
 {
   auto *current_node = &starting_point;
   for (; !is_last (iterator, segments); iterator++)
@@ -371,7 +394,7 @@ ForeverStack<N>::resolve_segments (
       // check that we don't encounter *any* leading keywords afterwards
       if (check_leading_kw_at_start (seg, seg.is_crate_path_seg ()
 					    || seg.is_super_path_seg ()
-					    || seg.is_lower_self ()))
+					    || seg.is_lower_self_seg ()))
 	return tl::nullopt;
 
       tl::optional<typename ForeverStack<N>::Node &> child = tl::nullopt;
@@ -406,20 +429,128 @@ ForeverStack<N>::resolve_segments (
 }
 
 template <Namespace N>
+template <typename S>
 tl::optional<NodeId>
-ForeverStack<N>::resolve_path (const AST::SimplePath &path)
+ForeverStack<N>::resolve_path (const std::vector<S> &segments)
 {
+  // TODO: What to do if segments.empty() ?
+
+  // if there's only one segment, we just use `get`
+  if (segments.size () == 1)
+    return get (segments.back ().as_string ());
+
   auto starting_point = cursor ();
-  auto &segments = path.get_segments ();
 
   return find_starting_point (segments, starting_point)
     .and_then ([this, &segments, &starting_point] (
-		 std::vector<AST::SimplePathSegment>::const_iterator iterator) {
+		 typename std::vector<S>::const_iterator iterator) {
       return resolve_segments (starting_point, segments, iterator);
     })
-    .and_then ([&path] (Node final_node) {
-      return final_node.rib.get (path.get_final_segment ().as_string ());
+    .and_then ([&segments] (Node final_node) {
+      return final_node.rib.get (segments.back ().as_string ());
     });
+}
+
+template <Namespace N>
+tl::optional<std::pair<typename ForeverStack<N>::Node &, std::string>>
+ForeverStack<N>::dfs (ForeverStack<N>::Node &starting_point, NodeId to_find)
+{
+  auto &values = starting_point.rib.get_values ();
+
+  for (auto &kv : values)
+    if (kv.second == to_find)
+      return {{starting_point, kv.first}};
+
+  for (auto &child : starting_point.children)
+    {
+      auto candidate = dfs (child.second, to_find);
+
+      if (candidate.has_value ())
+	return candidate;
+    }
+
+  return tl::nullopt;
+}
+
+template <Namespace N>
+tl::optional<Resolver::CanonicalPath>
+ForeverStack<N>::to_canonical_path (NodeId id)
+{
+  // find the id in the current forever stack, starting from the root,
+  // performing either a BFS or DFS once the Node containing the ID is found, go
+  // back up to the root (parent().parent().parent()...) accumulate link
+  // segments reverse them that's your canonical path
+
+  return dfs (root, id).map ([this, id] (std::pair<Node &, std::string> tuple) {
+    auto containing_node = tuple.first;
+    auto name = tuple.second;
+
+    auto segments = std::vector<Resolver::CanonicalPath> ();
+
+    reverse_iter (containing_node, [&segments] (Node &current) {
+      if (current.is_root ())
+	return KeepGoing::No;
+
+      auto children = current.parent.value ().children;
+      const Link *outer_link = nullptr;
+
+      for (auto &kv : children)
+	{
+	  auto &link = kv.first;
+	  auto &child = kv.second;
+
+	  if (link.id == child.id)
+	    {
+	      outer_link = &link;
+	      break;
+	    }
+	}
+
+      rust_assert (outer_link);
+
+      outer_link->path.map ([&segments, outer_link] (Identifier path) {
+	segments.emplace (segments.begin (),
+			  Resolver::CanonicalPath::new_seg (outer_link->id,
+							    path.as_string ()));
+      });
+
+      return KeepGoing::Yes;
+    });
+
+    auto path = Resolver::CanonicalPath::create_empty ();
+    for (const auto &segment : segments)
+      path = path.append (segment);
+
+    // Finally, append the name
+    path = path.append (Resolver::CanonicalPath::new_seg (id, name));
+
+    return path;
+  });
+}
+
+template <Namespace N>
+tl::optional<Rib &>
+ForeverStack<N>::dfs_rib (ForeverStack<N>::Node &starting_point, NodeId to_find)
+{
+  if (starting_point.id == to_find)
+    return starting_point.rib;
+
+  for (auto &child : starting_point.children)
+    {
+      auto candidate = dfs_rib (child.second, to_find);
+
+      if (candidate.has_value ())
+	return candidate;
+    }
+
+  return tl::nullopt;
+}
+
+template <Namespace N>
+tl::optional<Rib &>
+ForeverStack<N>::to_rib (NodeId rib_id)
+{
+  return dfs_rib (root, rib_id);
 }
 
 template <Namespace N>
