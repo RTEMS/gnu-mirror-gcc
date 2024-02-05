@@ -17,7 +17,9 @@
 // <http://www.gnu.org/licenses/>.
 
 #include "rust-ast-validation.h"
+#include "rust-common.h"
 #include "rust-diagnostics.h"
+#include "rust-item.h"
 #include "rust-keyword-values.h"
 
 namespace Rust {
@@ -82,10 +84,33 @@ ASTValidation::visit (AST::ExternalFunctionItem &item)
 }
 
 void
+ASTValidation::visit (AST::Union &item)
+{
+  if (item.get_variants ().empty ())
+    rust_error_at (item.get_locus (), "unions cannot have zero fields");
+
+  AST::ContextualASTVisitor::visit (item);
+}
+
+void
 ASTValidation::visit (AST::Function &function)
 {
   std::set<Context> valid_context
     = {Context::INHERENT_IMPL, Context::TRAIT_IMPL};
+
+  const auto &qualifiers = function.get_qualifiers ();
+  if (qualifiers.is_async () && qualifiers.is_const ())
+    rust_error_at (function.get_locus (),
+		   "functions cannot be both %<const%> and %<async%>");
+
+  if (qualifiers.is_const () && context.back () == Context::TRAIT_IMPL)
+    rust_error_at (function.get_locus (), ErrorCode::E0379,
+		   "functions in traits cannot be declared const");
+
+  // may change soon
+  if (qualifiers.is_async () && context.back () == Context::TRAIT_IMPL)
+    rust_error_at (function.get_locus (), ErrorCode::E0706,
+		   "functions in traits cannot be declared %<async%>");
 
   if (valid_context.find (context.back ()) == valid_context.end ()
       && function.has_self_param ())
@@ -93,7 +118,73 @@ ASTValidation::visit (AST::Function &function)
       function.get_self_param ()->get_locus (),
       "%<self%> parameter is only allowed in associated functions");
 
+  if (!function.has_body ())
+    {
+      if (context.back () == Context::INHERENT_IMPL
+	  || context.back () == Context::TRAIT_IMPL)
+	rust_error_at (function.get_locus (),
+		       "associated function in %<impl%> without body");
+      else if (context.back () != Context::TRAIT)
+	rust_error_at (function.get_locus (), "free function without a body");
+    }
+
+  if (function.is_variadic ())
+    rust_error_at (
+      function.get_function_params ().back ()->get_locus (),
+      "only foreign or %<unsafe extern \"C\"%> functions may be C-variadic");
+
   AST::ContextualASTVisitor::visit (function);
+}
+
+void
+ASTValidation::visit (AST::TraitFunctionDecl &decl)
+{
+  const auto &qualifiers = decl.get_qualifiers ();
+
+  if (context.back () == Context::TRAIT)
+    {
+      // may change soon
+      if (qualifiers.is_async ())
+	rust_error_at (decl.get_identifier ().get_locus (), ErrorCode::E0706,
+		       "functions in traits cannot be declared %<async%>");
+      if (qualifiers.is_const ())
+	rust_error_at (decl.get_identifier ().get_locus (), ErrorCode::E0379,
+		       "functions in traits cannot be declared %<const%>");
+    }
+}
+
+void
+ASTValidation::visit (AST::Trait &trait)
+{
+  if (trait.is_auto ())
+    {
+      if (trait.has_generics ())
+	rust_error_at (trait.get_generic_params ()[0]->get_locus (),
+		       ErrorCode::E0567,
+		       "auto traits cannot have generic parameters");
+      if (trait.has_type_param_bounds ())
+	rust_error_at (trait.get_type_param_bounds ()[0]->get_locus (),
+		       ErrorCode::E0568,
+		       "auto traits cannot have super traits");
+      if (trait.has_trait_items ())
+	{
+	  rust_error_at (trait.get_identifier ().get_locus (), ErrorCode::E0380,
+			 "auto traits cannot have methods or associated items");
+	  for (const auto &item : trait.get_trait_items ())
+	    Error::Hint (item->get_locus (), "remove this item").emit ();
+	}
+    }
+
+  AST::ContextualASTVisitor::visit (trait);
+}
+
+void
+ASTValidation::visit (AST::Module &module)
+{
+  if (module.get_unsafety () == Unsafety::Unsafe)
+    rust_error_at (module.get_locus (), "module cannot be declared unsafe");
+
+  AST::ContextualASTVisitor::visit (module);
 }
 
 } // namespace Rust

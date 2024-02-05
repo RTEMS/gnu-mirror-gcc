@@ -18,6 +18,7 @@ along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
 #include "rust-ast.h"
+#include "optional.h"
 #include "rust-system.h"
 #include "rust-ast-full.h"
 #include "rust-diagnostics.h"
@@ -59,16 +60,8 @@ SingleASTNode::SingleASTNode (SingleASTNode const &other)
       external_item = other.external_item->clone_external_item ();
       break;
 
-    case TRAIT:
-      trait_item = other.trait_item->clone_trait_item ();
-      break;
-
-    case IMPL:
-      impl_item = other.impl_item->clone_inherent_impl_item ();
-      break;
-
-    case TRAIT_IMPL:
-      trait_impl_item = other.trait_impl_item->clone_trait_impl_item ();
+    case ASSOC_ITEM:
+      assoc_item = other.assoc_item->clone_associated_item ();
       break;
 
     case TYPE:
@@ -99,16 +92,8 @@ SingleASTNode::operator= (SingleASTNode const &other)
       external_item = other.external_item->clone_external_item ();
       break;
 
-    case TRAIT:
-      trait_item = other.trait_item->clone_trait_item ();
-      break;
-
-    case IMPL:
-      impl_item = other.impl_item->clone_inherent_impl_item ();
-      break;
-
-    case TRAIT_IMPL:
-      trait_impl_item = other.trait_impl_item->clone_trait_impl_item ();
+    case ASSOC_ITEM:
+      assoc_item = other.assoc_item->clone_associated_item ();
       break;
 
     case TYPE:
@@ -139,16 +124,8 @@ SingleASTNode::accept_vis (ASTVisitor &vis)
       external_item->accept_vis (vis);
       break;
 
-    case TRAIT:
-      trait_item->accept_vis (vis);
-      break;
-
-    case IMPL:
-      impl_item->accept_vis (vis);
-      break;
-
-    case TRAIT_IMPL:
-      trait_impl_item->accept_vis (vis);
+    case ASSOC_ITEM:
+      assoc_item->accept_vis (vis);
       break;
 
     case TYPE:
@@ -170,12 +147,8 @@ SingleASTNode::is_error ()
       return stmt == nullptr;
     case EXTERN:
       return external_item == nullptr;
-    case TRAIT:
-      return trait_item == nullptr;
-    case IMPL:
-      return impl_item == nullptr;
-    case TRAIT_IMPL:
-      return trait_impl_item == nullptr;
+    case ASSOC_ITEM:
+      return assoc_item == nullptr;
     case TYPE:
       return type == nullptr;
     }
@@ -197,12 +170,8 @@ SingleASTNode::as_string () const
       return "Stmt: " + stmt->as_string ();
     case EXTERN:
       return "External Item: " + external_item->as_string ();
-    case TRAIT:
-      return "Trait Item: " + trait_item->as_string ();
-    case IMPL:
-      return "Impl Item: " + impl_item->as_string ();
-    case TRAIT_IMPL:
-      return "Trait Impl Item: " + trait_impl_item->as_string ();
+    case ASSOC_ITEM:
+      return "Associated Item: " + assoc_item->as_string ();
     case TYPE:
       return "Type: " + type->as_string ();
     }
@@ -1100,8 +1069,10 @@ Function::Function (Function const &other)
     return_type = other.return_type->clone_type ();
 
   // guard to prevent null dereference (only required if error state)
-  if (other.function_body != nullptr)
-    function_body = other.function_body->clone_block_expr ();
+  if (other.has_body ())
+    function_body = other.function_body.value ()->clone_block_expr ();
+  else
+    function_body = tl::nullopt;
 
   generic_params.reserve (other.generic_params.size ());
   for (const auto &e : other.generic_params)
@@ -1131,10 +1102,10 @@ Function::operator= (Function const &other)
     return_type = nullptr;
 
   // guard to prevent null dereference (only required if error state)
-  if (other.function_body != nullptr)
-    function_body = other.function_body->clone_block_expr ();
+  if (other.has_body ())
+    function_body = other.function_body.value ()->clone_block_expr ();
   else
-    function_body = nullptr;
+    function_body = tl::nullopt;
 
   generic_params.reserve (other.generic_params.size ());
   for (const auto &e : other.generic_params)
@@ -1221,15 +1192,8 @@ Function::as_string () const
 
   str += "\n";
 
-  // DEBUG: null pointer check
-  if (function_body == nullptr)
-    {
-      rust_debug (
-	"something really terrible has gone wrong - null pointer function "
-	"body in function.");
-      return "NULL_POINTER_MARK";
-    }
-  str += function_body->as_string () + "\n";
+  if (has_body ())
+    str += function_body.value ()->as_string () + "\n";
 
   return str;
 }
@@ -2333,22 +2297,11 @@ FunctionQualifiers::as_string () const
 {
   std::string str;
 
-  switch (const_status)
-    {
-    case NONE:
-      // do nothing
-      break;
-    case CONST_FN:
-      str += "const ";
-      break;
-    case ASYNC_FN:
-      str += "async ";
-      break;
-    default:
-      return "ERROR_MARK_STRING: async-const status failure";
-    }
-
-  if (has_unsafe)
+  if (is_async ())
+    str += "async ";
+  if (is_const ())
+    str += "const ";
+  if (is_unsafe ())
     str += "unsafe ";
 
   if (has_extern)

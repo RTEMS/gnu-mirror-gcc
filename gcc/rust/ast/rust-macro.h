@@ -598,8 +598,6 @@ class MacroInvocation : public TypeNoBounds,
 			public Pattern,
 			public Item,
 			public TraitItem,
-			public TraitImplItem,
-			public InherentImplItem,
 			public ExternalItem,
 			public ExprWithoutBlock
 {

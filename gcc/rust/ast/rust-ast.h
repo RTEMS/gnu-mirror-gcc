@@ -25,6 +25,7 @@
 #include "rust-token.h"
 #include "rust-location.h"
 #include "rust-diagnostics.h"
+#include "rust-keyword-values.h"
 
 namespace Rust {
 // TODO: remove typedefs and make actual types for these
@@ -393,14 +394,20 @@ public:
   const std::string &get_segment_name () const { return segment_name; }
   bool is_super_path_seg () const
   {
-    return as_string ().compare ("super") == 0;
+    return as_string ().compare (Values::Keywords::SUPER) == 0;
   }
   bool is_crate_path_seg () const
   {
-    return as_string ().compare ("crate") == 0;
+    return as_string ().compare (Values::Keywords::CRATE) == 0;
   }
-  bool is_lower_self () const { return as_string ().compare ("self") == 0; }
-  bool is_big_self () const { return as_string ().compare ("Self") == 0; }
+  bool is_lower_self_seg () const
+  {
+    return as_string ().compare (Values::Keywords::SELF) == 0;
+  }
+  bool is_big_self () const
+  {
+    return as_string ().compare (Values::Keywords::SELF_ALIAS) == 0;
+  }
 };
 
 // A simple path without generic or type arguments
@@ -489,6 +496,129 @@ operator!= (const SimplePath &lhs, const std::string &rhs)
 
 // forward decl for Attribute
 class AttrInput;
+
+// Visibility of item - if the item has it, then it is some form of public
+struct Visibility
+{
+public:
+  enum VisType
+  {
+    PRIV,
+    PUB,
+    PUB_CRATE,
+    PUB_SELF,
+    PUB_SUPER,
+    PUB_IN_PATH
+  };
+
+private:
+  VisType vis_type;
+  // Only assigned if vis_type is IN_PATH
+  SimplePath in_path;
+  location_t locus;
+
+  // should this store location info?
+
+public:
+  // Creates a Visibility - TODO make constructor protected or private?
+  Visibility (VisType vis_type, SimplePath in_path, location_t locus)
+    : vis_type (vis_type), in_path (std::move (in_path)), locus (locus)
+  {}
+
+  VisType get_vis_type () const { return vis_type; }
+
+  // Returns whether visibility is in an error state.
+  bool is_error () const
+  {
+    return vis_type == PUB_IN_PATH && in_path.is_empty ();
+  }
+
+  // Returns whether a visibility has a path
+  bool has_path () const { return !is_error () && vis_type >= PUB_CRATE; }
+
+  // Returns whether visibility is public or not.
+  bool is_public () const { return vis_type != PRIV && !is_error (); }
+
+  location_t get_locus () const { return locus; }
+
+  // empty?
+  // Creates an error visibility.
+  static Visibility create_error ()
+  {
+    return Visibility (PUB_IN_PATH, SimplePath::create_empty (),
+		       UNDEF_LOCATION);
+  }
+
+  // Unique pointer custom clone function
+  /*std::unique_ptr<Visibility> clone_visibility() const {
+      return std::unique_ptr<Visibility>(clone_visibility_impl());
+  }*/
+
+  /* TODO: think of a way to only allow valid Visibility states - polymorphism
+   * is one idea but may be too resource-intensive. */
+
+  // Creates a public visibility with no further features/arguments.
+  // empty?
+  static Visibility create_public (location_t pub_vis_location)
+  {
+    return Visibility (PUB, SimplePath::create_empty (), pub_vis_location);
+  }
+
+  // Creates a public visibility with crate-relative paths
+  static Visibility create_crate (location_t crate_tok_location,
+				  location_t crate_vis_location)
+  {
+    return Visibility (PUB_CRATE,
+		       SimplePath::from_str (Values::Keywords::CRATE,
+					     crate_tok_location),
+		       crate_vis_location);
+  }
+
+  // Creates a public visibility with self-relative paths
+  static Visibility create_self (location_t self_tok_location,
+				 location_t self_vis_location)
+  {
+    return Visibility (PUB_SELF,
+		       SimplePath::from_str (Values::Keywords::SELF,
+					     self_tok_location),
+		       self_vis_location);
+  }
+
+  // Creates a public visibility with parent module-relative paths
+  static Visibility create_super (location_t super_tok_location,
+				  location_t super_vis_location)
+  {
+    return Visibility (PUB_SUPER,
+		       SimplePath::from_str (Values::Keywords::SUPER,
+					     super_tok_location),
+		       super_vis_location);
+  }
+
+  // Creates a private visibility
+  static Visibility create_private ()
+  {
+    return Visibility (PRIV, SimplePath::create_empty (), UNDEF_LOCATION);
+  }
+
+  // Creates a public visibility with a given path or whatever.
+  static Visibility create_in_path (SimplePath in_path,
+				    location_t in_path_vis_location)
+  {
+    return Visibility (PUB_IN_PATH, std::move (in_path), in_path_vis_location);
+  }
+
+  std::string as_string () const;
+  const SimplePath &get_path () const { return in_path; }
+  SimplePath &get_path () { return in_path; }
+
+protected:
+  // Clone function implementation - not currently virtual but may be if
+  // polymorphism used
+  /*virtual*/ Visibility *clone_visibility_impl () const
+  {
+    return new Visibility (*this);
+  }
+};
 
 // aka Attr
 // Attribute AST representation
@@ -1042,125 +1172,6 @@ protected:
   Item *clone_stmt_impl () const final override { return clone_item_impl (); }
 };
 
-// Visibility of item - if the item has it, then it is some form of public
-struct Visibility
-{
-public:
-  enum VisType
-  {
-    PRIV,
-    PUB,
-    PUB_CRATE,
-    PUB_SELF,
-    PUB_SUPER,
-    PUB_IN_PATH
-  };
-
-private:
-  VisType vis_type;
-  // Only assigned if vis_type is IN_PATH
-  SimplePath in_path;
-  location_t locus;
-
-  // should this store location info?
-
-public:
-  // Creates a Visibility - TODO make constructor protected or private?
-  Visibility (VisType vis_type, SimplePath in_path, location_t locus)
-    : vis_type (vis_type), in_path (std::move (in_path)), locus (locus)
-  {}
-
-  VisType get_vis_type () const { return vis_type; }
-
-  // Returns whether visibility is in an error state.
-  bool is_error () const
-  {
-    return vis_type == PUB_IN_PATH && in_path.is_empty ();
-  }
-
-  // Returns whether a visibility has a path
-  bool has_path () const { return !is_error () && vis_type >= PUB_CRATE; }
-
-  // Returns whether visibility is public or not.
-  bool is_public () const { return vis_type != PRIV && !is_error (); }
-
-  location_t get_locus () const { return locus; }
-
-  // empty?
-  // Creates an error visibility.
-  static Visibility create_error ()
-  {
-    return Visibility (PUB_IN_PATH, SimplePath::create_empty (),
-		       UNDEF_LOCATION);
-  }
-
-  // Unique pointer custom clone function
-  /*std::unique_ptr<Visibility> clone_visibility() const {
-      return std::unique_ptr<Visibility>(clone_visibility_impl());
-  }*/
-
-  /* TODO: think of a way to only allow valid Visibility states - polymorphism
-   * is one idea but may be too resource-intensive. */
-
-  // Creates a public visibility with no further features/arguments.
-  // empty?
-  static Visibility create_public (location_t pub_vis_location)
-  {
-    return Visibility (PUB, SimplePath::create_empty (), pub_vis_location);
-  }
-
-  // Creates a public visibility with crate-relative paths
-  static Visibility create_crate (location_t crate_tok_location,
-				  location_t crate_vis_location)
-  {
-    return Visibility (PUB_CRATE,
-		       SimplePath::from_str ("crate", crate_tok_location),
-		       crate_vis_location);
-  }
-
-  // Creates a public visibility with self-relative paths
-  static Visibility create_self (location_t self_tok_location,
-				 location_t self_vis_location)
-  {
-    return Visibility (PUB_SELF,
-		       SimplePath::from_str ("self", self_tok_location),
-		       self_vis_location);
-  }
-
-  // Creates a public visibility with parent module-relative paths
-  static Visibility create_super (location_t super_tok_location,
-				  location_t super_vis_location)
-  {
-    return Visibility (PUB_SUPER,
-		       SimplePath::from_str ("super", super_tok_location),
-		       super_vis_location);
-  }
-
-  // Creates a private visibility
-  static Visibility create_private ()
-  {
-    return Visibility (PRIV, SimplePath::create_empty (), UNDEF_LOCATION);
-  }
-
-  // Creates a public visibility with a given path or whatever.
-  static Visibility create_in_path (SimplePath in_path,
-				    location_t in_path_vis_location)
-  {
-    return Visibility (PUB_IN_PATH, std::move (in_path), in_path_vis_location);
-  }
-
-  std::string as_string () const;
-  const SimplePath &get_path () const { return in_path; }
-  SimplePath &get_path () { return in_path; }
-
-protected:
-  // Clone function implementation - not currently virtual but may be if
-  // polymorphism used
-  /*virtual*/ Visibility *clone_visibility_impl () const
-  {
-    return new Visibility (*this);
-  }
-};
 // Item that supports visibility - abstract base class
 class VisItem : public Item
 {
@@ -1501,6 +1512,8 @@ public:
   // Creates an "error" lifetime.
   static Lifetime error () { return Lifetime (NAMED, ""); }
 
+  static Lifetime elided () { return Lifetime (WILDCARD, ""); }
+
   // Returns true if the lifetime is in an error state.
   bool is_error () const
   {
@@ -1645,17 +1658,24 @@ public:
 };
 
 // Item used in trait declarations - abstract base class
-class TraitItem : virtual public AssociatedItem
+class TraitItem : public AssociatedItem
 {
 protected:
   TraitItem (location_t locus)
-    : node_id (Analysis::Mappings::get ()->get_next_node_id ()), locus (locus)
+    : node_id (Analysis::Mappings::get ()->get_next_node_id ()),
+      vis (Visibility::create_private ()), locus (locus)
+  {}
+
+  TraitItem (Visibility vis, location_t locus)
+    : node_id (Analysis::Mappings::get ()->get_next_node_id ()), vis (vis),
+      locus (locus)
   {}
 
   // Clone function implementation as pure virtual method
   virtual TraitItem *clone_associated_item_impl () const override = 0;
 
   NodeId node_id;
+  Visibility vis;
   location_t locus;
 
 public:
@@ -1667,36 +1687,6 @@ public:
 
   NodeId get_node_id () const { return node_id; }
   location_t get_locus () const override { return locus; }
-};
-
-/* Abstract base class for items used within an inherent impl block (the impl
- * name {} one) */
-class InherentImplItem : virtual public AssociatedItem
-{
-protected:
-  // Clone function implementation as pure virtual method
-  virtual InherentImplItem *clone_associated_item_impl () const override = 0;
-
-public:
-  // Unique pointer custom clone function
-  std::unique_ptr<InherentImplItem> clone_inherent_impl_item () const
-  {
-    return std::unique_ptr<InherentImplItem> (clone_associated_item_impl ());
-  }
-};
-
-// Abstract base class for items used in a trait impl
-class TraitImplItem : virtual public AssociatedItem
-{
-protected:
-  virtual TraitImplItem *clone_associated_item_impl () const override = 0;
-
-public:
-  // Unique pointer custom clone function
-  std::unique_ptr<TraitImplItem> clone_trait_impl_item () const
-  {
-    return std::unique_ptr<TraitImplItem> (clone_associated_item_impl ());
-  }
 };
 
 // Abstract base class for an item used inside an extern block
@@ -1827,9 +1817,7 @@ public:
     ITEM,
     STMT,
     EXTERN,
-    TRAIT,
-    IMPL,
-    TRAIT_IMPL,
+    ASSOC_ITEM,
     TYPE,
   };
 
@@ -1841,9 +1829,7 @@ private:
   std::unique_ptr<Item> item;
   std::unique_ptr<Stmt> stmt;
   std::unique_ptr<ExternalItem> external_item;
-  std::unique_ptr<TraitItem> trait_item;
-  std::unique_ptr<InherentImplItem> impl_item;
-  std::unique_ptr<TraitImplItem> trait_impl_item;
+  std::unique_ptr<AssociatedItem> assoc_item;
   std::unique_ptr<Type> type;
 
 public:
@@ -1863,16 +1849,8 @@ public:
     : kind (EXTERN), external_item (std::move (item))
   {}
 
-  SingleASTNode (std::unique_ptr<TraitItem> item)
-    : kind (TRAIT), trait_item (std::move (item))
-  {}
-
-  SingleASTNode (std::unique_ptr<InherentImplItem> item)
-    : kind (IMPL), impl_item (std::move (item))
-  {}
-
-  SingleASTNode (std::unique_ptr<TraitImplItem> trait_impl_item)
-    : kind (TRAIT_IMPL), trait_impl_item (std::move (trait_impl_item))
+  SingleASTNode (std::unique_ptr<AssociatedItem> item)
+    : kind (ASSOC_ITEM), assoc_item (std::move (item))
   {}
 
   SingleASTNode (std::unique_ptr<Type> type)
@@ -1932,7 +1910,8 @@ public:
   std::unique_ptr<TraitItem> take_trait_item ()
   {
     rust_assert (!is_error ());
-    return std::move (trait_item);
+    return std::unique_ptr<TraitItem> (
+      static_cast<TraitItem *> (assoc_item.release ()));
   }
 
   std::unique_ptr<ExternalItem> take_external_item ()
@@ -1941,16 +1920,20 @@ public:
     return std::move (external_item);
   }
 
-  std::unique_ptr<InherentImplItem> take_impl_item ()
+  std::unique_ptr<AssociatedItem> take_assoc_item ()
   {
     rust_assert (!is_error ());
-    return std::move (impl_item);
+    return std::move (assoc_item);
   }
 
-  std::unique_ptr<TraitImplItem> take_trait_impl_item ()
+  std::unique_ptr<AssociatedItem> take_impl_item ()
   {
-    rust_assert (!is_error ());
-    return std::move (trait_impl_item);
+    return take_assoc_item ();
+  }
+
+  std::unique_ptr<AssociatedItem> take_trait_impl_item ()
+  {
+    return take_assoc_item ();
   }
 
   std::unique_ptr<Type> take_type ()

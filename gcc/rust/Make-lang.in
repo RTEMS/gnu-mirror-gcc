@@ -64,6 +64,7 @@ gccrs$(exeext): $(GCCRS_D_OBJS) $(EXTRA_GCC_OBJS) libcommon-target.a $(LIBDEPS)
 # The compiler proper, not driver
 GRS_OBJS = \
     rust/rust-lang.o \
+    rust/rust-attribs.o \
     rust/rust-object-export.o \
     rust/rust-linemap.o \
     rust/rust-diagnostics.o \
@@ -84,6 +85,8 @@ GRS_OBJS = \
     rust/rust-session-manager.o \
     rust/rust-compile.o \
     rust/rust-mangle.o \
+    rust/rust-mangle-v0.o \
+    rust/rust-mangle-legacy.o \
     rust/rust-compile-resolve-path.o \
     rust/rust-macro-expand.o \
     rust/rust-cfg-strip.o \
@@ -116,6 +119,7 @@ GRS_OBJS = \
     rust/rust-default-resolver.o \
     rust/rust-toplevel-name-resolver-2.0.o \
     rust/rust-early-name-resolver-2.0.o \
+    rust/rust-late-name-resolver-2.0.o \
     rust/rust-early-name-resolver.o \
     rust/rust-name-resolver.o \
     rust/rust-ast-resolve.o \

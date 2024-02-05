@@ -616,7 +616,7 @@ ResolveItem::visit (AST::Function &function)
     }
 
   // resolve the function body
-  ResolveExpr::go (function.get_definition ().get (), path, cpath);
+  ResolveExpr::go (function.get_definition ()->get (), path, cpath);
 
   resolver->get_name_scope ().pop ();
   resolver->get_type_scope ().pop ();
@@ -1031,7 +1031,7 @@ ResolveItem::visit (AST::UseDeclaration &use_item)
       if (!ok)
 	continue;
 
-      const AST::SimplePathSegment &final_seg = path.get_final_segment ();
+      const AST::SimplePathSegment &final_seg = path.get_segments ().back ();
 
       auto decl
 	= CanonicalPath::new_seg (resolved_node_id, final_seg.as_string ());

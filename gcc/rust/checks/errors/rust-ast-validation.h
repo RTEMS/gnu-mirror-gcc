@@ -21,6 +21,7 @@
 
 #include "rust-ast-visitor.h"
 #include "rust-ast-full.h"
+#include "rust-item.h"
 
 namespace Rust {
 
@@ -33,11 +34,15 @@ public:
 
   void check (AST::Crate &crate) { AST::ContextualASTVisitor::visit (crate); }
 
+  virtual void visit (AST::Module &module);
   virtual void visit (AST::ConstantItem &const_item);
   virtual void visit (AST::Lifetime &lifetime);
   virtual void visit (AST::LoopLabel &label);
   virtual void visit (AST::ExternalFunctionItem &item);
+  virtual void visit (AST::Union &item);
   virtual void visit (AST::Function &function);
+  virtual void visit (AST::Trait &trait);
+  virtual void visit (AST::TraitFunctionDecl &decl);
 };
 
 } // namespace Rust
