@@ -3756,15 +3756,39 @@ rs6000_option_override_internal (bool global_init_p)
     rs6000_isa_flags &= ~OPTION_MASK_POWERPC64;
 #endif
 
+  /* At the moment, we don't have explicit -mtune=future support.  If the user
+     explicitly uses -mtune=future, give a warning.  If not, use the power10
+     tuning until future tuning is added.  */
   if (rs6000_tune_index >= 0)
-    tune_index = rs6000_tune_index;
+    {
+      enum processor_type cur_proc
+	= processor_target_table[rs6000_tune_index].processor;
+
+      if (cur_proc == PROCESSOR_FUTURE)
+	{
+	  warning (0, "%qs is not currently supported", "-mtune=future");
+	  rs6000_tune_index = rs6000_cpu_name_lookup ("power10");
+	}
+      tune_index = rs6000_tune_index;
+    }
   else if (cpu_index >= 0)
-    rs6000_tune_index = tune_index = cpu_index;
+    {
+      enum processor_type cur_cpu
+	= processor_target_table[cpu_index].processor;
+
+      rs6000_tune_index = tune_index
+	= (cur_cpu == PROCESSOR_FUTURE
+	   ? rs6000_cpu_name_lookup ("power10")
+	   : cpu_index);
+    }
   else
     {
       size_t i;
       enum processor_type tune_proc
 	= (TARGET_POWERPC64 ? PROCESSOR_DEFAULT64 : PROCESSOR_DEFAULT);
+
+      if (tune_proc == PROCESSOR_FUTURE)
+	tune_proc = PROCESSOR_POWER10;
 
       tune_index = -1;
       for (i = 0; i < ARRAY_SIZE (processor_target_table); i++)
@@ -4785,6 +4809,7 @@ rs6000_option_override_internal (bool global_init_p)
 	break;
 
       case PROCESSOR_POWER10:
+      case PROCESSOR_FUTURE:
 	rs6000_cost = &power10_cost;
 	break;
 
@@ -5944,6 +5969,8 @@ rs6000_machine_from_flags (void)
   /* Disable the flags that should never influence the .machine selection.  */
   flags &= ~(OPTION_MASK_PPC_GFXOPT | OPTION_MASK_PPC_GPOPT | OPTION_MASK_ISEL);
 
+  if ((flags & (ISA_FUTURE_MASKS_SERVER & ~ISA_3_1_MASKS_SERVER)) != 0)
+    return "future";
   if ((flags & (ISA_3_1_MASKS_SERVER & ~ISA_3_0_MASKS_SERVER)) != 0)
     return "power10";
   if ((flags & (ISA_3_0_MASKS_SERVER & ~ISA_2_7_MASKS_SERVER)) != 0)
@@ -24505,6 +24532,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "float128-hardware",	OPTION_MASK_FLOAT128_HW,	false, true  },
   { "fprnd",			OPTION_MASK_FPRND,		false, true  },
   { "power10",			OPTION_MASK_POWER10,		false, true  },
+  { "future",			OPTION_MASK_FUTURE,		false, true  },
   { "hard-dfp",			OPTION_MASK_DFP,		false, true  },
   { "htm",			OPTION_MASK_HTM,		false, true  },
   { "isel",			OPTION_MASK_ISEL,		false, true  },
