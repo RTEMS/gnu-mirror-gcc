@@ -533,19 +533,20 @@ public:
 // Qualifiers for function, i.e. const, unsafe, extern etc.
 class FunctionQualifiers
 {
-  AsyncConstStatus const_status;
-  bool has_unsafe;
+  Async async_status;
+  Const const_status;
+  Unsafety unsafe_status;
   bool has_extern;
   std::string extern_abi;
   location_t locus;
 
 public:
-  FunctionQualifiers (location_t locus, AsyncConstStatus const_status,
-		      bool has_unsafe, bool has_extern = false,
+  FunctionQualifiers (location_t locus, Async async_status, Const const_status,
+		      Unsafety unsafe_status, bool has_extern = false,
 		      std::string extern_abi = std::string ())
-    : const_status (const_status), has_unsafe (has_unsafe),
-      has_extern (has_extern), extern_abi (std::move (extern_abi)),
-      locus (locus)
+    : async_status (async_status), const_status (const_status),
+      unsafe_status (unsafe_status), has_extern (has_extern),
+      extern_abi (std::move (extern_abi)), locus (locus)
   {
     if (!this->extern_abi.empty ())
       {
@@ -556,11 +557,14 @@ public:
 
   std::string as_string () const;
 
-  AsyncConstStatus get_const_status () const { return const_status; }
-  bool is_unsafe () const { return has_unsafe; }
+  bool is_unsafe () const { return unsafe_status == Unsafety::Unsafe; }
   bool is_extern () const { return has_extern; }
+  bool is_const () const { return const_status == Const::Yes; }
+  bool is_async () const { return async_status == Async::Yes; }
   std::string get_extern_abi () const { return extern_abi; }
   bool has_abi () const { return !extern_abi.empty (); }
+  Const get_const_status () const { return const_status; }
+  Async get_async_status () const { return async_status; }
 
   location_t get_locus () const { return locus; }
 };
@@ -736,6 +740,7 @@ private:
   Identifier module_name;
   location_t locus;
   ModuleKind kind;
+  Unsafety safety;
 
   // Name of the file including the module
   std::string outer_filename;
@@ -766,11 +771,12 @@ public:
 
   // Unloaded module constructor
   Module (Identifier module_name, Visibility visibility,
-	  std::vector<Attribute> outer_attrs, location_t locus,
+	  std::vector<Attribute> outer_attrs, location_t locus, Unsafety safety,
 	  std::string outer_filename, std::vector<std::string> module_scope)
     : VisItem (std::move (visibility), std::move (outer_attrs)),
       module_name (module_name), locus (locus), kind (ModuleKind::UNLOADED),
-      outer_filename (outer_filename), inner_attrs (std::vector<Attribute> ()),
+      safety (safety), outer_filename (outer_filename),
+      inner_attrs (std::vector<Attribute> ()),
       items (std::vector<std::unique_ptr<Item>> ()),
       module_scope (std::move (module_scope))
   {}
@@ -779,18 +785,19 @@ public:
   Module (Identifier name, location_t locus,
 	  std::vector<std::unique_ptr<Item>> items,
 	  Visibility visibility = Visibility::create_error (),
+	  Unsafety safety = Unsafety::Normal,
 	  std::vector<Attribute> inner_attrs = std::vector<Attribute> (),
 	  std::vector<Attribute> outer_attrs = std::vector<Attribute> ())
     : VisItem (std::move (visibility), std::move (outer_attrs)),
       module_name (name), locus (locus), kind (ModuleKind::LOADED),
-      outer_filename (std::string ()), inner_attrs (std::move (inner_attrs)),
-      items (std::move (items))
+      safety (safety), outer_filename (std::string ()),
+      inner_attrs (std::move (inner_attrs)), items (std::move (items))
   {}
 
   // Copy constructor with vector clone
   Module (Module const &other)
     : VisItem (other), module_name (other.module_name), locus (other.locus),
-      kind (other.kind), inner_attrs (other.inner_attrs),
+      kind (other.kind), safety (other.safety), inner_attrs (other.inner_attrs),
       module_scope (other.module_scope)
   {
     // We need to check whether we are copying a loaded module or an unloaded
@@ -836,6 +843,8 @@ public:
 
   // Returns the kind of the module
   enum ModuleKind get_kind () const { return kind; }
+
+  Unsafety get_unsafety () const { return safety; }
 
   // TODO: think of better way to do this - mutable getter seems dodgy
   const std::vector<Attribute> &get_inner_attrs () const { return inner_attrs; }
@@ -940,6 +949,7 @@ protected:
 class UseTree
 {
   location_t locus;
+  NodeId node_id;
 
 public:
   enum Kind
@@ -975,6 +985,7 @@ public:
   virtual Kind get_kind () const = 0;
 
   location_t get_locus () const { return locus; }
+  NodeId get_node_id () const { return node_id; }
 
   virtual void accept_vis (ASTVisitor &vis) = 0;
 
@@ -982,7 +993,9 @@ protected:
   // Clone function implementation as pure virtual method
   virtual UseTree *clone_use_tree_impl () const = 0;
 
-  UseTree (location_t locus) : locus (locus) {}
+  UseTree (location_t locus)
+    : locus (locus), node_id (Analysis::Mappings::get ()->get_next_node_id ())
+  {}
 };
 
 // Use tree with a glob (wildcard) operator
@@ -1182,7 +1195,7 @@ public:
 
   Kind get_kind () const override { return Rebind; }
 
-  SimplePath get_path () const
+  const SimplePath &get_path () const
   {
     rust_assert (has_path ());
     return path;
@@ -1276,7 +1289,7 @@ protected:
 class LetStmt;
 
 // Rust function declaration AST node
-class Function : public VisItem, public InherentImplItem, public TraitImplItem
+class Function : public VisItem, public AssociatedItem
 {
   FunctionQualifiers qualifiers;
   Identifier function_name;
@@ -1284,7 +1297,7 @@ class Function : public VisItem, public InherentImplItem, public TraitImplItem
   std::vector<std::unique_ptr<Param>> function_params;
   std::unique_ptr<Type> return_type;
   WhereClause where_clause;
-  std::unique_ptr<BlockExpr> function_body;
+  tl::optional<std::unique_ptr<BlockExpr>> function_body;
   location_t locus;
   bool is_default;
 
@@ -1308,14 +1321,16 @@ public:
     return function_params.size () > 0 && function_params[0]->is_self ();
   }
 
+  bool has_body () const { return function_body.has_value (); }
+
   // Mega-constructor with all possible fields
   Function (Identifier function_name, FunctionQualifiers qualifiers,
 	    std::vector<std::unique_ptr<GenericParam>> generic_params,
 	    std::vector<std::unique_ptr<Param>> function_params,
 	    std::unique_ptr<Type> return_type, WhereClause where_clause,
-	    std::unique_ptr<BlockExpr> function_body, Visibility vis,
-	    std::vector<Attribute> outer_attrs, location_t locus,
-	    bool is_default = false)
+	    tl::optional<std::unique_ptr<BlockExpr>> function_body,
+	    Visibility vis, std::vector<Attribute> outer_attrs,
+	    location_t locus, bool is_default = false)
     : VisItem (std::move (vis), std::move (outer_attrs)),
       qualifiers (std::move (qualifiers)),
       function_name (std::move (function_name)),
@@ -1375,9 +1390,8 @@ public:
   }
 
   // TODO: is this better? Or is a "vis_block" better?
-  std::unique_ptr<BlockExpr> &get_definition ()
+  tl::optional<std::unique_ptr<BlockExpr>> &get_definition ()
   {
-    rust_assert (function_body != nullptr);
     return function_body;
   }
 
@@ -1422,7 +1436,7 @@ protected:
 };
 
 // Rust type alias (i.e. typedef) AST node
-class TypeAlias : public VisItem, public TraitImplItem
+class TypeAlias : public VisItem, public AssociatedItem
 {
   Identifier new_type_name;
 
@@ -2298,9 +2312,7 @@ protected:
 
 /* "Constant item" AST node - used for constant, compile-time expressions
  * within module scope (like constexpr) */
-class ConstantItem : public VisItem,
-		     public InherentImplItem,
-		     public TraitImplItem
+class ConstantItem : public VisItem, public AssociatedItem
 {
   // either has an identifier or "_" - maybe handle in identifier?
   // bool identifier_is_underscore;
@@ -2519,412 +2531,6 @@ protected:
   }
 };
 
-// Function declaration in traits
-class TraitFunctionDecl
-{
-  // TODO: delete and replace with Function decl item? no as no body in this.
-  FunctionQualifiers qualifiers;
-  Identifier function_name;
-
-  // bool has_generics;
-  // Generics generic_params;
-  std::vector<std::unique_ptr<GenericParam>> generic_params; // inlined
-
-  // bool has_params;
-  // FunctionParams function_params;
-  std::vector<std::unique_ptr<Param>> function_params; // inlined
-
-  // bool has_return_type;
-  std::unique_ptr<Type> return_type;
-
-  // bool has_where_clause;
-  WhereClause where_clause;
-
-  // should this store location info?
-
-public:
-  // Returns whether function decl has generic parameters.
-  bool has_generics () const { return !generic_params.empty (); }
-
-  // Returns whether function decl has regular parameters.
-  bool has_params () const { return !function_params.empty (); }
-
-  // Returns whether function has return type (otherwise is void).
-  bool has_return_type () const { return return_type != nullptr; }
-
-  // Returns whether function has a where clause.
-  bool has_where_clause () const { return !where_clause.is_empty (); }
-
-  Identifier get_identifier () const { return function_name; }
-
-  // Mega-constructor
-  TraitFunctionDecl (Identifier function_name, FunctionQualifiers qualifiers,
-		     std::vector<std::unique_ptr<GenericParam>> generic_params,
-		     std::vector<std::unique_ptr<Param>> function_params,
-		     std::unique_ptr<Type> return_type,
-		     WhereClause where_clause)
-    : qualifiers (std::move (qualifiers)),
-      function_name (std::move (function_name)),
-      generic_params (std::move (generic_params)),
-      function_params (std::move (function_params)),
-      return_type (std::move (return_type)),
-      where_clause (std::move (where_clause))
-  {}
-
-  // Copy constructor with clone
-  TraitFunctionDecl (TraitFunctionDecl const &other)
-    : qualifiers (other.qualifiers), function_name (other.function_name),
-      where_clause (other.where_clause)
-  {
-    // guard to prevent nullptr dereference
-    if (other.return_type != nullptr)
-      return_type = other.return_type->clone_type ();
-
-    generic_params.reserve (other.generic_params.size ());
-    for (const auto &e : other.generic_params)
-      generic_params.push_back (e->clone_generic_param ());
-
-    function_params.reserve (other.function_params.size ());
-    for (const auto &e : other.function_params)
-      function_params.push_back (e->clone_param ());
-  }
-
-  ~TraitFunctionDecl () = default;
-
-  // Overloaded assignment operator with clone
-  TraitFunctionDecl &operator= (TraitFunctionDecl const &other)
-  {
-    function_name = other.function_name;
-    qualifiers = other.qualifiers;
-    where_clause = other.where_clause;
-
-    // guard to prevent nullptr dereference
-    if (other.return_type != nullptr)
-      return_type = other.return_type->clone_type ();
-    else
-      return_type = nullptr;
-
-    generic_params.reserve (other.generic_params.size ());
-    for (const auto &e : other.generic_params)
-      generic_params.push_back (e->clone_generic_param ());
-
-    function_params.reserve (other.function_params.size ());
-    for (const auto &e : other.function_params)
-      function_params.push_back (e->clone_param ());
-
-    return *this;
-  }
-
-  // move constructors
-  TraitFunctionDecl (TraitFunctionDecl &&other) = default;
-  TraitFunctionDecl &operator= (TraitFunctionDecl &&other) = default;
-
-  std::string as_string () const;
-
-  // Invalid if function name is empty, so base stripping on that.
-  void mark_for_strip () { function_name = {""}; }
-  bool is_marked_for_strip () const { return function_name.empty (); }
-
-  // TODO: this mutable getter seems really dodgy. Think up better way.
-  std::vector<std::unique_ptr<Param>> &get_function_params ()
-  {
-    return function_params;
-  }
-  const std::vector<std::unique_ptr<Param>> &get_function_params () const
-  {
-    return function_params;
-  }
-
-  std::vector<std::unique_ptr<GenericParam>> &get_generic_params ()
-  {
-    return generic_params;
-  }
-  const std::vector<std::unique_ptr<GenericParam>> &get_generic_params () const
-  {
-    return generic_params;
-  }
-
-  // TODO: is this better? Or is a "vis_block" better?
-  std::unique_ptr<Type> &get_return_type () { return return_type; }
-
-  // TODO: is this better? Or is a "vis_block" better?
-  WhereClause &get_where_clause () { return where_clause; }
-
-  FunctionQualifiers get_qualifiers () const { return qualifiers; }
-  FunctionQualifiers &get_qualifiers () { return qualifiers; }
-};
-
-// Actual trait item function declaration within traits
-class TraitItemFunc : public TraitItem
-{
-  std::vector<Attribute> outer_attrs;
-  TraitFunctionDecl decl;
-  std::unique_ptr<BlockExpr> block_expr;
-
-public:
-  // Returns whether function has a definition or is just a declaration.
-  bool has_definition () const { return block_expr != nullptr; }
-
-  TraitItemFunc (TraitFunctionDecl decl, std::unique_ptr<BlockExpr> block_expr,
-		 std::vector<Attribute> outer_attrs, location_t locus)
-    : TraitItem (locus), outer_attrs (std::move (outer_attrs)),
-      decl (std::move (decl)), block_expr (std::move (block_expr))
-  {}
-
-  // Copy constructor with clone
-  TraitItemFunc (TraitItemFunc const &other);
-
-  // Overloaded assignment operator to clone
-
-  TraitItemFunc &operator= (TraitItemFunc const &other);
-
-  // move constructors
-  TraitItemFunc (TraitItemFunc &&other) = default;
-  TraitItemFunc &operator= (TraitItemFunc &&other) = default;
-
-  std::string as_string () const override;
-
-  void accept_vis (ASTVisitor &vis) override;
-
-  // Invalid if trait decl is empty, so base stripping on that.
-  void mark_for_strip () override { decl.mark_for_strip (); }
-  bool is_marked_for_strip () const override
-  {
-    return decl.is_marked_for_strip ();
-  }
-
-  // TODO: this mutable getter seems really dodgy. Think up better way.
-  std::vector<Attribute> &get_outer_attrs () { return outer_attrs; }
-  const std::vector<Attribute> &get_outer_attrs () const { return outer_attrs; }
-
-  // TODO: is this better? Or is a "vis_block" better?
-  std::unique_ptr<BlockExpr> &get_definition () { return block_expr; }
-
-  // TODO: is this better? Or is a "vis_block" better?
-  TraitFunctionDecl &get_trait_function_decl ()
-  {
-    // TODO: maybe only allow access if not marked for strip?
-    return decl;
-  }
-
-protected:
-  // Clone function implementation as (not pure) virtual method
-  TraitItemFunc *clone_associated_item_impl () const override
-  {
-    return new TraitItemFunc (*this);
-  }
-};
-
-// Method declaration within traits
-class TraitMethodDecl
-{
-  // TODO: delete and replace with Function decl item? no as no body.
-  FunctionQualifiers qualifiers;
-  Identifier function_name;
-
-  // bool has_generics;
-  // Generics generic_params;
-  std::vector<std::unique_ptr<GenericParam>> generic_params; // inlined
-
-  // bool has_params;
-  // FunctionParams function_params;
-  std::vector<std::unique_ptr<Param>> function_params; // inlined
-
-  // bool has_return_type;
-  std::unique_ptr<Type> return_type;
-
-  // bool has_where_clause;
-  WhereClause where_clause;
-
-  // should this store location info?
-
-public:
-  // Returns whether method decl has generic parameters.
-  bool has_generics () const { return !generic_params.empty (); }
-
-  // Returns whether method decl has regular parameters.
-  bool has_params () const { return !function_params.empty (); }
-
-  // Returns whether method has return type (otherwise is void).
-  bool has_return_type () const { return return_type != nullptr; }
-
-  // Returns whether method has a where clause.
-  bool has_where_clause () const { return !where_clause.is_empty (); }
-
-  Identifier get_identifier () const { return function_name; }
-
-  // Mega-constructor
-  TraitMethodDecl (Identifier function_name, FunctionQualifiers qualifiers,
-		   std::vector<std::unique_ptr<GenericParam>> generic_params,
-		   std::vector<std::unique_ptr<Param>> function_params,
-		   std::unique_ptr<Type> return_type, WhereClause where_clause)
-    : qualifiers (std::move (qualifiers)),
-      function_name (std::move (function_name)),
-      generic_params (std::move (generic_params)),
-      function_params (std::move (function_params)),
-      return_type (std::move (return_type)),
-      where_clause (std::move (where_clause))
-  {}
-
-  // Copy constructor with clone
-  TraitMethodDecl (TraitMethodDecl const &other)
-    : qualifiers (other.qualifiers), function_name (other.function_name),
-      where_clause (other.where_clause)
-  {
-    // guard to prevent nullptr dereference
-    if (other.return_type != nullptr)
-      return_type = other.return_type->clone_type ();
-
-    generic_params.reserve (other.generic_params.size ());
-    for (const auto &e : other.generic_params)
-      generic_params.push_back (e->clone_generic_param ());
-
-    function_params.reserve (other.function_params.size ());
-    for (const auto &e : other.function_params)
-      function_params.push_back (e->clone_param ());
-  }
-
-  ~TraitMethodDecl () = default;
-
-  // Overloaded assignment operator with clone
-  TraitMethodDecl &operator= (TraitMethodDecl const &other)
-  {
-    function_name = other.function_name;
-    qualifiers = other.qualifiers;
-    where_clause = other.where_clause;
-
-    // guard to prevent nullptr dereference
-    if (other.return_type != nullptr)
-      return_type = other.return_type->clone_type ();
-    else
-      return_type = nullptr;
-
-    generic_params.reserve (other.generic_params.size ());
-    for (const auto &e : other.generic_params)
-      generic_params.push_back (e->clone_generic_param ());
-
-    function_params.reserve (other.function_params.size ());
-    for (const auto &e : other.function_params)
-      function_params.push_back (e->clone_param ());
-
-    return *this;
-  }
-
-  // move constructors
-  TraitMethodDecl (TraitMethodDecl &&other) = default;
-  TraitMethodDecl &operator= (TraitMethodDecl &&other) = default;
-
-  std::string as_string () const;
-
-  // Invalid if method name is empty, so base stripping on that.
-  void mark_for_strip () { function_name = {""}; }
-  bool is_marked_for_strip () const { return function_name.empty (); }
-
-  // TODO: this mutable getter seems really dodgy. Think up better way.
-  std::vector<std::unique_ptr<Param>> &get_function_params ()
-  {
-    return function_params;
-  }
-  const std::vector<std::unique_ptr<Param>> &get_function_params () const
-  {
-    return function_params;
-  }
-
-  std::vector<std::unique_ptr<GenericParam>> &get_generic_params ()
-  {
-    return generic_params;
-  }
-  const std::vector<std::unique_ptr<GenericParam>> &get_generic_params () const
-  {
-    return generic_params;
-  }
-
-  // TODO: is this better? Or is a "vis_block" better?
-  std::unique_ptr<Type> &get_return_type () { return return_type; }
-
-  // TODO: is this better? Or is a "vis_block" better?
-  WhereClause &get_where_clause () { return where_clause; }
-
-  bool has_self () const
-  {
-    return !function_params.empty () && function_params[0]->is_self ();
-  }
-
-  std::unique_ptr<Param> &get_self_param ()
-  {
-    rust_assert (has_self ());
-    return function_params[0];
-  }
-  const std::unique_ptr<Param> &get_self_param () const
-  {
-    rust_assert (has_self ());
-    return function_params[0];
-  }
-
-  FunctionQualifiers get_qualifiers () const { return qualifiers; }
-
-  FunctionQualifiers &get_qualifiers () { return qualifiers; }
-};
-
-// Actual trait item method declaration within traits
-class TraitItemMethod : public TraitItem
-{
-  std::vector<Attribute> outer_attrs;
-  TraitMethodDecl decl;
-  std::unique_ptr<BlockExpr> block_expr;
-
-public:
-  // Returns whether method has a definition or is just a declaration.
-  bool has_definition () const { return block_expr != nullptr; }
-
-  TraitItemMethod (TraitMethodDecl decl, std::unique_ptr<BlockExpr> block_expr,
-		   std::vector<Attribute> outer_attrs, location_t locus)
-    : TraitItem (locus), outer_attrs (std::move (outer_attrs)),
-      decl (std::move (decl)), block_expr (std::move (block_expr))
-  {}
-
-  // Copy constructor with clone
-  TraitItemMethod (TraitItemMethod const &other);
-  // Overloaded assignment operator to clone
-  TraitItemMethod &operator= (TraitItemMethod const &other);
-
-  // move constructors
-  TraitItemMethod (TraitItemMethod &&other) = default;
-  TraitItemMethod &operator= (TraitItemMethod &&other) = default;
-
-  std::string as_string () const override;
-
-  void accept_vis (ASTVisitor &vis) override;
-
-  // Invalid if trait decl is empty, so base stripping on that.
-  void mark_for_strip () override { decl.mark_for_strip (); }
-  bool is_marked_for_strip () const override
-  {
-    return decl.is_marked_for_strip ();
-  }
-
-  // TODO: this mutable getter seems really dodgy. Think up better way.
-  std::vector<Attribute> &get_outer_attrs () { return outer_attrs; }
-  const std::vector<Attribute> &get_outer_attrs () const { return outer_attrs; }
-
-  // TODO: is this better? Or is a "vis_block" better?
-  TraitMethodDecl &get_trait_method_decl ()
-  {
-    // TODO: maybe only allow access if not marked for strip?
-    return decl;
-  }
-
-  // TODO: is this better? Or is a "vis_block" better?
-  std::unique_ptr<BlockExpr> &get_definition () { return block_expr; }
-
-protected:
-  // Clone function implementation as (not pure) virtual method
-  TraitItemMethod *clone_associated_item_impl () const override
-  {
-    return new TraitItemMethod (*this);
-  }
-};
-
 // Constant item within traits
 class TraitItemConst : public TraitItem
 {
@@ -3048,8 +2654,9 @@ public:
 
   TraitItemType (Identifier name,
 		 std::vector<std::unique_ptr<TypeParamBound>> type_param_bounds,
-		 std::vector<Attribute> outer_attrs, location_t locus)
-    : TraitItem (locus), outer_attrs (std::move (outer_attrs)),
+		 std::vector<Attribute> outer_attrs, Visibility vis,
+		 location_t locus)
+    : TraitItem (vis, locus), outer_attrs (std::move (outer_attrs)),
       name (std::move (name)), type_param_bounds (std::move (type_param_bounds))
   {}
 
@@ -3127,7 +2734,7 @@ class Trait : public VisItem
   std::vector<std::unique_ptr<TypeParamBound>> type_param_bounds;
   WhereClause where_clause;
   std::vector<Attribute> inner_attrs;
-  std::vector<std::unique_ptr<TraitItem>> trait_items;
+  std::vector<std::unique_ptr<AssociatedItem>> trait_items;
   location_t locus;
 
 public:
@@ -3158,9 +2765,9 @@ public:
 	 std::vector<std::unique_ptr<GenericParam>> generic_params,
 	 std::vector<std::unique_ptr<TypeParamBound>> type_param_bounds,
 	 WhereClause where_clause,
-	 std::vector<std::unique_ptr<TraitItem>> trait_items, Visibility vis,
-	 std::vector<Attribute> outer_attrs, std::vector<Attribute> inner_attrs,
-	 location_t locus)
+	 std::vector<std::unique_ptr<AssociatedItem>> trait_items,
+	 Visibility vis, std::vector<Attribute> outer_attrs,
+	 std::vector<Attribute> inner_attrs, location_t locus)
     : VisItem (std::move (vis), std::move (outer_attrs)),
       has_unsafe (is_unsafe), has_auto (is_auto), name (std::move (name)),
       generic_params (std::move (generic_params)),
@@ -3186,7 +2793,7 @@ public:
 
     trait_items.reserve (other.trait_items.size ());
     for (const auto &e : other.trait_items)
-      trait_items.push_back (e->clone_trait_item ());
+      trait_items.push_back (e->clone_associated_item ());
   }
 
   // Overloaded assignment operator with vector clone
@@ -3210,7 +2817,7 @@ public:
 
     trait_items.reserve (other.trait_items.size ());
     for (const auto &e : other.trait_items)
-      trait_items.push_back (e->clone_trait_item ());
+      trait_items.push_back (e->clone_associated_item ());
 
     return *this;
   }
@@ -3231,11 +2838,11 @@ public:
   const std::vector<Attribute> &get_inner_attrs () const { return inner_attrs; }
   std::vector<Attribute> &get_inner_attrs () { return inner_attrs; }
 
-  const std::vector<std::unique_ptr<TraitItem>> &get_trait_items () const
+  const std::vector<std::unique_ptr<AssociatedItem>> &get_trait_items () const
   {
     return trait_items;
   }
-  std::vector<std::unique_ptr<TraitItem>> &get_trait_items ()
+  std::vector<std::unique_ptr<AssociatedItem>> &get_trait_items ()
   {
     return trait_items;
   }
@@ -3398,7 +3005,7 @@ protected:
 class InherentImpl : public Impl
 {
   // bool has_impl_items;
-  std::vector<std::unique_ptr<InherentImplItem>> impl_items;
+  std::vector<std::unique_ptr<AssociatedItem>> impl_items;
 
 public:
   std::string as_string () const override;
@@ -3407,7 +3014,7 @@ public:
   bool has_impl_items () const { return !impl_items.empty (); }
 
   // Mega-constructor
-  InherentImpl (std::vector<std::unique_ptr<InherentImplItem>> impl_items,
+  InherentImpl (std::vector<std::unique_ptr<AssociatedItem>> impl_items,
 		std::vector<std::unique_ptr<GenericParam>> generic_params,
 		std::unique_ptr<Type> trait_type, WhereClause where_clause,
 		Visibility vis, std::vector<Attribute> inner_attrs,
@@ -3423,7 +3030,7 @@ public:
   {
     impl_items.reserve (other.impl_items.size ());
     for (const auto &e : other.impl_items)
-      impl_items.push_back (e->clone_inherent_impl_item ());
+      impl_items.push_back (e->clone_associated_item ());
   }
 
   // Overloaded assignment operator with vector clone
@@ -3433,7 +3040,7 @@ public:
 
     impl_items.reserve (other.impl_items.size ());
     for (const auto &e : other.impl_items)
-      impl_items.push_back (e->clone_inherent_impl_item ());
+      impl_items.push_back (e->clone_associated_item ());
 
     return *this;
   }
@@ -3445,11 +3052,11 @@ public:
   void accept_vis (ASTVisitor &vis) override;
 
   // TODO: think of better way to do this
-  const std::vector<std::unique_ptr<InherentImplItem>> &get_impl_items () const
+  const std::vector<std::unique_ptr<AssociatedItem>> &get_impl_items () const
   {
     return impl_items;
   }
-  std::vector<std::unique_ptr<InherentImplItem>> &get_impl_items ()
+  std::vector<std::unique_ptr<AssociatedItem>> &get_impl_items ()
   {
     return impl_items;
   }
@@ -3471,7 +3078,7 @@ class TraitImpl : public Impl
   TypePath trait_path;
 
   // bool has_impl_items;
-  std::vector<std::unique_ptr<TraitImplItem>> impl_items;
+  std::vector<std::unique_ptr<AssociatedItem>> impl_items;
 
 public:
   std::string as_string () const override;
@@ -3481,7 +3088,7 @@ public:
 
   // Mega-constructor
   TraitImpl (TypePath trait_path, bool is_unsafe, bool has_exclam,
-	     std::vector<std::unique_ptr<TraitImplItem>> impl_items,
+	     std::vector<std::unique_ptr<AssociatedItem>> impl_items,
 	     std::vector<std::unique_ptr<GenericParam>> generic_params,
 	     std::unique_ptr<Type> trait_type, WhereClause where_clause,
 	     Visibility vis, std::vector<Attribute> inner_attrs,
@@ -3500,7 +3107,7 @@ public:
   {
     impl_items.reserve (other.impl_items.size ());
     for (const auto &e : other.impl_items)
-      impl_items.push_back (e->clone_trait_impl_item ());
+      impl_items.push_back (e->clone_associated_item ());
   }
 
   // Overloaded assignment operator with vector clone
@@ -3513,7 +3120,7 @@ public:
 
     impl_items.reserve (other.impl_items.size ());
     for (const auto &e : other.impl_items)
-      impl_items.push_back (e->clone_trait_impl_item ());
+      impl_items.push_back (e->clone_associated_item ());
 
     return *this;
   }
@@ -3528,11 +3135,11 @@ public:
   bool is_exclam () const { return has_exclam; }
 
   // TODO: think of better way to do this
-  const std::vector<std::unique_ptr<TraitImplItem>> &get_impl_items () const
+  const std::vector<std::unique_ptr<AssociatedItem>> &get_impl_items () const
   {
     return impl_items;
   }
-  std::vector<std::unique_ptr<TraitImplItem>> &get_impl_items ()
+  std::vector<std::unique_ptr<AssociatedItem>> &get_impl_items ()
   {
     return impl_items;
   }

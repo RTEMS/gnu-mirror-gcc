@@ -63,12 +63,15 @@ TypeCheckItem::ResolveImplBlockSelf (HIR::ImplBlock &impl_block)
   TypeCheckItem resolver;
 
   bool failed_flag = false;
-  std::vector<TyTy::SubstitutionParamMapping> substitutions
+  auto result
     = resolver.resolve_impl_block_substitutions (impl_block, failed_flag);
   if (failed_flag)
     {
       return new TyTy::ErrorType (impl_block.get_mappings ().get_hirid ());
     }
+  std::vector<TyTy::SubstitutionParamMapping> substitutions
+    = std::move (result.first);
+  TyTy::RegionConstraints region_constraints = std::move (result.second);
 
   return resolver.resolve_impl_block_self (impl_block);
 }
@@ -81,12 +84,14 @@ TypeCheckItem::ResolveImplBlockSelfWithInference (
   TypeCheckItem resolver;
 
   bool failed_flag = false;
-  std::vector<TyTy::SubstitutionParamMapping> substitutions
-    = resolver.resolve_impl_block_substitutions (impl, failed_flag);
+  auto result = resolver.resolve_impl_block_substitutions (impl, failed_flag);
   if (failed_flag)
     {
       return new TyTy::ErrorType (impl.get_mappings ().get_hirid ());
     }
+  std::vector<TyTy::SubstitutionParamMapping> substitutions
+    = std::move (result.first);
+  TyTy::RegionConstraints region_constraints = std::move (result.second);
 
   // now that we have the param mappings we need to query the self type
   TyTy::BaseType *self = resolver.resolve_impl_block_self (impl);
@@ -113,8 +118,11 @@ TypeCheckItem::ResolveImplBlockSelfWithInference (
     }
 
   // create argument mappings
-  *infer_arguments
-    = TyTy::SubstitutionArgumentMappings (std::move (args), {}, locus);
+  *infer_arguments = TyTy::SubstitutionArgumentMappings (
+    std::move (args), {},
+    TyTy::SubstitutionArgumentMappings::regions_from_nullable_args (
+      infer_arguments),
+    locus);
 
   TyTy::BaseType *infer = SubstMapperInternal::Resolve (self, *infer_arguments);
 
@@ -137,9 +145,10 @@ TypeCheckItem::visit (HIR::TypeAlias &alias)
 
   context->insert_type (alias.get_mappings (), actual_type);
 
+  TyTy::RegionConstraints region_constraints;
   for (auto &where_clause_item : alias.get_where_clause ().get_items ())
     {
-      ResolveWhereClauseItem::Resolve (*where_clause_item.get ());
+      ResolveWhereClauseItem::Resolve (*where_clause_item, region_constraints);
     }
   infered = actual_type;
 }
@@ -147,13 +156,16 @@ TypeCheckItem::visit (HIR::TypeAlias &alias)
 void
 TypeCheckItem::visit (HIR::TupleStruct &struct_decl)
 {
+  auto lifetime_pin = context->push_clean_lifetime_resolver ();
+
   std::vector<TyTy::SubstitutionParamMapping> substitutions;
   if (struct_decl.has_generics ())
     resolve_generic_params (struct_decl.get_generic_params (), substitutions);
 
+  TyTy::RegionConstraints region_constraints;
   for (auto &where_clause_item : struct_decl.get_where_clause ().get_items ())
     {
-      ResolveWhereClauseItem::Resolve (*where_clause_item.get ());
+      ResolveWhereClauseItem::Resolve (*where_clause_item, region_constraints);
     }
 
   std::vector<TyTy::StructFieldType *> fields;
@@ -162,7 +174,7 @@ TypeCheckItem::visit (HIR::TupleStruct &struct_decl)
     {
       TyTy::BaseType *field_type
 	= TypeCheckType::Resolve (field.get_field_type ().get ());
-      TyTy::StructFieldType *ty_field
+      auto *ty_field
 	= new TyTy::StructFieldType (field.get_mappings ().get_hirid (),
 				     std::to_string (idx), field_type,
 				     field.get_locus ());
@@ -192,12 +204,14 @@ TypeCheckItem::visit (HIR::TupleStruct &struct_decl)
   TyTy::ADTType::ReprOptions repr
     = parse_repr_options (attrs, struct_decl.get_locus ());
 
-  TyTy::BaseType *type
-    = new TyTy::ADTType (struct_decl.get_mappings ().get_hirid (),
-			 mappings->get_next_hir_id (),
-			 struct_decl.get_identifier ().as_string (), ident,
-			 TyTy::ADTType::ADTKind::TUPLE_STRUCT,
-			 std::move (variants), std::move (substitutions), repr);
+  TyTy::BaseType *type = new TyTy::ADTType (
+    struct_decl.get_mappings ().get_hirid (), mappings->get_next_hir_id (),
+    struct_decl.get_identifier ().as_string (), ident,
+    TyTy::ADTType::ADTKind::TUPLE_STRUCT, std::move (variants),
+    std::move (substitutions), repr,
+    TyTy::SubstitutionArgumentMappings::empty (
+      context->get_lifetime_resolver ().get_num_bound_regions ()),
+    region_constraints);
 
   context->insert_type (struct_decl.get_mappings (), type);
   infered = type;
@@ -206,13 +220,16 @@ TypeCheckItem::visit (HIR::TupleStruct &struct_decl)
 void
 TypeCheckItem::visit (HIR::StructStruct &struct_decl)
 {
+  auto lifetime_pin = context->push_clean_lifetime_resolver ();
+
   std::vector<TyTy::SubstitutionParamMapping> substitutions;
   if (struct_decl.has_generics ())
     resolve_generic_params (struct_decl.get_generic_params (), substitutions);
 
+  TyTy::RegionConstraints region_constraints;
   for (auto &where_clause_item : struct_decl.get_where_clause ().get_items ())
     {
-      ResolveWhereClauseItem::Resolve (*where_clause_item.get ());
+      ResolveWhereClauseItem::Resolve (*where_clause_item, region_constraints);
     }
 
   std::vector<TyTy::StructFieldType *> fields;
@@ -220,7 +237,7 @@ TypeCheckItem::visit (HIR::StructStruct &struct_decl)
     {
       TyTy::BaseType *field_type
 	= TypeCheckType::Resolve (field.get_field_type ().get ());
-      TyTy::StructFieldType *ty_field
+      auto *ty_field
 	= new TyTy::StructFieldType (field.get_mappings ().get_hirid (),
 				     field.get_field_name ().as_string (),
 				     field_type, field.get_locus ());
@@ -249,12 +266,14 @@ TypeCheckItem::visit (HIR::StructStruct &struct_decl)
   TyTy::ADTType::ReprOptions repr
     = parse_repr_options (attrs, struct_decl.get_locus ());
 
-  TyTy::BaseType *type
-    = new TyTy::ADTType (struct_decl.get_mappings ().get_hirid (),
-			 mappings->get_next_hir_id (),
-			 struct_decl.get_identifier ().as_string (), ident,
-			 TyTy::ADTType::ADTKind::STRUCT_STRUCT,
-			 std::move (variants), std::move (substitutions), repr);
+  TyTy::BaseType *type = new TyTy::ADTType (
+    struct_decl.get_mappings ().get_hirid (), mappings->get_next_hir_id (),
+    struct_decl.get_identifier ().as_string (), ident,
+    TyTy::ADTType::ADTKind::STRUCT_STRUCT, std::move (variants),
+    std::move (substitutions), repr,
+    TyTy::SubstitutionArgumentMappings::empty (
+      context->get_lifetime_resolver ().get_num_bound_regions ()),
+    region_constraints);
 
   context->insert_type (struct_decl.get_mappings (), type);
   infered = type;
@@ -263,6 +282,7 @@ TypeCheckItem::visit (HIR::StructStruct &struct_decl)
 void
 TypeCheckItem::visit (HIR::Enum &enum_decl)
 {
+  auto lifetime_pin = context->push_clean_lifetime_resolver ();
   std::vector<TyTy::SubstitutionParamMapping> substitutions;
   if (enum_decl.has_generics ())
     resolve_generic_params (enum_decl.get_generic_params (), substitutions);
@@ -301,13 +321,15 @@ TypeCheckItem::visit (HIR::Enum &enum_decl)
 void
 TypeCheckItem::visit (HIR::Union &union_decl)
 {
+  auto lifetime_pin = context->push_clean_lifetime_resolver ();
   std::vector<TyTy::SubstitutionParamMapping> substitutions;
   if (union_decl.has_generics ())
     resolve_generic_params (union_decl.get_generic_params (), substitutions);
 
+  TyTy::RegionConstraints region_constraints;
   for (auto &where_clause_item : union_decl.get_where_clause ().get_items ())
     {
-      ResolveWhereClauseItem::Resolve (*where_clause_item.get ());
+      ResolveWhereClauseItem::Resolve (*where_clause_item, region_constraints);
     }
 
   std::vector<TyTy::StructFieldType *> fields;
@@ -315,7 +337,7 @@ TypeCheckItem::visit (HIR::Union &union_decl)
     {
       TyTy::BaseType *variant_type
 	= TypeCheckType::Resolve (variant.get_field_type ().get ());
-      TyTy::StructFieldType *ty_variant
+      auto *ty_variant
 	= new TyTy::StructFieldType (variant.get_mappings ().get_hirid (),
 				     variant.get_field_name ().as_string (),
 				     variant_type, variant.get_locus ());
@@ -387,14 +409,18 @@ TypeCheckItem::visit (HIR::ConstantItem &constant)
 void
 TypeCheckItem::visit (HIR::ImplBlock &impl_block)
 {
+  auto binder_pin = context->push_clean_lifetime_resolver (true);
+
   bool failed_flag = false;
-  std::vector<TyTy::SubstitutionParamMapping> substitutions
-    = resolve_impl_block_substitutions (impl_block, failed_flag);
+  auto result = resolve_impl_block_substitutions (impl_block, failed_flag);
   if (failed_flag)
     {
       infered = new TyTy::ErrorType (impl_block.get_mappings ().get_hirid ());
       return;
     }
+  std::vector<TyTy::SubstitutionParamMapping> substitutions
+    = std::move (result.first);
+  TyTy::RegionConstraints region_constraints = std::move (result.second);
 
   TyTy::BaseType *self = resolve_impl_block_self (impl_block);
 
@@ -414,12 +440,15 @@ TypeCheckItem::resolve_impl_item (HIR::ImplBlock &impl_block,
 				  HIR::ImplItem &item)
 {
   bool failed_flag = false;
-  std::vector<TyTy::SubstitutionParamMapping> substitutions
-    = resolve_impl_block_substitutions (impl_block, failed_flag);
+  auto result = resolve_impl_block_substitutions (impl_block, failed_flag);
   if (failed_flag)
     {
       return new TyTy::ErrorType (impl_block.get_mappings ().get_hirid ());
     }
+
+  std::vector<TyTy::SubstitutionParamMapping> substitutions
+    = std::move (result.first);
+  TyTy::RegionConstraints region_constraints = std::move (result.second);
 
   TyTy::BaseType *self = resolve_impl_block_self (impl_block);
 
@@ -429,13 +458,16 @@ TypeCheckItem::resolve_impl_item (HIR::ImplBlock &impl_block,
 void
 TypeCheckItem::visit (HIR::Function &function)
 {
+  auto lifetime_pin = context->push_clean_lifetime_resolver ();
   std::vector<TyTy::SubstitutionParamMapping> substitutions;
   if (function.has_generics ())
-    resolve_generic_params (function.get_generic_params (), substitutions);
+    resolve_generic_params (function.get_generic_params (),
+			    substitutions); // TODO resolve constraints
 
+  TyTy::RegionConstraints region_constraints;
   for (auto &where_clause_item : function.get_where_clause ().get_items ())
     {
-      ResolveWhereClauseItem::Resolve (*where_clause_item.get ());
+      ResolveWhereClauseItem::Resolve (*where_clause_item, region_constraints);
     }
 
   TyTy::BaseType *ret_type = nullptr;
@@ -463,8 +495,7 @@ TypeCheckItem::visit (HIR::Function &function)
     {
       // get the name as well required for later on
       auto param_tyty = TypeCheckType::Resolve (param.get_type ().get ());
-      params.push_back (std::pair<HIR::Pattern *, TyTy::BaseType *> (
-	param.get_param_name ().get (), param_tyty));
+      params.emplace_back (param.get_param_name ().get (), param_tyty);
 
       context->insert_type (param.get_mappings (), param_tyty);
       TypeCheckPattern::Resolve (param.get_param_name ().get (), param_tyty);
@@ -477,21 +508,26 @@ TypeCheckItem::visit (HIR::Function &function)
   rust_assert (ok);
 
   RustIdent ident{*canonical_path, function.get_locus ()};
-  auto fnType = new TyTy::FnType (function.get_mappings ().get_hirid (),
-				  function.get_mappings ().get_defid (),
-				  function.get_function_name ().as_string (),
-				  ident, TyTy::FnType::FNTYPE_DEFAULT_FLAGS,
-				  ABI::RUST, std::move (params), ret_type,
-				  std::move (substitutions));
 
-  context->insert_type (function.get_mappings (), fnType);
+  auto fn_type = new TyTy::FnType (
+    function.get_mappings ().get_hirid (),
+    function.get_mappings ().get_defid (),
+    function.get_function_name ().as_string (), ident,
+    TyTy::FnType::FNTYPE_DEFAULT_FLAGS, ABI::RUST, std::move (params), ret_type,
+    std::move (substitutions),
+    TyTy::SubstitutionArgumentMappings::empty (
+      context->get_lifetime_resolver ().get_num_bound_regions ()),
+    region_constraints);
+
+  context->insert_type (function.get_mappings (), fn_type);
 
   // need to get the return type from this
-  TyTy::FnType *resolved_fn_type = fnType;
+  TyTy::FnType *resolved_fn_type = fn_type;
   auto expected_ret_tyty = resolved_fn_type->get_return_type ();
   context->push_return_type (TypeCheckContextItem (&function),
 			     expected_ret_tyty);
 
+  context->switch_to_fn_body ();
   auto block_expr_ty
     = TypeCheckExpr::Resolve (function.get_definition ().get ());
 
@@ -505,14 +541,14 @@ TypeCheckItem::visit (HIR::Function &function)
 
   context->pop_return_type ();
 
-  infered = fnType;
+  infered = fn_type;
 }
 
 void
 TypeCheckItem::visit (HIR::Module &module)
 {
   for (auto &item : module.get_items ())
-    TypeCheckItem::Resolve (*item.get ());
+    TypeCheckItem::Resolve (*item);
 }
 
 void
@@ -541,7 +577,7 @@ TypeCheckItem::visit (HIR::ExternBlock &extern_block)
     }
 }
 
-std::vector<TyTy::SubstitutionParamMapping>
+std::pair<std::vector<TyTy::SubstitutionParamMapping>, TyTy::RegionConstraints>
 TypeCheckItem::resolve_impl_block_substitutions (HIR::ImplBlock &impl_block,
 						 bool &failure_flag)
 {
@@ -549,9 +585,10 @@ TypeCheckItem::resolve_impl_block_substitutions (HIR::ImplBlock &impl_block,
   if (impl_block.has_generics ())
     resolve_generic_params (impl_block.get_generic_params (), substitutions);
 
+  TyTy::RegionConstraints region_constraints;
   for (auto &where_clause_item : impl_block.get_where_clause ().get_items ())
     {
-      ResolveWhereClauseItem::Resolve (*where_clause_item.get ());
+      ResolveWhereClauseItem::Resolve (*where_clause_item, region_constraints);
     }
 
   auto specified_bound = TyTy::TypeBoundPredicate::error ();
@@ -559,13 +596,13 @@ TypeCheckItem::resolve_impl_block_substitutions (HIR::ImplBlock &impl_block,
   if (impl_block.has_trait_ref ())
     {
       std::unique_ptr<HIR::TypePath> &ref = impl_block.get_trait_ref ();
-      trait_reference = TraitResolver::Resolve (*ref.get ());
+      trait_reference = TraitResolver::Resolve (*ref);
       rust_assert (!trait_reference->is_error ());
 
       // we don't error out here see: gcc/testsuite/rust/compile/traits2.rs
       // for example
       specified_bound
-	= get_predicate_from_bound (*ref.get (), impl_block.get_type ().get ());
+	= get_predicate_from_bound (*ref, impl_block.get_type ().get ());
     }
 
   TyTy::BaseType *self = TypeCheckType::Resolve (impl_block.get_type ().get ());
@@ -583,7 +620,7 @@ TypeCheckItem::resolve_impl_block_substitutions (HIR::ImplBlock &impl_block,
   failure_flag = check_for_unconstrained (substitutions, trait_constraints,
 					  impl_constraints, self);
 
-  return substitutions;
+  return {substitutions, region_constraints};
 }
 
 void
@@ -596,13 +633,13 @@ TypeCheckItem::validate_trait_impl_block (
   if (impl_block.has_trait_ref ())
     {
       std::unique_ptr<HIR::TypePath> &ref = impl_block.get_trait_ref ();
-      trait_reference = TraitResolver::Resolve (*ref.get ());
+      trait_reference = TraitResolver::Resolve (*ref);
       rust_assert (!trait_reference->is_error ());
 
       // we don't error out here see: gcc/testsuite/rust/compile/traits2.rs
       // for example
       specified_bound
-	= get_predicate_from_bound (*ref.get (), impl_block.get_type ().get ());
+	= get_predicate_from_bound (*ref, impl_block.get_type ().get ());
     }
 
   bool is_trait_impl_block = !trait_reference->is_error ();
@@ -637,17 +674,17 @@ TypeCheckItem::validate_trait_impl_block (
 	      std::string trait_item_name = trait_item_ref.get_identifier ();
 	      std::string impl_item_name
 		= implemented_trait_item->get_identifier ();
-	      found = trait_item_name.compare (impl_item_name) == 0;
+	      found = trait_item_name == impl_item_name;
 	      if (found)
 		break;
 	    }
 
 	  bool is_required_trait_item = !trait_item_ref.is_optional ();
 	  if (!found && is_required_trait_item)
-	    missing_trait_items.push_back (trait_item_ref);
+	    missing_trait_items.emplace_back (trait_item_ref);
 	}
 
-      if (missing_trait_items.size () > 0)
+      if (!missing_trait_items.empty ())
 	{
 	  std::string missing_items_buf;
 	  rich_location r (line_table, impl_block.get_locus ());

@@ -26,6 +26,9 @@
 #include "rust-tyty-bounds.h"
 #include "rust-tyty-util.h"
 #include "rust-tyty-subst.h"
+#include "rust-tyty-region.h"
+
+#include <limits>
 
 namespace Rust {
 
@@ -38,6 +41,10 @@ class AssociatedImplTrait;
 } // namespace Resolver
 
 namespace TyTy {
+class ClosureType;
+class FnPtr;
+class FnType;
+class CallableTypeInterface;
 
 // https://rustc-dev-guide.rust-lang.org/type-inference.html#inference-variables
 // https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/enum.TyKind.html#variants
@@ -91,6 +98,8 @@ public:
 
   HirId get_ty_ref () const;
   void set_ty_ref (HirId id);
+
+  HirId get_orig_ref () const;
 
   virtual void accept_vis (TyVisitor &vis) = 0;
   virtual void accept_vis (TyConstVisitor &vis) const = 0;
@@ -177,7 +186,7 @@ public:
   virtual BaseType *clone () const = 0;
 
   // Check if TyTy::BaseType is of a specific type.
-  template <typename T>[[nodiscard]] bool is () const
+  template <typename T> WARN_UNUSED_RESULT bool is () const
   {
     static_assert (std::is_base_of<BaseType, T>::value,
 		   "Can only safely cast to TyTy types.");
@@ -236,10 +245,27 @@ protected:
   TypeKind kind;
   HirId ref;
   HirId ty_ref;
+  const HirId orig_ref;
   std::set<HirId> combined;
   RustIdent ident;
 
   Analysis::Mappings *mappings;
+};
+
+/** Unified interface for all function-like types. */
+class CallableTypeInterface : public BaseType
+{
+public:
+  explicit CallableTypeInterface (HirId ref, HirId ty_ref, TypeKind kind,
+				  RustIdent ident,
+				  std::set<HirId> refs = std::set<HirId> ())
+    : BaseType (ref, ty_ref, kind, ident, refs)
+  {}
+
+  WARN_UNUSED_RESULT virtual size_t get_num_params () const = 0;
+  WARN_UNUSED_RESULT virtual BaseType *
+  get_param_type_at (size_t index) const = 0;
+  WARN_UNUSED_RESULT virtual BaseType *get_return_type () const = 0;
 };
 
 class InferType : public BaseType
@@ -627,9 +653,11 @@ public:
 	   std::vector<SubstitutionParamMapping> subst_refs,
 	   SubstitutionArgumentMappings generic_arguments
 	   = SubstitutionArgumentMappings::error (),
+	   RegionConstraints region_constraints = {},
 	   std::set<HirId> refs = std::set<HirId> ())
     : BaseType (ref, ref, TypeKind::ADT, ident, refs),
-      SubstitutionRef (std::move (subst_refs), std::move (generic_arguments)),
+      SubstitutionRef (std::move (subst_refs), std::move (generic_arguments),
+		       region_constraints),
       identifier (identifier), variants (variants), adt_kind (adt_kind)
   {}
 
@@ -638,9 +666,11 @@ public:
 	   std::vector<SubstitutionParamMapping> subst_refs,
 	   SubstitutionArgumentMappings generic_arguments
 	   = SubstitutionArgumentMappings::error (),
+	   RegionConstraints region_constraints = {},
 	   std::set<HirId> refs = std::set<HirId> ())
     : BaseType (ref, ty_ref, TypeKind::ADT, ident, refs),
-      SubstitutionRef (std::move (subst_refs), std::move (generic_arguments)),
+      SubstitutionRef (std::move (subst_refs), std::move (generic_arguments),
+		       region_constraints),
       identifier (identifier), variants (variants), adt_kind (adt_kind)
   {}
 
@@ -649,9 +679,11 @@ public:
 	   std::vector<SubstitutionParamMapping> subst_refs, ReprOptions repr,
 	   SubstitutionArgumentMappings generic_arguments
 	   = SubstitutionArgumentMappings::error (),
+	   RegionConstraints region_constraints = {},
 	   std::set<HirId> refs = std::set<HirId> ())
     : BaseType (ref, ty_ref, TypeKind::ADT, ident, refs),
-      SubstitutionRef (std::move (subst_refs), std::move (generic_arguments)),
+      SubstitutionRef (std::move (subst_refs), std::move (generic_arguments),
+		       region_constraints),
       identifier (identifier), variants (variants), adt_kind (adt_kind),
       repr (repr)
   {}
@@ -736,7 +768,7 @@ private:
   ReprOptions repr;
 };
 
-class FnType : public BaseType, public SubstitutionRef
+class FnType : public CallableTypeInterface, public SubstitutionRef
 {
 public:
   static constexpr auto KIND = TypeKind::FNDEF;
@@ -750,10 +782,12 @@ public:
 	  uint8_t flags, ABI abi,
 	  std::vector<std::pair<HIR::Pattern *, BaseType *>> params,
 	  BaseType *type, std::vector<SubstitutionParamMapping> subst_refs,
+	  SubstitutionArgumentMappings substitution_argument_mappings,
+	  RegionConstraints region_constraints,
 	  std::set<HirId> refs = std::set<HirId> ())
-    : BaseType (ref, ref, TypeKind::FNDEF, ident, refs),
-      SubstitutionRef (std::move (subst_refs),
-		       SubstitutionArgumentMappings::error ()),
+    : CallableTypeInterface (ref, ref, TypeKind::FNDEF, ident, refs),
+      SubstitutionRef (std::move (subst_refs), substitution_argument_mappings,
+		       region_constraints),
       params (std::move (params)), type (type), flags (flags),
       identifier (identifier), id (id), abi (abi)
   {
@@ -765,10 +799,12 @@ public:
 	  RustIdent ident, uint8_t flags, ABI abi,
 	  std::vector<std::pair<HIR::Pattern *, BaseType *>> params,
 	  BaseType *type, std::vector<SubstitutionParamMapping> subst_refs,
+	  SubstitutionArgumentMappings substitution_argument_mappings,
+	  RegionConstraints region_constraints,
 	  std::set<HirId> refs = std::set<HirId> ())
-    : BaseType (ref, ty_ref, TypeKind::FNDEF, ident, refs),
-      SubstitutionRef (std::move (subst_refs),
-		       SubstitutionArgumentMappings::error ()),
+    : CallableTypeInterface (ref, ty_ref, TypeKind::FNDEF, ident, refs),
+      SubstitutionRef (std::move (subst_refs), substitution_argument_mappings,
+		       region_constraints),
       params (params), type (type), flags (flags), identifier (identifier),
       id (id), abi (abi)
   {
@@ -832,8 +868,6 @@ public:
     return params.at (idx);
   }
 
-  BaseType *get_return_type () const { return type; }
-
   BaseType *clone () const final override;
 
   FnType *
@@ -841,6 +875,21 @@ public:
 
   ABI get_abi () const { return abi; }
   uint8_t get_flags () const { return flags; }
+
+  WARN_UNUSED_RESULT size_t get_num_params () const override
+  {
+    return params.size ();
+  }
+
+  WARN_UNUSED_RESULT BaseType *get_param_type_at (size_t index) const override
+  {
+    return param_at (index).second;
+  }
+
+  WARN_UNUSED_RESULT BaseType *get_return_type () const override
+  {
+    return type;
+  }
 
 private:
   std::vector<std::pair<HIR::Pattern *, BaseType *>> params;
@@ -851,33 +900,47 @@ private:
   ABI abi;
 };
 
-class FnPtr : public BaseType
+class FnPtr : public CallableTypeInterface
 {
 public:
   static constexpr auto KIND = TypeKind::FNPTR;
 
   FnPtr (HirId ref, location_t locus, std::vector<TyVar> params,
 	 TyVar result_type, std::set<HirId> refs = std::set<HirId> ())
-    : BaseType (ref, ref, TypeKind::FNPTR,
-		{Resolver::CanonicalPath::create_empty (), locus}, refs),
+    : CallableTypeInterface (ref, ref, TypeKind::FNPTR,
+			     {Resolver::CanonicalPath::create_empty (), locus},
+			     refs),
       params (std::move (params)), result_type (result_type)
   {}
 
   FnPtr (HirId ref, HirId ty_ref, location_t locus, std::vector<TyVar> params,
 	 TyVar result_type, std::set<HirId> refs = std::set<HirId> ())
-    : BaseType (ref, ty_ref, TypeKind::FNPTR,
-		{Resolver::CanonicalPath::create_empty (), locus}, refs),
+    : CallableTypeInterface (ref, ty_ref, TypeKind::FNPTR,
+			     {Resolver::CanonicalPath::create_empty (), locus},
+			     refs),
       params (params), result_type (result_type)
   {}
 
   std::string get_name () const override final { return as_string (); }
 
-  BaseType *get_return_type () const { return result_type.get_tyty (); }
+  WARN_UNUSED_RESULT size_t get_num_params () const override
+  {
+    return params.size ();
+  }
+
+  WARN_UNUSED_RESULT BaseType *get_param_type_at (size_t index) const override
+  {
+    return params.at (index).get_tyty ();
+  }
+
+  WARN_UNUSED_RESULT BaseType *get_return_type () const override
+  {
+    return result_type.get_tyty ();
+  }
+
   const TyVar &get_var_return_type () const { return result_type; }
 
   size_t num_params () const { return params.size (); }
-
-  BaseType *param_at (size_t idx) const { return params.at (idx).get_tyty (); }
 
   void accept_vis (TyVisitor &vis) override;
   void accept_vis (TyConstVisitor &vis) const override;
@@ -898,21 +961,22 @@ private:
   TyVar result_type;
 };
 
-class ClosureType : public BaseType, public SubstitutionRef
+class ClosureType : public CallableTypeInterface, public SubstitutionRef
 {
 public:
   static constexpr auto KIND = TypeKind::CLOSURE;
 
-  ClosureType (HirId ref, DefId id, RustIdent ident,
-	       TyTy::TupleType *parameters, TyVar result_type,
+  ClosureType (HirId ref, DefId id, RustIdent ident, TupleType *parameters,
+	       TyVar result_type,
 	       std::vector<SubstitutionParamMapping> subst_refs,
 	       std::set<NodeId> captures,
 	       std::set<HirId> refs = std::set<HirId> (),
 	       std::vector<TypeBoundPredicate> specified_bounds
 	       = std::vector<TypeBoundPredicate> ())
-    : BaseType (ref, ref, TypeKind::CLOSURE, ident, refs),
+    : CallableTypeInterface (ref, ref, TypeKind::CLOSURE, ident, refs),
       SubstitutionRef (std::move (subst_refs),
-		       SubstitutionArgumentMappings::error ()),
+		       SubstitutionArgumentMappings::error (),
+		       {}), // TODO: check region constraints
       parameters (parameters), result_type (std::move (result_type)), id (id),
       captures (captures)
   {
@@ -922,15 +986,15 @@ public:
   }
 
   ClosureType (HirId ref, HirId ty_ref, RustIdent ident, DefId id,
-	       TyTy::TupleType *parameters, TyVar result_type,
+	       TupleType *parameters, TyVar result_type,
 	       std::vector<SubstitutionParamMapping> subst_refs,
 	       std::set<NodeId> captures,
 	       std::set<HirId> refs = std::set<HirId> (),
 	       std::vector<TypeBoundPredicate> specified_bounds
 	       = std::vector<TypeBoundPredicate> ())
-    : BaseType (ref, ty_ref, TypeKind::CLOSURE, ident, refs),
+    : CallableTypeInterface (ref, ty_ref, TypeKind::CLOSURE, ident, refs),
       SubstitutionRef (std::move (subst_refs),
-		       SubstitutionArgumentMappings::error ()),
+		       SubstitutionArgumentMappings::error (), {}), // TODO
       parameters (parameters), result_type (std::move (result_type)), id (id),
       captures (captures)
   {
@@ -941,6 +1005,21 @@ public:
 
   void accept_vis (TyVisitor &vis) override;
   void accept_vis (TyConstVisitor &vis) const override;
+
+  WARN_UNUSED_RESULT size_t get_num_params () const override
+  {
+    return parameters->num_fields ();
+  }
+
+  WARN_UNUSED_RESULT BaseType *get_param_type_at (size_t index) const override
+  {
+    return parameters->get_field (index);
+  }
+
+  WARN_UNUSED_RESULT BaseType *get_return_type () const override
+  {
+    return result_type.get_tyty ();
+  }
 
   std::string as_string () const override;
   std::string get_name () const override final { return as_string (); }
@@ -1303,11 +1382,13 @@ public:
 class ReferenceType : public BaseType
 {
 public:
-  static constexpr auto KIND = TypeKind::REF;
+  static constexpr auto KIND = REF;
 
   ReferenceType (HirId ref, TyVar base, Mutability mut,
+		 Region region = Region::make_anonymous (),
 		 std::set<HirId> refs = std::set<HirId> ());
   ReferenceType (HirId ref, HirId ty_ref, TyVar base, Mutability mut,
+		 Region region = Region::make_anonymous (),
 		 std::set<HirId> refs = std::set<HirId> ());
 
   BaseType *get_base () const;
@@ -1331,6 +1412,9 @@ public:
   Mutability mutability () const;
   bool is_mutable () const;
 
+  WARN_UNUSED_RESULT Region get_region () const;
+  void set_region (Region region);
+
   bool is_dyn_object () const;
   bool is_dyn_slice_type (const TyTy::SliceType **slice = nullptr) const;
   bool is_dyn_str_type (const TyTy::StrType **str = nullptr) const;
@@ -1339,6 +1423,7 @@ public:
 private:
   TyVar base;
   Mutability mut;
+  Region region;
 };
 
 class PointerType : public BaseType
@@ -1463,6 +1548,7 @@ public:
 		  std::vector<SubstitutionParamMapping> subst_refs,
 		  SubstitutionArgumentMappings generic_arguments
 		  = SubstitutionArgumentMappings::error (),
+		  RegionConstraints region_constraints = {},
 		  std::set<HirId> refs = std::set<HirId> ());
 
   ProjectionType (HirId ref, HirId ty_ref, BaseType *base,
@@ -1470,6 +1556,7 @@ public:
 		  std::vector<SubstitutionParamMapping> subst_refs,
 		  SubstitutionArgumentMappings generic_arguments
 		  = SubstitutionArgumentMappings::error (),
+		  RegionConstraints region_constraints = {},
 		  std::set<HirId> refs = std::set<HirId> ());
 
   void accept_vis (TyVisitor &vis) override;
@@ -1494,6 +1581,99 @@ private:
   const Resolver::TraitReference *trait;
   DefId item;
 };
+
+template <>
+WARN_UNUSED_RESULT inline bool
+BaseType::is<CallableTypeInterface> () const
+{
+  auto kind = this->get_kind ();
+  return kind == FNPTR || kind == FNDEF || kind == CLOSURE;
+}
+
+template <>
+WARN_UNUSED_RESULT inline bool
+BaseType::is<const CallableTypeInterface> () const
+{
+  return this->is<CallableTypeInterface> ();
+}
+
+template <>
+WARN_UNUSED_RESULT inline bool
+BaseType::is<SubstitutionRef> () const
+{
+  auto kind = this->get_kind ();
+  return kind == FNPTR || kind == FNDEF || kind == CLOSURE || kind == ADT
+	 || kind == PROJECTION;
+}
+
+template <>
+WARN_UNUSED_RESULT inline bool
+BaseType::is<const SubstitutionRef> () const
+{
+  return this->is<SubstitutionRef> ();
+}
+
+template <>
+WARN_UNUSED_RESULT inline SubstitutionRef *
+BaseType::as<SubstitutionRef> ()
+{
+  auto kind = this->get_kind ();
+  switch (kind)
+    {
+    case FNDEF:
+      return static_cast<FnType *> (this);
+    case CLOSURE:
+      return static_cast<ClosureType *> (this);
+    case ADT:
+      return static_cast<ADTType *> (this);
+    case PROJECTION:
+      return static_cast<ProjectionType *> (this);
+    default:
+      rust_unreachable ();
+    }
+}
+
+template <>
+WARN_UNUSED_RESULT inline const SubstitutionRef *
+BaseType::as<const SubstitutionRef> () const
+{
+  auto kind = this->get_kind ();
+  switch (kind)
+    {
+    case FNDEF:
+      return static_cast<const FnType *> (this);
+    case CLOSURE:
+      return static_cast<const ClosureType *> (this);
+    case ADT:
+      return static_cast<const ADTType *> (this);
+    case PROJECTION:
+      return static_cast<const ProjectionType *> (this);
+    default:
+      rust_unreachable ();
+    }
+}
+
+template <>
+WARN_UNUSED_RESULT inline SubstitutionRef *
+BaseType::try_as<SubstitutionRef> ()
+{
+  if (this->is<SubstitutionRef> ())
+    {
+      return this->as<SubstitutionRef> ();
+    }
+  return nullptr;
+}
+
+template <>
+WARN_UNUSED_RESULT inline const SubstitutionRef *
+BaseType::try_as<const SubstitutionRef> () const
+{
+  if (this->is<const SubstitutionRef> ())
+    {
+      return this->as<const SubstitutionRef> ();
+    }
+  return nullptr;
+}
 
 } // namespace TyTy
 } // namespace Rust

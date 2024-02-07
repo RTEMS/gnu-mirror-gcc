@@ -53,6 +53,9 @@ private:
   template <typename T>
   void insert_or_error_out (const Identifier &identifier, const T &node,
 			    Namespace ns);
+  void insert_or_error_out (const Identifier &identifier,
+			    const location_t &locus, const NodeId &id,
+			    Namespace ns);
 
   // FIXME: Do we move these to our mappings?
   std::unordered_map<NodeId, location_t> node_locations;
@@ -62,7 +65,6 @@ private:
   void visit (AST::Function &function) override;
   void visit (AST::BlockExpr &expr) override;
   void visit (AST::StaticItem &static_item) override;
-  void visit (AST::TraitItemFunc &item) override;
   void visit (AST::StructStruct &struct_item) override;
   void visit (AST::TupleStruct &tuple_struct) override;
   void visit (AST::EnumItem &variant) override;
@@ -73,6 +75,14 @@ private:
   void visit (AST::Union &union_item) override;
   void visit (AST::ConstantItem &const_item) override;
   void visit (AST::ExternCrate &crate) override;
+
+  // FIXME: Documentation
+  // Call this on all the paths of a UseDec - so each flattened path in a
+  // UseTreeList for example
+  // FIXME: Should that return `found`?
+  bool handle_use_dec (AST::SimplePath path);
+
+  void visit (AST::UseDeclaration &use) override;
 };
 
 } // namespace Resolver2_0

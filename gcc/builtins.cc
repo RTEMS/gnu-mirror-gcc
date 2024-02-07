@@ -5450,7 +5450,7 @@ expand_builtin_stack_address ()
   rtx ret = convert_to_mode (ptr_mode, copy_to_reg (stack_pointer_rtx),
 			     STACK_UNSIGNED);
 
-#ifdef SPARC_STACK_BOUNDARY_HACK
+#ifdef STACK_ADDRESS_OFFSET
   /* Unbias the stack pointer, bringing it to the boundary between the
      stack area claimed by the active function calling this builtin,
      and stack ranges that could get clobbered if it called another
@@ -5477,8 +5477,7 @@ expand_builtin_stack_address ()
      (caller) function's active area as well, whereas those pushed or
      allocated temporarily for a call are regarded as part of the
      callee's stack range, rather than the caller's.  */
-  if (SPARC_STACK_BOUNDARY_HACK)
-    ret = plus_constant (ptr_mode, ret, STACK_POINTER_OFFSET);
+  ret = plus_constant (ptr_mode, ret, STACK_ADDRESS_OFFSET);
 #endif
 
   return force_reg (ptr_mode, ret);
@@ -7792,7 +7791,8 @@ expand_builtin (tree exp, rtx target, rtx subtarget, machine_mode mode,
       default:
 	break;
       }
-  if (sanitize_flags_p (SANITIZE_ADDRESS) && asan_intercepted_p (fcode))
+  if (sanitize_flags_p (SANITIZE_ADDRESS | SANITIZE_HWADDRESS)
+		  && asan_intercepted_p (fcode))
     return expand_call (exp, target, ignore);
 
   /* When not optimizing, generate calls to library functions for a certain
@@ -8415,6 +8415,10 @@ expand_builtin (tree exp, rtx target, rtx subtarget, machine_mode mode,
       return expand_builtin_init_descriptor (exp);
     case BUILT_IN_ADJUST_DESCRIPTOR:
       return expand_builtin_adjust_descriptor (exp);
+
+    case BUILT_IN_GCC_NESTED_PTR_CREATED:
+    case BUILT_IN_GCC_NESTED_PTR_DELETED:
+      break; /* At present, no expansion, just call the function.  */
 
     case BUILT_IN_FORK:
     case BUILT_IN_EXECL:

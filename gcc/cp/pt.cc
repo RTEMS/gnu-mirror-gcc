@@ -1816,6 +1816,11 @@ iterative_hash_template_arg (tree arg, hashval_t val)
 	}
       return iterative_hash_template_arg (TREE_TYPE (arg), val);
 
+    case TEMPLATE_DECL:
+      if (DECL_TEMPLATE_TEMPLATE_PARM_P (arg))
+	return iterative_hash_template_arg (TREE_TYPE (arg), val);
+      break;
+
     case TARGET_EXPR:
       return iterative_hash_template_arg (TARGET_EXPR_INITIAL (arg), val);
 
@@ -4499,6 +4504,8 @@ struct ctp_hasher : ggc_ptr_hash<tree_node>
     hashval_t val = iterative_hash_object (code, 0);
     val = iterative_hash_object (TEMPLATE_TYPE_LEVEL (t), val);
     val = iterative_hash_object (TEMPLATE_TYPE_IDX (t), val);
+    if (TREE_CODE (t) == TEMPLATE_TYPE_PARM)
+      val = iterative_hash_template_arg (CLASS_PLACEHOLDER_TEMPLATE (t), val);
     if (TREE_CODE (t) == BOUND_TEMPLATE_TEMPLATE_PARM)
       val = iterative_hash_template_arg (TYPE_TI_ARGS (t), val);
     --comparing_specializations;
@@ -12226,8 +12233,7 @@ instantiate_class_template (tree type)
     return error_mark_node;
 
   if (COMPLETE_OR_OPEN_TYPE_P (type)
-      || (uses_template_parms (type)
-	  && !TYPE_FUNCTION_SCOPE_P (type)))
+      || uses_template_parms (type))
     return type;
 
   /* Figure out which template is being instantiated.  */
@@ -14806,6 +14812,7 @@ tsubst_function_decl (tree t, tree args, tsubst_flags_t complain,
   if (DECL_SECTION_NAME (t))
     set_decl_section_name (r, t);
   if (DECL_DEFAULTED_OUTSIDE_CLASS_P (r)
+      && COMPLETE_TYPE_P (DECL_CONTEXT (r))
       && !processing_template_decl)
     defaulted_late_check (r);
 
@@ -18893,7 +18900,10 @@ tsubst_stmt (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 
     case TAG_DEFN:
       tmp = tsubst (TREE_TYPE (t), args, complain, NULL_TREE);
-      if (CLASS_TYPE_P (tmp))
+      if (dependent_type_p (tmp))
+	/* This is a partial instantiation, try again when full.  */
+	add_stmt (build_min (TAG_DEFN, tmp));
+      else if (CLASS_TYPE_P (tmp))
 	{
 	  /* Local classes are not independent templates; they are
 	     instantiated along with their containing function.  And this
@@ -18902,12 +18912,6 @@ tsubst_stmt (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 	  /* Closures are handled by the LAMBDA_EXPR.  */
 	  gcc_assert (!LAMBDA_TYPE_P (TREE_TYPE (t)));
 	  complete_type (tmp);
-	  if (dependent_type_p (tmp))
-	    {
-	      /* This is a partial instantiation, try again when full.  */
-	      add_stmt (build_min (TAG_DEFN, tmp));
-	      break;
-	    }
 	  tree save_ccp = current_class_ptr;
 	  tree save_ccr = current_class_ref;
 	  for (tree fld = TYPE_FIELDS (tmp); fld; fld = DECL_CHAIN (fld))
@@ -21702,7 +21706,8 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 
     case REQUIRES_EXPR:
       {
-	tree r = tsubst_requires_expr (t, args, tf_none, in_decl);
+	complain &= ~tf_warning_or_error;
+	tree r = tsubst_requires_expr (t, args, complain, in_decl);
 	RETURN (r);
       }
 
@@ -22102,9 +22107,16 @@ instantiate_template (tree tmpl, tree orig_args, tsubst_flags_t complain)
   DECL_TI_TEMPLATE (fndecl) = tmpl;
   DECL_TI_ARGS (fndecl) = targ_ptr;
   if (VAR_P (pattern))
-    /* Now that we we've formed this variable template specialization,
-       remember the result of most_specialized_partial_spec for it.  */
-    TI_PARTIAL_INFO (DECL_TEMPLATE_INFO (fndecl)) = partial_ti;
+    {
+      /* Now that we we've formed this variable template specialization,
+	 remember the result of most_specialized_partial_spec for it.  */
+      TI_PARTIAL_INFO (DECL_TEMPLATE_INFO (fndecl)) = partial_ti;
+
+      /* And remember if the variable was declared with [].  */
+      if (TREE_CODE (TREE_TYPE (fndecl)) == ARRAY_TYPE
+	  && TYPE_DOMAIN (TREE_TYPE (fndecl)) == NULL_TREE)
+	SET_VAR_HAD_UNKNOWN_BOUND (fndecl);
+    }
 
   fndecl = register_specialization (fndecl, gen_tmpl, targ_ptr, false, hash);
   if (fndecl == error_mark_node)
@@ -24953,7 +24965,8 @@ unify (tree tparms, tree targs, tree parm, tree arg, int strict,
       /* Type INTEGER_CST can come from ordinary constant template args.  */
     case INTEGER_CST:
     case REAL_CST:
-      if (!same_type_p (TREE_TYPE (parm), TREE_TYPE (arg)))
+      if (TREE_TYPE (arg) == NULL_TREE
+	  || !same_type_p (TREE_TYPE (parm), TREE_TYPE (arg)))
 	return unify_template_argument_mismatch (explain_p, parm, arg);
       while (CONVERT_EXPR_P (arg))
 	arg = TREE_OPERAND (arg, 0);
