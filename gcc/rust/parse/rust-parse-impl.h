@@ -2946,8 +2946,8 @@ Parser<ManagedTokenSource>::parse_function (AST::Visibility vis,
       && initial_param.error () != ParseSelfError::NOT_SELF)
     return nullptr;
 
-  if (initial_param.has_value ())
-    skip_token (COMMA);
+  if (initial_param.has_value () && lexer.peek_token ()->get_id () == COMMA)
+    skip_token ();
 
   // parse function parameters (only if next token isn't right paren)
   std::vector<std::unique_ptr<AST::Param>> function_params;
@@ -5045,12 +5045,12 @@ Parser<ManagedTokenSource>::parse_trait (AST::Visibility vis,
   AST::AttrVec inner_attrs = parse_inner_attributes ();
 
   // parse trait items
-  std::vector<std::unique_ptr<AST::TraitItem>> trait_items;
+  std::vector<std::unique_ptr<AST::AssociatedItem>> trait_items;
 
   const_TokenPtr t = lexer.peek_token ();
   while (t->get_id () != RIGHT_CURLY)
     {
-      std::unique_ptr<AST::TraitItem> trait_item = parse_trait_item ();
+      std::unique_ptr<AST::AssociatedItem> trait_item = parse_trait_item ();
 
       if (trait_item == nullptr)
 	{
@@ -5082,7 +5082,7 @@ Parser<ManagedTokenSource>::parse_trait (AST::Visibility vis,
 
 // Parses a trait item used inside traits (not trait, the Item).
 template <typename ManagedTokenSource>
-std::unique_ptr<AST::TraitItem>
+std::unique_ptr<AST::AssociatedItem>
 Parser<ManagedTokenSource>::parse_trait_item ()
 {
   // parse outer attributes (if they exist)
@@ -5094,6 +5094,18 @@ Parser<ManagedTokenSource>::parse_trait_item ()
   const_TokenPtr tok = lexer.peek_token ();
   switch (tok->get_id ())
     {
+    case SUPER:
+    case SELF:
+    case CRATE:
+    case DOLLAR_SIGN:
+      // these seem to be SimplePath tokens, so this is a macro invocation
+      // semi
+      return parse_macro_invocation_semi (std::move (outer_attrs));
+    case IDENTIFIER:
+      if (lexer.peek_token ()->get_str () == Values::WeakKeywords::DEFAULT)
+	return parse_function (std::move (vis), std::move (outer_attrs));
+      else
+	return parse_macro_invocation_semi (std::move (outer_attrs));
     case TYPE:
       return parse_trait_type (std::move (outer_attrs), vis);
     case CONST:
@@ -5108,150 +5120,16 @@ Parser<ManagedTokenSource>::parse_trait_item ()
     case ASYNC:
     case UNSAFE:
     case EXTERN_KW:
-      case FN_KW: {
-	/* function and method can't be disambiguated by lookahead alone
-	 * (without a lot of work and waste), so either make a
-	 * "parse_trait_function_or_method" or parse here mostly and pass in
-	 * most parameters (or if short enough, parse whole thing here). */
-	// parse function and method here
-
-	// parse function or method qualifiers
-	AST::FunctionQualifiers qualifiers = parse_function_qualifiers ();
-
-	skip_token (FN_KW);
-
-	// parse function or method name
-	const_TokenPtr ident_tok = expect_token (IDENTIFIER);
-	if (ident_tok == nullptr)
-	  return nullptr;
-
-	Identifier ident{ident_tok};
-
-	// parse generic params
-	std::vector<std::unique_ptr<AST::GenericParam>> generic_params
-	  = parse_generic_params_in_angles ();
-
-	if (!skip_token (LEFT_PAREN))
-	  {
-	    // skip after somewhere?
-	    return nullptr;
-	  }
-
-	/* now for function vs method disambiguation - method has opening
-	 * "self" param */
-	auto initial_param = parse_self_param ();
-	if (!initial_param.has_value () && initial_param.error () != NOT_SELF)
-	  return nullptr;
-	/* FIXME: ensure that self param doesn't accidently consume tokens for
-	 * a function */
-	bool is_method = false;
-	if (initial_param.has_value ())
-	  {
-	    if ((*initial_param)->is_self ())
-	      is_method = true;
-
-	    /* skip comma so function and method regular params can be parsed
-	     * in same way */
-	    if (lexer.peek_token ()->get_id () == COMMA)
-	      lexer.skip_token ();
-	  }
-
-	// parse trait function params
-	std::vector<std::unique_ptr<AST::Param>> function_params
-	  = parse_function_params (
-	    [] (TokenId id) { return id == RIGHT_PAREN; });
-
-	if (!skip_token (RIGHT_PAREN))
-	  {
-	    // skip after somewhere?
-	    return nullptr;
-	  }
-
-	if (initial_param.has_value ())
-	  function_params.insert (function_params.begin (),
-				  std::move (*initial_param));
-
-	// parse return type (optional)
-	std::unique_ptr<AST::Type> return_type = parse_function_return_type ();
-
-	// parse where clause (optional)
-	AST::WhereClause where_clause = parse_where_clause ();
-
-	// parse semicolon or function definition (in block)
-	const_TokenPtr t = lexer.peek_token ();
-	std::unique_ptr<AST::BlockExpr> definition = nullptr;
-	switch (t->get_id ())
-	  {
-	  case SEMICOLON:
-	    lexer.skip_token ();
-	    // definition is already nullptr, so don't need to change it
-	    break;
-	  case LEFT_CURLY:
-	    definition = parse_block_expr ();
-	    /* FIXME: are these outer attributes meant to be passed into the
-	     * block? */
-	    break;
-	  default:
-	    add_error (
-	      Error (t->get_locus (),
-		     "expected %<;%> or definiton at the end of trait %s "
-		     "definition - found %qs instead",
-		     is_method ? "method" : "function",
-		     t->get_token_description ()));
-
-	    // skip?
-	    return nullptr;
-	  }
-
-	// do actual if instead of ternary for return value optimisation
-	if (is_method)
-	  {
-	    AST::TraitMethodDecl method_decl (std::move (ident),
-					      std::move (qualifiers),
-					      std::move (generic_params),
-					      std::move (function_params),
-					      std::move (return_type),
-					      std::move (where_clause));
-
-	    // TODO: does this (method_decl) need move?
-	    return std::unique_ptr<AST::TraitItemMethod> (
-	      new AST::TraitItemMethod (std::move (method_decl),
-					std::move (definition),
-					std::move (outer_attrs),
-					tok->get_locus ()));
-	  }
-	else
-	  {
-	    AST::TraitFunctionDecl function_decl (std::move (ident),
-						  std::move (qualifiers),
-						  std::move (generic_params),
-						  std::move (function_params),
-						  std::move (return_type),
-						  std::move (where_clause));
-
-	    return std::unique_ptr<AST::TraitItemFunc> (new AST::TraitItemFunc (
-	      std::move (function_decl), std::move (definition),
-	      std::move (outer_attrs), tok->get_locus ()));
-	  }
-      }
-      default: {
-	// TODO: try and parse macro invocation semi - if fails, maybe error.
-	std::unique_ptr<AST::TraitItem> macro_invoc
-	  = parse_macro_invocation_semi (outer_attrs);
-
-	if (macro_invoc == nullptr)
-	  {
-	    // TODO: error?
-	    return nullptr;
-	  }
-	else
-	  {
-	    return macro_invoc;
-	  }
-	/* FIXME: macro invocations can only start with certain tokens. be
-	 * more picky with these? */
-      }
+    case FN_KW:
+      return parse_function (std::move (vis), std::move (outer_attrs));
+    default:
+      break;
     }
+  add_error (Error (tok->get_locus (),
+		    "unrecognised token %qs for item in trait",
+		    tok->get_token_description ()));
+  // skip?
+  return nullptr;
 }
 
 // Parse a typedef trait item.

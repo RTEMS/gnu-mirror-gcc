@@ -46,29 +46,16 @@ ResolveTraitItems::go (AST::AssociatedItem *item, const CanonicalPath &prefix,
 }
 
 void
-ResolveTraitItems::visit (AST::TraitItemType &type)
+ResolveTraitItems::visit (AST::Function &function)
 {
-  auto decl = CanonicalPath::new_seg (type.get_node_id (),
-				      type.get_identifier ().as_string ());
+  auto decl
+    = CanonicalPath::new_seg (function.get_node_id (),
+			      function.get_function_name ().as_string ());
   auto path = prefix.append (decl);
   auto cpath = canonical_prefix.append (decl);
-  mappings->insert_canonical_path (type.get_node_id (), cpath);
+  mappings->insert_canonical_path (function.get_node_id (), cpath);
 
-  for (auto &bound : type.get_type_param_bounds ())
-    ResolveTypeBound::go (bound.get ());
-}
-
-void
-ResolveTraitItems::visit (AST::TraitItemFunc &func)
-{
-  auto decl = CanonicalPath::new_seg (
-    func.get_node_id (),
-    func.get_trait_function_decl ().get_identifier ().as_string ());
-  auto path = prefix.append (decl);
-  auto cpath = canonical_prefix.append (decl);
-  mappings->insert_canonical_path (func.get_node_id (), cpath);
-
-  NodeId scope_node_id = func.get_node_id ();
+  NodeId scope_node_id = function.get_node_id ();
   resolver->get_name_scope ().push (scope_node_id);
   resolver->get_type_scope ().push (scope_node_id);
   resolver->get_label_scope ().push (scope_node_id);
@@ -76,72 +63,6 @@ ResolveTraitItems::visit (AST::TraitItemFunc &func)
   resolver->push_new_type_rib (resolver->get_type_scope ().peek ());
   resolver->push_new_label_rib (resolver->get_type_scope ().peek ());
 
-  AST::TraitFunctionDecl &function = func.get_trait_function_decl ();
-  if (function.has_generics ())
-    for (auto &generic : function.get_generic_params ())
-      ResolveGenericParam::go (generic.get (), prefix, canonical_prefix);
-
-  if (function.has_return_type ())
-    ResolveType::go (function.get_return_type ().get ());
-
-  std::vector<PatternBinding> bindings
-    = {PatternBinding (PatternBoundCtx::Product, std::set<Identifier> ())};
-
-  // we make a new scope so the names of parameters are resolved and shadowed
-  // correctly
-  for (auto &p : function.get_function_params ())
-    {
-      if (p->is_variadic ())
-	{
-	  auto param = static_cast<AST::VariadicParam *> (p.get ());
-	  PatternDeclaration::go (param->get_pattern ().get (),
-				  Rib::ItemType::Param, bindings);
-	}
-      else if (p->is_self ())
-	{
-	  auto param = static_cast<AST::SelfParam *> (p.get ());
-	  ResolveType::go (param->get_type ().get ());
-	}
-      else
-	{
-	  auto param = static_cast<AST::FunctionParam *> (p.get ());
-	  ResolveType::go (param->get_type ().get ());
-	  PatternDeclaration::go (param->get_pattern ().get (),
-				  Rib::ItemType::Param, bindings);
-	}
-    }
-
-  if (function.has_where_clause ())
-    ResolveWhereClause::Resolve (function.get_where_clause ());
-
-  // trait items have an optional body
-  if (func.has_definition ())
-    ResolveExpr::go (func.get_definition ().get (), path, cpath);
-
-  resolver->get_name_scope ().pop ();
-  resolver->get_type_scope ().pop ();
-  resolver->get_label_scope ().pop ();
-}
-
-void
-ResolveTraitItems::visit (AST::TraitItemMethod &func)
-{
-  auto decl = CanonicalPath::new_seg (
-    func.get_node_id (),
-    func.get_trait_method_decl ().get_identifier ().as_string ());
-  auto path = prefix.append (decl);
-  auto cpath = canonical_prefix.append (decl);
-  mappings->insert_canonical_path (func.get_node_id (), cpath);
-
-  NodeId scope_node_id = func.get_node_id ();
-  resolver->get_name_scope ().push (scope_node_id);
-  resolver->get_type_scope ().push (scope_node_id);
-  resolver->get_label_scope ().push (scope_node_id);
-  resolver->push_new_name_rib (resolver->get_name_scope ().peek ());
-  resolver->push_new_type_rib (resolver->get_type_scope ().peek ());
-  resolver->push_new_label_rib (resolver->get_type_scope ().peek ());
-
-  AST::TraitMethodDecl &function = func.get_trait_method_decl ();
   if (function.has_generics ())
     for (auto &generic : function.get_generic_params ())
       ResolveGenericParam::go (generic.get (), prefix, canonical_prefix);
@@ -205,12 +126,24 @@ ResolveTraitItems::visit (AST::TraitItemMethod &func)
     ResolveWhereClause::Resolve (function.get_where_clause ());
 
   // trait items have an optional body
-  if (func.has_definition ())
-    ResolveExpr::go (func.get_definition ().get (), path, cpath);
+  if (function.has_body ())
+    ResolveExpr::go (function.get_definition ()->get (), path, cpath);
 
   resolver->get_name_scope ().pop ();
   resolver->get_type_scope ().pop ();
   resolver->get_label_scope ().pop ();
+}
+void
+ResolveTraitItems::visit (AST::TraitItemType &type)
+{
+  auto decl = CanonicalPath::new_seg (type.get_node_id (),
+				      type.get_identifier ().as_string ());
+  auto path = prefix.append (decl);
+  auto cpath = canonical_prefix.append (decl);
+  mappings->insert_canonical_path (type.get_node_id (), cpath);
+
+  for (auto &bound : type.get_type_param_bounds ())
+    ResolveTypeBound::go (bound.get ());
 }
 
 void

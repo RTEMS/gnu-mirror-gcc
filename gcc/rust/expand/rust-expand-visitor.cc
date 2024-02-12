@@ -438,42 +438,6 @@ ExpandVisitor::expand_where_clause (AST::WhereClause &where_clause)
 }
 
 void
-ExpandVisitor::expand_trait_function_decl (AST::TraitFunctionDecl &decl)
-{
-  // just expand sub-stuff - can't actually strip generic params themselves
-  for (auto &param : decl.get_generic_params ())
-    visit (param);
-
-  /* strip function parameters if required - this is specifically
-   * allowed by spec */
-  expand_function_params (decl.get_function_params ());
-
-  if (decl.has_return_type ())
-    maybe_expand_type (decl.get_return_type ());
-
-  if (decl.has_where_clause ())
-    expand_where_clause (decl.get_where_clause ());
-}
-
-void
-ExpandVisitor::expand_trait_method_decl (AST::TraitMethodDecl &decl)
-{
-  for (auto &param : decl.get_generic_params ())
-    visit (param);
-
-  /* strip function parameters if required - this is specifically
-   * allowed by spec */
-  expand_function_params (decl.get_function_params ());
-
-  if (decl.has_return_type ())
-
-    maybe_expand_type (decl.get_return_type ());
-
-  if (decl.has_where_clause ())
-    expand_where_clause (decl.get_where_clause ());
-}
-
-void
 ExpandVisitor::visit (AST::Crate &crate)
 {
   expand_inner_items (crate.items);
@@ -863,24 +827,6 @@ ExpandVisitor::visit (AST::StaticItem &static_item)
 }
 
 void
-ExpandVisitor::visit (AST::TraitItemFunc &item)
-{
-  expand_trait_function_decl (item.get_trait_function_decl ());
-
-  if (item.has_definition ())
-    visit (item.get_definition ());
-}
-
-void
-ExpandVisitor::visit (AST::TraitItemMethod &item)
-{
-  expand_trait_method_decl (item.get_trait_method_decl ());
-
-  if (item.has_definition ())
-    visit (item.get_definition ());
-}
-
-void
 ExpandVisitor::visit (AST::TraitItemConst &const_item)
 {
   maybe_expand_type (const_item.get_type ());
@@ -903,7 +849,8 @@ ExpandVisitor::visit (AST::Trait &trait)
 
   expander.push_context (MacroExpander::ContextType::TRAIT);
 
-  std::function<std::unique_ptr<AST::TraitItem> (AST::SingleASTNode)> extractor
+  std::function<std::unique_ptr<AST::AssociatedItem> (AST::SingleASTNode)>
+    extractor
     = [] (AST::SingleASTNode node) { return node.take_trait_item (); };
 
   expand_macro_children (MacroExpander::ContextType::TRAIT,

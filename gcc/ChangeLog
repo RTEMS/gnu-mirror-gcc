@@ -1,3 +1,413 @@
+2024-02-10  Marek Polacek  <polacek@redhat.com>
+
+	DR 2237
+	PR c++/107126
+	PR c++/97202
+	* doc/invoke.texi: Document -Wtemplate-id-cdtor.
+
+2024-02-10  Jakub Jelinek  <jakub@redhat.com>
+
+	* gimple-lower-bitint.cc (itint_large_huge::lower_addsub_overflow): Fix
+	computation of idx for i == 4 of bitint_prec_huge.
+
+2024-02-10  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/110754
+	* gimple-low.cc (assumption_copy_decl): For TREE_THIS_VOLATILE
+	decls create PARM_DECL with pointer to original type, set
+	TREE_READONLY and keep TREE_THIS_VOLATILE, TREE_ADDRESSABLE,
+	DECL_NOT_GIMPLE_REG_P and DECL_BY_REFERENCE cleared.
+	(adjust_assumption_stmt_op): For remapped TREE_THIS_VOLATILE decls
+	wrap PARM_DECL into a simple TREE_THIS_NO_TRAP MEM_REF.
+	(lower_assumption): For TREE_THIS_VOLATILE vars pass ADDR_EXPR
+	of the var as argument.
+
+2024-02-10  Jakub Jelinek  <jakub@redhat.com>
+
+	* pretty-print.cc (pp_integer_with_precision): Handle precision 3 for
+	size_t and precision 4 for ptrdiff_t.  Formatting fix.
+	(pp_format): Document %{t,z}{d,i,u,o,x}.  Implement t and z modifiers.
+	Formatting fixes.
+	(test_pp_format): Test t and z modifiers.
+	* gcc.cc (read_specs): Use %td instead of %ld and casts to long.
+
+2024-02-10  Jakub Jelinek  <jakub@redhat.com>
+
+	* ipa-icf.cc (sem_item_optimizer::process_cong_reduction,
+	sem_item_optimizer::dump_cong_classes): Use HOST_SIZE_T_PRINT_UNSIGNED
+	and casts to fmt_size_t instead of "%lu" and casts to unsigned long.
+	* tree.cc (print_debug_expr_statistics): Use HOST_SIZE_T_PRINT_DEC
+	and casts to fmt_size_t instead of "%ld" and casts to long.
+	(print_value_expr_statistics, print_type_hash_statistics): Likewise.
+	* dwarf2out.cc (output_macinfo_op): Use HOST_WIDE_INT_PRINT_UNSIGNED
+	instead of "%lu" and casts to unsigned long.
+	* gcov-dump.cc (dump_gcov_file): Use %u instead of %lu and casts to
+	unsigned long.
+	* tree-ssa-dom.cc (htab_statistics): Use HOST_SIZE_T_PRINT_DEC
+	and casts to fmt_size_t instead of "%ld" and casts to long.
+	* cfgexpand.cc (dump_stack_var_partition): Use
+	HOST_SIZE_T_PRINT_UNSIGNED and casts to fmt_size_t instead of "%lu"
+	and casts to unsigned long.
+	* gengtype.cc (adjust_field_rtx_def): Likewise.
+	* tree-into-ssa.cc (htab_statistics): Use HOST_SIZE_T_PRINT_DEC
+	and casts to fmt_size_t instead of "%ld" and casts to long.
+	* postreload-gcse.cc (dump_hash_table): Likewise.
+	* ggc-page.cc (alloc_page): Use HOST_SIZE_T_PRINT_UNSIGNED
+	and casts to fmt_size_t instead of "%lu" and casts to unsigned long.
+	(ggc_internal_alloc, ggc_free): Likewise.
+	* genpreds.cc (write_lookup_constraint_1): Likewise.
+	(write_insn_constraint_len): Likewise.
+	* tree-dfa.cc (dump_dfa_stats): Use HOST_SIZE_T_PRINT_DEC
+	and casts to fmt_size_t instead of "%ld" and casts to long.
+	* varasm.cc (output_constant_pool_contents): Use
+	HOST_WIDE_INT_PRINT_DEC instead of "%ld" and casts to long.
+	* var-tracking.cc (dump_var): Likewise.
+
+2024-02-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/113783
+	* gimple-lower-bitint.cc (bitint_large_huge::lower_stmt): Look
+	through VIEW_CONVERT_EXPR for final cast checks.  Handle
+	VIEW_CONVERT_EXPRs from large/huge _BitInt to > MAX_FIXED_MODE_SIZE
+	INTEGER_TYPEs.
+	(gimple_lower_bitint): Don't merge mergeable operations or other
+	casts with VIEW_CONVERT_EXPRs to > MAX_FIXED_MODE_SIZE INTEGER_TYPEs.
+	* expr.cc (expand_expr_real_1): Don't use convert_modes if either
+	mode is BLKmode.
+
+2024-02-09  Jakub Jelinek  <jakub@redhat.com>
+
+	* hwint.h (GCC_PRISZ, fmt_size_t, HOST_SIZE_T_PRINT_DEC,
+	HOST_SIZE_T_PRINT_UNSIGNED, HOST_SIZE_T_PRINT_HEX,
+	HOST_SIZE_T_PRINT_HEX_PURE): Define.
+	* ira-conflicts.cc (build_conflict_bit_table): Use it.  Formatting
+	fixes.
+
+2024-02-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/113415
+	* cfgexpand.cc (expand_asm_stmt): For asm goto, use
+	duplicate_insn_chain to duplicate after_rtl_seq sequence instead
+	of hand written loop with emit_insn of copy_insn and emit original
+	after_rtl_seq on the last edge.
+
+2024-02-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/113818
+	* gimple-lower-bitint.cc (add_eh_edge): New function.
+	(bitint_large_huge::handle_load,
+	bitint_large_huge::lower_mergeable_stmt,
+	bitint_large_huge::lower_muldiv_stmt): Use it.
+
+2024-02-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/113774
+	* gimple-lower-bitint.cc (bitint_large_huge::handle_cast): Don't
+	emit any comparison if m_first and low + 1 is equal to
+	m_upwards_2limb, simplify condition for that.  If not
+	single_comparison, not m_first and we can prove that the idx <= low
+	comparison will be always true, emit instead of idx <= low
+	comparison low <= low such that cfg cleanup will optimize it at
+	the end of the pass.
+
+2024-02-08  Aldy Hernandez  <aldyh@redhat.com>
+
+	PR tree-optimization/113735
+	* value-relation.cc (equiv_oracle::add_equiv_to_block): Call
+	limit_check().
+
+2024-02-08  Georg-Johann Lay  <avr@gjlay.de>
+
+	* config/avr/gen-avr-mmcu-specs.cc (struct McuInfo): New.
+	(main, print_mcu, diagnose_mrodata_in_ram): Pass it down.
+
+2024-02-08  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR target/113711
+	PR target/113733
+	* config/i386/constraints.md: List all constraints with j prefix.
+	(j>): Change auto-dec to auto-inc in documentation.
+	(je): Changed to a memory constraint with APX NDD TLS operand
+	check.
+	(jM): New memory constraint for APX NDD instructions.
+	(jO): Likewise.
+	* config/i386/i386-protos.h (x86_poff_operand_p): Removed.
+	* config/i386/i386.cc (x86_poff_operand_p): Likewise.
+	* config/i386/i386.md (*add<dwi>3_doubleword): Use rjO.
+	(*add<mode>_1[SWI48]): Use je and jM.
+	(addsi_1_zext): Use jM.
+	(*addv<dwi>4_doubleword_1[DWI]): Likewise.
+	(*sub<mode>_1[SWI]): Use jM.
+	(@add<mode>3_cc_overflow_1[SWI]): Likewise.
+	(*add<dwi>3_doubleword_cc_overflow_1): Use rjO.
+	(*and<dwi>3_doubleword): Likewise.
+	(*anddi_1): Use jM.
+	(*andsi_1_zext): Likewise.
+	(*and<mode>_1[SWI24]): Likewise.
+	(*<code><dwi>3_doubleword[any_or]): Use rjO
+	(*code<mode>_1[any_or SWI248]): Use jM.
+	(*<code>si_1_zext[zero_extend + any_or]): Likewise.
+	* config/i386/predicates.md (apx_ndd_memory_operand): New.
+	(apx_ndd_add_memory_operand): Likewise.
+
+2024-02-08  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR target/113824
+	* config/avr/avr-mcus.def (ata5797): Move from avr5 to avr4.
+	* doc/avr-mmcu.texi: Rebuild.
+
+2024-02-08  Tamar Christina  <tamar.christina@arm.com>
+
+	PR tree-optimization/113808
+	* tree-vect-loop.cc (vectorizable_live_operation): Don't cache the
+	value cross iterations.
+
+2024-02-08  Georg-Johann Lay  <avr@gjlay.de>
+
+	* config/avr/gen-avr-mmcu-specs.cc (print_mcu) <*cpp_mcu>: Spec always
+	defines __AVR_PM_BASE_ADDRESS__ if the core has it.
+
+2024-02-08  Richard Biener  <rguenther@suse.de>
+
+	* tree-vect-data-refs.cc (vect_analyze_early_break_dependences):
+	Revert last change to dr_may_alias_p.
+
+2024-02-08  Georg-Johann Lay  <avr@gjlay.de>
+
+	* config/avr/gen-avr-mmcu-specs.cc: Rename spec cc1_misc to
+	cc1_rodata_in_ram.  Rename spec link_misc to link_rodata_in_ram.
+	Remove spec asm_misc.
+	* config/avr/specs.h: Same.
+
+2024-02-08  Pan Li  <pan2.li@intel.com>
+
+	PR target/113766
+	* config/riscv/riscv-vector-builtins-shapes.cc (struct alu_def): Make
+	sure the c.arg_num is >= 2 before checking.
+	(struct build_frm_base): Ditto.
+	(struct narrow_alu_def): Ditto.
+
+2024-02-07  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/113796
+	* tree-if-conv.cc (combine_blocks): Wipe range-info before
+	replacing PHIs and inserting predicates.
+
+2024-02-07  Roger Sayle  <roger@nextmovesoftware.com>
+	    Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/113690
+	* config/i386/i386-features.cc (timode_convert_cst): New helper
+	function to convert a TImode CONST_SCALAR_INT_P to a V1TImode
+	CONST_VECTOR.
+	(timode_scalar_chain::convert_op): Use timode_convert_cst.
+	(timode_scalar_chain::convert_insn): Delete REG_EQUAL notes.
+	Use timode_convert_cst.
+
+2024-02-07  Victor Do Nascimento  <victor.donascimento@arm.com>
+
+	* config/aarch64/aarch64-sys-regs.def: Copy from Binutils.
+	* config/aarch64/aarch64.h (AARCH64_FL_AIE): New.
+	(AARCH64_FL_DEBUGv8p9): Likewise.
+	(AARCH64_FL_FGT2): Likewise.Likewise.
+	(AARCH64_FL_ITE): Likewise.
+	(AARCH64_FL_PFAR): Likewise.
+	(AARCH64_FL_PMUv3_ICNTR): Likewise.
+	(AARCH64_FL_PMUv3_SS): Likewise.
+	(AARCH64_FL_PMUv3p9): Likewise.
+	(AARCH64_FL_RASv2): Likewise.
+	(AARCH64_FL_S1PIE): Likewise.
+	(AARCH64_FL_S1POE): Likewise.
+	(AARCH64_FL_S2PIE): Likewise.
+	(AARCH64_FL_S2POE): Likewise.
+	(AARCH64_FL_SCTLR2): Likewise.
+	(AARCH64_FL_SEBEP): Likewise.
+	(AARCH64_FL_SPE_FDS): Likewise.
+	(AARCH64_FL_TCR2): Likewise.
+
+2024-02-07  Richard Biener  <rguenther@suse.de>
+
+	* tree-vect-data-refs.cc (vect_analyze_early_break_dependences):
+	Only check whether reads are in-bound in places that are not safe.
+	Fix dependence check.  Add missing newline.  Clarify comments.
+
+2024-02-07  Tamar Christina  <tamar.christina@arm.com>
+
+	PR tree-optimization/113750
+	* tree-vect-data-refs.cc (vect_analyze_early_break_dependences): Check
+	for single predecessor when doing early break vect.
+	* tree-vect-loop.cc (move_early_exit_stmts): Get gsi at the start but
+	after labels.
+
+2024-02-07  Tamar Christina  <tamar.christina@arm.com>
+
+	PR tree-optimization/113731
+	* gimple-iterator.cc (gsi_move_before): Take new parameter for update
+	method.
+	* gimple-iterator.h (gsi_move_before): Default new param to
+	GSI_SAME_STMT.
+	* tree-vect-loop.cc (move_early_exit_stmts): Call gsi_move_before with
+	GSI_NEW_STMT.
+
+2024-02-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/113756
+	* range-op.cc (update_known_bitmask): For GIMPLE_UNARY_RHS,
+	use TYPE_SIGN (lh.type ()) instead of sign for widest_int::from
+	of lh_bits value and mask.
+
+2024-02-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/113753
+	* wide-int.cc (wi::mul_internal): Unpack op1val and op2val with
+	UNSIGNED rather than SIGNED.  If high or needs_overflow and prec is
+	not a multiple of HOST_BITS_PER_WIDE_INT, shift left bits above prec
+	so that they start with r[half_blocks_needed] lowest bit.  Fix up
+	computation of top mask for SIGNED.
+
+2024-02-07  Pan Li  <pan2.li@intel.com>
+
+	PR target/113766
+	* config/riscv/riscv-protos.h (resolve_overloaded_builtin): Adjust
+	the signature of func.
+	* config/riscv/riscv-c.cc (riscv_resolve_overloaded_builtin): Ditto.
+	* config/riscv/riscv-vector-builtins.cc (resolve_overloaded_builtin): Make
+	overloaded func with empty args error.
+
+2024-02-06  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR target/113689
+	* config/i386/i386.cc (x86_64_select_profile_regnum): Return
+	R10_REG after sorry.
+
+2024-02-06  Andrew Carlotti  <andrew.carlotti@arm.com>
+
+	* config/aarch64/aarch64.cc (aarch64_mangle_decl_assembler_name):
+	Move before new caller, and add ".default" suffix.
+	(get_suffixed_assembler_name): New.
+	(make_resolver_func): Use get_suffixed_assembler_name.
+	(aarch64_generate_version_dispatcher_body): Redo name mangling.
+
+2024-02-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/113763
+	* config/aarch64/aarch64.cc (aarch64_output_sme_zero_za): Change tiles
+	element from std::pair<unsigned int, char> to an unnamed struct.
+	Adjust uses of tile range variable.
+
+2024-02-06  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* config/riscv/riscv-vsetvl.cc (pre_vsetvl::emit_vsetvl): Fix inifinite compilation.
+	(pre_vsetvl::remove_vsetvl_pre_insns): Ditto.
+
+2024-02-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR sanitizer/110676
+	* gimple-fold.cc (gimple_fold_builtin_strlen): For -fsanitize=address
+	reset maxlen to sizetype maximum.
+
+2024-02-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/113736
+	* gimple-lower-bitint.cc (bitint_large_huge::limb_access): Use
+	var's address space for MEM_REF or VIEW_CONVERT_EXPRs.
+
+2024-02-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/113759
+	* tree-ssa-math-opts.cc (convert_mult_to_widen): If actual_precision
+	or from_unsignedN differs from properties of typeN, update typeN
+	to build_nonstandard_integer_type.  If TREE_TYPE (rhsN) is not
+	uselessly convertible to typeN, convert it using fold_convert or
+	build_and_insert_cast depending on if rhsN is INTEGER_CST or not.
+	(convert_plusminus_to_widen): Likewise.
+
+2024-02-06  Tejas Belagod  <tejas.belagod@arm.com>
+
+	PR target/112577
+	* config/aarch64/aarch64.cc (aarch64_class_max_nregs): Handle 64-bit
+	vector structure modes correctly.
+
+2024-02-05  Christoph Müllner  <christoph.muellner@vrull.eu>
+
+	* config/riscv/thead.cc (th_print_operand_address): Fix compiler
+	warning.
+
+2024-02-05  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR target/113689
+	* config/i386/i386.cc (x86_64_select_profile_regnum): New.
+	(x86_function_profiler): Call x86_64_select_profile_regnum to
+	get a scratch register for large model profiling.
+
+2024-02-05  Richard Ball  <richard.ball@arm.com>
+
+	* config/arm/arm.cc (arm_output_mi_thunk): Emit
+	insn for bti_c when bti is enabled.
+
+2024-02-05  Xi Ruoyao  <xry111@xry111.site>
+
+	* config/mips/mips-msa.md (neg<mode:MSA>2): Add missing mode for
+	neg.
+
+2024-02-05  Xi Ruoyao  <xry111@xry111.site>
+
+	* config/mips/mips-msa.md (elmsgnbit): New define_mode_attr.
+	(neg<mode>2): Change the mode iterator from MSA to IMSA because
+	in FP arithmetic we cannot use (0 - x) for -x.
+	(neg<mode>2): New define_insn to implement FP vector negation,
+	using a bnegi instruction to negate the sign bit.
+
+2024-02-05  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/113707
+	* tree-ssa-sccvn.cc (rpo_elim::eliminate_avail): After
+	checking the avail set treat out-of-region defines as
+	available.
+
+2024-02-05  Richard Biener  <rguenther@suse.de>
+
+	* tree-vect-data-refs.cc (vect_create_data_ref_ptr): Use
+	the default mode when building a pointer.
+
+2024-02-05  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/113737
+	* gimple-lower-bitint.cc (gimple_lower_bitint): If GIMPLE_SWITCH
+	has just a single label, remove it and make single successor edge
+	EDGE_FALLTHRU.
+
+2024-02-05  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/113059
+	* config/i386/i386-features.cc (rest_of_handle_insert_vzeroupper):
+	Remove REG_DEAD/REG_UNUSED notes at the end of the pass before
+	df_analyze call.
+
+2024-02-05  Richard Biener  <rguenther@suse.de>
+
+	PR target/113255
+	* config/i386/i386-expand.cc
+	(expand_set_or_cpymem_prologue_epilogue_by_misaligned_moves):
+	Use a new pseudo for the skipped number of bytes.
+
+2024-02-05  Monk Chiang  <monk.chiang@sifive.com>
+
+	* config/riscv/riscv-cores.def: Add sifive-p450, sifive-p670.
+	* doc/invoke.texi (RISC-V Options): Add sifive-p450,
+	sifive-p670.
+
+2024-02-05  Monk Chiang  <monk.chiang@sifive.com>
+
+	* config/riscv/riscv.md: Include sifive-p400.md.
+	* config/riscv/sifive-p400.md: New file.
+	* config/riscv/riscv-cores.def (RISCV_TUNE): Add parameter.
+	* config/riscv/riscv-opts.h (enum riscv_microarchitecture_type):
+	Add sifive_p400.
+	* config/riscv/riscv.cc (sifive_p400_tune_info): New.
+	* config/riscv/riscv.h (TARGET_SFB_ALU): Update.
+	* doc/invoke.texi (RISC-V Options): Add sifive-p400-series
+
 2024-02-04  Takayuki 'January June' Suwa  <jjsuwa_sys3175@yahoo.co.jp>
 
 	* config/xtensa/xtensa.md (*eqne_zero_masked_bits):

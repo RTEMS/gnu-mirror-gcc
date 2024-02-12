@@ -10950,7 +10950,7 @@ vectorizable_live_operation (vec_info *vinfo, stmt_vec_info stmt_info,
 	 did.  For the live values we want the value at the start of the iteration
 	 rather than at the end.  */
       edge main_e = LOOP_VINFO_IV_EXIT (loop_vinfo);
-      bool restart_loop = LOOP_VINFO_EARLY_BREAKS_VECT_PEELED (loop_vinfo);
+      bool all_exits_as_early_p = LOOP_VINFO_EARLY_BREAKS_VECT_PEELED (loop_vinfo);
       FOR_EACH_IMM_USE_STMT (use_stmt, imm_iter, lhs)
 	if (!is_gimple_debug (use_stmt)
 	    && !flow_bb_inside_loop_p (loop, gimple_bb (use_stmt)))
@@ -10966,8 +10966,7 @@ vectorizable_live_operation (vec_info *vinfo, stmt_vec_info stmt_info,
 	      /* For early exit where the exit is not in the BB that leads
 		 to the latch then we're restarting the iteration in the
 		 scalar loop.  So get the first live value.  */
-	      restart_loop = restart_loop || !main_exit_edge;
-	      if (restart_loop
+	      if ((all_exits_as_early_p || !main_exit_edge)
 		  && STMT_VINFO_DEF_TYPE (stmt_info) == vect_induction_def)
 		{
 		  tmp_vec_lhs = vec_lhs0;
@@ -11786,10 +11785,29 @@ move_early_exit_stmts (loop_vec_info loop_vinfo)
 
   /* Move all stmts that need moving.  */
   basic_block dest_bb = LOOP_VINFO_EARLY_BRK_DEST_BB (loop_vinfo);
-  gimple_stmt_iterator dest_gsi = gsi_start_bb (dest_bb);
+  gimple_stmt_iterator dest_gsi = gsi_after_labels (dest_bb);
 
   for (gimple *stmt : LOOP_VINFO_EARLY_BRK_STORES (loop_vinfo))
     {
+      /* We have to update crossed degenerate virtual PHIs.  Simply
+	 elide them.  */
+      if (gphi *vphi = dyn_cast <gphi *> (stmt))
+	{
+	  tree vdef = gimple_phi_result (vphi);
+	  tree vuse = gimple_phi_arg_def (vphi, 0);
+	  imm_use_iterator iter;
+	  use_operand_p use_p;
+	  gimple *use_stmt;
+	  FOR_EACH_IMM_USE_STMT (use_stmt, iter, vdef)
+	    {
+	      FOR_EACH_IMM_USE_ON_STMT (use_p, iter)
+		SET_USE (use_p, vuse);
+	    }
+	  auto gsi = gsi_for_stmt (stmt);
+	  remove_phi_node (&gsi, true);
+	  continue;
+	}
+
       /* Check to see if statement is still required for vect or has been
 	 elided.  */
       auto stmt_info = loop_vinfo->lookup_stmt (stmt);
@@ -11800,8 +11818,7 @@ move_early_exit_stmts (loop_vec_info loop_vinfo)
 	dump_printf_loc (MSG_NOTE, vect_location, "moving stmt %G", stmt);
 
       gimple_stmt_iterator stmt_gsi = gsi_for_stmt (stmt);
-      gsi_move_before (&stmt_gsi, &dest_gsi);
-      gsi_prev (&dest_gsi);
+      gsi_move_before (&stmt_gsi, &dest_gsi, GSI_NEW_STMT);
     }
 
   /* Update all the stmts with their new reaching VUSES.  */

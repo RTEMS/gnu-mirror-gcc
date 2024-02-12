@@ -1,3 +1,39 @@
+2024-02-10  Jakub Jelinek  <jakub@redhat.com>
+
+	* soft-fp/floatbitintdd.c (__bid_floatbitintdd): Or in all remainder
+	limbs into inexact rather than just first two.
+	* soft-fp/floatbitintsd.c (__bid_floatbitintsd): Likewise.
+	* soft-fp/floatbitinttd.c (__bid_floatbitinttd): Likewise.
+
+2024-02-10  Jakub Jelinek  <jakub@redhat.com>
+
+	* soft-fp/fixddbitint.c (__bid_fixddbitint): Fix up
+	BIL_TYPE_SIZE == 32 shifts.
+	* soft-fp/fixsdbitint.c (__bid_fixsdbitint): Likewise.
+	* soft-fp/fixtdbitint.c (__bid_fixtdbitint): Likewise.
+	* soft-fp/floatbitintdd.c (__bid_floatbitintdd): Likewise.
+	* soft-fp/floatbitinttd.c (__bid_floatbitinttd): Likewise.
+
+2024-02-09  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config/i386/libgcc-darwin.ver: Export bf and bitint-related
+	synbols.
+
+2024-02-06  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	PR target/113700
+	* config/i386/libgcc-sol2.ver (GCC_14.0.0): Added all symbols from
+	i386/libgcc-glibc.ver (GCC_12.0.0, GCC_13.0.0, GCC_14.0.0).
+	* config/i386/libgcc-glibc.ver: Request notifications on updates.
+
+2024-02-06  Matteo Italia  <matteo@mitalia.net>
+
+	PR libgcc/113337
+	* unwind-seh.c (_Unwind_Resume_or_Rethrow): forward
+	_Unwind_RaiseException return code back to caller instead of
+	calling abort, allowing __cxa_rethrow to invoke std::terminate
+	in case of uncaught rethrown exception
+
 2024-02-02  Jakub Jelinek  <jakub@redhat.com>
 
 	PR libgcc/113604

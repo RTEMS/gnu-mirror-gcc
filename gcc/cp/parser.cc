@@ -1310,7 +1310,8 @@ cp_lexer_peek_nth_token (cp_lexer* lexer, size_t n)
 
   if (cp_lexer_debugging_p (lexer))
     fprintf (cp_lexer_debug_stream,
-	     "cp_lexer: peeking ahead %ld at token: ", (long)n);
+	     "cp_lexer: peeking ahead " HOST_SIZE_T_PRINT_DEC " at token: ",
+	     (fmt_size_t) n);
 
   --n;
   token = lexer->next_token;
@@ -2088,7 +2089,9 @@ enum
   /* When parsing of the noexcept-specifier should be delayed.  */
   CP_PARSER_FLAGS_DELAY_NOEXCEPT = 0x40,
   /* When parsing a consteval declarator.  */
-  CP_PARSER_FLAGS_CONSTEVAL = 0x80
+  CP_PARSER_FLAGS_CONSTEVAL = 0x80,
+  /* When parsing a parameter declaration.  */
+  CP_PARSER_FLAGS_PARAMETER = 0x100
 };
 
 /* This type is used for parameters and variables which hold
@@ -6717,12 +6720,19 @@ cp_parser_unqualified_id (cp_parser* parser,
 
 	/* DR 2237 (C++20 only): A simple-template-id is no longer valid as the
 	   declarator-id of a constructor or destructor.  */
-	if (token->type == CPP_TEMPLATE_ID && declarator_p
-	    && cxx_dialect >= cxx20)
+	if (token->type == CPP_TEMPLATE_ID && declarator_p)
 	  {
-	    if (!cp_parser_simulate_error (parser))
-	      error_at (tilde_loc, "template-id not allowed for destructor");
-	    return error_mark_node;
+	    auto_diagnostic_group d;
+	    bool w = false;
+	    if (cxx_dialect >= cxx20 && !cp_parser_simulate_error (parser))
+	      w = pedwarn (tilde_loc, OPT_Wtemplate_id_cdtor,
+			   "template-id not allowed for destructor in C++20");
+	    else if (cxx_dialect < cxx20
+		     && !cp_parser_uncommitted_to_tentative_parse_p (parser))
+	      w = warning_at (tilde_loc, OPT_Wtemplate_id_cdtor,
+			      "template-id not allowed for destructor in C++20");
+	    if (w)
+	      inform (tilde_loc, "remove the %qs", "< >");
 	  }
 
 	/* If there was an explicit qualification (S::~T), first look
@@ -16342,7 +16352,7 @@ cp_parser_decl_specifier_seq (cp_parser* parser,
       /* Special case for "this" specifier, indicating a parm is an xobj parm.
 	 The "this" specifier must be the first specifier in the declaration,
 	 after any attributes.  */
-      if (token->keyword == RID_THIS)
+      if (token->keyword == RID_THIS && (flags & CP_PARSER_FLAGS_PARAMETER))
 	{
 	  cp_lexer_consume_token (parser->lexer);
 	  if (token != first_specifier)
@@ -25607,7 +25617,7 @@ cp_parser_parameter_declaration (cp_parser *parser,
   /* Parse the declaration-specifiers.  */
   cp_token *decl_spec_token_start = cp_lexer_peek_token (parser->lexer);
   cp_parser_decl_specifier_seq (parser,
-				flags,
+				flags | CP_PARSER_FLAGS_PARAMETER,
 				&decl_specifiers,
 				&declares_class_or_enum);
 
@@ -29308,7 +29318,7 @@ cp_parser_throw_expression (cp_parser* parser)
      the end at the end of the final token we consumed.  */
   location_t combined_loc = make_location (start_loc, start_loc,
 					   parser->lexer);
-  expression = build_throw (combined_loc, expression);
+  expression = build_throw (combined_loc, expression, tf_warning_or_error);
 
   return expression;
 }
@@ -32329,9 +32339,7 @@ cp_parser_constructor_declarator_p (cp_parser *parser, cp_parser_flags flags,
   if (next_token->type != CPP_NAME
       && next_token->type != CPP_SCOPE
       && next_token->type != CPP_NESTED_NAME_SPECIFIER
-      /* DR 2237 (C++20 only): A simple-template-id is no longer valid as the
-	 declarator-id of a constructor or destructor.  */
-      && (next_token->type != CPP_TEMPLATE_ID || cxx_dialect >= cxx20))
+      && next_token->type != CPP_TEMPLATE_ID)
     return false;
 
   /* Parse tentatively; we are going to roll back all of the tokens
@@ -32549,6 +32557,18 @@ cp_parser_constructor_declarator_p (cp_parser *parser, cp_parser_flags flags,
 
   /* We did not really want to consume any tokens.  */
   cp_parser_abort_tentative_parse (parser);
+
+  /* DR 2237 (C++20 only): A simple-template-id is no longer valid as the
+     declarator-id of a constructor or destructor.  */
+  if (constructor_p
+      && cp_lexer_peek_token (parser->lexer)->type == CPP_TEMPLATE_ID)
+    {
+      auto_diagnostic_group d;
+      if (emit_diagnostic (cxx_dialect >= cxx20 ? DK_PEDWARN : DK_WARNING,
+			   input_location, OPT_Wtemplate_id_cdtor,
+			   "template-id not allowed for constructor in C++20"))
+	inform (input_location, "remove the %qs", "< >");
+    }
 
   return constructor_p;
 }

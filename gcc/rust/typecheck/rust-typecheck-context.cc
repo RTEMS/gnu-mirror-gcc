@@ -17,6 +17,7 @@
 // <http://www.gnu.org/licenses/>.
 
 #include "rust-hir-type-check.h"
+#include "rust-type-util.h"
 
 namespace Rust {
 namespace Resolver {
@@ -31,7 +32,7 @@ TypeCheckContext::get ()
   return instance;
 }
 
-TypeCheckContext::TypeCheckContext () {}
+TypeCheckContext::TypeCheckContext () { lifetime_resolver_stack.emplace (); }
 
 TypeCheckContext::~TypeCheckContext () {}
 
@@ -494,6 +495,126 @@ TypeCheckContext::trait_query_in_progress (DefId id) const
 {
   return trait_queries_in_progress.find (id)
 	 != trait_queries_in_progress.end ();
+}
+
+Lifetime
+TypeCheckContext::intern_lifetime (const HIR::Lifetime &lifetime)
+{
+  if (lifetime.get_lifetime_type () == AST::Lifetime::NAMED)
+    {
+      auto maybe_interned = lookup_lifetime (lifetime);
+      if (maybe_interned)
+	return *maybe_interned;
+
+      auto interned = next_lifetime_index.next ();
+      lifetime_name_interner[lifetime.get_name ()] = interned;
+      return interned;
+    }
+  if (lifetime.get_lifetime_type () == AST::Lifetime::WILDCARD)
+    {
+      return next_lifetime_index.next ();
+    }
+  if (lifetime.get_lifetime_type () == AST::Lifetime::STATIC)
+    {
+      return Lifetime::static_lifetime ();
+    }
+  rust_unreachable ();
+}
+
+tl::optional<Lifetime>
+TypeCheckContext::lookup_lifetime (const HIR::Lifetime &lifetime) const
+{
+  if (lifetime.get_lifetime_type () == AST::Lifetime::NAMED)
+    {
+      rust_assert (lifetime.get_name () != "static");
+      const auto name = lifetime.get_name ();
+      auto it = lifetime_name_interner.find (name);
+      if (it == lifetime_name_interner.end ())
+	return tl::nullopt;
+      return it->second;
+    }
+  if (lifetime.get_lifetime_type () == AST::Lifetime::WILDCARD)
+    {
+      return Lifetime::anonymous_lifetime ();
+    }
+  if (lifetime.get_lifetime_type () == AST::Lifetime::STATIC)
+    {
+      return Lifetime::static_lifetime ();
+    }
+  rust_unreachable ();
+}
+
+WARN_UNUSED_RESULT tl::optional<TyTy::Region>
+TypeCheckContext::lookup_and_resolve_lifetime (
+  const HIR::Lifetime &lifetime) const
+{
+  auto maybe_interned = lookup_lifetime (lifetime);
+  if (!maybe_interned)
+    return tl::nullopt;
+
+  return get_lifetime_resolver ().resolve (maybe_interned.value ());
+}
+void
+TypeCheckContext::intern_and_insert_lifetime (const HIR::Lifetime &lifetime)
+{
+  get_lifetime_resolver ().insert_mapping (intern_lifetime (lifetime));
+}
+
+WARN_UNUSED_RESULT std::vector<TyTy::Region>
+TypeCheckContext::regions_from_generic_args (const HIR::GenericArgs &args) const
+{
+  std::vector<TyTy::Region> regions;
+  for (const auto &lifetime : args.get_lifetime_args ())
+    {
+      auto resolved = lookup_and_resolve_lifetime (lifetime);
+      if (!resolved)
+	{
+	  rust_error_at (lifetime.get_locus (), "unresolved lifetime");
+	  return {};
+	}
+      regions.push_back (*resolved);
+    }
+  return regions;
+}
+
+void
+TypeCheckContext::compute_inference_variables (bool error)
+{
+  auto mappings = Analysis::Mappings::get ();
+
+  // default inference variables if possible
+  iterate ([&] (HirId id, TyTy::BaseType *ty) mutable -> bool {
+    // nothing to do
+    if (ty->get_kind () != TyTy::TypeKind::INFER)
+      return true;
+
+    TyTy::InferType *infer_var = static_cast<TyTy::InferType *> (ty);
+    TyTy::BaseType *default_type;
+
+    rust_debug_loc (mappings->lookup_location (id),
+		    "trying to default infer-var: %s",
+		    infer_var->as_string ().c_str ());
+    bool ok = infer_var->default_type (&default_type);
+    if (!ok)
+      {
+	if (error)
+	  rust_error_at (mappings->lookup_location (id), ErrorCode::E0282,
+			 "type annotations needed");
+	return true;
+      }
+
+    auto result
+      = unify_site (id, TyTy::TyWithLocation (ty),
+		    TyTy::TyWithLocation (default_type), UNDEF_LOCATION);
+    rust_assert (result);
+    rust_assert (result->get_kind () != TyTy::TypeKind::ERROR);
+    result->set_ref (id);
+    insert_type (Analysis::NodeMapping (mappings->get_current_crate (), 0, id,
+					UNKNOWN_LOCAL_DEFID),
+		 result);
+
+    return true;
+  });
 }
 
 // TypeCheckContextItem

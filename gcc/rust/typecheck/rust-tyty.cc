@@ -140,14 +140,15 @@ is_primitive_type_kind (TypeKind kind)
 BaseType::BaseType (HirId ref, HirId ty_ref, TypeKind kind, RustIdent ident,
 		    std::set<HirId> refs)
   : TypeBoundsMappings ({}), kind (kind), ref (ref), ty_ref (ty_ref),
-    combined (refs), ident (ident), mappings (Analysis::Mappings::get ())
+    orig_ref (ref), combined (refs), ident (ident),
+    mappings (Analysis::Mappings::get ())
 {}
 
 BaseType::BaseType (HirId ref, HirId ty_ref, TypeKind kind, RustIdent ident,
 		    std::vector<TypeBoundPredicate> specified_bounds,
 		    std::set<HirId> refs)
   : TypeBoundsMappings (specified_bounds), kind (kind), ref (ref),
-    ty_ref (ty_ref), combined (refs), ident (ident),
+    ty_ref (ty_ref), orig_ref (ref), combined (refs), ident (ident),
     mappings (Analysis::Mappings::get ())
 {}
 
@@ -177,6 +178,11 @@ void
 BaseType::set_ty_ref (HirId id)
 {
   ty_ref = id;
+}
+HirId
+BaseType::get_orig_ref () const
+{
+  return orig_ref;
 }
 
 bool
@@ -572,7 +578,8 @@ BaseType::monomorphized_clone () const
     {
       TyVar elm = ref->get_var_element_type ().monomorphized_clone ();
       return new ReferenceType (ref->get_ref (), ref->get_ty_ref (), elm,
-				ref->mutability (), ref->get_combined_refs ());
+				ref->mutability (), ref->get_region (),
+				ref->get_combined_refs ());
     }
   else if (auto tuple = x->try_as<const TupleType> ())
     {
@@ -594,7 +601,9 @@ BaseType::monomorphized_clone () const
       return new FnType (fn->get_ref (), fn->get_ty_ref (), fn->get_id (),
 			 fn->get_identifier (), fn->ident, fn->get_flags (),
 			 fn->get_abi (), std::move (cloned_params), retty,
-			 fn->clone_substs (), fn->get_combined_refs ());
+			 fn->clone_substs (), fn->get_substitution_arguments (),
+			 fn->get_region_constraints (),
+			 fn->get_combined_refs ());
     }
   else if (auto fn = x->try_as<const FnPtr> ())
     {
@@ -618,6 +627,7 @@ BaseType::monomorphized_clone () const
 			  adt->get_adt_kind (), cloned_variants,
 			  adt->clone_substs (), adt->get_repr_options (),
 			  adt->get_used_arguments (),
+			  adt->get_region_constraints (),
 			  adt->get_combined_refs ());
     }
   else
@@ -977,6 +987,7 @@ InferType::default_type (BaseType **type) const
   auto context = Resolver::TypeCheckContext::get ();
   bool ok = false;
 
+  // NOTE: Calling this error is misleading.
   if (default_hint.kind == TypeKind::ERROR)
     {
       switch (infer_kind)
@@ -1636,7 +1647,7 @@ ADTType::clone () const
   return new ADTType (get_ref (), get_ty_ref (), identifier, ident,
 		      get_adt_kind (), cloned_variants, clone_substs (),
 		      get_repr_options (), used_arguments,
-		      get_combined_refs ());
+		      get_region_constraints (), get_combined_refs ());
 }
 
 static bool
@@ -1955,6 +1966,7 @@ FnType::clone () const
   return new FnType (get_ref (), get_ty_ref (), get_id (), get_identifier (),
 		     ident, flags, abi, std::move (cloned_params),
 		     get_return_type ()->clone (), clone_substs (),
+		     get_substitution_arguments (), get_region_constraints (),
 		     get_combined_refs ());
 }
 
@@ -2848,19 +2860,20 @@ CharType::clone () const
 // Reference Type
 
 ReferenceType::ReferenceType (HirId ref, TyVar base, Mutability mut,
-			      std::set<HirId> refs)
+			      Region region, std::set<HirId> refs)
   : BaseType (ref, ref, KIND,
 	      {Resolver::CanonicalPath::create_empty (), BUILTINS_LOCATION},
-	      refs),
-    base (base), mut (mut)
+	      std::move (refs)),
+    base (base), mut (mut), region (region)
 {}
 
 ReferenceType::ReferenceType (HirId ref, HirId ty_ref, TyVar base,
-			      Mutability mut, std::set<HirId> refs)
+			      Mutability mut, Region region,
+			      std::set<HirId> refs)
   : BaseType (ref, ty_ref, KIND,
 	      {Resolver::CanonicalPath::create_empty (), BUILTINS_LOCATION},
-	      refs),
-    base (base), mut (mut)
+	      std::move (refs)),
+    base (base), mut (mut), region (region)
 {}
 
 Mutability
@@ -2873,6 +2886,11 @@ bool
 ReferenceType::is_mutable () const
 {
   return mut == Mutability::Mut;
+}
+Region
+ReferenceType::get_region () const
+{
+  return region;
 }
 
 bool
@@ -2982,7 +3000,7 @@ BaseType *
 ReferenceType::clone () const
 {
   return new ReferenceType (get_ref (), get_ty_ref (), base, mutability (),
-			    get_combined_refs ());
+			    get_region (), get_combined_refs ());
 }
 
 ReferenceType *
@@ -3564,11 +3582,13 @@ PlaceholderType::is_equal (const BaseType &other) const
 ProjectionType::ProjectionType (
   HirId ref, BaseType *base, const Resolver::TraitReference *trait, DefId item,
   std::vector<SubstitutionParamMapping> subst_refs,
-  SubstitutionArgumentMappings generic_arguments, std::set<HirId> refs)
+  SubstitutionArgumentMappings generic_arguments,
+  RegionConstraints region_constraints, std::set<HirId> refs)
   : BaseType (ref, ref, KIND,
 	      {Resolver::CanonicalPath::create_empty (), BUILTINS_LOCATION},
-	      refs),
-    SubstitutionRef (std::move (subst_refs), std::move (generic_arguments)),
+	      std::move (refs)),
+    SubstitutionRef (std::move (subst_refs), std::move (generic_arguments),
+		     std::move (region_constraints)),
     base (base), trait (trait), item (item)
 {}
 
@@ -3576,11 +3596,13 @@ ProjectionType::ProjectionType (
   HirId ref, HirId ty_ref, BaseType *base,
   const Resolver::TraitReference *trait, DefId item,
   std::vector<SubstitutionParamMapping> subst_refs,
-  SubstitutionArgumentMappings generic_arguments, std::set<HirId> refs)
+  SubstitutionArgumentMappings generic_arguments,
+  RegionConstraints region_constraints, std::set<HirId> refs)
   : BaseType (ref, ty_ref, KIND,
 	      {Resolver::CanonicalPath::create_empty (), BUILTINS_LOCATION},
 	      refs),
-    SubstitutionRef (std::move (subst_refs), std::move (generic_arguments)),
+    SubstitutionRef (std::move (subst_refs), std::move (generic_arguments),
+		     std::move (region_constraints)),
     base (base), trait (trait), item (item)
 {}
 
@@ -3631,7 +3653,7 @@ ProjectionType::clone () const
 {
   return new ProjectionType (get_ref (), get_ty_ref (), base->clone (), trait,
 			     item, clone_substs (), used_arguments,
-			     get_combined_refs ());
+			     region_constraints, get_combined_refs ());
 }
 
 ProjectionType *

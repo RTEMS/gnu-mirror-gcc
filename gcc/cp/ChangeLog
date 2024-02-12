@@ -1,3 +1,88 @@
+2024-02-10  Marek Polacek  <polacek@redhat.com>
+
+	DR 2237
+	PR c++/107126
+	PR c++/97202
+	* parser.cc (cp_parser_unqualified_id): Downgrade the DR2237 error to
+	a pedwarn.
+	(cp_parser_constructor_declarator_p): Likewise.
+
+2024-02-10  Jakub Jelinek  <jakub@redhat.com>
+
+	* tree.cc (debug_binfo): Use HOST_WIDE_INT_PRINT_DEC instead of "%ld"
+	and casts to long.
+	* pt.cc (print_template_statistics): Use HOST_SIZE_T_PRINT_DEC
+	and casts to fmt_size_t instead of "%ld" and casts to long.
+	* class.cc (dump_class_hierarchy_1): Use HOST_WIDE_INT_PRINT_UNSIGNED
+	instead of "%lu" and casts to unsigned long.  For TYPE_ALIGN, use
+	%u instead of %lu and drop casts to unsigned long.
+	* parser.cc (cp_lexer_peek_nth_token): Use HOST_SIZE_T_PRINT_DEC
+	and casts to fmt_size_t instead of "%ld" and casts to long.
+
+2024-02-09  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/113834
+	* semantics.cc (finish_type_pack_element): Perform range checking
+	before tree_to_shwi.
+
+2024-02-09  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/98388
+	* coroutines.cc (coro_rewrite_function_body): Pass tf_warning_or_error
+	to build_throw.
+	(morph_fn_to_coro): Likewise.
+	* cp-tree.h (build_throw): Adjust.
+	* except.cc (expand_end_catch_block): Pass tf_warning_or_error to
+	build_throw.
+	(build_throw): Add a tsubst_flags_t parameter.  Use it.  Remove
+	redundant variable.  Guard an inform call.
+	* parser.cc (cp_parser_throw_expression): Pass tf_warning_or_error
+	to build_throw.
+	* pt.cc (tsubst_expr) <case THROW_EXPR>: Pass complain to build_throw.
+
+2024-02-09  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/112580
+	* module.cc (trees_in::read_class_def): When streaming in
+	an anonymous union field of an as-base class, don't overwrite
+	ANON_AGGR_TYPE_FIELD.
+
+2024-02-08  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/113649
+	* pt.cc (do_class_deduction): Add outer_targs parameter.
+	Substitute outer arguments into the CTAD template.
+	(do_auto_deduction): Pass outer_targs to do_class_deduction.
+
+2024-02-08  Jason Merrill  <jason@redhat.com>
+
+	* pt.cc (create_template_parm_object): Pass TARGET_EXPR to
+	cxx_constant_value.
+
+2024-02-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/113788
+	* parser.cc (CP_PARSER_FLAGS_PARAMETER): New enumerator.
+	(cp_parser_decl_specifier_seq): Parse RID_THIS only if
+	CP_PARSER_FLAGS_PARAMETER is set in flags.
+	(cp_parser_parameter_declaration): Or in CP_PARSER_FLAGS_PARAMETER
+	when calling cp_parser_decl_specifier_seq.
+
+2024-02-06  Marek Polacek  <polacek@redhat.com>
+
+	* method.cc (early_check_defaulted_comparison): Add
+	auto_diagnostic_group.
+
+2024-02-06  Jason Merrill  <jason@redhat.com>
+
+	PR c++/107291
+	* method.cc (early_check_defaulted_comparison): Fail if not friend.
+
+2024-02-05  Jason Merrill  <jason@redhat.com>
+
+	PR c++/111286
+	* tree.cc (rvalue): Don't drop cv-quals from an array.
+
 2024-02-03  Patrick Palka  <ppalka@redhat.com>
 
 	PR c++/110006
