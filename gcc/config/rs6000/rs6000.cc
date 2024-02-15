@@ -5944,6 +5944,8 @@ rs6000_machine_from_flags (void)
   /* Disable the flags that should never influence the .machine selection.  */
   flags &= ~(OPTION_MASK_PPC_GFXOPT | OPTION_MASK_PPC_GPOPT | OPTION_MASK_ISEL);
 
+  if ((flags & OPTION_MASK_FUTURE) != 0)
+    return "future";
   if ((flags & (ISA_3_1_MASKS_SERVER & ~ISA_3_0_MASKS_SERVER)) != 0)
     return "power10";
   if ((flags & (ISA_3_0_MASKS_SERVER & ~ISA_2_7_MASKS_SERVER)) != 0)
