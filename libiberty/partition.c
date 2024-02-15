@@ -86,9 +86,8 @@ partition_union (partition part, int elem1, int elem2)
   if (class_element == elements[elem2].class_element)
     return class_element;
 
-  /* Make sure ELEM1 is in the larger class of the two.  If not, swap
-     them.  This way we always scan the shorter list.  */
-  if (elements[elem1].class_count < elements[elem2].class_count) 
+  /* Make the class with the smaller index be the representative.  */
+  if (elements[elem1].class_element > elements[elem2].class_element)
     {
       int temp = elem1;
       elem1 = elem2;
