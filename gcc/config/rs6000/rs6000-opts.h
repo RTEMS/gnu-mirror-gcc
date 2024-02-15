@@ -70,6 +70,9 @@ enum processor_type
    PROCESSOR_TITAN
 };
 
+/* Until there are changes for -mcpu=future, treat -mcpu=future to be like
+   -mcpu=power10.  */
+#define PROCESSOR_FUTURE	PROCESSOR_POWER10
 
 /* Types of costly dependences.  */
 enum rs6000_dependence_cost
