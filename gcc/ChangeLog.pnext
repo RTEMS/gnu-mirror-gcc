@@ -1,3 +1,29 @@
+==================== Branch work158-pnext, patch #200 ====================
+
+Add -mcpu=power11 support.
+
+2024-02-15  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config.gcc (powerpc*-*-*, rs6000-*-*): Add support for
+	--with-cpu=power11.
+	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Define
+	_ARCH_PWR11 if -mcpu=power11.
+	* config/rs6000/rs6000-cpus.def (ISA_POWER11_MASKS_SERVER): New macro.
+	(POWERPC_MASKS): Add -mcpu=power11 ISA bit.
+	(power11 cpu): New cpu target.
+	* config/rs6000/rs6000-opts.h (PROCESSOR_POWER11): Define as
+	PROCESSOR_POWER10 for now.
+	* config/rs6000/rs6000-tables.optL: Regenerate.
+	* config/rs6000/rs6000.cc (rs6000_machine_from_flags): Set .machine
+	power11 if -mcpu=power11.
+	(rs6000_opt_masks): Add Power11.
+	* config/rs6000/rs6000.h (ASM_CPU_SPEC): Pass -mpower11 to the assembler
+	if -mcpu=power11.
+	* config/rs6000/rs6000.opt (-mpower11): Add ISA bit for power11.
+	* doc/invoke.texi (PowerPC options): Document -mcpu=power11.
+
 ==================== Branch work158-pnext, patch #116 from work158-future branch ====================
 
 Add configure support for PowerPC future.
