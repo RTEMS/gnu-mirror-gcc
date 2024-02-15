@@ -612,6 +612,9 @@ mrop-protect
 Target Var(rs6000_rop_protect) Init(0)
 Enable instructions that guard against return-oriented programming attacks.
 
+mpower11
+Target Undocumented Mask(POWER11) Var(rs6000_isa_flags) Warn(Do not use %<-mpower11>)
+
 mfuture
 Target Undocumented Mask(FUTURE) Var(rs6000_isa_flags) Warn(Do not use %<-mfuture>)
 
