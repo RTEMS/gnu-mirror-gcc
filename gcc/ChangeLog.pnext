@@ -1,5 +1,27 @@
 ==================== Branch work158-pnext, patch #201 ====================
 
+Add power11 aux vector and tests.
+
+2024-02-15  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/driver-rs6000.c (asm_names): Add power11 support.
+	* config/rs6000/ppc-auxv.h (PPC_PLATFORM_POWER10): Remove comment saying
+	this is not yet official.
+	(PPC_PLATFORM_POWER11): Add power11 support.
+	* config/rs6000/rs6000-builtin.cc (cpu_is_info): Likewise.
+
+gcc/testsuite/
+
+	* lib/target-support.exp (check_effective_target_power11_ok): Add
+	power11 support.
+	* gcc.target/powerpc/power11-1.c: New test.
+	* gcc.target/powerpc/power11-2.c: Likewise.
+	* gcc.target/powerpc/power11-3.c: Likewise.
+
+==================== Branch work158-pnext, patch #201 ====================
+
 Add -mcpu=power11 and -mcpu=future support.
 
 2024-02-15  Michael Meissner  <meissner@linux.ibm.com>
