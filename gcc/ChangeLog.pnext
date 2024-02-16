@@ -1,3 +1,35 @@
+==================== Branch work158-pnext, patch #201 ====================
+
+Add -mcpu=power11 and -mcpu=future support.
+
+2024-02-15  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config.gcc (powerpc*-*-*, rs6000-*-*): Add support for power11 and
+	future processors.
+	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Define
+	_ARCH_PWR11 if -mcpu=power11 and _ARCH_PWR_FUTURE if -mcpu=future.
+	* config/rs6000/rs6000-cpus.def (ISA_POWER11_MASKS_SERVER): Add support
+	for -mcpu=power11.
+	(ISA_FUTURE_MASKS_SERVER): Add support for -mcpu=future.
+	(POWERPC_MASKS): Add support for -mcpu=power11 and -mcpu=future.
+	(power11 cpu): Add power11 cpu.
+	(future cpu): Add future cpu.
+	* config/rs6000/rs6000-opts.h (PROCESSOR_POWER11): New macro.
+	(PROCESSOR_FUTURE): Likewise.
+	* config/rs6000/rs6000-tables.opt: Regenerate.
+	* config/rs6000/rs6000.cc (rs6000_machine_from_flags): If -mcpu=power11,
+	emit .machine power11.  If -mcpu=future emit .machine future.
+	(rs6000_opt_masks): Add support for power11 and future ISA bits.
+	* config/rs6000/rs6000.h (ASM_CPU_SPEC): Pass -mfuture to the assembler
+	if -mcpu=future.  Pass -mpower11 to the assembler if -mcpu=power11.
+	* config/rs6000/rs6000.opt (-mpower11): New internal ISA bit for
+	power11 cpu.
+	(-mfuture): New internal ISA bit for future cpu.
+	* doc/invoke.texi (PowerPC options): Document -mcpu=future and
+	-mcpu=power11.
+
 ==================== Branch work158-pnext, patch #200 was reverted ====================
 
 ==================== Branch work158-pnext, patches #111-116 were reverted ====================
