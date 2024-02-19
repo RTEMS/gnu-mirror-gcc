@@ -1,3 +1,12 @@
+2024-02-19  Backport from ae193f9008e02683e27f3c87f3b06f38e103b1d0
+
+	Use reduced version of the PR101188 fix that only handles CLOBBERs.
+	It's not clear how to backport the full fix from Jeff Law.
+
+	PR rtl-optimization/101188
+	* postreload.c (reload_cse_move2add): Record effect of CLOBBERs.
+	* testsuite/gcc.c-torture/execute/pr101188.c: New test.
+
 2021-05-14  Release Manager
 
 	* GCC 8.5.0 released.

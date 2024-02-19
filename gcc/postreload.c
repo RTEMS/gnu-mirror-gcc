@@ -40,6 +40,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "cselib.h"
 #include "tree-pass.h"
 #include "dbgcnt.h"
+#include "rtl-iter.h"
 
 static int reload_cse_noop_set_p (rtx);
 static bool reload_cse_simplify (rtx_insn *, rtx);
@@ -2027,6 +2028,14 @@ reload_cse_move2add (rtx_insn *first)
 		      if (success)
 			delete_insn (insn);
 		      changed |= success;
+		      // By setting "insn = next" below, we are bypassing the
+		      // side-effects of next, see PR101188.  Do them by hand
+		      subrtx_iterator::array_type array;
+		      FOR_EACH_SUBRTX (iter, array, PATTERN (next), NONCONST)
+			{
+			  if (GET_CODE (*iter) == CLOBBER)
+			    move2add_note_store (XEXP (*iter, 0), *iter, next);
+			}
 		      insn = next;
 		      move2add_record_mode (reg);
 		      reg_offset[regno]
