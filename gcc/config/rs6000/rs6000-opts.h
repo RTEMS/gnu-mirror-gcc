@@ -70,10 +70,6 @@ enum processor_type
    PROCESSOR_TITAN
 };
 
-/* Until there are changes in instruction tuning for either power11 or a
-   possible future cpu, treat them to be like -mtune=power10.  */
-#define PROCESSOR_POWER11	PROCESSOR_POWER10
-#define PROCESSOR_FUTURE	PROCESSOR_POWER10
 
 /* Types of costly dependences.  */
 enum rs6000_dependence_cost
