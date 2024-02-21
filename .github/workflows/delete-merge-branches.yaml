@@ -37,7 +37,7 @@ jobs:
       matrixTestSet: ${{ steps.printGCCTestSet.outputs.testSet }}
     steps:
       - name: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive

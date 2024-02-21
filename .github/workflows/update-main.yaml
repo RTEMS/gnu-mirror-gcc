@@ -47,7 +47,7 @@ jobs:
       matrixTestSet: ${{ steps.printGCCTestSet.outputs.testSet }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
@@ -60,7 +60,7 @@ jobs:
 
 
       - name: Setup Python 3.7
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: 3.7
         
@@ -113,7 +113,7 @@ jobs:
         run: tar -czf objdir.tar.gz ../objdir
 
       - name: Upload build output
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: gccBuild
           path: objdir.tar.gz
@@ -140,7 +140,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
@@ -152,7 +152,7 @@ jobs:
           .github/scripts/free-disk-space.sh
 
       - name: Setup Python 3.7
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: 3.7
         
@@ -172,7 +172,7 @@ jobs:
       # for download through the REST API until after the workflow has completed. We can only get the workflows from the
       # previous steps through the download-artifact action.
       - name: Download gccBuild artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: gccBuild
           path: gccBuild
@@ -196,7 +196,7 @@ jobs:
         run: mv ../objdir objdir
 
       - name: Upload test logs
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: master_${{ matrix.testSet }}_logs
           path: objdir/logs
@@ -209,7 +209,7 @@ jobs:
       newBranchName: ${{ steps.setBranchName.outputs.newBranchName }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
@@ -217,7 +217,7 @@ jobs:
           token: ${{ secrets.VICTORPAT }} # The basic ${{ github.token }} doesn't include "workflows" write permission access to modify workflows in the .github directory
 
       - name: Setup Python 3.7
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: 3.7
           
@@ -240,7 +240,7 @@ jobs:
       # so we'll have to download the GCC build earlier, which isn't necessary for this step since we only
       # care about the test logs.
       # To make this faster, we can avoid downloading the GCC build in the future
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           path: artifacts
 
@@ -267,7 +267,7 @@ jobs:
 
       - name: Upload failures patch
         if: ${{ steps.check_failures_patch.outputs.files_exists }} == 'true'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: newFailures.patch
           path: newFailures.patch
@@ -328,14 +328,14 @@ jobs:
       newFailuresPatchExists: ${{ steps.check_failures_patch.outputs.files_exists }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
           lfs: true
 
       - name: Setup Python 3.7
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: 3.7
       
@@ -366,14 +366,14 @@ jobs:
       newFailuresPatchExists: ${{ steps.check_failures_patch.outputs.files_exists }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
           lfs: true
 
       - name: Setup Python 3.7
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: 3.7
           

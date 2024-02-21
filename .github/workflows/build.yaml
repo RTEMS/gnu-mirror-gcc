@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
@@ -54,7 +54,7 @@ jobs:
           .github/scripts/free-disk-space.sh
 
       - name: Setup Python 3.7
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: 3.7
         
@@ -87,7 +87,7 @@ jobs:
         run: tar -czf objdir.tar.gz ../objdir
 
       - name: Upload build output
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: gccBuild
           path: objdir.tar.gz

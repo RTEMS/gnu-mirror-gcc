@@ -45,7 +45,7 @@ jobs:
 
       # Clone the GCC repository to path gcc.
       - name: Checkout GCC Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
@@ -59,7 +59,7 @@ jobs:
       # Upload gcc-${{ env.release_version }}.tar.xz file to the Github Action artifact storage.
       # The variable ${{ env.release_version }} will be set by ./gcc/.github/actions/build-tarball job.
       - name: Upload GCC tar.xz
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: gcc-${{ env.release_version }}.tar.xz
           path: ~/gcc-${{ env.release_version }}/gcc-${{ env.release_version }}.tar.xz

@@ -58,7 +58,7 @@ jobs:
       fail-fast: false    
     steps:
       - name: Checkout  
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
@@ -66,7 +66,7 @@ jobs:
           token: ${{ secrets.VICTORPAT }} # The basic ${{ github.token }} doesn't include "workflows" write permission access to modify workflows in the .github directory
 
       - name: Setup Python 3.7
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: 3.7
 

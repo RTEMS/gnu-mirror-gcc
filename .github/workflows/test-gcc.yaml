@@ -53,14 +53,14 @@ jobs:
       matrixTestSet: ${{ steps.printGCCTestSet.outputs.testSet }}
     steps:
       - name: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
           lfs: true
 
       - name: Setup Python 3.7
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: 3.7
 
@@ -110,7 +110,7 @@ jobs:
         env:
           GITHUB_CONTEXT: ${{ toJson(github) }}
       - name: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
@@ -122,7 +122,7 @@ jobs:
           .github/scripts/free-disk-space.sh
 
       - name: Setup Python 3.7
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: 3.7
         
@@ -145,7 +145,7 @@ jobs:
         run: mv ../objdir objdir
 
       - name: Upload build output
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.testSet }}_logs
           path: objdir/logs
