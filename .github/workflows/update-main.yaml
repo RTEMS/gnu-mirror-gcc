@@ -356,7 +356,7 @@ jobs:
         shell: bash
         env:
           mergeBranch: ${{ needs.parse-failures.outputs.newBranchName }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.VICTORPAT }}
 
   wait-test:
     name: Waiting on tests with gcc/master merged into vendor/microsoft/main
@@ -394,7 +394,7 @@ jobs:
         shell: bash
         env:
           mergeBranch: ${{ needs.parse-failures.outputs.newBranchName }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.VICTORPAT }}
       
       # The text below is marked with a warning header so that it's colored yellow in the logs and will stand out
       # I couldn't find any documentation on setting text color in printf statements in a GitHub Yaml file so we're using this for now
