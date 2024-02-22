@@ -261,7 +261,7 @@ jobs:
       # newFailures.patch is created in ParseTestLogs IFF there were failures in master run that aren't in the .xfail file
       - name: Check if failures patch exists
         id: check_failures_patch
-        uses: andstor/file-existence-action@v2
+        uses: andstor/file-existence-action@v3
         with:
           files: "newFailures.patch"
 
