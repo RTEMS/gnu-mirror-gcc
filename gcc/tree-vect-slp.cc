@@ -1912,7 +1912,8 @@ vect_build_slp_tree_2 (vec_info *vinfo, slp_tree node,
 	    /* Reduction chain backedge defs are filled manually.
 	       ???  Need a better way to identify a SLP reduction chain PHI.
 	       Or a better overall way to SLP match those.  */
-	    if (all_same && def_type == vect_reduction_def)
+	    if (stmts.length () > 1
+		&& all_same && def_type == vect_reduction_def)
 	      skip_args[loop_latch_edge (loop)->dest_idx] = true;
 	  }
 	else if (def_type != vect_internal_def)
@@ -3891,11 +3892,31 @@ vect_analyze_slp (vec_info *vinfo, unsigned max_tree_size)
 	    loop_vinfo->reductions.safe_push (last);
 	  }
 
-      /* Find SLP sequences starting from groups of reductions.  */
-      if (loop_vinfo->reductions.length () > 1)
-	vect_analyze_slp_instance (vinfo, bst_map, loop_vinfo->reductions[0],
-				   slp_inst_kind_reduc_group, max_tree_size,
-				   &limit);
+      if (loop_vinfo->reductions.length () > 0
+	  && (loop_vinfo->reductions.length () == 1
+	      /* Find SLP sequences starting from groups of reductions.  */
+	      || ! vect_analyze_slp_instance (vinfo, bst_map,
+					      loop_vinfo->reductions[0],
+					      slp_inst_kind_reduc_group,
+					      max_tree_size, &limit))
+	  && param_vect_single_lane_slp != 0)
+	{
+	  /* Do SLP discovery for single-lane reductions.  */
+	  for (auto stmt_info : loop_vinfo->reductions)
+	    {
+	      vec<stmt_vec_info> stmts;
+	      vec<stmt_vec_info> roots = vNULL;
+	      vec<tree> remain = vNULL;
+	      stmts.create (1);
+	      stmts.quick_push (stmt_info);
+	      bool res = vect_build_slp_instance (vinfo,
+						  slp_inst_kind_reduc_group,
+						  stmts, roots, remain,
+						  max_tree_size, &limit,
+						  bst_map, NULL);
+	      gcc_assert (res);
+	    }
+	}
     }
 
   hash_set<slp_tree> visited_patterns;
