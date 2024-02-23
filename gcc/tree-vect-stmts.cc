@@ -13373,6 +13373,8 @@ vect_transform_stmt (vec_info *vinfo,
 
   gcc_assert (slp_node || !PURE_SLP_STMT (stmt_info));
 
+  gcc_assert (!param_vect_force_slp || slp_node);
+
   tree saved_vectype = STMT_VINFO_VECTYPE (stmt_info);
   if (slp_node)
     STMT_VINFO_VECTYPE (stmt_info) = SLP_TREE_VECTYPE (slp_node);
