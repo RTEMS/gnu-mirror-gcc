@@ -85,7 +85,7 @@ jobs:
         shell: bash
         env:
           GITHUB_CONTEXT: ${{ toJson(github) }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.VICTORPAT }}
 
       # This should be the last step on this machine since it will clear out fields in the config json
       - name: Print No Secret Json
