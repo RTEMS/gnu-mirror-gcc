@@ -138,7 +138,7 @@ jobs:
         with: 
           configjson: ${{needs.init.outputs.config}}
           testSet: ${{ matrix.testSet }}
-          githubtoken: ${{ secrets.GITHUB_TOKEN }}
+          githubtoken: ${{ secrets.VICTORPAT }}
           buildDownloaded: False
 
       - name: Move objdir to be in repo so logs inside can be uploaded 

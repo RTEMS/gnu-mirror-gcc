@@ -189,7 +189,7 @@ jobs:
         with: 
           configjson: ${{needs.gcc-master-build.outputs.config}}
           testSet: ${{ matrix.testSet }}
-          githubtoken: ${{ secrets.GITHUB_TOKEN }}
+          githubtoken: ${{ secrets.VICTORPAT }}
           buildDownloaded: True 
       
       - name: Move objdir to be in repo so logs inside can be uploaded
