@@ -1,3 +1,141 @@
+==================== Branch work160-vpair, patch #200 ====================
+
+Add vector pair optimizations.
+
+2024-02-27  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-pair.md (vpair_add_neg_<vpair_modename>3): New
+	combiner insn to convert vector plus/neg into a minus operation.
+	(vpair_fma_<vpair_modename>_merge): Optimize multiply, add/subtract, and
+	negation into fma operations if the user specifies to create fmas.
+	(vpair_fma_<vpair_modename>_merge): Likewise.
+	(vpair_fma_<vpair_modename>_merge2): Likewise.
+	(vpair_nfma_<vpair_modename>_merge): Likewise.
+	(vpair_nfms_<vpair_modename>_merge): Likewise.
+	(vpair_nfms_<vpair_modename>_merge2): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-7.c: New test.
+	* gcc.target/powerpc/vector-pair-8.c: Likewise.
+	* gcc.target/powerpc/vector-pair-9.c: Likewise.
+	* gcc.target/powerpc/vector-pair-10.c: Likewise.
+	* gcc.target/powerpc/vector-pair-11.c: Likewise.
+	* gcc.target/powerpc/vector-pair-12xs.c: Likewise.
+
+==================== Branch work160-vpair, patch #200 ====================
+
+Add vector pair init and splat.
+
+2024-02-27  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_zero): New
+	built-in function.
+	(__builtin_vpair_f32_splat): Likewise.
+	(__builtin_vpair_f64_splat): Likewise.
+	* config/rs6000/vector-pair.md (UNSPEC_VPAIR_ZERO): New unspec.
+	(UNSPEC_VPAIR_SPLAT): Likewise.
+	(VPAIR_SPLAT_VMODE): New mode iterator.
+	(VPAIR_SPLAT_ELEMENT_TO_VMODE): New mode attribute.
+	(vpair_splat_name): Likewise.
+	(vpair_zero): New insn.
+	(vpair_splat_<vpair_splat_name>): New define_expand.
+	(vpair_splat_<vpair_splat_name>_internal): New insns.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-5.c: New test.
+	* gcc.target/powerpc/vector-pair-6.c: Likewise.
+
+==================== Branch work160-vpair, patch #200 ====================
+
+Add support for vector pair fma operations.
+
+2024-02-27  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_f32_fma): New
+	built-in.
+	(__builtin_vpair_f32_fms): Likewise.
+	(__builtin_vpair_f32_nfma): Likewise.
+	(__builtin_vpair_f32_nfms): Likewise.
+	(__builtin_vpair_f64_fma): Likewise.
+	(__builtin_vpair_f64_fms): Likewise.
+	(__builtin_vpair_f64_nfma): Likewise.
+	* config/rs6000/rs6000/rs6000-proto.h (enum vpair_split_fma): New
+	enumeration.
+	(vpair_split_fma): New declaration.
+	* config/rs6000/rs6000.cc (vpair_split_fma): New function to split
+	vector pair FMA operations.
+	* config/rs6000/vector-pair.md (UNSPEC_VPAIR_FMA): New unspec.
+	(vpair_stdname): Add UNSPEC_VPAIR_FMA.
+	(VPAIR_OP): Likewise.
+	(vpair_fma_<vpair_modename>4): New insns.
+	(vpair_fms_<vpair_modename>4): Likewise.
+	(vpair_nfma_<vpair_modename>4): Likewise.
+	(vpair_nfms_<vpair_modename>4): Likewise.
+	* doc/extend.texi (PowerPC Vector Pair Built-in Functions): Document new
+	vector pair fma built-in functions.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-3.c: New test.
+	* gcc.target/powerpc/vector-pair-4.c: Likewise.
+
+==================== Branch work160-vpair, patch #200 ====================
+
+Add support for vector pair unary and binary operations.
+
+2024-02-27  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_*): Add new
+	built-in functions for vector pair support.
+	* config/rs6000/rs6000-protos.h (enum vpair_split_unary): New
+	enumeration.
+	(vpair_split_unary): New declaration.
+	(vpair_split_binary): Likewise.
+	* config/rs6000/rs6000.cc (vpair_split_unary): New function to split
+	vector pair operations.
+	(vpair_split_binary): Likewise.
+	* config/rs6000/rs6000.md (toplevel): Include vector-pair.md.
+	* config/rs6000/t-rs6000 (MD_INCLUDES): Add vector-pair.md.
+	* config/rs6000/vector-pair.md: New file.
+	* doc/extend.texi (PowerPC Vector Pair Built-in Functions): Add
+	documentation for the new vector pair built-in functions.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-1.c: New test.
+	* gcc.target/powerpc/vector-pair-2.c: Likewise.
+
+==================== Branch work160-vpair, patch #200 ====================
+
+Peter's patches for subreg support.
+
+2024-02-27  Peter Bergner  <bergner@linux.ibm.com>
+
+gcc/
+
+	PR target/109116
+	* gcc/config/rs6000/rs6000.cc (rs6000_modes_tieable_p): Make OOmode
+	tieable with 128-bit vector modes.
+
+2024-02-27  Peter Bergner  <bergner@linux.ibm.com>
+
+gcc/
+
+	PR target/109116
+	* gcc/config/rs6000/mma.md (vsx_disassemble_pair): Use SUBREG's instead
+	of UNSPEC's.
+	(mma_disassemble_acc): Likewise.
+
 ==================== Branch work160-vpair, patch #5 from work160 branch ====================
 
 PR target/112886, Add %S<n> to print_operand for vector pair support.
