@@ -1,3 +1,146 @@
+==================== Branch work160-test, patch #5 from work160 branch ====================
+
+PR target/112886, Add %S<n> to print_operand for vector pair support.
+
+In looking at support for load vector pair and store vector pair for the
+PowerPC in GCC, I noticed that we were missing a print_operand output modifier
+if you are dealing with vector pairs to print the 2nd register in the vector
+pair.
+
+If the instruction inside of the asm used the Altivec encoding, then we could
+use the %L<n> modifier:
+
+	__vector_pair *p, *q, *r;
+	// ...
+	__asm__ ("vaddudm %0,%1,%2\n\tvaddudm %L0,%L1,%L2"
+		 : "=v" (*p)
+		 : "v" (*q), "v" (*r));
+
+Likewise if we know the value to be in a tradiational FPR register, %L<n> will
+work for instructions that use the VSX encoding:
+
+	__vector_pair *p, *q, *r;
+	// ...
+	__asm__ ("xvadddp %x0,%x1,%x2\n\txvadddp %L0,%L1,%L2"
+		 : "=f" (*p)
+		 : "f" (*q), "f" (*r));
+
+But if have a value that is in a traditional Altivec register, and the
+instruction uses the VSX encoding, %L<n> will a value between 0 and 31, when it
+should give a value between 32 and 63.
+
+This patch adds %S<n> that acts like %x<n>, except that it adds 1 to the
+register number.
+
+This is version 2 of the patch.  The only difference is I made the test case
+simpler to read.
+
+I have tested this on power10 and power9 little endian systems and on a power9
+big endian system.  There were no regressions in the patch.  Can I apply it to
+the trunk?
+
+It would be nice if I could apply it to the open branches.  Can I backport it
+after a burn-in period?
+
+2024-02-27  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/112886
+	* config/rs6000/rs6000.cc (print_operand): Add %S<n> output modifier.
+	* doc/md.texi (Modifiers): Mention %S can be used like %x.
+
+gcc/testsuite/
+
+	PR target/112886
+	* /gcc.target/powerpc/pr112886.c: New test.
+
+==================== Branch work160-test, patch #4 from work160 branch ====================
+
+Power10: Add options to disable load and store vector pair.
+
+This is version 2 of the patch to add -mno-load-vector-pair and
+-mno-store-vector-pair undocumented tuning switches.
+
+The differences between the first version of the patch and this version is that
+I added explicit RTL abi attributes for when the compiler can generate the load
+vector pair and store vector pair instructions.  By having this attribute, the
+movoo insn has separate alternatives for when we generate the instruction and
+when we want to split the instruction into 2 separate vector loads or stores.
+
+In the first version of the patch, I had previously provided built-in functions
+that would always generate load vector pair and store vector pair instructions
+even if these instructions are normally disabled.  I found these built-ins
+weren't specified like the other vector pair built-ins, and I didn't include
+documentation for the built-in functions.  If we want such built-in functions,
+we can add them as a separate patch later.
+
+In addition, since both versions of the patch adds #pragma target and attribute
+support to change the results for individual functions, we can select on a
+function by function basis what the defaults for load/store vector pair is.
+
+The original text for the patch is:
+
+In working on some future patches that involve utilizing vector pair
+instructions, I wanted to be able to tune my program to enable or disable using
+the vector pair load or store operations while still keeping the other
+operations on the vector pair.
+
+This patch adds two undocumented tuning options.  The -mno-load-vector-pair
+option would tell GCC to generate two load vector instructions instead of a
+single load vector pair.  The -mno-store-vector-pair option would tell GCC to
+generate two store vector instructions instead of a single store vector pair.
+
+If either -mno-load-vector-pair is used, GCC will not generate the indexed
+stxvpx instruction.  Similarly if -mno-store-vector-pair is used, GCC will not
+generate the indexed lxvpx instruction.  The reason for this is to enable
+splitting the {,p}lxvp or {,p}stxvp instructions after reload without needing a
+scratch GPR register.
+
+The default for -mcpu=power10 is that both load vector pair and store vector
+pair are enabled.
+
+I added code so that the user code can modify these settings using either a
+'#pragma GCC target' directive or used __attribute__((__target__(...))) in the
+function declaration.
+
+I added tests for the switches, #pragma, and attribute options.
+
+I have built this on both little endian power10 systems and big endian power9
+systems doing the normal bootstrap and test.  There were no regressions in any
+of the tests, and the new tests passed.  Can I check this patch into the master
+branch?
+
+2024-02-27  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (movoo): Add support for -mno-load-vector-pair and
+	-mno-store-vector-pair.
+	* config/rs6000/rs6000-cpus.def (OTHER_POWER10_MASKS): Add support for
+	-mload-vector-pair and -mstore-vector-pair.
+	(POWERPC_MASKS): Likewise.
+	* config/rs6000/rs6000.cc (rs6000_setup_reg_addr_masks): Only allow
+	indexed mode for OOmode if we are generating both load vector pair and
+	store vector pair instructions.
+	(rs6000_option_override_internal): Add support for -mno-load-vector-pair
+	and -mno-store-vector-pair.
+	(rs6000_opt_masks): Likewise.
+	* config/rs6000/rs6000.md (isa attribute): Add lxvp and stxvp
+	attributes.
+	(enabled attribute): Likewise.
+	* config/rs6000/rs6000.opt (-mload-vector-pair): New option.
+	(-mstore-vector-pair): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-attribute.c: New test.
+	* gcc.target/powerpc/vector-pair-pragma.c: New test.
+	* gcc.target/powerpc/vector-pair-switch1.c: New test.
+	* gcc.target/powerpc/vector-pair-switch2.c: New test.
+	* gcc.target/powerpc/vector-pair-switch3.c: New test.
+	* gcc.target/powerpc/vector-pair-switch4.c: New test.
+
 ==================== Branch work160-test, patch #3 from work160 branch ====================
 
 Use vector pair load/store for memcpy with -mcpu=future
