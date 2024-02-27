@@ -3386,8 +3386,9 @@ A VSX register (VSR), @code{vs0}@dots{}@code{vs63}.  This is either an
 FPR (@code{vs0}@dots{}@code{vs31} are @code{f0}@dots{}@code{f31}) or a VR
 (@code{vs32}@dots{}@code{vs63} are @code{v0}@dots{}@code{v31}).
 
-When using @code{wa}, you should use the @code{%x} output modifier, so that
-the correct register number is printed.  For example:
+When using @code{wa}, you should use either the @code{%x} or @code{%S}
+output modifier, so that the correct register number is printed.  For
+example:
 
 @smallexample
 asm ("xvadddp %x0,%x1,%x2"
