@@ -29416,6 +29416,77 @@ vpair_split_binary (rtx operands[],			/* Dest, 2 inputs.  */
   emit_insn (gen_rtx_SET (op0_b, operation_b));
   return;
 }
+
+/* Split vector pair fma operations.  */
+
+void
+vpair_split_fma (rtx operands[],			/* Dest, 3 inputs.  */
+		 machine_mode vmode,			/* Vector mode.  */
+		 enum vpair_split_fma action)		/* Action to take.  */
+{
+  rtx op0 = operands[0];
+  machine_mode mode0 = GET_MODE (op0);
+  gcc_assert (GET_MODE_SIZE (mode0) == 32);
+  rtx op0_a = simplify_gen_subreg (vmode, op0, mode0, 0);
+  rtx op0_b = simplify_gen_subreg (vmode, op0, mode0, 16);
+
+  rtx op1 = operands[1];
+  machine_mode mode1 = GET_MODE (op1);
+  gcc_assert (GET_MODE_SIZE (mode1) == 32);
+  rtx op1_a = simplify_gen_subreg (vmode, op1, mode1, 0);
+  rtx op1_b = simplify_gen_subreg (vmode, op1, mode1, 16);
+
+  rtx op2 = operands[2];
+  machine_mode mode2 = GET_MODE (op2);
+  gcc_assert (GET_MODE_SIZE (mode2) == 32);
+  rtx op2_a = simplify_gen_subreg (vmode, op2, mode2, 0);
+  rtx op2_b = simplify_gen_subreg (vmode, op2, mode2, 16);
+
+  rtx op3 = operands[3];
+  machine_mode mode3 = GET_MODE (op3);
+  gcc_assert (GET_MODE_SIZE (mode3) == 32);
+  rtx op3_a = simplify_gen_subreg (vmode, op3, mode3, 0);
+  rtx op3_b = simplify_gen_subreg (vmode, op3, mode3, 16);
+
+  switch (action)
+    {
+    case VPAIR_SPLIT_FMA:
+    case VPAIR_SPLIT_NFMA:
+      break;
+
+    case VPAIR_SPLIT_FMS:
+    case VPAIR_SPLIT_NFMS:
+      op3_a = gen_rtx_NEG (vmode, op3_a);
+      op3_b = gen_rtx_NEG (vmode, op3_b);
+      break;
+
+    default:
+      gcc_unreachable ();
+    }
+
+  rtx operation_a = gen_rtx_fmt_eee (FMA, vmode, op1_a, op2_a, op3_a);
+  rtx operation_b = gen_rtx_fmt_eee (FMA, vmode, op1_b, op2_b, op3_b);
+
+  switch (action)
+    {
+    case VPAIR_SPLIT_FMA:
+    case VPAIR_SPLIT_FMS:
+      break;
+
+    case VPAIR_SPLIT_NFMA:
+    case VPAIR_SPLIT_NFMS:
+      operation_a = gen_rtx_NEG (vmode, operation_a);
+      operation_b = gen_rtx_NEG (vmode, operation_b);
+      break;
+
+    default:
+      gcc_unreachable ();
+    }
+
+  emit_insn (gen_rtx_SET (op0_a, operation_a));
+  emit_insn (gen_rtx_SET (op0_b, operation_b));
+  return;
+}
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

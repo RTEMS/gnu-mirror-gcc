@@ -23896,6 +23896,15 @@ store instruction.
 The @code{nabs} built-in is a combination of @code{neg} and
 @code{abs}.
 
+The @code{fms} built-in is a combination of @code{fma} and @code{neg}
+of the third element.
+
+The @code{nfma} built-in is a combination of @code{neg} of the
+@code{fma} built-in.
+
+The @code{nfms} built-in is a combination of @code{neg} of the
+@code{fms} built-in.
+
 The following built-in functions operate on pairs of
 @code{vector float} values:
 
@@ -23903,11 +23912,19 @@ The following built-in functions operate on pairs of
 __vector_pair __builtin_vpair_f32_abs (__vector_pair);
 __vector_pair __builtin_vpair_f32_add (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_f32_div (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f32_fma (__vector_pair, __vector_pair,
+                                       __vector_pair);
+__vector_pair __builtin_vpair_f32_fms (__vector_pair, __vector_pair,
+                                       __vector_pair);
 __vector_pair __builtin_vpair_f32_max (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_f32_min (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_f32_mul (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_f32_nabs (__vector_pair);
 __vector_pair __builtin_vpair_f32_neg (__vector_pair);
+__vector_pair __builtin_vpair_f32_nfma (__vector_pair, __vector_pair,
+                                       __vector_pair);
+__vector_pair __builtin_vpair_f32_nfms (__vector_pair, __vector_pair,
+                                       __vector_pair);
 __vector_pair __builtin_vpair_f32_sub (__vector_pair, __vector_pair);
 @end smallexample
 
@@ -23918,11 +23935,19 @@ The following built-in functions operate on pairs of
 __vector_pair __builtin_vpair_f64_abs (__vector_pair);
 __vector_pair __builtin_vpair_f64_add (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_f64_div (__vector_pair, __vector_pair);
+__vector_pair __builtin_vpair_f64_fma (__vector_pair, __vector_pair,
+                                       __vector_pair);
+__vector_pair __builtin_vpair_f64_fms (__vector_pair, __vector_pair,
+                                       __vector_pair);
 __vector_pair __builtin_vpair_f64_max (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_f64_min (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_f64_mul (__vector_pair, __vector_pair);
 __vector_pair __builtin_vpair_f64_nabs (__vector_pair);
 __vector_pair __builtin_vpair_f64_neg (__vector_pair);
+__vector_pair __builtin_vpair_f64_nfma (__vector_pair, __vector_pair,
+                                       __vector_pair);
+__vector_pair __builtin_vpair_f64_nfms (__vector_pair, __vector_pair,
+                                       __vector_pair);
 __vector_pair __builtin_vpair_f64_sub (__vector_pair, __vector_pair);
 @end smallexample
 
