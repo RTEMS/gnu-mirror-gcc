@@ -19027,6 +19027,7 @@ loc_list_from_tree_1 (tree loc, int want_address,
 		&& ! DECL_IGNORED_P (loc)
 		&& (INTEGRAL_TYPE_P (TREE_TYPE (loc))
 		    || POINTER_TYPE_P (TREE_TYPE (loc)))
+		&& TYPE_MODE (TREE_TYPE (loc)) != BLKmode
 		&& (GET_MODE_SIZE (SCALAR_INT_TYPE_MODE (TREE_TYPE (loc)))
 		    <= DWARF2_ADDR_SIZE))
 	      {
@@ -28986,8 +28987,9 @@ output_macinfo_op (macinfo_entry *ref)
       file_num = maybe_emit_file (fd);
       dw2_asm_output_data (1, DW_MACINFO_start_file, "Start new file");
       dw2_asm_output_data_uleb128 (ref->lineno,
-				   "Included from line number %lu", 
-				   (unsigned long) ref->lineno);
+				   "Included from line number "
+				   HOST_WIDE_INT_PRINT_UNSIGNED,
+				   ref->lineno);
       dw2_asm_output_data_uleb128 (file_num, "file %s", ref->info);
       break;
     case DW_MACINFO_end_file:
@@ -29013,8 +29015,10 @@ output_macinfo_op (macinfo_entry *ref)
       dw2_asm_output_data (1, ref->code,
 			   ref->code == DW_MACINFO_define
 			   ? "Define macro" : "Undefine macro");
-      dw2_asm_output_data_uleb128 (ref->lineno, "At line number %lu", 
-				   (unsigned long) ref->lineno);
+      dw2_asm_output_data_uleb128 (ref->lineno,
+				   "At line number "
+				   HOST_WIDE_INT_PRINT_UNSIGNED, 
+				   ref->lineno);
       dw2_asm_output_nstring (ref->info, -1, "The macro");
       break;
     case DW_MACRO_define_strp:
@@ -29046,8 +29050,10 @@ output_macinfo_op (macinfo_entry *ref)
       gcc_assert (node
 		  && (node->form == DW_FORM_strp
 		      || node->form == dwarf_FORM (DW_FORM_strx)));
-      dw2_asm_output_data_uleb128 (ref->lineno, "At line number %lu",
-				   (unsigned long) ref->lineno);
+      dw2_asm_output_data_uleb128 (ref->lineno,
+				   "At line number "
+				   HOST_WIDE_INT_PRINT_UNSIGNED,
+				   ref->lineno);
       if (node->form == DW_FORM_strp)
         dw2_asm_output_offset (dwarf_offset_size, node->label,
                                debug_str_section, "The macro: \"%s\"",

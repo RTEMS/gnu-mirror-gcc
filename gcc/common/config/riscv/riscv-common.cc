@@ -21,6 +21,8 @@ along with GCC; see the file COPYING3.  If not see
 #include <vector>
 
 #define INCLUDE_STRING
+#define INCLUDE_SET
+#define INCLUDE_MAP
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -247,6 +249,8 @@ static const struct riscv_ext_version riscv_ext_version_table[] =
 
   {"zicond", ISA_SPEC_CLASS_NONE, 1, 0},
 
+  {"za64rs",  ISA_SPEC_CLASS_NONE, 1, 0},
+  {"za128rs", ISA_SPEC_CLASS_NONE, 1, 0},
   {"zawrs", ISA_SPEC_CLASS_NONE, 1, 0},
 
   {"zba", ISA_SPEC_CLASS_NONE, 1, 0},
@@ -276,6 +280,11 @@ static const struct riscv_ext_version riscv_ext_version_table[] =
   {"zicboz",ISA_SPEC_CLASS_NONE, 1, 0},
   {"zicbom",ISA_SPEC_CLASS_NONE, 1, 0},
   {"zicbop",ISA_SPEC_CLASS_NONE, 1, 0},
+  {"zic64b",   ISA_SPEC_CLASS_NONE, 1, 0},
+  {"ziccamoa", ISA_SPEC_CLASS_NONE, 1, 0},
+  {"ziccif",   ISA_SPEC_CLASS_NONE, 1, 0},
+  {"zicclsm",  ISA_SPEC_CLASS_NONE, 1, 0},
+  {"ziccrse",  ISA_SPEC_CLASS_NONE, 1, 0},
 
   {"zicntr", ISA_SPEC_CLASS_NONE, 2, 0},
   {"zihpm",  ISA_SPEC_CLASS_NONE, 2, 0},
@@ -1494,6 +1503,8 @@ static const riscv_ext_flag_table_t riscv_ext_flag_table[] =
   {"zifencei", &gcc_options::x_riscv_zi_subext, MASK_ZIFENCEI},
   {"zicond",   &gcc_options::x_riscv_zi_subext, MASK_ZICOND},
 
+  {"za64rs", &gcc_options::x_riscv_za_subext, MASK_ZA64RS},
+  {"za128rs", &gcc_options::x_riscv_za_subext, MASK_ZA128RS},
   {"zawrs", &gcc_options::x_riscv_za_subext, MASK_ZAWRS},
 
   {"zba",    &gcc_options::x_riscv_zb_subext, MASK_ZBA},
@@ -1523,6 +1534,11 @@ static const riscv_ext_flag_table_t riscv_ext_flag_table[] =
   {"zicboz", &gcc_options::x_riscv_zicmo_subext, MASK_ZICBOZ},
   {"zicbom", &gcc_options::x_riscv_zicmo_subext, MASK_ZICBOM},
   {"zicbop", &gcc_options::x_riscv_zicmo_subext, MASK_ZICBOP},
+  {"zic64b", &gcc_options::x_riscv_zicmo_subext, MASK_ZIC64B},
+  {"ziccamoa", &gcc_options::x_riscv_zicmo_subext, MASK_ZICCAMOA},
+  {"ziccif", &gcc_options::x_riscv_zicmo_subext, MASK_ZICCIF},
+  {"zicclsm", &gcc_options::x_riscv_zicmo_subext, MASK_ZICCLSM},
+  {"ziccrse", &gcc_options::x_riscv_zicmo_subext, MASK_ZICCRSE},
 
   {"zve32x",   &gcc_options::x_target_flags, MASK_VECTOR},
   {"zve32f",   &gcc_options::x_target_flags, MASK_VECTOR},
@@ -2209,6 +2225,50 @@ riscv_get_valid_option_values (int option_code,
     }
 
   return v;
+}
+
+const char *
+riscv_arch_help (int, const char **)
+{
+  /* Collect all exts, and sort it in canonical order.  */
+  struct extension_comparator {
+    bool operator()(const std::string& a, const std::string& b) const {
+      return subset_cmp(a, b) >= 1;
+    }
+  };
+  std::map<std::string, std::set<unsigned>, extension_comparator> all_exts;
+  for (const riscv_ext_version &ext : riscv_ext_version_table)
+    {
+      if (!ext.name)
+	break;
+      if (ext.name[0] == 'g')
+	continue;
+      unsigned version_value = (ext.major_version * RISCV_MAJOR_VERSION_BASE)
+				+ (ext.minor_version
+				   * RISCV_MINOR_VERSION_BASE);
+      all_exts[ext.name].insert(version_value);
+    }
+
+  printf("All available -march extensions for RISC-V:\n");
+  printf("\t%-20sVersion\n", "Name");
+  for (auto const &ext_info : all_exts)
+    {
+      printf("\t%-20s\t", ext_info.first.c_str());
+      bool first = true;
+      for (auto version : ext_info.second)
+	{
+	  if (first)
+	    first = false;
+	  else
+	    printf(", ");
+	  unsigned major = version / RISCV_MAJOR_VERSION_BASE;
+	  unsigned minor = (version % RISCV_MAJOR_VERSION_BASE)
+			    / RISCV_MINOR_VERSION_BASE;
+	  printf("%u.%u", major, minor);
+	}
+      printf("\n");
+    }
+  exit (0);
 }
 
 /* Implement TARGET_OPTION_OPTIMIZATION_TABLE.  */

@@ -1816,6 +1816,11 @@ iterative_hash_template_arg (tree arg, hashval_t val)
 	}
       return iterative_hash_template_arg (TREE_TYPE (arg), val);
 
+    case TEMPLATE_DECL:
+      if (DECL_TEMPLATE_TEMPLATE_PARM_P (arg))
+	return iterative_hash_template_arg (TREE_TYPE (arg), val);
+      break;
+
     case TARGET_EXPR:
       return iterative_hash_template_arg (TARGET_EXPR_INITIAL (arg), val);
 
@@ -4499,6 +4504,8 @@ struct ctp_hasher : ggc_ptr_hash<tree_node>
     hashval_t val = iterative_hash_object (code, 0);
     val = iterative_hash_object (TEMPLATE_TYPE_LEVEL (t), val);
     val = iterative_hash_object (TEMPLATE_TYPE_IDX (t), val);
+    if (TREE_CODE (t) == TEMPLATE_TYPE_PARM)
+      val = iterative_hash_template_arg (CLASS_PLACEHOLDER_TEMPLATE (t), val);
     if (TREE_CODE (t) == BOUND_TEMPLATE_TEMPLATE_PARM)
       val = iterative_hash_template_arg (TYPE_TI_ARGS (t), val);
     --comparing_specializations;
@@ -5410,9 +5417,14 @@ process_partial_specialization (tree decl)
     }
 
   if (VAR_P (decl))
-    /* We didn't register this in check_explicit_specialization so we could
-       wait until the constraints were set.  */
-    decl = register_specialization (decl, maintmpl, specargs, false, 0);
+    {
+      /* We didn't register this in check_explicit_specialization so we could
+	 wait until the constraints were set.  */
+      tree reg = register_specialization (decl, maintmpl, specargs, false, 0);
+      if (reg != decl)
+	/* Redeclaration.  */
+	return reg;
+    }
   else
     associate_classtype_constraints (type);
 
@@ -7301,14 +7313,15 @@ invalid_tparm_referent_p (tree type, tree expr, tsubst_flags_t complain)
 static tree
 create_template_parm_object (tree expr, tsubst_flags_t complain)
 {
+  tree orig = expr;
   if (TREE_CODE (expr) == TARGET_EXPR)
     expr = TARGET_EXPR_INITIAL (expr);
 
   if (!TREE_CONSTANT (expr))
     {
       if ((complain & tf_error)
-	  && require_rvalue_constant_expression (expr))
-	cxx_constant_value (expr);
+	  && require_rvalue_constant_expression (orig))
+	cxx_constant_value (orig);
       return error_mark_node;
     }
   if (invalid_tparm_referent_p (TREE_TYPE (expr), expr, complain))
@@ -14805,6 +14818,7 @@ tsubst_function_decl (tree t, tree args, tsubst_flags_t complain,
   if (DECL_SECTION_NAME (t))
     set_decl_section_name (r, t);
   if (DECL_DEFAULTED_OUTSIDE_CLASS_P (r)
+      && COMPLETE_TYPE_P (DECL_CONTEXT (r))
       && !processing_template_decl)
     defaulted_late_check (r);
 
@@ -21171,7 +21185,7 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 
     case THROW_EXPR:
       RETURN (build_throw
-       (input_location, RECUR (TREE_OPERAND (t, 0))));
+       (input_location, RECUR (TREE_OPERAND (t, 0)), complain));
 
     case CONSTRUCTOR:
       {
@@ -21698,7 +21712,8 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 
     case REQUIRES_EXPR:
       {
-	tree r = tsubst_requires_expr (t, args, tf_none, in_decl);
+	complain &= ~tf_warning_or_error;
+	tree r = tsubst_requires_expr (t, args, complain, in_decl);
 	RETURN (r);
       }
 
@@ -22098,9 +22113,16 @@ instantiate_template (tree tmpl, tree orig_args, tsubst_flags_t complain)
   DECL_TI_TEMPLATE (fndecl) = tmpl;
   DECL_TI_ARGS (fndecl) = targ_ptr;
   if (VAR_P (pattern))
-    /* Now that we we've formed this variable template specialization,
-       remember the result of most_specialized_partial_spec for it.  */
-    TI_PARTIAL_INFO (DECL_TEMPLATE_INFO (fndecl)) = partial_ti;
+    {
+      /* Now that we we've formed this variable template specialization,
+	 remember the result of most_specialized_partial_spec for it.  */
+      TI_PARTIAL_INFO (DECL_TEMPLATE_INFO (fndecl)) = partial_ti;
+
+      /* And remember if the variable was declared with [].  */
+      if (TREE_CODE (TREE_TYPE (fndecl)) == ARRAY_TYPE
+	  && TYPE_DOMAIN (TREE_TYPE (fndecl)) == NULL_TREE)
+	SET_VAR_HAD_UNKNOWN_BOUND (fndecl);
+    }
 
   fndecl = register_specialization (fndecl, gen_tmpl, targ_ptr, false, hash);
   if (fndecl == error_mark_node)
@@ -30665,7 +30687,7 @@ ctad_template_p (tree tmpl)
    type.  */
 
 static tree
-do_class_deduction (tree ptype, tree tmpl, tree init,
+do_class_deduction (tree ptype, tree tmpl, tree init, tree outer_targs,
 		    int flags, tsubst_flags_t complain)
 {
   /* We should have handled this in the caller.  */
@@ -30726,6 +30748,23 @@ do_class_deduction (tree ptype, tree tmpl, tree init,
   /* Wait until the initializer is non-dependent.  */
   if (type_dependent_expression_p (init))
     return ptype;
+
+  if (outer_targs)
+    {
+      int args_depth = TMPL_ARGS_DEPTH (outer_targs);
+      int parms_depth = TMPL_PARMS_DEPTH (DECL_TEMPLATE_PARMS (tmpl));
+      if (parms_depth > 1)
+	{
+	  /* Substitute outer arguments into this CTAD template from the
+	     current instantiation.  */
+	  int want = std::min (args_depth, parms_depth - 1);
+	  outer_targs = strip_innermost_template_args (outer_targs,
+						       args_depth - want);
+	  tmpl = tsubst (tmpl, outer_targs, complain, NULL_TREE);
+	  if (tmpl == error_mark_node)
+	    return error_mark_node;
+	}
+    }
 
   /* Don't bother with the alias rules for an equivalent template.  */
   tmpl = get_underlying_template (tmpl);
@@ -30982,7 +31021,7 @@ do_auto_deduction (tree type, tree init, tree auto_node,
 
   if (tree ctmpl = CLASS_PLACEHOLDER_TEMPLATE (auto_node))
     /* C++17 class template argument deduction.  */
-    return do_class_deduction (type, ctmpl, init, flags, complain);
+    return do_class_deduction (type, ctmpl, init, outer_targs, flags, complain);
 
   if (init == NULL_TREE || TREE_TYPE (init) == NULL_TREE)
     /* Nothing we can do with this, even in deduction context.  */
@@ -31559,13 +31598,15 @@ init_template_processing (void)
 void
 print_template_statistics (void)
 {
-  fprintf (stderr, "decl_specializations: size %ld, %ld elements, "
-	   "%f collisions\n", (long) decl_specializations->size (),
-	   (long) decl_specializations->elements (),
+  fprintf (stderr, "decl_specializations: size " HOST_SIZE_T_PRINT_DEC ", "
+	   HOST_SIZE_T_PRINT_DEC " elements, %f collisions\n",
+	   (fmt_size_t) decl_specializations->size (),
+	   (fmt_size_t) decl_specializations->elements (),
 	   decl_specializations->collisions ());
-  fprintf (stderr, "type_specializations: size %ld, %ld elements, "
-	   "%f collisions\n", (long) type_specializations->size (),
-	   (long) type_specializations->elements (),
+  fprintf (stderr, "type_specializations: size " HOST_SIZE_T_PRINT_DEC ", "
+	   HOST_SIZE_T_PRINT_DEC " elements, %f collisions\n",
+	   (fmt_size_t) type_specializations->size (),
+	   (fmt_size_t) type_specializations->elements (),
 	   type_specializations->collisions ());
 }
 

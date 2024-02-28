@@ -560,7 +560,7 @@ gimple *gimple_fold_builtin (unsigned int, gimple_stmt_iterator *, gcall *);
 rtx expand_builtin (unsigned int, tree, rtx);
 bool check_builtin_call (location_t, vec<location_t>, unsigned int,
 			   tree, unsigned int, tree *);
-tree resolve_overloaded_builtin (unsigned int, vec<tree, va_gc> *);
+tree resolve_overloaded_builtin (location_t, unsigned int, tree, vec<tree, va_gc> *);
 bool const_vec_all_same_in_range_p (rtx, HOST_WIDE_INT, HOST_WIDE_INT);
 bool legitimize_move (rtx, rtx *);
 void emit_vlmax_vsetvl (machine_mode, rtx);
@@ -779,5 +779,12 @@ struct riscv_tune_info {
 const struct riscv_tune_info *
 riscv_parse_tune (const char *, bool);
 const cpu_vector_cost *get_vector_costs ();
+
+enum
+{
+  RISCV_MAJOR_VERSION_BASE = 1000000,
+  RISCV_MINOR_VERSION_BASE = 1000,
+  RISCV_REVISION_VERSION_BASE = 1,
+};
 
 #endif /* ! GCC_RISCV_PROTOS_H */

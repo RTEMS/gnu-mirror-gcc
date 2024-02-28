@@ -1228,7 +1228,12 @@ early_check_defaulted_comparison (tree fn)
 	  /* Defaulted outside the class body.  */
 	  ctx = TYPE_MAIN_VARIANT (parmtype);
 	  if (!is_friend (ctx, fn))
-	    error_at (loc, "defaulted %qD is not a friend of %qT", fn, ctx);
+	    {
+	      auto_diagnostic_group d;
+	      error_at (loc, "defaulted %qD is not a friend of %qT", fn, ctx);
+	      inform (location_of (ctx), "declared here");
+	      ok = false;
+	    }
 	}
       else if (!same_type_ignoring_top_level_qualifiers_p (parmtype, ctx))
 	saw_bad = true;
@@ -2755,6 +2760,7 @@ synthesized_method_walk (tree ctype, special_function_kind sfk, bool const_p,
 	return;
     }
 
+  bool push_to_top = maybe_push_to_top_level (TYPE_NAME (ctype));
   ++cp_unevaluated_operand;
   ++c_inhibit_evaluation_warnings;
   push_deferring_access_checks (dk_no_deferred);
@@ -2852,6 +2858,7 @@ synthesized_method_walk (tree ctype, special_function_kind sfk, bool const_p,
   pop_deferring_access_checks ();
   --cp_unevaluated_operand;
   --c_inhibit_evaluation_warnings;
+  maybe_pop_from_top_level (push_to_top);
 }
 
 /* DECL is a defaulted function whose exception specification is now

@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2023 Free Software Foundation, Inc.
+// Copyright (C) 2020-2024 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -401,14 +401,6 @@ DefaultResolver::visit (AST::StaticItem &item)
   // FIXME: Why do we need a Rib here?
   ctx.scoped (Rib::Kind::ConstantItem, item.get_node_id (), expr_vis);
 }
-
-void
-DefaultResolver::visit (AST::TraitItemFunc &)
-{}
-
-void
-DefaultResolver::visit (AST::TraitItemMethod &)
-{}
 
 void
 DefaultResolver::visit (AST::TraitItemConst &)

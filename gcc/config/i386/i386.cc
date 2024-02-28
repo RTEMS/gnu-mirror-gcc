@@ -86,6 +86,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "intl.h"
 #include "ifcvt.h"
 #include "symbol-summary.h"
+#include "sreal.h"
+#include "ipa-cp.h"
 #include "ipa-prop.h"
 #include "ipa-fnsummary.h"
 #include "wide-int-bitmask.h"
@@ -6802,11 +6804,25 @@ get_probe_interval (void)
 
 #define SPLIT_STACK_AVAILABLE 256
 
+/* Return true if push2/pop2 can be generated.  */
+
+static bool
+ix86_can_use_push2pop2 (void)
+{
+  /* Use push2/pop2 only if the incoming stack is 16-byte aligned.  */
+  unsigned int incoming_stack_boundary
+    = (crtl->parm_stack_boundary > ix86_incoming_stack_boundary
+       ? crtl->parm_stack_boundary : ix86_incoming_stack_boundary);
+  return incoming_stack_boundary % 128 == 0;
+}
+
 /* Helper function to determine whether push2/pop2 can be used in prologue or
    epilogue for register save/restore.  */
 static bool
 ix86_pro_and_epilogue_can_use_push2pop2 (int nregs)
 {
+  if (!ix86_can_use_push2pop2 ())
+    return false;
   int aligned = cfun->machine->fs.sp_offset % 16 == 0;
   return TARGET_APX_PUSH2POP2
 	 && !cfun->machine->frame.save_regs_using_mov
@@ -7395,7 +7411,9 @@ ix86_emit_save_regs (void)
   int regno;
   rtx_insn *insn;
 
-  if (!TARGET_APX_PUSH2POP2 || cfun->machine->func_type != TYPE_NORMAL)
+  if (!TARGET_APX_PUSH2POP2
+      || !ix86_can_use_push2pop2 ()
+      || cfun->machine->func_type != TYPE_NORMAL)
     {
       for (regno = FIRST_PSEUDO_REGISTER - 1; regno >= 0; regno--)
 	if (GENERAL_REGNO_P (regno) && ix86_save_reg (regno, true, true))
@@ -10033,7 +10051,9 @@ ix86_expand_epilogue (int style)
 				     m->fs.cfa_reg == stack_pointer_rtx);
 	}
 
-      if (TARGET_APX_PUSH2POP2 && m->func_type == TYPE_NORMAL)
+      if (TARGET_APX_PUSH2POP2
+	  && ix86_can_use_push2pop2 ()
+	  && m->func_type == TYPE_NORMAL)
 	ix86_emit_restore_regs_using_pop2 ();
       else
 	ix86_emit_restore_regs_using_pop (TARGET_APX_PPX);
@@ -22749,6 +22769,48 @@ current_fentry_section (const char **name)
   return true;
 }
 
+/* Return a caller-saved register which isn't live or a callee-saved
+   register which has been saved on stack in the prologue at entry for
+   profile.  */
+
+static int
+x86_64_select_profile_regnum (bool r11_ok ATTRIBUTE_UNUSED)
+{
+  /* Use %r10 if the profiler is emitted before the prologue or it isn't
+     used by DRAP.  */
+  if (ix86_profile_before_prologue ()
+      || !crtl->drap_reg
+      || REGNO (crtl->drap_reg) != R10_REG)
+    return R10_REG;
+
+  /* The profiler is emitted after the prologue.  If there is a
+     caller-saved register which isn't live or a callee-saved
+     register saved on stack in the prologue, use it.  */
+
+  bitmap reg_live = df_get_live_out (ENTRY_BLOCK_PTR_FOR_FN (cfun));
+
+  int i;
+  for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
+    if (GENERAL_REGNO_P (i)
+	&& i != R10_REG
+#ifdef NO_PROFILE_COUNTERS
+	&& (r11_ok || i != R11_REG)
+#else
+	&& i != R11_REG
+#endif
+	&& TEST_HARD_REG_BIT (accessible_reg_set, i)
+	&& (ix86_save_reg (i, true, true)
+	    || (call_used_regs[i]
+		&& !fixed_regs[i]
+		&& !REGNO_REG_SET_P (reg_live, i))))
+      return i;
+
+  sorry ("no register available for profiling %<-mcmodel=large%s%>",
+	 ix86_cmodel == CM_LARGE_PIC ? " -fPIC" : "");
+
+  return R10_REG;
+}
+
 /* Output assembler code to FILE to increment profiler label # LABELNO
    for profiling a function entry.  */
 void
@@ -22783,42 +22845,61 @@ x86_function_profiler (FILE *file, int labelno ATTRIBUTE_UNUSED)
 	fprintf (file, "\tleaq\t%sP%d(%%rip), %%r11\n", LPREFIX, labelno);
 #endif
 
+      int scratch;
+      const char *reg;
+      char legacy_reg[4] = { 0 };
+
       if (!TARGET_PECOFF)
 	{
 	  switch (ix86_cmodel)
 	    {
 	    case CM_LARGE:
-	      /* NB: R10 is caller-saved.  Although it can be used as a
-		 static chain register, it is preserved when calling
-		 mcount for nested functions.  */
+	      scratch = x86_64_select_profile_regnum (true);
+	      reg = hi_reg_name[scratch];
+	      if (LEGACY_INT_REGNO_P (scratch))
+		{
+		  legacy_reg[0] = 'r';
+		  legacy_reg[1] = reg[0];
+		  legacy_reg[2] = reg[1];
+		  reg = legacy_reg;
+		}
 	      if (ASSEMBLER_DIALECT == ASM_INTEL)
-		fprintf (file, "1:\tmovabs\tr10, OFFSET FLAT:%s\n"
-			       "\tcall\tr10\n", mcount_name);
+		fprintf (file, "1:\tmovabs\t%s, OFFSET FLAT:%s\n"
+			       "\tcall\t%s\n", reg, mcount_name, reg);
 	      else
-		fprintf (file, "1:\tmovabsq\t$%s, %%r10\n\tcall\t*%%r10\n",
-			 mcount_name);
+		fprintf (file, "1:\tmovabsq\t$%s, %%%s\n\tcall\t*%%%s\n",
+			 mcount_name, reg, reg);
 	      break;
 	    case CM_LARGE_PIC:
 #ifdef NO_PROFILE_COUNTERS
+	      scratch = x86_64_select_profile_regnum (false);
+	      reg = hi_reg_name[scratch];
+	      if (LEGACY_INT_REGNO_P (scratch))
+		{
+		  legacy_reg[0] = 'r';
+		  legacy_reg[1] = reg[0];
+		  legacy_reg[2] = reg[1];
+		  reg = legacy_reg;
+		}
 	      if (ASSEMBLER_DIALECT == ASM_INTEL)
 		{
 		  fprintf (file, "1:movabs\tr11, "
 				 "OFFSET FLAT:_GLOBAL_OFFSET_TABLE_-1b\n");
-		  fprintf (file, "\tlea\tr10, 1b[rip]\n");
-		  fprintf (file, "\tadd\tr10, r11\n");
+		  fprintf (file, "\tlea\t%s, 1b[rip]\n", reg);
+		  fprintf (file, "\tadd\t%s, r11\n", reg);
 		  fprintf (file, "\tmovabs\tr11, OFFSET FLAT:%s@PLTOFF\n",
 			   mcount_name);
-		  fprintf (file, "\tadd\tr10, r11\n");
-		  fprintf (file, "\tcall\tr10\n");
+		  fprintf (file, "\tadd\t%s, r11\n", reg);
+		  fprintf (file, "\tcall\t%s\n", reg);
 		  break;
 		}
 	      fprintf (file,
 		       "1:\tmovabsq\t$_GLOBAL_OFFSET_TABLE_-1b, %%r11\n");
-	      fprintf (file, "\tleaq\t1b(%%rip), %%r10\n");
-	      fprintf (file, "\taddq\t%%r11, %%r10\n");
+	      fprintf (file, "\tleaq\t1b(%%rip), %%%s\n", reg);
+	      fprintf (file, "\taddq\t%%r11, %%%s\n", reg);
 	      fprintf (file, "\tmovabsq\t$%s@PLTOFF, %%r11\n", mcount_name);
-	      fprintf (file, "\taddq\t%%r11, %%r10\n");
-	      fprintf (file, "\tcall\t*%%r10\n");
+	      fprintf (file, "\taddq\t%%r11, %%%s\n", reg);
+	      fprintf (file, "\tcall\t*%%%s\n", reg);
 #else
 	      sorry ("profiling %<-mcmodel=large%> with PIC is not supported");
 #endif
@@ -22828,7 +22909,7 @@ x86_function_profiler (FILE *file, int labelno ATTRIBUTE_UNUSED)
 	      if (!ix86_direct_extern_access)
 		{
 		  if (ASSEMBLER_DIALECT == ASM_INTEL)
-		    fprintf (file, "1:\tcall\t[QWORD PTR %s@GOTPCREL[rip]]",
+		    fprintf (file, "1:\tcall\t[QWORD PTR %s@GOTPCREL[rip]]\n",
 			     mcount_name);
 		  else
 		    fprintf (file, "1:\tcall\t*%s@GOTPCREL(%%rip)\n",
@@ -23403,31 +23484,6 @@ x86_evex_reg_mentioned_p (rtx operands[], int nops)
     if (EXT_REX_SSE_REG_P (operands[i])
 	|| x86_extended_rex2reg_mentioned_p (operands[i]))
       return true;
-  return false;
-}
-
-/* Return true when rtx operand does not contain any UNSPEC_*POFF related
-   constant to avoid APX_NDD instructions excceed encoding length limit.  */
-bool
-x86_poff_operand_p (rtx operand)
-{
-  if (GET_CODE (operand) == CONST)
-    {
-      rtx op = XEXP (operand, 0);
-      if (GET_CODE (op) == PLUS)
-	op = XEXP (op, 0);
-	
-      if (GET_CODE (op) == UNSPEC)
-	{
-	  int unspec = XINT (op, 1);
-	  return (unspec == UNSPEC_NTPOFF
-		  || unspec == UNSPEC_TPOFF
-		  || unspec == UNSPEC_DTPOFF
-		  || unspec == UNSPEC_GOTTPOFF
-		  || unspec == UNSPEC_GOTNTPOFF
-		  || unspec == UNSPEC_INDNTPOFF);
-	}
-    }
   return false;
 }
 
@@ -25721,13 +25777,11 @@ ix86_get_excess_precision (enum excess_precision_type type)
 bool
 ix86_bitint_type_info (int n, struct bitint_info *info)
 {
-  if (!TARGET_64BIT)
-    return false;
   if (n <= 8)
     info->limb_mode = QImode;
   else if (n <= 16)
     info->limb_mode = HImode;
-  else if (n <= 32)
+  else if (n <= 32 || (!TARGET_64BIT && n > 64))
     info->limb_mode = SImode;
   else
     info->limb_mode = DImode;

@@ -443,6 +443,7 @@ public:
   }
 
   bool can_duplicate_repeating_sequence_p ();
+  bool is_repeating_sequence ();
   rtx get_merged_repeating_sequence ();
 
   bool repeating_sequence_use_merge_profitable_p ();
@@ -483,12 +484,25 @@ rvv_builder::can_duplicate_repeating_sequence_p ()
 {
   poly_uint64 new_size = exact_div (full_nelts (), npatterns ());
   unsigned int new_inner_size = m_inner_bits_size * npatterns ();
-  if (!int_mode_for_size (new_inner_size, 0).exists (&m_new_inner_mode)
+  if (m_inner_mode == Pmode
+      || !int_mode_for_size (new_inner_size, 0).exists (&m_new_inner_mode)
       || GET_MODE_SIZE (m_new_inner_mode) > UNITS_PER_WORD
       || !get_vector_mode (m_new_inner_mode, new_size).exists (&m_new_mode))
     return false;
   if (full_nelts ().is_constant ())
     return repeating_sequence_p (0, full_nelts ().to_constant (), npatterns ());
+  return nelts_per_pattern () == 1;
+}
+
+/* Return true if the vector is a simple sequence with one pattern and all
+   elements the same.  */
+bool
+rvv_builder::is_repeating_sequence ()
+{
+  if (npatterns () > 1)
+    return false;
+  if (full_nelts ().is_constant ())
+    return repeating_sequence_p (0, full_nelts ().to_constant (), 1);
   return nelts_per_pattern () == 1;
 }
 
@@ -2544,6 +2558,15 @@ expand_vec_init (rtx target, rtx vals)
     v.quick_push (XVECEXP (vals, 0, i));
   v.finalize ();
 
+  /* If the sequence is v = { a, a, a, a } just broadcast an element.  */
+  if (v.is_repeating_sequence ())
+    {
+      machine_mode mode = GET_MODE (target);
+      rtx dup = expand_vector_broadcast (mode, v.elt (0));
+      emit_move_insn (target, dup);
+      return;
+    }
+
   if (nelts > 3)
     {
       /* Case 1: Convert v = { a, b, a, b } into v = { ab, ab }.  */
@@ -4151,13 +4174,15 @@ expand_reduction (unsigned unspec, unsigned insn_flags, rtx *ops, rtx init)
 
   rtx m1_tmp = gen_reg_rtx (m1_mode);
   rtx scalar_move_ops[] = {m1_tmp, init};
-  emit_nonvlmax_insn (code_for_pred_broadcast (m1_mode), SCALAR_MOVE_OP,
-		      scalar_move_ops,
-		      need_mask_operand_p (insn_flags) ? ops[3]
-						       : CONST1_RTX (Pmode));
+  insn_code icode = code_for_pred_broadcast (m1_mode);
+  if (need_mask_operand_p (insn_flags))
+    emit_nonvlmax_insn (icode, SCALAR_MOVE_OP, scalar_move_ops, ops[3]);
+  else
+    emit_vlmax_insn (icode, SCALAR_MOVE_OP, scalar_move_ops);
+
   rtx m1_tmp2 = gen_reg_rtx (m1_mode);
   rtx reduc_ops[] = {m1_tmp2, vector_src, m1_tmp};
-  insn_code icode = code_for_pred (unspec, vmode);
+  icode = code_for_pred (unspec, vmode);
 
   if (need_mask_operand_p (insn_flags))
     {

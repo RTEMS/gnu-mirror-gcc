@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2023 Free Software Foundation, Inc.
+// Copyright (C) 2020-2024 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -159,8 +159,6 @@ private:
   virtual void visit (EnumItemDiscriminant &item) override final{};
   virtual void visit (ConstantItem &const_item) override final{};
   virtual void visit (StaticItem &static_item) override final{};
-  virtual void visit (TraitItemFunc &item) override final{};
-  virtual void visit (TraitItemMethod &item) override final{};
   virtual void visit (TraitItemConst &item) override final{};
   virtual void visit (TraitItemType &item) override final{};
   virtual void visit (Trait &trait) override final{};

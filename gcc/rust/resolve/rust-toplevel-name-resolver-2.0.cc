@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2023 Free Software Foundation, Inc.
+// Copyright (C) 2020-2024 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -226,16 +226,6 @@ TopLevel::visit (AST::StaticItem &static_item)
     = [this, &static_item] () { static_item.get_expr ()->accept_vis (*this); };
 
   ctx.scoped (Rib::Kind::Item, static_item.get_node_id (), sub_vis);
-}
-
-void
-TopLevel::visit (AST::TraitItemFunc &item)
-{
-  auto def_vis
-    = [this, &item] () { item.get_definition ()->accept_vis (*this); };
-
-  if (item.has_definition ())
-    ctx.scoped (Rib::Kind::Function, item.get_node_id (), def_vis);
 }
 
 void

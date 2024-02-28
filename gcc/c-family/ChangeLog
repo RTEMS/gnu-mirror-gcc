@@ -1,3 +1,41 @@
+2024-02-22  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/114007
+	* c-lex.cc (c_common_has_attribute): Parse 2 CPP_COLONs with
+	the first one with COLON_SCOPE flag the same as CPP_SCOPE.
+
+2024-02-10  Marek Polacek  <polacek@redhat.com>
+
+	DR 2237
+	PR c++/107126
+	PR c++/97202
+	* c-opts.cc (c_common_post_options): In C++20 or with -Wc++20-compat,
+	turn on -Wtemplate-id-cdtor.
+	* c.opt (Wtemplate-id-cdtor): New.
+
+2024-02-10  Jakub Jelinek  <jakub@redhat.com>
+
+	* c-format.cc (gcc_diag_length_specs): Add t and z modifiers.
+	(PP_FORMAT_CHAR_TABLE, gcc_gfc_char_table): Add entries for t and
+	z modifiers.
+
+2024-02-10  Jakub Jelinek  <jakub@redhat.com>
+
+	* c-ada-spec.cc (dump_template_types): Use HOST_SIZE_T_PRINT_UNSIGNED
+	and casts to fmt_size_t instead of "%lu" and casts to unsigned long.
+
+2024-02-01  Lewis Hyatt  <lhyatt@gmail.com>
+
+	PR preprocessor/105608
+	* c-pch.cc (c_common_read_pch): Adjust line map so that libcpp
+	assigns a location to restored macros which is the same location
+	that triggered the PCH include.
+
+2024-01-31  Marek Polacek  <polacek@redhat.com>
+
+	* c-opts.cc (c_common_post_options): Add an inform saying that
+	-fconcepts-ts is deprecated and will be removed in GCC 15.
+
 2024-01-27  Lewis Hyatt  <lhyatt@gmail.com>
 
 	PR preprocessor/105608

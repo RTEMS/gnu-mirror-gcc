@@ -91,6 +91,8 @@
 #include "tree-pass.h"
 #include "cfgbuild.h"
 #include "symbol-summary.h"
+#include "sreal.h"
+#include "ipa-cp.h"
 #include "ipa-prop.h"
 #include "ipa-fnsummary.h"
 #include "hash-map.h"
@@ -2361,7 +2363,7 @@ aarch64_reg_save_mode (unsigned int regno)
       case ARM_PCS_SIMD:
 	/* The vector PCS saves the low 128 bits (which is the full
 	   register on non-SVE targets).  */
-	return TFmode;
+	return V16QImode;
 
       case ARM_PCS_SVE:
 	/* Use vectors of DImode for registers that need frame
@@ -2657,6 +2659,27 @@ aarch64_gen_compare_zero_and_branch (rtx_code code, rtx x,
   x = gen_rtx_IF_THEN_ELSE (VOIDmode, x,
 			    gen_rtx_LABEL_REF (Pmode, label), pc_rtx);
   return gen_rtx_SET (pc_rtx, x);
+}
+
+/* Return an rtx that branches to LABEL based on the value of bit BITNUM of X.
+   If CODE is NE, it branches to LABEL when the bit is set; if CODE is EQ,
+   it branches to LABEL when the bit is clear.  */
+
+static rtx
+aarch64_gen_test_and_branch (rtx_code code, rtx x, int bitnum,
+			     rtx_code_label *label)
+{
+  auto mode = GET_MODE (x);
+  if (aarch64_track_speculation)
+    {
+      auto mask = gen_int_mode (HOST_WIDE_INT_1U << bitnum, mode);
+      emit_insn (gen_aarch64_and3nr_compare0 (mode, x, mask));
+      rtx cc_reg = gen_rtx_REG (CC_NZVmode, CC_REGNUM);
+      rtx x = gen_rtx_fmt_ee (code, CC_NZVmode, cc_reg, const0_rtx);
+      return gen_condjump (x, cc_reg, label);
+    }
+  return gen_aarch64_tb (code, mode, mode,
+			 x, gen_int_mode (bitnum, mode), label);
 }
 
 /* Consider the operation:
@@ -4881,8 +4904,9 @@ aarch64_guard_switch_pstate_sm (rtx old_svcr, aarch64_feature_flags local_mode)
   gcc_assert (local_mode != 0);
   auto already_ok_cond = (local_mode & AARCH64_FL_SM_ON ? NE : EQ);
   auto *label = gen_label_rtx ();
-  auto *jump = emit_jump_insn (gen_aarch64_tb (already_ok_cond, DImode, DImode,
-					       old_svcr, const0_rtx, label));
+  auto branch = aarch64_gen_test_and_branch (already_ok_cond, old_svcr, 0,
+					     label);
+  auto *jump = emit_jump_insn (branch);
   JUMP_LABEL (jump) = label;
   return label;
 }
@@ -6312,8 +6336,10 @@ aarch64_function_ok_for_sibcall (tree, tree exp)
   tree fntype = TREE_TYPE (TREE_TYPE (CALL_EXPR_FN (exp)));
   if (aarch64_fntype_pstate_sm (fntype) & ~aarch64_cfun_incoming_pstate_sm ())
     return false;
-  if (aarch64_fntype_pstate_za (fntype) != aarch64_cfun_incoming_pstate_za ())
-    return false;
+  for (auto state : { "za", "zt0" })
+    if (bool (aarch64_cfun_shared_flags (state))
+	!= bool (aarch64_fntype_shared_flags (fntype, state)))
+      return false;
   return true;
 }
 
@@ -9501,7 +9527,9 @@ aarch64_expand_prologue (void)
   if (aarch64_cfun_enables_pstate_sm ())
     force_isa_mode = AARCH64_FL_SM_ON;
 
-  if (flag_stack_clash_protection && known_eq (callee_adjust, 0))
+  if (flag_stack_clash_protection
+      && known_eq (callee_adjust, 0)
+      && known_lt (frame.reg_offset[VG_REGNUM], 0))
     {
       /* Fold the SVE allocation into the initial allocation.
 	 We don't do this in aarch64_layout_arg to avoid pessimizing
@@ -9629,7 +9657,10 @@ aarch64_expand_prologue (void)
   if (maybe_ne (sve_callee_adjust, 0))
     {
       gcc_assert (!flag_stack_clash_protection
-		  || known_eq (initial_adjust, 0));
+		  || known_eq (initial_adjust, 0)
+		  /* The VG save isn't shrink-wrapped and so serves as
+		     a probe of the initial allocation.  */
+		  || known_eq (frame.reg_offset[VG_REGNUM], bytes_below_sp));
       aarch64_allocate_and_probe_stack_space (tmp1_rtx, tmp0_rtx,
 					      sve_callee_adjust,
 					      force_isa_mode,
@@ -12961,6 +12992,8 @@ aarch64_class_max_nregs (reg_class_t regclass, machine_mode mode)
 	  && constant_multiple_p (GET_MODE_SIZE (mode),
 				  aarch64_vl_bytes (mode, vec_flags), &nregs))
 	return nregs;
+      if (vec_flags == (VEC_ADVSIMD | VEC_STRUCT | VEC_PARTIAL))
+	return GET_MODE_SIZE (mode).to_constant () / 8;
       return (vec_flags & VEC_ADVSIMD
 	      ? CEIL (lowest_size, UNITS_PER_VREG)
 	      : CEIL (lowest_size, UNITS_PER_WORD));
@@ -13130,7 +13163,7 @@ aarch64_output_sme_zero_za (rtx mask)
   if (mask_val == 0xff)
     return "zero\t{ za }";
 
-  static constexpr std::pair<unsigned int, char> tiles[] = {
+  static constexpr struct { unsigned char mask; char letter; } tiles[] = {
     { 0xff, 'b' },
     { 0x55, 'h' },
     { 0x11, 's' },
@@ -13144,14 +13177,14 @@ aarch64_output_sme_zero_za (rtx mask)
   const char *prefix = "{ ";
   for (auto &tile : tiles)
     {
-      auto tile_mask = tile.first;
+      unsigned int tile_mask = tile.mask;
       unsigned int tile_index = 0;
       while (tile_mask < 0x100)
 	{
 	  if ((mask_val & tile_mask) == tile_mask)
 	    {
 	      i += snprintf (buffer + i, sizeof (buffer) - i, "%sza%d.%c",
-			     prefix, tile_index, tile.second);
+			     prefix, tile_index, tile.letter);
 	      prefix = ", ";
 	      mask_val &= ~tile_mask;
 	    }
@@ -19512,7 +19545,6 @@ aarch64_option_valid_attribute_p (tree fndecl, tree, tree args, int)
 			      TREE_TARGET_OPTION (target_option_current_node));
 
   ret = aarch64_process_target_attr (args);
-  ret = aarch64_process_target_attr (args);
   if (ret)
     {
       tree version_attr = lookup_attribute ("target_version",
@@ -19870,6 +19902,62 @@ build_ifunc_arg_type ()
   return pointer_type;
 }
 
+/* Implement TARGET_MANGLE_DECL_ASSEMBLER_NAME, to add function multiversioning
+   suffixes.  */
+
+tree
+aarch64_mangle_decl_assembler_name (tree decl, tree id)
+{
+  /* For function version, add the target suffix to the assembler name.  */
+  if (TREE_CODE (decl) == FUNCTION_DECL
+      && DECL_FUNCTION_VERSIONED (decl))
+    {
+      aarch64_fmv_feature_mask feature_mask = get_feature_mask_for_version (decl);
+
+      std::string name = IDENTIFIER_POINTER (id);
+
+      /* For the default version, append ".default".  */
+      if (feature_mask == 0ULL)
+	{
+	  name += ".default";
+	  return get_identifier (name.c_str());
+	}
+
+      name += "._";
+
+      for (int i = 0; i < FEAT_MAX; i++)
+	{
+	  if (feature_mask & aarch64_fmv_feature_data[i].feature_mask)
+	    {
+	      name += "M";
+	      name += aarch64_fmv_feature_data[i].name;
+	    }
+	}
+
+      if (DECL_ASSEMBLER_NAME_SET_P (decl))
+	SET_DECL_RTL (decl, NULL);
+
+      id = get_identifier (name.c_str());
+    }
+  return id;
+}
+
+/* Return an identifier for the base assembler name of a versioned function.
+   This is computed by taking the default version's assembler name, and
+   stripping off the ".default" suffix if it's already been appended.  */
+
+static tree
+get_suffixed_assembler_name (tree default_decl, const char *suffix)
+{
+  std::string name = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (default_decl));
+
+  auto size = name.size ();
+  if (size >= 8 && name.compare (size - 8, 8, ".default") == 0)
+    name.resize (size - 8);
+  name += suffix;
+  return get_identifier (name.c_str());
+}
+
 /* Make the resolver function decl to dispatch the versions of
    a multi-versioned function,  DEFAULT_DECL.  IFUNC_ALIAS_DECL is
    ifunc alias that will point to the created resolver.  Create an
@@ -19883,8 +19971,9 @@ make_resolver_func (const tree default_decl,
 {
   tree decl, type, t;
 
-  /* Create resolver function name based on default_decl.  */
-  tree decl_name = clone_function_name (default_decl, "resolver");
+  /* Create resolver function name based on default_decl.  We need to remove an
+     existing ".default" suffix if this has already been appended.  */
+  tree decl_name = get_suffixed_assembler_name (default_decl, ".resolver");
   const char *resolver_name = IDENTIFIER_POINTER (decl_name);
 
   /* The resolver function should have signature
@@ -20231,6 +20320,28 @@ aarch64_generate_version_dispatcher_body (void *node_p)
   dispatch_function_versions (resolver_decl, &fn_ver_vec, &empty_bb);
   cgraph_edge::rebuild_edges ();
   pop_cfun ();
+
+  /* Fix up symbol names.  First we need to obtain the base name, which may
+     have already been mangled.  */
+  tree base_name = get_suffixed_assembler_name (default_ver_decl, "");
+
+  /* We need to redo the version mangling on the non-default versions for the
+     target_clones case.  Redoing the mangling for the target_version case is
+     redundant but does no harm.  We need to skip the default version, because
+     expand_clones will append ".default" later; fortunately that suffix is the
+     one we want anyway.  */
+  for (versn_info = node_version_info->next->next; versn_info;
+       versn_info = versn_info->next)
+    {
+      tree version_decl = versn_info->this_node->decl;
+      tree name = aarch64_mangle_decl_assembler_name (version_decl,
+						      base_name);
+      symtab->change_decl_assembler_name (version_decl, name);
+    }
+
+  /* We also need to use the base name for the ifunc declaration.  */
+  symtab->change_decl_assembler_name (node->decl, base_name);
+
   return resolver_decl;
 }
 
@@ -20341,42 +20452,6 @@ aarch64_common_function_versions (tree fn1, tree fn2)
     return false;
 
   return (aarch64_compare_version_priority (fn1, fn2) != 0);
-}
-
-/* Implement TARGET_MANGLE_DECL_ASSEMBLER_NAME, to add function multiversioning
-   suffixes.  */
-
-tree
-aarch64_mangle_decl_assembler_name (tree decl, tree id)
-{
-  /* For function version, add the target suffix to the assembler name.  */
-  if (TREE_CODE (decl) == FUNCTION_DECL
-      && DECL_FUNCTION_VERSIONED (decl))
-    {
-      aarch64_fmv_feature_mask feature_mask = get_feature_mask_for_version (decl);
-
-      /* No suffix for the default version.  */
-      if (feature_mask == 0ULL)
-	return id;
-
-      std::string name = IDENTIFIER_POINTER (id);
-      name += "._";
-
-      for (int i = 0; i < FEAT_MAX; i++)
-	{
-	  if (feature_mask & aarch64_fmv_feature_data[i].feature_mask)
-	    {
-	      name += "M";
-	      name += aarch64_fmv_feature_data[i].name;
-	    }
-	}
-
-      if (DECL_ASSEMBLER_NAME_SET_P (decl))
-	SET_DECL_RTL (decl, NULL);
-
-      id = get_identifier (name.c_str());
-    }
-  return id;
 }
 
 /* Implement TARGET_FUNCTION_ATTRIBUTE_INLINABLE_P.  Use an opt-out
@@ -29266,13 +29341,25 @@ aarch64_mode_emit_local_sme_state (aarch64_local_sme_state mode,
 	     bl __arm_tpidr2_save
 	     msr tpidr2_el0, xzr
 	     zero { za }       // Only if ZA is live
+	     zero { zt0 }      // Only if ZT0 is live
 	 no_save:  */
-      bool is_active = (mode == aarch64_local_sme_state::ACTIVE_LIVE
-			|| mode == aarch64_local_sme_state::ACTIVE_DEAD);
       auto tmp_reg = gen_reg_rtx (DImode);
-      auto active_flag = gen_int_mode (is_active, DImode);
       emit_insn (gen_aarch64_read_tpidr2 (tmp_reg));
-      emit_insn (gen_aarch64_commit_lazy_save (tmp_reg, active_flag));
+      auto label = gen_label_rtx ();
+      rtx branch = aarch64_gen_compare_zero_and_branch (EQ, tmp_reg, label);
+      auto jump = emit_jump_insn (branch);
+      JUMP_LABEL (jump) = label;
+      emit_insn (gen_aarch64_tpidr2_save ());
+      emit_insn (gen_aarch64_clear_tpidr2 ());
+      if (mode == aarch64_local_sme_state::ACTIVE_LIVE
+	  || mode == aarch64_local_sme_state::ACTIVE_DEAD)
+	{
+	  if (aarch64_cfun_has_state ("za"))
+	    emit_insn (gen_aarch64_initial_zero_za ());
+	  if (aarch64_cfun_has_state ("zt0"))
+	    emit_insn (gen_aarch64_sme_zero_zt0 ());
+	}
+      emit_label (label);
     }
 
   if (mode == aarch64_local_sme_state::ACTIVE_LIVE
@@ -29446,6 +29533,8 @@ aarch64_mode_emit (int entity, int mode, int prev_mode, HARD_REG_SET live)
   HARD_REG_SET clobbers = {};
   for (rtx_insn *insn = seq; insn; insn = NEXT_INSN (insn))
     {
+      if (!NONDEBUG_INSN_P (insn))
+	continue;
       vec_rtx_properties properties;
       properties.add_insn (insn, false);
       for (rtx_obj_reference ref : properties.refs ())

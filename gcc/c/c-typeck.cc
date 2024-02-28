@@ -585,6 +585,11 @@ composite_type_internal (tree t1, tree t2, struct composite_cache* cache)
 	  /* Setup the struct/union type.  Because we inherit all variably
 	     modified components, we can ignore the size expression.  */
 	  tree expr = NULL_TREE;
+
+	  /* Set TYPE_STUB_DECL for debugging symbols.  */
+	  TYPE_STUB_DECL (n) = pushdecl (build_decl (input_location, TYPE_DECL,
+						     NULL_TREE, n));
+
 	  n = finish_struct(input_location, n, fields, attributes, NULL, &expr);
 
 	  n = qualify_type (n, t1);
@@ -13567,7 +13572,17 @@ c_objc_common_truthvalue_conversion (location_t location, tree expr, tree type)
       break;
     }
 
-  int_const = (TREE_CODE (expr) == INTEGER_CST && !TREE_OVERFLOW (expr));
+  /* Conversion of a floating constant to boolean goes through here
+     and yields an integer constant expression.  Otherwise, the result
+     is only an integer constant expression if the argument is.  */
+  int_const = ((TREE_CODE (expr) == INTEGER_CST && !TREE_OVERFLOW (expr))
+	       || ((TREE_CODE (expr) == REAL_CST
+		    || TREE_CODE (expr) == COMPLEX_CST)
+		   && (TREE_CODE (type) == BOOLEAN_TYPE
+		       || (TREE_CODE (type) == ENUMERAL_TYPE
+			   && ENUM_UNDERLYING_TYPE (type) != NULL_TREE
+			   && (TREE_CODE (ENUM_UNDERLYING_TYPE (type))
+			       == BOOLEAN_TYPE)))));
   int_operands = EXPR_INT_CONST_OPERANDS (expr);
   if (int_operands && TREE_CODE (expr) != INTEGER_CST)
     {

@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2023 Free Software Foundation, Inc.
+// Copyright (C) 2020-2024 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -65,7 +65,6 @@ private:
   void visit (AST::Function &function) override;
   void visit (AST::BlockExpr &expr) override;
   void visit (AST::StaticItem &static_item) override;
-  void visit (AST::TraitItemFunc &item) override;
   void visit (AST::StructStruct &struct_item) override;
   void visit (AST::TupleStruct &tuple_struct) override;
   void visit (AST::EnumItem &variant) override;

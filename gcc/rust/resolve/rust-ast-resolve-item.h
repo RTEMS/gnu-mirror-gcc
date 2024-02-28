@@ -35,9 +35,8 @@ public:
   static void go (AST::AssociatedItem *item, const CanonicalPath &prefix,
 		  const CanonicalPath &canonical_prefix);
 
+  void visit (AST::Function &type) override;
   void visit (AST::TraitItemType &type) override;
-  void visit (AST::TraitItemFunc &func) override;
-  void visit (AST::TraitItemMethod &func) override;
   void visit (AST::TraitItemConst &constant) override;
 
 private:
@@ -123,6 +122,29 @@ private:
 
   const CanonicalPath &prefix;
   const CanonicalPath &canonical_prefix;
+};
+
+class Import
+{
+public:
+  Import (AST::SimplePath path, bool is_glob, std::string name)
+    : path (path), is_glob_f (is_glob), name (name)
+  {}
+
+  AST::SimplePath &get_path () { return path; }
+
+  const AST::SimplePath &get_path () const { return path; }
+
+  bool is_glob () const { return is_glob_f; }
+
+  const std::string &get_name () const { return name; }
+
+  void add_prefix (AST::SimplePath prefix);
+
+private:
+  AST::SimplePath path;
+  bool is_glob_f;
+  std::string name;
 };
 
 } // namespace Resolver

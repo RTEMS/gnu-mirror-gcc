@@ -1307,6 +1307,11 @@ region_model::on_stmt_pre (const gimple *stmt,
       /* No-op for now.  */
       break;
 
+    case GIMPLE_DEBUG:
+      /* We should have stripped these out when building the supergraph.  */
+      gcc_unreachable ();
+      break;
+
     case GIMPLE_ASSIGN:
       {
 	const gassign *assign = as_a <const gassign *> (stmt);
@@ -3643,7 +3648,22 @@ string_cst_has_null_terminator (tree string_cst,
 				byte_offset_t *out_bytes_read)
 {
   gcc_assert (bytes.m_start_byte_offset >= 0);
-  gcc_assert (bytes.m_start_byte_offset < TREE_STRING_LENGTH (string_cst));
+
+  /* If we're beyond the string_cst, reads are unsuccessful.  */
+  if (tree cst_size = get_string_cst_size (string_cst))
+    if (TREE_CODE (cst_size) == INTEGER_CST)
+      if (bytes.m_start_byte_offset >= TREE_INT_CST_LOW (cst_size))
+	return tristate::unknown ();
+
+  /* Assume all bytes after TREE_STRING_LENGTH are zero.  This handles
+     the case where an array is initialized with a string_cst that isn't
+     as long as the array, where the remaining elements are
+     empty-initialized and thus zeroed.  */
+  if (bytes.m_start_byte_offset >= TREE_STRING_LENGTH (string_cst))
+    {
+      *out_bytes_read = 1;
+      return tristate (true);
+    }
 
   /* Look for the first 0 byte within STRING_CST
      from START_READ_OFFSET onwards.  */
