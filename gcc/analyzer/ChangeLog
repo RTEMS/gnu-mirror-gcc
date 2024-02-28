@@ -1,3 +1,49 @@
+2024-02-27  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/110483
+	PR analyzer/111802
+	* access-diagram.cc
+	(string_literal_spatial_item::add_column_for_byte): Use %wu for
+	printing unsigned HOST_WIDE_INT.
+
+2024-02-27  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/111881
+	* constraint-manager.cc (bound::ensure_closed): Assert that
+	m_constant has integral type.
+	(range::add_bound): Bail out on floating point constants.
+
+2024-02-21  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/113999
+	* analyzer.h (get_string_cst_size): New decl.
+	* region-model-manager.cc (get_string_cst_size): New.
+	(region_model_manager::maybe_get_char_from_string_cst): Treat
+	single-byte accesses within string_cst but beyond
+	TREE_STRING_LENGTH as being 0.
+	* region-model.cc (string_cst_has_null_terminator): Likewise.
+
+2024-02-21  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/113998
+	* ranges.cc (symbolic_byte_range::intersection): Handle empty ranges.
+	(selftest::test_intersects): Add test coverage for empty ranges.
+
+2024-02-19  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/111289
+	* varargs.cc (representable_in_integral_type_p): New.
+	(va_arg_compatible_types_p): Add "arg_sval" param.  Handle integer
+	types.
+	(kf_va_arg::impl_call_pre): Pass arg_sval to
+	va_arg_compatible_types_p.
+
+2024-02-19  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	PR analyzer/113983
+	* region-model-manager.cc (maybe_undo_optimize_bit_field_compare): Reject
+	non integral types.
+
 2024-02-15  David Malcolm  <dmalcolm@redhat.com>
 
 	PR analyzer/111266

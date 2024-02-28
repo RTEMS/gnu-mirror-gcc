@@ -1,3 +1,24 @@
+2024-02-20  François Dumont  <fdumont@gcc.gnu.org>
+
+	* include/bits/stl_algobase.h (std::__niter_wrap): Add a call to
+	std::__niter_base on res iterator.
+
+2024-02-19  Iain Sandoe  <iain@sandoe.co.uk>
+	    Jonathan Wakely  <jwakely@redhat.com>
+
+	PR target/112397
+	* configure: Regenerate.
+	* configure.ac: Detect if we are building for Darwin.
+	* libsupc++/Makefile.am: If we are building for Darwin, then
+	suppress hot/cold partitioning for the array allocators.
+	* libsupc++/Makefile.in: Regenerated.
+
+2024-02-17  François Dumont  <fdumont@gcc.gnu.org>
+
+	* include/bits/stl_algobase.h (std::__niter_base): Redefine the overload
+	definitions for __gnu_debug::_Safe_iterator.
+	* include/debug/safe_iterator.tcc (std::__niter_base): Adapt declarations.
+
 2024-02-16  Jonathan Wakely  <jwakely@redhat.com>
 
 	PR libstdc++/87744

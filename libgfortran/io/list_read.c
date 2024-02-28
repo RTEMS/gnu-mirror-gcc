@@ -475,11 +475,23 @@ eat_separator (st_parameter_dt *dtp)
     case ',':
       if (dtp->u.p.current_unit->decimal_status == DECIMAL_COMMA)
 	{
+	  generate_error (&dtp->common, LIBERROR_READ_VALUE,
+	   "Comma not allowed as separator with DECIMAL='comma'");
 	  unget_char (dtp, c);
 	  break;
 	}
-      /* Fall through.  */
+      dtp->u.p.comma_flag = 1;
+      eat_spaces (dtp);
+      break;
+
     case ';':
+      if (dtp->u.p.current_unit->decimal_status == DECIMAL_POINT)
+	{
+	  generate_error (&dtp->common, LIBERROR_READ_VALUE,
+	   "Semicolon not allowed as separator with DECIMAL='point'");
+	  unget_char (dtp, c);
+	  break;
+	}
       dtp->u.p.comma_flag = 1;
       eat_spaces (dtp);
       break;
@@ -1326,8 +1338,13 @@ parse_real (st_parameter_dt *dtp, void *buffer, int length)
     {
       if ((c = next_char (dtp)) == EOF)
 	goto bad;
-      if (c == ',' && dtp->u.p.current_unit->decimal_status == DECIMAL_COMMA)
-	c = '.';
+      if (dtp->u.p.current_unit->decimal_status == DECIMAL_COMMA)
+	{
+	  if (c == '.')
+	    goto bad;
+	  if (c == ',')
+	    c = '.';
+	}
       switch (c)
 	{
 	CASE_DIGITS:
@@ -1636,8 +1653,18 @@ read_real (st_parameter_dt *dtp, void *dest, int length)
   seen_dp = 0;
 
   c = next_char (dtp);
-  if (c == ',' && dtp->u.p.current_unit->decimal_status == DECIMAL_COMMA)
-    c = '.';
+  if (dtp->u.p.current_unit->decimal_status == DECIMAL_COMMA)
+    {
+      if (c == '.')
+	goto bad_real;
+      if (c == ',')
+	c = '.';
+    }
+  if (dtp->u.p.current_unit->decimal_status == DECIMAL_POINT)
+    {
+      if (c == ';')
+	goto bad_real;
+    }
   switch (c)
     {
     CASE_DIGITS:
@@ -1677,8 +1704,13 @@ read_real (st_parameter_dt *dtp, void *dest, int length)
   for (;;)
     {
       c = next_char (dtp);
-      if (c == ',' && dtp->u.p.current_unit->decimal_status == DECIMAL_COMMA)
-	c = '.';
+      if (dtp->u.p.current_unit->decimal_status == DECIMAL_COMMA)
+	{
+	  if (c == '.')
+	    goto bad_real;
+	  if (c == ',')
+	    c = '.';
+	}
       switch (c)
 	{
 	CASE_DIGITS:
@@ -1718,7 +1750,7 @@ read_real (st_parameter_dt *dtp, void *dest, int length)
 
 	CASE_SEPARATORS:
 	case EOF:
-          if (c != '\n' && c != ',' && c != '\r' && c != ';')
+	  if (c != '\n' && c != ',' && c != ';' && c != '\r')
 	    unget_char (dtp, c);
 	  goto done;
 
@@ -2106,6 +2138,7 @@ static int
 list_formatted_read_scalar (st_parameter_dt *dtp, bt type, void *p,
 			    int kind, size_t size)
 {
+  char message[MSGLEN];
   gfc_char4_t *q, *r;
   size_t m;
   int c;
@@ -2215,7 +2248,7 @@ list_formatted_read_scalar (st_parameter_dt *dtp, bt type, void *p,
 	  child_iostat = ((dtp->common.flags & IOPARM_HAS_IOSTAT)
 			  ? dtp->common.iostat : &noiostat);
 
-	  /* Set iomsge, intent(inout).  */
+	  /* Set iomsg, intent(inout).  */
 	  if (dtp->common.flags & IOPARM_HAS_IOMSG)
 	    {
 	      child_iomsg = dtp->common.iomsg;
@@ -2234,6 +2267,25 @@ list_formatted_read_scalar (st_parameter_dt *dtp, bt type, void *p,
 			      iotype_len, child_iomsg_len);
 	  dtp->u.p.child_saved_iostat = *child_iostat;
 	  dtp->u.p.current_unit->child_dtio--;
+	  
+	  
+	  if ((dtp->u.p.child_saved_iostat != 0) &&
+	      !(dtp->common.flags & IOPARM_HAS_IOMSG) &&
+	      !(dtp->common.flags & IOPARM_HAS_IOSTAT))
+	    {
+	      /* Trim trailing spaces from the message.  */
+	      for(int i = IOMSG_LEN - 1; i > 0; i--)
+		if (!isspace(child_iomsg[i]))
+		  {
+		    /* Add two to get back to the end of child_iomsg.  */
+		    child_iomsg_len = i+2;
+		    break;
+		  }
+	      free_line (dtp);
+	      snprintf (message, child_iomsg_len, child_iomsg);
+	      generate_error (&dtp->common, dtp->u.p.child_saved_iostat,
+			      message);
+	    }
       }
       break;
     default:

@@ -4255,12 +4255,12 @@ bitint_large_huge::lower_addsub_overflow (tree obj, gimple *stmt)
 				     NULL_TREE, NULL_TREE);
 	      gimple *g2 = NULL;
 	      if (!single_comparison)
-		g2 = gimple_build_cond (LT_EXPR, idx,
+		g2 = gimple_build_cond (EQ_EXPR, idx,
 					size_int (prec_limbs - 1),
 					NULL_TREE, NULL_TREE);
 	      edge edge_true_true, edge_true_false, edge_false;
 	      if_then_if_then_else (g, g2, profile_probability::likely (),
-				    profile_probability::likely (),
+				    profile_probability::unlikely (),
 				    edge_true_true, edge_true_false,
 				    edge_false);
 	      tree l = limb_access (type, var ? var : obj, idx, true);
@@ -4269,8 +4269,11 @@ bitint_large_huge::lower_addsub_overflow (tree obj, gimple *stmt)
 	      if (!single_comparison)
 		{
 		  m_gsi = gsi_after_labels (edge_true_true->src);
-		  l = limb_access (type, var ? var : obj,
-				   size_int (prec_limbs - 1), true);
+		  tree plm1idx = size_int (prec_limbs - 1);
+		  tree plm1type = limb_access_type (type, plm1idx);
+		  l = limb_access (type, var ? var : obj, plm1idx, true);
+		  if (!useless_type_conversion_p (plm1type, TREE_TYPE (rhs)))
+		    rhs = add_cast (plm1type, rhs);
 		  if (!useless_type_conversion_p (TREE_TYPE (l),
 						  TREE_TYPE (rhs)))
 		    rhs = add_cast (TREE_TYPE (l), rhs);
@@ -4497,7 +4500,7 @@ bitint_large_huge::lower_mul_overflow (tree obj, gimple *stmt)
 					   size_one_node);
 		  insert_before (g);
 		  g = gimple_build_cond (NE_EXPR, idx_next,
-					 size_int (endlimb + (cnt == 1)),
+					 size_int (endlimb + (cnt == 2)),
 					 NULL_TREE, NULL_TREE);
 		  insert_before (g);
 		  edge true_edge, false_edge;
@@ -5302,27 +5305,21 @@ bitint_large_huge::lower_stmt (gimple *stmt)
       else if (TREE_CODE (TREE_TYPE (rhs1)) == BITINT_TYPE
 	       && bitint_precision_kind (TREE_TYPE (rhs1)) >= bitint_prec_large
 	       && (INTEGRAL_TYPE_P (TREE_TYPE (lhs))
-		   || POINTER_TYPE_P (TREE_TYPE (lhs))))
+		   || POINTER_TYPE_P (TREE_TYPE (lhs))
+		   || gimple_assign_rhs_code (stmt) == VIEW_CONVERT_EXPR))
 	{
 	  final_cast_p = true;
-	  if (TREE_CODE (TREE_TYPE (lhs)) == INTEGER_TYPE
-	      && TYPE_PRECISION (TREE_TYPE (lhs)) > MAX_FIXED_MODE_SIZE
+	  if (((TREE_CODE (TREE_TYPE (lhs)) == INTEGER_TYPE
+		&& TYPE_PRECISION (TREE_TYPE (lhs)) > MAX_FIXED_MODE_SIZE)
+	       || (!INTEGRAL_TYPE_P (TREE_TYPE (lhs))
+		   && !POINTER_TYPE_P (TREE_TYPE (lhs))))
 	      && gimple_assign_rhs_code (stmt) == VIEW_CONVERT_EXPR)
 	    {
 	      /* Handle VIEW_CONVERT_EXPRs to not generally supported
 		 huge INTEGER_TYPEs like uint256_t or uint512_t.  These
 		 are usually emitted from memcpy folding and backends
-		 support moves with them but that is usually it.  */
-	      if (TREE_CODE (rhs1) == INTEGER_CST)
-		{
-		  rhs1 = fold_unary (VIEW_CONVERT_EXPR, TREE_TYPE (lhs),
-				     rhs1);
-		  gcc_assert (rhs1 && TREE_CODE (rhs1) == INTEGER_CST);
-		  gimple_assign_set_rhs1 (stmt, rhs1);
-		  gimple_assign_set_rhs_code (stmt, INTEGER_CST);
-		  update_stmt (stmt);
-		  return;
-		}
+		 support moves with them but that is usually it.
+		 Similarly handle VCEs to vector/complex types etc.  */
 	      gcc_assert (TREE_CODE (rhs1) == SSA_NAME);
 	      if (SSA_NAME_IS_DEFAULT_DEF (rhs1)
 		  && (!SSA_NAME_VAR (rhs1) || VAR_P (SSA_NAME_VAR (rhs1))))
@@ -5373,6 +5370,18 @@ bitint_large_huge::lower_stmt (gimple *stmt)
 		}
 	    }
 	}
+      else if (TREE_CODE (TREE_TYPE (lhs)) == BITINT_TYPE
+	       && bitint_precision_kind (TREE_TYPE (lhs)) >= bitint_prec_large
+	       && !INTEGRAL_TYPE_P (TREE_TYPE (rhs1))
+	       && !POINTER_TYPE_P (TREE_TYPE (rhs1))
+	       && gimple_assign_rhs_code (stmt) == VIEW_CONVERT_EXPR)
+	{
+	  int part = var_to_partition (m_map, lhs);
+	  gcc_assert (m_vars[part] != NULL_TREE);
+	  lhs = build1 (VIEW_CONVERT_EXPR, TREE_TYPE (rhs1), m_vars[part]);
+	  insert_before (gimple_build_assign (lhs, rhs1));
+	  return;
+	}
     }
   if (gimple_store_p (stmt))
     {
@@ -5408,6 +5417,28 @@ bitint_large_huge::lower_stmt (gimple *stmt)
 	      case IMAGPART_EXPR:
 		lower_cplxpart_stmt (lhs, g);
 		goto handled;
+	      case VIEW_CONVERT_EXPR:
+		{
+		  tree rhs1 = gimple_assign_rhs1 (g);
+		  rhs1 = TREE_OPERAND (rhs1, 0);
+		  if (!INTEGRAL_TYPE_P (TREE_TYPE (rhs1))
+		      && !POINTER_TYPE_P (TREE_TYPE (rhs1)))
+		    {
+		      tree ltype = TREE_TYPE (rhs1);
+		      addr_space_t as = TYPE_ADDR_SPACE (TREE_TYPE (lhs));
+		      ltype
+			= build_qualified_type (ltype,
+						TYPE_QUALS (TREE_TYPE (lhs))
+						| ENCODE_QUAL_ADDR_SPACE (as));
+		      lhs = build1 (VIEW_CONVERT_EXPR, ltype, lhs);
+		      gimple_assign_set_lhs (stmt, lhs);
+		      gimple_assign_set_rhs1 (stmt, rhs1);
+		      gimple_assign_set_rhs_code (stmt, TREE_CODE (rhs1));
+		      update_stmt (stmt);
+		      return;
+		    }
+		}
+		break;
 	      default:
 		break;
 	      }
@@ -6232,6 +6263,14 @@ gimple_lower_bitint (void)
 	      if (gimple_assign_cast_p (SSA_NAME_DEF_STMT (s)))
 		{
 		  tree rhs1 = gimple_assign_rhs1 (SSA_NAME_DEF_STMT (s));
+		  if (TREE_CODE (rhs1) == VIEW_CONVERT_EXPR)
+		    {
+		      rhs1 = TREE_OPERAND (rhs1, 0);
+		      if (!INTEGRAL_TYPE_P (TREE_TYPE (rhs1))
+			  && !POINTER_TYPE_P (TREE_TYPE (rhs1))
+			  && gimple_store_p (use_stmt))
+			continue;
+		    }
 		  if (INTEGRAL_TYPE_P (TREE_TYPE (rhs1))
 		      && ((is_gimple_assign (use_stmt)
 			   && (gimple_assign_rhs_code (use_stmt)
@@ -6276,11 +6315,15 @@ gimple_lower_bitint (void)
 			      goto force_name;
 			    break;
 			  case VIEW_CONVERT_EXPR:
-			    /* Don't merge with VIEW_CONVERT_EXPRs to
-			       huge INTEGER_TYPEs used sometimes in memcpy
-			       expansion.  */
 			    {
 			      tree lhs = gimple_assign_lhs (use_stmt);
+			      /* Don't merge with VIEW_CONVERT_EXPRs to
+				 non-integral types.  */
+			      if (!INTEGRAL_TYPE_P (TREE_TYPE (lhs)))
+				goto force_name;
+			      /* Don't merge with VIEW_CONVERT_EXPRs to
+				 huge INTEGER_TYPEs used sometimes in memcpy
+				 expansion.  */
 			      if (TREE_CODE (TREE_TYPE (lhs)) == INTEGER_TYPE
 				  && (TYPE_PRECISION (TREE_TYPE (lhs))
 				      > MAX_FIXED_MODE_SIZE))

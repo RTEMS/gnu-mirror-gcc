@@ -1019,6 +1019,14 @@ gfc_conv_intrinsic_to_class (gfc_se *parmse, gfc_expr *e,
   tmp = gfc_typenode_for_spec (&class_ts);
   var = gfc_create_var (tmp, "class");
 
+  /* Force a temporary for component or substring references.  */
+  if (unlimited_poly
+      && class_ts.u.derived->components->attr.dimension
+      && !class_ts.u.derived->components->attr.allocatable
+      && !class_ts.u.derived->components->attr.class_pointer
+      && is_subref_array (e))
+    parmse->force_tmp = 1;
+
   /* Set the vptr.  */
   ctree = gfc_class_vptr_get (var);
 
@@ -6682,6 +6690,10 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
 			  if (!UNLIMITED_POLY (e) && UNLIMITED_POLY (fsym))
 			    {
 			      tree efield;
+
+			      /* Evaluate arguments just once.  */
+			      if (e->expr_type != EXPR_VARIABLE)
+				parmse.expr = save_expr (parmse.expr);
 
 			      /* Set the _data field.  */
 			      tmp = gfc_class_data_get (var);
