@@ -70,6 +70,9 @@ enum processor_type
    PROCESSOR_TITAN
 };
 
+/* Until there are changes in instruction tuning for the power11 cpu, make
+   -mtune=power11 use the same instruction tuning as power10.  */
+#define PROCESSOR_POWER11	PROCESSOR_POWER10
 
 /* Types of costly dependences.  */
 enum rs6000_dependence_cost
