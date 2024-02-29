@@ -74,6 +74,10 @@ enum processor_type
    -mtune=power11 use the same instruction tuning as power10.  */
 #define PROCESSOR_POWER11	PROCESSOR_POWER10
 
+/* Until there are changes in instruction tuning for a potential future cpu,
+   make -mtune=future use the same instruction tuning as power11.  */
+#define PROCESSOR_FUTURE	PROCESSOR_POWER11
+
 /* Types of costly dependences.  */
 enum rs6000_dependence_cost
 {
