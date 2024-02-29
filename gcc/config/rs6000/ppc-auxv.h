@@ -47,10 +47,9 @@
 #define PPC_PLATFORM_PPC476            12
 #define PPC_PLATFORM_POWER8            13
 #define PPC_PLATFORM_POWER9            14
-#define PPC_PLATFORM_POWER10           15
 
 /* This is not yet official.  */
-#define PPC_PLATFORM_POWER11           16
+#define PPC_PLATFORM_POWER10           15
 
 /* AT_HWCAP bits.  These must match the values defined in the Linux kernel.  */
 #define PPC_FEATURE_32              0x80000000
