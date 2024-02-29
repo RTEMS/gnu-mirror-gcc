@@ -566,6 +566,9 @@ extern int rs6000_vector_align[];
 #define TARGET_DENSE_MATH		(TARGET_MMA && TARGET_FUTURE)
 #define TARGET_MMA_NO_DENSE_MATH	(TARGET_MMA && !TARGET_FUTURE)
 
+/* Dense math flags.  */
+#define DENSE_MATH_FLAGS		(OPTION_MASK_FUTURE & OPTION_MASK_MMA)
+
 /* Inlining allows targets to define the meanings of bits in target_info
    field of ipa_fn_summary by itself, the used bits for rs6000 are listed
    below.  */
