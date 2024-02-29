@@ -5880,8 +5880,6 @@ rs6000_machine_from_flags (void)
   /* Disable the flags that should never influence the .machine selection.  */
   flags &= ~(OPTION_MASK_PPC_GFXOPT | OPTION_MASK_PPC_GPOPT | OPTION_MASK_ISEL);
 
-  if ((flags & OPTION_MASK_FUTURE) != 0)
-    return "future";
   if ((flags & OPTION_MASK_POWER11) != 0)
     return "power11";
   if ((flags & (ISA_3_1_MASKS_SERVER & ~ISA_3_0_MASKS_SERVER)) != 0)
@@ -24440,7 +24438,6 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "float128",			OPTION_MASK_FLOAT128_KEYWORD,	false, true  },
   { "float128-hardware",	OPTION_MASK_FLOAT128_HW,	false, true  },
   { "fprnd",			OPTION_MASK_FPRND,		false, true  },
-  { "future",			OPTION_MASK_FUTURE,		false, false },
   { "power10",			OPTION_MASK_POWER10,		false, true  },
   { "hard-dfp",			OPTION_MASK_DFP,		false, true  },
   { "htm",			OPTION_MASK_HTM,		false, true  },
