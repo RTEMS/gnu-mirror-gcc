@@ -1,6 +1,124 @@
+==================== Branch work161, patch #2 ====================
+
+Add -mcpu=future support.
+
+This patch adds support for -mcpu=future.  At the current time, no new
+instructions are implemented.  The tuning for the future processor is exactly
+the same as for power10.
+
+If -mcpu=future is used, the macro _ARCH_PWR_FUTURE will be defined.
+
+In order to use -mcpu=future, you will need an assembler that supports the
+-mfuture option.
+
+2024-02-29  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config.gcc (powerpc*-*-*, rs6000-*-*): Add support for a potential
+	future processor.
+	* config/rs6000/aix71.h (ASM_CPU_SPEC): Likewise.
+	* config/rs6000/aix72.h (ASM_CPU_SPEC): Likewise.
+	* config/rs6000/aix73.h (ASM_CPU_SPEC): Likewise.
+	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Define
+	_ARCH_PWR_FUTURE if -mcpu=future.
+	* config/rs6000/rs6000-cpus.def (ISA_FUTURE_MASKS_SERVER): New macro.
+	(POWERPC_MASKS): Add support for -mcpu=future.
+	(future cpu): Add future cpu.
+	* config/rs6000/rs6000-opts.h (PROCESSOR_FUTURE): New macro.
+	* config/rs6000/rs6000-tables.opt: Regenerate.
+	* config/rs6000/rs6000.cc (rs6000_machine_from_flags): If -mcpu=future,
+	emit .machine future.
+	(rs6000_opt_masks): Add support for the future ISA bits.
+	* config/rs6000/rs6000.h (ASM_CPU_SPEC): Add support for the future
+	processor.
+	* config/rs6000/rs6000.opt (-mfuture): New internal ISA bit for a
+	potential future cpu.
+	* doc/invoke.texi (PowerPC options): Document -mcpu=future.
+
+==================== Branch work161, patch #1 ====================
+
+Add -mcpu=power11 support.
+
+This patch adds support for -mcpu=power11.  At the current time, no new
+instructions are implemented.  The tuning for the power11 processor is exactly
+the same as for power10.
+
+If -mcpu=power11 is used, the macro _ARCH_PWR11 will be defined.
+
+In order to use -mcpu=power11, you will need an assembler that supports the
+-mpower11 option.
+
+2024-02-29  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config.gcc (powerpc*-*-*, rs6000-*-*): Add support for the power11
+	processor.
+	* config/rs6000/aix71.h (ASM_CPU_SPEC): Likewise.
+	* config/rs6000/aix72.h (ASM_CPU_SPEC): Likewise.
+	* config/rs6000/aix73.h (ASM_CPU_SPEC): Likewise.
+	* config/rs6000/driver-rs6000.c (asm_names): Likewise.
+	* config/rs6000/rs6000-builtin.cc (cpu_is_info): Likewise.
+	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Define
+	_ARCH_PWR11 if -mcpu=power11.
+	* config/rs6000/rs6000-cpus.def (ISA_POWER11_MASKS_SERVER): New macro.
+	(POWERPC_MASKS): Add support for -mcpu=power11.
+	(power11 cpu): Add power11 cpu.
+	* config/rs6000/rs6000-opts.h (PROCESSOR_POWER11): New macro.
+	* config/rs6000/rs6000-tables.opt: Regenerate.
+	* config/rs6000/rs6000.cc (rs6000_machine_from_flags): If -mcpu=power11,
+	emit .machine power11.
+	(rs6000_opt_masks): Add support for the power11 ISA bits.
+	* config/rs6000/rs6000.h (ASM_CPU_SPEC): Add support for the power11
+	processor.
+	* config/rs6000/rs6000.opt (-mpower11): New internal ISA bit for
+	power11 cpu.
+	* doc/invoke.texi (PowerPC options): Document -mcpu=power11.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/power11-1.c: New test.
+	* gcc.target/powerpc/power11-2.c: Likewise.
+	* gcc.target/powerpc/power11-3.c: Likewise.
+	* lib/target-support.exp (check_effective_target_power11_ok): Add
+	power11 support.
+
 ==================== Branch work161, baseline ====================
+
+Add ChangeLog.meissner and REVISION.
+
+2024-02-28  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* REVISION: New file for branch.
+	* ChangeLog.meissner: New file.
+
+gcc/c-family/
+
+	* ChangeLog.meissner: New file.
+
+gcc/c/
+
+	* ChangeLog.meissner: New file.
+
+gcc/cp/
+
+	* ChangeLog.meissner: New file.
+
+gcc/fortran/
+
+	* ChangeLog.meissner: New file.
+
+gcc/testsuite/
+
+	* ChangeLog.meissner: New file.
+
+libgcc/
+
+	* ChangeLog.meissner: New file.
 
 2024-02-28   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
-
