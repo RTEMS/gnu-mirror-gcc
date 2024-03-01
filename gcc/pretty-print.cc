@@ -752,6 +752,9 @@ output_buffer::~output_buffer ()
   obstack_free (&formatted_obstack, NULL);
 }
 
+#ifndef PTRDIFF_MAX
+#define PTRDIFF_MAX INTTYPE_MAXIMUM (ptrdiff_t)
+#endif
 
 /* Format an integer given by va_arg (ARG, type-specifier T) where
    type-specifier is a precision modifier as indicated by PREC.  F is
@@ -783,7 +786,15 @@ output_buffer::~output_buffer ()
         break;                                               \
                                                              \
       case 4:                                                \
-        if (sizeof (ptrdiff_t) <= sizeof (int))              \
+        if (T (-1) >= T (0))                                 \
+          {                                                  \
+            unsigned long long a = va_arg (ARG, ptrdiff_t);  \
+            unsigned long long m = PTRDIFF_MAX;              \
+            m = 2 * m + 1;                                   \
+            pp_scalar (PP, "%" HOST_LONG_LONG_FORMAT F,      \
+		       a & m);                               \
+          }                                                  \
+        else if (sizeof (ptrdiff_t) <= sizeof (int))         \
           pp_scalar (PP, "%" F,                              \
                      (int) va_arg (ARG, ptrdiff_t));         \
         else if (sizeof (ptrdiff_t) <= sizeof (long))        \
@@ -2802,13 +2813,16 @@ test_pp_format ()
   ASSERT_PP_FORMAT_2 ("17 12345678", "%llo %x", (long long)15, 0x12345678);
   ASSERT_PP_FORMAT_2 ("cafebabe 12345678", "%llx %x", (long long)0xcafebabe,
 		      0x12345678);
-  ASSERT_PP_FORMAT_2 ("-27 12345678", "%wd %x", (HOST_WIDE_INT)-27, 0x12345678);
-  ASSERT_PP_FORMAT_2 ("-5 12345678", "%wi %x", (HOST_WIDE_INT)-5, 0x12345678);
-  ASSERT_PP_FORMAT_2 ("10 12345678", "%wu %x", (unsigned HOST_WIDE_INT)10,
+  ASSERT_PP_FORMAT_2 ("-27 12345678", "%wd %x", HOST_WIDE_INT_C (-27),
 		      0x12345678);
-  ASSERT_PP_FORMAT_2 ("17 12345678", "%wo %x", (HOST_WIDE_INT)15, 0x12345678);
-  ASSERT_PP_FORMAT_2 ("0xcafebabe 12345678", "%wx %x", (HOST_WIDE_INT)0xcafebabe,
+  ASSERT_PP_FORMAT_2 ("-5 12345678", "%wi %x", HOST_WIDE_INT_C (-5),
 		      0x12345678);
+  ASSERT_PP_FORMAT_2 ("10 12345678", "%wu %x", HOST_WIDE_INT_UC (10),
+		      0x12345678);
+  ASSERT_PP_FORMAT_2 ("17 12345678", "%wo %x", HOST_WIDE_INT_C (15),
+		      0x12345678);
+  ASSERT_PP_FORMAT_2 ("0xcafebabe 12345678", "%wx %x",
+		      HOST_WIDE_INT_C (0xcafebabe), 0x12345678);
   ASSERT_PP_FORMAT_2 ("-27 12345678", "%zd %x", (ssize_t)-27, 0x12345678);
   ASSERT_PP_FORMAT_2 ("-5 12345678", "%zi %x", (ssize_t)-5, 0x12345678);
   ASSERT_PP_FORMAT_2 ("10 12345678", "%zu %x", (size_t)10, 0x12345678);

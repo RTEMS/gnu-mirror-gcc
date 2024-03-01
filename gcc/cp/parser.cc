@@ -25724,8 +25724,15 @@ cp_parser_parameter_declaration (cp_parser *parser,
      for a C-style variadic function. */
   token = cp_lexer_peek_token (parser->lexer);
 
-  bool const xobj_param_p
+  bool xobj_param_p
     = decl_spec_seq_has_spec_p (&decl_specifiers, ds_this);
+  if (xobj_param_p && template_parm_p)
+    {
+      error_at (decl_specifiers.locations[ds_this],
+		"%<this%> specifier in template parameter declaration");
+      xobj_param_p = false;
+      decl_specifiers.locations[ds_this] = 0;
+    }
 
   if (xobj_param_p
       && ((declarator && declarator->parameter_pack_p)
@@ -27671,10 +27678,16 @@ cp_parser_class_head (cp_parser* parser,
   if (cp_lexer_next_token_is (parser->lexer, CPP_COLON))
     {
       if (type)
-	pushclass (type);
+	{
+	  pushclass (type);
+	  start_lambda_scope (TYPE_NAME (type));
+	}
       bases = cp_parser_base_clause (parser);
       if (type)
-	popclass ();
+	{
+	  finish_lambda_scope ();
+	  popclass ();
+	}
     }
   else
     bases = NULL_TREE;
@@ -27999,7 +28012,7 @@ cp_parser_member_declaration (cp_parser* parser)
       if (!decl_specifiers.any_specifiers_p)
 	{
 	  cp_token *token = cp_lexer_peek_token (parser->lexer);
-	  if (!in_system_header_at (token->location))
+	  if (cxx_dialect < cxx11 && !in_system_header_at (token->location))
 	    {
 	      gcc_rich_location richloc (token->location);
 	      richloc.add_fixit_remove ();
@@ -47984,7 +47997,8 @@ cp_parser_omp_context_selector (cp_parser *parser, enum omp_tss_code set,
 		}
 	      while (1);
 	      break;
-	    case OMP_TRAIT_PROPERTY_EXPR:
+	    case OMP_TRAIT_PROPERTY_DEV_NUM_EXPR:
+	    case OMP_TRAIT_PROPERTY_BOOL_EXPR:
 	      /* FIXME: this is bogus, the expression need
 		 not be constant.  */
 	      t = cp_parser_constant_expression (parser);

@@ -1,3 +1,28 @@
+2024-02-26  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/114042
+	* c-parser.cc (c_parser_postfix_expression): Diagnose
+	__builtin_stdc_bit_* argument with ENUMERAL_TYPE or BOOLEAN_TYPE
+	type or if signed here rather than on the replacement builtins
+	in check_builtin_function_arguments.
+
+2024-02-22  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/114007
+	* c-parser.cc (c_parser_std_attribute): Remove loose_scope_p argument.
+	Instead of checking it, parse 2 CPP_COLONs with the first one with
+	COLON_SCOPE flag the same as CPP_SCOPE.
+	(c_parser_std_attribute_list): Remove loose_scope_p argument, don't
+	pass it to c_parser_std_attribute.
+	(c_parser_std_attribute_specifier): Adjust c_parser_std_attribute_list
+	caller.
+
+2024-02-13  Tobias Burnus  <tburnus@baylibre.com>
+
+	PR middle-end/113904
+	* c-parser.cc (c_parser_omp_context_selector): Handle splitting of
+	OMP_TRAIT_PROPERTY_EXPR into OMP_TRAIT_PROPERTY_{DEV_NUM,BOOL}_EXPR.
+
 2024-02-10  Jakub Jelinek  <jakub@redhat.com>
 
 	* c-decl.cc (get_parm_array_spec): Use HOST_WIDE_INT_PRINT_UNSIGNED

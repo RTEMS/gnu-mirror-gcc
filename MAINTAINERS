@@ -373,8 +373,10 @@ Gabriel Charette				<gchare@google.com>
 Chandra Chavva					<cchavva@redhat.com>
 Dehao Chen					<dehao@google.com>
 Fabien Chêne					<fabien@gcc.gnu.org>
+Monk Chiang					<monkchiang@gmail.com>
 Clément Chigot					<chigot@adacore.com>
 Harshit Chopra					<harshit@google.com>
+Juergen Christ					<jchrist@linux.ibm.com>
 Tamar Christina					<tamar.christina@arm.com>
 Eric Christopher				<echristo@gmail.com>
 Paul Clarke					<pc@us.ibm.com>
@@ -667,6 +669,7 @@ Edward Smith-Rowland				<esmithrowland@gmail.com>
 Anatoly Sokolov					<aesok@dol.ru>
 Michael Sokolov					<msokolov@ivan.Harhan.ORG>
 Jayant Sonar					<rsonar.jayant@gmail.com>
+Fangrui Song	                                <maskray@gcc.gnu.org>
 Richard Stallman				<rms@gnu.org>
 Basile Starynkevitch				<basile@starynkevitch.net>
 Jakub Staszak					<kuba@et.pl>
@@ -757,6 +760,7 @@ Certificate of Origin Version 1.1.  See https://gcc.gnu.org/dco.html for more
 information.
 
 
+Juergen Christ                                  <jchrist@linux.ibm.com>
 Robin Dapp					<rdapp.gcc@gmail.com>
 Robin Dapp					<rdapp@ventanamicro.com>
 Michal Jires					<mjires@suse.cz>
@@ -776,6 +780,7 @@ Bill Schmidt					<bill.schmidt@fastmail.com>
 Nathaniel Shead					<nathanieloshead@gmail.org>
 Nathan Sidwell					<nathan@acm.org>
 Edward Smith-Rowland				<esmithrowland@gmail.com>
+Fangrui Song	                                <maskray@gcc.gnu.org>
 Petter Tomner					<tomner@bahnhof.se>
 Martin Uecker					<uecker@gcc.gnu.org>
 Jonathan Wakely					<jwakely@redhat.com>

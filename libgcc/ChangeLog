@@ -1,3 +1,56 @@
+2024-02-22  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR target/109987
+	* config/rs6000/t-float128-hw: Replace options -mpower{8,9}-vector
+	with -mcpu=power9.
+	* configure.ac: Update use of option -mpower9-vector with
+	-mcpu=power9.
+	* configure: Regenerate.
+
+2024-02-21  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config/aarch64/heap-trampoline.c
+	(aarch64_trampoline_insns): Arrange to encode instructions as a
+	byte array so that the order is independent of memory byte order.
+	(struct aarch64_trampoline): Likewise.
+
+2024-02-20  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR target/113971
+	* config/aarch64/heap-trampoline.c: Allow all linux variants.
+
+2024-02-16  Matteo Italia  <matteo@mitalia.net>
+
+	PR libgcc/113850
+	* config/i386/gthr-win32-cond.c (__gthr_win32_abs_to_rel_time):
+	fix absolute timespec to relative milliseconds count
+	conversion (it incorrectly returned seconds instead of
+	milliseconds); this avoids spurious wakeups in
+	__gthr_win32_cond_timedwait
+
+2024-02-14  Jakub Jelinek  <jakub@redhat.com>
+	    H.J. Lu  <hjl.tools@gmail.com>
+
+	PR target/113855
+	* config/i386/heap-trampoline.c (trampoline_insns): Add IBT
+	support and pad to the multiple of 4 bytes.  Use movabsq
+	instead of movabs in comments.  Add -mx32 variant.
+
+2024-02-13  Jakub Jelinek  <jakub@redhat.com>
+
+	* soft-fp/bitint.h (FP_FROM_BITINT): If iprec < 0 and msb is all ones,
+	just set n to 1 instead of using __builtin_clzll (~msb).
+
+2024-02-12  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR target/113855
+	* config.host: Add trampoline support to x?86-linux.
+	* config/i386/heap-trampoline.c (trampoline_insns): Provide
+	a variant for IA32.
+	(union ix86_trampoline): Likewise.
+	(__gcc_nested_func_ptr_created): Implement a basic trampoline
+	for IA32.
+
 2024-02-10  Jakub Jelinek  <jakub@redhat.com>
 
 	* soft-fp/floatbitintdd.c (__bid_floatbitintdd): Or in all remainder

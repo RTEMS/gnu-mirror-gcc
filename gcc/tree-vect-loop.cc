@@ -2551,7 +2551,8 @@ vect_dissolve_slp_only_groups (loop_vec_info loop_vinfo)
   FOR_EACH_VEC_ELT (datarefs, i, dr)
     {
       gcc_assert (DR_REF (dr));
-      stmt_vec_info stmt_info = loop_vinfo->lookup_stmt (DR_STMT (dr));
+      stmt_vec_info stmt_info
+	= vect_stmt_to_vectorize (loop_vinfo->lookup_stmt (DR_STMT (dr)));
 
       /* Check if the load is a part of an interleaving chain.  */
       if (STMT_VINFO_GROUPED_ACCESS (stmt_info))
@@ -7758,17 +7759,18 @@ vectorizable_reduction (loop_vec_info loop_vinfo,
 		  < GET_MODE_SIZE (SCALAR_TYPE_MODE (TREE_TYPE (vectype_op[i]))))))
 	vectype_in = vectype_op[i];
 
-      if (op.code == COND_EXPR)
+      /* Record how the non-reduction-def value of COND_EXPR is defined.
+	 ???  For a chain of multiple CONDs we'd have to match them up all.  */
+      if (op.code == COND_EXPR && reduc_chain_length == 1)
 	{
-	  /* Record how the non-reduction-def value of COND_EXPR is defined.  */
 	  if (dt == vect_constant_def)
 	    {
 	      cond_reduc_dt = dt;
 	      cond_reduc_val = op.ops[i];
 	    }
-	  if (dt == vect_induction_def
-	      && def_stmt_info
-	      && is_nonwrapping_integer_induction (def_stmt_info, loop))
+	  else if (dt == vect_induction_def
+		   && def_stmt_info
+		   && is_nonwrapping_integer_induction (def_stmt_info, loop))
 	    {
 	      cond_reduc_dt = dt;
 	      cond_stmt_vinfo = def_stmt_info;
@@ -11787,6 +11789,7 @@ move_early_exit_stmts (loop_vec_info loop_vinfo)
   basic_block dest_bb = LOOP_VINFO_EARLY_BRK_DEST_BB (loop_vinfo);
   gimple_stmt_iterator dest_gsi = gsi_after_labels (dest_bb);
 
+  tree last_seen_vuse = NULL_TREE;
   for (gimple *stmt : LOOP_VINFO_EARLY_BRK_STORES (loop_vinfo))
     {
       /* We have to update crossed degenerate virtual PHIs.  Simply
@@ -11805,6 +11808,7 @@ move_early_exit_stmts (loop_vec_info loop_vinfo)
 	    }
 	  auto gsi = gsi_for_stmt (stmt);
 	  remove_phi_node (&gsi, true);
+	  last_seen_vuse = vuse;
 	  continue;
 	}
 
@@ -11819,17 +11823,17 @@ move_early_exit_stmts (loop_vec_info loop_vinfo)
 
       gimple_stmt_iterator stmt_gsi = gsi_for_stmt (stmt);
       gsi_move_before (&stmt_gsi, &dest_gsi, GSI_NEW_STMT);
+      last_seen_vuse = gimple_vuse (stmt);
     }
 
   /* Update all the stmts with their new reaching VUSES.  */
-  tree vuse
-    = gimple_vuse (LOOP_VINFO_EARLY_BRK_STORES (loop_vinfo).last ());
   for (auto p : LOOP_VINFO_EARLY_BRK_VUSES (loop_vinfo))
     {
       if (dump_enabled_p ())
 	  dump_printf_loc (MSG_NOTE, vect_location,
-			   "updating vuse to %T for load %G", vuse, p);
-      gimple_set_vuse (p, vuse);
+			   "updating vuse to %T for load %G",
+			   last_seen_vuse, p);
+      gimple_set_vuse (p, last_seen_vuse);
       update_stmt (p);
     }
 
@@ -11837,7 +11841,7 @@ move_early_exit_stmts (loop_vec_info loop_vinfo)
   for (edge e : get_loop_exit_edges (LOOP_VINFO_LOOP  (loop_vinfo)))
     if (!dominated_by_p (CDI_DOMINATORS, e->src, dest_bb))
       if (gphi *phi = get_virtual_phi (e->dest))
-	SET_PHI_ARG_DEF_ON_EDGE (phi, e, vuse);
+	SET_PHI_ARG_DEF_ON_EDGE (phi, e, last_seen_vuse);
 }
 
 /* Function vect_transform_loop.
@@ -12174,7 +12178,8 @@ vect_transform_loop (loop_vec_info loop_vinfo, gimple *loop_vectorized_call)
   /* True if the final iteration might not handle a full vector's
      worth of scalar iterations.  */
   bool final_iter_may_be_partial
-    = LOOP_VINFO_USING_PARTIAL_VECTORS_P (loop_vinfo);
+    = LOOP_VINFO_USING_PARTIAL_VECTORS_P (loop_vinfo)
+      || LOOP_VINFO_EARLY_BREAKS (loop_vinfo);
   /* The minimum number of iterations performed by the epilogue.  This
      is 1 when peeling for gaps because we always need a final scalar
      iteration.  */

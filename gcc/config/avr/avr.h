@@ -65,6 +65,7 @@ enum
 #define AVR_HAVE_JMP_CALL (avr_arch->have_jmp_call && ! AVR_SHORT_CALLS)
 #define AVR_HAVE_MUL (avr_arch->have_mul)
 #define AVR_HAVE_MOVW (avr_arch->have_movw_lpmx)
+#define AVR_HAVE_ADIW (!AVR_TINY)
 #define AVR_HAVE_LPM (!AVR_TINY)
 #define AVR_HAVE_LPMX (avr_arch->have_movw_lpmx)
 #define AVR_HAVE_ELPM (avr_arch->have_elpm)
@@ -332,6 +333,10 @@ typedef struct avr_args
 
   /* Next available register number */
   int regno;
+
+  /* Whether some of the arguments are passed on the stack,
+     and hence an arg pointer is needed.  */
+  int has_stack_args;
 } CUMULATIVE_ARGS;
 
 #define INIT_CUMULATIVE_ARGS(CUM, FNTYPE, LIBNAME, FNDECL, N_NAMED_ARGS) \
