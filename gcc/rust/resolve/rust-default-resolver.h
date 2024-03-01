@@ -1,5 +1,5 @@
 
-// Copyright (C) 2020-2023 Free Software Foundation, Inc.
+// Copyright (C) 2020-2024 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -114,8 +114,6 @@ public:
   void visit (AST::EnumItemDiscriminant &);
   void visit (AST::ConstantItem &);
   void visit (AST::StaticItem &);
-  void visit (AST::TraitItemFunc &);
-  void visit (AST::TraitItemMethod &);
   void visit (AST::TraitItemConst &);
   void visit (AST::TraitItemType &);
   void visit (AST::ExternalTypeItem &);

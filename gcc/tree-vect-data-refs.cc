@@ -684,9 +684,10 @@ vect_analyze_early_break_dependences (loop_vec_info loop_vinfo)
   /* Since we don't support general control flow, the location we'll move the
      side-effects to is always the latch connected exit.  When we support
      general control flow we can do better but for now this is fine.  Move
-     side-effects to the in-loop destination of the last early exit.  For the PEELED
-     case we move the side-effects to the latch block as this is guaranteed to be the
-     last block to be executed when a vector iteration finished.  */
+     side-effects to the in-loop destination of the last early exit.  For the
+     PEELED case we move the side-effects to the latch block as this is
+     guaranteed to be the last block to be executed when a vector iteration
+     finished.  */
   if (LOOP_VINFO_EARLY_BREAKS_VECT_PEELED (loop_vinfo))
     dest_bb = loop->latch;
   else
@@ -697,9 +698,9 @@ vect_analyze_early_break_dependences (loop_vec_info loop_vinfo)
      loads.  */
   basic_block bb = dest_bb;
 
-  /* In the peeled case we need to check all the loads in the loop since to move the
-     the stores we lift the stores over all loads into the latch.  */
-  bool check_deps = LOOP_VINFO_EARLY_BREAKS_VECT_PEELED (loop_vinfo);
+  /* We move stores across all loads to the beginning of dest_bb, so
+     the first block processed below doesn't need dependence checking.  */
+  bool check_deps = false;
 
   do
     {
@@ -711,8 +712,7 @@ vect_analyze_early_break_dependences (loop_vec_info loop_vinfo)
 	{
 	  gimple *stmt = gsi_stmt (gsi);
 	  gsi_prev (&gsi);
-	  if (!gimple_has_ops (stmt)
-	      || is_gimple_debug (stmt))
+	  if (is_gimple_debug (stmt))
 	    continue;
 
 	  stmt_vec_info stmt_vinfo = loop_vinfo->lookup_stmt (stmt);
@@ -720,27 +720,31 @@ vect_analyze_early_break_dependences (loop_vec_info loop_vinfo)
 	  if (!dr_ref)
 	    continue;
 
+	  /* We know everything below dest_bb is safe since we know we
+	     had a full vector iteration when reaching it.  Either by
+	     the loop entry / IV exit test being last or because this
+	     is the loop latch itself.  */
+	  if (!check_deps)
+	    continue;
+
 	  /* Check if vector accesses to the object will be within bounds.
 	     must be a constant or assume loop will be versioned or niters
-	     bounded by VF so accesses are within range.  We only need to check the
-	     reads since writes are moved to a safe place where if we get there we
-	     know they are safe to perform.  */
+	     bounded by VF so accesses are within range.  We only need to check
+	     the reads since writes are moved to a safe place where if we get
+	     there we know they are safe to perform.  */
 	  if (DR_IS_READ (dr_ref)
 	      && !ref_within_array_bound (stmt, DR_REF (dr_ref)))
 	    {
 	      if (dump_enabled_p ())
 		dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
 				 "early breaks not supported: vectorization "
-				 "would %s beyond size of obj.",
+				 "would %s beyond size of obj.\n",
 				 DR_IS_READ (dr_ref) ? "read" : "write");
 	      return opt_result::failure_at (stmt,
 				 "can't safely apply code motion to "
 				 "dependencies of %G to vectorize "
 				 "the early exit.\n", stmt);
 	    }
-
-	  if (!check_deps)
-	    continue;
 
 	  if (DR_IS_READ (dr_ref))
 	    bases.safe_push (dr_ref);
@@ -808,8 +812,11 @@ vect_analyze_early_break_dependences (loop_vec_info loop_vinfo)
 	  break;
 	}
 
-      /* For the non-PEELED case we don't want to check the loads in the IV exit block
-	 for dependencies with the stores, but any block preceeding it we do.  */
+      /* If we possibly sink through a virtual PHI make sure to elide that.  */
+      if (gphi *vphi = get_virtual_phi (bb))
+	LOOP_VINFO_EARLY_BRK_STORES (loop_vinfo).safe_push (vphi);
+
+      /* All earlier blocks need dependence checking.  */
       check_deps = true;
       bb = single_pred (bb);
     }
@@ -818,6 +825,18 @@ vect_analyze_early_break_dependences (loop_vec_info loop_vinfo)
   /* We don't allow outer -> inner loop transitions which should have been
      trapped already during loop form analysis.  */
   gcc_assert (dest_bb->loop_father == loop);
+
+  /* Check that the destination block we picked has only one pred.  To relax this we
+     have to take special care when moving the statements.  We don't currently support
+     such control flow however this check is there to simplify how we handle
+     labels that may be present anywhere in the IL.  This check is to ensure that the
+     labels aren't significant for the CFG.  */
+  if (!single_pred (dest_bb))
+    return opt_result::failure_at (vect_location,
+			     "chosen loop exit block (BB %d) does not have a "
+			     "single predecessor which is currently not "
+			     "supported for early break vectorization.\n",
+			     dest_bb->index);
 
   LOOP_VINFO_EARLY_BRK_DEST_BB (loop_vinfo) = dest_bb;
 

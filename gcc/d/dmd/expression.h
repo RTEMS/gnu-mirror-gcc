@@ -46,16 +46,19 @@ typedef union tree_node Symbol;
 struct Symbol;          // back end symbol
 #endif
 
-// Entry point for CTFE.
-// A compile-time result is required. Give an error if not possible
-Expression *ctfeInterpret(Expression *e);
-void expandTuples(Expressions *exps, Identifiers *names = nullptr);
-StringExp *toUTF8(StringExp *se, Scope *sc);
-Expression *resolveLoc(Expression *exp, const Loc &loc, Scope *sc);
-MATCH implicitConvTo(Expression *e, Type *t);
-Expression *toLvalue(Expression *_this, Scope *sc, const char* action);
-Expression *modifiableLvalue(Expression* exp, Scope *sc);
-Expression *optimize(Expression *exp, int result, bool keepLvalue = false);
+namespace dmd
+{
+    // in expressionsem.d
+    Expression *expressionSemantic(Expression *e, Scope *sc);
+    // in typesem.d
+    Expression *defaultInit(Type *mt, const Loc &loc, const bool isCfile = false);
+
+    // Entry point for CTFE.
+    // A compile-time result is required. Give an error if not possible
+    Expression *ctfeInterpret(Expression *e);
+    void expandTuples(Expressions *exps, Identifiers *names = nullptr);
+    Expression *optimize(Expression *exp, int result, bool keepLvalue = false);
+}
 
 typedef unsigned char OwnedBy;
 enum
@@ -87,6 +90,7 @@ public:
     Type *type;                 // !=NULL means that semantic() has been run
     Loc loc;                    // file location
     EXP op;                     // to minimize use of dynamic_cast
+    d_bool parens;              // if this is a parenthesized expression
 
     size_t size() const;
     static void _init();
@@ -297,7 +301,6 @@ class IdentifierExp : public Expression
 {
 public:
     Identifier *ident;
-    d_bool parens;
 
     static IdentifierExp *create(const Loc &loc, Identifier *ident);
     bool isLvalue() override final;

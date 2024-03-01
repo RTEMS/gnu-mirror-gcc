@@ -30,8 +30,11 @@ class StructDeclaration;
 struct IntRange;
 struct AttributeViolation;
 
-bool functionSemantic(FuncDeclaration* fd);
-bool functionSemantic3(FuncDeclaration* fd);
+namespace dmd
+{
+    bool functionSemantic(FuncDeclaration* fd);
+    bool functionSemantic3(FuncDeclaration* fd);
+}
 
 //enum STC : ulong from astenums.d:
 
@@ -106,8 +109,6 @@ bool functionSemantic3(FuncDeclaration* fd);
 
 #define STC_TYPECTOR    (STCconst | STCimmutable | STCshared | STCwild)
 #define STC_FUNCATTR    (STCref | STCnothrow | STCnogc | STCpure | STCproperty | STCsafe | STCtrusted | STCsystem)
-
-void ObjectNotFound(Identifier *id);
 
 /**************************************************************/
 

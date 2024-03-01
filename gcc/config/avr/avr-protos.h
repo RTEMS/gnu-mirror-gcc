@@ -88,6 +88,7 @@ extern void avr_expand_prologue (void);
 extern void avr_expand_epilogue (bool);
 extern bool avr_emit_cpymemhi (rtx*);
 extern int avr_epilogue_uses (int regno);
+extern bool avr_split_tiny_move (rtx_insn *insn, rtx *operands);
 
 extern void avr_output_addr_vec (rtx_insn*, rtx);
 extern const char *avr_out_sbxx_branch (rtx_insn *insn, rtx operands[]);
@@ -123,6 +124,7 @@ extern enum reg_class avr_mode_code_base_reg_class (machine_mode, addr_space_t, 
 extern bool avr_regno_mode_code_ok_for_base_p (int, machine_mode, addr_space_t, RTX_CODE, RTX_CODE);
 extern rtx avr_incoming_return_addr_rtx (void);
 extern rtx avr_legitimize_reload_address (rtx*, machine_mode, int, int, int, int, rtx (*)(rtx,int));
+extern bool avr_adiw_reg_p (rtx);
 extern bool avr_mem_flash_p (rtx);
 extern bool avr_mem_memx_p (rtx);
 extern bool avr_load_libgcc_p (rtx);
@@ -160,6 +162,7 @@ extern bool avr_have_dimode;
 namespace gcc { class context; }
 class rtl_opt_pass;
 
+extern rtl_opt_pass *make_avr_pass_fuse_add (gcc::context *);
 extern rtl_opt_pass *make_avr_pass_pre_proep (gcc::context *);
 extern rtl_opt_pass *make_avr_pass_recompute_notes (gcc::context *);
 extern rtl_opt_pass *make_avr_pass_casesi (gcc::context *);

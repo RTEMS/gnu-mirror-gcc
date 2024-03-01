@@ -1773,9 +1773,8 @@ check_constraint_info (tree t)
   (DECL_LANG_SPECIFIC (DECL_MODULE_CHECK (NODE))->u.base.module_entity_p)
 
 /* DECL that has attached decls for ODR-relatedness.  */
-#define DECL_MODULE_KEYED_DECLS_P(NODE)			\
-  (DECL_LANG_SPECIFIC (TREE_CHECK2(NODE,FUNCTION_DECL,VAR_DECL))\
-   ->u.base.module_keyed_decls_p)
+#define DECL_MODULE_KEYED_DECLS_P(NODE) \
+  (DECL_LANG_SPECIFIC (DECL_MODULE_CHECK (NODE))->u.base.module_keyed_decls_p)
 
 /* Whether this is an exported DECL.  Held on any decl that can appear
    at namespace scope (function, var, type, template, const or
@@ -2887,21 +2886,20 @@ struct GTY(()) lang_decl_base {
   unsigned friend_or_tls : 1;		   /* var, fn, type or template */
   unsigned unknown_bound_p : 1;		   /* var */
   unsigned odr_used : 1;		   /* var or fn */
-  unsigned concept_p : 1;                  /* applies to vars and functions */
+  unsigned concept_p : 1;		   /* applies to vars and functions */
   unsigned var_declared_inline_p : 1;	   /* var */
   unsigned dependent_init_p : 1;	   /* var */
 
-  /* The following apply to VAR, FUNCTION, TYPE, CONCEPT, & NAMESPACE
+  /* The following four apply to VAR, FUNCTION, TYPE, CONCEPT, & NAMESPACE
      decls.  */
-  unsigned module_purview_p : 1;	   // in named-module purview
-  unsigned module_attach_p : 1;		   // attached to named module
-  unsigned module_import_p : 1;     	   /* from an import */
-  unsigned module_entity_p : 1;		   /* is in the entitity ary &
-					      hash.  */
-  /* VAR_DECL or FUNCTION_DECL has keyed decls.     */
-  unsigned module_keyed_decls_p : 1;
+  unsigned module_purview_p : 1;	   /* in named-module purview */
+  unsigned module_attach_p : 1;		   /* attached to named module */
+  unsigned module_import_p : 1;		   /* from an import */
+  unsigned module_entity_p : 1;		   /* is in the entitity ary & hash */
 
-  /* 12 spare bits.  */
+  unsigned module_keyed_decls_p : 1;	   /* has keys, applies to all decls */
+
+  /* 11 spare bits.  */
 };
 
 /* True for DECL codes which have template info and access.  */
@@ -6845,6 +6843,7 @@ extern void cp_warn_deprecated_use_scopes	(tree);
 extern tree get_function_version_dispatcher	(tree);
 extern bool any_template_arguments_need_structural_equality_p (tree);
 extern void maybe_show_nonconverting_candidate	(tree, tree, tree, int);
+extern bool conv_binds_to_reference_parm_p	(tree, tree);
 
 /* in class.cc */
 extern tree build_vfield_ref			(tree, tree);
@@ -7185,7 +7184,8 @@ extern void init_exception_processing		(void);
 extern tree expand_start_catch_block		(tree);
 extern void expand_end_catch_block		(void);
 extern tree build_exc_ptr			(void);
-extern tree build_throw				(location_t, tree);
+extern tree build_throw				(location_t, tree,
+						 tsubst_flags_t);
 extern int nothrow_libfn_p			(const_tree);
 extern void check_handlers			(tree);
 extern tree finish_noexcept_expr		(tree, tsubst_flags_t);

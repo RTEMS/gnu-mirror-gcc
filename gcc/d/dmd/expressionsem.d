@@ -2523,7 +2523,7 @@ private bool checkRightThis(Expression e, Scope* sc)
     return false;
 }
 
-extern (C++) Expression resolveProperties(Scope* sc, Expression e)
+Expression resolveProperties(Scope* sc, Expression e)
 {
     //printf("resolveProperties(%s)\n", e.toChars());
     e = resolvePropertiesX(sc, e);
@@ -3464,12 +3464,12 @@ private bool functionParameters(const ref Loc loc, Scope* sc,
             eprefix = ae.expressionSemantic(sc);
         }
 
-        for (ptrdiff_t i = 0; i != nargs; i++)
+        foreach (ptrdiff_t i; 0 .. nargs)
         {
             Expression arg = (*arguments)[i];
             //printf("arg[%d]: %s\n", cast(int)i, arg.toChars());
 
-            Parameter parameter = (i >= nparams ? null : tf.parameterList[i]);
+            Parameter parameter = i < nparams ? tf.parameterList[i] : null;
             const bool isRef = parameter && parameter.isReference();
             const bool isLazy = parameter && parameter.isLazy();
 
@@ -3485,7 +3485,7 @@ private bool functionParameters(const ref Loc loc, Scope* sc,
              * 'eprefix' will therefore finally contain all args up to and including 'lastPrefix',
              * excluding all lazy parameters.
              */
-            if (needsPrefix && (lastPrefix - i) >= 0)
+            if (needsPrefix && i <= lastPrefix)
             {
                 const bool needsDtor = !isRef && arg.type.needsDestruction() &&
                                        // Problem 3: last throwing arg doesn't require dtor patching
@@ -3494,9 +3494,9 @@ private bool functionParameters(const ref Loc loc, Scope* sc,
                 /* Declare temporary 'auto __pfx = arg' (needsDtor) or 'auto __pfy = arg' (!needsDtor)
                  */
                 auto tmp = copyToTemp(
-                    (parameter ? parameter.storageClass : tf.parameterList.stc) & (STC.scope_),
+                    (parameter ? parameter.storageClass : tf.parameterList.stc) & (STC.return_ | STC.scope_),
                     needsDtor ? "__pfx" : "__pfy",
-                    !isRef ? arg : arg.addressOf());
+                    isRef ? arg.addressOf() : arg);
                 tmp.dsymbolSemantic(sc);
 
                 if (callerDestroysArgs)
@@ -3511,15 +3511,7 @@ private bool functionParameters(const ref Loc loc, Scope* sc,
                     /* Problem 2: Modify the destructor so it only runs if gate==false,
                      * i.e., only if there was a throw while constructing the args
                      */
-                    if (!needsDtor)
-                    {
-                        if (tmp.edtor)
-                        {
-                            assert(i == lastPrefix);
-                            tmp.edtor = null;
-                        }
-                    }
-                    else
+                    if (needsDtor)
                     {
                         // edtor => (__gate || edtor)
                         assert(tmp.edtor);
@@ -3527,6 +3519,14 @@ private bool functionParameters(const ref Loc loc, Scope* sc,
                         e = new LogicalExp(e.loc, EXP.orOr, new VarExp(e.loc, gate), e);
                         tmp.edtor = e.expressionSemantic(sc);
                         //printf("edtor: %s\n", tmp.edtor.toChars());
+                    }
+                    else
+                    {
+                        if (tmp.edtor)
+                        {
+                            assert(i == lastPrefix);
+                            tmp.edtor = null;
+                        }
                     }
                 }
 
@@ -5023,7 +5023,12 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                     return setError();
 
                 checkFunctionAttributes(exp, sc, f);
-                checkAccess(cd, exp.loc, sc, f);
+                if (!checkSymbolAccess(sc, f))
+                {
+                    error(exp.loc, "%s `%s` is not accessible from module `%s`",
+                        f.kind(), f.toPrettyChars(), sc._module.toChars);
+                    return setError();
+                }
 
                 TypeFunction tf = f.type.isTypeFunction();
                 if (!exp.arguments)
@@ -6463,7 +6468,12 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 return setError();
 
             checkFunctionAttributes(exp, sc, exp.f);
-            checkAccess(exp.loc, sc, null, exp.f);
+            if (!checkSymbolAccess(sc, exp.f))
+            {
+                error(exp.loc, "%s `%s` is not accessible from module `%s`",
+                    exp.f.kind(), exp.f.toPrettyChars(), sc._module.toChars);
+                return setError();
+            }
 
             exp.e1 = new DotVarExp(exp.e1.loc, exp.e1, exp.f, false);
             exp.e1 = exp.e1.expressionSemantic(sc);
@@ -6649,7 +6659,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             assert(exp.f);
             tiargs = null;
 
-            if (exp.f.overnext)
+            if (ve.hasOverloads && exp.f.overnext)
                 exp.f = resolveFuncCall(exp.loc, sc, exp.f, tiargs, null, exp.argumentList, FuncResolveFlag.overloadOnly);
             else
             {
@@ -14193,7 +14203,7 @@ Expression binSemanticProp(BinExp e, Scope* sc)
 }
 
 // entrypoint for semantic ExpressionSemanticVisitor
-extern (C++) Expression expressionSemantic(Expression e, Scope* sc)
+Expression expressionSemantic(Expression e, Scope* sc)
 {
     scope v = new ExpressionSemanticVisitor(sc);
     e.accept(v);
@@ -14211,8 +14221,10 @@ private Expression dotIdSemanticPropX(DotIdExp exp, Scope* sc)
         // symbol.mangleof
 
         // return mangleof as an Expression
-        static Expression dotMangleof(const ref Loc loc, Scope* sc, Dsymbol ds)
+        static Expression dotMangleof(const ref Loc loc, Scope* sc, Dsymbol ds, bool hasOverloads)
         {
+            Expression e;
+
             assert(ds);
             if (auto f = ds.isFuncDeclaration())
             {
@@ -14224,24 +14236,40 @@ private Expression dotIdSemanticPropX(DotIdExp exp, Scope* sc)
                     error(loc, "%s `%s` cannot retrieve its `.mangleof` while inferring attributes", f.kind, f.toPrettyChars);
                     return ErrorExp.get();
                 }
+
+                if (!hasOverloads)
+                    e = StringExp.create(loc, mangleExact(f));
             }
-            OutBuffer buf;
-            mangleToBuffer(ds, buf);
-            Expression e = new StringExp(loc, buf.extractSlice());
+
+            if (!e)
+            {
+                OutBuffer buf;
+                mangleToBuffer(ds, buf);
+                e = new StringExp(loc, buf.extractSlice());
+            }
+
             return e.expressionSemantic(sc);
         }
 
         Dsymbol ds;
         switch (exp.e1.op)
         {
-            case EXP.scope_:      return dotMangleof(exp.loc, sc, exp.e1.isScopeExp().sds);
-            case EXP.variable:    return dotMangleof(exp.loc, sc, exp.e1.isVarExp().var);
-            case EXP.dotVariable: return dotMangleof(exp.loc, sc, exp.e1.isDotVarExp().var);
-            case EXP.overloadSet: return dotMangleof(exp.loc, sc, exp.e1.isOverExp().vars);
+            case EXP.scope_:      return dotMangleof(exp.loc, sc, exp.e1.isScopeExp().sds, false);
+            case EXP.overloadSet: return dotMangleof(exp.loc, sc, exp.e1.isOverExp().vars, false);
+            case EXP.variable:
+            {
+                VarExp ve = exp.e1.isVarExp();
+                return dotMangleof(exp.loc, sc, ve.var, ve.hasOverloads);
+            }
+            case EXP.dotVariable:
+            {
+                DotVarExp dve = exp.e1.isDotVarExp();
+                return dotMangleof(exp.loc, sc, dve.var, dve.hasOverloads);
+            }
             case EXP.template_:
             {
                 TemplateExp te = exp.e1.isTemplateExp();
-                return dotMangleof(exp.loc, sc, ds = te.fd ? te.fd.isDsymbol() : te.td);
+                return dotMangleof(exp.loc, sc, ds = te.fd ? te.fd.isDsymbol() : te.td, false);
             }
 
             default:
@@ -15534,7 +15562,7 @@ Expression addDtorHook(Expression e, Scope* sc)
  *     action = for error messages, what the lvalue is needed for (e.g. take address of for `&x`, modify for `x++`)
  * Returns: converted expression, or `ErrorExp` on error
 */
-extern(C++) Expression toLvalue(Expression _this, Scope* sc, const(char)* action)
+Expression toLvalue(Expression _this, Scope* sc, const(char)* action)
 {
     return toLvalueImpl(_this, sc, action, _this);
 }
@@ -15955,7 +15983,7 @@ Modifiable checkModifiable(Expression exp, Scope* sc, ModifyFlags flag = ModifyF
  *     sc = scope
  * Returns: `_this` converted to an lvalue, or an `ErrorExp`
  */
-extern(C++) Expression modifiableLvalue(Expression _this, Scope* sc)
+Expression modifiableLvalue(Expression _this, Scope* sc)
 {
     return modifiableLvalueImpl(_this, sc, _this);
 }
@@ -16599,4 +16627,101 @@ Expression toBoolean(Expression exp, Scope* sc)
             }
             return e;
     }
+}
+
+/********************************************
+ * Semantically analyze and then evaluate a static condition at compile time.
+ * This is special because short circuit operators &&, || and ?: at the top
+ * level are not semantically analyzed if the result of the expression is not
+ * necessary.
+ * Params:
+ *      sc  = instantiating scope
+ *      original = original expression, for error messages
+ *      e =  resulting expression
+ *      errors = set to `true` if errors occurred
+ *      negatives = array to store negative clauses
+ * Returns:
+ *      true if evaluates to true
+ */
+bool evalStaticCondition(Scope* sc, Expression original, Expression e, out bool errors, Expressions* negatives = null)
+{
+    if (negatives)
+        negatives.setDim(0);
+
+    bool impl(Expression e)
+    {
+        if (e.isNotExp())
+        {
+            NotExp ne = cast(NotExp)e;
+            return !impl(ne.e1);
+        }
+
+        if (e.op == EXP.andAnd || e.op == EXP.orOr)
+        {
+            LogicalExp aae = cast(LogicalExp)e;
+            bool result = impl(aae.e1);
+            if (errors)
+                return false;
+            if (e.op == EXP.andAnd)
+            {
+                if (!result)
+                    return false;
+            }
+            else
+            {
+                if (result)
+                    return true;
+            }
+            result = impl(aae.e2);
+            return !errors && result;
+        }
+
+        if (e.op == EXP.question)
+        {
+            CondExp ce = cast(CondExp)e;
+            bool result = impl(ce.econd);
+            if (errors)
+                return false;
+            Expression leg = result ? ce.e1 : ce.e2;
+            result = impl(leg);
+            return !errors && result;
+        }
+
+        Expression before = e;
+        const uint nerrors = global.errors;
+
+        sc = sc.startCTFE();
+        sc.flags |= SCOPE.condition;
+
+        e = e.expressionSemantic(sc);
+        e = resolveProperties(sc, e);
+        e = e.toBoolean(sc);
+
+        sc = sc.endCTFE();
+        e = e.optimize(WANTvalue);
+
+        if (nerrors != global.errors ||
+            e.isErrorExp() ||
+            e.type.toBasetype() == Type.terror)
+        {
+            errors = true;
+            return false;
+        }
+
+        e = e.ctfeInterpret();
+
+        const opt = e.toBool();
+        if (opt.isEmpty())
+        {
+            if (!e.type.isTypeError())
+                error(e.loc, "expression `%s` is not constant", e.toChars());
+            errors = true;
+            return false;
+        }
+
+        if (negatives && !opt.get())
+            negatives.push(before);
+        return opt.get();
+    }
+    return impl(e);
 }

@@ -2619,7 +2619,7 @@ region_model::called_from_main_p () const
   /* Determine if the oldest stack frame in this model is for "main".  */
   const frame_region *frame0 = get_frame_at_index (0);
   gcc_assert (frame0);
-  return id_equal (DECL_NAME (frame0->get_function ()->decl), "main");
+  return id_equal (DECL_NAME (frame0->get_function ().decl), "main");
 }
 
 /* Subroutine of region_model::get_store_value for when REG is (or is within)
@@ -3648,7 +3648,22 @@ string_cst_has_null_terminator (tree string_cst,
 				byte_offset_t *out_bytes_read)
 {
   gcc_assert (bytes.m_start_byte_offset >= 0);
-  gcc_assert (bytes.m_start_byte_offset < TREE_STRING_LENGTH (string_cst));
+
+  /* If we're beyond the string_cst, reads are unsuccessful.  */
+  if (tree cst_size = get_string_cst_size (string_cst))
+    if (TREE_CODE (cst_size) == INTEGER_CST)
+      if (bytes.m_start_byte_offset >= TREE_INT_CST_LOW (cst_size))
+	return tristate::unknown ();
+
+  /* Assume all bytes after TREE_STRING_LENGTH are zero.  This handles
+     the case where an array is initialized with a string_cst that isn't
+     as long as the array, where the remaining elements are
+     empty-initialized and thus zeroed.  */
+  if (bytes.m_start_byte_offset >= TREE_STRING_LENGTH (string_cst))
+    {
+      *out_bytes_read = 1;
+      return tristate (true);
+    }
 
   /* Look for the first 0 byte within STRING_CST
      from START_READ_OFFSET onwards.  */
@@ -5537,7 +5552,8 @@ region_model::update_for_gcall (const gcall *call_stmt,
     callee = DECL_STRUCT_FUNCTION (fn_decl);
   }
 
-  push_frame (callee, &arg_svals, ctxt);
+  gcc_assert (callee);
+  push_frame (*callee, &arg_svals, ctxt);
 }
 
 /* Pop the top-most frame_region from the stack, and copy the return
@@ -5881,14 +5897,15 @@ region_model::on_top_level_param (tree param,
    Return the frame_region for the new frame.  */
 
 const region *
-region_model::push_frame (function *fun, const vec<const svalue *> *arg_svals,
+region_model::push_frame (const function &fun,
+			  const vec<const svalue *> *arg_svals,
 			  region_model_context *ctxt)
 {
   m_current_frame = m_mgr->get_frame_region (m_current_frame, fun);
   if (arg_svals)
     {
       /* Arguments supplied from a caller frame.  */
-      tree fndecl = fun->decl;
+      tree fndecl = fun.decl;
       unsigned idx = 0;
       for (tree iter_parm = DECL_ARGUMENTS (fndecl); iter_parm;
 	   iter_parm = DECL_CHAIN (iter_parm), ++idx)
@@ -5899,7 +5916,7 @@ region_model::push_frame (function *fun, const vec<const svalue *> *arg_svals,
 	  if (idx >= arg_svals->length ())
 	    break;
 	  tree parm_lval = iter_parm;
-	  if (tree parm_default_ssa = ssa_default_def (fun, iter_parm))
+	  if (tree parm_default_ssa = get_ssa_default_def (fun, iter_parm))
 	    parm_lval = parm_default_ssa;
 	  const region *parm_reg = get_lvalue (parm_lval, ctxt);
 	  const svalue *arg_sval = (*arg_svals)[idx];
@@ -5922,7 +5939,7 @@ region_model::push_frame (function *fun, const vec<const svalue *> *arg_svals,
       /* Otherwise we have a top-level call within the analysis.  The params
 	 have defined but unknown initial values.
 	 Anything they point to has escaped.  */
-      tree fndecl = fun->decl;
+      tree fndecl = fun.decl;
 
       /* Handle "__attribute__((nonnull))".   */
       tree fntype = TREE_TYPE (fndecl);
@@ -5936,7 +5953,7 @@ region_model::push_frame (function *fun, const vec<const svalue *> *arg_svals,
 			   ? (bitmap_empty_p (nonnull_args)
 			      || bitmap_bit_p (nonnull_args, parm_idx))
 			   : false);
-	  if (tree parm_default_ssa = ssa_default_def (fun, iter_parm))
+	  if (tree parm_default_ssa = get_ssa_default_def (fun, iter_parm))
 	    on_top_level_param (parm_default_ssa, non_null, ctxt);
 	  else
 	    on_top_level_param (iter_parm, non_null, ctxt);
@@ -5952,12 +5969,12 @@ region_model::push_frame (function *fun, const vec<const svalue *> *arg_svals,
 /* Get the function of the top-most frame in this region_model's stack.
    There must be such a frame.  */
 
-function *
+const function *
 region_model::get_current_function () const
 {
   const frame_region *frame = get_current_frame ();
   gcc_assert (frame);
-  return frame->get_function ();
+  return &frame->get_function ();
 }
 
 /* Pop the topmost frame_region from this region_model's stack;
@@ -5992,7 +6009,7 @@ region_model::pop_frame (tree result_lvalue,
     ctxt->on_pop_frame (frame_reg);
 
   /* Evaluate the result, within the callee frame.  */
-  tree fndecl = m_current_frame->get_function ()->decl;
+  tree fndecl = m_current_frame->get_function ().decl;
   tree result = DECL_RESULT (fndecl);
   const svalue *retval = NULL;
   if (result
@@ -7951,7 +7968,7 @@ test_stack_frames ()
 
   /* Push stack frame for "parent_fn".  */
   const region *parent_frame_reg
-    = model.push_frame (DECL_STRUCT_FUNCTION (parent_fndecl),
+    = model.push_frame (*DECL_STRUCT_FUNCTION (parent_fndecl),
 			NULL, &ctxt);
   ASSERT_EQ (model.get_current_frame (), parent_frame_reg);
   ASSERT_TRUE (model.region_exists_p (parent_frame_reg));
@@ -7967,7 +7984,7 @@ test_stack_frames ()
 
   /* Push stack frame for "child_fn".  */
   const region *child_frame_reg
-    = model.push_frame (DECL_STRUCT_FUNCTION (child_fndecl), NULL, &ctxt);
+    = model.push_frame (*DECL_STRUCT_FUNCTION (child_fndecl), NULL, &ctxt);
   ASSERT_EQ (model.get_current_frame (), child_frame_reg);
   ASSERT_TRUE (model.region_exists_p (child_frame_reg));
   const region *x_in_child_reg = model.get_lvalue (x, &ctxt);
@@ -8060,7 +8077,7 @@ test_get_representative_path_var ()
   for (int depth = 0; depth < 5; depth++)
     {
       const region *frame_n_reg
-	= model.push_frame (DECL_STRUCT_FUNCTION (fndecl), NULL, &ctxt);
+	= model.push_frame (*DECL_STRUCT_FUNCTION (fndecl), NULL, &ctxt);
       const region *parm_n_reg = model.get_lvalue (path_var (n, depth), &ctxt);
       parm_regs.safe_push (parm_n_reg);
 
@@ -8304,9 +8321,9 @@ test_state_merging ()
     region_model model0 (&mgr);
     region_model model1 (&mgr);
     ASSERT_EQ (model0.get_stack_depth (), 0);
-    model0.push_frame (DECL_STRUCT_FUNCTION (test_fndecl), NULL, &ctxt);
+    model0.push_frame (*DECL_STRUCT_FUNCTION (test_fndecl), NULL, &ctxt);
     ASSERT_EQ (model0.get_stack_depth (), 1);
-    model1.push_frame (DECL_STRUCT_FUNCTION (test_fndecl), NULL, &ctxt);
+    model1.push_frame (*DECL_STRUCT_FUNCTION (test_fndecl), NULL, &ctxt);
 
     placeholder_svalue test_sval (mgr.alloc_symbol_id (),
 				  integer_type_node, "test sval");
@@ -8398,7 +8415,7 @@ test_state_merging ()
   /* Pointers: non-NULL and non-NULL: ptr to a local.  */
   {
     region_model model0 (&mgr);
-    model0.push_frame (DECL_STRUCT_FUNCTION (test_fndecl), NULL, NULL);
+    model0.push_frame (*DECL_STRUCT_FUNCTION (test_fndecl), NULL, NULL);
     model0.set_value (model0.get_lvalue (p, NULL),
 		      model0.get_rvalue (addr_of_a, NULL), NULL);
 
@@ -8537,12 +8554,12 @@ test_state_merging ()
      frame points to a local in a more recent stack frame.  */
   {
     region_model model0 (&mgr);
-    model0.push_frame (DECL_STRUCT_FUNCTION (test_fndecl), NULL, NULL);
+    model0.push_frame (*DECL_STRUCT_FUNCTION (test_fndecl), NULL, NULL);
     const region *q_in_first_frame = model0.get_lvalue (q, NULL);
 
     /* Push a second frame.  */
     const region *reg_2nd_frame
-      = model0.push_frame (DECL_STRUCT_FUNCTION (test_fndecl), NULL, NULL);
+      = model0.push_frame (*DECL_STRUCT_FUNCTION (test_fndecl), NULL, NULL);
 
     /* Have a pointer in the older frame point to a local in the
        more recent frame.  */
@@ -8569,7 +8586,7 @@ test_state_merging ()
   /* Verify that we can merge a model in which a local points to a global.  */
   {
     region_model model0 (&mgr);
-    model0.push_frame (DECL_STRUCT_FUNCTION (test_fndecl), NULL, NULL);
+    model0.push_frame (*DECL_STRUCT_FUNCTION (test_fndecl), NULL, NULL);
     model0.set_value (model0.get_lvalue (q, NULL),
 		      model0.get_rvalue (addr_of_y, NULL), NULL);
 
@@ -9095,7 +9112,7 @@ test_alloca ()
 
   /* Push stack frame.  */
   const region *frame_reg
-    = model.push_frame (DECL_STRUCT_FUNCTION (fndecl),
+    = model.push_frame (*DECL_STRUCT_FUNCTION (fndecl),
 			NULL, &ctxt);
   /* "p = alloca (n * 4);".  */
   const svalue *size_sval = model.get_rvalue (n_times_4, &ctxt);

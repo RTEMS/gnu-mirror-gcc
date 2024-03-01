@@ -16,12 +16,14 @@ module dmd.dmodule;
 import core.stdc.stdio;
 import core.stdc.stdlib;
 import core.stdc.string;
+
 import dmd.aggregate;
 import dmd.arraytypes;
 import dmd.astcodegen;
 import dmd.astenums;
+import dmd.common.outbuffer;
 import dmd.compiler;
-import dmd.gluelayer;
+import dmd.cparse;
 import dmd.dimport;
 import dmd.dmacro;
 import dmd.doc;
@@ -35,24 +37,36 @@ import dmd.expressionsem;
 import dmd.file_manager;
 import dmd.func;
 import dmd.globals;
+import dmd.gluelayer;
 import dmd.id;
 import dmd.identifier;
 import dmd.location;
 import dmd.parse;
-import dmd.cparse;
 import dmd.root.array;
 import dmd.root.file;
 import dmd.root.filename;
-import dmd.common.outbuffer;
 import dmd.root.port;
 import dmd.root.rmem;
-import dmd.rootobject;
 import dmd.root.string;
+import dmd.rootobject;
 import dmd.semantic2;
 import dmd.semantic3;
 import dmd.target;
 import dmd.utils;
 import dmd.visitor;
+
+version (Windows)
+{
+    import core.sys.windows.winbase : getpid = GetCurrentProcessId;
+    enum PathSeparator = '\\';
+}
+else version (Posix)
+{
+    import core.sys.posix.unistd : getpid;
+    enum PathSeparator = '/';
+}
+else
+    static assert(0);
 
 version (IN_GCC) {}
 else version (IN_LLVM) {}
@@ -141,11 +155,7 @@ private const(char)[] getFilename(Identifier[] packages, Identifier ident) nothr
         buf.writestring(p);
         if (modAliases.length)
             checkModFileAlias(p);
-        version (Windows)
-            enum FileSeparator = '\\';
-        else
-            enum FileSeparator = '/';
-        buf.writeByte(FileSeparator);
+        buf.writeByte(PathSeparator);
     }
     buf.writestring(filename);
     if (modAliases.length)
@@ -558,10 +568,6 @@ extern (C++) final class Module : Package
             OutBuffer buf;
             if (arg == "__stdin.d")
             {
-                version (Posix)
-                    import core.sys.posix.unistd : getpid;
-                else version (Windows)
-                    import core.sys.windows.winbase : getpid = GetCurrentProcessId;
                 buf.printf("__stdin_%d.d", getpid());
                 arg = buf[];
             }
@@ -1300,7 +1306,7 @@ extern (C++) struct ModuleDeclaration
  *      aclasses = array to fill in
  * Returns: array of local classes
  */
-extern (C++) void getLocalClasses(Module mod, ref ClassDeclarations aclasses)
+void getLocalClasses(Module mod, ref ClassDeclarations aclasses)
 {
     //printf("members.length = %d\n", mod.members.length);
     int pushAddClassDg(size_t n, Dsymbol sm)
@@ -1565,7 +1571,7 @@ private const(char)[] processSource (const(ubyte)[] src, Module mod)
  *      const(MemberInfo)[] getMembers(string);
  * Returns NULL if not found
  */
-extern(C++) FuncDeclaration findGetMembers(ScopeDsymbol dsym)
+FuncDeclaration findGetMembers(ScopeDsymbol dsym)
 {
     import dmd.opover : search_function;
     Dsymbol s = search_function(dsym, Id.getmembers);

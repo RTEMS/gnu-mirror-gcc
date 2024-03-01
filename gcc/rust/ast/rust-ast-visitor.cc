@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2023 Free Software Foundation, Inc.
+// Copyright (C) 2020-2024 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -909,51 +909,6 @@ DefaultASTVisitor::visit (AST::StaticItem &static_item)
   visit (static_item.get_visibility ());
   visit (static_item.get_type ());
   visit (static_item.get_expr ());
-}
-
-void
-DefaultASTVisitor::visit (AST::TraitFunctionDecl &decl)
-{
-  visit (decl.get_qualifiers ());
-  for (auto &generic : decl.get_generic_params ())
-    visit (generic);
-  visit (decl.get_where_clause ());
-  for (auto &param : decl.get_function_params ())
-    visit (param);
-  if (decl.has_return_type ())
-    visit (decl.get_return_type ());
-}
-
-void
-DefaultASTVisitor::visit (AST::TraitItemFunc &item)
-{
-  visit_outer_attrs (item);
-  visit (item.get_trait_function_decl ());
-  if (item.has_definition ())
-    visit (item.get_definition ());
-}
-
-void
-DefaultASTVisitor::visit (AST::TraitMethodDecl &decl)
-{
-  visit (decl.get_qualifiers ());
-  for (auto &generic : decl.get_generic_params ())
-    visit (generic);
-  visit (decl.get_where_clause ());
-  visit (decl.get_self_param ());
-  for (auto &param : decl.get_function_params ())
-    visit (param);
-  if (decl.has_return_type ())
-    visit (decl.get_return_type ());
-}
-
-void
-DefaultASTVisitor::visit (AST::TraitItemMethod &item)
-{
-  visit_outer_attrs (item);
-  visit (item.get_trait_method_decl ());
-  if (item.has_definition ())
-    visit (item.get_definition ());
 }
 
 void

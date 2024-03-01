@@ -520,7 +520,7 @@ int mutabilityOfType(bool isref, Type t)
  * Set 'purity' field of 'typeFunction'.
  * Do this lazily, as the parameter types might be forward referenced.
  */
-extern(C++) void purityLevel(TypeFunction typeFunction)
+void purityLevel(TypeFunction typeFunction)
 {
     TypeFunction tf = typeFunction;
     if (tf.purity != PURE.fwdref)
@@ -1222,7 +1222,7 @@ private extern(D) MATCH matchTypeSafeVarArgs(TypeFunction tf, Parameter p,
  * Return !=0 if type has pointers that need to
  * be scanned by the GC during a collection cycle.
  */
-extern(C++) bool hasPointers(Type t)
+bool hasPointers(Type t)
 {
     bool visitType(Type _)              { return false; }
     bool visitDArray(TypeDArray _)      { return true; }
@@ -1292,7 +1292,7 @@ extern(C++) bool hasPointers(Type t)
  *      `Type` with completed semantic analysis, `Terror` if errors
  *      were encountered
  */
-extern(C++) Type typeSemantic(Type type, const ref Loc loc, Scope* sc)
+Type typeSemantic(Type type, const ref Loc loc, Scope* sc)
 {
     static Type error()
     {
@@ -2821,7 +2821,7 @@ extern(C++) Type typeSemantic(Type type, const ref Loc loc, Scope* sc)
     }
 }
 
-extern(C++) Type trySemantic(Type type, const ref Loc loc, Scope* sc)
+Type trySemantic(Type type, const ref Loc loc, Scope* sc)
 {
     //printf("+trySemantic(%s) %d\n", toChars(), global.errors);
 
@@ -2855,7 +2855,7 @@ extern(C++) Type trySemantic(Type type, const ref Loc loc, Scope* sc)
  * Returns:
  *      the type that was merged
  */
-extern (C++) Type merge(Type type)
+Type merge(Type type)
 {
     switch (type.ty)
     {
@@ -2925,7 +2925,7 @@ extern (C++) Type merge(Type type)
  * This version does a merge even if the deco is already computed.
  * Necessary for types that have a deco, but are not merged.
  */
-extern(C++) Type merge2(Type type)
+Type merge2(Type type)
 {
     //printf("merge2(%s)\n", toChars());
     Type t = type;
@@ -5365,7 +5365,7 @@ Expression dotExp(Type mt, Scope* sc, Expression e, Identifier ident, DotExpFlag
  * Returns:
  *  The initialization expression for the type.
  */
-extern (C++) Expression defaultInit(Type mt, const ref Loc loc, const bool isCfile = false)
+Expression defaultInit(Type mt, const ref Loc loc, const bool isCfile = false)
 {
     Expression visitBasic(TypeBasic mt)
     {
@@ -5545,7 +5545,7 @@ Returns:
   if the type does resolve to any symbol (for example,
   in the case of basic types).
 */
-extern(C++) Dsymbol toDsymbol(Type type, Scope* sc)
+Dsymbol toDsymbol(Type type, Scope* sc)
 {
     Dsymbol visitType(Type _)            { return null; }
     Dsymbol visitStruct(TypeStruct type) { return type.sym; }
@@ -5644,6 +5644,94 @@ extern(C++) Dsymbol toDsymbol(Type type, Scope* sc)
     }
 }
 
+/************************************
+ * Add storage class modifiers to type.
+ */
+Type addStorageClass(Type type, StorageClass stc)
+{
+    Type visitType(Type t)
+    {
+        /* Just translate to MOD bits and let addMod() do the work
+         */
+        MOD mod = 0;
+        if (stc & STC.immutable_)
+            mod = MODFlags.immutable_;
+        else
+        {
+            if (stc & (STC.const_ | STC.in_))
+                mod |= MODFlags.const_;
+            if (stc & STC.wild)
+                mod |= MODFlags.wild;
+            if (stc & STC.shared_)
+                mod |= MODFlags.shared_;
+        }
+        return t.addMod(mod);
+    }
+
+    Type visitFunction(TypeFunction tf_src)
+    {
+        //printf("addStorageClass(%llx) %d\n", stc, (stc & STC.scope_) != 0);
+        TypeFunction t = visitType(tf_src).toTypeFunction();
+        if ((stc & STC.pure_ && !t.purity) ||
+            (stc & STC.nothrow_ && !t.isnothrow) ||
+            (stc & STC.nogc && !t.isnogc) ||
+            (stc & STC.scope_ && !t.isScopeQual) ||
+            (stc & STC.safe && t.trust < TRUST.trusted))
+        {
+            // Klunky to change these
+            auto tf = new TypeFunction(t.parameterList, t.next, t.linkage, 0);
+            tf.mod = t.mod;
+            tf.fargs = tf_src.fargs;
+            tf.purity = t.purity;
+            tf.isnothrow = t.isnothrow;
+            tf.isnogc = t.isnogc;
+            tf.isproperty = t.isproperty;
+            tf.isref = t.isref;
+            tf.isreturn = t.isreturn;
+            tf.isreturnscope = t.isreturnscope;
+            tf.isScopeQual = t.isScopeQual;
+            tf.isreturninferred = t.isreturninferred;
+            tf.isscopeinferred = t.isscopeinferred;
+            tf.trust = t.trust;
+            tf.isInOutParam = t.isInOutParam;
+            tf.isInOutQual = t.isInOutQual;
+            tf.isctor = t.isctor;
+
+            if (stc & STC.pure_)
+                tf.purity = PURE.fwdref;
+            if (stc & STC.nothrow_)
+                tf.isnothrow = true;
+            if (stc & STC.nogc)
+                tf.isnogc = true;
+            if (stc & STC.safe)
+                tf.trust = TRUST.safe;
+            if (stc & STC.scope_)
+            {
+                tf.isScopeQual = true;
+                if (stc & STC.scopeinferred)
+                    tf.isscopeinferred = true;
+            }
+
+            tf.deco = tf.merge().deco;
+            t = tf;
+        }
+        return t;
+    }
+
+    Type visitDelegate(TypeDelegate tdg)
+    {
+        TypeDelegate t = visitType(tdg).isTypeDelegate();
+        return t;
+    }
+
+    switch(type.ty)
+    {
+        default:            return visitType(type);
+        case Tfunction:     return visitFunction(type.isTypeFunction());
+        case Tdelegate:     return visitDelegate(type.isTypeDelegate());
+    }
+}
+
 /**********************************************
  * Extract complex type from core.stdc.config
  * Params:
@@ -5722,7 +5810,7 @@ Type getComplexLibraryType(const ref Loc loc, Scope* sc, TY ty)
  * Returns:
  *     An enum value of either `Covariant.yes` or a reason it's not covariant.
  */
-extern(C++) Covariant covariant(Type src, Type t, StorageClass* pstc = null, bool cppCovariant = false)
+Covariant covariant(Type src, Type t, StorageClass* pstc = null, bool cppCovariant = false)
 {
     version (none)
     {
@@ -6085,7 +6173,7 @@ StorageClass parameterStorageClass(TypeFunction tf, Type tthis, Parameter p, Var
         return stc | STC.scope_;
 }
 
-extern(C++) bool isBaseOf(Type tthis, Type t, int* poffset)
+bool isBaseOf(Type tthis, Type t, int* poffset)
 {
     auto tc = tthis.isTypeClass();
     if (!tc)
@@ -6106,10 +6194,45 @@ extern(C++) bool isBaseOf(Type tthis, Type t, int* poffset)
     return false;
 }
 
+bool equivalent(Type src, Type t)
+{
+    return immutableOf(src).equals(t.immutableOf());
+}
+
+Type pointerTo(Type type)
+{
+    if (type.ty == Terror)
+        return type;
+    if (!type.pto)
+    {
+        Type t = new TypePointer(type);
+        if (type.ty == Tfunction)
+        {
+            t.deco = t.merge().deco;
+            type.pto = t;
+        }
+        else
+            type.pto = t.merge();
+    }
+    return type.pto;
+}
+
+Type referenceTo(Type type)
+{
+    if (type.ty == Terror)
+        return type;
+    if (!type.rto)
+    {
+        Type t = new TypeReference(type);
+        type.rto = t.merge();
+    }
+    return type.rto;
+}
+
 /********************************
  * Convert to 'const'.
  */
-extern(C++) Type constOf(Type type)
+Type constOf(Type type)
 {
     //printf("Type::constOf() %p %s\n", type, type.toChars());
     if (type.mod == MODFlags.const_)
@@ -6129,7 +6252,7 @@ extern(C++) Type constOf(Type type)
 /********************************
  * Convert to 'immutable'.
  */
-extern(C++) Type immutableOf(Type type)
+Type immutableOf(Type type)
 {
     //printf("Type::immutableOf() %p %s\n", this, toChars());
     if (type.isImmutable())
@@ -6149,7 +6272,7 @@ extern(C++) Type immutableOf(Type type)
 /********************************
  * Make type mutable.
  */
-extern(C++) Type mutableOf(Type type)
+Type mutableOf(Type type)
 {
     //printf("Type::mutableOf() %p, %s\n", type, type.toChars());
     Type t = type;
@@ -6199,7 +6322,7 @@ extern(C++) Type mutableOf(Type type)
     return t;
 }
 
-extern(C++) Type sharedOf(Type type)
+Type sharedOf(Type type)
 {
     //printf("Type::sharedOf() %p, %s\n", type, type.toChars());
     if (type.mod == MODFlags.shared_)
@@ -6216,7 +6339,7 @@ extern(C++) Type sharedOf(Type type)
     return t;
 }
 
-extern(C++) Type sharedConstOf(Type type)
+Type sharedConstOf(Type type)
 {
     //printf("Type::sharedConstOf() %p, %s\n", type, type.toChars());
     if (type.mod == (MODFlags.shared_ | MODFlags.const_))
@@ -6245,7 +6368,7 @@ extern(C++) Type sharedConstOf(Type type)
  *      shared wild  => wild
  *      shared wild const => wild const
  */
-extern(C++) Type unSharedOf(Type type)
+Type unSharedOf(Type type)
 {
     //printf("Type::unSharedOf() %p, %s\n", type, type.toChars());
     Type t = type;
@@ -6287,7 +6410,7 @@ extern(C++) Type unSharedOf(Type type)
 /********************************
  * Convert to 'wild'.
  */
-extern(C++) Type wildOf(Type type)
+Type wildOf(Type type)
 {
     //printf("Type::wildOf() %p %s\n", type, type.toChars());
     if (type.mod == MODFlags.wild)
@@ -6304,7 +6427,7 @@ extern(C++) Type wildOf(Type type)
     return t;
 }
 
-extern(C++) Type wildConstOf(Type type)
+Type wildConstOf(Type type)
 {
     //printf("Type::wildConstOf() %p %s\n", type, type.toChars());
     if (type.mod == MODFlags.wildconst)
@@ -6321,7 +6444,7 @@ extern(C++) Type wildConstOf(Type type)
     return t;
 }
 
-extern(C++) Type sharedWildOf(Type type)
+Type sharedWildOf(Type type)
 {
     //printf("Type::sharedWildOf() %p, %s\n", type, type.toChars());
     if (type.mod == (MODFlags.shared_ | MODFlags.wild))
@@ -6338,7 +6461,7 @@ extern(C++) Type sharedWildOf(Type type)
     return t;
 }
 
-extern(C++) Type sharedWildConstOf(Type type)
+Type sharedWildConstOf(Type type)
 {
     //printf("Type::sharedWildConstOf() %p, %s\n", type, type.toChars());
     if (type.mod == (MODFlags.shared_ | MODFlags.wildconst))
@@ -6358,7 +6481,7 @@ extern(C++) Type sharedWildConstOf(Type type)
 /************************************
  * Apply MODxxxx bits to existing type.
  */
-extern(C++) Type castMod(Type type, MOD mod)
+Type castMod(Type type, MOD mod)
 {
     Type t;
     switch (mod)
@@ -6401,6 +6524,111 @@ extern(C++) Type castMod(Type type, MOD mod)
 
     default:
         assert(0);
+    }
+    return t;
+}
+
+/************************************
+ * Add MODxxxx bits to existing type.
+ * We're adding, not replacing, so adding const to
+ * a shared type => "shared const"
+ */
+Type addMod(Type type, MOD mod)
+{
+    /* Add anything to immutable, and it remains immutable
+     */
+    Type t = type;
+    if (!t.isImmutable())
+    {
+        //printf("addMod(%x) %s\n", mod, toChars());
+        switch (mod)
+        {
+        case 0:
+            break;
+
+        case MODFlags.const_:
+            if (type.isShared())
+            {
+                if (type.isWild())
+                    t = type.sharedWildConstOf();
+                else
+                    t = type.sharedConstOf();
+            }
+            else
+            {
+                if (type.isWild())
+                    t = type.wildConstOf();
+                else
+                    t = t.constOf();
+            }
+            break;
+
+        case MODFlags.wild:
+            if (type.isShared())
+            {
+                if (type.isConst())
+                    t = type.sharedWildConstOf();
+                else
+                    t = type.sharedWildOf();
+            }
+            else
+            {
+                if (type.isConst())
+                    t = type.wildConstOf();
+                else
+                    t = type.wildOf();
+            }
+            break;
+
+        case MODFlags.wildconst:
+            if (type.isShared())
+                t = type.sharedWildConstOf();
+            else
+                t = type.wildConstOf();
+            break;
+
+        case MODFlags.shared_:
+            if (type.isWild())
+            {
+                if (type.isConst())
+                    t = type.sharedWildConstOf();
+                else
+                    t = type.sharedWildOf();
+            }
+            else
+            {
+                if (type.isConst())
+                    t = type.sharedConstOf();
+                else
+                    t = type.sharedOf();
+            }
+            break;
+
+        case MODFlags.shared_ | MODFlags.const_:
+            if (type.isWild())
+                t = type.sharedWildConstOf();
+            else
+                t = type.sharedConstOf();
+            break;
+
+        case MODFlags.shared_ | MODFlags.wild:
+            if (type.isConst())
+                t = type.sharedWildConstOf();
+            else
+                t = type.sharedWildOf();
+            break;
+
+        case MODFlags.shared_ | MODFlags.wildconst:
+            t = type.sharedWildConstOf();
+            break;
+
+        case MODFlags.immutable_:
+            t = type.immutableOf();
+            break;
+
+        default:
+            assert(0);
+        }
     }
     return t;
 }

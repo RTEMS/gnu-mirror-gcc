@@ -8215,6 +8215,15 @@ should_move_die_to_comdat (dw_die_ref die)
           || is_nested_in_subprogram (die)
           || contains_subprogram_definition (die))
 	return false;
+      if (die->die_tag != DW_TAG_enumeration_type)
+	{
+	  /* Don't move non-constant size aggregates.  */
+	  dw_attr_node *sz = get_AT (die, DW_AT_byte_size);
+	  if (sz == NULL
+	      || (AT_class (sz) != dw_val_class_unsigned_const
+		  && AT_class (sz) != dw_val_class_unsigned_const_implicit))
+	    return false;
+	}
       return true;
     case DW_TAG_array_type:
     case DW_TAG_interface_type:
@@ -28987,8 +28996,9 @@ output_macinfo_op (macinfo_entry *ref)
       file_num = maybe_emit_file (fd);
       dw2_asm_output_data (1, DW_MACINFO_start_file, "Start new file");
       dw2_asm_output_data_uleb128 (ref->lineno,
-				   "Included from line number %lu", 
-				   (unsigned long) ref->lineno);
+				   "Included from line number "
+				   HOST_WIDE_INT_PRINT_UNSIGNED,
+				   ref->lineno);
       dw2_asm_output_data_uleb128 (file_num, "file %s", ref->info);
       break;
     case DW_MACINFO_end_file:
@@ -29014,8 +29024,10 @@ output_macinfo_op (macinfo_entry *ref)
       dw2_asm_output_data (1, ref->code,
 			   ref->code == DW_MACINFO_define
 			   ? "Define macro" : "Undefine macro");
-      dw2_asm_output_data_uleb128 (ref->lineno, "At line number %lu", 
-				   (unsigned long) ref->lineno);
+      dw2_asm_output_data_uleb128 (ref->lineno,
+				   "At line number "
+				   HOST_WIDE_INT_PRINT_UNSIGNED, 
+				   ref->lineno);
       dw2_asm_output_nstring (ref->info, -1, "The macro");
       break;
     case DW_MACRO_define_strp:
@@ -29047,8 +29059,10 @@ output_macinfo_op (macinfo_entry *ref)
       gcc_assert (node
 		  && (node->form == DW_FORM_strp
 		      || node->form == dwarf_FORM (DW_FORM_strx)));
-      dw2_asm_output_data_uleb128 (ref->lineno, "At line number %lu",
-				   (unsigned long) ref->lineno);
+      dw2_asm_output_data_uleb128 (ref->lineno,
+				   "At line number "
+				   HOST_WIDE_INT_PRINT_UNSIGNED,
+				   ref->lineno);
       if (node->form == DW_FORM_strp)
         dw2_asm_output_offset (dwarf_offset_size, node->label,
                                debug_str_section, "The macro: \"%s\"",

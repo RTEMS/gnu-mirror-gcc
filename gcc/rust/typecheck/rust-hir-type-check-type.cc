@@ -70,6 +70,12 @@ TypeCheckType::Resolve (HIR::Type *type)
 void
 TypeCheckType::visit (HIR::BareFunctionType &fntype)
 {
+  auto binder_pin = context->push_lifetime_binder ();
+  for (auto &lifetime_param : fntype.get_for_lifetimes ())
+    {
+      context->intern_and_insert_lifetime (lifetime_param.get_lifetime ());
+    }
+
   TyTy::BaseType *return_type;
   if (fntype.has_return_type ())
     {
@@ -292,8 +298,11 @@ TypeCheckType::visit (HIR::QualifiedPathInType &path)
 		= new TyTy::ErrorType (path.get_mappings ().get_hirid ());
 	      return;
 	    }
-	  translated = SubstMapper::Resolve (translated, path.get_locus (),
-					     &generic_seg.get_generic_args ());
+	  translated
+	    = SubstMapper::Resolve (translated, path.get_locus (),
+				    &generic_seg.get_generic_args (),
+				    context->regions_from_generic_args (
+				      generic_seg.get_generic_args ()));
 	}
     }
 
@@ -425,8 +434,11 @@ TypeCheckType::resolve_root_path (HIR::TypePath &path, size_t *offset,
 	  HIR::TypePathSegmentGeneric *generic_segment
 	    = static_cast<HIR::TypePathSegmentGeneric *> (seg.get ());
 
+	  auto regions = context->regions_from_generic_args (
+	    generic_segment->get_generic_args ());
 	  lookup = SubstMapper::Resolve (lookup, path.get_locus (),
-					 &generic_segment->get_generic_args ());
+					 &generic_segment->get_generic_args (),
+					 regions);
 	  if (lookup->get_kind () == TyTy::TypeKind::ERROR)
 	    return new TyTy::ErrorType (seg->get_mappings ().get_hirid ());
 	}
@@ -434,7 +446,9 @@ TypeCheckType::resolve_root_path (HIR::TypePath &path, size_t *offset,
 	{
 	  HIR::GenericArgs empty
 	    = HIR::GenericArgs::create_empty (path.get_locus ());
-	  lookup = SubstMapper::Resolve (lookup, path.get_locus (), &empty);
+	  lookup
+	    = SubstMapper::Resolve (lookup, path.get_locus (), &empty,
+				    context->regions_from_generic_args (empty));
 	}
 
       *root_resolved_node_id = ref_node_id;
@@ -532,33 +546,32 @@ TypeCheckType::resolve_segments (
 
       if (seg->is_generic_segment ())
 	{
-	  HIR::TypePathSegmentGeneric *generic_segment
+	  auto *generic_segment
 	    = static_cast<HIR::TypePathSegmentGeneric *> (seg.get ());
 
+	  std::vector<TyTy::Region> regions;
+	  for (auto &lifetime :
+	       generic_segment->get_generic_args ().get_lifetime_args ())
+	    {
+	      auto region = context->lookup_and_resolve_lifetime (lifetime);
+	      if (!region.has_value ())
+		{
+		  rust_error_at (lifetime.get_locus (),
+				 "failed to resolve lifetime");
+		  return new TyTy::ErrorType (expr_id);
+		}
+	      regions.push_back (region.value ());
+	    }
+
 	  tyseg = SubstMapper::Resolve (tyseg, expr_locus,
-					&generic_segment->get_generic_args ());
+					&generic_segment->get_generic_args (),
+					regions);
 	  if (tyseg->get_kind () == TyTy::TypeKind::ERROR)
 	    return new TyTy::ErrorType (expr_id);
 	}
     }
 
   context->insert_receiver (expr_mappings.get_hirid (), prev_segment);
-  if (tyseg->needs_generic_substitutions ())
-    {
-      // location_t locus = segments.back ()->get_locus ();
-      if (!prev_segment->needs_generic_substitutions ())
-	{
-	  auto used_args_in_prev_segment
-	    = GetUsedSubstArgs::From (prev_segment);
-	  if (!used_args_in_prev_segment.is_error ())
-	    tyseg
-	      = SubstMapperInternal::Resolve (tyseg, used_args_in_prev_segment);
-	}
-
-      if (tyseg->get_kind () == TyTy::TypeKind::ERROR)
-	return new TyTy::ErrorType (expr_id);
-    }
-
   rust_assert (resolved_node_id != UNKNOWN_NODEID);
 
   // lookup if the name resolver was able to canonically resolve this or not
@@ -606,6 +619,12 @@ TypeCheckType::visit (HIR::TraitObjectType &type)
 
       HIR::TypeParamBound &b = *bound.get ();
       HIR::TraitBound &trait_bound = static_cast<HIR::TraitBound &> (b);
+
+      auto binder_pin = context->push_lifetime_binder ();
+      for (auto &lifetime_param : trait_bound.get_for_lifetimes ())
+	{
+	  context->intern_and_insert_lifetime (lifetime_param.get_lifetime ());
+	}
 
       TyTy::TypeBoundPredicate predicate = get_predicate_from_bound (
 	trait_bound.get_path (),
@@ -660,10 +679,18 @@ void
 TypeCheckType::visit (HIR::ReferenceType &type)
 {
   TyTy::BaseType *base = TypeCheckType::Resolve (type.get_base_type ().get ());
-  translated
-    = new TyTy::ReferenceType (type.get_mappings ().get_hirid (),
-			       TyTy::TyVar (base->get_ref ()), type.get_mut ());
-}
+  rust_assert (type.has_lifetime ());
+  auto region = context->lookup_and_resolve_lifetime (type.get_lifetime ());
+  if (!region.has_value ())
+    {
+      rust_error_at (type.get_locus (), "failed to resolve lifetime");
+      translated = new TyTy::ErrorType (type.get_mappings ().get_hirid ());
+      return;
+    }
+  translated = new TyTy::ReferenceType (type.get_mappings ().get_hirid (),
+					TyTy::TyVar (base->get_ref ()),
+					type.get_mut (), region.value ());
+} // namespace Resolver
 
 void
 TypeCheckType::visit (HIR::RawPointerType &type)
@@ -846,9 +873,13 @@ TypeResolveGenericParam::visit (HIR::TypeParam &param)
 }
 
 void
-ResolveWhereClauseItem::Resolve (HIR::WhereClauseItem &item)
+ResolveWhereClauseItem::Resolve (HIR::WhereClauseItem &item,
+				 TyTy::RegionConstraints &region_constraints)
 {
-  ResolveWhereClauseItem resolver;
+  ResolveWhereClauseItem resolver (region_constraints);
+
+  auto binder_pin = resolver.context->push_lifetime_binder ();
+
   switch (item.get_item_type ())
     {
     case HIR::WhereClauseItem::LIFETIME:
@@ -863,11 +894,36 @@ ResolveWhereClauseItem::Resolve (HIR::WhereClauseItem &item)
 
 void
 ResolveWhereClauseItem::visit (HIR::LifetimeWhereClauseItem &item)
-{}
+{
+  auto lhs = context->lookup_and_resolve_lifetime (item.get_lifetime ());
+  if (!lhs.has_value ())
+    {
+      rust_error_at (UNKNOWN_LOCATION, "failed to resolve lifetime");
+    }
+  for (auto &lifetime : item.get_lifetime_bounds ())
+    {
+      auto rhs_i = context->lookup_and_resolve_lifetime (lifetime);
+      if (!rhs_i.has_value ())
+	{
+	  rust_error_at (UNKNOWN_LOCATION, "failed to resolve lifetime");
+	}
+      region_constraints.region_region.emplace_back (lhs.value (),
+						     rhs_i.value ());
+    }
+}
 
 void
 ResolveWhereClauseItem::visit (HIR::TypeBoundWhereClauseItem &item)
 {
+  auto binder_pin = context->push_lifetime_binder ();
+  if (item.has_for_lifetimes ())
+    {
+      for (auto &lifetime_param : item.get_for_lifetimes ())
+	{
+	  context->intern_and_insert_lifetime (lifetime_param.get_lifetime ());
+	}
+    }
+
   auto &binding_type_path = item.get_bound_type ();
   TyTy::BaseType *binding = TypeCheckType::Resolve (binding_type_path.get ());
 
@@ -879,13 +935,28 @@ ResolveWhereClauseItem::visit (HIR::TypeBoundWhereClauseItem &item)
       switch (bound->get_bound_type ())
 	{
 	  case HIR::TypeParamBound::BoundType::TRAITBOUND: {
-	    HIR::TraitBound *b = static_cast<HIR::TraitBound *> (bound.get ());
+	    auto *b = static_cast<HIR::TraitBound *> (bound.get ());
 
 	    TyTy::TypeBoundPredicate predicate
 	      = get_predicate_from_bound (b->get_path (),
 					  binding_type_path.get ());
 	    if (!predicate.is_error ())
 	      specified_bounds.push_back (std::move (predicate));
+	  }
+	  break;
+	  case HIR::TypeParamBound::BoundType::LIFETIME: {
+	    if (auto param = binding->try_as<TyTy::ParamType> ())
+	      {
+		auto *b = static_cast<HIR::Lifetime *> (bound.get ());
+		auto region = context->lookup_and_resolve_lifetime (*b);
+		if (!region.has_value ())
+		  {
+		    rust_error_at (UNKNOWN_LOCATION,
+				   "failed to resolve lifetime");
+		  }
+		region_constraints.type_region.emplace_back (param,
+							     region.value ());
+	      }
 	  }
 	  break;
 

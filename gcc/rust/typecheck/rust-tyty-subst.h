@@ -23,12 +23,24 @@
 #include "rust-location.h"
 #include "rust-hir-full-decls.h"
 #include "rust-tyty-bounds.h"
+#include "rust-tyty-region.h"
+
+#include <optional.h>
 
 namespace Rust {
 namespace TyTy {
 
-class BaseType;
 class ParamType;
+
+struct RegionConstraints
+{
+  /** 'a: 'b */
+  std::vector<std::pair<Region, Region>> region_region;
+  /** T: 'a */
+  std::vector<std::pair<ParamType *, Region>> type_region;
+};
+
+class BaseType;
 class SubstitutionArgumentMappings;
 class SubstitutionParamMapping
 {
@@ -67,6 +79,61 @@ public:
 private:
   const HIR::TypeParam &generic;
   ParamType *param;
+};
+
+/**
+ * Represents the part of the parameter list that contains lifetime
+ * parameters.
+ *
+ * ```
+ * Foo<'a, 'b, i32, 8>
+ *     ^^^^^^
+ * ```
+ *
+ * It has fixed size based on the number of lifetime parameters and they are
+ * indexed based on their order.
+ *
+ * All regions are initially set to unresolved. When type instantiation is
+ * encountered, all explicitly mentioned lifetimes are resolved to bound
+ * lifetimes. The remaining unresolved lifetimes are set to anonymous. During
+ * BIR construction, all lifetimes are replaced with free region variables.
+ * Inference of anonymous regions happens automatically using BIR subtyping
+ * pass.
+ */
+class RegionParamList
+{
+  std::vector<Region> regions;
+
+public:
+  RegionParamList (size_t num_regions) : regions (num_regions) {}
+
+  Region *begin () { return regions.data (); }
+  Region *end () { return regions.data () + regions.size (); }
+  Region &operator[] (size_t index) { return regions.at (index); }
+  const Region &operator[] (size_t index) const { return regions.at (index); }
+  WARN_UNUSED_RESULT const Region *begin () const { return regions.data (); }
+  WARN_UNUSED_RESULT const Region *end () const
+  {
+    return regions.data () + regions.size ();
+  }
+  size_t size () const { return regions.size (); }
+
+  /**
+   * Takes regions from the `subst` parameter and fills the rest with anonymous
+   * regions.
+   */
+  static RegionParamList from_subst (size_t num_regions,
+				     std::vector<Region> subst)
+  {
+    RegionParamList list (num_regions);
+    for (size_t i = 0; i < subst.size (); i++)
+      list.regions.at (i) = subst.at (i);
+    for (size_t i = subst.size (); i < num_regions; i++)
+      {
+	list.regions.at (i) = Region::make_anonymous ();
+      }
+    return list;
+  }
 };
 
 class SubstitutionArg
@@ -110,7 +177,7 @@ class SubstitutionArgumentMappings
 public:
   SubstitutionArgumentMappings (std::vector<SubstitutionArg> mappings,
 				std::map<std::string, BaseType *> binding_args,
-				location_t locus,
+				RegionParamList regions, location_t locus,
 				ParamSubstCb param_subst_cb = nullptr,
 				bool trait_item_flag = false,
 				bool error_flag = false);
@@ -124,12 +191,26 @@ public:
     = default;
 
   static SubstitutionArgumentMappings error ();
-  static SubstitutionArgumentMappings empty ();
+
+  /** Creates empty substitution argument mappings with unresolved regions */
+  static SubstitutionArgumentMappings empty (size_t num_regions = 0);
+
+  static RegionParamList
+  regions_from_nullable_args (SubstitutionArgumentMappings *args)
+  {
+    if (args == nullptr)
+      return RegionParamList (0);
+
+    return args->get_regions ();
+  }
 
   bool is_error () const;
 
   bool get_argument_for_symbol (const ParamType *param_to_find,
-				SubstitutionArg *argument);
+				SubstitutionArg *argument) const;
+
+  /** Return type parameter index for symbol */
+  tl::optional<size_t> find_symbol (const ParamType &param_to_find) const;
 
   bool get_argument_at (size_t index, SubstitutionArg *argument);
 
@@ -152,6 +233,9 @@ public:
 
   const std::map<std::string, BaseType *> &get_binding_args () const;
 
+  const RegionParamList &get_regions () const;
+  RegionParamList &get_mut_regions ();
+
   std::string as_string () const;
 
   void on_param_subst (const ParamType &p, const SubstitutionArg &a) const;
@@ -163,6 +247,7 @@ public:
 private:
   std::vector<SubstitutionArg> mappings;
   std::map<std::string, BaseType *> binding_args;
+  RegionParamList regions;
   location_t locus;
   ParamSubstCb param_subst_cb;
   bool trait_item_flag;
@@ -173,7 +258,8 @@ class SubstitutionRef
 {
 public:
   SubstitutionRef (std::vector<SubstitutionParamMapping> substitutions,
-		   SubstitutionArgumentMappings arguments);
+		   SubstitutionArgumentMappings arguments,
+		   RegionConstraints region_constraints);
 
   bool has_substitutions () const;
 
@@ -192,6 +278,10 @@ public:
   lookup_associated_type (const std::string &search);
 
   size_t get_num_substitutions () const;
+
+  size_t get_num_lifetime_params () const;
+
+  size_t get_num_type_params () const;
 
   std::vector<SubstitutionParamMapping> &get_substs ();
 
@@ -221,7 +311,8 @@ public:
   // the substitions we have here define X,Y but the arguments have no bindings
   // so its a matter of ordering
   SubstitutionArgumentMappings
-  get_mappings_from_generic_args (HIR::GenericArgs &args);
+  get_mappings_from_generic_args (HIR::GenericArgs &args,
+				  const std::vector<Region> &regions);
 
   // Recursive substitutions
   // Foo <A,B> { a:A, b: B}; Bar <X,Y,Z>{a:X, b: Foo<Y,Z>}
@@ -318,11 +409,17 @@ public:
   virtual BaseType *handle_substitions (SubstitutionArgumentMappings &mappings)
     = 0;
 
-  SubstitutionArgumentMappings get_used_arguments () const;
+  WARN_UNUSED_RESULT const SubstitutionArgumentMappings &
+  get_used_arguments () const;
+
+  WARN_UNUSED_RESULT tl::optional<SubstitutionArg> get_arg_at (size_t i) const;
+
+  const RegionConstraints &get_region_constraints () const;
 
 protected:
   std::vector<SubstitutionParamMapping> substitutions;
   SubstitutionArgumentMappings used_arguments;
+  RegionConstraints region_constraints;
 };
 
 } // namespace TyTy

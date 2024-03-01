@@ -46,29 +46,16 @@ ResolveTraitItems::go (AST::AssociatedItem *item, const CanonicalPath &prefix,
 }
 
 void
-ResolveTraitItems::visit (AST::TraitItemType &type)
+ResolveTraitItems::visit (AST::Function &function)
 {
-  auto decl = CanonicalPath::new_seg (type.get_node_id (),
-				      type.get_identifier ().as_string ());
+  auto decl
+    = CanonicalPath::new_seg (function.get_node_id (),
+			      function.get_function_name ().as_string ());
   auto path = prefix.append (decl);
   auto cpath = canonical_prefix.append (decl);
-  mappings->insert_canonical_path (type.get_node_id (), cpath);
+  mappings->insert_canonical_path (function.get_node_id (), cpath);
 
-  for (auto &bound : type.get_type_param_bounds ())
-    ResolveTypeBound::go (bound.get ());
-}
-
-void
-ResolveTraitItems::visit (AST::TraitItemFunc &func)
-{
-  auto decl = CanonicalPath::new_seg (
-    func.get_node_id (),
-    func.get_trait_function_decl ().get_identifier ().as_string ());
-  auto path = prefix.append (decl);
-  auto cpath = canonical_prefix.append (decl);
-  mappings->insert_canonical_path (func.get_node_id (), cpath);
-
-  NodeId scope_node_id = func.get_node_id ();
+  NodeId scope_node_id = function.get_node_id ();
   resolver->get_name_scope ().push (scope_node_id);
   resolver->get_type_scope ().push (scope_node_id);
   resolver->get_label_scope ().push (scope_node_id);
@@ -76,72 +63,6 @@ ResolveTraitItems::visit (AST::TraitItemFunc &func)
   resolver->push_new_type_rib (resolver->get_type_scope ().peek ());
   resolver->push_new_label_rib (resolver->get_type_scope ().peek ());
 
-  AST::TraitFunctionDecl &function = func.get_trait_function_decl ();
-  if (function.has_generics ())
-    for (auto &generic : function.get_generic_params ())
-      ResolveGenericParam::go (generic.get (), prefix, canonical_prefix);
-
-  if (function.has_return_type ())
-    ResolveType::go (function.get_return_type ().get ());
-
-  std::vector<PatternBinding> bindings
-    = {PatternBinding (PatternBoundCtx::Product, std::set<Identifier> ())};
-
-  // we make a new scope so the names of parameters are resolved and shadowed
-  // correctly
-  for (auto &p : function.get_function_params ())
-    {
-      if (p->is_variadic ())
-	{
-	  auto param = static_cast<AST::VariadicParam *> (p.get ());
-	  PatternDeclaration::go (param->get_pattern ().get (),
-				  Rib::ItemType::Param, bindings);
-	}
-      else if (p->is_self ())
-	{
-	  auto param = static_cast<AST::SelfParam *> (p.get ());
-	  ResolveType::go (param->get_type ().get ());
-	}
-      else
-	{
-	  auto param = static_cast<AST::FunctionParam *> (p.get ());
-	  ResolveType::go (param->get_type ().get ());
-	  PatternDeclaration::go (param->get_pattern ().get (),
-				  Rib::ItemType::Param, bindings);
-	}
-    }
-
-  if (function.has_where_clause ())
-    ResolveWhereClause::Resolve (function.get_where_clause ());
-
-  // trait items have an optional body
-  if (func.has_definition ())
-    ResolveExpr::go (func.get_definition ().get (), path, cpath);
-
-  resolver->get_name_scope ().pop ();
-  resolver->get_type_scope ().pop ();
-  resolver->get_label_scope ().pop ();
-}
-
-void
-ResolveTraitItems::visit (AST::TraitItemMethod &func)
-{
-  auto decl = CanonicalPath::new_seg (
-    func.get_node_id (),
-    func.get_trait_method_decl ().get_identifier ().as_string ());
-  auto path = prefix.append (decl);
-  auto cpath = canonical_prefix.append (decl);
-  mappings->insert_canonical_path (func.get_node_id (), cpath);
-
-  NodeId scope_node_id = func.get_node_id ();
-  resolver->get_name_scope ().push (scope_node_id);
-  resolver->get_type_scope ().push (scope_node_id);
-  resolver->get_label_scope ().push (scope_node_id);
-  resolver->push_new_name_rib (resolver->get_name_scope ().peek ());
-  resolver->push_new_type_rib (resolver->get_type_scope ().peek ());
-  resolver->push_new_label_rib (resolver->get_type_scope ().peek ());
-
-  AST::TraitMethodDecl &function = func.get_trait_method_decl ();
   if (function.has_generics ())
     for (auto &generic : function.get_generic_params ())
       ResolveGenericParam::go (generic.get (), prefix, canonical_prefix);
@@ -205,12 +126,24 @@ ResolveTraitItems::visit (AST::TraitItemMethod &func)
     ResolveWhereClause::Resolve (function.get_where_clause ());
 
   // trait items have an optional body
-  if (func.has_definition ())
-    ResolveExpr::go (func.get_definition ().get (), path, cpath);
+  if (function.has_body ())
+    ResolveExpr::go (function.get_definition ()->get (), path, cpath);
 
   resolver->get_name_scope ().pop ();
   resolver->get_type_scope ().pop ();
   resolver->get_label_scope ().pop ();
+}
+void
+ResolveTraitItems::visit (AST::TraitItemType &type)
+{
+  auto decl = CanonicalPath::new_seg (type.get_node_id (),
+				      type.get_identifier ().as_string ());
+  auto path = prefix.append (decl);
+  auto cpath = canonical_prefix.append (decl);
+  mappings->insert_canonical_path (type.get_node_id (), cpath);
+
+  for (auto &bound : type.get_type_param_bounds ())
+    ResolveTypeBound::go (bound.get ());
 }
 
 void
@@ -891,33 +824,30 @@ ResolveItem::resolve_extern_item (AST::ExternalItem *item)
 }
 
 static void
-flatten_glob (const AST::UseTreeGlob &glob,
-	      std::vector<AST::SimplePath> &paths);
+flatten_glob (const AST::UseTreeGlob &glob, std::vector<Import> &imports);
 static void
-flatten_rebind (const AST::UseTreeRebind &glob,
-		std::vector<AST::SimplePath> &paths);
+flatten_rebind (const AST::UseTreeRebind &glob, std::vector<Import> &imports);
 static void
-flatten_list (const AST::UseTreeList &glob,
-	      std::vector<AST::SimplePath> &paths);
+flatten_list (const AST::UseTreeList &glob, std::vector<Import> &imports);
 
 static void
-flatten (const AST::UseTree *tree, std::vector<AST::SimplePath> &paths)
+flatten (const AST::UseTree *tree, std::vector<Import> &imports)
 {
   switch (tree->get_kind ())
     {
       case AST::UseTree::Glob: {
 	auto glob = static_cast<const AST::UseTreeGlob *> (tree);
-	flatten_glob (*glob, paths);
+	flatten_glob (*glob, imports);
 	break;
       }
       case AST::UseTree::Rebind: {
 	auto rebind = static_cast<const AST::UseTreeRebind *> (tree);
-	flatten_rebind (*rebind, paths);
+	flatten_rebind (*rebind, imports);
 	break;
       }
       case AST::UseTree::List: {
 	auto list = static_cast<const AST::UseTreeList *> (tree);
-	flatten_list (*list, paths);
+	flatten_list (*list, imports);
 	break;
       }
       break;
@@ -925,36 +855,28 @@ flatten (const AST::UseTree *tree, std::vector<AST::SimplePath> &paths)
 }
 
 static void
-flatten_glob (const AST::UseTreeGlob &glob, std::vector<AST::SimplePath> &paths)
+flatten_glob (const AST::UseTreeGlob &glob, std::vector<Import> &imports)
 {
   if (glob.has_path ())
-    paths.emplace_back (glob.get_path ());
+    imports.emplace_back (glob.get_path (), true, std::string ());
 }
 
 static void
-flatten_rebind (const AST::UseTreeRebind &rebind,
-		std::vector<AST::SimplePath> &paths)
+flatten_rebind (const AST::UseTreeRebind &rebind, std::vector<Import> &imports)
 {
   auto path = rebind.get_path ();
-  if (rebind.has_path ())
-    paths.emplace_back (path);
 
-  // FIXME: Do we want to emplace the rebind here as well?
+  std::string label;
   if (rebind.has_identifier ())
-    {
-      auto rebind_path = path;
-      auto new_seg = rebind.get_identifier ();
+    label = rebind.get_identifier ().as_string ();
+  else
+    label = path.get_final_segment ().as_string ();
 
-      // Add the identifier as a new path
-      rebind_path.get_segments ().back ()
-	= AST::SimplePathSegment (new_seg.as_string (), UNDEF_LOCATION);
-
-      paths.emplace_back (rebind_path);
-    }
+  imports.emplace_back (path, false, label);
 }
 
 static void
-flatten_list (const AST::UseTreeList &list, std::vector<AST::SimplePath> &paths)
+flatten_list (const AST::UseTreeList &list, std::vector<Import> &imports)
 {
   auto prefix = AST::SimplePath::create_empty ();
   if (list.has_path ())
@@ -962,19 +884,23 @@ flatten_list (const AST::UseTreeList &list, std::vector<AST::SimplePath> &paths)
 
   for (const auto &tree : list.get_trees ())
     {
-      auto sub_paths = std::vector<AST::SimplePath> ();
-      flatten (tree.get (), sub_paths);
+      // append imports to the main list, then modify them in-place
+      auto start_idx = imports.size ();
+      flatten (tree.get (), imports);
 
-      for (auto &sub_path : sub_paths)
-	{
-	  auto new_path = prefix;
-	  std::copy (sub_path.get_segments ().begin (),
-		     sub_path.get_segments ().end (),
-		     std::back_inserter (new_path.get_segments ()));
-
-	  paths.emplace_back (new_path);
-	}
+      for (auto import = imports.begin () + start_idx; import != imports.end ();
+	   import++)
+	import->add_prefix (prefix);
     }
+}
+
+void
+Import::add_prefix (AST::SimplePath prefix)
+{
+  AST::SimplePath old_path (std::move (path));
+  path = std::move (prefix);
+  std::move (old_path.get_segments ().begin (), old_path.get_segments ().end (),
+	     std::back_inserter (path.get_segments ()));
 }
 
 /**
@@ -997,21 +923,21 @@ flatten_list (const AST::UseTreeList &list, std::vector<AST::SimplePath> &paths)
  * Finally in the third case, we want to create two SimplePaths to resolve:
  * [some::path::one, some::path::two]
  */
-static std::vector<AST::SimplePath>
-flatten_use_dec_to_paths (const AST::UseDeclaration &use_item)
+static std::vector<Import>
+flatten_use_dec_to_imports (const AST::UseDeclaration &use_item)
 {
-  auto paths = std::vector<AST::SimplePath> ();
+  auto imports = std::vector<Import> ();
 
   const auto &tree = use_item.get_tree ();
-  flatten (tree.get (), paths);
+  flatten (tree.get (), imports);
 
-  return paths;
+  return imports;
 }
 
 void
 ResolveItem::visit (AST::UseDeclaration &use_item)
 {
-  std::vector<AST::SimplePath> to_resolve = flatten_use_dec_to_paths (use_item);
+  std::vector<Import> to_resolve = flatten_use_dec_to_imports (use_item);
 
   // FIXME: I think this does not actually resolve glob use-decls and is going
   // the wrong way about it. RFC #1560 specifies the following:
@@ -1023,18 +949,20 @@ ResolveItem::visit (AST::UseDeclaration &use_item)
   // Which is the opposite of what we're doing if I understand correctly?
 
   NodeId current_module = resolver->peek_current_module_scope ();
-  for (auto &path : to_resolve)
+  for (auto &import : to_resolve)
     {
+      auto &path = import.get_path ();
+
       rust_debug ("resolving use-decl path: [%s]", path.as_string ().c_str ());
       NodeId resolved_node_id = ResolvePath::go (&path);
       bool ok = resolved_node_id != UNKNOWN_NODEID;
       if (!ok)
 	continue;
 
-      const AST::SimplePathSegment &final_seg = path.get_segments ().back ();
+      if (import.is_glob ())
+	continue;
 
-      auto decl
-	= CanonicalPath::new_seg (resolved_node_id, final_seg.as_string ());
+      auto decl = CanonicalPath::new_seg (resolved_node_id, import.get_name ());
       mappings->insert_module_child_item (current_module, decl);
 
       resolver->get_type_scope ().insert (decl, resolved_node_id,
@@ -1146,13 +1074,13 @@ rust_flatten_nested_glob (void)
     = Rust::AST::UseTreeGlob (Rust::AST::UseTreeGlob::PathType::PATH_PREFIXED,
 			      foobar, UNDEF_LOCATION);
 
-  auto paths = std::vector<Rust::AST::SimplePath> ();
-  Rust::Resolver::flatten_glob (glob, paths);
+  auto imports = std::vector<Rust::Resolver::Import> ();
+  Rust::Resolver::flatten_glob (glob, imports);
 
-  ASSERT_TRUE (!paths.empty ());
-  ASSERT_EQ (paths.size (), 1);
-  ASSERT_EQ (paths[0].get_segments ()[0].as_string (), "foo");
-  ASSERT_EQ (paths[0].get_segments ()[1].as_string (), "bar");
+  ASSERT_TRUE (!imports.empty ());
+  ASSERT_EQ (imports.size (), 1);
+  ASSERT_EQ (imports[0].get_path ().get_segments ()[0].as_string (), "foo");
+  ASSERT_EQ (imports[0].get_path ().get_segments ()[1].as_string (), "bar");
 }
 
 static void
@@ -1164,12 +1092,12 @@ rust_flatten_glob (void)
     = Rust::AST::UseTreeGlob (Rust::AST::UseTreeGlob::PathType::PATH_PREFIXED,
 			      frob, UNDEF_LOCATION);
 
-  auto paths = std::vector<Rust::AST::SimplePath> ();
-  Rust::Resolver::flatten_glob (glob, paths);
+  auto imports = std::vector<Rust::Resolver::Import> ();
+  Rust::Resolver::flatten_glob (glob, imports);
 
-  ASSERT_TRUE (!paths.empty ());
-  ASSERT_EQ (paths.size (), 1);
-  ASSERT_EQ (paths[0], "frobulator");
+  ASSERT_TRUE (!imports.empty ());
+  ASSERT_EQ (imports.size (), 1);
+  ASSERT_EQ (imports[0].get_path (), "frobulator");
 }
 
 static void
@@ -1182,13 +1110,13 @@ rust_flatten_rebind_none (void)
   auto rebind = Rust::AST::UseTreeRebind (Rust::AST::UseTreeRebind::NONE,
 					  foobar, UNDEF_LOCATION);
 
-  auto paths = std::vector<Rust::AST::SimplePath> ();
-  Rust::Resolver::flatten_rebind (rebind, paths);
+  auto imports = std::vector<Rust::Resolver::Import> ();
+  Rust::Resolver::flatten_rebind (rebind, imports);
 
-  ASSERT_TRUE (!paths.empty ());
-  ASSERT_EQ (paths.size (), 1);
-  ASSERT_EQ (paths[0].get_segments ()[0].as_string (), "foo");
-  ASSERT_EQ (paths[0].get_segments ()[1].as_string (), "bar");
+  ASSERT_TRUE (!imports.empty ());
+  ASSERT_EQ (imports.size (), 1);
+  ASSERT_EQ (imports[0].get_path ().get_segments ()[0].as_string (), "foo");
+  ASSERT_EQ (imports[0].get_path ().get_segments ()[1].as_string (), "bar");
 }
 
 static void
@@ -1199,13 +1127,13 @@ rust_flatten_rebind (void)
   auto rebind = Rust::AST::UseTreeRebind (Rust::AST::UseTreeRebind::IDENTIFIER,
 					  frob, UNDEF_LOCATION, {"saindoux"});
 
-  auto paths = std::vector<Rust::AST::SimplePath> ();
-  Rust::Resolver::flatten_rebind (rebind, paths);
+  auto imports = std::vector<Rust::Resolver::Import> ();
+  Rust::Resolver::flatten_rebind (rebind, imports);
 
-  ASSERT_TRUE (!paths.empty ());
-  ASSERT_EQ (paths.size (), 2);
-  ASSERT_EQ (paths[0], "frobulator");
-  ASSERT_EQ (paths[1], "saindoux");
+  ASSERT_TRUE (!imports.empty ());
+  ASSERT_EQ (imports.size (), 1);
+  ASSERT_EQ (imports[0].get_path (), "frobulator");
+  ASSERT_EQ (imports[0].get_name (), "saindoux");
 }
 
 static void
@@ -1221,17 +1149,15 @@ rust_flatten_rebind_nested (void)
     = Rust::AST::UseTreeRebind (Rust::AST::UseTreeRebind::IDENTIFIER,
 				foo_bar_baz, UNDEF_LOCATION, {"saindoux"});
 
-  auto paths = std::vector<Rust::AST::SimplePath> ();
-  Rust::Resolver::flatten_rebind (rebind, paths);
+  auto imports = std::vector<Rust::Resolver::Import> ();
+  Rust::Resolver::flatten_rebind (rebind, imports);
 
-  ASSERT_TRUE (!paths.empty ());
-  ASSERT_EQ (paths.size (), 2);
-  ASSERT_EQ (paths[0].get_segments ()[0].as_string (), "foo");
-  ASSERT_EQ (paths[0].get_segments ()[1].as_string (), "bar");
-  ASSERT_EQ (paths[0].get_segments ()[2].as_string (), "baz");
-  ASSERT_EQ (paths[1].get_segments ()[0].as_string (), "foo");
-  ASSERT_EQ (paths[1].get_segments ()[1].as_string (), "bar");
-  ASSERT_EQ (paths[1].get_segments ()[2].as_string (), "saindoux");
+  ASSERT_TRUE (!imports.empty ());
+  ASSERT_EQ (imports.size (), 1);
+  ASSERT_EQ (imports[0].get_path ().get_segments ()[0].as_string (), "foo");
+  ASSERT_EQ (imports[0].get_path ().get_segments ()[1].as_string (), "bar");
+  ASSERT_EQ (imports[0].get_path ().get_segments ()[2].as_string (), "baz");
+  ASSERT_EQ (imports[0].get_name (), "saindoux");
 }
 
 static void
@@ -1261,17 +1187,17 @@ rust_flatten_list (void)
     = Rust::AST::UseTreeList (Rust::AST::UseTreeList::PATH_PREFIXED, foo_bar,
 			      std::move (uses), UNDEF_LOCATION);
 
-  auto paths = std::vector<Rust::AST::SimplePath> ();
-  Rust::Resolver::flatten_list (list, paths);
+  auto imports = std::vector<Rust::Resolver::Import> ();
+  Rust::Resolver::flatten_list (list, imports);
 
-  ASSERT_TRUE (!paths.empty ());
-  ASSERT_EQ (paths.size (), 2);
-  ASSERT_EQ (paths[0].get_segments ()[0].as_string (), "foo");
-  ASSERT_EQ (paths[0].get_segments ()[1].as_string (), "bar");
-  ASSERT_EQ (paths[0].get_segments ()[2].as_string (), "baz");
-  ASSERT_EQ (paths[1].get_segments ()[0].as_string (), "foo");
-  ASSERT_EQ (paths[1].get_segments ()[1].as_string (), "bar");
-  ASSERT_EQ (paths[1].get_segments ()[2].as_string (), "bul");
+  ASSERT_TRUE (!imports.empty ());
+  ASSERT_EQ (imports.size (), 2);
+  ASSERT_EQ (imports[0].get_path ().get_segments ()[0].as_string (), "foo");
+  ASSERT_EQ (imports[0].get_path ().get_segments ()[1].as_string (), "bar");
+  ASSERT_EQ (imports[0].get_path ().get_segments ()[2].as_string (), "baz");
+  ASSERT_EQ (imports[1].get_path ().get_segments ()[0].as_string (), "foo");
+  ASSERT_EQ (imports[1].get_path ().get_segments ()[1].as_string (), "bar");
+  ASSERT_EQ (imports[1].get_path ().get_segments ()[2].as_string (), "bul");
 }
 
 static void

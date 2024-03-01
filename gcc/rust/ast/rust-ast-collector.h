@@ -1,4 +1,4 @@
-// Copyright (C) 2020-2023 Free Software Foundation, Inc.
+// Copyright (C) 2020-2024 Free Software Foundation, Inc.
 
 // This file is part of GCC.
 
@@ -325,9 +325,7 @@ public:
   void visit (Union &union_item);
   void visit (ConstantItem &const_item);
   void visit (StaticItem &static_item);
-  void visit (TraitItemFunc &item);
   void visit (SelfParam &param);
-  void visit (TraitItemMethod &item);
   void visit (TraitItemConst &item);
   void visit (TraitItemType &item);
   void visit (Trait &trait);
