@@ -14009,6 +14009,10 @@ vect_is_simple_use (vec_info *vinfo, stmt_vec_info stmt, slp_tree slp_node,
       *vectype = SLP_TREE_VECTYPE (child);
       if (SLP_TREE_DEF_TYPE (child) == vect_internal_def)
 	{
+	  /* ???  Instead of crashing, easier to identify.  But we
+	     need to think what to do with internal defs of VEC_PERM
+	     kind here.  */
+	  gcc_assert (SLP_TREE_REPRESENTATIVE (child));
 	  *op = gimple_get_lhs (SLP_TREE_REPRESENTATIVE (child)->stmt);
 	  return vect_is_simple_use (*op, vinfo, dt, def_stmt_info_out);
 	}
