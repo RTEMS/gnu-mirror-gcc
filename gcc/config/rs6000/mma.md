@@ -314,7 +314,9 @@
    (set_attr "length" "*,*,8")])
 
 
-;; Vector quad support.  XOmode can only live in FPRs.
+;; Vector quad support.  Under the original MMA, XOmode can only live in VSX
+;; registers 0..31.  With dense math, XOmode can live in either VSX registers
+;; (0..63) or DMR registers.
 (define_expand "movxo"
   [(set (match_operand:XO 0 "nonimmediate_operand")
 	(match_operand:XO 1 "input_operand"))]
@@ -339,10 +341,10 @@
     gcc_assert (false);
 })
 
-(define_insn_and_split "*movxo"
+(define_insn_and_split "*movxo_nodm"
   [(set (match_operand:XO 0 "nonimmediate_operand" "=d,ZwO,d")
 	(match_operand:XO 1 "input_operand" "ZwO,d,d"))]
-  "TARGET_MMA
+  "TARGET_MMA_NO_DENSE_MATH
    && (gpc_reg_operand (operands[0], XOmode)
        || gpc_reg_operand (operands[1], XOmode))"
   "@
@@ -358,6 +360,31 @@
   [(set_attr "type" "vecload,vecstore,veclogical")
    (set_attr "length" "*,*,16")
    (set_attr "max_prefixed_insns" "2,2,*")])
+
+(define_insn_and_split "*movxo_dm"
+  [(set (match_operand:XO 0 "nonimmediate_operand" "=wa,QwO,wa,wD,wD,wa")
+	(match_operand:XO 1 "input_operand"        "QwO,wa, wa,wa,wD,wD"))]
+  "TARGET_MMA_DENSE_MATH
+   && (gpc_reg_operand (operands[0], XOmode)
+       || gpc_reg_operand (operands[1], XOmode))"
+  "@
+   #
+   #
+   #
+   dmxxinstdmr512 %0,%1,%Y1,0
+   dmmr %0,%1
+   dmxxextfdmr512 %0,%Y0,%1,0"
+  "&& reload_completed
+   && !dmr_operand (operands[0], XOmode)
+   && !dmr_operand (operands[1], XOmode)"
+  [(const_int 0)]
+{
+  rs6000_split_multireg_move (operands[0], operands[1]);
+  DONE;
+}
+  [(set_attr "type" "vecload,vecstore,veclogical,mma,mma,mma")
+   (set_attr "length" "*,*,16,*,*,*")
+   (set_attr "max_prefixed_insns" "2,2,*,*,*,*")])
 
 (define_expand "vsx_assemble_pair"
   [(match_operand:OO 0 "vsx_register_operand")
