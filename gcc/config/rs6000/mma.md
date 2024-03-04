@@ -92,6 +92,7 @@
    UNSPEC_MMA_XXMFACC
    UNSPEC_MMA_XXMTACC
    UNSPEC_MMA_DMSETDMRZ
+   UNSPEC_DM_ASSEMBLE
   ])
 
 (define_c_enum "unspecv"
@@ -454,25 +455,47 @@
 })
 
 (define_expand "mma_assemble_acc"
-  [(match_operand:XO 0 "fpr_reg_operand")
+  [(match_operand:XO 0 "register_operand")
    (match_operand:V16QI 1 "mma_assemble_input_operand")
    (match_operand:V16QI 2 "mma_assemble_input_operand")
    (match_operand:V16QI 3 "mma_assemble_input_operand")
    (match_operand:V16QI 4 "mma_assemble_input_operand")]
   "TARGET_MMA"
 {
-  rtx src = gen_rtx_UNSPEC_VOLATILE (XOmode,
-			    	     gen_rtvec (4, operands[1], operands[2],
-				       		operands[3], operands[4]),
-			    	     UNSPECV_MMA_ASSEMBLE);
-  emit_move_insn (operands[0], src);
+  rtx op0 = operands[0];
+  rtx op1 = operands[1];
+  rtx op2 = operands[2];
+  rtx op3 = operands[3];
+  rtx op4 = operands[4];
+
+  if (TARGET_DENSE_MATH)
+    {
+      rtx vpair1 = gen_reg_rtx (OOmode);
+      rtx vpair2 = gen_reg_rtx (OOmode);
+      if (WORDS_BIG_ENDIAN)
+	{
+	  emit_insn (gen_vsx_assemble_pair (vpair1, op1, op2));
+	  emit_insn (gen_vsx_assemble_pair (vpair2, op3, op4));
+	  emit_insn (gen_mma_assemble_acc_dm (op0, vpair1, vpair2));
+	}
+      else
+	{
+	  emit_insn (gen_vsx_assemble_pair (vpair1, op4, op3));
+	  emit_insn (gen_vsx_assemble_pair (vpair2, op2, op1));
+	  emit_insn (gen_mma_assemble_acc_dm (op0, vpair1, vpair2));
+	}
+    }
+
+  else
+    emit_insn (gen_mma_assemble_acc_nodm (op0, op1, op2, op3, op4));
+
   DONE;
 })
 
 ;; We cannot update the four output registers atomically, so mark the output
-;; as an early clobber so we don't accidentally clobber the input operands.  */
+;; as an early clobber so we don't accidentally clobber the input operands.
 
-(define_insn_and_split "*mma_assemble_acc"
+(define_insn_and_split "mma_assemble_acc_nodm"
   [(set (match_operand:XO 0 "fpr_reg_operand" "=&d")
 	(unspec_volatile:XO
 	  [(match_operand:V16QI 1 "mma_assemble_input_operand" "mwa")
@@ -480,7 +503,7 @@
 	   (match_operand:V16QI 3 "mma_assemble_input_operand" "mwa")
 	   (match_operand:V16QI 4 "mma_assemble_input_operand" "mwa")]
 	  UNSPECV_MMA_ASSEMBLE))]
-  "TARGET_MMA"
+  "TARGET_MMA_NO_DENSE_MATH"
   "#"
   "&& reload_completed"
   [(const_int 0)]
@@ -492,6 +515,31 @@
   rs6000_split_multireg_move (operands[0], src);
   DONE;
 })
+
+;; On a system with dense math, we build the accumulators from two vector
+;; pairs.
+
+(define_insn_and_split "mma_assemble_acc_dm"
+ [(set (match_operand:XO 0 "register_operand" "=wD,?wa")
+       (unspec:XO [(match_operand:OO 1 "vsx_register_operand" "wa,mwa")
+		   (match_operand:OO 2 "vsx_register_operand" "wa,mwa")]
+		  UNSPEC_DM_ASSEMBLE))]
+ "TARGET_MMA_DENSE_MATH"
+ "@
+  dmxxinstdmr512 %0,%1,%2,0
+  #"
+ "&& reload_completed && vsx_register_operand (operands[0], XOmode)"
+ [(set (match_dup 3) (match_dup 1))
+  (set (match_dup 4) (match_dup 2))]
+{
+  int r = reg_or_subregno (operands[0]);
+  int hi = (!WORDS_BIG_ENDIAN);
+  int lo = 1 - hi;
+  operands[3] = gen_rtx_REG (OOmode, r + (hi * 2));
+  operands[4] = gen_rtx_REG (OOmode, r + (lo * 2));
+}
+ [(set_attr "type" "mma")
+  (set_attr "length" "*,16")])
 
 (define_expand "mma_disassemble_acc"
   [(match_operand:V16QI 0 "mma_disassemble_output_operand")
