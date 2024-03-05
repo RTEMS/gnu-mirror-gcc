@@ -91,8 +91,6 @@
    UNSPEC_MMA_XVI8GER4SPP
    UNSPEC_MMA_XXMFACC
    UNSPEC_MMA_XXMTACC
-   UNSPEC_MMA_DMSETDMRZ
-   UNSPEC_DM_ASSEMBLE
   ])
 
 (define_c_enum "unspecv"
@@ -316,9 +314,7 @@
    (set_attr "length" "*,*,8")])
 
 
-;; Vector quad support.  Under the original MMA, XOmode can only live in VSX
-;; registers 0..31.  With dense math, XOmode can live in either VSX registers
-;; (0..63) or DMR registers.
+;; Vector quad support.  XOmode can only live in FPRs.
 (define_expand "movxo"
   [(set (match_operand:XO 0 "nonimmediate_operand")
 	(match_operand:XO 1 "input_operand"))]
@@ -343,10 +339,10 @@
     gcc_assert (false);
 })
 
-(define_insn_and_split "*movxo_nodm"
+(define_insn_and_split "*movxo"
   [(set (match_operand:XO 0 "nonimmediate_operand" "=d,ZwO,d")
 	(match_operand:XO 1 "input_operand" "ZwO,d,d"))]
-  "TARGET_MMA_NO_DENSE_MATH
+  "TARGET_MMA
    && (gpc_reg_operand (operands[0], XOmode)
        || gpc_reg_operand (operands[1], XOmode))"
   "@
@@ -362,31 +358,6 @@
   [(set_attr "type" "vecload,vecstore,veclogical")
    (set_attr "length" "*,*,16")
    (set_attr "max_prefixed_insns" "2,2,*")])
-
-(define_insn_and_split "*movxo_dm"
-  [(set (match_operand:XO 0 "nonimmediate_operand" "=wa,QwO,wa,wD,wD,wa")
-	(match_operand:XO 1 "input_operand"        "QwO,wa, wa,wa,wD,wD"))]
-  "TARGET_MMA_DENSE_MATH
-   && (gpc_reg_operand (operands[0], XOmode)
-       || gpc_reg_operand (operands[1], XOmode))"
-  "@
-   #
-   #
-   #
-   dmxxinstdmr512 %0,%1,%Y1,0
-   dmmr %0,%1
-   dmxxextfdmr512 %0,%Y0,%1,0"
-  "&& reload_completed
-   && !dmr_operand (operands[0], XOmode)
-   && !dmr_operand (operands[1], XOmode)"
-  [(const_int 0)]
-{
-  rs6000_split_multireg_move (operands[0], operands[1]);
-  DONE;
-}
-  [(set_attr "type" "vecload,vecstore,veclogical,mma,mma,mma")
-   (set_attr "length" "*,*,16,*,*,*")
-   (set_attr "max_prefixed_insns" "2,2,*,*,*,*")])
 
 (define_expand "vsx_assemble_pair"
   [(match_operand:OO 0 "vsx_register_operand")
@@ -455,47 +426,25 @@
 })
 
 (define_expand "mma_assemble_acc"
-  [(match_operand:XO 0 "register_operand")
+  [(match_operand:XO 0 "fpr_reg_operand")
    (match_operand:V16QI 1 "mma_assemble_input_operand")
    (match_operand:V16QI 2 "mma_assemble_input_operand")
    (match_operand:V16QI 3 "mma_assemble_input_operand")
    (match_operand:V16QI 4 "mma_assemble_input_operand")]
   "TARGET_MMA"
 {
-  rtx op0 = operands[0];
-  rtx op1 = operands[1];
-  rtx op2 = operands[2];
-  rtx op3 = operands[3];
-  rtx op4 = operands[4];
-
-  if (TARGET_DENSE_MATH)
-    {
-      rtx vpair1 = gen_reg_rtx (OOmode);
-      rtx vpair2 = gen_reg_rtx (OOmode);
-      if (WORDS_BIG_ENDIAN)
-	{
-	  emit_insn (gen_vsx_assemble_pair (vpair1, op1, op2));
-	  emit_insn (gen_vsx_assemble_pair (vpair2, op3, op4));
-	  emit_insn (gen_mma_assemble_acc_dm (op0, vpair1, vpair2));
-	}
-      else
-	{
-	  emit_insn (gen_vsx_assemble_pair (vpair1, op4, op3));
-	  emit_insn (gen_vsx_assemble_pair (vpair2, op2, op1));
-	  emit_insn (gen_mma_assemble_acc_dm (op0, vpair1, vpair2));
-	}
-    }
-
-  else
-    emit_insn (gen_mma_assemble_acc_nodm (op0, op1, op2, op3, op4));
-
+  rtx src = gen_rtx_UNSPEC_VOLATILE (XOmode,
+			    	     gen_rtvec (4, operands[1], operands[2],
+				       		operands[3], operands[4]),
+			    	     UNSPECV_MMA_ASSEMBLE);
+  emit_move_insn (operands[0], src);
   DONE;
 })
 
 ;; We cannot update the four output registers atomically, so mark the output
-;; as an early clobber so we don't accidentally clobber the input operands.
+;; as an early clobber so we don't accidentally clobber the input operands.  */
 
-(define_insn_and_split "mma_assemble_acc_nodm"
+(define_insn_and_split "*mma_assemble_acc"
   [(set (match_operand:XO 0 "fpr_reg_operand" "=&d")
 	(unspec_volatile:XO
 	  [(match_operand:V16QI 1 "mma_assemble_input_operand" "mwa")
@@ -503,7 +452,7 @@
 	   (match_operand:V16QI 3 "mma_assemble_input_operand" "mwa")
 	   (match_operand:V16QI 4 "mma_assemble_input_operand" "mwa")]
 	  UNSPECV_MMA_ASSEMBLE))]
-  "TARGET_MMA_NO_DENSE_MATH"
+  "TARGET_MMA"
   "#"
   "&& reload_completed"
   [(const_int 0)]
@@ -515,31 +464,6 @@
   rs6000_split_multireg_move (operands[0], src);
   DONE;
 })
-
-;; On a system with dense math, we build the accumulators from two vector
-;; pairs.
-
-(define_insn_and_split "mma_assemble_acc_dm"
- [(set (match_operand:XO 0 "register_operand" "=wD,?wa")
-       (unspec:XO [(match_operand:OO 1 "vsx_register_operand" "wa,mwa")
-		   (match_operand:OO 2 "vsx_register_operand" "wa,mwa")]
-		  UNSPEC_DM_ASSEMBLE))]
- "TARGET_MMA_DENSE_MATH"
- "@
-  dmxxinstdmr512 %0,%1,%2,0
-  #"
- "&& reload_completed && vsx_register_operand (operands[0], XOmode)"
- [(set (match_dup 3) (match_dup 1))
-  (set (match_dup 4) (match_dup 2))]
-{
-  int r = reg_or_subregno (operands[0]);
-  int hi = (!WORDS_BIG_ENDIAN);
-  int lo = 1 - hi;
-  operands[3] = gen_rtx_REG (OOmode, r + (hi * 2));
-  operands[4] = gen_rtx_REG (OOmode, r + (lo * 2));
-}
- [(set_attr "type" "mma")
-  (set_attr "length" "*,16")])
 
 (define_expand "mma_disassemble_acc"
   [(match_operand:V16QI 0 "mma_disassemble_output_operand")
@@ -573,71 +497,28 @@
   DONE;
 })
 
-;; MMA instructions that do not use their accumulators as an input, still must
-;; not allow their vector operands to overlap the registers used by the
-;; accumulator.  We enforce this by marking the output as early clobber.  The
-;; prime and de-prime instructions are not needed on systems with dense math
-;; registers.
+;; MMA instructions that do not use their accumulators as an input, still
+;; must not allow their vector operands to overlap the registers used by
+;; the accumulator.  We enforce this by marking the output as early clobber.
 
 (define_insn "mma_<acc>"
   [(set (match_operand:XO 0 "accumulator_operand" "=&wD")
-	(unspec:XO [(match_operand:XO 1 "fpr_reg_operand" "0")]
+	(unspec:XO [(match_operand:XO 1 "accumulator_operand" "0")]
 		    MMA_ACC))]
-  "TARGET_MMA_NO_DENSE_MATH"
+  "TARGET_MMA"
   "<acc> %A0"
   [(set_attr "type" "mma")])
 
 ;; We can't have integer constants in XOmode so we wrap this in an
-;; UNSPEC_VOLATILE for the non-dense math case.  For dense math, we don't need
-;; to disable optimization and we can do a normal UNSPEC.
+;; UNSPEC_VOLATILE.
 
-(define_expand "mma_xxsetaccz"
-  [(set (match_operand:XO 0 "register_operand")
+(define_insn "mma_xxsetaccz"
+  [(set (match_operand:XO 0 "accumulator_operand" "=wD")
 	(unspec_volatile:XO [(const_int 0)]
 			    UNSPECV_MMA_XXSETACCZ))]
   "TARGET_MMA"
-{
-  if (TARGET_DENSE_MATH)
-    {
-      emit_insn (gen_mma_dmsetaccz (operands[0]));
-      DONE;
-    }
-})
-
-(define_insn "*mma_xxsetaccz_nodm"
-  [(set (match_operand:XO 0 "fpr_reg_operand" "=d")
-	(unspec_volatile:XO [(const_int 0)]
-			    UNSPECV_MMA_XXSETACCZ))]
-  "TARGET_MMA_NO_DENSE_MATH"
   "xxsetaccz %A0"
   [(set_attr "type" "mma")])
-
-
-;; If we have dense math registers, allow VSX registers as well as the
-;; accumulators.  This means if we are setting things up by clearing an
-;; accumulator and then just storing it for later, we don't have to do a
-;; dmsetdmrz and a dmxxextfdmr512 just to store the accumulator.
-(define_insn_and_split "mma_dmsetaccz"
-  [(set (match_operand:XO 0 "register_operand" "=wD,?wa")
-	(unspec:XO [(const_int 0)]
-		   UNSPEC_MMA_DMSETDMRZ))]
-  "TARGET_MMA_DENSE_MATH"
-  "@
-   dmsetdmrz %0
-   #"
-  "&& reload_completed && vsx_register_operand (operands[0], XOmode)"
-  [(const_int 0)]
-{
-  int r = reg_or_subregno (operands[0]);
-  rtx zero = CONST0_RTX (V2DFmode);
-  emit_move_insn (gen_rtx_REG (V2DFmode, r), zero);
-  emit_move_insn (gen_rtx_REG (V2DFmode, r + 1), zero);
-  emit_move_insn (gen_rtx_REG (V2DFmode, r + 2), zero);
-  emit_move_insn (gen_rtx_REG (V2DFmode, r + 3), zero);
-  DONE;
-}
-  [(set_attr "type" "mma")
-   (set_attr "length" "*,16")])
 
 (define_insn "mma_<vv>"
   [(set (match_operand:XO 0 "accumulator_operand" "=&wD,&wD")
