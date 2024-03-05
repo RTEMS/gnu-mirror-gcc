@@ -1,4 +1,4 @@
-==================== Branch work161-dmf, patch #104 ====================
+==================== Branch work161-dmf, patch #145 ====================
 
 PowerPC: Add support for 1,024 bit DMR registers.
 
@@ -20,7 +20,7 @@ don't have aliases for __dmr512 and __dmr1024 that we've discussed internally.
 The patches have been tested on both little and big endian systems.  Can I check
 it into the master branch?
 
-2024-02-29   Michael Meissner  <meissner@linux.ibm.com>
+2024-03-05   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -70,7 +70,7 @@ gcc/testsuite/
 
 	* gcc.target/powerpc/dm-1024bit.c: New test.
 
-==================== Branch work161-dmf, patch #104 ====================
+==================== Branch work161-dmf, patch #144 ====================
 
 PowerPC: Switch to dense math names for all MMA operations.
 
@@ -132,7 +132,7 @@ And now we have:
      (set_attr "isa" "dm,not_dm,not_dm")])
 
 
-2024-02-29   Michael Meissner  <meissner@linux.ibm.com>
+2024-03-05   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -147,8 +147,9 @@ gcc/
 	(apvi4i2): Likewise.
 	(vvi4i4i4): Likewise.
 	(avvi4i4i4): Likewise.
-	(mma_<vv>): Add support for running on DMF systems, generating the dense
-	math instruction and using the dense math accumulators.
+	(mma_xxsetaccz): Add support for running on DMF systems, generating the
+	dense math instruction and using the dense math accumulators.
+	(mma_<vv>): Likewise.
 	(mma_<pv>): Likewise.
 	(mma_<avv>): Likewise.
 	(mma_<apv>): Likewise.
@@ -173,58 +174,9 @@ gcc/testsuite/
 	* lib/target-supports.exp (check_effective_target_ppc_dmr_ok): New
 	target test.
 
-==================== Branch work161-dmf, patch #103 ====================
+==================== Branch work161-dmf, patch #143 ====================
 
-PowerPC: Make MMA insns support DMR registers.
-
-This patch changes the MMA instructions to use either FPR registers
-(-mcpu=power10) or DMRs (-mcpu=future).  In this patch, the existing MMA
-instruction names are used.
-
-A macro (__PPC_DMR__) is defined if the MMA instructions use the DMRs.
-
-The patches have been tested on both little and big endian systems.  Can I check
-it into the master branch?
-
-2024-02-29   Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/mma.md (mma_<acc>): Convert to a define_expand to handle
-	non dense math and dense math cases.
-	(mma_<acc>_nodm insn): Rename from mma_<acc>, and restrict to non dense
-	math.
-	(mma_xxsetaccz): Convert to define_expand to handle non dense math and
-	dense math cases.
-	(mma_xxsetaccz_vsx): Rename from mma_xxsetaccz and restrict usage to non
-	dense math.
-	(mma_xxsetaccz_dm): Dense math version of mma_xxsetaccz.
-	(mma_<vv>): Add support for dense math.
-	(mma_<avv>): Likewise.
-	(mma_<pv>): Likewise.
-	(mma_<apv>): Likewise.
-	(mma_<vvi4i4i8>): Likewise.
-	(mma_<avvi4i4i8>): Likewise.
-	(mma_<vvi4i4i2>): Likewise.
-	(mma_<avvi4i4i2>): Likewise.
-	(mma_<vvi4i4>): Likewise.
-	(mma_<avvi4i4>): Likewise.
-	(mma_<pvi4i2>): Likewise.
-	(mma_<apvi4i2>): Likewise.
-	(mma_<vvi4i4i4>): Likewise.
-	(mma_<avvi4i4i4>): Likewise.
-	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Define
-	__PPC_DMR__ if we have dense math instructions.
-	* config/rs6000/rs6000.cc (print_operand): Make %A handle only DMRs if
-	dense math and only FPRs if not dense math.
-	(rs6000_split_multireg_move): Do not generate the xxmtacc instruction to
-	prime the DMR registers or the xxmfacc instruction to de-prime
-	instructions if we have dense math register support.
-	* config/rs6000/rs6000.h (DENSE_MATH_FLAGS): Define.
-
-==================== Branch work161-dmf, patch #102 ====================
-
-PowerPC: Add support for accumulators in DMR registers.
+Add support for dense math registers.
 
 The MMA subsystem added the notion of accumulator registers as an optional
 feature of ISA 3.1 (power10).  In ISA 3.1, these accumulators overlapped with
@@ -273,27 +225,23 @@ both MMA without dense math and MMA with dense math:
 It is possible that the mangling for DMRs and the GDB register numbers may
 produce other changes in the future.
 
-2024-02-29   Michael Meissner  <meissner@linux.ibm.com>
+2024-03-05   Michael Meissner  <meissner@linux.ibm.com>
 
-gcc/
-
-	* config/rs6000/constraints.md (wD constraint): New constraint.
-	* config/rs6000/mma.md (UNSPEC_DM_ASSEMBLE): New unspec.
-	(movxo): Convert into define_expand.
-	(movxo_nodm): Version of movxo where accumulators overlap with VSX vector
-	registers 0..31.
-	(movxo_dm): Verson of movxo that supports separate dense math
-	accumulators.
-	(mma_assemble_acc): Add dense math support to define_expand.
-	(mma_assemble_acc_nodm): Rename from mma_assemble_acc, and restrict it
-	to non dense math systems.
-	(mma_assemble_acc_dm): Dense math version of mma_assemble_acc.
-	(mma_disassemble_acc): Add dense math support to define_expand.
-	(mma_disassemble_acc_nodm): Rename from mma_disassemble_acc, and
-	restrict it to non dense math systems.
-	(mma_disassemble_acc_dm): Dense math version of mma_disassemble_acc.
+	* config/rs6000/mma.md (movxo): Add comments about dense math registers.
+	(movxo_nodm): Rename from movxo and restrict the usage to machines
+	without dense math registers.
+	(movxo_dm): New insn for movxo support for machines with dense math
+	registers.
+	(mma_<acc>): Restrict usage to machines without dense math registers.
+	(mma_xxsetaccz): Make a define_expand, and add support for dense math
+	registers.
+	(mma_xxsetaccz_nodm): Rename from mma_xxsetaccz, and restrict to
+	machines without dense math registers.
+	(mma_dmsetaccz): New insn.
 	* config/rs6000/predicates.md (dmr_operand): New predicate.
-	(accumulator_operand): Likewise.
+	(accumulator_operand): Add support for dense math registers.
+	* config/rs6000/rs6000-builtin.cc (rs6000_gimple_fold_mma_builtin): Do
+	not de-prime accumulator when disassembling a vector quad.
 	* config/rs6000/rs6000.cc (enum rs6000_reg_type): Add DMR_REG_TYPE.
 	(enum rs6000_reload_reg_type): Add RELOAD_REG_DMR.
 	(LAST_RELOAD_REG_CLASS): Add support for DMR registers and the wD
@@ -318,8 +266,9 @@ gcc/
 	(rs6000_debugger_regno): Likewise.
 	(rs6000_split_multireg_move): Add support for DMRs.
 	* config/rs6000/rs6000.h (TARGET_DENSE_MATH): New macro.
+	(TARGET_MMA_DENSE_MATH): Likewise.
 	(TARGET_MMA_NO_DENSE_MATH): Likewise
-	(UNITS_PER_DMR_WORD): New macro.
+	(UNITS_PER_DMR_WORD): Likewise.
 	(FIRST_PSEUDO_REGISTER): Update for DMRs.
 	(FIXED_REGISTERS): Add DMRs.
 	(CALL_REALLY_USED_REGISTERS): Likewise.
@@ -335,9 +284,44 @@ gcc/
 	(LAST_DMR_REGNO): Likewise.
 	(isa attribute): Add 'dm' and 'not_dm' attributes.
 	(enabled attribute): Support 'dm' and 'not_dm' attributes.
-	* doc/md.texi (PowerPC constraints): Document wD constraint.
 
-==================== Branch work161-dmf, patch #101 ====================
+==================== Branch work161-dmf, patch #142 ====================
+
+Add wD constraint.
+
+This patch adds a new constraint ('wD') that matches the accumulator registers
+that overlap with VSX registers 0..31 on power10.  Future patches will add the
+support for a separate accumulator register class that will be used when the
+support for dense math registes is added.
+
+2024-03-04   Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/constraints.md (wD): New constraint.
+	* config/rs6000/mma.md (mma_disassemble_acc): Likewise.
+	(mma_<vv>): Likewise.
+	(mma_<avv>): Likewise.
+	(mma_<pv>): Likewise.
+	(mma_<apv>): Likewise.
+	(mma_<vvi4i4i8>): Likewise.
+	(mma_<avvi4i4i8>): Likewise.
+	(mma_<vvi4i4i2>): Likewise.
+	(mma_<avvi4i4i2>): Likewise.
+	(mma_<vvi4i4>): Likewise.
+	(mma_<avvi4i4>): Likewise.
+	(mma_<pvi4i2): Likewise.
+	(mma_<apvi4i2>): Likewise.
+	(mma_<vvi4i4i4>): Likewise.
+	(mma_<avvi4i4i4): Likewise.
+	* config/rs6000/predicates.md (accumulator_operand): New predicate.
+	* config/rs6000/rs6000.cc (rs6000_debug_reg_global): Print the register
+	class for the 'wD' constraint.
+	(rs6000_init_hard_regno_mode_ok): Set the 'wD' register constraint
+	class.
+	* config/rs6000/rs6000.h (enum r6000_reg_class_enum): Add element for
+	the 'wD' constraint.
+	* doc/md.texi (PowerPC constraints): Document the 'wD' constraint.
+
+==================== Branch work161-dmf, patch #141 ====================
 
 Use vector pair load/store for memcpy with -mcpu=future
 
@@ -346,7 +330,7 @@ vector pair and store vector pair instructions when optimizing things like
 memory copy.  This patch enables using those instructions if -mcpu=future is
 used.
 
-2024-02-29  Michael Meissner  <meissner@linux.ibm.com>
+2024-03-04  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -356,6 +340,8 @@ gcc/
 	(POWERPC_MASKS): Make the bit for enabling using load vector pair and
 	store vector pair operations set and reset when the PowerPC processor is
 	changed.
+
+==================== Branch work161-dmf, patches 101 .. 139 were reverted ====================
 
 ==================== Branch work161-dmf, baseline ====================
 
