@@ -7117,29 +7117,6 @@ proc check_effective_target_power11_ok { } {
 	    }
 	} "-mcpu=power11"]
     } else {
-	return 0;
-    }
-}
-
-# Return 1 if this is a PowerPC target supporting -mcpu=future which enables
-# the dense math operations.
-proc check_effective_target_powerpc_dense_math_ok { } {
-	return [check_no_compiler_messages_nocache powerpc_dense_math_ok assembly {
-		__vector_quad vq;
-		void test (void)
-		{
-		#ifndef __PPC_DMR__
-		#error "target does not have dense math support."
-		#else
-		/* Make sure we have dense math support.  */
-		  __vector_quad dmr;
-		  __asm__ ("dmsetaccz %A0" : "=wD" (dmr));
-		  vq = dmr;
-		#endif
-		return 0;
-	    }
-	} "-mcpu=power11"]
-    } else {
 	return 0
     }
 }
