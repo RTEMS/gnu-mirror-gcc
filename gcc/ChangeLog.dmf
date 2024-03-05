@@ -1,4 +1,4 @@
-==================== Branch work161-dmf, patch #145 ====================
+==================== Branch work161-dmf, patch 156 ====================
 
 PowerPC: Add support for 1,024 bit DMR registers.
 
@@ -70,7 +70,19 @@ gcc/testsuite/
 
 	* gcc.target/powerpc/dm-1024bit.c: New test.
 
-==================== Branch work161-dmf, patch #144 ====================
+==================== Branch work161-dmf, patch 155 ====================
+
+Add dense math test for new instruction names.
+
+2024-03-05   Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/dm-double-test.c: New test.
+	* lib/target-supports.exp (check_effective_target_ppc_dmr_ok): New
+	target test.
+
+==================== Branch work161-dmf, patch 154 ====================
 
 PowerPC: Switch to dense math names for all MMA operations.
 
@@ -79,58 +91,11 @@ the original name used in power10 to the new name when used with the dense math
 system.  I.e. xvf64gerpp becomes dmxvf64gerpp.  The assembler will emit the
 same bits for either spelling.
 
-The patches have been tested on both little and big endian systems.  Can I check
-it into the master branch?
-
 For the non-prefixed MMA instructions, we add a 'dm' prefix in front of the
 instruction.  However, the prefixed instructions have a 'pm' prefix, and we add
 the 'dm' prefix afterwards.  To prevent having two sets of parallel int
 attributes, we remove the "pm" prefix from the instruction string in the
 attributes, and add it later, both in the insn name and in the output template.
-
-For example, previously we had
-
-  (define_int_attr vvi4i4i8 [(UNSPEC_MMA_PMXVI4GER8 "pmxvi4ger8")])
-
-  ;; ...
-
-  (define_insn "mma_<vvi4i4i8>"
-    [(set (match_operand:XO 0 "accumulator_operand" "=wD,&d,&d")
-          (unspec:XO [(match_operand:V16QI 1 "vsx_register_operand" "wa,v,?wa")
-                      (match_operand:V16QI 2 "vsx_register_operand" "wa,v,?wa")
-                      (match_operand:SI 3 "const_0_to_15_operand" "n,n,n")
-                      (match_operand:SI 4 "const_0_to_15_operand" "n,n,n")
-                      (match_operand:SI 5 "u8bit_cint_operand" "n,n,n")]
-                      MMA_VVI4I4I8))]
-    "TARGET_MMA"
-    "<vvi4i4i8> %A0,%x1,%x2,%3,%4,%5"
-    [(set_attr "type" "mma")
-     (set_attr "prefixed" "yes")
-     (set_attr "isa" "dm,not_dm,not_dm")])
-
-And now we have:
-
-  (define_int_attr vvi4i4i8 [(UNSPEC_MMA_PMXVI4GER8 "xvi4ger8")])
-
-  ;; ...
-
-  (define_insn "mma_pm<vvi4i4i8>"
-    [(set (match_operand:XO 0 "accumulator_operand" "=wD,&d,&d")
-          (unspec:XO [(match_operand:V16QI 1 "vsx_register_operand" "wa,v,?wa")
-                      (match_operand:V16QI 2 "vsx_register_operand" "wa,v,?wa")
-                      (match_operand:SI 3 "const_0_to_15_operand" "n,n,n")
-                      (match_operand:SI 4 "const_0_to_15_operand" "n,n,n")
-                      (match_operand:SI 5 "u8bit_cint_operand" "n,n,n")]
-                      MMA_VVI4I4I8))]
-    "TARGET_MMA"
-    "@
-     pmdm<vvi4i4i8> %A0,%x1,%x2,%3,%4,%5
-     pm<vvi4i4i8> %A0,%x1,%x2,%3,%4,%5
-     pm<vvi4i4i8> %A0,%x1,%x2,%3,%4,%5"
-    [(set_attr "type" "mma")
-     (set_attr "prefixed" "yes")
-     (set_attr "isa" "dm,not_dm,not_dm")])
-
 
 2024-03-05   Michael Meissner  <meissner@linux.ibm.com>
 
@@ -168,13 +133,7 @@ gcc/
 	(mma_pm<vvi4i4i4>): Likewise.
 	(mma_pm<avvi4i4i4>): Likewise.
 
-gcc/testsuite/
-
-	* gcc.target/powerpc/dm-double-test.c: New test.
-	* lib/target-supports.exp (check_effective_target_ppc_dmr_ok): New
-	target test.
-
-==================== Branch work161-dmf, patch #143 ====================
+==================== Branch work161-dmf, patch 153 ====================
 
 Add support for dense math registers.
 
@@ -280,12 +239,8 @@ produce other changes in the future.
 	(enum r6000_reg_class_enum): Add RS6000_CONSTRAINT_wD.
 	(REGISTER_NAMES): Add DMR registers.
 	(ADDITIONAL_REGISTER_NAMES): Likewise.
-	* config/rs6000/rs6000.md (FIRST_DMR_REGNO): New constant.
-	(LAST_DMR_REGNO): Likewise.
-	(isa attribute): Add 'dm' and 'not_dm' attributes.
-	(enabled attribute): Support 'dm' and 'not_dm' attributes.
 
-==================== Branch work161-dmf, patch #142 ====================
+==================== Branch work161-dmf, patch 152 ====================
 
 Add wD constraint.
 
@@ -294,7 +249,7 @@ that overlap with VSX registers 0..31 on power10.  Future patches will add the
 support for a separate accumulator register class that will be used when the
 support for dense math registes is added.
 
-2024-03-04   Michael Meissner  <meissner@linux.ibm.com>
+2024-03-05   Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/constraints.md (wD): New constraint.
 	* config/rs6000/mma.md (mma_disassemble_acc): Likewise.
@@ -321,7 +276,7 @@ support for dense math registes is added.
 	the 'wD' constraint.
 	* doc/md.texi (PowerPC constraints): Document the 'wD' constraint.
 
-==================== Branch work161-dmf, patch #141 ====================
+==================== Branch work161-dmf, patch 151 ====================
 
 Use vector pair load/store for memcpy with -mcpu=future
 
@@ -330,7 +285,7 @@ vector pair and store vector pair instructions when optimizing things like
 memory copy.  This patch enables using those instructions if -mcpu=future is
 used.
 
-2024-03-04  Michael Meissner  <meissner@linux.ibm.com>
+2024-03-05  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -341,7 +296,15 @@ gcc/
 	store vector pair operations set and reset when the PowerPC processor is
 	changed.
 
-==================== Branch work161-dmf, patches 101 .. 139 were reverted ====================
+==================== Branch work161-dmf, patches 141 .. 145 were reverted ====================
+
+==================== Branch work161-dmf, patches 131 .. 137 were reverted ====================
+
+==================== Branch work161-dmf, patches 121 .. 124 were reverted ====================
+
+==================== Branch work161-dmf, patches 111 .. 112 were reverted ====================
+
+==================== Branch work161-dmf, patches 101 .. 105 were reverted ====================
 
 ==================== Branch work161-dmf, baseline ====================
 
