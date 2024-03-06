@@ -8195,7 +8195,9 @@ vectorizable_store (vec_info *vinfo,
   gcc_assert (ncopies >= 1);
 
   /* FORNOW.  This restriction should be relaxed.  */
-  if (loop && nested_in_vect_loop_p (loop, stmt_info) && ncopies > 1)
+  if (loop
+      && nested_in_vect_loop_p (loop, stmt_info)
+      && (ncopies > 1 || (slp && SLP_TREE_NUMBER_OF_VEC_STMTS (slp_node) > 1)))
     {
       if (dump_enabled_p ())
 	dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
@@ -9941,7 +9943,8 @@ vectorizable_load (vec_info *vinfo,
   gcc_assert (ncopies >= 1);
 
   /* FORNOW. This restriction should be relaxed.  */
-  if (nested_in_vect_loop && ncopies > 1)
+  if (nested_in_vect_loop
+      && (ncopies > 1 || (slp && SLP_TREE_NUMBER_OF_VEC_STMTS (slp_node) > 1)))
     {
       if (dump_enabled_p ())
         dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
