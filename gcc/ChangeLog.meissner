@@ -1,4 +1,14 @@
-==================== Branch work162, patch #1 ====================
+==================== Branch work162, patch #3 ====================
+
+Reallow power11 sched charges for sched pass one.
+
+2024-03-07  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_sched_reorder): Add power11 change.
+
+==================== Branch work162, patch #2 ====================
 
 Revert some changes.
 
