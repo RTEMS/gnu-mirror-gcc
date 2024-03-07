@@ -19568,7 +19568,9 @@ rs6000_sched_reorder (FILE *dump ATTRIBUTE_UNUSED, int sched_verbose,
     load_store_pendulum = 0;
 
   /* Do Power10 dependent reordering.  */
-  if (rs6000_tune == PROCESSOR_POWER10 && last_scheduled_insn)
+  if (last_scheduled_insn
+      && (rs6000_tune == PROCESSOR_POWER10
+	  || rs6000_tune == PROCESSOR_POWER11))
     power10_sched_reorder (ready, n_ready - 1);
 
   return rs6000_issue_rate ();
