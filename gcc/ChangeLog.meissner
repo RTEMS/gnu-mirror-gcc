@@ -1,5 +1,16 @@
 ==================== Branch work162, patch #1 ====================
 
+Revert some changes.
+
+2024-03-07  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_sched_reorder): Revert changes.
+	(rs6000_sched_reorder2): Likewise.
+
+==================== Branch work162, patch #1 ====================
+
 Add -mcpu=power11 support.
 
 This patch adds support for -mcpu=power11.  At the current time, no new
