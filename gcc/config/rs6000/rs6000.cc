@@ -19568,9 +19568,7 @@ rs6000_sched_reorder (FILE *dump ATTRIBUTE_UNUSED, int sched_verbose,
     load_store_pendulum = 0;
 
   /* Do Power10 dependent reordering.  */
-  if (last_scheduled_insn
-      && (rs6000_tune == PROCESSOR_POWER10
-	  || rs6000_tune == PROCESSOR_POWER11))
+  if (rs6000_tune == PROCESSOR_POWER10 && last_scheduled_insn)
     power10_sched_reorder (ready, n_ready - 1);
 
   return rs6000_issue_rate ();
@@ -19594,9 +19592,9 @@ rs6000_sched_reorder2 (FILE *dump, int sched_verbose, rtx_insn **ready,
       && recog_memoized (last_scheduled_insn) >= 0)
     return power9_sched_reorder2 (ready, *pn_ready - 1);
 
-  if (last_scheduled_insn
-      && (rs6000_tune == PROCESSOR_POWER10
-	  || rs6000_tune == PROCESSOR_POWER11))
+  /* Do Power10 dependent reordering.  */
+  if (rs6000_tune == PROCESSOR_POWER10 && last_scheduled_insn)
+    return power10_sched_reorder (ready, *pn_ready - 1);
 
   return cached_can_issue_more;
 }
