@@ -1,6 +1,45 @@
-==================== Branch work162, patch #11 ====================
+==================== Branch work162, patch #24 ====================
 
-Add -mcpu=power11 support.
+Add -mcpu=power11 tests.
+
+This patch adds some simple tests for -mcpu=power11 support.  In order to run
+these tests, you need an assembler that supports the -mpwr11 option.
+
+2024-03-08  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/power11-1.c: New test.
+	* gcc.target/powerpc/power11-2.c: Likewise.
+	* gcc.target/powerpc/power11-3.c: Likewise.
+	* lib/target-supports.exp (check_effective_target_power11_ok): Add new
+	effective target.
+
+==================== Branch work162, patch #23 ====================
+
+Add -mcpu=power11 support part 3.
+
+This patch makes -mtune=power11 use the same tuning decision as -mtune=power10.
+
+2024-03-08  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/power10.md (all reservations): Add power11 as an
+	alterntive to power10.
+
+==================== Branch work162, patch #22 ====================
+
+Add -mcpu=power11 support part 2
+
+This patch allows GCC to be configured with the --with-cpu=power11 and
+--with-tune=power11 options.
+
+This patch passes -mpwr11 to the assembler if the user uses -mcpu=power11.
+
+This patch adds support for using "power11" in the __builtin_cpu_is built-in
+function.
+
 
 2024-03-08  Michael Meissner  <meissner@linux.ibm.com>
 
@@ -11,16 +50,35 @@ gcc/
 	* config/rs6000/aix72.h (ASM_CPU_SPEC): Likewise.
 	* config/rs6000/aix73.h (ASM_CPU_SPEC): Likewise.
 	* config/rs6000/driver-rs6000.cc (asm_names): Likewise.
-	* config/rs6000/power10.md (all reservations): Add power11 as an
-	alterntive to power10.
 	* config/rs6000/ppc-auxv.h (PPC_PLATFORM_POWER11): New define.
 	* config/rs6000/rs6000-builtin.cc (cpu_is_info): Add power11.
+	* config/rs6000/rs6000.h (ASM_CPU_SPEC): Likewise.
+
+==================== Branch work162, patch #21 ====================
+
+Add -mcpu=power11 support.
+
+This patch adds the power11 option to the -mcpu= and -mtune= switches.
+
+This patch treats the power11 like a power10 in terms of costs and reassociation
+width.
+
+This patch issues a ".machine power11" to the assembly file if you use
+-mcpu=power11.
+
+This patch defines _ARCH_PWR11 if the user uses -mcpu=power11.
+
+2024-03-08  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
 	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Define
 	_ARCH_PWR11 if -mcpu=power11.
 	* config/rs6000/rs6000-cpus.def (ISA_POWER11_MASKS_SERVER): New define.
 	(POWERPC_MASKS): Add power11 isa bit.
 	(power11 cpu): Add power11 definition.
 	* rs6000-opts.h (PROCESSOR_POWER11): Add power11 processor.
+	* config/rs6000/rs6000-string.cc (expand_compare_loop): Likewise.
 	* config/rs6000/rs6000-tables.opt: Regenerate.
 	* config/rs6000/rs6000.cc (power11_cost): Add power11 support.
 	(rs6000_option_override_internal): Likewise.
@@ -32,18 +90,11 @@ gcc/
 	(rs6000_sched_reorder2): Likewise.
 	(rs6000_register_move_cost): Likewise.
 	(rs6000_opt_masks): Likewise.
-	* config/rs6000/rs6000.h (ASM_CPU_SPEC): Likewise.
 	* config/rs6000/rs6000.md (cpu attribute): Add power11.
 	* config/rs6000/rs6000.opt (-mpower11): Add internal power11 ISA flag.
 	* doc/invoke.texi (RS/6000 and PowerPC Options): Document -mcpu=power11.
 
-gcc/testsuite/
-
-	* gcc.target/powerpc/power11-1.c: New test.
-	* gcc.target/powerpc/power11-2.c: Likewise.
-	* gcc.target/powerpc/power11-3.c: Likewise.
-	* lib/target-supports.exp (check_effective_target_power11_ok): Add new
-	effective target.
+==================== Branch work162, patch #11 was reverted ====================
 
 ==================== Branch work162, patches #1..7 were reverted ====================
 
