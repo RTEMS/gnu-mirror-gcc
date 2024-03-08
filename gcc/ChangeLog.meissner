@@ -1,3 +1,11 @@
+==================== Branch work162, patch #6 ====================
+
+Add power11 to rs6000-string.cc
+
+2024-03-07  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-string.cc (expand_compare_loop): Add power11.
+
 ==================== Branch work162, patch #5 ====================
 
 Allow configuration of power11
