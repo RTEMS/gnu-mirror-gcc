@@ -107,7 +107,6 @@
 #define ASM_CPU_SPEC \
 "%{mcpu=native: %(asm_cpu_native); \
   mcpu=power10: -mpower10; \
-  mcpu=power11: -mpower11; \
   mcpu=power9: -mpower9; \
   mcpu=power8|mcpu=powerpc64le: -mpower8; \
   mcpu=power7: -mpower7; \
