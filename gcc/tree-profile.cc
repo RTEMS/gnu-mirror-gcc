@@ -999,7 +999,8 @@ pass_ipa_tree_profile::gate (function *)
      disabled.  */
   return (!in_lto_p && !flag_auto_profile
 	  && (flag_branch_probabilities || flag_test_coverage
-	      || profile_arc_flag));
+	      || profile_arc_flag)
+	  && !seen_error ());
 }
 
 } // anon namespace
