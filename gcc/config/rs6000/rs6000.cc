@@ -19598,6 +19598,7 @@ rs6000_sched_reorder2 (FILE *dump, int sched_verbose, rtx_insn **ready,
   if (last_scheduled_insn
       && (rs6000_tune == PROCESSOR_POWER10
 	  || rs6000_tune == PROCESSOR_POWER11))
+    return power10_sched_reorder (ready, *pn_ready - 1);
 
   return cached_can_issue_more;
 }
