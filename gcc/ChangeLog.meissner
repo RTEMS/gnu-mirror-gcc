@@ -1,3 +1,11 @@
+==================== Branch work162, patch #7 ====================
+
+Fix thinko
+
+2024-03-07  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.cc (rs6000_sched_reorder2): Fix thinko.
+
 ==================== Branch work162, patch #6 ====================
 
 Add power11 to rs6000-string.cc
