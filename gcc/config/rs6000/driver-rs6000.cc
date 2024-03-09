@@ -441,6 +441,7 @@ struct asm_name {
 
 static const struct asm_name asm_names[] = {
 #if defined (_AIX)
+  { "future",	"-mfuture" },
   { "power3",	"-m620" },
   { "power4",	"-mpwr4" },
   { "power5",	"-mpwr5" },
@@ -470,6 +471,7 @@ static const struct asm_name asm_names[] = {
 
 #else
   { "cell",	"-mcell" },
+  { "future",	"-mfuture },
   { "power3",	"-mppc64" },
   { "power4",	"-mpower4" },
   { "power5",	"-mpower5" },
