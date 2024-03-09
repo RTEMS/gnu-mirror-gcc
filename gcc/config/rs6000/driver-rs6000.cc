@@ -441,7 +441,6 @@ struct asm_name {
 
 static const struct asm_name asm_names[] = {
 #if defined (_AIX)
-  { "future",	"-mfuture" },
   { "power3",	"-m620" },
   { "power4",	"-mpwr4" },
   { "power5",	"-mpwr5" },
@@ -452,7 +451,6 @@ static const struct asm_name asm_names[] = {
   { "power8",	"-mpwr8" },
   { "power9",	"-mpwr9" },
   { "power10",	"-mpwr10" },
-  { "power11",	"-mpwr11" },
   { "powerpc",	"-mppc" },
   { "rs64",	"-mppc" },
   { "603",	"-m603" },
@@ -471,7 +469,6 @@ static const struct asm_name asm_names[] = {
 
 #else
   { "cell",	"-mcell" },
-  { "future",	"-mfuture },
   { "power3",	"-mppc64" },
   { "power4",	"-mpower4" },
   { "power5",	"-mpower5" },
@@ -482,7 +479,6 @@ static const struct asm_name asm_names[] = {
   { "power8",	"-mpower8" },
   { "power9",	"-mpower9" },
   { "power10",	"-mpower10" },
-  { "power11",	"-mpower11" },
   { "a2",	"-ma2" },
   { "powerpc",	"-mppc" },
   { "powerpc64", "-mppc64" },
