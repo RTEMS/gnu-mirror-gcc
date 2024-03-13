@@ -3341,7 +3341,7 @@ vectorizable_call (vec_info *vinfo,
   if (ifn == IFN_LAST && !fndecl)
     {
       if (cfn == CFN_GOMP_SIMD_LANE
-	  && !slp_node
+	  && (!slp_node || SLP_TREE_LANES (slp_node) == 1)
 	  && loop_vinfo
 	  && LOOP_VINFO_LOOP (loop_vinfo)->simduid
 	  && TREE_CODE (gimple_call_arg (stmt, 0)) == SSA_NAME
@@ -3487,18 +3487,15 @@ vectorizable_call (vec_info *vinfo,
 	  /* Build argument list for the vectorized call.  */
 	  if (slp_node)
 	    {
-	      vec<tree> vec_oprnds0;
-
+	      unsigned int vec_num = SLP_TREE_NUMBER_OF_VEC_STMTS (slp_node);
 	      vect_get_slp_defs (vinfo, slp_node, &vec_defs);
-	      vec_oprnds0 = vec_defs[0];
 
 	      /* Arguments are ready.  Create the new vector stmt.  */
-	      FOR_EACH_VEC_ELT (vec_oprnds0, i, vec_oprnd0)
+	      for (i = 0; i < vec_num; ++i)
 		{
 		  int varg = 0;
 		  if (masked_loop_p && reduc_idx >= 0)
 		    {
-		      unsigned int vec_num = vec_oprnds0.length ();
 		      /* Always true for SLP.  */
 		      gcc_assert (ncopies == 1);
 		      vargs[varg++] = vect_get_loop_mask (loop_vinfo,
@@ -3539,11 +3536,26 @@ vectorizable_call (vec_info *vinfo,
 		      vect_finish_stmt_generation (vinfo, stmt_info,
 						   new_stmt, gsi);
 		    }
+		  else if (cfn == CFN_GOMP_SIMD_LANE)
+		    {
+		      /* ???  For multi-lane SLP we'd need to build
+			 { 0, 0, .., 1, 1, ... }.  */
+		      tree cst = build_index_vector (vectype_out,
+						     i * nunits_out, 1);
+		      tree new_var
+			= vect_get_new_ssa_name (vectype_out, vect_simple_var,
+						 "cst_");
+		      gimple *init_stmt = gimple_build_assign (new_var, cst);
+		      vect_init_vector_1 (vinfo, stmt_info, init_stmt, NULL);
+		      new_temp = make_ssa_name (vec_dest);
+		      new_stmt = gimple_build_assign (new_temp, new_var);
+		      vect_finish_stmt_generation (vinfo, stmt_info, new_stmt,
+						   gsi);
+		    }
 		  else
 		    {
 		      if (len_opno >= 0 && len_loop_p)
 			{
-			  unsigned int vec_num = vec_oprnds0.length ();
 			  /* Always true for SLP.  */
 			  gcc_assert (ncopies == 1);
 			  tree len
@@ -3557,7 +3569,6 @@ vectorizable_call (vec_info *vinfo,
 			}
 		      else if (mask_opno >= 0 && masked_loop_p)
 			{
-			  unsigned int vec_num = vec_oprnds0.length ();
 			  /* Always true for SLP.  */
 			  gcc_assert (ncopies == 1);
 			  tree mask = vect_get_loop_mask (loop_vinfo,
