@@ -29368,7 +29368,74 @@ rs6000_opaque_type_invalid_use_p (gimple *stmt)
 
   return false;
 }
+
+/* Split vector pair unary operations.  */
 
+void
+vpair_split_unary (rtx operands[],			/* Dest, input.  */
+		   machine_mode vmode,			/* Vector mode.  */
+		   enum rtx_code code,			/* Operator code.  */
+		   enum vpair_split_unary action)	/* Action to take.  */
+{
+  rtx op0 = operands[0];
+  machine_mode mode0 = GET_MODE (op0);
+  gcc_assert (GET_MODE_SIZE (mode0) == 32);
+  rtx op0_a = simplify_gen_subreg (vmode, op0, mode0, 0);
+  rtx op0_b = simplify_gen_subreg (vmode, op0, mode0, 16);
+
+  rtx op1 = operands[1];
+  machine_mode mode1 = GET_MODE (op1);
+  gcc_assert (GET_MODE_SIZE (mode0) == 32);
+  rtx op1_a = simplify_gen_subreg (vmode, op1, mode1, 0);
+  rtx op1_b = simplify_gen_subreg (vmode, op1, mode1, 16);
+
+  rtx operation_a = gen_rtx_fmt_e (code, vmode, op1_a);
+  rtx operation_b = gen_rtx_fmt_e (code, vmode, op1_b);
+
+  if (action == VPAIR_SPLIT_NEGATE)
+    {
+      operation_a = gen_rtx_NEG (vmode, operation_a);
+      operation_b = gen_rtx_NEG (vmode, operation_b);
+    }
+
+  emit_insn (gen_rtx_SET (op0_a, operation_a));
+  emit_insn (gen_rtx_SET (op0_b, operation_b));
+  return;
+}
+
+/* Split vector pair binary operations.  */
+
+void
+vpair_split_binary (rtx operands[],			/* Dest, 2 inputs.  */
+		    machine_mode vmode,			/* Vector mode.  */
+		    enum rtx_code code)			/* Operator code.  */
+{
+  rtx op0 = operands[0];
+  machine_mode mode0 = GET_MODE (op0);
+  gcc_assert (GET_MODE_SIZE (mode0) == 32);
+  rtx op0_a = simplify_gen_subreg (vmode, op0, mode0, 0);
+  rtx op0_b = simplify_gen_subreg (vmode, op0, mode0, 16);
+
+  rtx op1 = operands[1];
+  machine_mode mode1 = GET_MODE (op1);
+  gcc_assert (GET_MODE_SIZE (mode1) == 32);
+  rtx op1_a = simplify_gen_subreg (vmode, op1, mode1, 0);
+  rtx op1_b = simplify_gen_subreg (vmode, op1, mode1, 16);
+
+  rtx op2 = operands[2];
+  machine_mode mode2 = GET_MODE (op2);
+  gcc_assert (GET_MODE_SIZE (mode2) == 32);
+  rtx op2_a = simplify_gen_subreg (vmode, op2, mode2, 0);
+  rtx op2_b = simplify_gen_subreg (vmode, op2, mode2, 16);
+
+  rtx operation_a = gen_rtx_fmt_ee (code, vmode, op1_a, op2_a);
+  rtx operation_b = gen_rtx_fmt_ee (code, vmode, op1_b, op2_b);
+
+  emit_insn (gen_rtx_SET (op0_a, operation_a));
+  emit_insn (gen_rtx_SET (op0_b, operation_b));
+  return;
+}
+
 struct gcc_target targetm = TARGET_INITIALIZER;
 
 #include "gt-rs6000.h"
