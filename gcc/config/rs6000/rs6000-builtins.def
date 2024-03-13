@@ -4132,6 +4132,10 @@
   void __builtin_vsx_stxvp (v256, unsigned long, const v256 *);
     STXVP nothing {mma,pair}
 
+;; Vector pair built-in functions.
+  v256 __builtin_vpair_zero ();
+    VPAIR_ZERO vpair_zero {mma}
+
 ;; Vector pair built-in functions with float elements
   v256 __builtin_vpair_f32_abs (v256);
     VPAIR_F32_ABS vpair_abs_v8sf2 {mma}
@@ -4168,6 +4172,9 @@
 
   v256 __builtin_vpair_f32_nfms (v256, v256, v256);
     VPAIR_F32_NFMS vpair_nfms_v8sf4 {mma}
+
+  v256 __builtin_vpair_f32_splat (float);
+    VPAIR_F32_SPLAT vpair_splat_v8sf {mma}
 
   v256 __builtin_vpair_f32_sub (v256, v256);
     VPAIR_F32_SUB vpair_sub_v8sf3 {mma}
@@ -4208,6 +4215,9 @@
 
   v256 __builtin_vpair_f64_nfms (v256, v256, v256);
     VPAIR_F64_NFMS vpair_nfms_v4df4 {mma}
+
+  v256 __builtin_vpair_f64_splat (double);
+    VPAIR_F64_SPLAT vpair_splat_v4df {mma}
 
   v256 __builtin_vpair_f64_sub (v256, v256);
     VPAIR_F64_SUB vpair_sub_v4df3 {mma}
