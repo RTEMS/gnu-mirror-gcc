@@ -6223,7 +6223,6 @@ static tree
 merge_truthop_with_opposite_arm (location_t loc, tree op, tree cmpop,
 				 bool rhs_only)
 {
-  tree type = TREE_TYPE (cmpop);
   enum tree_code code = TREE_CODE (cmpop);
   enum tree_code truthop_code = TREE_CODE (op);
   tree lhs = TREE_OPERAND (op, 0);
@@ -6238,6 +6237,8 @@ merge_truthop_with_opposite_arm (location_t loc, tree op, tree cmpop,
 
   if (TREE_CODE_CLASS (code) != tcc_comparison)
     return NULL_TREE;
+
+  tree type = TREE_TYPE (TREE_OPERAND (cmpop, 0));
 
   if (rhs_code == truthop_code)
     {
@@ -14258,7 +14259,7 @@ multiple_of_p (tree type, const_tree top, const_tree bottom, bool nowrap)
 	      && TREE_CODE (op2) == INTEGER_CST
 	      && integer_pow2p (bottom)
 	      && wi::multiple_of_p (wi::to_widest (op2),
-				    wi::to_widest (bottom), UNSIGNED))
+				    wi::to_widest (bottom), SIGNED))
 	    return 1;
 
 	  op1 = gimple_assign_rhs1 (stmt);

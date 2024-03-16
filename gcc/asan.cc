@@ -2291,6 +2291,8 @@ asan_protect_global (tree decl, bool ignore_decl_rtl_set_p)
       || (DECL_SECTION_NAME (decl) != NULL
 	  && !symtab_node::get (decl)->implicit_section
 	  && !section_sanitized_p (DECL_SECTION_NAME (decl)))
+      /* Don't protect variables in non-generic address-space.  */
+      || !ADDR_SPACE_GENERIC_P (TYPE_ADDR_SPACE (TREE_TYPE (decl)))
       || DECL_SIZE (decl) == 0
       || ASAN_RED_ZONE_SIZE * BITS_PER_UNIT > MAX_OFILE_ALIGNMENT
       || TREE_CODE (DECL_SIZE_UNIT (decl)) != INTEGER_CST
@@ -2569,7 +2571,7 @@ maybe_create_ssa_name (location_t loc, tree base, gimple_stmt_iterator *iter,
   gimple *g = gimple_build_assign (make_ssa_name (TREE_TYPE (base)), base);
   gimple_set_location (g, loc);
   if (before_p)
-    gsi_insert_before (iter, g, GSI_SAME_STMT);
+    gsi_safe_insert_before (iter, g);
   else
     gsi_insert_after (iter, g, GSI_NEW_STMT);
   return gimple_assign_lhs (g);
@@ -2588,7 +2590,7 @@ maybe_cast_to_ptrmode (location_t loc, tree len, gimple_stmt_iterator *iter,
 				  NOP_EXPR, len);
   gimple_set_location (g, loc);
   if (before_p)
-    gsi_insert_before (iter, g, GSI_SAME_STMT);
+    gsi_safe_insert_before (iter, g);
   else
     gsi_insert_after (iter, g, GSI_NEW_STMT);
   return gimple_assign_lhs (g);
@@ -2679,7 +2681,7 @@ build_check_stmt (location_t loc, tree base, tree len,
 						 align / BITS_PER_UNIT));
   gimple_set_location (g, loc);
   if (before_p)
-    gsi_insert_before (&gsi, g, GSI_SAME_STMT);
+    gsi_safe_insert_before (&gsi, g);
   else
     {
       gsi_insert_after (&gsi, g, GSI_NEW_STMT);
@@ -3018,7 +3020,7 @@ maybe_instrument_call (gimple_stmt_iterator *iter)
 	  tree decl = builtin_decl_implicit (BUILT_IN_ASAN_HANDLE_NO_RETURN);
 	  gimple *g = gimple_build_call (decl, 0);
 	  gimple_set_location (g, gimple_location (stmt));
-	  gsi_insert_before (iter, g, GSI_SAME_STMT);
+	  gsi_safe_insert_before (iter, g);
 	}
     }
 
@@ -3842,7 +3844,7 @@ asan_expand_mark_ifn (gimple_stmt_iterator *iter)
       g = gimple_build_assign (make_ssa_name (pointer_sized_int_node),
 			       NOP_EXPR, len);
       gimple_set_location (g, loc);
-      gsi_insert_before (iter, g, GSI_SAME_STMT);
+      gsi_safe_insert_before (iter, g);
       tree sz_arg = gimple_assign_lhs (g);
 
       tree fun

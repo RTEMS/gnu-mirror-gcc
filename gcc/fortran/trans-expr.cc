@@ -2106,10 +2106,24 @@ gfc_conv_missing_dummy (gfc_se * se, gfc_expr * arg, gfc_typespec ts, int kind)
 
   if (ts.type == BT_CHARACTER)
     {
-      tmp = build_int_cst (gfc_charlen_type_node, 0);
-      tmp = fold_build3_loc (input_location, COND_EXPR, gfc_charlen_type_node,
-			     present, se->string_length, tmp);
-      tmp = gfc_evaluate_now (tmp, &se->pre);
+      /* Handle deferred-length dummies that pass the character length by
+	 reference so that the value can be returned.  */
+      if (ts.deferred && INDIRECT_REF_P (se->string_length))
+	{
+	  tmp = gfc_build_addr_expr (NULL_TREE, se->string_length);
+	  tmp = fold_build3_loc (input_location, COND_EXPR, TREE_TYPE (tmp),
+				 present, tmp, null_pointer_node);
+	  tmp = gfc_evaluate_now (tmp, &se->pre);
+	  tmp = build_fold_indirect_ref_loc (input_location, tmp);
+	}
+      else
+	{
+	  tmp = build_int_cst (gfc_charlen_type_node, 0);
+	  tmp = fold_build3_loc (input_location, COND_EXPR,
+				 gfc_charlen_type_node,
+				 present, se->string_length, tmp);
+	  tmp = gfc_evaluate_now (tmp, &se->pre);
+	}
       se->string_length = tmp;
     }
   return;
@@ -6504,6 +6518,10 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
 			    {
 			      tree efield;
 
+			      /* Evaluate arguments just once.  */
+			      if (e->expr_type != EXPR_VARIABLE)
+				parmse.expr = save_expr (parmse.expr);
+
 			      /* Set the _data field.  */
 			      tmp = gfc_class_data_get (var);
 			      efield = fold_convert (TREE_TYPE (tmp),
@@ -6919,7 +6937,9 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
 					     INTENT_IN, fsym->attr.pointer);
 		}
 	      else if (fsym && fsym->attr.contiguous
-		       && !gfc_is_simply_contiguous (e, false, true)
+		       && (fsym->attr.target
+			   ? gfc_is_not_contiguous (e)
+			   : !gfc_is_simply_contiguous (e, false, true))
 		       && gfc_expr_is_variable (e))
 		{
 		  gfc_conv_subref_array_arg (&parmse, e, nodesc_arg,

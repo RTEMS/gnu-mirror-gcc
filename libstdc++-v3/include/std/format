@@ -64,7 +64,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 // 202106 std::format improvements.
 // 202110 Fixing locale handling in chrono formatters, generator-like types.
 // 202207 Encodings in localized formatting of chrono, basic-format-string.
-#define __cpp_lib_format 202106L
+#define __cpp_lib_format 202110L
+
+#define __cpp_lib_format_uchar 202311L
 
 #if __cplusplus > 202002L
 // 202207 P2286R8 Formatting Ranges
@@ -1544,6 +1546,7 @@ namespace __format
 		*__p = std::toupper(*__p);
 	    }
 
+	  bool __have_sign = true;
 	  // Add sign for non-negative values.
 	  if (!__builtin_signbit(__v))
 	    {
@@ -1551,56 +1554,73 @@ namespace __format
 		*--__start = '+';
 	      else if (_M_spec._M_sign == _Sign_space)
 		*--__start = ' ';
+	      else
+		__have_sign = false;
 	    }
 
 	  string_view __narrow_str(__start, __res.ptr - __start);
 
-	  // Use alternate form.
+	  // Use alternate form. Ensure decimal point is always present,
+	  // and add trailing zeros (up to precision) for g and G forms.
 	  if (_M_spec._M_alt && __builtin_isfinite(__v))
 	    {
 	      string_view __s = __narrow_str;
-	      size_t __z = 0;
-	      size_t __p;
-	      size_t __d = __s.find('.');
-	      size_t __sigfigs;
-	      if (__d != __s.npos)
+	      size_t __sigfigs; // Number of significant figures.
+	      size_t __z = 0;   // Number of trailing zeros to add.
+	      size_t __p;       // Position of the exponent character (if any).
+	      size_t __d = __s.find('.'); // Position of decimal point.
+	      if (__d != __s.npos) // Found decimal point.
 		{
 		  __p = __s.find(__expc, __d + 1);
 		  if (__p == __s.npos)
 		    __p = __s.size();
-		  __sigfigs = __p - 1;
+
+		  // If presentation type is g or G we might need to add zeros.
+		  if (__trailing_zeros)
+		    {
+		      // Find number of digits after first significant figure.
+		      if (__s[__have_sign] != '0')
+			// A string like "D.D" or "-D.DDD"
+			__sigfigs = __p - __have_sign - 1;
+		      else
+			// A string like "0.D" or "-0.0DD".
+			// Safe to assume there is a non-zero digit, because
+			// otherwise there would be no decimal point.
+			__sigfigs = __p - __s.find_first_not_of('0', __d + 1);
+		    }
 		}
-	      else
+	      else // No decimal point, we need to insert one.
 		{
-		  __p = __s.find(__expc);
+		  __p = __s.find(__expc); // Find the exponent, if present.
 		  if (__p == __s.npos)
 		    __p = __s.size();
 		  __d = __p; // Position where '.' should be inserted.
-		  __sigfigs = __d;
+		  __sigfigs = __d - __have_sign;
 		}
 
 	      if (__trailing_zeros && __prec != 0)
 		{
-		  if (!__format::__is_xdigit(__s[0]))
-		    --__sigfigs;
-		  __z = __prec - __sigfigs; // Number of zeros to insert.
+		  // For g and G presentation types std::to_chars produces
+		  // no more than prec significant figures. Insert this many
+		  // zeros so the result has exactly prec significant figures.
+		  __z = __prec - __sigfigs;
 		}
 
-	      if (size_t __extras = int(__d == __p) + __z)
+	      if (size_t __extras = int(__d == __p) + __z) // How many to add.
 		{
 		  if (__dynbuf.empty() && __extras <= size_t(__end - __res.ptr))
 		    {
+		      // The stack buffer is large enough for the result.
 		      // Move exponent to make space for extra chars.
 		      __builtin_memmove(__start + __p + __extras,
 					__start + __p,
 					__s.size() - __p);
-
 		      if (__d == __p)
 			__start[__p++] = '.';
 		      __builtin_memset(__start + __p, '0', __z);
 		      __narrow_str = {__s.data(), __s.size() + __extras};
 		    }
-		  else
+		  else // Need to switch to the dynamic buffer.
 		    {
 		      __dynbuf.reserve(__s.size() + __extras);
 		      if (__dynbuf.empty())
@@ -1610,6 +1630,7 @@ namespace __format
 			    __dynbuf += '.';
 			  if (__z)
 			    __dynbuf.append(__z, '0');
+			  __dynbuf.append(__s.substr(__p));
 			}
 		      else
 			{
@@ -1775,7 +1796,8 @@ namespace __format
 	typename basic_format_context<_Out, _CharT>::iterator
 	format(_CharT __u, basic_format_context<_Out, _CharT>& __fc) const
 	{
-	  if (_M_f._M_spec._M_type == __format::_Pres_none)
+	  if (_M_f._M_spec._M_type == __format::_Pres_none
+	      || _M_f._M_spec._M_type == __format::_Pres_c)
 	    return _M_f._M_format_character(__u, __fc);
 	  else if (_M_f._M_spec._M_type == __format::_Pres_esc)
 	    {
@@ -1783,7 +1805,7 @@ namespace __format
 	      return __fc.out();
 	    }
 	  else
-	    return _M_f.format(__u, __fc);
+	    return _M_f.format(static_cast<make_unsigned_t<_CharT>>(__u), __fc);
 	}
 
 #if __cpp_lib_format_ranges
@@ -1812,7 +1834,8 @@ namespace __format
 	typename basic_format_context<_Out, wchar_t>::iterator
 	format(char __u, basic_format_context<_Out, wchar_t>& __fc) const
 	{
-	  if (_M_f._M_spec._M_type == __format::_Pres_none)
+	  if (_M_f._M_spec._M_type == __format::_Pres_none
+	      || _M_f._M_spec._M_type == __format::_Pres_c)
 	    return _M_f._M_format_character(__u, __fc);
 	  else if (_M_f._M_spec._M_type == __format::_Pres_esc)
 	    {
@@ -1820,12 +1843,14 @@ namespace __format
 	      return __fc.out();
 	    }
 	  else
-	    return _M_f.format(__u, __fc);
+	    return _M_f.format(static_cast<unsigned char>(__u), __fc);
 	}
 
+#if __cpp_lib_format_ranges
       constexpr void
       set_debug_format() noexcept
       { _M_f._M_spec._M_type = __format::_Pres_esc; }
+#endif
 
     private:
       __format::__formatter_int<wchar_t> _M_f;
@@ -1850,7 +1875,9 @@ namespace __format
 	format(_CharT* __u, basic_format_context<_Out, _CharT>& __fc) const
 	{ return _M_f.format(__u, __fc); }
 
+#if __cpp_lib_format_ranges
       constexpr void set_debug_format() noexcept { _M_f.set_debug_format(); }
+#endif
 
     private:
       __format::__formatter_str<_CharT> _M_f;
@@ -1873,7 +1900,9 @@ namespace __format
 	       basic_format_context<_Out, _CharT>& __fc) const
 	{ return _M_f.format(__u, __fc); }
 
+#if __cpp_lib_format_ranges
       constexpr void set_debug_format() noexcept { _M_f.set_debug_format(); }
+#endif
 
     private:
       __format::__formatter_str<_CharT> _M_f;
@@ -1895,7 +1924,9 @@ namespace __format
 	       basic_format_context<_Out, _CharT>& __fc) const
 	{ return _M_f.format({__u, _Nm}, __fc); }
 
+#if __cpp_lib_format_ranges
       constexpr void set_debug_format() noexcept { _M_f.set_debug_format(); }
+#endif
 
     private:
       __format::__formatter_str<_CharT> _M_f;
@@ -2579,7 +2610,6 @@ namespace __format
     requires same_as<iter_value_t<_OutIter>, _CharT>
     class _Iter_sink<_CharT, _OutIter> : public _Sink<_CharT>
     {
-      using uint64_t = __UINTPTR_TYPE__;
       _OutIter _M_first;
       iter_difference_t<_OutIter> _M_max = -1;
     protected:
@@ -2638,7 +2668,7 @@ namespace __format
 	  return {__ptr, __bytes / sizeof(_CharT)};
 #endif
 	// Avoid forming a pointer to a different memory page.
-	uint64_t __off = reinterpret_cast<uint64_t>(__ptr) % 1024;
+	const auto __off = reinterpret_cast<__UINTPTR_TYPE__>(__ptr) % 1024;
 	__n = (1024 - __off) / sizeof(_CharT);
 	if (__n > 0) [[likely]]
 	return {__ptr, static_cast<size_t>(__n)};
@@ -2836,8 +2866,7 @@ namespace __format
 	// Format as const if possible, to reduce instantiations.
 	template<typename _Tp>
 	  using __maybe_const_t
-	    = __conditional_t<__format::__formattable_with<_Tp, _Context>,
-			      const _Tp, _Tp>;
+	    = __conditional_t<__formattable<const _Tp>, const _Tp, _Tp>;
 
 	template<typename _Tq>
 	  static void
@@ -2855,10 +2884,6 @@ namespace __format
 	  explicit
 	  handle(_Tp& __val) noexcept
 	  {
-	    if constexpr (!__format::__formattable_with<const _Tp, _Context>)
-	      static_assert(!is_const_v<_Tp>, "std::format argument must be "
-					      "non-const for this type");
-
 	    this->_M_ptr = __builtin_addressof(__val);
 	    auto __func = _S_format<__maybe_const_t<_Tp>>;
 	    this->_M_func = reinterpret_cast<void(*)()>(__func);
@@ -3079,13 +3104,16 @@ namespace __format
 	  using _Td = _Normalize<_Tp>;
 	  if constexpr (is_same_v<_Td, basic_string_view<_CharT>>)
 	    _M_set(_Td{__v.data(), __v.size()});
+	  else if constexpr (is_same_v<remove_const_t<_Tp>, char>
+			       && is_same_v<_CharT, wchar_t>)
+	    _M_set(static_cast<_Td>(static_cast<unsigned char>(__v)));
 	  else
 	    _M_set(static_cast<_Td>(__v));
 	}
 
       template<typename _Ctx, typename... _Argz>
 	friend auto
-	make_format_args(_Argz&&...) noexcept;
+	make_format_args(_Argz&...) noexcept;
 
       template<typename _Visitor, typename _Ctx>
 	friend decltype(auto)
@@ -3255,7 +3283,7 @@ namespace __format
 
       template<typename _Ctx, typename... _Args>
 	friend auto
-	make_format_args(_Args&&...) noexcept;
+	make_format_args(_Args&...) noexcept;
 
       // An array of _Arg_t enums corresponding to _Args...
       template<typename... _Args>
@@ -3293,7 +3321,7 @@ namespace __format
 
   template<typename _Context, typename... _Args>
     auto
-    make_format_args(_Args&&... __fmt_args) noexcept;
+    make_format_args(_Args&... __fmt_args) noexcept;
 
   // An array of type-erased formatting arguments.
   template<typename _Context, typename... _Args>
@@ -3302,14 +3330,11 @@ namespace __format
       friend std::basic_format_args<_Context>;
 
       template<typename _Ctx, typename... _Argz>
-	friend auto
+	friend auto std::
 #if _GLIBCXX_INLINE_VERSION
-	// Needed for PR c++/59526
-	std::__8::
-#else
-	std::
+	__8:: // Needed for PR c++/59256
 #endif
-	make_format_args(_Argz&&...) noexcept;
+	make_format_args(_Argz&...) noexcept;
 
       // For a sufficiently small number of arguments we only store values.
       // basic_format_args can get the types from the _Args pack.
@@ -3383,11 +3408,11 @@ namespace __format
   template<typename _Context = format_context, typename... _Args>
     [[nodiscard,__gnu__::__always_inline__]]
     inline auto
-    make_format_args(_Args&&... __fmt_args) noexcept
+    make_format_args(_Args&... __fmt_args) noexcept
     {
       using _Fmt_arg = basic_format_arg<_Context>;
       using _Store = __format::_Arg_store<_Context, typename _Fmt_arg::template
-		     _Normalize<remove_reference_t<_Args>>...>;
+		     _Normalize<_Args>...>;
       return _Store(__fmt_args...);
     }
 
@@ -3395,7 +3420,7 @@ namespace __format
   template<typename... _Args>
     [[nodiscard,__gnu__::__always_inline__]]
     inline auto
-    make_wformat_args(_Args&&... __args) noexcept
+    make_wformat_args(_Args&... __args) noexcept
     { return std::make_format_args<wformat_context>(__args...); }
 
 /// @cond undocumented
@@ -3828,7 +3853,7 @@ namespace __format
     format_to(_Out __out, format_string<_Args...> __fmt, _Args&&... __args)
     {
       return std::vformat_to(std::move(__out), __fmt.get(),
-			     std::make_format_args(std::forward<_Args>(__args)...));
+			     std::make_format_args(__args...));
     }
 
   template<typename _Out, typename... _Args>
@@ -3837,7 +3862,7 @@ namespace __format
     format_to(_Out __out, wformat_string<_Args...> __fmt, _Args&&... __args)
     {
       return std::vformat_to(std::move(__out), __fmt.get(),
-			     std::make_wformat_args(std::forward<_Args>(__args)...));
+			     std::make_wformat_args(__args...));
     }
 
   template<typename _Out, typename... _Args>
@@ -3847,7 +3872,7 @@ namespace __format
 	      _Args&&... __args)
     {
       return std::vformat_to(std::move(__out), __loc, __fmt.get(),
-			     std::make_format_args(std::forward<_Args>(__args)...));
+			     std::make_format_args(__args...));
     }
 
   template<typename _Out, typename... _Args>
@@ -3857,7 +3882,7 @@ namespace __format
 	      _Args&&... __args)
     {
       return std::vformat_to(std::move(__out), __loc, __fmt.get(),
-			     std::make_wformat_args(std::forward<_Args>(__args)...));
+			     std::make_wformat_args(__args...));
     }
 
   template<typename _Out, typename... _Args>
@@ -3959,7 +3984,7 @@ namespace __format
     {
       __format::_Counting_sink<char> __buf;
       std::vformat_to(__buf.out(), __fmt.get(),
-		      std::make_format_args(std::forward<_Args>(__args)...));
+		      std::make_format_args(__args...));
       return __buf.count();
     }
 
@@ -3970,7 +3995,7 @@ namespace __format
     {
       __format::_Counting_sink<wchar_t> __buf;
       std::vformat_to(__buf.out(), __fmt.get(),
-		      std::make_wformat_args(std::forward<_Args>(__args)...));
+		      std::make_wformat_args(__args...));
       return __buf.count();
     }
 
@@ -3982,7 +4007,7 @@ namespace __format
     {
       __format::_Counting_sink<char> __buf;
       std::vformat_to(__buf.out(), __loc, __fmt.get(),
-		      std::make_format_args(std::forward<_Args>(__args)...));
+		      std::make_format_args(__args...));
       return __buf.count();
     }
 
@@ -3994,7 +4019,7 @@ namespace __format
     {
       __format::_Counting_sink<wchar_t> __buf;
       std::vformat_to(__buf.out(), __loc, __fmt.get(),
-		      std::make_wformat_args(std::forward<_Args>(__args)...));
+		      std::make_wformat_args(__args...));
       return __buf.count();
     }
 

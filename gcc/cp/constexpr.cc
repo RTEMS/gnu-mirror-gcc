@@ -6298,6 +6298,7 @@ cxx_eval_store_expression (const constexpr_ctx *ctx, tree t,
      object.  Make a note of this fact by marking the CONSTRUCTOR
      TREE_READONLY.  */
   if (TREE_CODE (t) == INIT_EXPR
+      && !empty_base
       && TREE_CODE (*valp) == CONSTRUCTOR
       && TYPE_READONLY (type))
     {
@@ -6721,6 +6722,16 @@ cxx_eval_switch_expr (const constexpr_ctx *ctx, tree t,
   cond = cxx_eval_constant_expression (ctx, cond, vc_prvalue,
 				       non_constant_p, overflow_p);
   VERIFY_CONSTANT (cond);
+  if (TREE_CODE (cond) != INTEGER_CST)
+    {
+      /* If the condition doesn't reduce to an INTEGER_CST it isn't a usable
+	 switch condition even if it's constant enough for other things
+	 (c++/113545).  */
+      gcc_checking_assert (ctx->quiet);
+      *non_constant_p = true;
+      return t;
+    }
+
   *jump_target = cond;
 
   tree body
@@ -9080,8 +9091,9 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
       if (now && want_rval)
 	{
 	  tree type = TREE_TYPE (t);
-	  if ((processing_template_decl && !COMPLETE_TYPE_P (type))
-	      || dependent_type_p (type)
+	  if (dependent_type_p (type)
+	      || !COMPLETE_TYPE_P (processing_template_decl
+				   ? type : complete_type (type))
 	      || is_really_empty_class (type, /*ignore_vptr*/false))
 	    /* An empty class has no data to read.  */
 	    return true;

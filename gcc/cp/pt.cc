@@ -975,6 +975,7 @@ maybe_new_partial_specialization (tree& type)
       DECL_SOURCE_LOCATION (d) = input_location;
       TREE_PRIVATE (d) = (current_access_specifier == access_private_node);
       TREE_PROTECTED (d) = (current_access_specifier == access_protected_node);
+      TREE_PUBLIC (d) = TREE_PUBLIC (DECL_TEMPLATE_RESULT (tmpl));
 
       set_instantiating_module (d);
       DECL_MODULE_EXPORT_P (d) = DECL_MODULE_EXPORT_P (tmpl);
@@ -5408,9 +5409,14 @@ process_partial_specialization (tree decl)
     }
 
   if (VAR_P (decl))
-    /* We didn't register this in check_explicit_specialization so we could
-       wait until the constraints were set.  */
-    decl = register_specialization (decl, maintmpl, specargs, false, 0);
+    {
+      /* We didn't register this in check_explicit_specialization so we could
+	 wait until the constraints were set.  */
+      tree reg = register_specialization (decl, maintmpl, specargs, false, 0);
+      if (reg != decl)
+	/* Redeclaration.  */
+	return reg;
+    }
   else
     associate_classtype_constraints (type);
 
@@ -7179,8 +7185,10 @@ invalid_tparm_referent_p (tree type, tree expr, tsubst_flags_t complain)
 	   * a string literal (5.13.5),
 	   * the result of a typeid expression (8.2.8), or
 	   * a predefined __func__ variable (11.4.1).  */
-	else if (VAR_P (decl) && DECL_ARTIFICIAL (decl))
+	else if (VAR_P (decl) && DECL_ARTIFICIAL (decl)
+		 && !DECL_NTTP_OBJECT_P (decl))
 	  {
+	    gcc_checking_assert (DECL_TINFO_P (decl) || DECL_FNAME_P (decl));
 	    if (complain & tf_error)
 	      error ("the address of %qD is not a valid template argument",
 		     decl);
@@ -14625,6 +14633,7 @@ tsubst_function_decl (tree t, tree args, tsubst_flags_t complain,
     }
   determine_visibility (r);
   if (DECL_DEFAULTED_OUTSIDE_CLASS_P (r)
+      && COMPLETE_TYPE_P (DECL_CONTEXT (r))
       && !processing_template_decl)
     defaulted_late_check (r);
 
@@ -22152,6 +22161,13 @@ instantiate_template (tree tmpl, tree orig_args, tsubst_flags_t complain)
      template, not the most general template.  */
   DECL_TI_TEMPLATE (fndecl) = tmpl;
   DECL_TI_ARGS (fndecl) = targ_ptr;
+  if (VAR_P (pattern))
+    {
+      /* Remember if the variable was declared with [].  */
+      if (TREE_CODE (TREE_TYPE (fndecl)) == ARRAY_TYPE
+	  && TYPE_DOMAIN (TREE_TYPE (fndecl)) == NULL_TREE)
+	SET_VAR_HAD_UNKNOWN_BOUND (fndecl);
+    }
 
   set_instantiating_module (fndecl);
 
@@ -27972,9 +27988,7 @@ value_dependent_expression_p (tree expression)
     case VAR_DECL:
        /* A constant with literal type and is initialized
 	  with an expression that is value-dependent.  */
-      if (DECL_DEPENDENT_INIT_P (expression)
-	  /* FIXME cp_finish_decl doesn't fold reference initializers.  */
-	  || TYPE_REF_P (TREE_TYPE (expression)))
+      if (DECL_DEPENDENT_INIT_P (expression))
 	return true;
       if (DECL_HAS_VALUE_EXPR_P (expression))
 	{
@@ -27989,6 +28003,16 @@ value_dependent_expression_p (tree expression)
 		  && value_expr == error_mark_node))
 	    return true;
 	}
+      else if (TYPE_REF_P (TREE_TYPE (expression)))
+	/* FIXME cp_finish_decl doesn't fold reference initializers.  */
+	return true;
+      /* We have a constexpr variable and we're processing a template.  When
+	 there's lifetime extension involved (for which finish_compound_literal
+	 used to create a temporary), we'll not be able to evaluate the
+	 variable until instantiating, so pretend it's value-dependent.  */
+      else if (DECL_DECLARED_CONSTEXPR_P (expression)
+	       && !TREE_CONSTANT (expression))
+	return true;
       return false;
 
     case DYNAMIC_CAST_EXPR:

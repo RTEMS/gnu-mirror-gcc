@@ -9284,6 +9284,15 @@ vectorizable_induction (loop_vec_info loop_vinfo,
 
   step_expr = STMT_VINFO_LOOP_PHI_EVOLUTION_PART (stmt_info);
   gcc_assert (step_expr != NULL_TREE);
+  if (INTEGRAL_TYPE_P (TREE_TYPE (step_expr))
+      && !type_has_mode_precision_p (TREE_TYPE (step_expr)))
+    {
+      if (dump_enabled_p ())
+	dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+			 "bit-precision induction vectorization not "
+			 "supported.\n");
+      return false;
+    }
   tree step_vectype = get_same_sized_vectype (TREE_TYPE (step_expr), vectype);
 
   /* Check for backend support of PLUS/MINUS_EXPR. */
@@ -10531,7 +10540,16 @@ vect_transform_loop_stmt (loop_vec_info loop_vinfo, stmt_vec_info stmt_info,
 
   if (!STMT_VINFO_RELEVANT_P (stmt_info)
       && !STMT_VINFO_LIVE_P (stmt_info))
-    return false;
+    {
+      if (is_gimple_call (stmt_info->stmt)
+	  && gimple_call_internal_p (stmt_info->stmt, IFN_MASK_CALL))
+	{
+	  gcc_assert (!gimple_call_lhs (stmt_info->stmt));
+	  *seen_store = stmt_info;
+	  return false;
+	}
+      return false;
+    }
 
   if (STMT_VINFO_VECTYPE (stmt_info))
     {

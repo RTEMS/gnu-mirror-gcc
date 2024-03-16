@@ -6,16 +6,28 @@
 
 #ifndef __cpp_lib_format
 # error "Feature test macro for std::format is missing in <format>"
-#elif __cpp_lib_format < 202106L
+#elif __cpp_lib_format < 202110L
 # error "Feature test macro for std::format has wrong value in <format>"
+#endif
+
+#ifndef __cpp_lib_format_uchar
+# error "Feature test macro for formatting chars as integers is missing in <format>"
+#elif __cpp_lib_format_uchar < 202311L
+# error "Feature test macro for formatting chars as integers has wrong value in <format>"
 #endif
 
 #undef __cpp_lib_format
 #include <version>
 #ifndef __cpp_lib_format
 # error "Feature test macro for std::format is missing in <version>"
-#elif __cpp_lib_format < 202106L
+#elif __cpp_lib_format < 202110L
 # error "Feature test macro for std::format has wrong value in <version>"
+#endif
+
+#ifndef __cpp_lib_format_uchar
+# error "Feature test macro for formatting chars as integers is missing in <version>"
+#elif __cpp_lib_format_uchar < 202311L
+# error "Feature test macro for formatting chars as integers has wrong value in <version>"
 #endif
 
 #include <string>
@@ -157,6 +169,12 @@ test_alternate_forms()
   // PR libstdc++/108046
   s = std::format("{0:#.0} {0:#.1} {0:#.0g}", 10.0);
   VERIFY( s == "1.e+01 1.e+01 1.e+01" );
+
+  // PR libstdc++/113512
+  s = std::format("{:#.3g}", 0.025);
+  VERIFY( s == "0.0250" );
+  s = std::format("{:#07.3g}", 0.02);
+  VERIFY( s == "00.0200" );
 }
 
 void
@@ -243,14 +261,16 @@ test_width()
   }
 
   try {
-    auto args = std::make_format_args(false, true);
+    bool no = false, yes = true;
+    auto args = std::make_format_args(no, yes);
     s = std::vformat("DR 3720: restrict type of width arg-id {0:{1}}", args);
     VERIFY(false);
   } catch (const std::format_error&) {
   }
 
   try {
-    auto args = std::make_format_args('?', '!');
+    char wat = '?', bang = '!';
+    auto args = std::make_format_args(wat, bang);
     s = std::vformat("DR 3720: restrict type of width arg-id {0:{1}}", args);
     VERIFY(false);
   } catch (const std::format_error&) {
@@ -258,10 +278,43 @@ test_width()
 }
 
 void
+test_char()
+{
+  std::string s;
+
+  s = std::format("{}", 'a');
+  VERIFY( s == "a" );
+
+  s = std::format("{:c} {:d} {:o}", 'b', '\x17', '\x3f');
+  VERIFY( s == "b 23 77" );
+
+  s = std::format("{:#d} {:#o}", '\x17', '\x3f');
+  VERIFY( s == "23 077" );
+
+  s = std::format("{:04d} {:04o}", '\x17', '\x3f');
+  VERIFY( s == "0023 0077" );
+
+  s = std::format("{:b} {:B} {:#b} {:#B}", '\xff', '\xa0', '\x17', '\x3f');
+  VERIFY( s == "11111111 10100000 0b10111 0B111111" );
+
+  s = std::format("{:x} {:#x} {:#X}", '\x12', '\x34', '\x45');
+  VERIFY( s == "12 0x34 0X45" );
+
+  // P2909R4 Fix formatting of code units as integers (Dude, where’s my char?)
+  // char and wchar_t should be converted to unsigned when formatting them
+  // with an integer presentation type.
+  s = std::format("{0:b} {0:B} {0:d} {0:o} {0:x} {0:X}", '\xf0');
+  VERIFY( s == "11110000 11110000 240 360 f0 F0" );
+}
+
+void
 test_wchar()
 {
   using namespace std::literals;
   std::wstring s;
+
+  s = std::format(L"{}", L'a');
+  VERIFY( s == L"a" );
 
   s = std::format(L"{} {} {} {} {} {}", L'0', 1, 2LL, 3.4, L"five", L"six"s);
   VERIFY( s == L"0 1 2 3.4 five six" );
@@ -274,6 +327,20 @@ test_wchar()
   VERIFY( s == L"0.0625" );
   s = std::format(L"{}", 0.25);
   VERIFY( s == L"0.25" );
+  s = std::format(L"{:+a} {:A}", 0x1.23p45, -0x1.abcdefp-15);
+  VERIFY( s == L"+1.23p+45 -1.ABCDEFP-15" );
+
+  double inf = std::numeric_limits<double>::infinity();
+  double nan = std::numeric_limits<double>::quiet_NaN();
+  s = std::format(L"{0} {0:F} {1} {1:E}", -inf, -nan);
+  VERIFY( s == L"-inf -INF -nan -NAN" );
+
+  s = std::format(L"{0:#b} {0:#B} {0:#x} {0:#X}", 99);
+  VERIFY( s == L"0b1100011 0B1100011 0x63 0X63" );
+
+  // P2909R4 Fix formatting of code units as integers (Dude, where’s my char?)
+  s = std::format(L"{:d} {:d}", wchar_t(-1), char(-1));
+  VERIFY( s.find('-') == std::wstring::npos );
 }
 
 void
@@ -292,7 +359,7 @@ test_minmax()
     s = std::format("{:b}" , std::numeric_limits<U>::max());
     VERIFY( s == '1' + ones );
   };
-  check(std::int8_t(0));
+  check((signed char)(0)); // int8_t is char on Solaris, see PR 113450
   check(std::int16_t(0));
   check(std::int32_t(0));
   check(std::int64_t(0));
@@ -376,6 +443,9 @@ test_pointer()
   const void* pc = p;
   std::string s, str_int;
 
+  s = std::format("{}", p);
+  VERIFY( s == "0x0" );
+
   s = std::format("{} {} {}", p, pc, nullptr);
   VERIFY( s == "0x0 0x0 0x0" );
   s = std::format("{:p} {:p} {:p}", p, pc, nullptr);
@@ -408,6 +478,27 @@ test_pointer()
 #endif
 }
 
+void
+test_bool()
+{
+  std::string s;
+
+  s = std::format("{}", true);
+  VERIFY( s == "true" );
+  s = std::format("{:} {:s}", true, false);
+  VERIFY( s == "true false" );
+  s = std::format("{:b} {:#b}", true, false);
+  VERIFY( s == "1 0b0" );
+  s = std::format("{:B} {:#B}", false, true);
+  VERIFY( s == "0 0B1" );
+  s = std::format("{:d} {:#d}", false, true);
+  VERIFY( s == "0 1" );
+  s = std::format("{:o} {:#o} {:#o}", false, true, false);
+  VERIFY( s == "0 01 0" );
+  s = std::format("{:x} {:#x} {:#X}", false, true, false);
+  VERIFY( s == "0 0x1 0X0" );
+}
+
 int main()
 {
   test_no_args();
@@ -416,9 +507,11 @@ int main()
   test_alternate_forms();
   test_locale();
   test_width();
+  test_char();
   test_wchar();
   test_minmax();
   test_p1652r1();
   test_float128();
   test_pointer();
+  test_bool();
 }

@@ -3962,7 +3962,10 @@ gfc_conv_array_ref (gfc_se * se, gfc_array_ref * ar, gfc_expr *expr,
     }
 
   decl = se->expr;
-  if (IS_CLASS_ARRAY (sym) && sym->attr.dummy && ar->as->type != AS_DEFERRED)
+  if (UNLIMITED_POLY(sym)
+      && IS_CLASS_ARRAY (sym)
+      && sym->attr.dummy
+      && ar->as->type != AS_DEFERRED)
     decl = sym->backend_decl;
 
   cst_offset = offset = gfc_index_zero_node;
@@ -11284,6 +11287,15 @@ gfc_trans_deferred_array (gfc_symbol * sym, gfc_wrapped_block * block)
     {
       gfc_conv_string_length (sym->ts.u.cl, NULL, &init);
       gfc_trans_vla_type_sizes (sym, &init);
+
+      /* Presence check of optional deferred-length character dummy.  */
+      if (sym->ts.deferred && sym->attr.dummy && sym->attr.optional)
+	{
+	  tmp = gfc_finish_block (&init);
+	  tmp = build3_v (COND_EXPR, gfc_conv_expr_present (sym),
+			  tmp, build_empty_stmt (input_location));
+	  gfc_add_expr_to_block (&init, tmp);
+	}
     }
 
   /* Dummy, use associated and result variables don't need anything special.  */

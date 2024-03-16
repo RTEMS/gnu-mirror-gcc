@@ -1,3 +1,103 @@
+2024-03-15  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2024-03-12  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/110826
+	* array.cc (gfc_array_dimen_size): When walking the ref chain of an
+	array and the ultimate component is a procedure pointer, do not try
+	to figure out its dimension even if it is a array-valued function.
+
+2024-03-15  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-12-05  Harald Anlauf  <anlauf@gmx.de>
+		    Tobias Burnus   <tobias@codesourcery.com>
+
+	PR fortran/100988
+	* gfortran.h (IS_PROC_POINTER): New macro.
+	* trans-types.cc (gfc_sym_type): Use macro in determination if the
+	restrict qualifier can be used for a dummy variable.  Fix logic to
+	allow the restrict qualifier also for optional arguments, and to
+	not apply it to pointer or proc_pointer arguments.
+
+2024-03-15  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2024-03-01  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/104819
+	* check.cc (gfc_check_null): Handle nested NULL()s.
+	(is_c_interoperable): Check for MOLD argument of NULL() as part of
+	the interoperability check.
+	* interface.cc (gfc_compare_actual_formal): Extend checks for NULL()
+	actual arguments for presence of MOLD argument when required by
+	Interp J3/22-146.
+
+2024-03-06  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2024-02-26  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/114012
+	* trans-expr.cc (gfc_conv_procedure_call): Evaluate non-trivial
+	arguments just once before assigning to an unlimited polymorphic
+	dummy variable.
+
+2024-03-06  Steve Kargl  <kargl@gcc.gnu.org>
+
+	Backported from master:
+	2024-02-23  Steve Kargl  <kargl@gcc.gnu.org>
+		    Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/114024
+	* trans-stmt.cc (gfc_trans_allocate): When a source expression has
+	substring references, part-refs, or %re/%im inquiries, wrap the
+	entity in parentheses to force evaluation of the expression.
+
+2024-01-31  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2024-01-27  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/104908
+	* trans-array.cc (gfc_conv_array_ref): Restrict use of transformed
+	descriptor (sym->backend_decl) to the unlimited polymorphic case.
+
+2024-01-18  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2024-01-13  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/67277
+	* trans-intrinsic.cc (gfc_conv_intrinsic_ishftc): Handle optional
+	dummy argument for SIZE passed to ISHFTC.  Set default value to
+	BIT_SIZE(I) when missing.
+
+2023-12-27  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-12-17  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/97592
+	* trans-expr.cc (gfc_conv_procedure_call): For a contiguous dummy
+	with the TARGET attribute, the effective argument may still be
+	contiguous even if the actual argument is not simply-contiguous.
+	Allow packing to be decided at runtime by _gfortran_internal_pack.
+
+2023-12-10  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2023-12-02  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/93762
+	PR fortran/100651
+	* trans-array.cc (gfc_trans_deferred_array): Add presence check
+	for optional deferred-length character dummy arguments.
+	* trans-expr.cc (gfc_conv_missing_dummy): The character length for
+	deferred-length dummy arguments is passed by reference, so that
+	its value can be returned.  Adjust handling for optional dummies.
+
 2023-11-30  Harald Anlauf  <anlauf@gmx.de>
 
 	Backported from master:
