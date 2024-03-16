@@ -553,8 +553,7 @@
 ;; The RTL mapping therefore applies at LD1 granularity, rather than
 ;; being broken down into individual types of load.
 (define_attr "stride_type"
-  "none,ld1_consecutive,ld1_strided,st1_consecutive,st1_strided,
-   luti_consecutive,luti_strided"
+  "none,ld1_consecutive,ld1_strided,st1_consecutive,st1_strided"
   (const_string "none"))
 
 ;; Attribute used to identify load pair and store pair instructions.
@@ -1028,7 +1027,7 @@
     if (aarch64_return_address_signing_enabled ()
 	&& (TARGET_PAUTH))
       {
-	if (aarch_ra_sign_key == AARCH_KEY_B)
+	if (aarch64_ra_sign_key == AARCH64_KEY_B)
 	  ret = "retab";
 	else
 	  ret = "retaa";

@@ -912,14 +912,14 @@ calculate_ratio (unsigned int sew, enum vlmul_type vlmul)
 }
 
 /* SCALABLE means that the vector-length is agnostic (run-time invariant and
-   compile-time unknown). FIXED meands that the vector-length is specific
-   (compile-time known). Both RVV_SCALABLE and RVV_FIXED_VLMAX are doing
+   compile-time unknown). ZVL meands that the vector-length is specific
+   (compile-time known by march like zvl*b). Both SCALABLE and ZVL are doing
    auto-vectorization using VLMAX vsetvl configuration.  */
 static bool
 autovec_use_vlmax_p (void)
 {
-  return (riscv_autovec_preference == RVV_SCALABLE
-	  || riscv_autovec_preference == RVV_FIXED_VLMAX);
+  return rvv_vector_bits == RVV_VECTOR_BITS_SCALABLE
+	  || rvv_vector_bits == RVV_VECTOR_BITS_ZVL;
 }
 
 /* This function emits VLMAX vrgather instruction. Emit vrgather.vx/vi when sel
@@ -2775,7 +2775,8 @@ vectorize_related_mode (machine_mode vector_mode, scalar_mode element_mode,
 /* Expand an RVV comparison.  */
 
 void
-expand_vec_cmp (rtx target, rtx_code code, rtx op0, rtx op1)
+expand_vec_cmp (rtx target, rtx_code code, rtx op0, rtx op1, rtx mask,
+		rtx maskoff)
 {
   machine_mode mask_mode = GET_MODE (target);
   machine_mode data_mode = GET_MODE (op0);
@@ -2785,8 +2786,8 @@ expand_vec_cmp (rtx target, rtx_code code, rtx op0, rtx op1)
     {
       rtx lt = gen_reg_rtx (mask_mode);
       rtx gt = gen_reg_rtx (mask_mode);
-      expand_vec_cmp (lt, LT, op0, op1);
-      expand_vec_cmp (gt, GT, op0, op1);
+      expand_vec_cmp (lt, LT, op0, op1, mask, maskoff);
+      expand_vec_cmp (gt, GT, op0, op1, mask, maskoff);
       icode = code_for_pred (IOR, mask_mode);
       rtx ops[] = {target, lt, gt};
       emit_vlmax_insn (icode, BINARY_MASK_OP, ops);
@@ -2794,33 +2795,16 @@ expand_vec_cmp (rtx target, rtx_code code, rtx op0, rtx op1)
     }
 
   rtx cmp = gen_rtx_fmt_ee (code, mask_mode, op0, op1);
-  rtx ops[] = {target, cmp, op0, op1};
-  emit_vlmax_insn (icode, COMPARE_OP, ops);
-}
-
-void
-expand_vec_cmp (rtx target, rtx_code code, rtx mask, rtx maskoff, rtx op0,
-		rtx op1)
-{
-  machine_mode mask_mode = GET_MODE (target);
-  machine_mode data_mode = GET_MODE (op0);
-  insn_code icode = get_cmp_insn_code (code, data_mode);
-
-  if (code == LTGT)
+  if (!mask && !maskoff)
     {
-      rtx lt = gen_reg_rtx (mask_mode);
-      rtx gt = gen_reg_rtx (mask_mode);
-      expand_vec_cmp (lt, LT, mask, maskoff, op0, op1);
-      expand_vec_cmp (gt, GT, mask, maskoff, op0, op1);
-      icode = code_for_pred (IOR, mask_mode);
-      rtx ops[] = {target, lt, gt};
-      emit_vlmax_insn (icode, BINARY_MASK_OP, ops);
-      return;
+      rtx ops[] = {target, cmp, op0, op1};
+      emit_vlmax_insn (icode, COMPARE_OP, ops);
     }
-
-  rtx cmp = gen_rtx_fmt_ee (code, mask_mode, op0, op1);
-  rtx ops[] = {target, mask, maskoff, cmp, op0, op1};
-  emit_vlmax_insn (icode, COMPARE_OP_MU, ops);
+  else
+    {
+      rtx ops[] = {target, mask, maskoff, cmp, op0, op1};
+      emit_vlmax_insn (icode, COMPARE_OP_MU, ops);
+    }
 }
 
 /* Expand an RVV floating-point comparison:
@@ -2898,7 +2882,7 @@ expand_vec_cmp_float (rtx target, rtx_code code, rtx op0, rtx op1,
       else
 	{
 	  /* vmfeq.vv    v0, vb, vb, v0.t  */
-	  expand_vec_cmp (eq0, EQ, eq0, eq0, op1, op1);
+	  expand_vec_cmp (eq0, EQ, op1, op1, eq0, eq0);
 	}
       break;
     default:
@@ -2916,7 +2900,7 @@ expand_vec_cmp_float (rtx target, rtx_code code, rtx op0, rtx op1,
   if (code == ORDERED)
     emit_move_insn (target, eq0);
   else
-    expand_vec_cmp (eq0, code, eq0, eq0, op0, op1);
+    expand_vec_cmp (eq0, code, op0, op1, eq0, eq0);
 
   if (can_invert_p)
     {
@@ -4431,7 +4415,7 @@ vls_mode_valid_p (machine_mode vls_mode)
   if (!TARGET_VECTOR || TARGET_XTHEADVECTOR)
     return false;
 
-  if (riscv_autovec_preference == RVV_SCALABLE)
+  if (rvv_vector_bits == RVV_VECTOR_BITS_SCALABLE)
     {
       if (GET_MODE_CLASS (vls_mode) != MODE_VECTOR_BOOL
 	  && !ordered_p (TARGET_MAX_LMUL * BITS_PER_RISCV_VECTOR,
@@ -4448,7 +4432,7 @@ vls_mode_valid_p (machine_mode vls_mode)
       return true;
     }
 
-  if (riscv_autovec_preference == RVV_FIXED_VLMAX)
+  if (rvv_vector_bits == RVV_VECTOR_BITS_ZVL)
     {
       machine_mode inner_mode = GET_MODE_INNER (vls_mode);
       int precision = GET_MODE_PRECISION (inner_mode).to_constant ();
@@ -5123,13 +5107,13 @@ estimated_poly_value (poly_int64 val, unsigned int kind)
   unsigned int width_source
     = BITS_PER_RISCV_VECTOR.is_constant ()
 	? (unsigned int) BITS_PER_RISCV_VECTOR.to_constant ()
-	: (unsigned int) RVV_SCALABLE;
+	: (unsigned int) RVV_VECTOR_BITS_SCALABLE;
 
   /* If there is no core-specific information then the minimum and likely
      values are based on TARGET_MIN_VLEN vectors and the maximum is based on
      the architectural maximum of 65536 bits.  */
   unsigned int min_vlen_bytes = TARGET_MIN_VLEN / 8 - 1;
-  if (width_source == RVV_SCALABLE)
+  if (width_source == RVV_VECTOR_BITS_SCALABLE)
     switch (kind)
       {
       case POLY_VALUE_MIN:

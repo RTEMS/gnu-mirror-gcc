@@ -451,15 +451,29 @@ ix86_expand_move (machine_mode mode, rtx operands[])
 	  && GET_MODE (SUBREG_REG (op1)) == DImode
 	  && SUBREG_BYTE (op1) == 0)
 	op1 = gen_rtx_ZERO_EXTEND (TImode, SUBREG_REG (op1));
+      /* As not all values in XFmode are representable in real_value,
+	 we might be called with unfoldable SUBREGs of constants.  */
+      if (mode == XFmode
+	  && CONSTANT_P (SUBREG_REG (op1))
+	  && can_create_pseudo_p ())
+	{
+	  machine_mode imode = GET_MODE (SUBREG_REG (op1));
+	  rtx r = force_const_mem (imode, SUBREG_REG (op1));
+	  if (r)
+	    r = validize_mem (r);
+	  else
+	    r = force_reg (imode, SUBREG_REG (op1));
+	  op1 = simplify_gen_subreg (mode, r, imode, SUBREG_BYTE (op1));
+	}
       break;
     }
 
   if ((flag_pic || MACHOPIC_INDIRECT)
       && symbolic_operand (op1, mode))
     {
+#if TARGET_MACHO
       if (TARGET_MACHO && !TARGET_64BIT)
 	{
-#if TARGET_MACHO
 	  /* dynamic-no-pic */
 	  if (MACHOPIC_INDIRECT)
 	    {
@@ -476,33 +490,18 @@ ix86_expand_move (machine_mode mode, rtx operands[])
 	      emit_insn (insn);
 	      return;
 	    }
-	  if (GET_CODE (op0) == MEM)
-	    op1 = force_reg (Pmode, op1);
-	  else
-	    {
-	      rtx temp = op0;
-	      if (GET_CODE (temp) != REG)
-		temp = gen_reg_rtx (Pmode);
-	      temp = legitimize_pic_address (op1, temp);
-	      if (temp == op0)
-	    return;
-	      op1 = temp;
-	    }
-      /* dynamic-no-pic */
-#endif
 	}
-      else
+#endif
+
+      if (MEM_P (op0))
+	op1 = force_reg (mode, op1);
+      else if (!(TARGET_64BIT && x86_64_movabs_operand (op1, DImode)))
 	{
-	  if (MEM_P (op0))
-	    op1 = force_reg (mode, op1);
-	  else if (!(TARGET_64BIT && x86_64_movabs_operand (op1, DImode)))
-	    {
-	      rtx reg = can_create_pseudo_p () ? NULL_RTX : op0;
-	      op1 = legitimize_pic_address (op1, reg);
-	      if (op0 == op1)
-		return;
-	      op1 = convert_to_mode (mode, op1, 1);
-	    }
+	  rtx reg = can_create_pseudo_p () ? NULL_RTX : op0;
+	  op1 = legitimize_pic_address (op1, reg);
+	  if (op0 == op1)
+	    return;
+	  op1 = convert_to_mode (mode, op1, 1);
 	}
     }
   else
@@ -4691,7 +4690,7 @@ ix86_expand_int_sse_cmp (rtx dest, enum rtx_code code, rtx cop0, rtx cop1,
 		  rtx elt = CONST_VECTOR_ELT (cop1, i);
 		  if (!CONST_INT_P (elt))
 		    break;
-		  if (code == GE)
+		  if (code == LE)
 		    {
 		      /* For LE punt if some element is signed maximum.  */
 		      if ((INTVAL (elt) & (GET_MODE_MASK (eltmode) >> 1))

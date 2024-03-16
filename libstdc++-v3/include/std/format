@@ -3210,7 +3210,7 @@ namespace __format
 	// Format as const if possible, to reduce instantiations.
 	template<typename _Tp>
 	  using __maybe_const_t
-	    = __conditional_t<__formattable<_Tp>, const _Tp, _Tp>;
+	    = __conditional_t<__formattable<const _Tp>, const _Tp, _Tp>;
 
 	template<typename _Tq>
 	  static void
@@ -3228,10 +3228,6 @@ namespace __format
 	  explicit
 	  handle(_Tp& __val) noexcept
 	  {
-	    if constexpr (!__formattable<const _Tp>)
-	      static_assert(!is_const_v<_Tp>, "std::format argument must be "
-					      "non-const for this type");
-
 	    this->_M_ptr = __builtin_addressof(__val);
 	    auto __func = _S_format<__maybe_const_t<_Tp>>;
 	    this->_M_func = reinterpret_cast<void(*)()>(__func);
@@ -3708,6 +3704,19 @@ namespace __format
 	static _Element_t
 	_S_make_elt(_Tp& __v)
 	{
+	  using _Tq = remove_const_t<_Tp>;
+	  using _CharT = typename _Context::char_type;
+	  static_assert(is_default_constructible_v<formatter<_Tq, _CharT>>,
+			"std::formatter must be specialized for the type "
+			"of each format arg");
+	  using __format::__formattable_with;
+	  if constexpr (is_const_v<_Tp>)
+	    if constexpr (!__formattable_with<_Tp, _Context>)
+	      if constexpr (__formattable_with<_Tq, _Context>)
+		static_assert(__formattable_with<_Tp, _Context>,
+			      "format arg must be non-const because its "
+			      "std::formatter specialization has a "
+			      "non-const reference parameter");
 	  basic_format_arg<_Context> __arg(__v);
 	  if constexpr (_S_values_only)
 	    return __arg._M_val;
@@ -4082,6 +4091,7 @@ namespace __format
 	__sink_out = __sink.out();
 
       if constexpr (is_same_v<_CharT, char>)
+	// Fast path for "{}" format strings and simple format arg types.
 	if (__fmt.size() == 2 && __fmt[0] == '{' && __fmt[1] == '}')
 	  {
 	    bool __done = false;
@@ -4115,14 +4125,14 @@ namespace __format
 		    __uval = make_unsigned_t<_Tp>(~__arg) + 1u;
 		  else
 		    __uval = __arg;
-		  const auto __n = __detail::__to_chars_len(__uval) + __neg;
-		  if (auto __res = __sink_out._M_reserve(__n))
+		  const auto __n = __detail::__to_chars_len(__uval);
+		  if (auto __res = __sink_out._M_reserve(__n + __neg))
 		    {
 		      auto __ptr = __res.get();
 		      *__ptr = '-';
 		      __detail::__to_chars_10_impl(__ptr + (int)__neg, __n,
 						   __uval);
-		      __res._M_bump(__n);
+		      __res._M_bump(__n + __neg);
 		      __done = true;
 		    }
 		}

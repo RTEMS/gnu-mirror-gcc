@@ -4210,6 +4210,16 @@ vectorizable_simd_clone_call (vec_info *vinfo, stmt_vec_info stmt_info,
 				     " supported for mismatched vector sizes.\n");
 		  return false;
 		}
+	      if (!expand_vec_cond_expr_p (clone_arg_vectype,
+					   arginfo[i].vectype, ERROR_MARK))
+		{
+		  if (dump_enabled_p ())
+		    dump_printf_loc (MSG_MISSED_OPTIMIZATION,
+				     vect_location,
+				     "cannot compute mask argument for"
+				     " in-branch vector clones.\n");
+		  return false;
+		}
 	    }
 	  else if (SCALAR_INT_MODE_P (bestn->simdclone->mask_mode))
 	    {
@@ -8687,8 +8697,13 @@ vectorizable_store (vec_info *vinfo,
        ? &LOOP_VINFO_LENS (loop_vinfo)
        : NULL);
 
-  /* Shouldn't go with length-based approach if fully masked.  */
-  gcc_assert (!loop_lens || !loop_masks);
+  /* The vect_transform_stmt and vect_analyze_stmt will go here but there
+     are some difference here.  We cannot enable both the lens and masks
+     during transform but it is allowed during analysis.
+     Shouldn't go with length-based approach if fully masked.  */
+  if (cost_vec == NULL)
+    /* The cost_vec is NULL during transfrom.  */
+    gcc_assert ((!loop_lens || !loop_masks));
 
   /* Targets with store-lane instructions must not require explicit
      realignment.  vect_supportable_dr_alignment always returns either
@@ -10567,8 +10582,13 @@ vectorizable_load (vec_info *vinfo,
        ? &LOOP_VINFO_LENS (loop_vinfo)
        : NULL);
 
-  /* Shouldn't go with length-based approach if fully masked.  */
-  gcc_assert (!loop_lens || !loop_masks);
+  /* The vect_transform_stmt and vect_analyze_stmt will go here but there
+     are some difference here.  We cannot enable both the lens and masks
+     during transform but it is allowed during analysis.
+     Shouldn't go with length-based approach if fully masked.  */
+  if (cost_vec == NULL)
+    /* The cost_vec is NULL during transfrom.  */
+    gcc_assert ((!loop_lens || !loop_masks));
 
   /* Targets with store-lane instructions must not require explicit
      realignment.  vect_supportable_dr_alignment always returns either

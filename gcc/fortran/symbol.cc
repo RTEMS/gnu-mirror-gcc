@@ -291,6 +291,19 @@ bool
 gfc_set_default_type (gfc_symbol *sym, int error_flag, gfc_namespace *ns)
 {
   gfc_typespec *ts;
+  gfc_expr *e;
+
+  /* Check to see if a function selector of unknown type can be resolved.  */
+  if (sym->assoc
+      && (e = sym->assoc->target)
+      && e->expr_type == EXPR_FUNCTION)
+    {
+      if (e->ts.type == BT_UNKNOWN)
+	gfc_resolve_expr (e);
+      sym->ts = e->ts;
+      if (sym->ts.type != BT_UNKNOWN)
+	return true;
+    }
 
   if (sym->ts.type != BT_UNKNOWN)
     gfc_internal_error ("gfc_set_default_type(): symbol already has a type");
@@ -307,7 +320,7 @@ gfc_set_default_type (gfc_symbol *sym, int error_flag, gfc_namespace *ns)
 		       "; did you mean %qs?",
 		       sym->name, &sym->declared_at, guessed);
 	  else
-	    gfc_error ("Symbol %qs at %L has no IMPLICIT type",
+	    gfc_error ("Symbol %qs at %L has no IMPLICIT type(symbol)",
 		       sym->name, &sym->declared_at);
 	  sym->attr.untyped = 1; /* Ensure we only give an error once.  */
 	}
@@ -2401,6 +2414,67 @@ bad:
   return NULL;
 }
 
+
+/* Find all derived types in the uppermost namespace that have a component
+   a component called name and stash them in the assoc field of an
+   associate name variable.
+   This is used to infer the derived type of an associate name, whose selector
+   is a sibling derived type function that has not yet been parsed. Either
+   the derived type is use associated in both contained and sibling procedures
+   or it appears in the uppermost namespace.  */
+
+static int cts = 0;
+static void
+find_derived_types (gfc_symbol *sym, gfc_symtree *st, const char *name,
+		    bool contained, bool stash)
+{
+  if (st->n.sym && st->n.sym->attr.flavor == FL_DERIVED
+      && !st->n.sym->attr.is_class
+      && ((contained && st->n.sym->attr.use_assoc) || !contained)
+      && gfc_find_component (st->n.sym, name, true, true, NULL))
+    {
+      /* Do the stashing, if required.  */
+      cts++;
+      if (stash)
+	{
+	  if (sym->assoc->derived_types)
+	    st->n.sym->dt_next = sym->assoc->derived_types;
+	  sym->assoc->derived_types = st->n.sym;
+	}
+    }
+
+  if (st->left)
+    find_derived_types (sym, st->left, name, contained, stash);
+
+  if (st->right)
+    find_derived_types (sym, st->right, name, contained, stash);
+}
+
+int
+gfc_find_derived_types (gfc_symbol *sym, gfc_namespace *ns,
+			const char *name, bool stash)
+{
+  gfc_namespace *encompassing = NULL;
+  gcc_assert (sym->assoc);
+
+  cts = 0;
+  while (ns->parent)
+    {
+      if (!ns->parent->parent && ns->proc_name
+	  && (ns->proc_name->attr.function || ns->proc_name->attr.subroutine))
+	encompassing = ns;
+      ns = ns->parent;
+    }
+
+  /* Search the top level namespace first.  */
+  find_derived_types (sym, ns->sym_root, name, false, stash);
+
+  /* Then the encompassing namespace.  */
+  if (encompassing && encompassing != ns)
+    find_derived_types (sym, encompassing->sym_root, name, true, stash);
+
+  return cts;
+}
 
 /* Find the component with the given name in the union type symbol.
    If ref is not NULL it will be set to the chain of components through which
@@ -5172,6 +5246,33 @@ gfc_type_is_extension_of (gfc_symbol *t1, gfc_symbol *t2)
   return gfc_compare_derived_types (t1, t2);
 }
 
+/* Check if parameterized derived type t2 is an instance of pdt template t1
+
+   gfc_symbol *t1 -> pdt template to verify t2 against.
+   gfc_symbol *t2 -> pdt instance to be verified.
+
+   In decl.cc, gfc_get_pdt_instance, a pdt instance is given a 3 character
+   prefix "Pdt", followed by an underscore list of the kind parameters,
+   up to a maximum of 8 kind parameters.  To verify if a PDT Type corresponds
+   to the template, this functions extracts t2's derive_type name,
+   and compares it to the derive_type name of t1 for compatibility.
+
+   For example:
+
+   t2->name = Pdtf_2_2; extract out the 'f' and compare with t1->name.  */
+
+bool
+gfc_pdt_is_instance_of (gfc_symbol *t1, gfc_symbol *t2)
+{
+  if ( !t1->attr.pdt_template || !t2->attr.pdt_type )
+    return false;
+
+  /* Limit comparison to length of t1->name to ignore new kind params.  */
+  if ( !(strncmp (&(t2->name[3]), t1->name, strlen (t1->name)) == 0) )
+    return false;
+
+  return true;
+}
 
 /* Check if two typespecs are type compatible (F03:5.1.1.2):
    If ts1 is nonpolymorphic, ts2 must be the same type.

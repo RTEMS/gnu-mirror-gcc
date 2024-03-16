@@ -1,3 +1,170 @@
+2024-03-14  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/114294
+	* gm2-compiler/M2Quads.mod (BuildConstHighFromSym):
+	Call PutConst to assign the type Cardinal in the result
+	constant.
+
+2024-03-14  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/114333
+	* gm2-compiler/M2GenGCC.mod (CodeStatement): Remove op1, op2 and
+	op3 parameters to CodeIfLess, CodeIfLessEqu, CodeIfGreEqu, CodeIfGre,
+	CodeIfIn, CodeIfNotIn.
+	(CodeIfLess): Rewrite.
+	(PerformCodeIfLess): New procedure.
+	(CodeIfLess): Rewrite.
+	(PerformCodeIfLess): New procedure.
+	(CodeIfLessEqu): Rewrite.
+	(PerformCodeIfLessEqu): New procedure.
+	(CodeIfGreEqu): Rewrite.
+	(PerformCodeIfGreEqu): New procedure.
+	(CodeIfGre): Rewrite.
+	(PerformCodeIfGre): New procedure.
+	(CodeIfIn): Rewrite.
+	(PerformCodeIfIn): New procedure.
+	(CodeIfNotIn): Rewrite.
+	(PerformCodeIfNotIn): New procedure.
+
+2024-03-14  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/114333
+	* gm2-compiler/M2Check.mod (checkUnbounded): New procedure
+	function.
+	(checkArrayTypeEquivalence): Extend checking to cover unbounded
+	arrays, arrays and constants.
+	(IsTyped): Simplified the expression and corrected a test for
+	IsConstructor.
+	(checkTypeKindViolation): New procedure function.
+	(doCheckPair): Call checkTypeKindViolation.
+	* gm2-compiler/M2GenGCC.mod (CodeStatement): Remove parameters
+	to CodeEqu and CodeNotEqu.
+	(PerformCodeIfEqu): New procedure.
+	(CodeIfEqu): Rewrite.
+	(PerformCodeIfNotEqu): New procedure.
+	(CodeIfNotEqu): Rewrite.
+	* gm2-compiler/M2Quads.mod (BuildRelOpFromBoolean): Correct
+	comment.
+
+2024-03-11  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/114295
+	* gm2-compiler/M2Batch.mod (MakeProgramSource): Call PutDeclared
+	if the module is known.
+	(MakeDefinitionSource): Ditto.
+	(MakeImplementationSource): Ditto.
+	* gm2-compiler/M2Comp.mod (ExamineHeader): New procedure.
+	(ExamineCompilationUnit): Rewrite.
+	(PeepInto): Rewrite.
+	* gm2-compiler/M2Error.mod (NewError): Remove default call to
+	GetTokenNo.
+	* gm2-compiler/M2Quads.mod (callRequestDependant): Push tokno with
+	Adr.
+	(BuildStringAdrParam): Ditto.
+	(doBuildBinaryOp): Push OperatorPos on the bool stack.
+	(BuildRelOp): Ditto.
+	* gm2-compiler/P2Build.bnf (SetType): Pass set token pos to
+	BuildSetType.
+	(PointerType): Pass pointer token pos to BuildPointerType.
+	* gm2-compiler/P2SymBuild.def (BuildPointerType): Add parameter
+	pointerpos.
+	(BuildSetType): Add parameter setpos.
+	* gm2-compiler/P2SymBuild.mod (BuildPointerType): Add parameter
+	pointerpos.  Build combined token and use it when creating a
+	pointer type.
+	(BuildSetType): Add parameter setpos.  Build combined token and
+	use it when creating a set type.
+	* gm2-compiler/SymbolTable.mod (DebugUnknownToken): New constant.
+	(CheckTok): New procedure function.
+	(MakeProcedure): Call CheckTok.
+	(MakeRecord): Ditto.
+	(MakeVarient): Ditto.
+	(MakeEnumeration): Ditto.
+	(MakeHiddenType): Ditto.
+	(MakeConstant): Ditto.
+	(MakeConstStringCnul): Ditto.
+	(MakeSubrange): Ditto.
+	(MakeTemporary): Ditto.
+	(MakeVariableForParam): Ditto.
+	(MakeParameterHeapVar): Ditto.
+	(MakePointer): Ditto.
+	(MakeSet): Ditto.
+	(MakeUnbounded): Ditto.
+	(MakeProcType): Ditto.
+
+2024-03-08  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* gm2-compiler/M2Quads.mod (Init): Use InitIndexTuned with
+	default size 65K.
+	* gm2-compiler/SymbolConversion.mod (Init): Ditto.
+	* gm2-compiler/SymbolTable.mod (BEGIN):	Ditto.
+	* mc-boot/GM2Dependent.cc: Rebuild.
+	* mc-boot/GM2Dependent.h: Rebuild.
+	* mc-boot/GM2RTS.cc: Rebuild.
+	* pge-boot/GIndexing.cc: Rebuild.
+	* pge-boot/GIndexing.h: Rebuild.
+	* pge-boot/GM2Dependent.cc: Rebuild.
+	* pge-boot/GM2Dependent.h: Rebuild.
+	* pge-boot/GM2RTS.cc: Rebuild.
+
+2024-03-07  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/109969
+	* gm2-compiler/M2LexBuf.def (TokenToLineNo): Rename parameter.
+	(TokenToColumnNo): Rename parameter.
+	(TokenToLocation): Rename parameter.
+	(FindFileNameFromToken): Rename parameter.
+	(DumpTokens): Rewrite comment.
+	* gm2-compiler/M2LexBuf.mod: Rewrite.
+	* gm2-compiler/P0SyntaxCheck.bnf (CheckInsertCandidate):
+	DumpTokens before and after inserting recovery token.
+	* gm2-gcc/m2builtins.cc (do_target_support_exists): Add
+	bf_c99_compl case.
+	* gm2-libs/Indexing.def (InitIndexTuned): New procedure
+	function.
+	(IsEmpty): New procedure function.
+	* gm2-libs/Indexing.mod (InitIndexTuned): New procedure
+	function.
+	(IsEmpty): New procedure function.
+	(Index): New field GrowFactor.
+	(PutIndice): Use GrowFactor to extend dynamic array.
+
+2024-03-04  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/114227
+	* gm2-libs-iso/M2RTS.mod (ProcedureChain): Remove.
+	(ProcedureList): Remove.
+	(ExecuteReverse): Remove.
+	(ExecuteTerminationProcedures): Rewrite.
+	(ExecuteInitialProcedures): Rewrite.
+	(AppendProc): Remove.
+	(InstallTerminationProcedure): Rewrite.
+	(InstallInitialProcedure): Rewrite.
+	(InitProcList): Remove.
+	* gm2-libs/M2Dependent.def (InstallTerminationProcedure):
+	New procedure.
+	(ExecuteTerminationProcedures): New procedure.
+	(InstallInitialProcedure): New procedure.
+	(ExecuteInitialProcedures): New procedure.
+	* gm2-libs/M2Dependent.mod (ProcedureChain): New type.
+	(ProcedureList): New type.
+	(ExecuteReverse): New procedure.
+	(ExecuteTerminationProcedures): New procedure.
+	(ExecuteInitialProcedures): New procedure.
+	(AppendProc): New procedure.
+	(InstallTerminationProcedure): New procedure.
+	(InstallInitialProcedure): New procedure.
+	(InitProcList): New procedure.
+	* gm2-libs/M2RTS.mod (ProcedureChain): Remove.
+	(ProcedureList): Remove.
+	(ExecuteReverse): Remove.
+	(ExecuteTerminationProcedures): Rewrite.
+	(ExecuteInitialProcedures): Rewrite.
+	(AppendProc): Remove.
+	(InstallTerminationProcedure): Rewrite.
+	(InstallInitialProcedure): Rewrite.
+	(InitProcList): Remove.
+
 2024-02-25  Gaius Mulley  <gaiusmod2@gmail.com>
 
 	PR modula2/113749

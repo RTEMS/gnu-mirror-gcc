@@ -8215,6 +8215,15 @@ should_move_die_to_comdat (dw_die_ref die)
           || is_nested_in_subprogram (die)
           || contains_subprogram_definition (die))
 	return false;
+      if (die->die_tag != DW_TAG_enumeration_type)
+	{
+	  /* Don't move non-constant size aggregates.  */
+	  dw_attr_node *sz = get_AT (die, DW_AT_byte_size);
+	  if (sz == NULL
+	      || (AT_class (sz) != dw_val_class_unsigned_const
+		  && AT_class (sz) != dw_val_class_unsigned_const_implicit))
+	    return false;
+	}
       return true;
     case DW_TAG_array_type:
     case DW_TAG_interface_type:
@@ -22859,18 +22868,19 @@ gen_enumeration_type_die (tree type, dw_die_ref context_die, bool reverse)
 
   if (type_die == NULL || reverse)
     {
+      dw_die_ref scope_die = scope_die_for (type, context_die);
+
       /* The DIE with DW_AT_endianity is placed right after the naked DIE.  */
       if (reverse)
 	{
 	  gcc_assert (type_die);
 	  dw_die_ref after_die = type_die;
 	  type_die = new_die_raw (DW_TAG_enumeration_type);
-	  add_child_die_after (context_die, type_die, after_die);
+	  add_child_die_after (scope_die, type_die, after_die);
 	}
       else
 	{
-	  type_die = new_die (DW_TAG_enumeration_type,
-			      scope_die_for (type, context_die), type);
+	  type_die = new_die (DW_TAG_enumeration_type, scope_die, type);
 	  equate_type_number_to_die (type, type_die);
 	}
       add_name_attribute (type_die, type_tag (type));
@@ -25152,6 +25162,17 @@ gen_field_die (tree decl, struct vlr_context *ctx, dw_die_ref context_die)
     add_AT_flag (decl_die, DW_AT_artificial, 1);
 
   add_accessibility_attribute (decl_die, decl);
+
+  /* Add DW_AT_export_symbols to anonymous unions or structs.  */
+  if ((dwarf_version >= 5 || !dwarf_strict) && DECL_NAME (decl) == NULL_TREE)
+    if (tree type = member_declared_type (decl))
+      if (lang_hooks.types.type_dwarf_attribute (TYPE_MAIN_VARIANT (type),
+						 DW_AT_export_symbols) != -1)
+	{
+	  dw_die_ref type_die = lookup_type_die (TYPE_MAIN_VARIANT (type));
+	  if (type_die && get_AT (type_die, DW_AT_export_symbols) == NULL)
+	    add_AT_flag (type_die, DW_AT_export_symbols, 1);
+	}
 
   /* Equate decl number to die, so that we can look up this decl later on.  */
   equate_decl_number_to_die (decl, decl_die);

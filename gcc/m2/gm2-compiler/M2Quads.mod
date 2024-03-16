@@ -230,7 +230,8 @@ FROM M2StackWord IMPORT StackOfWord, InitStackWord, KillStackWord,
                         PushWord, PopWord, PeepWord, RemoveTop,
                         IsEmptyWord, NoOfItemsInStackWord ;
 
-FROM Indexing IMPORT Index, InitIndex, GetIndice, PutIndice, InBounds, HighIndice, IncludeIndiceIntoIndex ;
+FROM Indexing IMPORT Index, InitIndex, GetIndice, PutIndice, InBounds, HighIndice,
+                     IncludeIndiceIntoIndex, InitIndexTuned ;
 
 FROM M2Range IMPORT InitAssignmentRangeCheck,
                     InitReturnRangeCheck,
@@ -2383,12 +2384,12 @@ PROCEDURE callRequestDependant (tokno: CARDINAL;
 BEGIN
    Assert (requestDep # NulSym) ;
    PushTtok (requestDep, tokno) ;
-   PushTF (Adr, Address) ;
+   PushTFtok (Adr, Address, tokno) ;
    PushTtok (MakeConstString (tokno, GetSymName (moduleSym)), tokno) ;
    PushT (1) ;
    BuildAdrFunction ;
 
-   PushTF (Adr, Address) ;
+   PushTFtok (Adr, Address, tokno) ;
    PushTtok (MakeConstString (tokno, GetLibName (moduleSym)), tokno) ;
    PushT (1) ;
    BuildAdrFunction ;
@@ -2398,12 +2399,12 @@ BEGIN
       PushTF (Nil, Address) ;
       PushTF (Nil, Address)
    ELSE
-      PushTF (Adr, Address) ;
+      PushTFtok (Adr, Address, tokno) ;
       PushTtok (MakeConstString (tokno, GetSymName (depModuleSym)), tokno) ;
       PushT (1) ;
       BuildAdrFunction ;
 
-      PushTF (Adr, Address) ;
+      PushTFtok (Adr, Address, tokno) ;
       PushTtok (MakeConstString (tokno, GetLibName (depModuleSym)), tokno) ;
       PushT (1) ;
       BuildAdrFunction
@@ -2667,7 +2668,7 @@ PROCEDURE BuildStringAdrParam (tok: CARDINAL; name: Name);
 VAR
    str, m2strnul: CARDINAL ;
 BEGIN
-   PushTF (Adr, Address) ;
+   PushTFtok (Adr, Address, tok) ;
    str := MakeConstString (tok, name) ;
    PutConstStringKnown (tok, str, name, FALSE, TRUE) ;
    m2strnul := DeferMakeConstStringM2nul (tok, str) ;
@@ -2771,12 +2772,12 @@ BEGIN
             (* DeconstructModules (module_name, argc, argv, envp);  *)
             PushTtok (deconstructModules, tok) ;
 
-            PushTF(Adr, Address) ;
+            PushTFtok (Adr, Address, tok) ;
             PushTtok (MakeConstString (tok, GetSymName (moduleSym)), tok) ;
             PushT(1) ;
             BuildAdrFunction ;
 
-            PushTF(Adr, Address) ;
+            PushTFtok (Adr, Address, tok) ;
             PushTtok (MakeConstString (tok, GetLibName (moduleSym)), tok) ;
             PushT(1) ;
             BuildAdrFunction ;
@@ -2835,12 +2836,12 @@ BEGIN
             (* RegisterModule (module_name, init, fini, dependencies);  *)
             PushTtok (RegisterModule, tok) ;
 
-            PushTF (Adr, Address) ;
+            PushTFtok (Adr, Address, tok) ;
             PushTtok (MakeConstString (tok, GetSymName (moduleSym)), tok) ;
             PushT (1) ;
             BuildAdrFunction ;
 
-            PushTF (Adr, Address) ;
+            PushTFtok (Adr, Address, tok) ;
             PushTtok (MakeConstString (tok, GetLibName (moduleSym)), tok) ;
             PushT (1) ;
             BuildAdrFunction ;
@@ -6421,7 +6422,7 @@ BEGIN
             THEN
                MarkAsReadWrite(rw) ;
                (* pass the address field of an unbounded variable *)
-               PushTF(Adr, Address) ;
+               PushTFtok (Adr, Address, OperandTok (pi)) ;
                PushTFAD (f^.TrueExit, f^.FalseExit, f^.Unbounded, f^.Dimension) ;
                PushT(1) ;
                BuildAdrFunction ;
@@ -6451,7 +6452,7 @@ BEGIN
       THEN
          MarkAsReadWrite(rw) ;
          (* pass the address field of an unbounded variable *)
-         PushTF(Adr, Address) ;
+         PushTFtok (Adr, Address, OperandTok (pi)) ;
          PushTFAD (f^.TrueExit, f^.FalseExit, f^.Unbounded, f^.Dimension) ;
          PushT(1) ;
          BuildAdrFunction ;
@@ -8399,6 +8400,7 @@ VAR
 BEGIN
    PopT (NoOfParam) ;
    ReturnVar := MakeTemporary (tok, ImmediateValue) ;
+   PutConst (ReturnVar, Cardinal) ;
    GenHigh (tok, ReturnVar, 1, OperandT (1)) ;
    PopN (NoOfParam+1) ;
    PushTtok (ReturnVar, tok)
@@ -12573,19 +12575,21 @@ BEGIN
    IF Operator = OrTok
    THEN
       CheckBooleanId ;
-      PopBool (t1, f1) ;
+      PopBooltok (t1, f1, rightpos) ;
       PopTtok (Operator, OperatorPos) ;
-      PopBool (t2, f2) ;
+      PopBooltok (t2, f2, leftpos) ;
       Assert (f2=0) ;
-      PushBool (Merge (t1, t2), f1)
+      OperatorPos := MakeVirtualTok (OperatorPos, leftpos, rightpos) ;
+      PushBooltok (Merge (t1, t2), f1, OperatorPos)
    ELSIF (Operator = AndTok) OR (Operator = AmbersandTok)
    THEN
       CheckBooleanId ;
-      PopBool (t1, f1) ;
+      PopBooltok (t1, f1, rightpos) ;
       PopTtok (Operator, OperatorPos) ;
-      PopBool (t2, f2) ;
+      PopBooltok (t2, f2, leftpos) ;
       Assert (t2=0) ;
-      PushBool (t1, Merge (f1, f2))
+      OperatorPos := MakeVirtualTok (OperatorPos, leftpos, rightpos) ;
+      PushBooltok (t1, Merge (f1, f2), OperatorPos)
    ELSE
       PopTFrwtok (right, righttype, rightrw, rightpos) ;
       PopTtok (Operator, OperatorPos) ;
@@ -12892,10 +12896,10 @@ BEGIN
          GenQuadO (tokpos, Operator, Operand1, Operand2, 0, FALSE)
       END ;
       GenQuadO (tokpos, GotoOp, NulSym, NulSym, 0, FALSE) ;
-      PushBool (Merge (NextQuad-1, t1), Merge (NextQuad-2, f1))
+      PushBooltok (Merge (NextQuad-1, t1), Merge (NextQuad-2, f1), tokpos)
    ELSIF (OperandT (2) = HashTok) OR (OperandT (2) = LessGreaterTok)
    THEN
-      (* are the two boolean expressions the different? *)
+      (* are the two boolean expressions different? *)
       PopBool (t1, f1) ;
       PopT (Tok) ;
       PopBool (t2, f2) ;
@@ -12908,7 +12912,7 @@ BEGIN
          GenQuadO (tokpos, Operator, Operand1, Operand2, 0, FALSE)
       END ;
       GenQuadO (tokpos, GotoOp, NulSym, NulSym, 0, FALSE) ;
-      PushBool (Merge (NextQuad-2, f1), Merge (NextQuad-1, t1))
+      PushBooltok (Merge (NextQuad-2, f1), Merge (NextQuad-1, t1), tokpos)
    ELSE
       MetaError0 ('only allowed to use the relation operators {%Ek=} {%Ek#} rather than {%Ek<} or {%Ek>} on {%EkBOOLEAN} expressions as these do not imply an ordinal value for {%kTRUE} or {%kFALSE}')
    END
@@ -13060,7 +13064,7 @@ BEGIN
       GenQuadOtok (combinedTok, MakeOp (Op), left, right, 0, FALSE,
                    leftpos, rightpos, UnknownTokenNo) ;  (* True  Exit *)
       GenQuadO (combinedTok, GotoOp, NulSym, NulSym, 0, FALSE) ;  (* False Exit *)
-      PushBool (NextQuad-2, NextQuad-1)
+      PushBooltok (NextQuad-2, NextQuad-1, combinedTok)
    END
 END BuildRelOp ;
 
@@ -15451,7 +15455,7 @@ BEGIN
    LogicalXorTok := MakeKey('_LXOR') ;
    LogicalDifferenceTok := MakeKey('_LDIFF') ;
    ArithPlusTok := MakeKey ('_ARITH_+') ;
-   QuadArray := InitIndex (1) ;
+   QuadArray := InitIndexTuned (1, 1024*1024 DIV 16, 16) ;
    FreeList := 1 ;
    NewQuad(NextQuad) ;
    Assert(NextQuad=1) ;

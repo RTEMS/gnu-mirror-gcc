@@ -517,7 +517,6 @@
 ;; These code iterators allow the signed and unsigned scc operations to use
 ;; the same template.
 (define_code_iterator any_gt [gt gtu])
-(define_code_iterator any_ge [ge geu])
 (define_code_iterator any_lt [lt ltu])
 (define_code_iterator any_le [le leu])
 
@@ -2620,7 +2619,7 @@
 				(match_operand:P 2 "symbolic_operand")))]
 	UNSPEC_LOAD_FROM_GOT))]
   ""
-  "ld.<d>\t%0,%1,%L2"
+  "%Q2ld.<d>\t%0,%1,%L2"
   [(set_attr "type" "move")]
 )
 
@@ -3352,15 +3351,6 @@
 		     (match_operand:X 2 "reg_or_0_operand" "rJ")))]
   ""
   "slt<u>\t%0,%z2,%1"
-  [(set_attr "type" "slt")
-   (set_attr "mode" "<X:MODE>")])
-
-(define_insn "*sge<u>_<X:mode><GPR:mode>"
-  [(set (match_operand:GPR 0 "register_operand" "=r")
-	(any_ge:GPR (match_operand:X 1 "register_operand" "r")
-		     (const_int 1)))]
-  ""
-  "slt<u>i\t%0,%.,%1"
   [(set_attr "type" "slt")
    (set_attr "mode" "<X:MODE>")])
 
@@ -4251,24 +4241,27 @@
 
 
 (define_mode_iterator QHSD [QI HI SI DI])
+(define_int_iterator CRC [UNSPEC_CRC UNSPEC_CRCC])
+(define_int_attr crc [(UNSPEC_CRC "crc") (UNSPEC_CRCC "crcc")])
 
-(define_insn "loongarch_crc_w_<size>_w"
+(define_insn "loongarch_<crc>_w_<size>_w"
   [(set (match_operand:SI 0 "register_operand" "=r")
 	(unspec:SI [(match_operand:QHSD 1 "register_operand" "r")
 		   (match_operand:SI 2 "register_operand" "r")]
-		     UNSPEC_CRC))]
+		     CRC))]
   ""
-  "crc.w.<size>.w\t%0,%1,%2"
+  "<crc>.w.<size>.w\t%0,%1,%2"
   [(set_attr "type" "unknown")
    (set_attr "mode" "<MODE>")])
 
-(define_insn "loongarch_crcc_w_<size>_w"
-  [(set (match_operand:SI 0 "register_operand" "=r")
-	(unspec:SI [(match_operand:QHSD 1 "register_operand" "r")
-		   (match_operand:SI 2 "register_operand" "r")]
-		     UNSPEC_CRCC))]
-  ""
-  "crcc.w.<size>.w\t%0,%1,%2"
+(define_insn "loongarch_<crc>_w_<size>_w_extended"
+  [(set (match_operand:DI 0 "register_operand" "=r")
+	(sign_extend:DI
+	  (unspec:SI [(match_operand:QHSD 1 "register_operand" "r")
+		      (match_operand:SI 2 "register_operand" "r")]
+		     CRC)))]
+  "TARGET_64BIT"
+  "<crc>.w.<size>.w\t%0,%1,%2"
   [(set_attr "type" "unknown")
    (set_attr "mode" "<MODE>")])
 

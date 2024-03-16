@@ -1,3 +1,2285 @@
+2024-03-15  Jakub Jelinek  <jakub@redhat.com>
+
+	PR libgcc/114327
+	* gcc.dg/torture/bitint-63.c: New test.
+
+2024-03-15  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/113431
+	* gcc.dg/vect/pr113431.c: Restrict scan-tree-dump-times to
+	vect_hw_misalign targets.
+
+2024-03-15  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/114339
+	* gcc.target/i386/pr114339.c: New test.
+
+2024-03-15  Joe Ramsay  <Joe.Ramsay@arm.com>
+
+	* gcc.target/aarch64/no_merge_trunc_signed_zero.c: New test.
+
+2024-03-15  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/114332
+	* gcc.dg/torture/bitint-64.c: New file.
+
+2024-03-15  Jakub Jelinek  <jakub@redhat.com>
+
+	* g++.dg/torture/pr104601.C: Add -Wno-unused-result to dg-options.
+
+2024-03-15  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/113466
+	* gcc.dg/bitint-100.c: New test.
+
+2024-03-15  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/87477
+	PR fortran/89645
+	PR fortran/99065
+	PR fortran/114141
+	PR fortran/114280
+	* gfortran.dg/associate_64.f90 : New test
+	* gfortran.dg/associate_66.f90 : New test
+	* gfortran.dg/associate_67.f90 : New test
+	* gfortran.dg/associate_65.f90 : New test
+	* gfortran.dg/associate_68.f90 : New test
+
+2024-03-15  Tejas Belagod  <tejas.belagod@arm.com>
+
+	* gcc.dg/vect/pr114108.c: New test.
+
+2024-03-15  Chenghui Pan  <panchenghui@loongson.cn>
+
+	* gcc.target/loongarch/vector/lasx/lasx-xvpermi_q.c:
+	Reposition operand 3's value into instruction's defined accept range.
+
+2024-03-14  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/114294
+	* gm2/pim/pass/log: Removed.
+	* gm2/pim/pass/highexp.mod: New test.
+
+2024-03-14  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/113907
+	* gcc.dg/pr113907-1.c: New test.
+
+2024-03-14  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/114333
+	* gm2/pim/fail/badset5.mod: New test.
+	* gm2/pim/fail/badset6.mod: New test.
+
+2024-03-14  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* c-c++-common/goacc/readonly-1.c: Add basic OpenACC 'declare'
+	testing.
+	* gfortran.dg/goacc/readonly-1.f90: Likewise.
+
+2024-03-14  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/114310
+	* gcc.dg/pr114310.c: New test.
+
+2024-03-14  Juergen Christ  <jchrist@linux.ibm.com>
+
+	* gcc.target/s390/htm-builtins-1.c: Fix.
+	* gcc.target/s390/htm-builtins-2.c: Fix.
+
+2024-03-14  Lewis Hyatt  <lhyatt@gmail.com>
+
+	PR preprocessor/110558
+	* c-c++-common/cpp/has-include-2.c: New test.
+	* c-c++-common/cpp/has-include-2.h: New test.
+
+2024-03-14  Lewis Hyatt  <lhyatt@gmail.com>
+
+	* lib/gcc-defs.exp (dg-additional-options): Make $srcdir usable in a
+	dg-additional-options directive.
+	* c-c++-common/cpp/has-include-next-2-dir/has-include-next-2.h: New test.
+	* c-c++-common/cpp/has-include-next-2.c: New test.
+
+2024-03-14  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/114333
+	* gm2/cse/pass/testcse54.mod: New test.
+	* gm2/iso/run/pass/array9.mod: New test.
+	* gm2/iso/run/pass/strcons3.mod: New test.
+	* gm2/iso/run/pass/strcons4.mod: New test.
+	* gm2/pim/fail/badset1.mod: New test.
+	* gm2/pim/fail/badset2.mod: New test.
+	* gm2/pim/fail/badset3.mod: New test.
+	* gm2/pim/fail/badset4.mod: New test.
+
+2024-03-14  Chung-Lin Tang  <cltang@baylibre.com>
+
+	* c-c++-common/goacc/readonly-1.c: New test.
+	* gfortran.dg/goacc/readonly-1.f90: New test.
+
+2024-03-14  Andreas Krebbel  <krebbel@linux.ibm.com>
+
+	* gcc.target/s390/aligned-1.c: Add weak and void variables
+	incorporating the cases from unaligned-2.c.
+	* gcc.target/s390/unaligned-1.c: Likewise.
+	* gcc.target/s390/unaligned-2.c: Removed.
+
+2024-03-14  liuhongt  <hongtao.liu@intel.com>
+
+	* g++.target/i386/pr111822.C: New test.
+
+2024-03-13  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/114001
+	* gfortran.dg/is_contiguous_4.f90: New test.
+
+2024-03-13  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/114319
+	* gcc.target/i386/pr114319.c: New test.
+
+2024-03-13  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	* c-c++-common/analyzer/null-deref-pr108251-smp_fetch_ssl_fc_has_early-O2.c:
+	Added dg-bogus with target on offending line for short_enums.
+
+2024-03-13  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	* gcc.target/s390/md/rXsbg_mode_sXl.c: Fix tests rosbg_si_srl
+	and rxsbg_si_srl.
+
+2024-03-13  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/114313
+	* gcc.dg/torture/bitint-62.c: New test.
+
+2024-03-13  Jakub Jelinek  <jakub@redhat.com>
+
+	PR sanitizer/112709
+	* gcc.dg/asan/pr112709-2.c: New test.
+
+2024-03-13  Jakub Jelinek  <jakub@redhat.com>
+
+	PR sanitizer/112709
+	* gcc.dg/ubsan/pr112709-1.c: New test.
+	* gcc.dg/ubsan/pr112709-2.c: New test.
+
+2024-03-12  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/110826
+	* gfortran.dg/proc_ptr_comp_53.f90: New test.
+
+2024-03-12  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/114121
+	* gcc.dg/torture/pr114312.c: New testcase.
+
+2024-03-12  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/98645
+	PR c++/98688
+	PR c++/111224
+	* g++.dg/modules/target-aarch64-1_a.C: New test.
+	* g++.dg/modules/target-aarch64-1_b.C: New test.
+	* g++.dg/modules/target-powerpc-1_a.C: New test.
+	* g++.dg/modules/target-powerpc-1_b.C: New test.
+	* g++.dg/modules/target-powerpc-2_a.C: New test.
+	* g++.dg/modules/target-powerpc-2_b.C: New test.
+
+2024-03-12  Jakub Jelinek  <jakub@redhat.com>
+
+	PR sanitizer/112709
+	* gcc.dg/asan/pr112709-1.c: New test.
+	* g++.dg/asan/pr69276.C: Adjust expected output for some targets.
+
+2024-03-12  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/114293
+	* gcc.dg/pr114293.c: New test.
+
+2024-03-12  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/114297
+	* gcc.dg/vect/vect-early-break_123-pr114297.c: New testcase.
+
+2024-03-11  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+
+	PR libfortran/105437
+	PR libfortran/114304
+	* gfortran.dg/pr105473.f90: Add additional checks to address
+	the case of semicolon at the end of a line.
+
+2024-03-11  Richard Earnshaw  <rearnsha@arm.com>
+
+	PR testsuite/113428
+	* gcc.dg/gomp/bad-array-section-c-3.c: Use signed char instead
+	of int.
+
+2024-03-11  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	PR tree-optimization/98238
+	* gcc.dg/vect/vect-cost-model-1.c (scan-tree-dump): Also require
+	vect_hw_misalign.
+	* gcc.dg/vect/vect-cost-model-3.c: Likewise.
+	* gcc.dg/vect/vect-cost-model-5.c: Likewise.
+
+2024-03-11  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	PR tree-optimization/114071
+	PR tree-optimization/113557
+	PR testsuite/96109
+	* gcc.dg/vect/pr37027.c: Require vect_perm.
+	* gcc.dg/vect/pr67790.c: Likewise.
+	* gcc.dg/vect/slp-reduc-1.c: Likewise.
+	* gcc.dg/vect/slp-reduc-2.c: Likewise.
+	* gcc.dg/vect/slp-reduc-7.c: Likewise.
+	* gcc.dg/vect/slp-reduc-8.c: Likewise.
+	* gcc.dg/vect/vect-multi-peel-gaps.c (scan-tree-dump): Also
+	require vect_perm.
+	* gcc.dg/vect/slp-47.c: Require vect_perm.
+	* gcc.dg/vect/slp-48.c: Likewise.
+
+2024-03-11  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/114299
+	* gcc.target/i386/pr114299.c: New testcase.
+
+2024-03-11  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/114278
+	* gcc.dg/bitint-99.c: New test.
+
+2024-03-11  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gcc.dg/sso-20.c: New test.
+	* gcc.dg/sso-21.c: Likewise.
+
+2024-03-11  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	PR middle-end/95351
+	* gcc.dg/float_opposite_arm-1.c: New test.
+
+2024-03-10  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/112285
+	PR d/112290
+	* gdc.dg/pr112285.d: New test.
+	* gdc.dg/pr112290.d: New test.
+
+2024-03-10  jlaw  <jeffreyalaw@gmail.com>
+
+	PR tree-optimization/110199
+	* gcc.dg/tree-ssa/minmax-27.c: New test.
+	* gcc.dg/tree-ssa/minmax-28.c: New test.
+
+2024-03-10  Pan Li  <pan2.li@intel.com>
+
+	* gcc.target/riscv/rvv/base/pr114195-1.c: New test.
+
+2024-03-10  jlaw  <jeffreyalaw@gmail.com>
+
+	Revert:
+	2024-01-22  Jeff Law  <jlaw@ventanamicro.com>
+
+	* gcc.target/sh/pr59533-1.c: Adjust expected output.
+
+2024-03-10  jlaw  <jeffreyalaw@gmail.com>
+
+	PR target/111362
+	* gcc.target/riscv/compare-debug-1.c: New test.
+	* gcc.target/riscv/compare-debug-2.c: New test.
+
+2024-03-09  Xi Ruoyao  <xry111@xry111.site>
+
+	* gcc.target/loongarch/tls-ie-relax.c: New test.
+	* gcc.target/loongarch/tls-ie-norelax.c: New test.
+	* gcc.target/loongarch/tls-ie-extreme.c: New test.
+
+2024-03-09  Lulu Cheng  <chenglulu@loongson.cn>
+
+	* gcc.target/loongarch/regname-fp-s9.c: Add compilation option
+	'-Wno-pedantic -std=gnu90'.
+
+2024-03-09  Lulu Cheng  <chenglulu@loongson.cn>
+
+	* g++.target/loongarch/atomic-cas-int.C: New test.
+
+2024-03-08  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/113757
+	* g++.dg/ipa/pr113757.C: New test.
+
+2024-03-08  David Faust  <david.faust@oracle.com>
+
+	* gcc.target/bpf/inline-memops-threshold-1.c: New test.
+	* gcc.target/bpf/inline-memops-threshold-2.c: New test.
+
+2024-03-08  Richard Earnshaw  <rearnsha@arm.com>
+
+	PR target/113542
+	* gcc.target/arm/bics_3.c: Adjust code to something which should
+	always result in BICS.
+
+2024-03-08  David Faust  <david.faust@oracle.com>
+
+	* gcc.target/bpf/memset-1.c: Move error test case to...
+	* gcc.target/bpf/memset-2.c: ... here. New test.
+
+2024-03-08  Wilco Dijkstra  <wilco.dijkstra@arm.com>
+
+	PR target/113915
+	* gcc.target/arm/builtin-bswap.x: Fix test to avoid emitting CBZ.
+
+2024-03-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/113617
+	PR target/114233
+	* g++.dg/other/pr113617.C: Define -DSHARED when linking with -shared.
+	* g++.dg/other/pr113617-aux.cc: Add definitions for used methods and
+	templates not defined elsewhere.
+
+2024-03-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/38534
+	* gcc.target/i386/pr38534-1.c: Add -mnoreturn-no-callee-saved-registers
+	to dg-options.
+	* gcc.target/i386/pr38534-2.c: Likewise.
+	* gcc.target/i386/pr38534-3.c: Likewise.
+	* gcc.target/i386/pr38534-4.c: Likewise.
+	* gcc.target/i386/pr38534-5.c: Likewise.
+	* gcc.target/i386/pr38534-6.c: Likewise.
+	* gcc.target/i386/pr114097-1.c: Likewise.
+	* gcc.target/i386/stack-check-17.c: Likewise.
+
+2024-03-08  Jakub Jelinek  <jakub@redhat.com>
+
+	* g++.dg/ext/atomic-5.C: New test.
+
+2024-03-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR debug/113918
+	* c-c++-common/dwarf2/pr113918.c: New test.
+
+2024-03-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/113802
+	* g++.dg/cpp23/explicit-obj-diagnostics3.C (S0, S1, S2, S3, S4): Don't
+	expect any diagnostics on f and fd member function templates, add
+	similar templates with ...Selves instead of Selves as k and kd and
+	expect diagnostics for those.  Expect extra diagnostics in error
+	recovery for g and gd member function templates.
+
+2024-03-08  Richard Biener  <rguenther@suse.de>
+
+	PR testsuite/108355
+	* gcc.dg/tree-ssa/ssa-fre-104.c: Align e.
+
+2024-03-08  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* gm2/iso/pass/arrayconst.mod: New test.
+	* gm2/iso/pass/arrayconst2.mod: New test.
+	* gm2/iso/pass/arrayconst3.mod: New test.
+	* gm2/iso/pass/arrayconst4.mod: New test.
+
+2024-03-08  demin.han  <demin.han@starfivetech.com>
+
+	PR target/114264
+	* gcc.dg/vect/costmodel/riscv/rvv/pr114264.c: New test.
+
+2024-03-08  Haochen Gui  <guihaoc@gcc.gnu.org>
+
+	* gcc.target/powerpc/fwprop-1.c: New.
+
+2024-03-07  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/114229
+	* g++.dg/modules/virt-2_b.C: Update test to acknowledge that we
+	now emit vtables here too.
+	* g++.dg/modules/virt-3_a.C: New test.
+	* g++.dg/modules/virt-3_b.C: New test.
+	* g++.dg/modules/virt-3_c.C: New test.
+	* g++.dg/modules/virt-3_d.C: New test.
+
+2024-03-07  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/103994
+	* g++.dg/modules/pr99425-1_b.H: s/alias/decl in dump scan.
+	* g++.dg/modules/tpl-alias-1_a.H: Likewise.
+	* g++.dg/modules/tpl-alias-2_a.H: New test.
+	* g++.dg/modules/tpl-alias-2_b.C: New test.
+
+2024-03-07  Wilco Dijkstra  <wilco.dijkstra@arm.com>
+
+	PR target/113618
+	* gcc.target/aarch64/pr113618.c: New test.
+
+2024-03-07  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/110730
+	PR c++/105512
+	* g++.dg/modules/hello-2_a.C: New test.
+	* g++.dg/modules/hello-2_b.C: New test.
+	* g++.dg/modules/namespace-6_a.H: New test.
+	* g++.dg/modules/namespace-6_b.C: New test.
+
+2024-03-07  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	PR target/114233
+	* lib/target-supports.exp: Fix test for C++.
+
+2024-03-07  Robin Dapp  <rdapp@ventanamicro.com>
+
+	* gcc.target/aarch64/pr114196.c: New test.
+	* gcc.target/riscv/rvv/autovec/pr114196.c: New test.
+
+2024-03-07  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/110031
+	* g++.dg/cpp1z/inline-var11.C: New test.
+
+2024-03-07  Jeevitha Palanisamy  <jeevitha@linux.ibm.com>
+
+	PR target/113950
+	* gcc.target/powerpc/pr113950.c: New testcase.
+
+2024-03-07  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gnat.dg/predicate15.adb: New test.
+
+2024-03-07  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/98356
+	* g++.dg/pr98356.C: New test.
+
+2024-03-07  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/98881
+	* g++.dg/modules/tpl-tpl-parm-3.h: New test.
+	* g++.dg/modules/tpl-tpl-parm-3_a.H: New test.
+	* g++.dg/modules/tpl-tpl-parm-3_b.C: New test.
+	* g++.dg/modules/tpl-tpl-parm-3_c.C: New test.
+
+2024-03-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/110079
+	* gcc.dg/pr110079.c: New test.
+
+2024-03-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/105533
+	* gcc.dg/pr105533.c: New test.
+
+2024-03-07  chenxiaolong  <chenxiaolong@loongson.cn>
+
+	* gcc.target/loongarch/vector/lasx/lasx-xvfrint_s.c: Replace
+	ASSERTEQ_64 with the macro ASSERTEQ_32.
+	* gcc.target/loongarch/vector/lasx/lasx-xvshuf_b.c: Modify the expected
+	test results of some functions according to the function of the vector
+	instruction.
+	* gcc.target/loongarch/vector/lsx/lsx-vfrint_s.c: Same
+	modification as lasx-xvfrint_s.c.
+	* gcc.target/loongarch/vector/lsx/lsx-vshuf.c: Same
+	modification as lasx-xvshuf_b.c.
+	* gcc.target/loongarch/vector/simd_correctness_check.h: Use the llabs()
+	function instead of abs() to check the correctness of the results.
+
+2024-03-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/114009
+	* gcc.dg/tree-ssa/pr114009.c: New test.
+
+2024-03-07  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+
+	PR libfortran/105456
+	* gfortran.dg/pr105456.f90: Revise using '%' characters
+	in users error message.
+
+2024-03-06  Robin Dapp  <rdapp@ventanamicro.com>
+
+	* gcc.target/riscv/rvv/autovec/pr114200.c: New test.
+	* gcc.target/riscv/rvv/autovec/pr114202.c: New test.
+
+2024-03-06  Robin Dapp  <rdapp@ventanamicro.com>
+
+	* gcc.dg/vect/costmodel/riscv/rvv/vse-slp-1.c: New test.
+	* gcc.dg/vect/costmodel/riscv/rvv/vse-slp-2.c: New test.
+
+2024-03-06  Wilco Dijkstra  <wilco.dijkstra@arm.com>
+
+	PR target/113915
+	* gcc.target/arm/builtin-bswap-1.c: Fix test to allow conditional
+	execution both for Arm and Thumb-2.
+
+2024-03-06  Jeff Law  <jlaw@ventanamicro.com>
+
+	PR target/113001
+	PR target/112871
+	* gcc.target/riscv/zicond-ice-3.c: New test.
+	* gcc.target/riscv/zicond-ice-4.c: New test.
+
+2024-03-06  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103707
+	PR fortran/106987
+	* gfortran.dg/pr99350.f90:
+	* gfortran.dg/arithmetic_overflow_3.f90: New test.
+
+2024-03-06  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/114114
+	* g++.dg/cpp0x/noexcept84.C: New test.
+
+2024-03-06  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* gcc.target/gcn/sram-ecc-3.c: Adjust.
+	* gcc.target/gcn/sram-ecc-4.c: Likewise.
+	* gcc.target/gcn/sram-ecc-7.c: Likewise.
+	* gcc.target/gcn/sram-ecc-8.c: Likewise.
+
+2024-03-06  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/114239
+	* gcc.dg/vect/vect-early-break_122-pr114239.c: New testcase.
+
+2024-03-06  Xi Ruoyao  <xry111@xry111.site>
+
+	* gcc.target/loongarch/vfcmp-f.c: Rewrite to avoid named
+	registers.
+	* gcc.target/loongarch/vfcmp-d.c: Likewise.
+	* gcc.target/loongarch/xvfcmp-f.c: Likewise.
+	* gcc.target/loongarch/xvfcmp-d.c: Likewise.
+
+2024-03-06  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/113629
+	* g++.dg/cpp23/explicit-obj-conv-op.C: New test.
+
+2024-03-06  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/114249
+	* gcc.dg/vect/bb-slp-pr114249.c: New testcase.
+
+2024-03-06  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/114246
+	* gcc.dg/torture/pr114246.c: New testcase.
+
+2024-03-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/114190
+	* gcc.target/i386/avx-pr114190.c: New test.
+
+2024-03-06  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+
+	PR libfortran/105456
+	* gfortran.dg/pr105456-nmlr.f90: New test.
+	* gfortran.dg/pr105456-nmlw.f90: New test.
+	* gfortran.dg/pr105456-ruf.f90: New test.
+	* gfortran.dg/pr105456-wf.f90: New test.
+	* gfortran.dg/pr105456-wuf.f90: New test.
+
+2024-03-06  Patrick Palka  <ppalka@redhat.com>
+
+	* g++.dg/modules/friend-7.h: New test.
+	* g++.dg/modules/friend-7_a.H: New test.
+	* g++.dg/modules/friend-7_b.C: New test.
+
+2024-03-05  Cupertino Miranda  <cupertino.miranda@oracle.com>
+	    Indu Bhagat  <indu.bhagat@oracle.com>
+
+	PR debug/114186
+	* gcc.dg/debug/ctf/ctf-array-6.c: Add test.
+
+2024-03-05  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR sanitizer/97696
+	* gcc.target/aarch64/sve/pr97696.c: New test.
+
+2024-03-05  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.target/aarch64/sme/strided_1.c (test5): Remove.
+
+2024-03-05  Saurabh Jha  <saujha01@e130340.arm.com>
+
+	PR target/112337
+	* gcc.target/arm/pr112337.c: Check for, then use the right MVE
+	options.
+
+2024-03-05  Xi Ruoyao  <xry111@xry111.site>
+
+	* gcc.target/loongarch/regname-fp-s9.c: New test.
+
+2024-03-05  Roger Sayle  <roger@nextmovesoftware.com>
+
+	* gcc.target/avr/torture/insv-anyshift-hi.c: New test.
+	* gcc.target/avr/torture/insv-anyshift-si.c: New test.
+
+2024-03-05  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/114231
+	* gcc.dg/vect/pr114231.c: New testcase.
+
+2024-03-05  Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/114211
+	* gcc.dg/pr114211.c: New test.
+
+2024-03-05  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/114157
+	* gcc.dg/bitint-98.c: New test.
+	* gcc.target/i386/avx2-pr114157.c: New test.
+	* gcc.target/i386/avx512f-pr114157.c: New test.
+
+2024-03-05  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/114116
+	* gcc.target/i386/pr38534-1.c: Allow push/pop of bp.
+	* gcc.target/i386/pr38534-4.c: Likewise.
+	* gcc.target/i386/pr38534-2.c: Likewise.
+	* gcc.target/i386/pr38534-3.c: Likewise.
+	* gcc.target/i386/pr114097-1.c: Likewise.
+	* gcc.target/i386/stack-check-17.c: Expect no pop on ! ia32.
+
+2024-03-05  Patrick Palka  <ppalka@redhat.com>
+
+	* g++.dg/modules/friend-6_a.C: Pass -Wno-global-module instead
+	of -Wno-pedantic.  Remove now unnecessary preprocessing
+	directives from GMF.
+
+2024-03-04  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	* g++.dg/modules/using-12.C: New test.
+	* g++.dg/modules/using-13.h: New test.
+	* g++.dg/modules/using-13_a.C: New test.
+	* g++.dg/modules/using-13_b.C: New test.
+
+2024-03-04  David Faust  <david.faust@oracle.com>
+
+	* gcc.target/bpf/memset-1.c: New test.
+
+2024-03-04  Jan Dubiec  <jdx@o2.pl>
+
+	* gcc.c-torture/execute/20101011-1.c: Do not test on H8 series.
+
+2024-03-04  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/114197
+	* gcc.dg/torture/pr114197.c: New testcase.
+
+2024-03-04  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/114203
+	* gcc.dg/torture/pr114203.c: New testcase.
+
+2024-03-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/114209
+	* gcc.dg/bitint-97.c: New test.
+
+2024-03-04  Xi Ruoyao  <xry111@xry111.site>
+
+	PR testsuite/113418
+	* gcc.dg/pr104992.c (dg-options): Use -fdump-tree-forwprop2
+	instead of -fdump-tree-optimized.
+	(dg-final): Scan forwprop2 dump instead of optimized, and remove
+	the use of vect_int_mod.
+	* lib/target-supports.exp (check_effective_target_vect_int_mod):
+	Remove because it's not used anymore.
+
+2024-03-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/114184
+	* gcc.target/i386/pr114184.c: New test.
+
+2024-03-04  Roger Sayle  <roger@nextmovesoftware.com>
+
+	PR target/114187
+	* g++.target/i386/pr114187.C: New test case.
+
+2024-03-03  Greg McGary  <gkm@rivosinc.com>
+
+	* gcc.c-torture/execute/pr113010.c: New test.
+
+2024-03-03  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/114171
+	* gdc.dg/torture/pr114171.d: New test.
+
+2024-03-01  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/104919
+	PR c++/106009
+	* g++.dg/modules/tdef-7.h: Remove outdated comment.
+	* g++.dg/modules/tdef-7_b.C: Don't expect two TYPE_DECLs.
+	* g++.dg/modules/enum-13_a.C: New test.
+	* g++.dg/modules/enum-13_b.C: New test.
+
+2024-03-01  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/114170
+	* g++.dg/modules/var-tpl-2_a.H: New test.
+	* g++.dg/modules/var-tpl-2_b.C: New test.
+
+2024-03-01  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/114005
+	* g++.dg/modules/pr114005_a.C: New test.
+	* g++.dg/modules/pr114005_b.C: New test.
+
+2024-03-01  Jeff Law  <jlaw@ventanamicro.com>
+
+	* gcc.target/riscv/rvv/autovec/vls/calling-convention-1.c: Turn off
+	second phase scheduler.
+	* gcc.target/riscv/rvv/autovec/vls/calling-convention-2.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls/calling-convention-3.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls/calling-convention-4.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls/calling-convention-5.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls/calling-convention-6.c: Likewise.
+	* gcc.target/riscv/rvv/autovec/vls/calling-convention-7.c: Likewise.
+
+2024-03-01  Patrick Palka  <ppalka@redhat.com>
+
+	* g++.dg/modules/cexpr-4_a.C: New test.
+	* g++.dg/modules/cexpr-4_b.C: New test.
+
+2024-03-01  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/110358
+	PR c++/109642
+	* g++.dg/ext/attr-no-dangling1.C: New test.
+	* g++.dg/ext/attr-no-dangling2.C: New test.
+	* g++.dg/ext/attr-no-dangling3.C: New test.
+	* g++.dg/ext/attr-no-dangling4.C: New test.
+	* g++.dg/ext/attr-no-dangling5.C: New test.
+	* g++.dg/ext/attr-no-dangling6.C: New test.
+	* g++.dg/ext/attr-no-dangling7.C: New test.
+	* g++.dg/ext/attr-no-dangling8.C: New test.
+	* g++.dg/ext/attr-no-dangling9.C: New test.
+
+2024-03-01  David Faust  <david.faust@oracle.com>
+
+	* gcc.dg/debug/ctf/ctf-file-scope-1.c (SFOO): Make array member
+	fixed-length.
+
+2024-03-01  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/104819
+	* gfortran.dg/assumed_rank_9.f90: Adjust testcase use of NULL().
+	* gfortran.dg/pr101329.f90: Adjust testcase to conform to interp.
+	* gfortran.dg/null_actual_4.f90: New test.
+
+2024-03-01  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/110025
+	PR c++/114138
+	* g++.dg/cpp23/auto-fncast16.C: New test.
+	* g++.dg/cpp23/auto-fncast17.C: New test.
+	* g++.dg/cpp23/auto-fncast18.C: New test.
+
+2024-03-01  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/92687
+	* g++.dg/cpp1z/decomp59.C: New test.
+
+2024-03-01  Jakub Jelinek  <jakub@redhat.com>
+	    Tobias Burnus  <tburnus@baylibre.com>
+
+	PR c++/110347
+	* g++.dg/gomp/target-lambda-1.C: Moved to become a
+	run-time test under testsuite/libgomp.c++.
+
+2024-03-01  Jakub Jelinek  <jakub@redhat.com>
+
+	PR debug/114015
+	* gcc.dg/debug/dwarf2/pr114015.c: New test.
+
+2024-03-01  xuli  <xuli1@eswincomputing.com>
+
+	* g++.target/riscv/rvv/base/attribute-riscv_vector_cc-error.C: New test.
+	* gcc.target/riscv/rvv/base/attribute-riscv_vector_cc-callee-saved.c: New test.
+	* gcc.target/riscv/rvv/base/attribute-riscv_vector_cc-error.c: New test.
+
+2024-03-01  Pan Li  <pan2.li@intel.com>
+
+	PR target/112817
+	* g++.target/riscv/rvv/base/pr111296.C: Replace
+	param=riscv-autovec-preference to mrvv-vector-bits.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul4-6.c: Ditto.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul4-8.c: Ditto.
+	* gcc.dg/vect/costmodel/riscv/rvv/dynamic-lmul8-12.c: Ditto.
+	* gcc.dg/vect/costmodel/riscv/rvv/pr113112-1.c: Ditto.
+	* gcc.dg/vect/costmodel/riscv/rvv/pr113112-2.c: Ditto.
+	* gcc.dg/vect/costmodel/riscv/rvv/pr113112-3.c: Ditto.
+	* gcc.dg/vect/costmodel/riscv/rvv/pr113112-4.c: Ditto.
+	* gcc.dg/vect/costmodel/riscv/rvv/pr113112-5.c: Ditto.
+	* gcc.dg/vect/costmodel/riscv/rvv/pr113247-2.c: Ditto.
+	* gcc.dg/vect/costmodel/riscv/rvv/pr113247-4.c: Ditto.
+	* gcc.dg/vect/costmodel/riscv/rvv/pr113281-2.c: Ditto.
+	* gcc.dg/vect/costmodel/riscv/rvv/pr113281-4.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/align-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/align-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/copysign-run.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/copysign-rv32gcv.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/copysign-rv64gcv.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/copysign-zvfh-run.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/fmax-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/fmax_run-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/fmax_zvfh-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/fmax_zvfh_run-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/fmin-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/fmin_run-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/fmin_zvfh-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/fmin_zvfh_run-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/mulh-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/mulh-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/mulh_run-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/mulh_run-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/narrow-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/narrow-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/narrow-3.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/narrow_run-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/narrow_run-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/narrow_run-3.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/shift-immediate.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/shift-run.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/shift-rv32gcv.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/shift-rv64gcv.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/shift-scalar-run.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/shift-scalar-rv32gcv.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/shift-scalar-rv64gcv.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/shift-scalar-template.h: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vadd-run-nofm.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vadd-run.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vadd-rv32gcv-nofm.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vadd-rv32gcv.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vadd-rv64gcv-nofm.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vadd-rv64gcv.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vadd-zvfh-run.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vand-run.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vand-rv32gcv.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vand-rv64gcv.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vcompress-avlprop-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vdiv-run-nofm.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vdiv-run.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vdiv-rv32gcv-nofm.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vdiv-rv32gcv.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vdiv-rv64gcv-nofm.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vdiv-rv64gcv.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vdiv-zvfh-run.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vmax-run.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vmax-rv32gcv.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vmax-rv64gcv.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vmax-zvfh-run.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vmin-run.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vmin-rv32gcv.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vmin-rv64gcv.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vmin-zvfh-run.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vmul-run-nofm.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vmul-run.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vmul-rv32gcv-nofm.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vmul-rv32gcv.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vmul-rv64gcv-nofm.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vmul-rv64gcv.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vmul-zvfh-run.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vor-run.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vor-rv32gcv.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vor-rv64gcv.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vrem-run.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vrem-rv32gcv.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vrem-rv64gcv.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vsub-run-nofm.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vsub-run.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vsub-rv32gcv-nofm.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vsub-rv32gcv.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vsub-rv64gcv-nofm.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vsub-rv64gcv.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vsub-zvfh-run.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vxor-run.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vxor-rv32gcv.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/binop/vxor-rv64gcv.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/bug-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/bug-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/bug-3.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/bug-4.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/bug-5.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/bug-6.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/bug-8.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cmp/vcond-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cmp/vcond-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cmp/vcond-3.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cmp/vcond-4.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cmp/vcond_run-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cmp/vcond_run-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cmp/vcond_run-3.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cmp/vcond_run-4.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith-10.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith-11.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith-3.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith-4.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith-5.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith-6.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith-7.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith-8.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith-9.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith_run-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith_run-10.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith_run-11.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith_run-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith_run-3.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith_run-4.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith_run-5.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith_run-6.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith_run-7.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith_run-8.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_arith_run-9.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_float2float-rv32-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_float2float-rv32-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_float2float-rv64-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_float2float-rv64-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_float2float_run-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_float2float_run-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_float2int-rv32-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_float2int-rv32-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_float2int-rv64-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_float2int-rv64-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_float2int_run-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_float2int_run-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_float2int_zvfh-rv32-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_float2int_zvfh-rv32-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_float2int_zvfh-rv64-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_float2int_zvfh-rv64-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_float2int_zvfh_run-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_float2int_zvfh_run-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_int2float-rv32-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_int2float-rv32-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_int2float-rv64-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_int2float-rv64-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_int2float_run-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_int2float_run-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_int2int-rv32-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_int2int-rv32-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_int2int-rv64-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_int2int-rv64-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_int2int_run-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_convert_int2int_run-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_copysign-run.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_copysign-rv32gcv.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_copysign-rv64gcv.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_copysign-zvfh-run.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fadd-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fadd-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fadd-3.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fadd-4.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fadd_run-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fadd_run-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fadd_run-3.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fadd_run-4.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fma_fnma-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fma_fnma-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fma_fnma-3.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fma_fnma-4.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fma_fnma-5.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fma_fnma-6.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fma_fnma-7.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fma_fnma-8.c:
+	* gcc.target/riscv/rvv/autovec/cond/cond_fma_fnma_run-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fma_fnma_run-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fma_fnma_run-3.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fma_fnma_run-4.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fma_fnma_run-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fma_fnma_run-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fma_fnma_run-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fma_fnma_run-8.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmax-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmax-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmax-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmax-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmax_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmax_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmax_run-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmax_run-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmax_zvfh-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmax_zvfh-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmax_zvfh-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmax_zvfh-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmax_zvfh_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmax_zvfh_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmax_zvfh_run-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmax_zvfh_run-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmin-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmin-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmin-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmin-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmin_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmin_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmin_run-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmin_run-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmin_zvfh-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmin_zvfh-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmin_zvfh-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmin_zvfh-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmin_zvfh_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmin_zvfh_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmin_zvfh_run-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmin_zvfh_run-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fms_fnms-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fms_fnms-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fms_fnms-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fms_fnms-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fms_fnms-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fms_fnms-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fms_fnms_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fms_fnms_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fms_fnms_run-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fms_fnms_run-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fms_fnms_run-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fms_fnms_run-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmul-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmul-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmul-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmul-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmul-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmul_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmul_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmul_run-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmul_run-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_fmul_run-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_logical_min_max-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_logical_min_max-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_logical_min_max-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_logical_min_max-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_logical_min_max-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_logical_min_max_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_logical_min_max_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_logical_min_max_run-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_logical_min_max_run-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_logical_min_max_run-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_mulh-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_mulh-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_mulh_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_mulh_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_narrow_shift-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_narrow_shift-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_narrow_shift-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_narrow_shift_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_narrow_shift_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_narrow_shift_run-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_shift-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_shift-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_shift-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_shift-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_shift-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_shift-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_shift-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_shift-8.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_shift-9.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_shift_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_shift_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_shift_run-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_shift_run-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_shift_run-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_shift_run-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_shift_run-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_shift_run-8.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_shift_run-9.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_sqrt-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_sqrt-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_sqrt-zvfh-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_sqrt-zvfh-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_sqrt_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_sqrt_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_sqrt_run-zvfh-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_sqrt_run-zvfh-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary-8.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary_run-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary_run-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary_run-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary_run-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary_run-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_unary_run-8.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_widen_complicate-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_widen_complicate-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_widen_complicate-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_widen_complicate-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_widen_complicate-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_widen_complicate-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_widen_complicate-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_widen_complicate-8.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_widen_complicate-9.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_widen_reduc-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_widen_reduc-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_widen_reduc_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/cond_widen_reduc_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/cond/pr111401.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vec-narrow-int64-float16.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vec-widen-float16-int64.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfcvt-itof-run.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfcvt-itof-rv32gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfcvt-itof-rv64gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfcvt-itof-zvfh-run.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfcvt_rtz-run.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfcvt_rtz-rv32gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfcvt_rtz-rv64gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfcvt_rtz-zvfh-run.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfncvt-ftoi-run.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfncvt-ftoi-rv32gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfncvt-ftoi-rv64gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfncvt-ftoi-zvfh-run.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfncvt-itof-run.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfncvt-itof-rv32gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfncvt-itof-rv64gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfncvt-itof-zvfh-run.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfncvt-run.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfncvt-rv32gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfncvt-rv64gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfncvt-zvfh-run.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfwcvt-ftoi-run.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfwcvt-ftoi-rv32gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfwcvt-ftoi-rv64gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfwcvt-ftoi-zvfh-run.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfwcvt-itof-run.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfwcvt-itof-rv32gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfwcvt-itof-rv64gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfwcvt-itof-zvfh-run.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfwcvt-run.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfwcvt-rv32gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfwcvt-rv64gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vfwcvt-zvfh-run.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vncvt-run.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vncvt-rv32gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vncvt-rv64gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vsext-run.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vsext-rv32gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vsext-rv64gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vzext-run.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vzext-rv32gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/conversions/vzext-rv64gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/fixed-vlmax-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/fold-min-poly.c: Diito.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/strided_load-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/strided_load-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/strided_store-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/strided_store-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/madd-split2-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/gimple_fold-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/live-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/live-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/live_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/live_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/multiple_rgroup-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/multiple_rgroup-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/multiple_rgroup-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/multiple_rgroup-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/multiple_rgroup_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/multiple_rgroup_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/multiple_rgroup_run-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/multiple_rgroup_run-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/multiple_rgroup_zbb.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/select_vl-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/select_vl-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/single_rgroup-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/single_rgroup-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/single_rgroup-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/single_rgroup_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/single_rgroup_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/single_rgroup_run-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp-10.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp-11.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp-12.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp-13.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp-14.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp-15.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp-16.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp-17.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp-18.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp-19.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp-8.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp-9.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-10.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-11.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-12.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-13.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-14.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-15.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-16.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-17.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-18.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-19.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-8.c: Diito.
+	* gcc.target/riscv/rvv/autovec/partial/slp_run-9.c: Diito.
+	* gcc.target/riscv/rvv/autovec/post-ra-avl.c: Diito.
+	* gcc.target/riscv/rvv/autovec/pr110950.c: Diito.
+	* gcc.target/riscv/rvv/autovec/pr110964.c: Diito.
+	* gcc.target/riscv/rvv/autovec/pr110989.c: Diito.
+	* gcc.target/riscv/rvv/autovec/pr111232.c: Diito.
+	* gcc.target/riscv/rvv/autovec/pr111295.c: Diito.
+	* gcc.target/riscv/rvv/autovec/pr111313.c: Diito.
+	* gcc.target/riscv/rvv/autovec/pr112326.c: Diito.
+	* gcc.target/riscv/rvv/autovec/pr112552.c: Diito.
+	* gcc.target/riscv/rvv/autovec/pr112554.c: Diito.
+	* gcc.target/riscv/rvv/autovec/pr112561.c: Diito.
+	* gcc.target/riscv/rvv/autovec/pr112597-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/pr112599-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/pr112599-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/pr112694-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/pr112854.c: Diito.
+	* gcc.target/riscv/rvv/autovec/pr112872.c: Diito.
+	* gcc.target/riscv/rvv/autovec/pr112999.c: Diito.
+	* gcc.target/riscv/rvv/autovec/pr113393-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/pr113393-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/pr113393-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last-10.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last-11.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last-12.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last-13.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last-14.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last-8.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last-9.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last_run-10.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last_run-11.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last_run-12.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last_run-13.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last_run-14.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last_run-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last_run-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last_run-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last_run-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last_run-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last_run-8.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/extract_last_run-9.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc-10.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc-8.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc-9.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_call-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_call-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_call-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_call-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_call-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_run-10.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_run-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_run-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_run-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_run-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_run-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_run-8.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_strict-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_strict-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_strict-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_strict-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_strict-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_strict-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_strict-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_strict_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_strict_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_zvfh-10.c: Diito.
+	* gcc.target/riscv/rvv/autovec/reduc/reduc_zvfh_run-10.c: Diito.
+	* gcc.target/riscv/rvv/autovec/scalable-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/series-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/series_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/slp-mask-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/slp-mask-run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_load-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_load-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_load-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_load-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_load-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_load-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_load-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_load_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_load_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_load_run-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_load_run-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_load_run-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_load_run-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_load_run-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_store-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_store-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_store-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_store-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_store-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_store-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_store-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_store_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_store_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_store_run-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_store_run-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_store_run-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_store_run-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/mask_struct_store_run-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect-10.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect-11.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect-12.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect-13.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect-14.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect-15.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect-16.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect-17.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect-18.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect-8.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect-9.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-10.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-11.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-12.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-13.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-14.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-15.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-16.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-17.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-18.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-8.c: Diito.
+	* gcc.target/riscv/rvv/autovec/struct/struct_vect_run-9.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop-10.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop-11.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop-12.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop-8.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop-9.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm-10.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm-11.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm-12.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm-8.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm-9.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm_run-10.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm_run-11.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm_run-12.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm_run-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm_run-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm_run-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm_run-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm_run-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm_run-8.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_nofm_run-9.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run-10.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run-11.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run-12.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run-8.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run-9.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run_zvfh-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run_zvfh-10.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run_zvfh-11.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run_zvfh-12.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run_zvfh-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run_zvfh-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run_zvfh-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run_zvfh-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run_zvfh-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run_zvfh-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run_zvfh-8.c: Diito.
+	* gcc.target/riscv/rvv/autovec/ternop/ternop_run_zvfh-9.c: Diito.
+	* gcc.target/riscv/rvv/autovec/unop/abs-run.c: Diito.
+	* gcc.target/riscv/rvv/autovec/unop/abs-rv32gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/unop/abs-rv64gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/unop/abs-zvfh-run.c: Diito.
+	* gcc.target/riscv/rvv/autovec/unop/popcount-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/unop/popcount-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/unop/vfsqrt-run.c: Diito.
+	* gcc.target/riscv/rvv/autovec/unop/vfsqrt-rv32gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/unop/vfsqrt-rv64gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/unop/vfsqrt-zvfh-run.c: Diito.
+	* gcc.target/riscv/rvv/autovec/unop/vneg-run.c: Diito.
+	* gcc.target/riscv/rvv/autovec/unop/vneg-rv32gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/unop/vneg-rv64gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/unop/vneg-zvfh-run.c: Diito.
+	* gcc.target/riscv/rvv/autovec/unop/vnot-run.c: Diito.
+	* gcc.target/riscv/rvv/autovec/unop/vnot-rv32gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/unop/vnot-rv64gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/v-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/v-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/bitmask-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/bitmask-10.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/bitmask-11.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/bitmask-12.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/bitmask-13.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/bitmask-14.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/bitmask-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/bitmask-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/bitmask-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/bitmask-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/bitmask-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/bitmask-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/bitmask-8.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/bitmask-9.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/combine-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/combine-merge_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/combine-merge_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/compress-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/compress-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/compress-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/compress-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/compress-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/compress-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/compress_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/compress_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/compress_run-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/compress_run-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/compress_run-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/compress_run-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/consecutive-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/consecutive-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/consecutive_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/consecutive_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/full-vec-move1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/init-repeat-sequence-run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/init-repeat-sequence-run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/init-repeat-sequence-run-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/insert_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/insert_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/merge-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/merge-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/merge-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/merge-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/merge-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/merge-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/merge-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/merge_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/merge_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/merge_run-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/merge_run-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/merge_run-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/merge_run-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/merge_run-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/perm_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/perm_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/perm_run-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/perm_run-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/perm_run-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/perm_run-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/perm_run-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/pr110985.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/repeat_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/repeat_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/repeat_run-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/repeat_run-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/repeat_run-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/repeat_run-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/trailing-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/trailing-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/trailing_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls-vlmax/trailing_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls/calling-convention-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls/calling-convention-10.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls/calling-convention-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls/calling-convention-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls/calling-convention-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls/calling-convention-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls/calling-convention-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls/calling-convention-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls/calling-convention-8.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls/calling-convention-9.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls/calling-convention-run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls/calling-convention-run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls/calling-convention-run-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls/calling-convention-run-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls/calling-convention-run-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls/calling-convention-run-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vls/pr110994.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vmv-imm-fixed-rv32.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vmv-imm-fixed-rv64.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vmv-imm-run.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vmv-imm-rv32.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vmv-imm-rv64.c: Diito.
+	* gcc.target/riscv/rvv/autovec/vreinterpet-fixed.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/vec-avg-run.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/vec-avg-rv32gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/vec-avg-rv64gcv.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen-10.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen-11.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen-12.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen-8.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen-9.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen-complicate-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen-complicate-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen-complicate-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen-complicate-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen-complicate-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen-complicate-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen-complicate-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen-complicate-8.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen-complicate-9.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen_reduc-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen_reduc_order-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen_reduc_order-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen_reduc_order_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen_reduc_order_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen_reduc_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run-10.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run-11.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run-12.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run-4.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run-8.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run-9.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run_zvfh-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run_zvfh-10.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run_zvfh-11.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run_zvfh-12.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run_zvfh-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run_zvfh-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run_zvfh-5.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run_zvfh-6.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run_zvfh-7.c: Diito.
+	* gcc.target/riscv/rvv/autovec/widen/widen_run_zvfh-8.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve32f-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve32f-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve32f-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve32f_zvl1024b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve32f_zvl128b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve32f_zvl128b-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve32f_zvl2048b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve32f_zvl256b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve32f_zvl4096b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve32f_zvl512b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve32x-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve32x-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve32x-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve32x_zvl1024b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve32x_zvl128b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve32x_zvl128b-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve32x_zvl2048b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve32x_zvl256b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve32x_zvl4096b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve32x_zvl512b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64d-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64d-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64d-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64d_zvl1024b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64d_zvl128b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64d_zvl128b-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64d_zvl2048b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64d_zvl256b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64d_zvl4096b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64d_zvl512b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64f-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64f-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64f-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64f_zvl1024b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64f_zvl128b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64f_zvl128b-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64f_zvl2048b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64f_zvl256b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64f_zvl4096b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64f_zvl512b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64x-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64x-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64x-3.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64x_zvl1024b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64x_zvl128b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64x_zvl128b-2.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64x_zvl2048b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64x_zvl256b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64x_zvl4096b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zve64x_zvl512b-1.c: Diito.
+	* gcc.target/riscv/rvv/autovec/zvfhmin-1.c: Diito.
+	* gcc.target/riscv/rvv/base/abi-callee-saved-1-fixed-1.c: Diito.
+	* gcc.target/riscv/rvv/base/abi-callee-saved-1-fixed-2.c: Diito.
+	* gcc.target/riscv/rvv/base/cpymem-1.c: Diito.
+	* gcc.target/riscv/rvv/base/cpymem-2.c: Diito.
+	* gcc.target/riscv/rvv/base/cpymem-strategy-3.c: Diito.
+	* gcc.target/riscv/rvv/base/cpymem-strategy-4.c: Diito.
+	* gcc.target/riscv/rvv/base/float-point-dynamic-frm-77.c: Diito.
+	* gcc.target/riscv/rvv/base/float-point-frm-autovec-1.c: Diito.
+	* gcc.target/riscv/rvv/base/float-point-frm-autovec-2.c: Diito.
+	* gcc.target/riscv/rvv/base/float-point-frm-autovec-3.c: Diito.
+	* gcc.target/riscv/rvv/base/float-point-frm-autovec-4.c: Diito.
+	* gcc.target/riscv/rvv/base/poly-selftest-1.c: Diito.
+	* gcc.target/riscv/rvv/base/pr110119-1.c: Diito.
+	* gcc.target/riscv/rvv/base/pr110119-2.c: Diito.
+	* gcc.target/riscv/rvv/base/pr111720-0.c: Diito.
+	* gcc.target/riscv/rvv/base/pr111720-1.c: Diito.
+	* gcc.target/riscv/rvv/base/pr111720-10.c: Diito.
+	* gcc.target/riscv/rvv/base/pr111720-2.c: Diito.
+	* gcc.target/riscv/rvv/base/pr111720-3.c: Diito.
+	* gcc.target/riscv/rvv/base/pr111720-4.c: Diito.
+	* gcc.target/riscv/rvv/base/pr111720-5.c: Diito.
+	* gcc.target/riscv/rvv/base/pr111720-6.c: Diito.
+	* gcc.target/riscv/rvv/base/pr111720-7.c: Diito.
+	* gcc.target/riscv/rvv/base/pr111720-8.c: Diito.
+	* gcc.target/riscv/rvv/base/pr111720-9.c: Diito.
+	* gcc.target/riscv/rvv/base/vf_avl-1.c: Diito.
+	* gcc.target/riscv/rvv/base/vf_avl-2.c: Diito.
+	* gcc.target/riscv/rvv/base/vf_avl-3.c: Diito.
+	* gcc.target/riscv/rvv/base/vf_avl-4.c: Diito.
+	* gcc.target/riscv/rvv/base/zvl-unimplemented-1.c: Diito.
+	* gcc.target/riscv/rvv/base/zvl-unimplemented-2.c: Diito.
+	* gcc.target/riscv/rvv/rvv.exp: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-10.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-11.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-12.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-13.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-14.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-15.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-16.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-2.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-3.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-4.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-5.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-6.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-7.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-8.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_multiple-9.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_prop-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_prop-2.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-10.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-100.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-101.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-102.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-103.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-104.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-105.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-106.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-107.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-108.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-109.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-11.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-12.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-13.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-14.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-15.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-16.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-17.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-18.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-19.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-2.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-20.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-21.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-22.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-23.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-24.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-25.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-26.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-27.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-28.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-29.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-3.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-30.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-31.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-32.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-33.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-34.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-35.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-36.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-37.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-38.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-39.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-4.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-40.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-41.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-42.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-43.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-44.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-45.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-46.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-47.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-48.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-49.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-5.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-50.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-51.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-52.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-53.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-54.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-55.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-56.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-57.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-58.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-59.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-6.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-60.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-61.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-62.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-63.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-64.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-65.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-66.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-67.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-68.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-69.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-7.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-70.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-71.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-72.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-73.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-74.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-75.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-76.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-77.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-78.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-79.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-8.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-80.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-81.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-82.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-83.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-84.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-85.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-86.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-87.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-88.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-89.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-9.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-90.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-91.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-92.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-93.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-94.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-95.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-96.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-97.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-98.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/avl_single-99.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/dump-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/ffload-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/ffload-2.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/ffload-3.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/ffload-5.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/ffload-6.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/ffload-7.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_bb_prop-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_bb_prop-10.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_bb_prop-11.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_bb_prop-12.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_bb_prop-13.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_bb_prop-2.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_bb_prop-3.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_bb_prop-4.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_bb_prop-5.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_bb_prop-6.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_bb_prop-7.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_bb_prop-8.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_bb_prop-9.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_conflict-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_conflict-2.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_conflict-3.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_conflict-4.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_conflict-5.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-10.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-11.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-12.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-13.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-14.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-15.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-16.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-17.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-2.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-3.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-4.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-5.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-6.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-7.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-8.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_loop_invariant-9.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_switch-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_switch-2.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_switch-3.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_switch-4.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_switch-5.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_switch-6.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_switch-7.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_switch-8.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/imm_switch-9.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr108270.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr109399.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr109547.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr109615.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr109743-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr109743-2.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr109743-3.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr109743-4.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr109748.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr109773-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr109773-2.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr109974.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr111037-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr111037-2.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr111037-3.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr111037-4.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr111234.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr111255.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr111927.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr111947.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr112092-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr112092-2.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr112713-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr112713-2.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr112776.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr112813-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr112929-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr112988-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr113248.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/pr113696.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-10.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-11.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-12.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-13.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-14.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-15.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-16.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-17.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-18.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-19.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-2.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-20.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-21.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-22.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-23.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-24.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-25.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-26.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-27.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-28.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-29.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-3.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-30.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-31.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-32.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-33.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-34.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-35.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-36.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-37.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-38.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-39.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-4.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-40.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-41.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-42.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-43.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-44.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-45.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-46.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-5.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-6.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-7.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-8.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_back_prop-9.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-10.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-11.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-12.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-13.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-14.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-15.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-16.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-17.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-18.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-19.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-2.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-20.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-21.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-22.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-23.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-24.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-25.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-26.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-27.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-28.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-3.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-4.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-5.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-6.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-7.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-8.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_bb_prop-9.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_call-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_call-2.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_call-3.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_call-4.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_complex_loop-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_complex_loop-2.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_conflict-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_conflict-10.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_conflict-11.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_conflict-12.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_conflict-13.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_conflict-2.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_conflict-3.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_conflict-4.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_conflict-5.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_conflict-6.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_conflict-7.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_conflict-8.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_conflict-9.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-10.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-11.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-12.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-13.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-14.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-15.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-16.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-17.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-18.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-19.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-2.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-20.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-21.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-22.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-23.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-24.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-25.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-26.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-27.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-28.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-3.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-4.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-5.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-6.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-7.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-8.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_miss_default-9.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-10.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-11.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-12.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-13.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-14.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-15.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-16.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-17.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-18.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-19.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-2.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-20.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-21.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-22.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-23.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-24.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-25.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-26.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-27.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-28.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-3.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-4.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-5.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-6.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-7.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-8.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_phi-9.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-10.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-11.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-12.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-13.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-14.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-15.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-16.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-17.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-18.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-19.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-2.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-3.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-4.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-5.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-6.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-7.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-8.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_block-9.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_vtype-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_vtype-2.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_vtype-3.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_vtype-4.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_vtype-5.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_vtype-6.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_vtype-7.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_single_vtype-8.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-10.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-11.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-12.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-13.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-14.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-15.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-16.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-2.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-3.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-4.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-5.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-6.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-7.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-8.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-9.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-10.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-11.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-12.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-13.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-14.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-15.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-16.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-17.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-18.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-19.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-2.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-20.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-21.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-22.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-23.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-24.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-3.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-4.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-5.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-6.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-7.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-8.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-9.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl_bug-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl_bug-2.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl_int.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl_pre-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-1.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-10.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-11.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-12.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-13.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-14.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-15.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-16.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-17.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-18.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-19.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-2.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-20.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-3.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-4.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-5.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-6.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-7.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-8.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/vsetvlmax-9.c: Diito.
+	* gcc.target/riscv/rvv/vsetvl/wredsum_vlmax.c: Diito.
+	* gcc.target/riscv/rvv/base/rvv-vector-bits-1.c: New test.
+	* gcc.target/riscv/rvv/base/rvv-vector-bits-2.c: New test.
+	* gcc.target/riscv/rvv/base/rvv-vector-bits-3.c: New test.
+	* gcc.target/riscv/rvv/base/rvv-vector-bits-4.c: New test.
+	* gcc.target/riscv/rvv/base/rvv-vector-bits-5.c: New test.
+	* gcc.target/riscv/rvv/base/rvv-vector-bits-6.c: New test.
+
+2024-03-01  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/114156
+	* gcc.dg/bitint-96.c: New test.
+
+2024-02-29  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/114159
+	* c-c++-common/analyzer/call-summaries-pr114159.c: New test.
+
+2024-02-29  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR target/114132
+	* gcc.target/avr/pr114132-1.c: New test.
+	* gcc.target/avr/torture/pr114132-2.c: New test.
+
+2024-02-29  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/113987
+	* g++.dg/warn/Wuninitialized-15.C: Turn dg-warning into dg-bogus.
+	* g++.dg/warn/Wuninitialized-34.C: New test.
+
+2024-02-29  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/102344
+	* gm2/pim/pass/TestLong4.mod: Rewrite.
+	* gm2/cpp/pass/testlong4.mod: New test.
+
+2024-02-29  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	PR target/108174
+	* gcc.target/aarch64/acle/memtag_4.c: New test.
+
+2024-02-29  Xi Ruoyao  <xry111@xry111.site>
+
+	* gcc.target/loongarch/crc-sext.c: New test;
+
+2024-02-29  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/111710
+	* g++.dg/modules/lambda-7.h: New test.
+	* g++.dg/modules/lambda-7_a.H: New test.
+	* g++.dg/modules/lambda-7_b.C: New test.
+	* g++.dg/modules/lambda-7_c.C: New test.
+
+2024-02-29  Kito Cheng  <kito.cheng@sifive.com>
+
+	* gcc.target/riscv/pr114130.c: New.
+
+2024-02-29  Alexander Westbrooks  <alexanderw@gcc.gnu.org>
+
+	PR fortran/82943
+	PR fortran/86148
+	PR fortran/86268
+	* gfortran.dg/pdt_4.f03: Update modified error message.
+	* gfortran.dg/pdt_34.f03: New test.
+	* gfortran.dg/pdt_35.f03: New test.
+	* gfortran.dg/pdt_36.f03: New test.
+	* gfortran.dg/pdt_37.f03: New test.
+
+2024-02-28  Jakub Jelinek  <jakub@redhat.com>
+	    Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/113976
+	* g++.dg/cpp1y/var-templ87.C: New test.
+
+2024-02-28  Cupertino Miranda  <cupertino.miranda@oracle.com>
+
+	PR target/113453
+	PR target/113453
+	* gcc.target/bpf/btfext-funcinfo-nocore.c: Add.
+	* gcc.target/bpf/btfext-funcinfo.c: Add.
+	* gcc.target/bpf/core-attr-5.c: Fix regexp.
+	* gcc.target/bpf/core-attr-6.c: Fix regexp.
+	* gcc.target/bpf/core-builtin-fieldinfo-offset-1.c: Fix regexp.
+	* gcc.target/bpf/core-section-1.c: Fix regexp.
+
+2024-02-28  Harald Anlauf  <anlauf@gmx.de>
+
+	* gfortran.dg/pr101026.f: Let variables used in specification
+	expression be passed as dummy arguments
+
+2024-02-28  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/113831
+	PR tree-optimization/108355
+	* gcc.dg/tree-ssa/ssa-fre-104.c: XFAIL.
+
+2024-02-28  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/114121
+	* gcc.dg/torture/pr114121.c: New testcase.
+
+2024-02-28  Jakub Jelinek  <jakub@redhat.com>
+
+	PR testsuite/111462
+	* gcc.dg/tree-ssa/ssa-sink-18.c: XFAIL also on powerpc64.
+
+2024-02-28  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	PR tree-optimization/91567
+	* gcc.dg/tree-ssa/builtin-snprintf-6.c (scan-tree-dump-times):
+	Treat i?86-*-* like x86_64-*-*.
+
+2024-02-28  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/114075
+	* gcc.dg/gomp/pr114075.c: New test.
+
+2024-02-28  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/114041
+	* gcc.dg/graphite/run-id-pr114041-1.c: New test.
+	* gcc.dg/graphite/run-id-pr114041-2.c: New test.
+
+2024-02-28  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/113988
+	* gcc.dg/bitint-91.c: New test.
+
+2024-02-28  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc.dg/c23-stdarg-6.c: New test.
+
+2024-02-28  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/113970
+	PR c++/114013
+	* g++.dg/cpp1z/inline-var10.C: New test.
+
 2024-02-27  Uros Bizjak  <ubizjak@gmail.com>
 
 	PR target/113871
