@@ -1,3 +1,67 @@
+==================== Branch work163, patch #12 ====================
+
+Add -mcpu=future tuning support.
+
+This patch makes -mtune=future use the same tuning decision as -mtune=power11.
+
+2024-03-18  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/power10.md (all reservations): Add future as an
+	alterntive to power10 and power11.
+
+==================== Branch work163, patch #11 ====================
+
+Add -mcpu=future support.
+
+This patch adds the future option to the -mcpu= and -mtune= switches.
+
+This patch treats the future like a power11 in terms of costs and reassociation
+width.
+
+This patch issues a ".machine future" to the assembly file if you use
+-mcpu=power11.
+
+This patch defines _ARCH_PWR_FUTURE if the user uses -mcpu=future.
+
+This patch allows GCC to be configured with the --with-cpu=future and
+--with-tune=future options.
+
+This patch passes -mfuture to the assembler if the user uses -mcpu=future.
+
+2024-03-18  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config.gcc (rs6000*-*-*, powerpc*-*-*): Add support for power11.
+	* config/rs6000/aix71.h (ASM_CPU_SPEC): Add support for -mcpu=power11.
+	* config/rs6000/aix72.h (ASM_CPU_SPEC): Likewise.
+	* config/rs6000/aix73.h (ASM_CPU_SPEC): Likewise.
+	* config/rs6000/driver-rs6000.cc (asm_names): Likewise.
+	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Define
+	_ARCH_PWR_FUTURE if -mcpu=future.
+	* config/rs6000/rs6000-cpus.def (ISA_FUTURE_MASKS_SERVER): New define.
+	(POWERPC_MASKS): Add future isa bit.
+	(power11 cpu): Add future definition.
+	* config/rs6000/rs6000-opts.h (PROCESSOR_FUTURE): Add future processor.
+	* config/rs6000/rs6000-string.cc (expand_compare_loop): Likewise.
+	* config/rs6000/rs6000-tables.opt: Regenerate.
+	* config/rs6000/rs6000.cc (rs6000_option_override_internal): Add future
+	support.
+	(rs6000_machine_from_flags): Likewise.
+	(rs6000_reassociation_width): Likewise.
+	(rs6000_adjust_cost): Likewise.
+	(rs6000_issue_rate): Likewise.
+	(rs6000_sched_reorder): Likewise.
+	(rs6000_sched_reorder2): Likewise.
+	(rs6000_register_move_cost): Likewise.
+	(rs6000_opt_masks): Likewise.
+	* config/rs6000/rs6000.h (ASM_CPU_SPEC): Likewise.
+	* config/rs6000/rs6000.md (cpu attribute): Add future.
+	* config/rs6000/rs6000.opt (-mpower11): Add internal future ISA flag.
+	* doc/invoke.texi (RS/6000 and PowerPC Options): Document -mcpu=future.
+
 ==================== Branch work163, patch #3 ====================
 
 Add -mcpu=power11 tests.
