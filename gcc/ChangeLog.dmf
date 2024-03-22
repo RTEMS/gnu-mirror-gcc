@@ -1,4 +1,14 @@
-==================== Branch work163-dmf, patch #106 ====================
+==================== Branch work163-dmf, patch #130 ====================
+
+Add support for XVRL instruction.
+
+2024-03-22  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/altivec.md (xvrlw): New insn.
+
+==================== Branch work163-dmf, patch #126 ====================
 
 PowerPC: Add support for 1,024 bit DMR registers.
 
@@ -20,7 +30,7 @@ don't have aliases for __dmr512 and __dmr1024 that we've discussed internally.
 The patches have been tested on both little and big endian systems.  Can I check
 it into the master branch?
 
-2024-03-19   Michael Meissner  <meissner@linux.ibm.com>
+2024-03-22   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -70,11 +80,11 @@ gcc/testsuite/
 
 	* gcc.target/powerpc/dm-1024bit.c: New test.
 
-==================== Branch work163-dmf, patch #105 ====================
+==================== Branch work163-dmf, patch #125 ====================
 
 Add dense math test for new instruction names.
 
-2024-03-19   Michael Meissner  <meissner@linux.ibm.com>
+2024-03-22   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/testsuite/
 
@@ -82,7 +92,7 @@ gcc/testsuite/
 	* lib/target-supports.exp (check_effective_target_ppc_dmr_ok): New
 	target test.
 
-==================== Branch work163-dmf, patch #104 ====================
+==================== Branch work163-dmf, patch #124 ====================
 
 PowerPC: Switch to dense math names for all MMA operations.
 
@@ -97,7 +107,7 @@ the 'dm' prefix afterwards.  To prevent having two sets of parallel int
 attributes, we remove the "pm" prefix from the instruction string in the
 attributes, and add it later, both in the insn name and in the output template.
 
-2024-03-19   Michael Meissner  <meissner@linux.ibm.com>
+2024-03-22   Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -133,7 +143,7 @@ gcc/
 	(mma_pm<vvi4i4i4>): Likewise.
 	(mma_pm<avvi4i4i4>): Likewise.
 
-==================== Branch work163-dmf, patch #103 ====================
+==================== Branch work163-dmf, patch #123 ====================
 
 Add support for dense math registers.
 
@@ -184,7 +194,7 @@ both MMA without dense math and MMA with dense math:
 It is possible that the mangling for DMRs and the GDB register numbers may
 produce other changes in the future.
 
-2024-03-19   Michael Meissner  <meissner@linux.ibm.com>
+2024-03-22   Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/mma.md (movxo): Add comments about dense math registers.
 	(movxo_nodm): Rename from movxo and restrict the usage to machines
@@ -201,6 +211,8 @@ produce other changes in the future.
 	(accumulator_operand): Add support for dense math registers.
 	* config/rs6000/rs6000-builtin.cc (rs6000_gimple_fold_mma_builtin): Do
 	not de-prime accumulator when disassembling a vector quad.
+	* config/rs6000/rs6000-c.cc (rs6000_define_or_undefine_macro): Define
+	__DENSE_MATH__ if we have dense math registers.
 	* config/rs6000/rs6000.cc (enum rs6000_reg_type): Add DMR_REG_TYPE.
 	(enum rs6000_reload_reg_type): Add RELOAD_REG_DMR.
 	(LAST_RELOAD_REG_CLASS): Add support for DMR registers and the wD
@@ -239,8 +251,10 @@ produce other changes in the future.
 	(enum r6000_reg_class_enum): Add RS6000_CONSTRAINT_wD.
 	(REGISTER_NAMES): Add DMR registers.
 	(ADDITIONAL_REGISTER_NAMES): Likewise.
+	* config/rs6000/rs6000.md (FIRST_DMR_REGNO): New constant.
+	(LAST_DMR_REGNO): Likewise.
 
-==================== Branch work163-dmf, patch #102 ====================
+==================== Branch work163-dmf, patch #122 ====================
 
 Add wD constraint.
 
@@ -249,7 +263,7 @@ that overlap with VSX registers 0..31 on power10.  Future patches will add the
 support for a separate accumulator register class that will be used when the
 support for dense math registes is added.
 
-2024-03-19   Michael Meissner  <meissner@linux.ibm.com>
+2024-03-22   Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/constraints.md (wD): New constraint.
 	* config/rs6000/mma.md (mma_disassemble_acc): Likewise.
@@ -276,7 +290,7 @@ support for dense math registes is added.
 	the 'wD' constraint.
 	* doc/md.texi (PowerPC constraints): Document the 'wD' constraint.
 
-==================== Branch work163-dmf, patch #101 ====================
+==================== Branch work163-dmf, patch #121 ====================
 
 Use vector pair load/store for memcpy with -mcpu=future
 
@@ -285,7 +299,7 @@ vector pair and store vector pair instructions when optimizing things like
 memory copy.  This patch enables using those instructions if -mcpu=future is
 used.
 
-2024-03-18  Michael Meissner  <meissner@linux.ibm.com>
+2024-03-22  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -295,6 +309,13 @@ gcc/
 	(POWERPC_MASKS): Make the bit for enabling using load vector pair and
 	store vector pair operations set and reset when the PowerPC processor is
 	changed.
+
+==================== Branch work163-dmf, patch #106 was reverted ====================
+==================== Branch work163-dmf, patch #105 was reverted ====================
+==================== Branch work163-dmf, patch #104 was reverted ====================
+==================== Branch work163-dmf, patch #103 was reverted ====================
+==================== Branch work163-dmf, patch #102 was reverted ====================
+==================== Branch work163-dmf, patch #101 was reverted ====================
 
 ==================== Branch work163-dmf, baseline ====================
 
