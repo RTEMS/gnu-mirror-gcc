@@ -106,6 +106,7 @@
    you make changes here, make them also there.  */
 #define ASM_CPU_SPEC \
 "%{mcpu=native: %(asm_cpu_native); \
+  mcpu=future2: -mfuture; \
   mcpu=future: -mfuture; \
   mcpu=power11: -mpower11; \
   mcpu=power10: -mpower10; \
