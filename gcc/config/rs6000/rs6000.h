@@ -106,7 +106,6 @@
    you make changes here, make them also there.  */
 #define ASM_CPU_SPEC \
 "%{mcpu=native: %(asm_cpu_native); \
-  mcpu=future2: -mfuture; \
   mcpu=future: -mfuture; \
   mcpu=power11: -mpower11; \
   mcpu=power10: -mpower10; \
@@ -573,9 +572,6 @@ extern int rs6000_vector_align[];
    field of ipa_fn_summary by itself, the used bits for rs6000 are listed
    below.  */
 #define RS6000_FN_TARGET_INFO_HTM 1
-
-/* Whether we have PADDIS support.  */
-#define TARGET_PADDIS			TARGET_FUTURE2
 
 /* Whether the various reciprocal divide/square root estimate instructions
    exist, and whether we should automatically generate code for the instruction
@@ -2499,7 +2495,6 @@ typedef struct GTY(()) machine_function
 	    (HOST_WIDE_INT_1 << ((N)-1)) - 1)
 
 #define SIGNED_INTEGER_16BIT_P(VALUE)	SIGNED_INTEGER_NBIT_P (VALUE, 16)
-#define SIGNED_INTEGER_32BIT_P(VALUE)	SIGNED_INTEGER_NBIT_P (VALUE, 32)
 #define SIGNED_INTEGER_34BIT_P(VALUE)	SIGNED_INTEGER_NBIT_P (VALUE, 34)
 
 /* Like SIGNED_INTEGER_16BIT_P and SIGNED_INTEGER_34BIT_P, but with an extra
