@@ -7122,31 +7122,6 @@ proc check_effective_target_power11_ok { } {
 }
 
 # Return 1 if this is a PowerPC target supporting -mcpu=future which enables
-# the saturating subtract instruction.
-proc check_effective_target_powerpc_future_ok { } {
-       return [check_no_compiler_messages powerpc_future_ok object {
-           #ifndef _ARCH_PWR_FUTURE
-           #error "-mcpu=future is not supported"
-           #else
-           int dummy;
-           #endif
-       } "-mcpu=future"]
-}
-
-# Return 1 if this is a PowerPC target supporting -mcpu=future2 which enables
-# potential instructins beyond -mcpu=future.  Note, the assembler may not
-# have support for these instructions.
-proc check_effective_target_powerpc_future2_ok { } {
-       return [check_no_compiler_messages powerpc_future2_ok assembly {
-           #ifndef _ARCH_PWR_FUTURE2
-           #error "-mcpu=future2 is not supported"
-           #else
-           int dummy;
-           #endif
-       } "-mcpu=future2"]
-}
-
-# Return 1 if this is a PowerPC target supporting -mcpu=future which enables
 # the dense math operations.
 proc check_effective_target_powerpc_dense_math_ok { } {
     if { ([istarget powerpc*-*-*]) } {

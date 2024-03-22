@@ -79,7 +79,6 @@ do {									\
 #undef ASM_CPU_SPEC
 #define ASM_CPU_SPEC \
 "%{mcpu=native: %(asm_cpu_native); \
-  mcpu=future2: -mfuture; \
   mcpu=future: -mfuture; \
   mcpu=power11: -mpwr11; \
   mcpu=power10: -mpwr10; \
