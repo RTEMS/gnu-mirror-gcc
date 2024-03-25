@@ -498,6 +498,23 @@ static const struct riscv_tune_param thead_c906_tune_info = {
   NULL,						/* vector cost */
 };
 
+/* Costs to use when optimizing for xiangshan nanhu.  */
+static const struct riscv_tune_param xiangshan_nanhu_tune_info = {
+  {COSTS_N_INSNS (3), COSTS_N_INSNS (3)},	/* fp_add */
+  {COSTS_N_INSNS (3), COSTS_N_INSNS (3)},	/* fp_mul */
+  {COSTS_N_INSNS (10), COSTS_N_INSNS (20)},	/* fp_div */
+  {COSTS_N_INSNS (3), COSTS_N_INSNS (3)},	/* int_mul */
+  {COSTS_N_INSNS (6), COSTS_N_INSNS (6)},	/* int_div */
+  6,						/* issue_rate */
+  3,						/* branch_cost */
+  3,						/* memory_cost */
+  3,						/* fmv_cost */
+  true,						/* slow_unaligned_access */
+  false,					/* use_divmod_expansion */
+  RISCV_FUSE_ZEXTW | RISCV_FUSE_ZEXTH,          /* fusible_ops */
+  NULL,						/* vector cost */
+};
+
 /* Costs to use when optimizing for a generic ooo profile.  */
 static const struct riscv_tune_param generic_ooo_tune_info = {
   {COSTS_N_INSNS (2), COSTS_N_INSNS (2)},	/* fp_add */
@@ -535,26 +552,76 @@ static const struct riscv_tune_param optimize_size_tune_info = {
 static bool riscv_avoid_shrink_wrapping_separate ();
 static tree riscv_handle_fndecl_attribute (tree *, tree, tree, int, bool *);
 static tree riscv_handle_type_attribute (tree *, tree, tree, int, bool *);
+static tree riscv_handle_rvv_vector_bits_attribute (tree *, tree, tree, int,
+						    bool *);
 
 /* Defining target-specific uses of __attribute__.  */
-TARGET_GNU_ATTRIBUTES (riscv_attribute_table,
+static const attribute_spec riscv_gnu_attributes[] =
 {
   /* Syntax: { name, min_len, max_len, decl_required, type_required,
 	       function_type_required, affects_type_identity, handler,
 	       exclude } */
 
   /* The attribute telling no prologue/epilogue.  */
-  { "naked",	0,  0, true, false, false, false,
-    riscv_handle_fndecl_attribute, NULL },
+  {"naked", 0, 0, true, false, false, false, riscv_handle_fndecl_attribute,
+   NULL},
   /* This attribute generates prologue/epilogue for interrupt handlers.  */
-  { "interrupt", 0, 1, false, true, true, false,
-    riscv_handle_type_attribute, NULL },
+  {"interrupt", 0, 1, false, true, true, false, riscv_handle_type_attribute,
+   NULL},
 
   /* The following two are used for the built-in properties of the Vector type
      and are not used externally */
   {"RVV sizeless type", 4, 4, false, true, false, true, NULL, NULL},
-  {"RVV type", 0, 0, false, true, false, true, NULL, NULL}
-});
+  {"RVV type", 0, 0, false, true, false, true, NULL, NULL},
+  /* This attribute is used to declare a function, forcing it to use the
+    standard vector calling convention variant. Syntax:
+    __attribute__((riscv_vector_cc)). */
+  {"riscv_vector_cc", 0, 0, false, true, true, true, NULL, NULL},
+  /* This attribute is used to declare a new type, to appoint the exactly
+     bits size of the type.  For example:
+
+     typedef vint8m1_t f_vint8m1_t __attribute__((riscv_rvv_vector_bits(256)));
+
+     The new created type f_vint8m1_t will be exactly 256 bits.  It can be
+     be used in globals, structs, unions, and arrays instead of sizeless
+     types.  */
+  {"riscv_rvv_vector_bits", 1, 1, false, true, false, true,
+   riscv_handle_rvv_vector_bits_attribute, NULL},
+};
+
+static const scoped_attribute_specs riscv_gnu_attribute_table  =
+{
+  "gnu", {riscv_gnu_attributes}
+};
+
+static const attribute_spec riscv_attributes[] =
+{
+  /* This attribute is used to declare a function, forcing it to use the
+     standard vector calling convention variant. Syntax:
+     [[riscv::vector_cc]]. */
+  {"vector_cc", 0, 0, false, true, true, true, NULL, NULL},
+  /* This attribute is used to declare a new type, to appoint the exactly
+     bits size of the type.  For example:
+
+     typedef vint8m1_t f_vint8m1_t __attribute__((riscv_rvv_vector_bits(256)));
+
+     The new created type f_vint8m1_t will be exactly 256 bits.  It can be
+     be used in globals, structs, unions, and arrays instead of sizeless
+     types.  */
+  {"rvv_vector_bits", 1, 1, false, true, false, true,
+   riscv_handle_rvv_vector_bits_attribute, NULL},
+};
+
+static const scoped_attribute_specs riscv_nongnu_attribute_table =
+{
+  "riscv", {riscv_attributes}
+};
+
+static const scoped_attribute_specs *const riscv_attribute_table[] =
+{
+  &riscv_gnu_attribute_table,
+  &riscv_nongnu_attribute_table
+};
 
 /* Order for the CLOBBERs/USEs of gpr_save.  */
 static const unsigned gpr_save_reg_order[] = {
@@ -1499,10 +1566,6 @@ riscv_v_adjust_bytesize (machine_mode mode, int scale)
 	return BYTES_PER_RISCV_VECTOR;
 
       poly_int64 nunits = GET_MODE_NUNITS (mode);
-      poly_int64 mode_size = GET_MODE_SIZE (mode);
-
-      if (maybe_eq (mode_size, (uint16_t) -1))
-	mode_size = riscv_vector_chunks * scale;
 
       if (nunits.coeffs[0] > 8)
 	return exact_div (nunits, 8);
@@ -4609,8 +4672,6 @@ riscv_expand_conditional_move (rtx dest, rtx op, rtx cons, rtx alt)
 	       || (code == NE && rtx_equal_p (alt, op0)))
 	    {
 	      rtx cond = gen_rtx_fmt_ee (code, GET_MODE (op0), op0, op1);
-	      if (!rtx_equal_p (cons, op0))
-		std::swap (alt, cons);
 	      alt = force_reg (mode, alt);
 	      emit_insn (gen_rtx_SET (dest,
 				      gen_rtx_IF_THEN_ELSE (mode, cond,
@@ -5356,7 +5417,8 @@ riscv_setup_incoming_varargs (cumulative_args_t cum,
      argument.  Advance a local copy of CUM past the last "real" named
      argument, to find out how many registers are left over.  */
   local_cum = *get_cumulative_args (cum);
-  if (!TYPE_NO_NAMED_ARGS_STDARG_P (TREE_TYPE (current_function_decl)))
+  if (!TYPE_NO_NAMED_ARGS_STDARG_P (TREE_TYPE (current_function_decl))
+      || arg.type != NULL_TREE)
     riscv_function_arg_advance (pack_cumulative_args (&local_cum), arg);
 
   /* Found out how many registers we need to save.  */
@@ -5425,6 +5487,16 @@ riscv_arguments_is_vector_type_p (const_tree fntype)
   return false;
 }
 
+/* Return true if FUNC is a riscv_vector_cc function.
+   For more details please reference the below link.
+   https://github.com/riscv-non-isa/riscv-c-api-doc/pull/67 */
+static bool
+riscv_vector_cc_function_p (const_tree fntype)
+{
+  return lookup_attribute ("vector_cc", TYPE_ATTRIBUTES (fntype)) != NULL_TREE
+	 || lookup_attribute ("riscv_vector_cc", TYPE_ATTRIBUTES (fntype)) != NULL_TREE;
+}
+
 /* Implement TARGET_FNTYPE_ABI.  */
 
 static const predefined_function_abi &
@@ -5434,7 +5506,8 @@ riscv_fntype_abi (const_tree fntype)
      reference the below link.
      https://github.com/riscv-non-isa/riscv-elf-psabi-doc/pull/389  */
   if (riscv_return_value_is_vector_type_p (fntype)
-	  || riscv_arguments_is_vector_type_p (fntype))
+	  || riscv_arguments_is_vector_type_p (fntype)
+	  || riscv_vector_cc_function_p (fntype))
     return riscv_v_abi ();
 
   return default_function_abi;
@@ -5518,6 +5591,67 @@ riscv_handle_type_attribute (tree *node ATTRIBUTE_UNUSED, tree name, tree args,
 	    }
 	}
     }
+
+  return NULL_TREE;
+}
+
+static tree
+riscv_handle_rvv_vector_bits_attribute (tree *node, tree name, tree args,
+					ATTRIBUTE_UNUSED int flags,
+					bool *no_add_attrs)
+{
+  if (!is_attribute_p ("riscv_rvv_vector_bits", name))
+    return NULL_TREE;
+
+  *no_add_attrs = true;
+
+  if (rvv_vector_bits != RVV_VECTOR_BITS_ZVL)
+    {
+      error (
+	"%qs is only supported when %<-mrvv-vector-bits=zvl%> is specified",
+	"riscv_rvv_vector_bits");
+      return NULL_TREE;
+    }
+
+  tree type = *node;
+
+  if (!VECTOR_TYPE_P (type) || !riscv_vector::builtin_type_p (type))
+    {
+      error ("%qs applied to non-RVV type %qT", "riscv_rvv_vector_bits", type);
+      return NULL_TREE;
+    }
+
+  tree size = TREE_VALUE (args);
+
+  if (TREE_CODE (size) != INTEGER_CST)
+    {
+      error ("%qs requires an integer constant", "riscv_rvv_vector_bits");
+      return NULL_TREE;
+    }
+
+  unsigned HOST_WIDE_INT args_in_bits = tree_to_uhwi (size);
+  unsigned HOST_WIDE_INT type_mode_bits
+    = GET_MODE_PRECISION (TYPE_MODE (type)).to_constant ();
+
+  if (args_in_bits != type_mode_bits)
+    {
+      error ("invalid RVV vector size %qd, "
+	     "expected size is %qd based on LMUL of type and %qs",
+	     (int)args_in_bits, (int)type_mode_bits, "-mrvv-vector-bits=zvl");
+      return NULL_TREE;
+    }
+
+  type = build_distinct_type_copy (type);
+  TYPE_ATTRIBUTES (type)
+    = remove_attribute ("RVV sizeless type",
+			copy_list (TYPE_ATTRIBUTES (type)));
+
+  /* The operations like alu/cmp on vbool*_t is not well defined,
+     continue to treat vbool*_t as indivisible.  */
+  if (!VECTOR_BOOLEAN_TYPE_P (type))
+    TYPE_INDIVISIBLE_P (type) = 0;
+
+  *node = type;
 
   return NULL_TREE;
 }
@@ -7314,7 +7448,15 @@ riscv_expand_prologue (void)
       /* Second step for constant frame.  */
       HOST_WIDE_INT constant_frame = remaining_size.to_constant ();
       if (constant_frame == 0)
-	return;
+	{
+	  /* We must have allocated stack space for the scalable frame.
+	     Emit a stack tie if we have a frame pointer so that the
+	     allocation is ordered WRT fp setup and subsequent writes
+	     into the frame.  */
+	  if (frame_pointer_needed)
+	    riscv_emit_stack_tie ();
+	  return;
+	}
 
       if (SMALL_OPERAND (-constant_frame))
 	{
@@ -7334,6 +7476,13 @@ riscv_expand_prologue (void)
 	  insn = gen_rtx_SET (stack_pointer_rtx, insn);
 	  riscv_set_frame_expr (insn);
 	}
+
+      /* We must have allocated the remainder of the stack frame.
+	 Emit a stack tie if we have a frame pointer so that the
+	 allocation is ordered WRT fp setup and subsequent writes
+	 into the frame.  */
+      if (frame_pointer_needed)
+	riscv_emit_stack_tie ();
     }
 }
 
@@ -8640,8 +8789,13 @@ riscv_declare_function_name (FILE *stream, const char *name, tree fndecl)
   if (DECL_FUNCTION_SPECIFIC_TARGET (fndecl))
     {
       fprintf (stream, "\t.option push\n");
-      std::string isa = riscv_current_subset_list ()->to_string (true);
+
+      std::string *target_name = riscv_func_target_get (fndecl);
+      std::string isa = target_name != NULL
+	? *target_name
+	: riscv_cmdline_subset_list ()->to_string (true);
       fprintf (stream, "\t.option arch, %s\n", isa.c_str ());
+      riscv_func_target_remove_and_destory (fndecl);
 
       struct cl_target_option *local_cl_target =
 	TREE_TARGET_OPTION (DECL_FUNCTION_SPECIFIC_TARGET (fndecl));
@@ -8801,10 +8955,10 @@ riscv_init_machine_status (void)
   return ggc_cleared_alloc<machine_function> ();
 }
 
-/* Return the VLEN value associated with -march.
+/* Return the VLEN value associated with -march and -mwrvv-vector-bits.
    TODO: So far we only support length-agnostic value. */
 static poly_uint16
-riscv_convert_vector_bits (struct gcc_options *opts)
+riscv_convert_vector_chunks (struct gcc_options *opts)
 {
   int chunk_num;
   int min_vlen = TARGET_MIN_VLEN_OPTS (opts);
@@ -8847,10 +9001,15 @@ riscv_convert_vector_bits (struct gcc_options *opts)
      compile-time constant if TARGET_VECTOR is disabled.  */
   if (TARGET_VECTOR_OPTS_P (opts))
     {
-      if (opts->x_riscv_autovec_preference == RVV_FIXED_VLMAX)
-	return (int) min_vlen / (riscv_bytes_per_vector_chunk * 8);
-      else
-	return poly_uint16 (chunk_num, chunk_num);
+      switch (opts->x_rvv_vector_bits)
+	{
+	case RVV_VECTOR_BITS_SCALABLE:
+	  return poly_uint16 (chunk_num, chunk_num);
+	case RVV_VECTOR_BITS_ZVL:
+	  return (int) min_vlen / (riscv_bytes_per_vector_chunk * 8);
+	default:
+	  gcc_unreachable ();
+	}
     }
   else
     return 1;
@@ -8920,8 +9079,8 @@ riscv_override_options_internal (struct gcc_options *opts)
   if (TARGET_VECTOR && TARGET_BIG_ENDIAN)
     sorry ("Current RISC-V GCC does not support RVV in big-endian mode");
 
-  /* Convert -march to a chunks count.  */
-  riscv_vector_chunks = riscv_convert_vector_bits (opts);
+  /* Convert -march and -mrvv-vector-bits to a chunks count.  */
+  riscv_vector_chunks = riscv_convert_vector_chunks (opts);
 }
 
 /* Implement TARGET_OPTION_OVERRIDE.  */
@@ -9435,6 +9594,10 @@ riscv_set_current_function (tree decl)
   /* First set the target options.  */
   cl_target_option_restore (&global_options, &global_options_set,
 			    TREE_TARGET_OPTION (new_tree));
+
+  /* The ISA extension can vary based on the function extension like target.
+     Thus, make sure that the machine modes are reflected correctly here.  */
+  init_adjust_machine_modes ();
 
   riscv_save_restore_target_globals (new_tree);
 }

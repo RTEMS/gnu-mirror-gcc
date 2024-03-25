@@ -1,3 +1,99 @@
+2024-03-22  Kwok Cheung Yeung  <kcyeung@baylibre.com>
+
+	* config/accel/target-indirect.c: Include string.h and hashtab.h.
+	Remove include of splay-tree.h.  Update comments.
+	(splay_tree_prefix, splay_tree_c): Delete.
+	(struct indirect_map_t): New.
+	(hash_entry_type, htab_alloc, htab_free, htab_hash, htab_eq): New.
+	(GOMP_INDIRECT_ADD_MAP): Remove volatile qualifier.
+	(USE_SPLAY_TREE_LOOKUP): Rename to...
+	(USE_HASHTAB_LOOKUP): ..this.
+	(indirect_map, indirect_array): Delete.
+	(indirect_htab): New.
+	(build_indirect_map): Remove locking.  Build indirect map using
+	hashtab.
+	(GOMP_target_map_indirect_ptr): Use indirect_htab to lookup target
+	address.
+	(GOMP_target_map_indirect_ptr): Remove volatile qualifier.
+	* config/gcn/team.c (gomp_gcn_enter_kernel): Call build_indirect_map
+	from first thread of first team only.
+	* config/nvptx/team.c (gomp_nvptx_main): Likewise.
+	* testsuite/libgomp.c-c++-common/declare-target-indirect-2.c (main):
+	Add missing break statements.
+	* testsuite/libgomp.fortran/declare-target-indirect-2.f90: Remove
+	xfail.
+
+2024-03-22  Andrew Stubbs  <ams@baylibre.com>
+
+	* plugin/plugin-gcn.c (EF_AMDGPU_MACH): GFX1103.
+	(gcn_gfx1103_s): New.
+	(isa_hsa_name): Handle gfx1103.
+	(isa_code): Likewise.
+	(max_isa_vgprs): Likewise.
+
+2024-03-14  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* testsuite/libgomp.oacc-fortran/acc-memcpy.f90: Fix 'char'
+	initialization, copy, check.
+
+2024-03-13  Tobias Burnus  <tburnus@baylibre.com>
+
+	PR fortran/114283
+	* testsuite/libgomp.fortran/declare-target-indirect-4.f90: New test.
+
+2024-03-12  Tobias Burnus  <tburnus@baylibre.com>
+
+	* libgomp.texi (Device Memory Routines): Swap item order to match
+	the order of the '@node's of the '@subsection's.
+
+2024-03-08  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* plugin/plugin-gcn.c (GOMP_OFFLOAD_can_run): Don't consider
+	'GCN_SUPPRESS_HOST_FALLBACK' anymore (assume always-'true').
+	(init_hsa_context): Adjust 'GCN_SUPPRESS_HOST_FALLBACK' error
+	message.
+
+2024-03-08  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* plugin/plugin-nvptx.c (nvptx_get_num_devices):
+	'cuDeviceGetCount' failure is fatal.
+
+2024-03-08  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* plugin/plugin-gcn.c (init_hsa_runtime_functions): Fatal error
+	for missing symbols.
+	* plugin/plugin-nvptx.c (init_cuda_lib): Likewise.
+
+2024-03-06  John David Anglin  <danglin@gcc.gnu.org>
+
+	Revert:
+	2024-02-01  John David Anglin  <danglin@gcc.gnu.org>
+
+	* testsuite/libgomp.c++/loop-3.C: Set num_threads to 50
+	on 32-bit hppa.
+	* testsuite/libgomp.c/omp-loop03.c: Likewise.
+
+2024-03-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR libgomp/114216
+	* target.c (gomp_target_rev): Change host_fn type and corresponding
+	cast from void (*)() to void (*) (void *).
+
+2024-03-01  Jakub Jelinek  <jakub@redhat.com>
+	    Tobias Burnus  <tburnus@baylibre.com>
+
+	PR c++/110347
+	* testsuite/libgomp.c++/target-lambda-3.C: Moved from
+	gcc/testsuite/g++.dg/gomp/ and fixed is-mapped handling.
+	* testsuite/libgomp.c++/target-lambda-1.C: Modify to also
+	also work without offloading.
+	* testsuite/libgomp.c++/firstprivate-1.C: New test.
+	* testsuite/libgomp.c++/firstprivate-2.C: New test.
+	* testsuite/libgomp.c++/private-1.C: New test.
+	* testsuite/libgomp.c++/private-2.C: New test.
+	* testsuite/libgomp.c++/target-lambda-4.C: New test.
+	* testsuite/libgomp.c++/use_device_ptr-1.C: New test.
+
 2024-02-27  Tobias Burnus  <tburnus@baylibre.com>
 
 	* libgomp.texi (OpenACC Runtime Library Routines): Document new 3.3

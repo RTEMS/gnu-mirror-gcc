@@ -57,6 +57,7 @@ enum riscv_microarchitecture_type {
   sifive_7,
   sifive_p400,
   sifive_p600,
+  xiangshan,
   generic_ooo
 };
 extern enum riscv_microarchitecture_type riscv_microarchitecture;
@@ -72,15 +73,8 @@ enum stack_protector_guard {
   SSP_GLOBAL			/* global canary */
 };
 
-/* RISC-V auto-vectorization preference.  */
-enum riscv_autovec_preference_enum {
-  NO_AUTOVEC,
-  RVV_SCALABLE,
-  RVV_FIXED_VLMAX
-};
-
 /* RISC-V auto-vectorization RVV LMUL.  */
-enum riscv_autovec_lmul_enum {
+enum rvv_max_lmul_enum {
   RVV_M1 = 1,
   RVV_M2 = 2,
   RVV_M4 = 4,
@@ -129,6 +123,14 @@ enum vsetvl_strategy_enum {
   VSETVL_OPT_NO_FUSION,
 };
 
+/* RVV vector bits for option -mrvv-vector-bits, default is scalable.  */
+enum rvv_vector_bits_enum {
+  /* scalable indicates taking the value of zvl*b as the minimal vlen.  */
+  RVV_VECTOR_BITS_SCALABLE,
+  /* zvl indicates taking the value of zvl*b as the exactly vlen.  */
+  RVV_VECTOR_BITS_ZVL,
+};
+
 #define TARGET_ZICOND_LIKE (TARGET_ZICOND || (TARGET_XVENTANACONDOPS && TARGET_64BIT))
 
 /* Bit of riscv_zvl_flags will set contintuly, N-1 bit will set if N-bit is
@@ -150,6 +152,6 @@ enum vsetvl_strategy_enum {
 
 /* The maximmum LMUL according to user configuration.  */
 #define TARGET_MAX_LMUL                                                        \
-  (int) (riscv_autovec_lmul == RVV_DYNAMIC ? RVV_M8 : riscv_autovec_lmul)
+  (int) (rvv_max_lmul == RVV_DYNAMIC ? RVV_M8 : rvv_max_lmul)
 
 #endif /* ! GCC_RISCV_OPTS_H */

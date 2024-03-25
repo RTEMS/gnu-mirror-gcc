@@ -37,7 +37,8 @@ along with GCC; see the file COPYING3.  If not see
 static int
 riscv_ext_version_value (unsigned major, unsigned minor)
 {
-  return (major * RISCV_MAJOR_VERSION_BASE) + (minor * RISCV_MINOR_VERSION_BASE);
+  return (major * RISCV_MAJOR_VERSION_BASE)
+    + (minor * RISCV_MINOR_VERSION_BASE);
 }
 
 /* Implement TARGET_CPU_CPP_BUILTINS.  */
@@ -110,7 +111,6 @@ riscv_cpu_cpp_builtins (cpp_reader *pfile)
     case CM_MEDANY:
       builtin_define ("__riscv_cmodel_medany");
       break;
-
     }
 
   if (riscv_user_wants_strict_align)
@@ -140,11 +140,14 @@ riscv_cpu_cpp_builtins (cpp_reader *pfile)
       builtin_define ("__riscv_vector");
       builtin_define_with_int_value ("__riscv_v_intrinsic",
 				     riscv_ext_version_value (0, 12));
+
+      if (rvv_vector_bits == RVV_VECTOR_BITS_ZVL)
+	builtin_define_with_int_value ("__riscv_v_fixed_vlen", TARGET_MIN_VLEN);
     }
 
-   if (TARGET_XTHEADVECTOR)
-     builtin_define_with_int_value ("__riscv_th_v_intrinsic",
-				     riscv_ext_version_value (0, 11));
+  if (TARGET_XTHEADVECTOR)
+    builtin_define_with_int_value ("__riscv_th_v_intrinsic",
+				   riscv_ext_version_value (0, 11));
 
   /* Define architecture extension test macros.  */
   builtin_define_with_int_value ("__riscv_arch_test", 1);

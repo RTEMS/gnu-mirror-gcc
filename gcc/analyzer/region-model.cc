@@ -120,9 +120,27 @@ dump_quoted_tree (pretty_printer *pp, tree t)
 void
 print_quoted_type (pretty_printer *pp, tree t)
 {
+  if (!t)
+    return;
   pp_begin_quote (pp, pp_show_color (pp));
   dump_generic_node (pp, t, 0, TDF_SLIM, 0);
   pp_end_quote (pp, pp_show_color (pp));
+}
+
+/* Print EXPR to PP, without quotes.
+   For use within svalue::maybe_print_for_user
+   and region::maybe_print_for_user. */
+
+void
+print_expr_for_user (pretty_printer *pp, tree expr)
+{
+  /* Workaround for C++'s lang_hooks.decl_printable_name,
+     which unhelpfully (for us) prefixes the decl with its
+     type.  */
+  if (DECL_P (expr))
+    dump_generic_node (pp, expr, 0, TDF_SLIM, 0);
+  else
+    pp_printf (pp, "%E", expr);
 }
 
 /* class region_to_value_map.  */
@@ -2619,7 +2637,7 @@ region_model::called_from_main_p () const
   /* Determine if the oldest stack frame in this model is for "main".  */
   const frame_region *frame0 = get_frame_at_index (0);
   gcc_assert (frame0);
-  return id_equal (DECL_NAME (frame0->get_function ()->decl), "main");
+  return id_equal (DECL_NAME (frame0->get_function ().decl), "main");
 }
 
 /* Subroutine of region_model::get_store_value for when REG is (or is within)
@@ -2706,7 +2724,7 @@ region_model::get_store_value (const region *reg,
 	= cast_reg->get_original_region ()->dyn_cast_string_region ())
       {
 	tree string_cst = str_reg->get_string_cst ();
-	tree byte_offset_cst = build_int_cst (integer_type_node, 0);
+	tree byte_offset_cst = integer_zero_node;
 	if (const svalue *char_sval
 	    = m_mgr->maybe_get_char_from_string_cst (string_cst,
 						     byte_offset_cst))
@@ -3949,9 +3967,10 @@ static tree
 get_tree_for_byte_offset (tree ptr_expr, byte_offset_t byte_offset)
 {
   gcc_assert (ptr_expr);
+  tree ptype = build_pointer_type_for_mode (char_type_node, ptr_mode, true);
   return fold_build2 (MEM_REF,
 		      char_type_node,
-		      ptr_expr, wide_int_to_tree (size_type_node, byte_offset));
+		      ptr_expr, wide_int_to_tree (ptype, byte_offset));
 }
 
 /* Simulate a series of reads of REG until we find a 0 byte
@@ -4685,17 +4704,27 @@ region_model::eval_condition (const svalue *lhs,
     if (lhs_un_op && CONVERT_EXPR_CODE_P (lhs_un_op->get_op ())
 	&& rhs_un_op && CONVERT_EXPR_CODE_P (rhs_un_op->get_op ())
 	&& lhs_type == rhs_type)
-      return eval_condition (lhs_un_op->get_arg (),
-			     op,
-			     rhs_un_op->get_arg ());
-
+      {
+	tristate res = eval_condition (lhs_un_op->get_arg (),
+				       op,
+				       rhs_un_op->get_arg ());
+	if (res.is_known ())
+	  return res;
+      }
     else if (lhs_un_op && CONVERT_EXPR_CODE_P (lhs_un_op->get_op ())
 	     && lhs_type == rhs_type)
-      return eval_condition (lhs_un_op->get_arg (), op, rhs);
-
+      {
+	tristate res = eval_condition (lhs_un_op->get_arg (), op, rhs);
+	if (res.is_known ())
+	  return res;
+      }
     else if (rhs_un_op && CONVERT_EXPR_CODE_P (rhs_un_op->get_op ())
 	     && lhs_type == rhs_type)
-      return eval_condition (lhs, op, rhs_un_op->get_arg ());
+      {
+	tristate res = eval_condition (lhs, op, rhs_un_op->get_arg ());
+	if (res.is_known ())
+	  return res;
+      }
   }
 
   /* Otherwise, try constraints.
@@ -5342,9 +5371,10 @@ region_model::get_representative_path_var_1 (const region *reg,
 	tree addr_parent = build1 (ADDR_EXPR,
 				   build_pointer_type (reg->get_type ()),
 				   parent_pv.m_tree);
-	return path_var (build2 (MEM_REF,
-				 reg->get_type (),
-				 addr_parent, offset_pv.m_tree),
+	tree ptype = build_pointer_type_for_mode (char_type_node, ptr_mode,
+						  true);
+	return path_var (build2 (MEM_REF, reg->get_type (), addr_parent,
+				 fold_convert (ptype, offset_pv.m_tree)),
 			 parent_pv.m_stack_depth);
       }
 
@@ -5552,7 +5582,8 @@ region_model::update_for_gcall (const gcall *call_stmt,
     callee = DECL_STRUCT_FUNCTION (fn_decl);
   }
 
-  push_frame (callee, &arg_svals, ctxt);
+  gcc_assert (callee);
+  push_frame (*callee, &arg_svals, ctxt);
 }
 
 /* Pop the top-most frame_region from the stack, and copy the return
@@ -5896,14 +5927,15 @@ region_model::on_top_level_param (tree param,
    Return the frame_region for the new frame.  */
 
 const region *
-region_model::push_frame (function *fun, const vec<const svalue *> *arg_svals,
+region_model::push_frame (const function &fun,
+			  const vec<const svalue *> *arg_svals,
 			  region_model_context *ctxt)
 {
   m_current_frame = m_mgr->get_frame_region (m_current_frame, fun);
   if (arg_svals)
     {
       /* Arguments supplied from a caller frame.  */
-      tree fndecl = fun->decl;
+      tree fndecl = fun.decl;
       unsigned idx = 0;
       for (tree iter_parm = DECL_ARGUMENTS (fndecl); iter_parm;
 	   iter_parm = DECL_CHAIN (iter_parm), ++idx)
@@ -5914,7 +5946,7 @@ region_model::push_frame (function *fun, const vec<const svalue *> *arg_svals,
 	  if (idx >= arg_svals->length ())
 	    break;
 	  tree parm_lval = iter_parm;
-	  if (tree parm_default_ssa = ssa_default_def (fun, iter_parm))
+	  if (tree parm_default_ssa = get_ssa_default_def (fun, iter_parm))
 	    parm_lval = parm_default_ssa;
 	  const region *parm_reg = get_lvalue (parm_lval, ctxt);
 	  const svalue *arg_sval = (*arg_svals)[idx];
@@ -5937,7 +5969,7 @@ region_model::push_frame (function *fun, const vec<const svalue *> *arg_svals,
       /* Otherwise we have a top-level call within the analysis.  The params
 	 have defined but unknown initial values.
 	 Anything they point to has escaped.  */
-      tree fndecl = fun->decl;
+      tree fndecl = fun.decl;
 
       /* Handle "__attribute__((nonnull))".   */
       tree fntype = TREE_TYPE (fndecl);
@@ -5951,7 +5983,7 @@ region_model::push_frame (function *fun, const vec<const svalue *> *arg_svals,
 			   ? (bitmap_empty_p (nonnull_args)
 			      || bitmap_bit_p (nonnull_args, parm_idx))
 			   : false);
-	  if (tree parm_default_ssa = ssa_default_def (fun, iter_parm))
+	  if (tree parm_default_ssa = get_ssa_default_def (fun, iter_parm))
 	    on_top_level_param (parm_default_ssa, non_null, ctxt);
 	  else
 	    on_top_level_param (iter_parm, non_null, ctxt);
@@ -5967,12 +5999,12 @@ region_model::push_frame (function *fun, const vec<const svalue *> *arg_svals,
 /* Get the function of the top-most frame in this region_model's stack.
    There must be such a frame.  */
 
-function *
+const function *
 region_model::get_current_function () const
 {
   const frame_region *frame = get_current_frame ();
   gcc_assert (frame);
-  return frame->get_function ();
+  return &frame->get_function ();
 }
 
 /* Pop the topmost frame_region from this region_model's stack;
@@ -6007,7 +6039,7 @@ region_model::pop_frame (tree result_lvalue,
     ctxt->on_pop_frame (frame_reg);
 
   /* Evaluate the result, within the callee frame.  */
-  tree fndecl = m_current_frame->get_function ()->decl;
+  tree fndecl = m_current_frame->get_function ().decl;
   tree result = DECL_RESULT (fndecl);
   const svalue *retval = NULL;
   if (result
@@ -7146,7 +7178,7 @@ build_real_cst_from_string (tree type, const char *str)
 static void
 append_interesting_constants (auto_vec<tree> *out)
 {
-  out->safe_push (build_int_cst (integer_type_node, 0));
+  out->safe_push (integer_zero_node);
   out->safe_push (build_int_cst (integer_type_node, 42));
   out->safe_push (build_int_cst (unsigned_type_node, 0));
   out->safe_push (build_int_cst (unsigned_type_node, 42));
@@ -7371,7 +7403,7 @@ test_array_1 ()
 
   region_model_manager mgr;
   region_model model (&mgr);
-  tree int_0 = build_int_cst (integer_type_node, 0);
+  tree int_0 = integer_zero_node;
   tree a_0 = build4 (ARRAY_REF, char_type_node,
 		     a, int_0, NULL_TREE, NULL_TREE);
   tree char_A = build_int_cst (char_type_node, 'A');
@@ -7428,7 +7460,7 @@ test_get_representative_tree ()
     {
       test_region_model_context ctxt;
       region_model model (&mgr);
-      tree idx = build_int_cst (integer_type_node, 0);
+      tree idx = integer_zero_node;
       tree a_0 = build4 (ARRAY_REF, char_type_node,
 			 a, idx, NULL_TREE, NULL_TREE);
       const region *a_0_reg = model.get_lvalue (a_0, &ctxt);
@@ -7480,7 +7512,7 @@ test_get_representative_tree ()
 static void
 test_unique_constants ()
 {
-  tree int_0 = build_int_cst (integer_type_node, 0);
+  tree int_0 = integer_zero_node;
   tree int_42 = build_int_cst (integer_type_node, 42);
 
   test_region_model_context ctxt;
@@ -7863,7 +7895,7 @@ test_bit_range_regions ()
 static void
 test_assignment ()
 {
-  tree int_0 = build_int_cst (integer_type_node, 0);
+  tree int_0 = integer_zero_node;
   tree x = build_global_decl ("x", integer_type_node);
   tree y = build_global_decl ("y", integer_type_node);
 
@@ -7922,7 +7954,7 @@ test_stack_frames ()
   tree int_42 = build_int_cst (integer_type_node, 42);
   tree int_10 = build_int_cst (integer_type_node, 10);
   tree int_5 = build_int_cst (integer_type_node, 5);
-  tree int_0 = build_int_cst (integer_type_node, 0);
+  tree int_0 = integer_zero_node;
 
   auto_vec <tree> param_types;
   tree parent_fndecl = make_fndecl (integer_type_node,
@@ -7966,7 +7998,7 @@ test_stack_frames ()
 
   /* Push stack frame for "parent_fn".  */
   const region *parent_frame_reg
-    = model.push_frame (DECL_STRUCT_FUNCTION (parent_fndecl),
+    = model.push_frame (*DECL_STRUCT_FUNCTION (parent_fndecl),
 			NULL, &ctxt);
   ASSERT_EQ (model.get_current_frame (), parent_frame_reg);
   ASSERT_TRUE (model.region_exists_p (parent_frame_reg));
@@ -7982,7 +8014,7 @@ test_stack_frames ()
 
   /* Push stack frame for "child_fn".  */
   const region *child_frame_reg
-    = model.push_frame (DECL_STRUCT_FUNCTION (child_fndecl), NULL, &ctxt);
+    = model.push_frame (*DECL_STRUCT_FUNCTION (child_fndecl), NULL, &ctxt);
   ASSERT_EQ (model.get_current_frame (), child_frame_reg);
   ASSERT_TRUE (model.region_exists_p (child_frame_reg));
   const region *x_in_child_reg = model.get_lvalue (x, &ctxt);
@@ -8075,7 +8107,7 @@ test_get_representative_path_var ()
   for (int depth = 0; depth < 5; depth++)
     {
       const region *frame_n_reg
-	= model.push_frame (DECL_STRUCT_FUNCTION (fndecl), NULL, &ctxt);
+	= model.push_frame (*DECL_STRUCT_FUNCTION (fndecl), NULL, &ctxt);
       const region *parm_n_reg = model.get_lvalue (path_var (n, depth), &ctxt);
       parm_regs.safe_push (parm_n_reg);
 
@@ -8319,9 +8351,9 @@ test_state_merging ()
     region_model model0 (&mgr);
     region_model model1 (&mgr);
     ASSERT_EQ (model0.get_stack_depth (), 0);
-    model0.push_frame (DECL_STRUCT_FUNCTION (test_fndecl), NULL, &ctxt);
+    model0.push_frame (*DECL_STRUCT_FUNCTION (test_fndecl), NULL, &ctxt);
     ASSERT_EQ (model0.get_stack_depth (), 1);
-    model1.push_frame (DECL_STRUCT_FUNCTION (test_fndecl), NULL, &ctxt);
+    model1.push_frame (*DECL_STRUCT_FUNCTION (test_fndecl), NULL, &ctxt);
 
     placeholder_svalue test_sval (mgr.alloc_symbol_id (),
 				  integer_type_node, "test sval");
@@ -8413,7 +8445,7 @@ test_state_merging ()
   /* Pointers: non-NULL and non-NULL: ptr to a local.  */
   {
     region_model model0 (&mgr);
-    model0.push_frame (DECL_STRUCT_FUNCTION (test_fndecl), NULL, NULL);
+    model0.push_frame (*DECL_STRUCT_FUNCTION (test_fndecl), NULL, NULL);
     model0.set_value (model0.get_lvalue (p, NULL),
 		      model0.get_rvalue (addr_of_a, NULL), NULL);
 
@@ -8552,12 +8584,12 @@ test_state_merging ()
      frame points to a local in a more recent stack frame.  */
   {
     region_model model0 (&mgr);
-    model0.push_frame (DECL_STRUCT_FUNCTION (test_fndecl), NULL, NULL);
+    model0.push_frame (*DECL_STRUCT_FUNCTION (test_fndecl), NULL, NULL);
     const region *q_in_first_frame = model0.get_lvalue (q, NULL);
 
     /* Push a second frame.  */
     const region *reg_2nd_frame
-      = model0.push_frame (DECL_STRUCT_FUNCTION (test_fndecl), NULL, NULL);
+      = model0.push_frame (*DECL_STRUCT_FUNCTION (test_fndecl), NULL, NULL);
 
     /* Have a pointer in the older frame point to a local in the
        more recent frame.  */
@@ -8584,7 +8616,7 @@ test_state_merging ()
   /* Verify that we can merge a model in which a local points to a global.  */
   {
     region_model model0 (&mgr);
-    model0.push_frame (DECL_STRUCT_FUNCTION (test_fndecl), NULL, NULL);
+    model0.push_frame (*DECL_STRUCT_FUNCTION (test_fndecl), NULL, NULL);
     model0.set_value (model0.get_lvalue (q, NULL),
 		      model0.get_rvalue (addr_of_y, NULL), NULL);
 
@@ -8605,7 +8637,7 @@ test_state_merging ()
 static void
 test_constraint_merging ()
 {
-  tree int_0 = build_int_cst (integer_type_node, 0);
+  tree int_0 = integer_zero_node;
   tree int_5 = build_int_cst (integer_type_node, 5);
   tree x = build_global_decl ("x", integer_type_node);
   tree y = build_global_decl ("y", integer_type_node);
@@ -8652,9 +8684,9 @@ test_widening_constraints ()
 {
   region_model_manager mgr;
   function_point point (program_point::origin (mgr).get_function_point ());
-  tree int_0 = build_int_cst (integer_type_node, 0);
+  tree int_0 = integer_zero_node;
   tree int_m1 = build_int_cst (integer_type_node, -1);
-  tree int_1 = build_int_cst (integer_type_node, 1);
+  tree int_1 = integer_one_node;
   tree int_256 = build_int_cst (integer_type_node, 256);
   test_region_model_context ctxt;
   const svalue *int_0_sval = mgr.get_or_create_constant_svalue (int_0);
@@ -8768,8 +8800,8 @@ test_iteration_1 ()
   region_model_manager mgr;
   program_point point (program_point::origin (mgr));
 
-  tree int_0 = build_int_cst (integer_type_node, 0);
-  tree int_1 = build_int_cst (integer_type_node, 1);
+  tree int_0 = integer_zero_node;
+  tree int_1 = integer_one_node;
   tree int_256 = build_int_cst (integer_type_node, 256);
   tree i = build_global_decl ("i", integer_type_node);
 
@@ -8922,8 +8954,8 @@ test_array_2 ()
   /* "int i;"  */
   tree i = build_global_decl ("i", integer_type_node);
 
-  tree int_0 = build_int_cst (integer_type_node, 0);
-  tree int_1 = build_int_cst (integer_type_node, 1);
+  tree int_0 = integer_zero_node;
+  tree int_1 = integer_one_node;
 
   tree arr_0 = build4 (ARRAY_REF, integer_type_node,
 		       arr, int_0, NULL_TREE, NULL_TREE);
@@ -8971,7 +9003,10 @@ test_array_2 ()
     const region *arr_i_reg = model.get_lvalue (arr_i, NULL);
     region_offset offset = arr_i_reg->get_offset (&mgr);
     ASSERT_EQ (offset.get_base_region (), model.get_lvalue (arr, NULL));
-    ASSERT_EQ (offset.get_symbolic_byte_offset ()->get_kind (), SK_BINOP);
+    const svalue *offset_sval = offset.get_symbolic_byte_offset ();
+    if (const svalue *cast = offset_sval->maybe_undo_cast ())
+      offset_sval = cast;
+    ASSERT_EQ (offset_sval->get_kind (), SK_BINOP);
   }
 
   /* "arr[i] = i;" - this should remove the earlier bindings.  */
@@ -9001,7 +9036,8 @@ test_mem_ref ()
 
   tree int_17 = build_int_cst (integer_type_node, 17);
   tree addr_of_x = build1 (ADDR_EXPR, int_star, x);
-  tree offset_0 = build_int_cst (integer_type_node, 0);
+  tree ptype = build_pointer_type_for_mode (char_type_node, ptr_mode, true);
+  tree offset_0 = build_int_cst (ptype, 0);
   tree star_p = build2 (MEM_REF, integer_type_node, p, offset_0);
 
   region_model_manager mgr;
@@ -9051,7 +9087,8 @@ test_POINTER_PLUS_EXPR_then_MEM_REF ()
   tree a = build_global_decl ("a", int_star);
   tree offset_12 = build_int_cst (size_type_node, 12);
   tree pointer_plus_expr = build2 (POINTER_PLUS_EXPR, int_star, a, offset_12);
-  tree offset_0 = build_int_cst (integer_type_node, 0);
+  tree ptype = build_pointer_type_for_mode (char_type_node, ptr_mode, true);
+  tree offset_0 = build_int_cst (ptype, 0);
   tree mem_ref = build2 (MEM_REF, integer_type_node,
 			 pointer_plus_expr, offset_0);
   region_model_manager mgr;
@@ -9110,7 +9147,7 @@ test_alloca ()
 
   /* Push stack frame.  */
   const region *frame_reg
-    = model.push_frame (DECL_STRUCT_FUNCTION (fndecl),
+    = model.push_frame (*DECL_STRUCT_FUNCTION (fndecl),
 			NULL, &ctxt);
   /* "p = alloca (n * 4);".  */
   const svalue *size_sval = model.get_rvalue (n_times_4, &ctxt);

@@ -256,7 +256,7 @@ in the following sections.
 -Wdeprecated-copy -Wdeprecated-copy-dtor
 -Wno-deprecated-enum-enum-conversion -Wno-deprecated-enum-float-conversion
 -Weffc++ -Wno-elaborated-enum-base
--Wno-exceptions -Wextra-semi  -Wno-inaccessible-base
+-Wno-exceptions -Wextra-semi -Wno-global-module -Wno-inaccessible-base
 -Wno-inherited-variadic-ctor  -Wno-init-list-lifetime
 -Winvalid-constexpr -Winvalid-imported-macros
 -Wno-invalid-offsetof  -Wno-literal-suffix
@@ -884,7 +884,7 @@ Objective-C and Objective-C++ Dialects}.
 
 @emph{AVR Options}
 @gccoptlist{-mmcu=@var{mcu}  -mabsdata  -maccumulate-args
--mbranch-cost=@var{cost}
+-mbranch-cost=@var{cost}  -mfuse-add=@var{level}
 -mcall-prologues  -mgas-isr-prologues  -mint8  -mflmap
 -mdouble=@var{bits}  -mlong-double=@var{bits}
 -mn_flash=@var{size}  -mno-interrupts
@@ -971,7 +971,7 @@ Objective-C and Objective-C++ Dialects}.
 @gccoptlist{-mbig-endian -mlittle-endian
 -mframe-limit=@var{bytes} -mxbpf -mco-re -mno-co-re -mjmpext
 -mjmp32 -malu32 -mv3-atomics -mbswap -msdiv -msmov -mcpu=@var{version}
--masm=@var{dialect}}
+-masm=@var{dialect} -minline-memops-threshold=@var{bytes}}
 
 @emph{FR30 Options}
 @gccoptlist{-msmall-model  -mno-lsim}
@@ -1143,7 +1143,8 @@ Objective-C and Objective-C++ Dialects}.
 -mcheck-zero-division  -mno-check-zero-division
 -mdivide-traps  -mdivide-breaks
 -mload-store-pairs  -mno-load-store-pairs
--munaligned-access  -mno-unaligned-access
+-mstrict-align  -mno-strict-align
+-mno-unaligned-access  -munaligned-access
 -mmemcpy  -mno-memcpy  -mlong-calls  -mno-long-calls
 -mmad  -mno-mad  -mimadd  -mno-imadd  -mfused-madd  -mno-fused-madd  -nocpp
 -mfix-24k  -mno-fix-24k
@@ -1450,6 +1451,7 @@ See RS/6000 and PowerPC Options.
 -mvzeroupper  -mprefer-avx128  -mprefer-vector-width=@var{opt}
 -mpartial-vector-fp-math
 -mmove-max=@var{bits} -mstore-max=@var{bits}
+-mnoreturn-no-callee-saved-registers
 -mmmx  -msse  -msse2  -msse3  -mssse3  -msse4.1  -msse4.2  -msse4  -mavx
 -mavx2  -mavx512f  -mavx512pf  -mavx512er  -mavx512cd  -mavx512vl
 -mavx512bw  -mavx512dq  -mavx512ifma  -mavx512vbmi  -msha  -maes
@@ -3908,6 +3910,9 @@ const T& foo (const T&) @{ @dots{} @}
 #pragma GCC diagnostic pop
 @end smallexample
 
+The @code{#pragma} can also surround the class; in that case, the warning
+will be disabled for all the member functions.
+
 @option{-Wdangling-reference} also warns about code like
 
 @smallexample
@@ -3931,6 +3936,9 @@ struct Span @{
 
 as @code{std::span}-like; that is, the class is a non-union class
 that has a pointer data member and a trivial destructor.
+
+The warning can be disabled by using the @code{gnu::no_dangling} attribute
+(@pxref{C++ Attributes}).
 
 This warning is enabled by @option{-Wall}.
 
@@ -4767,6 +4775,12 @@ undefined behavior at runtime.  This warning is enabled by default.
 @opindex Wno-extra-semi
 @item -Wextra-semi @r{(C++, Objective-C++ only)}
 Warn about redundant semicolons after in-class function definitions.
+
+@opindex Wno-global-module
+@opindex Wglobal-module
+@item -Wno-global-module @r{(C++ and Objective-C++ only)}
+Disable the diagnostic for when the global module fragment of a module
+unit does not consist only of preprocessor directives.
 
 @opindex Winaccessible-base
 @opindex Wno-inaccessible-base
@@ -14917,6 +14931,9 @@ assignments).  This option is enabled by default for C or C++ if a strict
 conformance option such as @option{-std=c99} or @option{-std=c++17} is used.
 @option{-ffast-math} enables @option{-fexcess-precision=fast} by default
 regardless of whether a strict conformance option is used.
+If @option{-fexcess-precision=16} is specified, constants and the
+results of expressions with types @code{_Float16} and @code{__bf16}
+are computed without excess precision.
 
 @opindex mfpmath
 @option{-fexcess-precision=standard} is not implemented for languages
@@ -21778,6 +21795,9 @@ Compile for RDNA2 gfx1030 devices (GFX10 series).
 @item gfx1100
 Compile for RDNA3 gfx1100 devices (GFX11 series).
 
+@item gfx1103
+Compile for RDNA3 gfx1103 devices (GFX11 series).
+
 @end table
 
 @opindex msram-ecc
@@ -23785,6 +23805,15 @@ integers. The default branch cost is 0.
 Functions prologues/epilogues are expanded as calls to appropriate
 subroutines.  Code size is smaller.
 
+@opindex mfuse-add
+@item -mfuse-add
+@itemx -mno-fuse-add
+@itemx -mfuse-add=@var{level}
+Optimize indirect memory accesses on reduced Tiny devices.
+The default uses @code{@var{level}=1} for optimizations @option{-Og}
+and @option{-O1}, and @code{@var{level}=2} for higher optimizations.
+Valid values for @var{level} are @code{0}, @code{1} and @code{2}.
+
 @opindex mdouble
 @opindex mlong-double
 @item -mdouble=@var{bits}
@@ -25678,6 +25707,15 @@ Outputs normal assembly dialect.
 Outputs pseudo-c assembly dialect.
 
 @end table
+
+@opindex -minline-memops-threshold
+@item -minline-memops-threshold=@var{bytes}
+Specifies a size threshold in bytes at or below which memmove, memcpy
+and memset shall always be expanded inline.  Operations dealing with
+sizes larger than this threshold would have to be be implemented using
+a library call instead of being expanded inline, but since BPF doesn't
+allow libcalls, exceeding this threshold results in a compile-time
+error.  The default is @samp{1024} bytes.
 
 @end table
 
@@ -28530,14 +28568,19 @@ instructions to enable load/store bonding.  This option is enabled by
 default but only takes effect when the selected architecture is known
 to support bonding.
 
+@opindex mstrict-align
+@opindex mno-strict-align
 @opindex munaligned-access
 @opindex mno-unaligned-access
-@item -munaligned-access
+@item -mstrict-align
+@itemx -mno-strict-align
+@itemx -munaligned-access
 @itemx -mno-unaligned-access
-Enable (disable) direct unaligned access for MIPS Release 6.
-MIPSr6 requires load/store unaligned-access support,
-by hardware or trap&emulate.
-So @option{-mno-unaligned-access} may be needed by kernel.
+Disable (enable) direct unaligned access for MIPS Release 6.
+MIPSr6 requires load/store unaligned-access support, by hardware or
+trap&emulate.  So @option{-mstrict-align} may be needed by kernel.  The
+options @option{-munaligned-access} and @option{-mno-unaligned-access}
+are obsoleted, and only for backward-compatible.
 
 @opindex mmemcpy
 @opindex mno-memcpy
@@ -34450,6 +34493,16 @@ WBNOINVD, PKU, VPCLMULQDQ, VAES, AVX512F, AVX512DQ, AVX512IFMA, AVX512CD,
 AVX512BW, AVX512VL, AVX512BF16, AVX512VBMI, AVX512VBMI2, AVX512VNNI,
 AVX512BITALG, AVX512VPOPCNTDQ, GFNI and 64-bit instruction set extensions.)
 
+@item znver5
+AMD Family 1ah core based CPUs with x86-64 instruction set support. (This
+supersets BMI, BMI2, CLWB, F16C, FMA, FSGSBASE, AVX, AVX2, ADCX, RDSEED,
+MWAITX, SHA, CLZERO, AES, PCLMUL, CX16, MOVBE, MMX, SSE, SSE2, SSE3, SSE4A,
+SSSE3, SSE4.1, SSE4.2, ABM, XSAVEC, XSAVES, CLFLUSHOPT, POPCNT, RDPID,
+WBNOINVD, PKU, VPCLMULQDQ, VAES, AVX512F, AVX512DQ, AVX512IFMA, AVX512CD,
+AVX512BW, AVX512VL, AVX512BF16, AVX512VBMI, AVX512VBMI2, AVX512VNNI,
+AVX512BITALG, AVX512VPOPCNTDQ, GFNI, AVXVNNI, MOVDIRI, MOVDIR64B,
+AVX512VP2INTERSECT, PREFETCHI and 64-bit instruction set extensions.)
+
 @item btver1
 CPUs based on AMD Family 14h cores with x86-64 instruction set support.  (This
 supersets MMX, SSE, SSE2, SSE3, SSSE3, SSE4A, CX16, ABM and 64-bit
@@ -35375,6 +35428,15 @@ Prefer 256-bit vector width for instructions.
 @item 512
 Prefer 512-bit vector width for instructions.
 @end table
+
+@opindex mnoreturn-no-callee-saved-registers
+@item -mnoreturn-no-callee-saved-registers
+This option optimizes functions with @code{noreturn} attribute or
+@code{_Noreturn} specifier by not saving in the function prologue callee-saved
+registers which are used in the function (except for the @code{BP}
+register).  This option can interfere with debugging of the caller of the
+@code{noreturn} function or any function further up in the call stack, so it
+is not enabled by default.
 
 @opindex mcx16
 @item -mcx16

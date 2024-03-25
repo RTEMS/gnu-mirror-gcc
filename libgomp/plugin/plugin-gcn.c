@@ -391,7 +391,8 @@ typedef enum {
   EF_AMDGPU_MACH_AMDGCN_GFX908 = 0x030,
   EF_AMDGPU_MACH_AMDGCN_GFX90a = 0x03f,
   EF_AMDGPU_MACH_AMDGCN_GFX1030 = 0x036,
-  EF_AMDGPU_MACH_AMDGCN_GFX1100 = 0x041
+  EF_AMDGPU_MACH_AMDGCN_GFX1100 = 0x041,
+  EF_AMDGPU_MACH_AMDGCN_GFX1103 = 0x044
 } EF_AMDGPU_MACH;
 
 const static int EF_AMDGPU_MACH_MASK = 0x000000ff;
@@ -1382,9 +1383,10 @@ init_hsa_runtime_functions (void)
 #define DLSYM_FN(function) \
   hsa_fns.function##_fn = dlsym (handle, #function); \
   if (hsa_fns.function##_fn == NULL) \
-    return false;
+    GOMP_PLUGIN_fatal ("'%s' is missing '%s'", hsa_runtime_lib, #function);
 #define DLSYM_OPT_FN(function) \
   hsa_fns.function##_fn = dlsym (handle, #function);
+
   void *handle = dlopen (hsa_runtime_lib, RTLD_LAZY);
   if (handle == NULL)
     return false;
@@ -1523,9 +1525,11 @@ init_hsa_context (void)
   init_environment_variables ();
   if (!init_hsa_runtime_functions ())
     {
-      GCN_WARNING ("Run-time could not be dynamically opened\n");
+      const char *msg = "Run-time could not be dynamically opened";
       if (suppress_host_fallback)
-	GOMP_PLUGIN_fatal ("GCN host fallback has been suppressed");
+	GOMP_PLUGIN_fatal ("%s\n", msg);
+      else
+	GCN_WARNING ("%s\n", msg);
       return false;
     }
   status = hsa_fns.hsa_init_fn ();
@@ -1674,6 +1678,7 @@ const static char *gcn_gfx908_s = "gfx908";
 const static char *gcn_gfx90a_s = "gfx90a";
 const static char *gcn_gfx1030_s = "gfx1030";
 const static char *gcn_gfx1100_s = "gfx1100";
+const static char *gcn_gfx1103_s = "gfx1103";
 const static int gcn_isa_name_len = 7;
 
 /* Returns the name that the HSA runtime uses for the ISA or NULL if we do not
@@ -1697,6 +1702,8 @@ isa_hsa_name (int isa) {
       return gcn_gfx1030_s;
     case EF_AMDGPU_MACH_AMDGCN_GFX1100:
       return gcn_gfx1100_s;
+    case EF_AMDGPU_MACH_AMDGCN_GFX1103:
+      return gcn_gfx1103_s;
     }
   return NULL;
 }
@@ -1742,6 +1749,9 @@ isa_code(const char *isa) {
   if (!strncmp (isa, gcn_gfx1100_s, gcn_isa_name_len))
     return EF_AMDGPU_MACH_AMDGCN_GFX1100;
 
+  if (!strncmp (isa, gcn_gfx1103_s, gcn_isa_name_len))
+    return EF_AMDGPU_MACH_AMDGCN_GFX1103;
+
   return EF_AMDGPU_MACH_UNSUPPORTED;
 }
 
@@ -1762,6 +1772,7 @@ max_isa_vgprs (int isa)
     case EF_AMDGPU_MACH_AMDGCN_GFX1030:
       return 512;  /* 512 SIMD32 = 256 wavefrontsize64.  */
     case EF_AMDGPU_MACH_AMDGCN_GFX1100:
+    case EF_AMDGPU_MACH_AMDGCN_GFX1103:
       return 1536; /* 1536 SIMD32 = 768 wavefrontsize64.  */
     }
   GOMP_PLUGIN_fatal ("unhandled ISA in max_isa_vgprs");
@@ -3854,15 +3865,9 @@ GOMP_OFFLOAD_can_run (void *fn_ptr)
 
   init_kernel (kernel);
   if (kernel->initialization_failed)
-    goto failure;
+    GOMP_PLUGIN_fatal ("kernel initialization failed");
 
   return true;
-
-failure:
-  if (suppress_host_fallback)
-    GOMP_PLUGIN_fatal ("GCN host fallback has been suppressed");
-  GCN_WARNING ("GCN target cannot be launched, doing a host fallback\n");
-  return false;
 }
 
 /* Allocate memory on device N.  */

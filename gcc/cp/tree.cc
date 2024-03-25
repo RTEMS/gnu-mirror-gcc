@@ -47,6 +47,7 @@ static tree verify_stmt_tree_r (tree *, int *, void *);
 static tree handle_init_priority_attribute (tree *, tree, tree, int, bool *);
 static tree handle_abi_tag_attribute (tree *, tree, tree, int, bool *);
 static tree handle_contract_attribute (tree *, tree, tree, int, bool *);
+static tree handle_no_dangling_attribute (tree *, tree, tree, int, bool *);
 
 /* If REF is an lvalue, returns the kind of lvalue that REF is.
    Otherwise, returns clk_none.  */
@@ -2970,7 +2971,8 @@ verify_stmt_tree (tree t)
 
 /* Check if the type T depends on a type with no linkage and if so,
    return it.  If RELAXED_P then do not consider a class type declared
-   within a vague-linkage function to have no linkage.  Remember:
+   within a vague-linkage function or in a module CMI to have no linkage,
+   since it can still be accessed within a different TU.  Remember:
    no-linkage is not the same as internal-linkage.  */
 
 tree
@@ -3011,7 +3013,15 @@ no_linkage_check (tree t, bool relaxed_p)
       /* Only treat unnamed types as having no linkage if they're at
 	 namespace scope.  This is core issue 966.  */
       if (TYPE_UNNAMED_P (t) && TYPE_NAMESPACE_SCOPE_P (t))
-	return t;
+	{
+	  if (relaxed_p
+	      && TREE_PUBLIC (CP_TYPE_CONTEXT (t))
+	      && module_maybe_has_cmi_p ())
+	    /* This type could possibly be accessed outside this TU.  */
+	    return NULL_TREE;
+	  else
+	    return t;
+	}
 
       for (r = CP_TYPE_CONTEXT (t); ; )
 	{
@@ -3022,10 +3032,12 @@ no_linkage_check (tree t, bool relaxed_p)
 	    return no_linkage_check (TYPE_CONTEXT (t), relaxed_p);
 	  else if (TREE_CODE (r) == FUNCTION_DECL)
 	    {
-	      if (!relaxed_p || !vague_linkage_p (r))
-		return t;
-	      else
+	      if (relaxed_p
+		  && (vague_linkage_p (r)
+		      || (TREE_PUBLIC (r) && module_maybe_has_cmi_p ())))
 		r = CP_DECL_CONTEXT (r);
+	      else
+		return t;
 	    }
 	  else
 	    break;
@@ -5102,6 +5114,8 @@ static const attribute_spec cxx_gnu_attributes[] =
     handle_init_priority_attribute, NULL },
   { "abi_tag", 1, -1, false, false, false, true,
     handle_abi_tag_attribute, NULL },
+  { "no_dangling", 0, 1, false, true, false, false,
+    handle_no_dangling_attribute, NULL },
 };
 
 const scoped_attribute_specs cxx_gnu_attribute_table =
@@ -5388,6 +5402,29 @@ handle_contract_attribute (tree *ARG_UNUSED (node), tree ARG_UNUSED (name),
 			   bool *ARG_UNUSED (no_add_attrs))
 {
   /* TODO: Is there any checking we could do here?  */
+  return NULL_TREE;
+}
+
+/* Handle a "no_dangling" attribute; arguments as in
+   struct attribute_spec.handler.  */
+
+tree
+handle_no_dangling_attribute (tree *node, tree name, tree args, int,
+			      bool *no_add_attrs)
+{
+  if (args && TREE_CODE (TREE_VALUE (args)) == STRING_CST)
+    {
+      error ("%qE attribute argument must be an expression that evaluates "
+	     "to true or false", name);
+      *no_add_attrs = true;
+    }
+  else if (!FUNC_OR_METHOD_TYPE_P (*node)
+	   && !RECORD_OR_UNION_TYPE_P (*node))
+    {
+      warning (OPT_Wattributes, "%qE attribute ignored", name);
+      *no_add_attrs = true;
+    }
+
   return NULL_TREE;
 }
 

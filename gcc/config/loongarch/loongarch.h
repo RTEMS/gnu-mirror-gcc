@@ -138,19 +138,16 @@ along with GCC; see the file COPYING3.  If not see
 /* Width of a LASX vector register in bits.  */
 #define BITS_PER_LASX_REG (UNITS_PER_LASX_REG * BITS_PER_UNIT)
 
-/* For LARCH, width of a floating point register.  */
-#define UNITS_PER_FPREG (TARGET_DOUBLE_FLOAT ? 8 : 4)
-
 /* The largest size of value that can be held in floating-point
    registers and moved with a single instruction.  */
 #define UNITS_PER_HWFPVALUE \
-  (TARGET_SOFT_FLOAT ? 0 : UNITS_PER_FPREG)
+  (TARGET_SOFT_FLOAT ? 0 : UNITS_PER_FP_REG)
 
 /* The largest size of value that can be held in floating-point
    registers.  */
 #define UNITS_PER_FPVALUE \
   (TARGET_SOFT_FLOAT ? 0 \
-   : TARGET_SINGLE_FLOAT ? UNITS_PER_FPREG \
+   : TARGET_SINGLE_FLOAT ? UNITS_PER_FP_REG \
 			 : LONG_DOUBLE_TYPE_SIZE / BITS_PER_UNIT)
 
 /* The number of bytes in a double.  */
@@ -931,6 +928,7 @@ typedef struct {
   { "t8",	20 + GP_REG_FIRST },					\
   { "x",	21 + GP_REG_FIRST },					\
   { "fp",	22 + GP_REG_FIRST },					\
+  { "s9",	22 + GP_REG_FIRST },					\
   { "s0",	23 + GP_REG_FIRST },					\
   { "s1",	24 + GP_REG_FIRST },					\
   { "s2",	25 + GP_REG_FIRST },					\

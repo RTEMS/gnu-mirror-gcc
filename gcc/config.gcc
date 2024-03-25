@@ -703,9 +703,9 @@ c7 esther"
 # 64-bit x86 processors supported by --with-arch=.  Each processor
 # MUST be separated by exactly one space.
 x86_64_archs="amdfam10 athlon64 athlon64-sse3 barcelona bdver1 bdver2 \
-bdver3 bdver4 znver1 znver2 znver3 znver4 btver1 btver2 k8 k8-sse3 opteron \
-opteron-sse3 nocona core2 corei7 corei7-avx core-avx-i core-avx2 atom \
-slm nehalem westmere sandybridge ivybridge haswell broadwell bonnell \
+bdver3 bdver4 znver1 znver2 znver3 znver4 znver5 btver1 btver2 k8 k8-sse3 \
+opteron opteron-sse3 nocona core2 corei7 corei7-avx core-avx-i core-avx2 \
+atom slm nehalem westmere sandybridge ivybridge haswell broadwell bonnell \
 silvermont knl knm skylake-avx512 cannonlake icelake-client icelake-server \
 skylake goldmont goldmont-plus tremont cascadelake tigerlake cooperlake \
 sapphirerapids alderlake rocketlake eden-x2 nano nano-1000 nano-2000 nano-3000 \
@@ -2538,6 +2538,9 @@ riscv*-*-freebsd*)
 
 loongarch*-*-linux*)
 	tm_file="elfos.h gnu-user.h linux.h linux-android.h glibc-stdint.h ${tm_file}"
+	case ${target} in
+	  *-linux-musl*) tm_file="${tm_file} loongarch/musl.h"
+	esac
 	tm_file="${tm_file} loongarch/gnu-user.h loongarch/linux.h loongarch/loongarch-driver.h"
 	extra_options="${extra_options} linux-android.opt"
 	tmake_file="${tmake_file} loongarch/t-multilib loongarch/t-linux"
@@ -3756,6 +3759,10 @@ case ${target} in
 	arch=znver4
 	cpu=znver4
 	;;
+      znver5-*)
+	arch=znver5
+	cpu=znver5
+	;;
       bdver4-*)
         arch=bdver4
         cpu=bdver4
@@ -3892,6 +3899,10 @@ case ${target} in
 	  znver4-*)
 	arch=znver4
 	cpu=znver4
+	;;
+      znver5-*)
+	arch=znver5
+	cpu=znver5
 	;;
       bdver4-*)
         arch=bdver4
@@ -4549,7 +4560,7 @@ case "${target}" in
 		for which in arch tune; do
 			eval "val=\$with_$which"
 			case ${val} in
-			"" | fiji | gfx900 | gfx906 | gfx908 | gfx90a | gfx1030 | gfx1100)
+			"" | fiji | gfx900 | gfx906 | gfx908 | gfx90a | gfx1030 | gfx1100 | gfx1103)
 				# OK
 				;;
 			*)
@@ -4565,7 +4576,7 @@ case "${target}" in
 			TM_MULTILIB_CONFIG=
 			;;
 		xdefault | xyes)
-			TM_MULTILIB_CONFIG=`echo "gfx900,gfx906,gfx908,gfx90a,gfx1030,gfx1100" | sed "s/${with_arch},\?//;s/,$//"`
+			TM_MULTILIB_CONFIG=`echo "gfx900,gfx906,gfx908,gfx90a,gfx1030,gfx1100,gfx1103" | sed "s/${with_arch},\?//;s/,$//"`
 			;;
 		*)
 			TM_MULTILIB_CONFIG="${with_multilib_list}"

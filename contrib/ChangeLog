@@ -1,3 +1,31 @@
+2024-03-19  Jonathan Wakely  <jwakely@redhat.com>
+
+	* unicode/gen_libstdcxx_unicode_data.py: Fix header of generated
+	file to name the correct script.
+
+2024-03-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	* gcc_update: Add more generated files in libcc1, lto-plugin,
+	fixincludes, and libstdc++-v3.
+
+2024-03-08  Sam James  <sam@gentoo.org>
+
+	PR other/109668
+	* dg-extract-results.sh: Check for python3 before python. Check for
+	python2 last.
+
+2024-03-07  Filip Kastl  <fkastl@suse.cz>
+
+	* test_mklog.py: "Moved to..." -> "Move to..."
+
+2024-03-01  Bernhard Reutner-Fischer  <aldot@gcc.gnu.org>
+
+	* mklog.py: Use present tense in ChangeLog.
+
+2024-02-29  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	* gcc-changelog/git_commit.py (bug_components): Add libcc1.
+
 2024-02-23  Richard Biener  <rguenther@suse.de>
 
 	PR target/90785

@@ -140,6 +140,7 @@ gcn_option_override (void)
       : gcn_arch == PROCESSOR_GFX90a ? ISA_CDNA2
       : gcn_arch == PROCESSOR_GFX1030 ? ISA_RDNA2
       : gcn_arch == PROCESSOR_GFX1100 ? ISA_RDNA3
+      : gcn_arch == PROCESSOR_GFX1103 ? ISA_RDNA3
       : ISA_UNKNOWN);
   gcc_assert (gcn_isa != ISA_UNKNOWN);
 
@@ -164,13 +165,15 @@ gcn_option_override (void)
   /* gfx803 "Fiji", gfx1030 and gfx1100 do not support XNACK.  */
   if (gcn_arch == PROCESSOR_FIJI
       || gcn_arch == PROCESSOR_GFX1030
-      || gcn_arch == PROCESSOR_GFX1100)
+      || gcn_arch == PROCESSOR_GFX1100
+      || gcn_arch == PROCESSOR_GFX1103)
     {
       if (flag_xnack == HSACO_ATTR_ON)
 	error ("%<-mxnack=on%> is incompatible with %<-march=%s%>",
 	       (gcn_arch == PROCESSOR_FIJI ? "fiji"
 		: gcn_arch == PROCESSOR_GFX1030 ? "gfx1030"
 		: gcn_arch == PROCESSOR_GFX1100 ? "gfx1100"
+		: gcn_arch == PROCESSOR_GFX1103 ? "gfx1103"
 		: NULL));
       /* Allow HSACO_ATTR_ANY silently because that's the default.  */
       flag_xnack = HSACO_ATTR_OFF;
@@ -3048,6 +3051,8 @@ gcn_omp_device_kind_arch_isa (enum omp_device_kind_arch_isa trait,
 	return gcn_arch == PROCESSOR_GFX1030;
       if (strcmp (name, "gfx1100") == 0)
 	return gcn_arch == PROCESSOR_GFX1100;
+      if (strcmp (name, "gfx1103") == 0)
+	return gcn_arch == PROCESSOR_GFX1103;
       return 0;
     default:
       gcc_unreachable ();
@@ -4932,8 +4937,8 @@ gcn_expand_builtin_1 (tree exp, rtx target, rtx /*subtarget */ ,
       }
     case GCN_BUILTIN_FIRST_CALL_THIS_THREAD_P:
       {
-	/* Stash a marker in the unused upper 16 bits of s[0:1] to indicate
-	   whether it was the first call.  */
+	/* Stash a marker in the unused upper 16 bits of QUEUE_PTR_ARG to
+	   indicate whether it was the first call.  */
 	rtx result = gen_reg_rtx (BImode);
 	emit_move_insn (result, const0_rtx);
 	if (cfun->machine->args.reg[QUEUE_PTR_ARG] >= 0)
@@ -5221,6 +5226,32 @@ gcn_vector_mode_supported_p (machine_mode mode)
 static machine_mode
 gcn_vectorize_preferred_simd_mode (scalar_mode mode)
 {
+  /* RDNA devices have 32-lane vectors with limited support for 64-bit vectors
+     (in particular, permute operations are only available for cases that don't
+     span the 32-lane boundary).
+
+     From the RDNA3 manual: "Hardware may choose to skip either half if the
+     EXEC mask for that half is all zeros...". This means that preferring
+     32-lanes is a good stop-gap until we have proper wave32 support.  */
+  if (TARGET_RDNA2_PLUS)
+    switch (mode)
+      {
+      case E_QImode:
+	return V32QImode;
+      case E_HImode:
+	return V32HImode;
+      case E_SImode:
+	return V32SImode;
+      case E_DImode:
+	return V32DImode;
+      case E_SFmode:
+	return V32SFmode;
+      case E_DFmode:
+	return V32DFmode;
+      default:
+	return word_mode;
+      }
+
   switch (mode)
     {
     case E_QImode:
@@ -6558,6 +6589,11 @@ output_file_start (void)
       xnack = "";
       sram_ecc = "";
       break;
+    case PROCESSOR_GFX1103:
+      cpu = "gfx1103";
+      xnack = "";
+      sram_ecc = "";
+      break;
     default: gcc_unreachable ();
     }
 
@@ -6705,7 +6741,7 @@ gcn_hsa_declare_function_name (FILE *file, const char *name,
 	   xnack_enabled,
 	   LDS_SIZE);
   /* Not supported with 'architected flat scratch'.  */
-  if (gcn_arch != PROCESSOR_GFX1100)
+  if (!TARGET_RDNA3)
     fprintf (file,
 	   "\t  .amdhsa_reserve_flat_scratch\t0\n");
   if (gcn_arch == PROCESSOR_GFX90a)
