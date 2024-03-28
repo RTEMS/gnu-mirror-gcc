@@ -1,3 +1,233 @@
+2024-03-27  Matthias Kretz  <m.kretz@gsi.de>
+
+	* include/experimental/bits/simd_x86.h (_S_masked_unary):
+	Cast inputs < 16 bytes to 16 byte vectors before calling the
+	right subtraction builtin. Before returning, truncate to the
+	return vector type.
+
+2024-03-27  Matthias Kretz  <m.kretz@gsi.de>
+
+	* include/experimental/bits/simd_x86.h (_S_masked_unary): Call
+	the 4- and 8-byte variants of __builtin_ia32_subp[ds] without
+	rounding direction argument.
+
+2024-03-27  Srinivas Yadav Singanaboina  <vasu.srinivasvasu.14@gmail.com>
+
+	* include/Makefile.am: Add simd_sve.h.
+	* include/Makefile.in: Add simd_sve.h.
+	* include/experimental/bits/simd.h: Add new SveAbi.
+	* include/experimental/bits/simd_builtin.h: Use
+	__no_sve_deduce_t to support existing Neon Abi.
+	* include/experimental/bits/simd_converter.h: Convert
+	sequentially when sve is available.
+	* include/experimental/bits/simd_detail.h: Define sve
+	specific macro.
+	* include/experimental/bits/simd_math.h: Fallback frexp
+	to execute sequntially when sve is available, to handle
+	fixed_size_simd return type that always uses sve.
+	* include/experimental/simd: Include bits/simd_sve.h.
+	* testsuite/experimental/simd/tests/bits/main.h: Enable
+	testing for sve128, sve256, sve512.
+	* include/experimental/bits/simd_sve.h: New file.
+
+2024-03-26  Arsen Arsenović  <arsen@aarsen.me>
+
+	* include/std/generator (generator::_Iterator::operator*): Fix
+	return type.
+	* testsuite/24_iterators/range_generators/iter_deref_return.cc:
+	New test.
+
+2024-03-26  Arsen Arsenović  <arsen@aarsen.me>
+
+	* include/std/generator: Fix _V badname.
+
+2024-03-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/19_diagnostics/stacktrace/current.cc: Check for
+	__cpp_lib_stacktrace instead of check for stacktrace ET.
+	* testsuite/19_diagnostics/stacktrace/entry.cc: Likewise.
+	* testsuite/19_diagnostics/stacktrace/hash.cc: Likewise.
+	* testsuite/19_diagnostics/stacktrace/output.cc: Likewise.
+	* testsuite/19_diagnostics/stacktrace/stacktrace.cc: Likewise.
+	* testsuite/19_diagnostics/stacktrace/synopsis.cc: Likewise.
+	* testsuite/19_diagnostics/stacktrace/version.cc: Likewise.
+	* testsuite/23_containers/vector/debug/assign4_backtrace_neg.cc:
+	Likewise.
+	* testsuite/lib/libstdc++.exp (check_effective_target_stacktrace):
+	Remove.
+
+2024-03-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/lib/dg-options.exp (dg-require-cpp-feature-test):
+	New proc.
+	* testsuite/lib/libstdc++.exp (check_v3_target_cpp_feature_test):
+	New proc.
+	* testsuite/std/text_encoding/cons.cc: Use new directive to skip
+	the test if the __cpp_lib_text_encoding feature test macro is
+	not defined.
+	* testsuite/std/text_encoding/requirements.cc: Likewise.
+
+2024-03-25  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/std/text_encoding/requirements.cc: #undef the
+	correct macro.
+
+2024-03-23  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/format (formatter): Disable specializations that
+	would allow sequences of narrow characters to be formatted as
+	wchar_t without conversion, as per LWG 3944.
+	* testsuite/std/format/formatter/lwg3944.cc: New test.
+
+2024-03-23  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/utility.h (__is_in_place_index_v): New variable
+	template.
+	* include/std/variant (__not_in_place_tag): Define in terms of
+	variable templates not a class template.
+
+2024-03-23  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/114400
+	* include/std/string_view (operator==): Use std::type_identity_t
+	in C++20 instead of our own __type_identity_t.
+
+2024-03-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/114401
+	* include/bits/hashtable.h (_Hashtable::_M_reinsert_node): Call
+	release() on node handle instead of just zeroing its pointer.
+	(_Hashtable::_M_reinsert_node_multi): Likewise.
+	(_Hashtable::_M_merge_unique): Likewise.
+	(_Hashtable::_M_merge_multi): Likewise.
+	* include/bits/node_handle.h (_Node_handle_common::release()):
+	New member function.
+	(_Node_handle_common::_Optional_alloc::_M_empty): Remove
+	unnecessary union member.
+	(_Node_handle_common): Declare _Hashtable as a friend.
+	* include/bits/stl_tree.h (_Rb_tree::_M_reinsert_node_unique):
+	Call release() on node handle instead of just zeroing its
+	pointer.
+	(_Rb_tree::_M_reinsert_node_equal): Likewise.
+	(_Rb_tree::_M_reinsert_node_hint_unique): Likewise.
+	(_Rb_tree::_M_reinsert_node_hint_equal): Likewise.
+	* testsuite/23_containers/multiset/modifiers/114401.cc: New test.
+	* testsuite/23_containers/set/modifiers/114401.cc: New test.
+	* testsuite/23_containers/unordered_multiset/modifiers/114401.cc: New test.
+	* testsuite/23_containers/unordered_set/modifiers/114401.cc: New test.
+
+2024-03-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/113841
+	* include/bits/allocator.h (allocator<cv T>): Add default
+	constructor to partial specializations for cv-qualified types.
+	* include/bits/stl_vector.h (_Vector_impl::_Vector_impl()):
+	Constrain so that it's only present if the allocator is default
+	constructible.
+	* include/bits/stl_bvector.h (_Bvector_impl::_Bvector_impl()):
+	Likewise.
+	* testsuite/23_containers/vector/cons/113841.cc: New test.
+
+2024-03-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/stl_construct.h (destroy_at, construct_at): Guard
+	with feature test macros instead of just __cplusplus.
+
+2024-03-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/version.def (generator, tuple_like): Move earlier
+	in the file.
+	* include/bits/version.h: Regenerate.
+
+2024-03-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/114394
+	* include/std/functional (bind): Use __invoke_result_t instead
+	of result_of::type.
+	* include/std/type_traits (__invoke_result_t): New alias
+	template.
+	* testsuite/20_util/bind/ref_neg.cc: Adjust prune pattern.
+
+2024-03-20  François Dumont  <fdumont@gcc.gnu.org>
+
+	* include/bits/version.def (null_iterators): Remove extra_cond.
+	* include/bits/version.h: Regenerate.
+
+2024-03-19  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/114359
+	* include/bits/random.tcc (binomial_distribution::param_type):
+	Ensure arithmetic is done as type double.
+	* testsuite/26_numerics/random/binomial_distribution/114359.cc: New test.
+
+2024-03-19  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/101228
+	* include/pstl/parallel_backend_tbb.h (TBB_SUPPRESS_DEPRECATED_MESSAGES):
+	Define before including <tbb/task.h> then undef afterwards.
+
+2024-03-19  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/Makefile.am [MAINTAINER_MODE]: Add target to
+	automatically update <bits/version.h>.
+	* include/Makefile.in: Regenerate.
+
+2024-03-19  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/manual/build_hacking.xml: Document generated files.
+	Update list of convenience libraries and sub-directories under
+	the src directory.
+	* doc/html/*: Regenerate.
+
+2024-03-19  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/text_encoding-data.h: Regenerate.
+	* include/bits/unicode-data.h: Regenerate.
+	* scripts/gen_text_encoding_data.py: Fix header of generated
+	file to name the correct script.
+
+2024-03-19  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/util/pstl/test_utils.h: Fix typos in comments.
+
+2024-03-19  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/114367
+	* include/bits/stl_bvector.h (_M_allocate): Use allocator's
+	construct function to begin lifetime of words.
+
+2024-03-19  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* testsuite/lib/dg-options.exp (atomic_link_flags): Emit a -B
+	option for the path to the uninstalled libatomic.
+
+2024-03-19  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* testsuite/lib/libstdc++.exp (v3_target_compile): Instead of
+	/dev/null, use a temporary file for test executables on Darwin.
+
+2024-03-18  François Dumont  <fdumont@gcc.gnu.org>
+
+	* include/debug/safe_iterator.tcc (_Safe_iterator<>::_M_can_advance):
+	Accept 0 offset advance on value-initialized iterator.
+	* testsuite/23_containers/vector/debug/n3644.cc: New test case.
+
+2024-03-18  François Dumont  <fdumont@gcc.gnu.org>
+
+	* include/debug/safe_local_iterator.tcc
+	(_Safe_local_iterator::_M_valid_range): Add _M_value_initialized and
+	_M_singular checks.
+	* testsuite/23_containers/unordered_set/debug/114316.cc: New test case.
+
+2024-03-17  François Dumont  <fdumont@gcc.gnu.org>
+
+	PR libstdc++/114316
+	* include/debug/safe_iterator.tcc (_Safe_iterator<>::_M_valid_range):
+	First check if both iterators are value-initialized before checking if
+	singular.
+	* testsuite/23_containers/set/debug/114316.cc: New test case.
+	* testsuite/23_containers/vector/debug/114316.cc: New test case.
+
 2024-03-14  Jonathan Wakely  <jwakely@redhat.com>
 
 	PR libstdc++/114325

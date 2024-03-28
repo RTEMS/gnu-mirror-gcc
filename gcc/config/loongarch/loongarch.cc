@@ -767,7 +767,13 @@ loongarch_setup_incoming_varargs (cumulative_args_t cum,
      argument.  Advance a local copy of CUM past the last "real" named
      argument, to find out how many registers are left over.  */
   local_cum = *get_cumulative_args (cum);
-  if (!TYPE_NO_NAMED_ARGS_STDARG_P (TREE_TYPE (current_function_decl)))
+
+  /* For a C23 variadic function w/o any named argument, and w/o an
+     artifical argument for large return value, skip advancing args.
+     There is such an artifical argument iff. arg.type is non-NULL
+     (PR 114175).  */
+  if (!TYPE_NO_NAMED_ARGS_STDARG_P (TREE_TYPE (current_function_decl))
+      || arg.type != NULL_TREE)
     loongarch_function_arg_advance (pack_cumulative_args (&local_cum), arg);
 
   /* Found out how many registers we need to save.  */
@@ -6770,7 +6776,7 @@ loongarch_hard_regno_mode_ok_uncached (unsigned int regno, machine_mode mode)
 	 and TRUNC.  There's no point allowing sizes smaller than a word,
 	 because the FPU has no appropriate load/store instructions.  */
       if (mclass == MODE_INT)
-	return size >= MIN_UNITS_PER_WORD && size <= UNITS_PER_FPREG;
+	return size >= MIN_UNITS_PER_WORD && size <= UNITS_PER_FP_REG;
     }
 
   return false;
@@ -6813,7 +6819,7 @@ loongarch_hard_regno_nregs (unsigned int regno, machine_mode mode)
       if (LASX_SUPPORTED_MODE_P (mode))
 	return 1;
 
-      return (GET_MODE_SIZE (mode) + UNITS_PER_FPREG - 1) / UNITS_PER_FPREG;
+      return (GET_MODE_SIZE (mode) + UNITS_PER_FP_REG - 1) / UNITS_PER_FP_REG;
     }
 
   /* All other registers are word-sized.  */
@@ -6848,7 +6854,7 @@ loongarch_class_max_nregs (enum reg_class rclass, machine_mode mode)
 	  else if (LSX_SUPPORTED_MODE_P (mode))
 	    size = MIN (size, UNITS_PER_LSX_REG);
 	  else
-	    size = MIN (size, UNITS_PER_FPREG);
+	    size = MIN (size, UNITS_PER_FP_REG);
 	}
       left &= ~reg_class_contents[FP_REGS];
     }
@@ -8222,7 +8228,7 @@ loongarch_get_separate_components (void)
 	if (IMM12_OPERAND (offset))
 	  bitmap_set_bit (components, regno);
 
-	offset -= UNITS_PER_FPREG;
+	offset -= UNITS_PER_FP_REG;
       }
 
   /* Don't mess with the hard frame pointer.  */
@@ -8301,7 +8307,7 @@ loongarch_process_components (sbitmap components, loongarch_save_restore_fn fn)
 	if (bitmap_bit_p (components, regno))
 	  loongarch_save_restore_reg (mode, regno, offset, fn);
 
-	offset -= UNITS_PER_FPREG;
+	offset -= UNITS_PER_FP_REG;
       }
 }
 
@@ -10801,30 +10807,12 @@ loongarch_expand_vec_cond_mask_expr (machine_mode mode, machine_mode vimode,
 }
 
 /* Expand integer vector comparison */
-bool
+void
 loongarch_expand_vec_cmp (rtx operands[])
 {
 
   rtx_code code = GET_CODE (operands[1]);
   loongarch_expand_lsx_cmp (operands[0], code, operands[2], operands[3]);
-  return true;
-}
-
-/* Implement TARGET_CASE_VALUES_THRESHOLD.  */
-
-unsigned int
-loongarch_case_values_threshold (void)
-{
-  return default_case_values_threshold ();
-}
-
-/* Implement TARGET_SPILL_CLASS.  */
-
-static reg_class_t
-loongarch_spill_class (reg_class_t rclass ATTRIBUTE_UNUSED,
-		       machine_mode mode ATTRIBUTE_UNUSED)
-{
-  return NO_REGS;
 }
 
 /* Implement TARGET_PROMOTE_FUNCTION_MODE.  */
@@ -11281,9 +11269,6 @@ loongarch_asm_code_end (void)
 #undef TARGET_FUNCTION_ARG_BOUNDARY
 #define TARGET_FUNCTION_ARG_BOUNDARY loongarch_function_arg_boundary
 
-#undef TARGET_OPTAB_SUPPORTED_P
-#define TARGET_OPTAB_SUPPORTED_P loongarch_optab_supported_p
-
 #undef TARGET_VECTOR_MODE_SUPPORTED_P
 #define TARGET_VECTOR_MODE_SUPPORTED_P loongarch_vector_mode_supported_p
 
@@ -11353,17 +11338,11 @@ loongarch_asm_code_end (void)
 #undef TARGET_SCHED_REASSOCIATION_WIDTH
 #define TARGET_SCHED_REASSOCIATION_WIDTH loongarch_sched_reassociation_width
 
-#undef TARGET_CASE_VALUES_THRESHOLD
-#define TARGET_CASE_VALUES_THRESHOLD loongarch_case_values_threshold
-
 #undef TARGET_ATOMIC_ASSIGN_EXPAND_FENV
 #define TARGET_ATOMIC_ASSIGN_EXPAND_FENV loongarch_atomic_assign_expand_fenv
 
 #undef TARGET_CALL_FUSAGE_CONTAINS_NON_CALLEE_CLOBBERS
 #define TARGET_CALL_FUSAGE_CONTAINS_NON_CALLEE_CLOBBERS true
-
-#undef TARGET_SPILL_CLASS
-#define TARGET_SPILL_CLASS loongarch_spill_class
 
 #undef TARGET_HARD_REGNO_NREGS
 #define TARGET_HARD_REGNO_NREGS loongarch_hard_regno_nregs

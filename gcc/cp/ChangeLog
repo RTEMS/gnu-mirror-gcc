@@ -1,3 +1,57 @@
+2024-03-26  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/112724
+	* error.cc (dump_expr): Handle EXCESS_PRECISION_EXPR like NOP_EXPR.
+
+2024-03-25  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/114349
+	* name-lookup.cc (maybe_push_to_top_level): For a non-lambda,
+	don't push to top level if decl_function_context is non-null.
+	* pt.cc (maybe_instantiate_noexcept): Use maybe_push_to_top_level.
+
+2024-03-25  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/114439
+	* init.cc (can_init_array_with_p): Return true for a VEC_INIT_EXPR
+	wrapped in a TARGET_EXPR.
+
+2024-03-22  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/59465
+	* init.cc (can_init_array_with_p): New.
+	(perform_member_init): Check it.
+
+2024-03-21  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/110323
+	* decl2.cc (min_vis_expr_r) <case VAR_DECL>: Do nothing for
+	decl_constant_var_p VAR_DECLs.
+
+2024-03-20  Jakub Jelinek  <jakub@redhat.com>
+
+	* coroutines.cc (expand_one_await_expression): Use
+	integer_zero_node instead of build_int_cst (integer_type_node, 0)
+	and integer_one_node instead of build_int_cst (integer_type_node, 1).
+
+2024-03-19  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	* cp-tree.h (module_maybe_has_cmi_p): New function.
+	* decl.cc (grokfndecl): Mark block-scope functions as public if
+	they could be visible in other TUs.
+	* decl2.cc (no_linkage_error): Don't error for declarations that
+	could be defined in other TUs since C++20. Suppress duplicate
+	errors from 'check_global_declaration'.
+	* tree.cc (no_linkage_check): In relaxed mode, don't consider
+	types in a module CMI to have no linkage.
+
+2024-03-16  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/112631
+	* cp-tree.h (named_module_attach_p): New function.
+	* decl.cc (start_decl): Check for attachment not purview.
+	(grokmethod): Likewise.
+
 2024-03-14  Chung-Lin Tang  <cltang@baylibre.com>
 
 	* parser.cc (cp_parser_oacc_data_clause): Add parsing support for

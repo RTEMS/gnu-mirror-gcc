@@ -125,7 +125,7 @@ EXPORT QUALIFIED StartBuildDefFile, StartBuildModFile, EndBuildFile,
                  IsDefOrModFile,
                  IsInitialisingConst,
 
-                 DisplayQuadList, DisplayQuadRange, DisplayQuad,
+                 DumpQuadruples, DisplayQuadRange, DisplayQuad,
                  WriteOperator, BackPatchSubrangesAndOptParam,
 
                  GetQuad, GetFirstQuad, GetNextQuad, PutQuad,
@@ -440,10 +440,12 @@ PROCEDURE IsDefOrModFile (QuadNo: CARDINAL) : BOOLEAN ;
 
 
 (*
-   DisplayQuadList - displays all quads.
+   DumpQuadruples - dump all quadruples providing the -fq, -fdump-lang-quad,
+                    -fdump-lang-quad= or -fdump-lang-all were issued to the
+                    command line.
 *)
 
-PROCEDURE DisplayQuadList ;
+PROCEDURE DumpQuadruples (title: ARRAY OF CHAR) ;
 
 
 (*
@@ -1934,9 +1936,10 @@ PROCEDURE BuildDesignatorPointer (ptrtok: CARDINAL) ;
                         Empty             +------------+
                                           | NulSym     |
                                           |------------|
+   tokpos is the position of the RETURN token.
 *)
 
-PROCEDURE BuildNulExpression ;
+PROCEDURE BuildNulExpression (tokpos: CARDINAL) ;
 
 
 (*
@@ -1953,7 +1956,7 @@ PROCEDURE BuildNulExpression ;
                                         |--------------|
 *)
 
-PROCEDURE BuildSetStart ;
+PROCEDURE BuildSetStart (tokpos: CARDINAL) ;
 
 
 (*
@@ -1986,9 +1989,10 @@ PROCEDURE BuildSetEnd ;
       	       	   | SetType   |     | SetType     |
                    |-----------|     |-------------|
 
+   tokpos points to the opening '{'.
 *)
 
-PROCEDURE BuildEmptySet ;
+PROCEDURE BuildEmptySet (tokpos: CARDINAL) ;
 
 
 (*
@@ -2097,9 +2101,12 @@ PROCEDURE BuildConstructorStart (cbratokpos: CARDINAL) ;
                          +------------+        +------------+
                          | const      |        | const      |
                          |------------+        |------------|
+
+   startpos is the start of the constructor, either the typename or '{'
+   cbratokpos is the '}'.
 *)
 
-PROCEDURE BuildConstructorEnd (cbratokpos: CARDINAL) ;
+PROCEDURE BuildConstructorEnd (startpos, cbratokpos: CARDINAL) ;
 
 
 (*
@@ -2116,7 +2123,7 @@ PROCEDURE NextConstructorField ;
                              it Pushes a Bitset type.
 *)
 
-PROCEDURE BuildTypeForConstructor ;
+PROCEDURE BuildTypeForConstructor (tokpos: CARDINAL) ;
 
 
 (*
