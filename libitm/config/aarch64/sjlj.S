@@ -29,6 +29,13 @@
 #define AUTIASP	hint	29
 #define PACIBSP	hint	27
 #define AUTIBSP	hint	31
+#define CHKFEAT_X16	hint	40
+#define MRS_GCSPR(x)	mrs	x, s3_3_c2_c5_1
+#define GCSPOPM(x)	sysl	x, #3, c7, c7, #1
+#define GCSSS1(x)	sys	#3, c7, c7, #2, x
+#define GCSSS2(x)	sysl	x, #3, c7, c7, #3
+
+#define L(name) .L##name
 
 #if defined(HAVE_AS_CFI_PSEUDO_OP) && defined(__GCC_HAVE_DWARF2_CFI_ASM)
 # define cfi_window_save .cfi_window_save
@@ -80,7 +87,16 @@ _ITM_beginTransaction:
 	stp	d10, d11, [sp, 7*16]
 	stp	d12, d13, [sp, 8*16]
 	stp	d14, d15, [sp, 9*16]
-	str	x1, [sp, 10*16]
+
+	/* GCS support.  */
+	mov	x2, 0
+	mov	x16, 1
+	CHKFEAT_X16
+	tbnz	x16, 0, L(gcs_done_sj)
+	MRS_GCSPR (x2)
+	add	x2, x2, 8 /* GCS after _ITM_beginTransaction returns.  */
+L(gcs_done_sj):
+	stp	x2, x1, [sp, 10*16]
 
 	/* Invoke GTM_begin_transaction with the struct we just built.  */
 	mov	x1, sp
@@ -117,7 +133,38 @@ GTM_longjmp:
 	ldp	d10, d11, [x1, 7*16]
 	ldp	d12, d13, [x1, 8*16]
 	ldp	d14, d15, [x1, 9*16]
+
+	/* GCS support.  */
+	mov	x16, 1
+	CHKFEAT_X16
+	tbnz	x16, 0, L(gcs_done_lj)
+	MRS_GCSPR (x7)
 	ldr	x3, [x1, 10*16]
+	mov	x4, x3
+	/* x7: GCSPR now.  x3, x4: target GCSPR.  x5, x6: tmp regs.  */
+L(gcs_scan):
+	cmp	x7, x4
+	b.eq	L(gcs_pop)
+	sub	x4, x4, 8
+	/* Check for a cap token.  */
+	ldr	x5, [x4]
+	and	x6, x4, 0xfffffffffffff000
+	orr	x6, x6, 1
+	cmp	x5, x6
+	b.ne	L(gcs_scan)
+L(gcs_switch):
+	add	x7, x4, 8
+	GCSSS1 (x4)
+	GCSSS2 (xzr)
+L(gcs_pop):
+	cmp	x7, x3
+	b.eq	L(gcs_done_lj)
+	GCSPOPM (xzr)
+	add	x7, x7, 8
+	b	L(gcs_pop)
+L(gcs_done_lj):
+
+	ldr	x3, [x1, 10*16 + 8]
 	ldp	x29, x30, [x1]
 	cfi_def_cfa(x1, 0)
 	CFI_PAC_TOGGLE
@@ -132,6 +179,7 @@ GTM_longjmp:
 #define FEATURE_1_AND 0xc0000000
 #define FEATURE_1_BTI 1
 #define FEATURE_1_PAC 2
+#define FEATURE_1_GCS 4
 
 /* Supported features based on the code generation options.  */
 #if defined(__ARM_FEATURE_BTI_DEFAULT)
@@ -144,6 +192,12 @@ GTM_longjmp:
 # define PAC_FLAG FEATURE_1_PAC
 #else
 # define PAC_FLAG 0
+#endif
+
+#if __ARM_FEATURE_GCS_DEFAULT
+# define GCS_FLAG FEATURE_1_GCS
+#else
+# define GCS_FLAG 0
 #endif
 
 /* Add a NT_GNU_PROPERTY_TYPE_0 note.  */
@@ -163,7 +217,7 @@ GTM_longjmp:
 .section .note.GNU-stack, "", %progbits
 
 /* Add GNU property note if built with branch protection.  */
-# if (BTI_FLAG|PAC_FLAG) != 0
-GNU_PROPERTY (FEATURE_1_AND, BTI_FLAG|PAC_FLAG)
+# if (BTI_FLAG|PAC_FLAG|GCS_FLAG) != 0
+GNU_PROPERTY (FEATURE_1_AND, BTI_FLAG|PAC_FLAG|GCS_FLAG)
 # endif
 #endif
