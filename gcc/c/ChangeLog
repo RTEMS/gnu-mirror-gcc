@@ -1,3 +1,26 @@
+2024-04-02  Martin Uecker  <uecker@tugraz.at>
+
+	PR c/114361
+	* c-decl.cc (finish_struct): Set TYPE_CANONICAL when completing
+	strucute types.
+
+2024-03-14  Chung-Lin Tang  <cltang@baylibre.com>
+
+	* c-parser.cc (c_parser_oacc_data_clause): Add parsing support for
+	'readonly' modifier, set OMP_CLAUSE_MAP_READONLY if readonly modifier
+	found, update comments.
+	(c_parser_oacc_cache): Add parsing support for 'readonly' modifier,
+	set OMP_CLAUSE__CACHE__READONLY if readonly modifier found, update
+	comments.
+
+2024-03-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR debug/113918
+	* c-tree.h (c_type_dwarf_attribute): Declare.
+	* c-objc-common.h (LANG_HOOKS_TYPE_DWARF_ATTRIBUTE): Redefine.
+	* c-objc-common.cc: Include dwarf2.h.
+	(c_type_dwarf_attribute): New function.
+
 2024-02-26  Jakub Jelinek  <jakub@redhat.com>
 
 	PR c/114042

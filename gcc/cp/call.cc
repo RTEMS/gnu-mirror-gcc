@@ -8742,7 +8742,15 @@ convert_like_internal (conversion *convs, tree expr, tree fn, int argnum,
       break;
     };
 
-  expr = convert_like (next_conversion (convs), expr, fn, argnum,
+  conversion *nc = next_conversion (convs);
+  if (convs->kind == ck_ref_bind && nc->kind == ck_qual
+      && !convs->need_temporary_p)
+    /* direct_reference_binding might have inserted a ck_qual under
+       this ck_ref_bind for the benefit of conversion sequence ranking.
+       Don't actually perform that conversion.  */
+    nc = next_conversion (nc);
+
+  expr = convert_like (nc, expr, fn, argnum,
 		       convs->kind == ck_ref_bind
 		       ? issue_conversion_warnings : false,
 		       c_cast_p, /*nested_p=*/true, complain & ~tf_no_cleanup);
@@ -8819,19 +8827,6 @@ convert_like_internal (conversion *convs, tree expr, tree fn, int argnum,
     case ck_ref_bind:
       {
 	tree ref_type = totype;
-
-	/* direct_reference_binding might have inserted a ck_qual under
-	   this ck_ref_bind for the benefit of conversion sequence ranking.
-	   Ignore the conversion; we'll create our own below.  */
-	if (next_conversion (convs)->kind == ck_qual
-	    && !convs->need_temporary_p)
-	  {
-	    gcc_assert (same_type_p (TREE_TYPE (expr),
-				     next_conversion (convs)->type));
-	    /* Strip the cast created by the ck_qual; cp_build_addr_expr
-	       below expects an lvalue.  */
-	    STRIP_NOPS (expr);
-	  }
 
 	if (convs->bad_p && !next_conversion (convs)->bad_p)
 	  {
@@ -14033,11 +14028,7 @@ std_pair_ref_ref_p (tree t)
   return true;
 }
 
-/* Return true if a class CTYPE is either std::reference_wrapper or
-   std::ref_view, or a reference wrapper class.  We consider a class
-   a reference wrapper class if it has a reference member.  We no
-   longer check that it has a constructor taking the same reference type
-   since that approach still generated too many false positives.  */
+/* Return true if a class T has a reference member.  */
 
 static bool
 class_has_reference_member_p (tree t)
@@ -14061,11 +14052,40 @@ class_has_reference_member_p_r (tree binfo, void *)
 	  ? integer_one_node : NULL_TREE);
 }
 
+
+/* Return true if T (either a class or a function) has been marked as
+   not-dangling.  */
+
+static bool
+no_dangling_p (tree t)
+{
+  t = lookup_attribute ("no_dangling", TYPE_ATTRIBUTES (t));
+  if (!t)
+    return false;
+
+  t = TREE_VALUE (t);
+  if (!t)
+    return true;
+
+  t = build_converted_constant_bool_expr (TREE_VALUE (t), tf_warning_or_error);
+  t = cxx_constant_value (t);
+  return t == boolean_true_node;
+}
+
+/* Return true if a class CTYPE is either std::reference_wrapper or
+   std::ref_view, or a reference wrapper class.  We consider a class
+   a reference wrapper class if it has a reference member.  We no
+   longer check that it has a constructor taking the same reference type
+   since that approach still generated too many false positives.  */
+
 static bool
 reference_like_class_p (tree ctype)
 {
   if (!CLASS_TYPE_P (ctype))
     return false;
+
+  if (no_dangling_p (ctype))
+    return true;
 
   /* Also accept a std::pair<const T&, const T&>.  */
   if (std_pair_ref_ref_p (ctype))
@@ -14173,7 +14193,8 @@ do_warn_dangling_reference (tree expr, bool arg_p)
 	       but probably not to one of its arguments.  */
 	    || (DECL_OBJECT_MEMBER_FUNCTION_P (fndecl)
 		&& DECL_OVERLOADED_OPERATOR_P (fndecl)
-		&& DECL_OVERLOADED_OPERATOR_IS (fndecl, INDIRECT_REF)))
+		&& DECL_OVERLOADED_OPERATOR_IS (fndecl, INDIRECT_REF))
+	    || no_dangling_p (TREE_TYPE (fndecl)))
 	  return NULL_TREE;
 
 	tree rettype = TREE_TYPE (TREE_TYPE (fndecl));

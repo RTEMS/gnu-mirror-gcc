@@ -37,7 +37,8 @@ along with GCC; see the file COPYING3.  If not see
 static int
 riscv_ext_version_value (unsigned major, unsigned minor)
 {
-  return (major * RISCV_MAJOR_VERSION_BASE) + (minor * RISCV_MINOR_VERSION_BASE);
+  return (major * RISCV_MAJOR_VERSION_BASE)
+    + (minor * RISCV_MINOR_VERSION_BASE);
 }
 
 /* Implement TARGET_CPU_CPP_BUILTINS.  */
@@ -110,7 +111,6 @@ riscv_cpu_cpp_builtins (cpp_reader *pfile)
     case CM_MEDANY:
       builtin_define ("__riscv_cmodel_medany");
       break;
-
     }
 
   if (riscv_user_wants_strict_align)
@@ -140,11 +140,14 @@ riscv_cpu_cpp_builtins (cpp_reader *pfile)
       builtin_define ("__riscv_vector");
       builtin_define_with_int_value ("__riscv_v_intrinsic",
 				     riscv_ext_version_value (0, 12));
+
+      if (rvv_vector_bits == RVV_VECTOR_BITS_ZVL)
+	builtin_define_with_int_value ("__riscv_v_fixed_vlen", TARGET_MIN_VLEN);
     }
 
-   if (TARGET_XTHEADVECTOR)
-     builtin_define_with_int_value ("__riscv_th_v_intrinsic",
-				     riscv_ext_version_value (0, 11));
+  if (TARGET_XTHEADVECTOR)
+    builtin_define_with_int_value ("__riscv_th_v_intrinsic",
+				   riscv_ext_version_value (0, 11));
 
   /* Define architecture extension test macros.  */
   builtin_define_with_int_value ("__riscv_arch_test", 1);
@@ -198,14 +201,20 @@ riscv_pragma_intrinsic (cpp_reader *)
   if (strcmp (name, "vector") == 0
       || strcmp (name, "xtheadvector") == 0)
     {
-      if (!TARGET_VECTOR)
+      if (TARGET_VECTOR)
+	riscv_vector::handle_pragma_vector ();
+      else /* Indicates riscv_vector.h is included but v is missing in arch  */
 	{
-	  error ("%<#pragma riscv intrinsic%> option %qs needs 'V' or "
-		 "'XTHEADVECTOR' extension enabled",
-		 name);
-	  return;
+	  /* To make the the rvv types and intrinsic API available for the
+	     target("arch=+v") attribute,  we need to temporally enable the
+	     TARGET_VECTOR, and disable it after all initialized.  */
+	  target_flags |= MASK_VECTOR;
+
+	  riscv_vector::init_builtins ();
+	  riscv_vector::handle_pragma_vector ();
+
+	  target_flags &= ~MASK_VECTOR;
 	}
-      riscv_vector::handle_pragma_vector ();
     }
   else
     error ("unknown %<#pragma riscv intrinsic%> option %qs", name);

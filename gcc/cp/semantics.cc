@@ -12439,7 +12439,13 @@ trait_expr_value (cp_trait_kind kind, tree type1, tree type2)
       return CP_AGGREGATE_TYPE_P (type1);
 
     case CPTK_IS_ARRAY:
-      return type_code1 == ARRAY_TYPE;
+      return (type_code1 == ARRAY_TYPE
+	      /* We don't want to report T[0] as being an array type.
+		 This is for compatibility with an implementation of
+		 std::is_array by template argument deduction, because
+		 compute_array_index_type_loc rejects a zero-size array
+		 in SFINAE context.  */
+	      && !(TYPE_SIZE (type1) && integer_zerop (TYPE_SIZE (type1))));
 
     case CPTK_IS_ASSIGNABLE:
       return is_xible (MODIFY_EXPR, type1, type2);
@@ -12607,6 +12613,45 @@ check_trait_type (tree type, int kind = 1)
   return true;
 }
 
+/* True iff the conversion (if any) would be a direct reference
+   binding, not requiring complete types.  This is LWG2939.  */
+
+static bool
+same_type_ref_bind_p (cp_trait_kind kind, tree type1, tree type2)
+{
+  tree from, to;
+  switch (kind)
+    {
+      /* These put the target type first.  */
+    case CPTK_IS_CONSTRUCTIBLE:
+    case CPTK_IS_NOTHROW_CONSTRUCTIBLE:
+    case CPTK_IS_TRIVIALLY_CONSTRUCTIBLE:
+    case CPTK_REF_CONSTRUCTS_FROM_TEMPORARY:
+    case CPTK_REF_CONVERTS_FROM_TEMPORARY:
+      to = type1;
+      from = type2;
+      break;
+
+      /* These put it second.  */
+    case CPTK_IS_CONVERTIBLE:
+    case CPTK_IS_NOTHROW_CONVERTIBLE:
+      to = type2;
+      from = type1;
+      break;
+
+    default:
+      gcc_unreachable ();
+    }
+
+  if (TREE_CODE (to) != REFERENCE_TYPE || !from)
+    return false;
+  if (TREE_CODE (from) == TREE_VEC && TREE_VEC_LENGTH (from) == 1)
+    from = TREE_VEC_ELT (from, 0);
+  return (TYPE_P (from)
+	  && (same_type_ignoring_top_level_qualifiers_p
+	      (non_reference (to), non_reference (from))));
+}
+
 /* Process a trait expression.  */
 
 tree
@@ -12666,20 +12711,21 @@ finish_trait_expr (location_t loc, cp_trait_kind kind, tree type1, tree type2)
 	return error_mark_node;
       break;
 
-    case CPTK_IS_ASSIGNABLE:
     case CPTK_IS_CONSTRUCTIBLE:
-      if (!check_trait_type (type1))
-	return error_mark_node;
-      break;
-
     case CPTK_IS_CONVERTIBLE:
-    case CPTK_IS_NOTHROW_ASSIGNABLE:
     case CPTK_IS_NOTHROW_CONSTRUCTIBLE:
     case CPTK_IS_NOTHROW_CONVERTIBLE:
-    case CPTK_IS_TRIVIALLY_ASSIGNABLE:
     case CPTK_IS_TRIVIALLY_CONSTRUCTIBLE:
     case CPTK_REF_CONSTRUCTS_FROM_TEMPORARY:
     case CPTK_REF_CONVERTS_FROM_TEMPORARY:
+      /* Don't check completeness for direct reference binding.  */;
+      if (same_type_ref_bind_p (kind, type1, type2))
+	break;
+      gcc_fallthrough ();
+
+    case CPTK_IS_ASSIGNABLE:
+    case CPTK_IS_NOTHROW_ASSIGNABLE:
+    case CPTK_IS_TRIVIALLY_ASSIGNABLE:
       if (!check_trait_type (type1)
 	  || !check_trait_type (type2))
 	return error_mark_node;

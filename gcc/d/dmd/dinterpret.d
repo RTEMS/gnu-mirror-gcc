@@ -50,7 +50,7 @@ import dmd.rootobject;
 import dmd.root.utf;
 import dmd.statement;
 import dmd.tokens;
-import dmd.typesem : mutableOf, equivalent, pointerTo;
+import dmd.typesem : mutableOf, equivalent, pointerTo, sarrayOf, arrayOf;
 import dmd.utils : arrayCastBigEndian;
 import dmd.visitor;
 
@@ -3787,7 +3787,7 @@ public:
             if (v is v2 || !v.isOverlappedWith(v2))
                 continue;
             auto e = (*sle.elements)[i];
-            if (e.op != EXP.void_)
+            if (e !is null && e.op != EXP.void_)
                 (*sle.elements)[i] = voidInitLiteral(e.type, v).copy();
         }
     }
@@ -6118,7 +6118,7 @@ public:
                     return;
                 }
 
-                auto str = arrayCastBigEndian((cast(const ubyte[]) se.peekString()), sz);
+                auto str = arrayCastBigEndian(se.peekData(), sz);
                 emplaceExp!(StringExp)(pue, e1.loc, str, se.len / sz, cast(ubyte) sz);
                 result = pue.exp();
                 result.type = e.to;

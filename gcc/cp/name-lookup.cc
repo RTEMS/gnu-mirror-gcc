@@ -4189,7 +4189,7 @@ walk_module_binding (tree binding, bitmap partitions,
 		     void *data)
 {
   // FIXME: We don't quite deal with using decls naming stat hack
-  // type.  Also using decls exporting something from the same scope.
+  // type.
   tree current = binding;
   unsigned count = 0;
 
@@ -5238,13 +5238,36 @@ do_nonmember_using_decl (name_lookup &lookup, bool fn_scope_p,
     }
   else if (insert_p)
     {
-      value = lookup.value;
-      if (revealing_p && module_exporting_p ())
-	check_can_export_using_decl (value);
+      if (revealing_p
+	  && module_exporting_p ()
+	  && check_can_export_using_decl (lookup.value)
+	  && lookup.value == value
+	  && !DECL_MODULE_EXPORT_P (value))
+	{
+	  /* We're redeclaring the same value, but this time as
+	     newly exported: make sure to mark it as such.  */
+	  if (TREE_CODE (value) == TEMPLATE_DECL)
+	    {
+	      DECL_MODULE_EXPORT_P (value) = true;
+
+	      tree result = DECL_TEMPLATE_RESULT (value);
+	      retrofit_lang_decl (result);
+	      DECL_MODULE_PURVIEW_P (result) = true;
+	      DECL_MODULE_EXPORT_P (result) = true;
+	    }
+	  else
+	    {
+	      retrofit_lang_decl (value);
+	      DECL_MODULE_PURVIEW_P (value) = true;
+	      DECL_MODULE_EXPORT_P (value) = true;
+	    }
+	}
+      else
+	value = lookup.value;
     }
   
   /* Now the type binding.  */
-  if (lookup.type && lookup.type != type)
+  if (lookup.type)
     {
       if (type && !decls_match (lookup.type, type))
 	{
@@ -5253,9 +5276,20 @@ do_nonmember_using_decl (name_lookup &lookup, bool fn_scope_p,
 	}
       else if (insert_p)
 	{
-	  type = lookup.type;
-	  if (revealing_p && module_exporting_p ())
-	    check_can_export_using_decl (type);
+	  if (revealing_p
+	      && module_exporting_p ()
+	      && check_can_export_using_decl (lookup.type)
+	      && lookup.type == type
+	      && !DECL_MODULE_EXPORT_P (type))
+	    {
+	      /* We're redeclaring the same type, but this time as
+		 newly exported: make sure to mark it as such.  */
+	      retrofit_lang_decl (type);
+	      DECL_MODULE_PURVIEW_P (type) = true;
+	      DECL_MODULE_EXPORT_P (type) = true;
+	    }
+	  else
+	    type = lookup.type;
 	}
     }
 
@@ -8630,10 +8664,13 @@ maybe_push_to_top_level (tree d)
 {
   /* Push if D isn't function-local, or is a lambda function, for which name
      resolution is already done.  */
-  bool push_to_top
-    = !(current_function_decl
-	&& !LAMBDA_FUNCTION_P (d)
-	&& decl_function_context (d) == current_function_decl);
+  const bool push_to_top
+    = (LAMBDA_FUNCTION_P (d)
+       || (TREE_CODE (d) == TYPE_DECL
+	   && TREE_TYPE (d)
+	   && LAMBDA_TYPE_P (TREE_TYPE (d)))
+       || !current_function_decl
+       || !decl_function_context (d));
 
   if (push_to_top)
     push_to_top_level ();

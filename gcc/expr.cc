@@ -5466,6 +5466,7 @@ emit_push_insn (rtx x, machine_mode mode, tree type, rtx size,
 	  /* If source is a constant VAR_DECL with a simple constructor,
              store the constructor to the stack instead of moving it.  */
 	  const_tree decl;
+	  HOST_WIDE_INT sz;
 	  if (partial == 0
 	      && MEM_P (xinner)
 	      && SYMBOL_REF_P (XEXP (xinner, 0))
@@ -5473,9 +5474,11 @@ emit_push_insn (rtx x, machine_mode mode, tree type, rtx size,
 	      && VAR_P (decl)
 	      && TREE_READONLY (decl)
 	      && !TREE_SIDE_EFFECTS (decl)
-	      && immediate_const_ctor_p (DECL_INITIAL (decl), 2))
-	    store_constructor (DECL_INITIAL (decl), target, 0,
-			       int_expr_size (DECL_INITIAL (decl)), false);
+	      && immediate_const_ctor_p (DECL_INITIAL (decl), 2)
+	      && (sz = int_expr_size (DECL_INITIAL (decl))) > 0
+	      && CONST_INT_P (size)
+	      && INTVAL (size) == sz)
+	    store_constructor (DECL_INITIAL (decl), target, 0, sz, false);
 	  else
 	    emit_block_move (target, xinner, size, BLOCK_OP_CALL_PARM);
 	}
@@ -7879,8 +7882,8 @@ store_constructor (tree exp, rtx target, int cleared, poly_int64 size,
 	    auto nunits = TYPE_VECTOR_SUBPARTS (type).to_constant ();
 	    if (maybe_ne (GET_MODE_PRECISION (mode), nunits))
 	      tmp = expand_binop (mode, and_optab, tmp,
-				  GEN_INT ((1 << nunits) - 1), target,
-				  true, OPTAB_WIDEN);
+				  GEN_INT ((HOST_WIDE_INT_1U << nunits) - 1),
+				  target, true, OPTAB_WIDEN);
 	    if (tmp != target)
 	      emit_move_insn (target, tmp);
 	    break;
@@ -12350,7 +12353,8 @@ expand_expr_real_1 (tree exp, rtx target, machine_mode tmode,
 	    return expand_builtin (exp, target, subtarget, tmode, ignore);
 	  }
       }
-      return expand_call (exp, target, ignore);
+      temp = expand_call (exp, target, ignore);
+      return EXTEND_BITINT (temp);
 
     case VIEW_CONVERT_EXPR:
       op0 = NULL_RTX;
@@ -13707,11 +13711,11 @@ do_store_flag (sepops ops, rtx target, machine_mode mode)
     {
       gcc_assert (code == EQ || code == NE);
       op0 = expand_binop (mode, and_optab, op0,
-			  GEN_INT ((1 << nunits) - 1), NULL_RTX,
-			  true, OPTAB_WIDEN);
+			  GEN_INT ((HOST_WIDE_INT_1U << nunits) - 1),
+			  NULL_RTX, true, OPTAB_WIDEN);
       op1 = expand_binop (mode, and_optab, op1,
-			  GEN_INT ((1 << nunits) - 1), NULL_RTX,
-			  true, OPTAB_WIDEN);
+			  GEN_INT ((HOST_WIDE_INT_1U << nunits) - 1),
+			  NULL_RTX, true, OPTAB_WIDEN);
     }
 
   if (target == 0)
