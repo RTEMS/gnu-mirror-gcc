@@ -9541,12 +9541,12 @@ aarch64_expand_prologue (void)
   /* Sign return address for functions.  */
   if (aarch64_return_address_signing_enabled ())
     {
-      switch (aarch_ra_sign_key)
+      switch (aarch64_ra_sign_key)
 	{
-	  case AARCH_KEY_A:
+	  case AARCH64_KEY_A:
 	    insn = emit_insn (gen_paciasp ());
 	    break;
-	  case AARCH_KEY_B:
+	  case AARCH64_KEY_B:
 	    insn = emit_insn (gen_pacibsp ());
 	    break;
 	  default:
@@ -9962,12 +9962,12 @@ aarch64_expand_epilogue (rtx_call_insn *sibcall)
   if (aarch64_return_address_signing_enabled ()
       && (sibcall || !TARGET_ARMV8_3))
     {
-      switch (aarch_ra_sign_key)
+      switch (aarch64_ra_sign_key)
 	{
-	  case AARCH_KEY_A:
+	  case AARCH64_KEY_A:
 	    insn = emit_insn (gen_autiasp ());
 	    break;
-	  case AARCH_KEY_B:
+	  case AARCH64_KEY_B:
 	    insn = emit_insn (gen_autibsp ());
 	    break;
 	  default:
@@ -18689,6 +18689,62 @@ aarch64_set_asm_isa_flags (aarch64_feature_flags flags)
   aarch64_set_asm_isa_flags (&global_options, flags);
 }
 
+static void
+aarch64_handle_no_branch_protection (void)
+{
+  aarch_ra_sign_scope = AARCH_FUNCTION_NONE;
+  aarch_enable_bti = 0;
+}
+
+static void
+aarch64_handle_standard_branch_protection (void)
+{
+  aarch_ra_sign_scope = AARCH_FUNCTION_NON_LEAF;
+  aarch64_ra_sign_key = AARCH64_KEY_A;
+  aarch_enable_bti = 1;
+}
+
+static void
+aarch64_handle_pac_ret_protection (void)
+{
+  aarch_ra_sign_scope = AARCH_FUNCTION_NON_LEAF;
+  aarch64_ra_sign_key = AARCH64_KEY_A;
+}
+
+static void
+aarch64_handle_pac_ret_leaf (void)
+{
+  aarch_ra_sign_scope = AARCH_FUNCTION_ALL;
+}
+
+static void
+aarch64_handle_pac_ret_b_key (void)
+{
+  aarch64_ra_sign_key = AARCH64_KEY_B;
+}
+
+static void
+aarch64_handle_bti_protection (void)
+{
+  aarch_enable_bti = 1;
+}
+
+static const struct aarch_branch_protect_type aarch64_pac_ret_subtypes[] = {
+  { "leaf", false, aarch64_handle_pac_ret_leaf, NULL, 0 },
+  { "b-key", false, aarch64_handle_pac_ret_b_key, NULL, 0 },
+  { NULL, false, NULL, NULL, 0 }
+};
+
+static const struct aarch_branch_protect_type aarch64_branch_protect_types[] =
+{
+  { "none", true, aarch64_handle_no_branch_protection, NULL, 0 },
+  { "standard", true, aarch64_handle_standard_branch_protection, NULL, 0 },
+  { "pac-ret", false, aarch64_handle_pac_ret_protection,
+    aarch64_pac_ret_subtypes, ARRAY_SIZE (aarch64_pac_ret_subtypes) },
+  { "bti", false, aarch64_handle_bti_protection, NULL, 0 },
+  { NULL, false, NULL, NULL, 0 }
+};
+
 /* Implement TARGET_OPTION_OVERRIDE.  This is called once in the beginning
    and is used to parse the -m{cpu,tune,arch} strings and setup the initial
    tuning structs.  In particular it must set selected_tune and
@@ -18711,7 +18767,8 @@ aarch64_override_options (void)
     aarch64_validate_sls_mitigation (aarch64_harden_sls_string);
 
   if (aarch64_branch_protection_string)
-    aarch_validate_mbranch_protection (aarch64_branch_protection_string,
+    aarch_validate_mbranch_protection (aarch64_branch_protect_types,
+				       aarch64_branch_protection_string,
 				       "-mbranch-protection=");
 
   /* -mcpu=CPU is shorthand for -march=ARCH_FOR_CPU, -mtune=CPU.
@@ -19149,7 +19206,7 @@ aarch64_handle_attr_cpu (const char *str)
 static bool
 aarch64_handle_attr_branch_protection (const char* str)
 {
-  return aarch_validate_mbranch_protection (str,
+  return aarch_validate_mbranch_protection (aarch64_branch_protect_types, str,
 					    "target(\"branch-protection=\")");
 }
 
@@ -24449,7 +24506,7 @@ void
 aarch64_post_cfi_startproc (FILE *f, tree ignored ATTRIBUTE_UNUSED)
 {
   if (cfun->machine->frame.laid_out && aarch64_return_address_signing_enabled ()
-      && aarch_ra_sign_key == AARCH_KEY_B)
+      && aarch64_ra_sign_key == AARCH64_KEY_B)
 	asm_fprintf (f, "\t.cfi_b_key_frame\n");
 }
 
@@ -24636,6 +24693,8 @@ aarch64_expand_compare_and_swap (rtx operands[])
         rval = copy_to_mode_reg (r_mode, oldval);
       else
 	emit_move_insn (rval, gen_lowpart (r_mode, oldval));
+      if (mode == TImode)
+	newval = force_reg (mode, newval);
 
       emit_insn (gen_aarch64_compare_and_swap_lse (mode, rval, mem,
 						   newval, mod_s));
@@ -26465,33 +26524,6 @@ aarch64_progress_pointer (rtx pointer)
   return aarch64_move_pointer (pointer, GET_MODE_SIZE (GET_MODE (pointer)));
 }
 
-typedef auto_vec<std::pair<rtx, rtx>, 12> copy_ops;
-
-/* Copy one block of size MODE from SRC to DST at offset OFFSET.  */
-static void
-aarch64_copy_one_block (copy_ops &ops, rtx src, rtx dst,
-			int offset, machine_mode mode)
-{
-  /* Emit explict load/store pair instructions for 32-byte copies.  */
-  if (known_eq (GET_MODE_SIZE (mode), 32))
-    {
-      mode = V4SImode;
-      rtx src1 = adjust_address (src, mode, offset);
-      rtx dst1 = adjust_address (dst, mode, offset);
-      rtx reg1 = gen_reg_rtx (mode);
-      rtx reg2 = gen_reg_rtx (mode);
-      rtx load = aarch64_gen_load_pair (reg1, reg2, src1);
-      rtx store = aarch64_gen_store_pair (dst1, reg1, reg2);
-      ops.safe_push ({ load, store });
-      return;
-    }
-
-  rtx reg = gen_reg_rtx (mode);
-  rtx load = gen_move_insn (reg, adjust_address (src, mode, offset));
-  rtx store = gen_move_insn (adjust_address (dst, mode, offset), reg);
-  ops.safe_push ({ load, store });
-}
-
 /* Expand a cpymem/movmem using the MOPS extension.  OPERANDS are taken
    from the cpymem/movmem pattern.  IS_MEMMOVE is true if this is a memmove
    rather than memcpy.  Return true iff we succeeded.  */
@@ -26527,7 +26559,7 @@ aarch64_expand_cpymem (rtx *operands, bool is_memmove)
   rtx src = operands[1];
   unsigned align = UINTVAL (operands[3]);
   rtx base;
-  machine_mode cur_mode = BLKmode, next_mode;
+  machine_mode mode = BLKmode, next_mode;
 
   /* Variable-sized or strict-align copies may use the MOPS expansion.  */
   if (!CONST_INT_P (operands[2]) || (STRICT_ALIGNMENT && align < 16))
@@ -26550,16 +26582,12 @@ aarch64_expand_cpymem (rtx *operands, bool is_memmove)
   if (size > max_copy_size || (TARGET_MOPS && size > mops_threshold))
     return aarch64_expand_cpymem_mops (operands, is_memmove);
 
-  unsigned copy_max = 32;
-
-  /* Default to 32-byte LDP/STP on large copies, however small copies, no SIMD
-     support or slow LDP/STP fall back to 16-byte chunks.
-
+  /* Default to 32-byte LDP/STP on large copies, however small copies or
+     no SIMD support fall back to 16-byte chunks.
      ??? Although it would be possible to use LDP/STP Qn in streaming mode
      (so using TARGET_BASE_SIMD instead of TARGET_SIMD), it isn't clear
      whether that would improve performance.  */
-  if (size <= 24 || !use_ldpq)
-    copy_max = 16;
+  bool use_qregs = size > 24 && TARGET_SIMD;
 
   base = copy_to_mode_reg (Pmode, XEXP (dst, 0));
   dst = adjust_automodify_address (dst, VOIDmode, base, 0);
@@ -26567,7 +26595,7 @@ aarch64_expand_cpymem (rtx *operands, bool is_memmove)
   base = copy_to_mode_reg (Pmode, XEXP (src, 0));
   src = adjust_automodify_address (src, VOIDmode, base, 0);
 
-  copy_ops ops;
+  auto_vec<std::pair<rtx, rtx>, 16> ops;
   int offset = 0;
 
   while (size > 0)
@@ -26576,23 +26604,27 @@ aarch64_expand_cpymem (rtx *operands, bool is_memmove)
 	 or writing.  */
       opt_scalar_int_mode mode_iter;
       FOR_EACH_MODE_IN_CLASS (mode_iter, MODE_INT)
-	if (GET_MODE_SIZE (mode_iter.require ()) <= MIN (size, copy_max))
-	  cur_mode = mode_iter.require ();
+	if (GET_MODE_SIZE (mode_iter.require ()) <= MIN (size, 16))
+	  mode = mode_iter.require ();
 
-      gcc_assert (cur_mode != BLKmode);
+      gcc_assert (mode != BLKmode);
 
-      mode_bytes = GET_MODE_SIZE (cur_mode).to_constant ();
+      mode_bytes = GET_MODE_SIZE (mode).to_constant ();
 
-      /* Prefer Q-register accesses for the last bytes.  */
-      if (mode_bytes == 16 && copy_max == 32)
-	cur_mode = V4SImode;
-      aarch64_copy_one_block (ops, src, dst, offset, cur_mode);
+      /* Prefer Q-register accesses.  */
+      if (mode_bytes == 16 && use_qregs)
+	mode = V4SImode;
+
+      rtx reg = gen_reg_rtx (mode);
+      rtx load = gen_move_insn (reg, adjust_address (src, mode, offset));
+      rtx store = gen_move_insn (adjust_address (dst, mode, offset), reg);
+      ops.safe_push ({ load, store });
       size -= mode_bytes;
       offset += mode_bytes;
 
       /* Emit trailing copies using overlapping unaligned accesses
 	 (when !STRICT_ALIGNMENT) - this is smaller and faster.  */
-      if (size > 0 && size < copy_max / 2 && !STRICT_ALIGNMENT)
+      if (size > 0 && size < 16 && !STRICT_ALIGNMENT)
 	{
 	  next_mode = smallest_mode_for_size (size * BITS_PER_UNIT, MODE_INT);
 	  int n_bytes = GET_MODE_SIZE (next_mode).to_constant ();
@@ -26604,7 +26636,7 @@ aarch64_expand_cpymem (rtx *operands, bool is_memmove)
 
   /* Memcpy interleaves loads with stores, memmove emits all loads first.  */
   int nops = ops.length();
-  int inc = is_memmove ? nops : nops == 4 ? 2 : 3;
+  int inc = is_memmove || nops <= 8 ? nops : 6;
 
   for (int i = 0; i < nops; i += inc)
     {
@@ -26633,7 +26665,8 @@ aarch64_set_one_block_and_progress_pointer (rtx src, rtx *dst,
       /* "Cast" the *dst to the correct mode.  */
       *dst = adjust_address (*dst, mode, 0);
       /* Emit the memset.  */
-      emit_insn (aarch64_gen_store_pair (*dst, src, src));
+      emit_move_insn (*dst, src);
+      emit_move_insn (aarch64_move_pointer (*dst, 16), src);
 
       /* Move the pointers forward.  */
       *dst = aarch64_move_pointer (*dst, 32);

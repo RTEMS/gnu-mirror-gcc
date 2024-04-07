@@ -4186,6 +4186,17 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
       adjust_for_new_dest (i3);
     }
 
+  /* If I2 didn't change, this is not a combination (but a simplification or
+     canonicalisation with context), which should not be done here.  Doing
+     it here explodes the algorithm.  Don't.  */
+  if (rtx_equal_p (newi2pat, PATTERN (i2)))
+    {
+      if (dump_file)
+	fprintf (dump_file, "i2 didn't change, not doing this\n");
+      undo_all ();
+      return 0;
+    }
+
   /* We now know that we can do this combination.  Merge the insns and
      update the status of registers and LOG_LINKS.  */
 
@@ -12550,9 +12561,22 @@ simplify_comparison (enum rtx_code code, rtx *pop0, rtx *pop1)
 	    }
 
 	  /* If the inner mode is narrower and we are extracting the low part,
-	     we can treat the SUBREG as if it were a ZERO_EXTEND.  */
+	     we can treat the SUBREG as if it were a ZERO_EXTEND ...  */
 	  if (paradoxical_subreg_p (op0))
-	    ;
+	    {
+	      if (WORD_REGISTER_OPERATIONS
+		  && is_a <scalar_int_mode> (GET_MODE (SUBREG_REG (op0)),
+					     &inner_mode)
+		  && GET_MODE_PRECISION (inner_mode) < BITS_PER_WORD
+		  /* On WORD_REGISTER_OPERATIONS targets the bits
+		     beyond sub_mode aren't considered undefined,
+		     so optimize only if it is a MEM load when MEM loads
+		     zero extend, because then the upper bits are all zero.  */
+		  && !(MEM_P (SUBREG_REG (op0))
+		       && load_extend_op (inner_mode) == ZERO_EXTEND))
+		break;
+	      /* FALLTHROUGH to case ZERO_EXTEND */
+	    }
 	  else if (subreg_lowpart_p (op0)
 		   && GET_MODE_CLASS (mode) == MODE_INT
 		   && is_int_mode (GET_MODE (SUBREG_REG (op0)), &inner_mode)

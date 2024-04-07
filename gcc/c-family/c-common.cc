@@ -7793,9 +7793,14 @@ resolve_overloaded_atomic_exchange (location_t loc, tree function,
   /* Convert object pointer to required type.  */
   p0 = build1 (VIEW_CONVERT_EXPR, I_type_ptr, p0);
   (*params)[0] = p0; 
-  /* Convert new value to required type, and dereference it.  */
-  p1 = build_indirect_ref (loc, p1, RO_UNARY_STAR);
-  p1 = build1 (VIEW_CONVERT_EXPR, I_type, p1);
+  /* Convert new value to required type, and dereference it.
+     If *p1 type can have padding or may involve floating point which
+     could e.g. be promoted to wider precision and demoted afterwards,
+     state of padding bits might not be preserved.  */
+  build_indirect_ref (loc, p1, RO_UNARY_STAR);
+  p1 = build2_loc (loc, MEM_REF, I_type,
+		   build1 (VIEW_CONVERT_EXPR, I_type_ptr, p1),
+		   build_zero_cst (TREE_TYPE (p1)));
   (*params)[1] = p1;
 
   /* Move memory model to the 3rd position, and end param list.  */
@@ -7873,9 +7878,14 @@ resolve_overloaded_atomic_compare_exchange (location_t loc, tree function,
   p1 = build1 (VIEW_CONVERT_EXPR, I_type_ptr, p1);
   (*params)[1] = p1;
 
-  /* Convert desired value to required type, and dereference it.  */
-  p2 = build_indirect_ref (loc, p2, RO_UNARY_STAR);
-  p2 = build1 (VIEW_CONVERT_EXPR, I_type, p2);
+  /* Convert desired value to required type, and dereference it.
+     If *p2 type can have padding or may involve floating point which
+     could e.g. be promoted to wider precision and demoted afterwards,
+     state of padding bits might not be preserved.  */
+  build_indirect_ref (loc, p2, RO_UNARY_STAR);
+  p2 = build2_loc (loc, MEM_REF, I_type,
+		   build1 (VIEW_CONVERT_EXPR, I_type_ptr, p2),
+		   build_zero_cst (TREE_TYPE (p2)));
   (*params)[2] = p2;
 
   /* The rest of the parameters are fine. NULL means no special return value
@@ -8451,7 +8461,19 @@ resolve_overloaded_builtin (location_t loc, tree function,
 	if (new_return)
 	  {
 	    /* Cast function result from I{1,2,4,8,16} to the required type.  */
-	    result = build1 (VIEW_CONVERT_EXPR, TREE_TYPE (new_return), result);
+	    if (TREE_CODE (TREE_TYPE (new_return)) == BITINT_TYPE)
+	      {
+		struct bitint_info info;
+		unsigned prec = TYPE_PRECISION (TREE_TYPE (new_return));
+		targetm.c.bitint_type_info (prec, &info);
+		if (!info.extended)
+		  /* For _BitInt which has the padding bits undefined
+		     convert to the _BitInt type rather than VCE to force
+		     zero or sign extension.  */
+		  result = build1 (NOP_EXPR, TREE_TYPE (new_return), result);
+	      }
+	    result
+	      = build1 (VIEW_CONVERT_EXPR, TREE_TYPE (new_return), result);
 	    result = build2 (MODIFY_EXPR, TREE_TYPE (new_return), new_return,
 			     result);
 	    TREE_SIDE_EFFECTS (result) = 1;
