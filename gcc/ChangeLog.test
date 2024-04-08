@@ -1,3 +1,18 @@
+==================== Branch work163-test, patch #201 ====================
+
+Add power10 ori/oris and xori/xoris fusion support.
+
+2024-04-08  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/fusion.md: Regenerate.
+	* config/rs6000/genfusion.md (gen_wide_immediate): Add wide immediate
+	fusion patterns.
+	* config/rs6000/rs6000.md (IORXOR_OP): New code attribute.
+	(ior, xor splitter): Do not split ior/xor patterns that could be fused
+	on power10.
+
 ==================== Branch work163-test, patch #200 ====================
 
 Add power10 wide immediate fusion
