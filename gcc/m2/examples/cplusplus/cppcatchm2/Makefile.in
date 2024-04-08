@@ -1,0 +1,49 @@
+#
+# Makefile.in build the simple M2 and C++ example.
+#
+# Copyright (C) 2010-2020 Free Software Foundation, Inc.
+# Contributed by Gaius Mulley <gaius.mulley@southwales.ac.uk>.
+#
+# This file is part of GNU Modula-2.
+#
+# GNU Modula-2 is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+#
+# GNU Modula-2 is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with GNU Modula-2; see the file COPYING3.  If not see
+# <http://www.gnu.org/licenses/>.
+#
+srcdir = @srcdir@
+gm2dir = $(srcdir)/../../..
+
+SRC_PATH_ISO=$(srcdir):../../../gm2-libs-iso:$(gm2dir)/gm2-libs-iso:$(gm2dir)/gm2-libs
+OBJ_PATH_ISO=.:../../../gm2-libs-iso:../../../gm2-libs
+
+XGM2=../../../../xgm2 -B../../../.. -B../../../../stage1/gm2
+XGPP=../../../../g++
+
+all: force
+	@echo "you need to use 'make pre-install' to build the examples using the locally built compiler"
+	@echo "or you can use 'make post-install' to build the examples after installing the compiler"
+
+pre-install: clean
+	$(XGPP) -g -c $(srcdir)/cpp.cc
+	$(XGM2) -I$(srcdir) -I$(SRC_PATH_ISO) -fobject-path=$(OBJ_PATH_ISO) -g $(srcdir)/m2.mod
+	./a.out
+
+post-install: force
+	g++ -g -c $(srcdir)/cpp.cc
+	gm2 -I$(srcdir) -g $(srcdir)/m2.mod
+	./a.out
+
+clean: force
+	$(RM) *.o a.out
+
+force:

@@ -1,0 +1,223 @@
+# Makefile.in:  used to build the pge examples.
+# Copyright (C) 2010, 2011, 2012, 2013, 2014, 2015
+#                 Free Software Foundation, Inc.
+
+# This file is part of GNU Modula-2.
+
+# GNU Modula-2 is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+
+# GNU Modula-2 is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with GNU CC; see the file COPYING.  If not, write to
+# the Free Software Foundation, 51 Franklin Street, Fifth Floor,
+# Boston, MA 02110-1301, USA.
+
+SOURCES = \
+          macroObjects.mod Points.mod Fractions.mod PolyMatrix3D.mod Transform3D.mod \
+          delay.mod GC.mod popWorld.mod twoDsim.mod NetworkOrder.mod \
+          roots.mod coord.mod polar.mod history.mod stairs.mod rpc.mod \
+          snooker.mod wall.mod npn.mod wallv.mod slope.mod para.mod testpy.mod \
+          deviceIf.mod ramps.mod ramps2.mod boxes.mod wallh.mod bounce.mod line.mod bounce2.mod \
+          bounce3.mod bounce4.mod bounce5.mod bagatelle.mod elc.mod rboxes.mod circle.mod
+
+
+PGELIBSOURCES = macroObjects.mod Points.mod Fractions.mod PolyMatrix3D.mod \
+                Transform3D.mod delay.mod GC.mod popWorld.mod \
+                twoDsim.mod roots.mod coord.mod polar.mod history.mod \
+                deviceIf.mod rpc.mod deviceBuffer.mod pgeif.mod NetworkOrder.mod
+
+include ../../../gm2/config-make
+LIBSTDCXX=../$(TARGET_SUBDIR)/libstdc++-v3/src/.libs/libstdc++.a
+
+OBJECTS = $(SOURCES:%.mod=%.o)
+PROFILE = 
+CHECK =
+# CHECK = -fsoft-check-all
+GM2FLAGS = $(PROFILE) $(CHECK) -g -fiso -fextended-opaque -I$(srcdir) -g
+
+EXAMPLES = post-world whole-world
+
+srcdir = @srcdir@
+gm2dir = $(srcdir)/../..
+gm2tardir = ../../../../$(TARGET_SUBDIR)
+prefix = @prefix@
+
+SRC_PATH_PIM=$(srcdir):$(gm2tardir)/libgm2/libpim:$(gm2dir)/gm2-libs:$(gm2dir)/gm2-libs-iso
+SRC_PATH=$(srcdir):$(gm2dir)/gm2-compiler:../../gm2-libs-iso:$(gm2dir)/gm2-libs-iso:$(gm2dir)/gm2-libs
+OBJ_PATH=.:../../gm2-libs-iso:../../gm2/gm2-libs
+
+XGM2=../../../xgm2 -B../../../
+XGCC=../../../xgcc -B../../../
+
+PYTHON_VERSION=3
+
+all: force
+	@echo "you need to use 'make pre-install' to build the examples using the locally built compiler"
+	@echo "or you can use 'make post-install' to build the examples after installing the compiler"
+	@echo "or you can use 'make post-whole-world' to build the world example using O3"
+	@echo "or you can use 'make pre-whole-world' to build the world example using O3"
+	@echo "you can run the world example by typing 'make run-whole-world'"
+	@echo "or you can run the world example by typing 'make run-post-world'"
+
+%.asc:  %.max
+	maxima -b $< > $@
+
+%.m:  $(srcdir)/%.mxm
+	python$(PYTHON_VERSION) $(srcdir)/max2code.py -o $@ $<
+
+$(srcdir)/twoDsim.mod: circles.m rotating-line.m rotating-circles.m
+
+twoDsim.o: $(srcdir)/twoDsim.mod
+	gm2 -I. -fcpp $(GM2FLAGS) -c $< -o $@
+
+%.o:  $(srcdir)/%.mod
+	gm2 $(GM2FLAGS) -c $< -o $@
+
+%.o:  $(srcdir)/%.c
+	gcc -g -c $< -o $@
+
+%.lo:  $(srcdir)/%.mod
+	libtool --tag=CC --mode=compile gm2 -fcpp -g -fiso -fextended-opaque -I. -I$(srcdir) -c $< -o $@
+
+%.lo:  $(srcdir)/%.c
+	libtool --tag=CC --mode=compile gcc -g -I$(srcdir) -c $< -o $@
+
+run-whole-world: force
+	( python$(PYTHON_VERSION) ../../../../../combined/gm2/gcc-versionno/gcc/gm2/examples/pge/pgepygame.py & ) ; sleep 1 ; ./whole-world
+
+run-post-world: force
+	( python$(PYTHON_VERSION) ../../../../../combined/gm2/gcc-versionno/gcc/gm2/examples/pge/pgepygame.py & ) ; sleep 1 ; ./post-world
+
+post-whole-world: circles.m force
+	gm2 -fm2-statistics -O3 -fsources -fiso -fcpp -I$(srcdir) -fm2-whole-program -fextended-opaque -g -o whole-world $(srcdir)/world.mod
+
+pre-whole-world: circles.m force
+	$(XGM2) -fm2-statistics -O3 -fsources -fiso -fcpp -I$(SRC_PATH_PIM) -fm2-whole-program -fextended-opaque -g -o whole-world $(srcdir)/world.mod $(LIBSTDCXX)
+
+post-world: circles.m $(OBJECTS) force
+	gm2 -fm2-statistics -O3 -fsources -fiso -fcpp -I$(srcdir) -fextended-opaque -g -o post-world $(srcdir)/world.mod
+
+libpgeif.la:  $(PGELIBSOURCES:%.mod=%.lo) buffers.lo
+	swig -outdir . -o pgeif_wrap.cxx -c++ -python $(srcdir)/pgeif.i
+	libtool --tag=CC --mode=compile g++ -g -c pgeif_wrap.cxx -I/usr/include/python$(PYTHON_VERSION) -o pgeif_wrap.lo
+	gm2 -c -g -I$(SRC_PATH_PIM) -fmakelist $(srcdir)/pgeif.mod
+	gm2 -c -g -I$(SRC_PATH_PIM) -fmakeinit -fshared $(srcdir)/pgeif.mod
+	libtool --tag=CC --mode=compile g++ -g -c _m2_pgeif.cpp -o _m2_pgeif.lo
+	libtool --tag=CC --mode=link gcc -g _m2_pgeif.lo $(PGELIBSOURCES:%.mod=%.lo) \
+            pgeif_wrap.lo buffers.lo \
+           -L$(prefix)/lib64 \
+           -rpath `pwd` -lgm2 -liso -lgcc -lstdc++ -lpth -lc -lm -o libpgeif.la 
+	cp .libs/libpgeif.so _pgeif.so
+
+output.raw: libpgeif.la
+	PYTHONPATH=.:$(srcdir) python$(PYTHON_VERSION) $(srcdir)/examples/exampleBoxes.py
+
+playback: force
+	PYTHONPATH=.:$(srcdir) python$(PYTHON_VERSION) $(srcdir)/pgeplayback.py
+
+boxes.raw:  libpgeif.la
+	PYTHONPATH=.:$(srcdir) python$(PYTHON_VERSION) $(srcdir)/examples/boxes.py
+
+foo: circles.m $(OBJECTS)
+	gm2 $(GM2FLAGS) -fonlylink $(srcdir)/foo.mod
+
+bounce: $(OBJECTS)
+	gm2 -fcpp -I. $(GM2FLAGS) -fonlylink $(srcdir)/bounce.mod
+
+bounce2: $(OBJECTS)
+	gm2 -fcpp -I. $(GM2FLAGS) -fonlylink $(srcdir)/bounce2.mod
+
+bounce3: $(OBJECTS)
+	gm2 -fcpp -I. $(GM2FLAGS) -fonlylink $(srcdir)/bounce3.mod
+
+bounce4: $(OBJECTS)
+	gm2 -fcpp -I. $(GM2FLAGS) -fonlylink $(srcdir)/bounce4.mod
+
+bounce5: $(OBJECTS)
+	gm2 -fcpp -I. $(GM2FLAGS) -fonlylink $(srcdir)/bounce5.mod
+
+bagatelle: $(OBJECTS)
+	gm2 -fcpp -I. $(GM2FLAGS) -fonlylink $(srcdir)/bagatelle.mod
+
+elc: $(OBJECTS)
+	gm2 -fcpp -I. $(GM2FLAGS) -fonlylink $(srcdir)/elc.mod
+
+elc2: $(OBJECTS)
+	gm2 -fcpp -I. $(GM2FLAGS) -fonlylink $(srcdir)/elc2.mod
+
+line: $(OBJECTS)
+	gm2 -fcpp -I. $(GM2FLAGS) -fonlylink $(srcdir)/line.mod
+
+wallh: $(OBJECTS)
+	gm2 -fcpp -I. $(GM2FLAGS) -fonlylink $(srcdir)/wallh.mod
+
+rboxes: $(OBJECTS)
+	gm2 -fcpp -I. $(GM2FLAGS) -fonlylink $(srcdir)/rboxes.mod
+
+circle: $(OBJECTS)
+	gm2 -fcpp -I. $(GM2FLAGS) -fonlylink $(srcdir)/circle.mod
+
+boxes: $(OBJECTS)
+	gm2 -fcpp -I. $(GM2FLAGS) -fonlylink $(srcdir)/boxes.mod
+
+ramps: $(OBJECTS)
+	gm2 -fcpp -I. $(GM2FLAGS) -fonlylink $(srcdir)/ramps.mod
+
+ramps2: $(OBJECTS)
+	gm2 -fcpp -I. $(GM2FLAGS) -fonlylink $(srcdir)/ramps2.mod
+
+slope: $(OBJECTS)
+	$(RM) *.ms *.png
+	gm2 -fcpp -I. $(GM2FLAGS) -fonlylink $(srcdir)/slope.mod
+
+stairs: $(OBJECTS)
+	$(RM) *.ms *.png
+	gm2 -fcpp -I. $(GM2FLAGS) -fonlylink $(srcdir)/stairs.mod
+
+py: $(OBJECTS)
+	$(RM) *.ms *.png
+	gm2 -pg -g -fiso -fextended-opaque -fonlylink testpy.mod
+
+para: $(OBJECTS)
+	$(RM) *.ms *.png
+	gm2 -fcpp -I. $(GM2FLAGS) -fonlylink para.mod && ./a.out
+	./produce-avi
+
+wallv: $(OBJECTS)
+	$(RM) *.ms *.png
+	gm2 $(GM2FLAGS) -fonlylink wallv.mod
+	# ./produce-avi && mplayer pge.avi
+
+wall: $(OBJECTS)
+	$(RM) *.ms *.png
+	gm2 $(GM2FLAGS) -fonlylink wall.mod
+	# ./produce-avi && mplayer pge.avi
+
+snooker: $(OBJECTS)
+	$(RM) *.ms *.png
+	gm2 -fcpp -I. $(GM2FLAGS) -fonlylink $(srcdir)/snooker.mod
+
+npn: $(OBJECTS)
+	$(RM) *.ms *.png
+	gm2 -fcpp -I. $(GM2FLAGS) -fonlylink $(srcdir)/npn.mod && ./a.out
+
+test: $(OBJECTS)
+	gm2 -fcpp -I. $(GM2FLAGS) -fonlylink $(srcdir)/test.mod && ./a.out
+
+transforms: rotating-circles.asc rotating-line.asc
+
+clean: force
+	$(RM) *.o *.m *.cpp *~ $(EXAMPLES) *.so *.lo *.la
+	$(RM) -rf .libs *_m2.cpp
+
+clear: force
+	$(RM) *.png *.ms *.cpp
+
+force:

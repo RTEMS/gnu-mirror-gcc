@@ -1,0 +1,36 @@
+#!/bin/bash
+
+
+source=$1
+if [ "$source" == "" ] ; then
+    if [ ! -f foo.fig ] ; then
+	cp scratch.fig foo.fig
+    fi
+    source=foo.fig
+fi
+
+modname=`basename $source .fig`.mod
+
+killall pge
+killall a.out
+rm *.png *.ms
+
+xfig $source
+if python3 fig.py $source $modname ; then
+    if gm2 -c -I. -g -fiso $modname ; then
+        rm `basename $modname .mod`.o
+	make foo.o ; make foo
+	python3 pge.py &
+	sleep 1
+	./a.out
+	# ./produce-avi
+	# eog *.png
+    else
+	echo "gm2 failed to compile $modname"
+	exit 1
+    fi
+else
+    echo "you need to fix your fig drawing before it can be simulated"
+    exit 1
+fi
+

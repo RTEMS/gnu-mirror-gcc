@@ -1,0 +1,6 @@
+2021-04-07       Gaius Mulley <gaius.mulley@southwales.ac.uk>
+
+	* analyzer/fail/badlistfree.mod:  (New file).
+	* analyzer/fail/disposenoalloc.mod:  (New file).
+	* analyzer/fail/testdoublefree.mod:  (New file).
+	* analyzer/fail/testdoubledispose.mod:  (New file).

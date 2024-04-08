@@ -1,0 +1,8 @@
+this is an example of how one might use GNU Modula-2 to produce a
+Python library.  You will need to install python swig, python
+development libraries, mencoder (mplayer), groff, convert, gs and
+netpbm.
+
+On Debian or Ubuntu you can:
+
+$ sudo apt-get install groff imagemagick python3-dev swig gs netpbm mplayer

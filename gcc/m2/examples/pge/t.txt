@@ -1,0 +1,203 @@
+Maxima 5.21.1 http://maxima.sourceforge.net
+using Lisp GNU Common Lisp (GCL) GCL 2.6.7 (a.k.a. GCL)
+Distributed under the GNU Public License. See the file COPYING.
+Dedicated to the memory of William Schelter.
+The function bug_report() provides bug reporting information.
+(%i1) C(X) := ''1 - X^2/2 + X^4/4 ;
+                                           2    4
+                                          X    X
+(%o1)                         C(X) := 1 - -- + --
+                                          2    4
+(%i2) S(X) := ''C(%pi/2-X);
+                                        %pi
+(%o2)                         S(X) := C(--- - X)
+                                         2
+(%i3) a + b*t + c*t^2/2 + d * S(e * t + f) - (g + h * t + i * t^2/2 + j * S(k*t+l)) = 0
+;
+                        %pi 4                %pi 2
+           (- k t - l + ---)    (- k t - l + ---)
+                         2                    2
+(%o3) - j (------------------ - ------------------ + 1)
+                   4                    2
+                   %pi 4                %pi 2
+      (- e t - f + ---)    (- e t - f + ---)            2      2
+                    2                    2           i t    c t
+ + d (------------------ - ------------------ + 1) - ---- + ---- - h t + b t
+              4                    2                  2      2
+ - g + a = 0
+(%i4) expand(%);
+           4  4      4  4                      3  3                      3  3
+        j k  t    d e  t       3    3   %pi j k  t       3    3   %pi d e  t
+(%o4) - ------- + ------- - j k  l t  + ----------- + d e  f t  - -----------
+           4         4                       2                         2
+        2  2  2            2    2        2    2  2      2  2      2
+   3 j k  l  t    3 %pi j k  l t    3 %pi  j k  t    j k  t    i t
+ - ------------ + --------------- - -------------- + ------- - ----
+        2                2                8             2       2
+        2  2  2            2    2        2    2  2      2  2      2
+   3 d e  f  t    3 %pi d e  f t    3 %pi  d e  t    d e  t    c t         3
+ + ------------ - --------------- + -------------- - ------- + ---- - j k l  t
+        2                2                8             2       2
+              2          2                        3
+   3 %pi j k l  t   3 %pi  j k l t             %pi  j k t   %pi j k t
+ + -------------- - -------------- + j k l t + ---------- - --------- - h t
+         2                4                        8            2
+                         2          2                        3
+        3     3 %pi d e f  t   3 %pi  d e f t             %pi  d e t
+ + d e f  t - -------------- + -------------- - d e f t - ----------
+                    2                4                        8
+                        4          3        2    2      2      3
+   %pi d e t         j l    %pi j l    3 %pi  j l    j l    %pi  j l   %pi j l
+ + --------- + b t - ---- + -------- - ----------- + ---- + -------- - -------
+       2              4        2            8         2        8          2
+      4        2                4          3        2    2      2      3
+   %pi  j   %pi  j           d f    %pi d f    3 %pi  d f    d f    %pi  d f
+ - ------ + ------ - j - g + ---- - -------- + ----------- - ---- - --------
+     64       8               4        2            8         2        8
+                4        2
+   %pi d f   %pi  d   %pi  d
+ + ------- + ------ - ------ + d + a = 0
+      2        64       8
+(%i5) collectterms(%,t);
+           4  4      4  4                      3  3                      3  3
+        j k  t    d e  t       3    3   %pi j k  t       3    3   %pi d e  t
+(%o5) - ------- + ------- - j k  l t  + ----------- + d e  f t  - -----------
+           4         4                       2                         2
+        2  2  2            2    2        2    2  2      2  2      2
+   3 j k  l  t    3 %pi j k  l t    3 %pi  j k  t    j k  t    i t
+ - ------------ + --------------- - -------------- + ------- - ----
+        2                2                8             2       2
+        2  2  2            2    2        2    2  2      2  2      2
+   3 d e  f  t    3 %pi d e  f t    3 %pi  d e  t    d e  t    c t         3
+ + ------------ - --------------- + -------------- - ------- + ---- - j k l  t
+        2                2                8             2       2
+              2          2                        3
+   3 %pi j k l  t   3 %pi  j k l t             %pi  j k t   %pi j k t
+ + -------------- - -------------- + j k l t + ---------- - --------- - h t
+         2                4                        8            2
+                         2          2                        3
+        3     3 %pi d e f  t   3 %pi  d e f t             %pi  d e t
+ + d e f  t - -------------- + -------------- - d e f t - ----------
+                    2                4                        8
+                        4          3        2    2      2      3
+   %pi d e t         j l    %pi j l    3 %pi  j l    j l    %pi  j l   %pi j l
+ + --------- + b t - ---- + -------- - ----------- + ---- + -------- - -------
+       2              4        2            8         2        8          2
+      4        2                4          3        2    2      2      3
+   %pi  j   %pi  j           d f    %pi d f    3 %pi  d f    d f    %pi  d f
+ - ------ + ------ - j - g + ---- - -------- + ----------- - ---- - --------
+     64       8               4        2            8         2        8
+                4        2
+   %pi d f   %pi  d   %pi  d
+ + ------- + ------ - ------ + d + a = 0
+      2        64       8
+(%i6) simplify(%);
+                    4  4      4  4                      3  3
+                 j k  t    d e  t       3    3   %pi j k  t       3    3
+(%o6) simplify(- ------- + ------- - j k  l t  + ----------- + d e  f t
+                    4         4                       2
+          3  3        2  2  2            2    2        2    2  2      2  2
+   %pi d e  t    3 j k  l  t    3 %pi j k  l t    3 %pi  j k  t    j k  t
+ - ----------- - ------------ + --------------- - -------------- + -------
+        2             2                2                8             2
+      2        2  2  2            2    2        2    2  2      2  2      2
+   i t    3 d e  f  t    3 %pi d e  f t    3 %pi  d e  t    d e  t    c t
+ - ---- + ------------ - --------------- + -------------- - ------- + ----
+    2          2                2                8             2       2
+                         2          2                        3
+        3     3 %pi j k l  t   3 %pi  j k l t             %pi  j k t
+ - j k l  t + -------------- - -------------- + j k l t + ----------
+                    2                4                        8
+                                           2          2
+   %pi j k t              3     3 %pi d e f  t   3 %pi  d e f t
+ - --------- - h t + d e f  t - -------------- + -------------- - d e f t
+       2                              2                4
+      3                              4          3        2    2      2
+   %pi  d e t   %pi d e t         j l    %pi j l    3 %pi  j l    j l
+ - ---------- + --------- + b t - ---- + -------- - ----------- + ----
+       8            2              4        2            8         2
+      3                    4        2                4          3        2    2
+   %pi  j l   %pi j l   %pi  j   %pi  j           d f    %pi d f    3 %pi  d f
+ + -------- - ------- - ------ + ------ - j - g + ---- - -------- + -----------
+      8          2        64       8               4        2            8
+      2      3                    4        2
+   d f    %pi  d f   %pi d f   %pi  d   %pi  d
+ - ---- - -------- + ------- + ------ - ------ + d + a = 0)
+    2        8          2        64       8
+(%i7) collectterms(%,t);
+                    4  4      4  4                      3  3
+                 j k  t    d e  t       3    3   %pi j k  t       3    3
+(%o7) simplify(- ------- + ------- - j k  l t  + ----------- + d e  f t
+                    4         4                       2
+          3  3        2  2  2            2    2        2    2  2      2  2
+   %pi d e  t    3 j k  l  t    3 %pi j k  l t    3 %pi  j k  t    j k  t
+ - ----------- - ------------ + --------------- - -------------- + -------
+        2             2                2                8             2
+      2        2  2  2            2    2        2    2  2      2  2      2
+   i t    3 d e  f  t    3 %pi d e  f t    3 %pi  d e  t    d e  t    c t
+ - ---- + ------------ - --------------- + -------------- - ------- + ----
+    2          2                2                8             2       2
+                         2          2                        3
+        3     3 %pi j k l  t   3 %pi  j k l t             %pi  j k t
+ - j k l  t + -------------- - -------------- + j k l t + ----------
+                    2                4                        8
+                                           2          2
+   %pi j k t              3     3 %pi d e f  t   3 %pi  d e f t
+ - --------- - h t + d e f  t - -------------- + -------------- - d e f t
+       2                              2                4
+      3                              4          3        2    2      2
+   %pi  d e t   %pi d e t         j l    %pi j l    3 %pi  j l    j l
+ - ---------- + --------- + b t - ---- + -------- - ----------- + ----
+       8            2              4        2            8         2
+      3                    4        2                4          3        2    2
+   %pi  j l   %pi j l   %pi  j   %pi  j           d f    %pi d f    3 %pi  d f
+ + -------- - ------- - ------ + ------ - j - g + ---- - -------- + -----------
+      8          2        64       8               4        2            8
+      2      3                    4        2
+   d f    %pi  d f   %pi d f   %pi  d   %pi  d
+ - ---- - -------- + ------- + ------ - ------ + d + a = 0)
+    2        8          2        64       8
+(%i8) ratsimp(%);
+                         4         4   4
+(%o8) simplify(- ((16 j k  - 16 d e ) t
+          3               3         3               3   3
+ + (64 j k  l - 32 %pi j k  - 64 d e  f + 32 %pi d e ) t
+          2  2             2            2          2                2  2
+ + (96 j k  l  - 96 %pi j k  l + (24 %pi  - 32) j k  + 32 i - 96 d e  f
+             2                 2     2          2
+ + 96 %pi d e  f + (32 - 24 %pi ) d e  - 32 c) t
+            3               2          2                              3
+ + (64 j k l  - 96 %pi j k l  + (48 %pi  - 64) j k l + (32 %pi - 8 %pi ) j k
+                  3               2               2
+ + 64 h - 64 d e f  + 96 %pi d e f  + (64 - 48 %pi ) d e f
+         3                                 4             3
+ + (8 %pi  - 32 %pi) d e - 64 b) t + 16 j l  - 32 %pi j l
+          2          2                  3            4        2
+ + (24 %pi  - 32) j l  + (32 %pi - 8 %pi ) j l + (%pi  - 8 %pi  + 64) j + 64 g
+         4             3               2     2         3
+ - 16 d f  + 32 %pi d f  + (32 - 24 %pi ) d f  + (8 %pi  - 32 %pi) d f
+         4        2
+ + (- %pi  + 8 %pi  - 64) d - 64 a)/64 = 0)
+(%i9) collectterms(%);
+                         4         4   4
+(%o9) simplify(- ((16 j k  - 16 d e ) t
+          3               3         3               3   3
+ + (64 j k  l - 32 %pi j k  - 64 d e  f + 32 %pi d e ) t
+          2  2             2            2          2                2  2
+ + (96 j k  l  - 96 %pi j k  l + (24 %pi  - 32) j k  + 32 i - 96 d e  f
+             2                 2     2          2
+ + 96 %pi d e  f + (32 - 24 %pi ) d e  - 32 c) t
+            3               2          2                              3
+ + (64 j k l  - 96 %pi j k l  + (48 %pi  - 64) j k l + (32 %pi - 8 %pi ) j k
+                  3               2               2
+ + 64 h - 64 d e f  + 96 %pi d e f  + (64 - 48 %pi ) d e f
+         3                                 4             3
+ + (8 %pi  - 32 %pi) d e - 64 b) t + 16 j l  - 32 %pi j l
+          2          2                  3            4        2
+ + (24 %pi  - 32) j l  + (32 %pi - 8 %pi ) j l + (%pi  - 8 %pi  + 64) j + 64 g
+         4             3               2     2         3
+ - 16 d f  + 32 %pi d f  + (32 - 24 %pi ) d f  + (8 %pi  - 32 %pi) d f
+         4        2
+ + (- %pi  + 8 %pi  - 64) d - 64 a)/64 = 0)
+(%i10) 
+

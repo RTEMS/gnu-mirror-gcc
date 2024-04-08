@@ -1,0 +1,441 @@
+(* Provides access to svga graphic primitives.
+
+Copyright (C) 2005-2019 Free Software Foundation, Inc.
+Contributed by Semi automatically created by h2def.
+
+This file is part of GNU Modula-2.
+
+GNU Modula-2 is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 3, or (at your option)
+any later version.
+
+GNU Modula-2 is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
+
+Under Section 7 of GPL version 3, you are granted additional
+permissions described in the GCC Runtime Library Exception, version
+3.1, as published by the Free Software Foundation.
+
+You should have received a copy of the GNU General Public License and
+a copy of the GCC Runtime Library Exception along with this program;
+see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+<http://www.gnu.org/licenses/>.  *)
+DEFINITION MODULE FOR "C" vga ;
+
+FROM SYSTEM IMPORT ADDRESS, BYTE ;
+
+TYPE
+     fd_set =  ADDRESS ;
+     __time_t =   INTEGER ;
+     __useconds_t =   CARDINAL ;
+     __suseconds_t =   INTEGER ;
+     size_t =   CARDINAL ;
+    timeval = RECORD
+                 tv_sec: __time_t ;
+                 tv_usec: __suseconds_t ;
+              END ;
+    
+CONST
+     TEXT =  0 ;
+     G320x200x16 =  1 ;
+     G640x200x16 =  2 ;
+     G640x350x16 =  3 ;
+     G640x480x16 =  4 ;
+     G320x200x256 =  5 ;
+     G320x240x256 =  6 ;
+     G320x400x256 =  7 ;
+     G360x480x256 =  8 ;
+     G640x480x2 =  9 ;
+     G640x480x256 =  10 ;
+     G800x600x256 =  11 ;
+     G1024x768x256 =  12 ;
+     G1280x1024x256 =  13 ;
+     G320x200x32K =  14 ;
+     G320x200x64K =  15 ;
+     G320x200x16M =  16 ;
+     G640x480x32K =  17 ;
+     G640x480x64K =  18 ;
+     G640x480x16M =  19 ;
+     G800x600x32K =  20 ;
+     G800x600x64K =  21 ;
+     G800x600x16M =  22 ;
+     G1024x768x32K =  23 ;
+     G1024x768x64K =  24 ;
+     G1024x768x16M =  25 ;
+     G1280x1024x32K =  26 ;
+     G1280x1024x64K =  27 ;
+     G1280x1024x16M =  28 ;
+     G800x600x16 =  29 ;
+     G1024x768x16 =  30 ;
+     G1280x1024x16 =  31 ;
+     G720x348x2 =  32 ;
+     G320x200x16M32 =  33 ;
+     G640x480x16M32 =  34 ;
+     G800x600x16M32 =  35 ;
+     G1024x768x16M32 =  36 ;
+     G1280x1024x16M32 =  37 ;
+     G1152x864x16 =  38 ;
+     G1152x864x256 =  39 ;
+     G1152x864x32K =  40 ;
+     G1152x864x64K =  41 ;
+     G1152x864x16M =  42 ;
+     G1152x864x16M32 =  43 ;
+     G1600x1200x16 =  44 ;
+     G1600x1200x256 =  45 ;
+     G1600x1200x32K =  46 ;
+     G1600x1200x64K =  47 ;
+     G1600x1200x16M =  48 ;
+     G1600x1200x16M32 =  49 ;
+     G320x240x256V =  50 ;
+     G320x240x32K =  51 ;
+     G320x240x64K =  52 ;
+     G320x240x16M =  53 ;
+     G320x240x16M32 =  54 ;
+     G400x300x256 =  55 ;
+     G400x300x32K =  56 ;
+     G400x300x64K =  57 ;
+     G400x300x16M =  58 ;
+     G400x300x16M32 =  59 ;
+     G512x384x256 =  60 ;
+     G512x384x32K =  61 ;
+     G512x384x64K =  62 ;
+     G512x384x16M =  63 ;
+     G512x384x16M32 =  64 ;
+     G960x720x256 =  65 ;
+     G960x720x32K =  66 ;
+     G960x720x64K =  67 ;
+     G960x720x16M =  68 ;
+     G960x720x16M32 =  69 ;
+     G1920x1440x256 =  70 ;
+     G1920x1440x32K =  71 ;
+     G1920x1440x64K =  72 ;
+     G1920x1440x16M =  73 ;
+     G1920x1440x16M32 =  74 ;
+     G320x400x256V =  75 ;
+     G320x400x32K =  76 ;
+     G320x400x64K =  77 ;
+     G320x400x16M =  78 ;
+     G320x400x16M32 =  79 ;
+     G640x400x256 =  80 ;
+     G640x400x32K =  81 ;
+     G640x400x64K =  82 ;
+     G640x400x16M =  83 ;
+     G640x400x16M32 =  84 ;
+     G320x480x256 =  85 ;
+     G320x480x32K =  86 ;
+     G320x480x64K =  87 ;
+     G320x480x16M =  88 ;
+     G320x480x16M32 =  89 ;
+     G720x540x256 =  90 ;
+     G720x540x32K =  91 ;
+     G720x540x64K =  92 ;
+     G720x540x16M =  93 ;
+     G720x540x16M32 =  94 ;
+     G848x480x256 =  95 ;
+     G848x480x32K =  96 ;
+     G848x480x64K =  97 ;
+     G848x480x16M =  98 ;
+     G848x480x16M32 =  99 ;
+     G1072x600x256 =  100 ;
+     G1072x600x32K =  101 ;
+     G1072x600x64K =  102 ;
+     G1072x600x16M =  103 ;
+     G1072x600x16M32 =  104 ;
+     G1280x720x256 =  105 ;
+     G1280x720x32K =  106 ;
+     G1280x720x64K =  107 ;
+     G1280x720x16M =  108 ;
+     G1280x720x16M32 =  109 ;
+     G1360x768x256 =  110 ;
+     G1360x768x32K =  111 ;
+     G1360x768x64K =  112 ;
+     G1360x768x16M =  113 ;
+     G1360x768x16M32 =  114 ;
+     G1800x1012x256 =  115 ;
+     G1800x1012x32K =  116 ;
+     G1800x1012x64K =  117 ;
+     G1800x1012x16M =  118 ;
+     G1800x1012x16M32 =  119 ;
+     G1920x1080x256 =  120 ;
+     G1920x1080x32K =  121 ;
+     G1920x1080x64K =  122 ;
+     G1920x1080x16M =  123 ;
+     G1920x1080x16M32 =  124 ;
+     G2048x1152x256 =  125 ;
+     G2048x1152x32K =  126 ;
+     G2048x1152x64K =  127 ;
+     G2048x1152x16M =  128 ;
+     G2048x1152x16M32 =  129 ;
+     G2048x1536x256 =  130 ;
+     G2048x1536x32K =  131 ;
+     G2048x1536x64K =  132 ;
+     G2048x1536x16M =  133 ;
+     G2048x1536x16M32 =  134 ;
+     G512x480x256 =  135 ;
+     G512x480x32K =  136 ;
+     G512x480x64K =  137 ;
+     G512x480x16M =  138 ;
+     G512x480x16M32 =  139 ;
+     G400x600x256 =  140 ;
+     G400x600x32K =  141 ;
+     G400x600x64K =  142 ;
+     G400x600x16M =  143 ;
+     G400x600x16M32 =  144 ;
+     __GLASTMODE =  G400x600x16M32 ;
+     
+VAR
+    vga_version:  INTEGER ;
+   
+ PROCEDURE vga_setmode (mode: INTEGER) : INTEGER ;
+ PROCEDURE vga_hasmode (mode: INTEGER) : INTEGER ;
+ PROCEDURE vga_setflipchar (c: INTEGER) : INTEGER ;
+ PROCEDURE vga_clear () : INTEGER ;
+ PROCEDURE vga_flip () : INTEGER ;
+ PROCEDURE vga_getxdim () : INTEGER ;
+ PROCEDURE vga_getydim () : INTEGER ;
+ PROCEDURE vga_getcolors () : INTEGER ;
+ PROCEDURE vga_setpalette (index: INTEGER; red: INTEGER; green: INTEGER; blue: INTEGER) : INTEGER ;
+ PROCEDURE vga_getpalette (index: INTEGER; red: ADDRESS; green: ADDRESS; blue: ADDRESS) : INTEGER ;
+ PROCEDURE vga_setpalvec (start: INTEGER; num: INTEGER; pal: ADDRESS) : INTEGER ;
+ PROCEDURE vga_getpalvec (start: INTEGER; num: INTEGER; pal: ADDRESS) : INTEGER ;
+ PROCEDURE vga_screenoff () : INTEGER ;
+ PROCEDURE vga_screenon () : INTEGER ;
+ PROCEDURE vga_setcolor (color: INTEGER) : INTEGER ;
+ PROCEDURE vga_drawpixel (x: INTEGER; y: INTEGER) : INTEGER ;
+ PROCEDURE vga_drawline (x1: INTEGER; y1: INTEGER; x2: INTEGER; y2: INTEGER) : INTEGER ;
+ PROCEDURE vga_drawscanline (line: INTEGER; colors: ADDRESS) : INTEGER ;
+ PROCEDURE vga_drawscansegment (colors: ADDRESS; x: INTEGER; y: INTEGER; length: INTEGER) : INTEGER ;
+ PROCEDURE vga_getpixel (x: INTEGER; y: INTEGER) : INTEGER ;
+ PROCEDURE vga_getscansegment (colors: ADDRESS; x: INTEGER; y: INTEGER; length: INTEGER) : INTEGER ;
+ PROCEDURE vga_getch () : INTEGER ;
+ PROCEDURE vga_dumpregs () : INTEGER ;
+
+CONST
+     HAVE_BITBLIT =  1 ;
+     HAVE_FILLBLIT =  2 ;
+     HAVE_IMAGEBLIT =  4 ;
+     HAVE_HLINELISTBLIT =  8 ;
+     HAVE_BLITWAIT =  16 ;
+     HAVE_RWPAGE =  1 ;
+     IS_INTERLACED =  2 ;
+     IS_MODEX =  4 ;
+     IS_DYNAMICMODE =  8 ;
+     CAPABLE_LINEAR =  16 ;
+     IS_LINEAR =  32 ;
+     EXT_INFO_AVAILABLE =  64 ;
+     RGB_MISORDERED =  128 ;
+     HAVE_EXT_SET =  256 ;
+     
+TYPE
+     vga_modeinfo =   RECORD
+                         width: INTEGER ;
+                         height: INTEGER ;
+                         bytesperpixel: INTEGER ;
+                         colors: INTEGER ;
+                         linewidth: INTEGER ;
+                         maxlogicalwidth: INTEGER ;
+                         startaddressrange: INTEGER ;
+                         maxpixels: INTEGER ;
+                         haveblit: INTEGER ;
+                         flags: INTEGER ;
+                         chiptype: INTEGER ;
+                         memory: INTEGER ;
+                         linewidth_unit: INTEGER ;
+                         linear_aperture: POINTER TO CHAR ;
+                         aperture_size: INTEGER ;
+                         set_aperture_page:  PROCEDURE (INTEGER) ;
+                         extensions: ADDRESS ;
+                      END ;
+    
+ PROCEDURE vga_getmodeinfo (mode: INTEGER) : ADDRESS ;
+ PROCEDURE vga_getdefaultmode () : INTEGER ;
+ PROCEDURE vga_getcurrentmode () : INTEGER ;
+ PROCEDURE vga_getcurrentchipset () : INTEGER ;
+ PROCEDURE vga_getmodename (mode: INTEGER) : ADDRESS ;
+ PROCEDURE vga_getmodenumber (name: ADDRESS) : INTEGER ;
+ PROCEDURE vga_lastmodenumber () : INTEGER ;
+ PROCEDURE vga_getoptmode (x: INTEGER; y: INTEGER; colors: INTEGER; bytesperpixel: INTEGER; c: INTEGER) : INTEGER ;
+
+VAR
+    graph_mem: POINTER TO BYTE ;
+   
+ PROCEDURE vga_getgraphmem () : ADDRESS ;
+ PROCEDURE vga_setpage (p: INTEGER) ;
+ PROCEDURE vga_setreadpage (p: INTEGER) ;
+ PROCEDURE vga_setwritepage (p: INTEGER) ;
+ PROCEDURE vga_setlogicalwidth (w: INTEGER) ;
+ PROCEDURE vga_setdisplaystart (a: INTEGER) ;
+ PROCEDURE vga_waitretrace  ;
+ PROCEDURE vga_claimvideomemory (n: INTEGER) : INTEGER ;
+ PROCEDURE vga_disabledriverreport  ;
+ PROCEDURE vga_setmodeX () : INTEGER ;
+ PROCEDURE vga_init () : INTEGER ;
+ PROCEDURE vga_initf (p1: INTEGER) : INTEGER ;
+ PROCEDURE vga_getmousetype () : INTEGER ;
+ PROCEDURE vga_getmonitortype () : INTEGER ;
+ PROCEDURE vga_setmousesupport (s: INTEGER) ;
+ PROCEDURE vga_lockvc  ;
+ PROCEDURE vga_unlockvc  ;
+ PROCEDURE vga_getkey () : INTEGER ;
+ PROCEDURE vga_oktowrite () : INTEGER ;
+ PROCEDURE vga_copytoplanar256 (virtualp: ADDRESS; pitch: INTEGER; voffset: INTEGER; vpitch: INTEGER; w: INTEGER; h: INTEGER) ;
+ PROCEDURE vga_copytoplanar16 (virtualp: ADDRESS; pitch: INTEGER; voffset: INTEGER; vpitch: INTEGER; w: INTEGER; h: INTEGER) ;
+ PROCEDURE vga_copytoplane (virtualp: ADDRESS; pitch: INTEGER; voffset: INTEGER; vpitch: INTEGER; w: INTEGER; h: INTEGER; plane: INTEGER) ;
+ PROCEDURE vga_setlinearaddressing () : INTEGER ;
+ PROCEDURE vga_safety_fork (shutdown_routine: t1);
+
+TYPE
+     t1 =    PROCEDURE  ;
+    
+ PROCEDURE vga_simple_init () : INTEGER ;
+ PROCEDURE vga_chipset_saveregs (p1: ADDRESS) ;
+ PROCEDURE vga_chipset_setregs (p1: ADDRESS) ;
+
+CONST
+     UNDEFINED =  0 ;
+     VGA =  1 ;
+     ET4000 =  2 ;
+     CIRRUS =  3 ;
+     TVGA8900 =  4 ;
+     OAK =  5 ;
+     EGA =  6 ;
+     S3 =  7 ;
+     ET3000 =  8 ;
+     MACH32 =  9 ;
+     GVGA6400 =  10 ;
+     ARK =  11 ;
+     ATI =  12 ;
+     ALI =  13 ;
+     MACH64 =  14 ;
+     CHIPS =  15 ;
+     APM =  16 ;
+     NV3 =  17 ;
+     ET6000 =  18 ;
+     VESA =  19 ;
+     MX =  20 ;
+     PARADISE =  21 ;
+     RAGE =  22 ;
+     BANSHEE =  23 ;
+     SIS =  24 ;
+     I740 =  25 ;
+     NEOMAGIC =  26 ;
+     LAGUNA =  27 ;
+     FBDEV =  28 ;
+     G400 =  29 ;
+     R128 =  30 ;
+     SAVAGE =  31 ;
+     MON640_60 =  0 ;
+     MON800_56 =  1 ;
+     MON1024_43I =  2 ;
+     MON800_60 =  3 ;
+     MON1024_60 =  4 ;
+     MON1024_70 =  5 ;
+     MON1024_72 =  6 ;
+     
+ PROCEDURE vga_setchipset (c: INTEGER) ;
+ PROCEDURE vga_setchipsetandfeatures (c: INTEGER; par1: INTEGER; par2: INTEGER) ;
+ PROCEDURE vga_gettextfont (font: ADDRESS) ;
+ PROCEDURE vga_puttextfont (font: ADDRESS) ;
+ PROCEDURE vga_settextmoderegs (regs: ADDRESS) ;
+ PROCEDURE vga_gettextmoderegs (regs: ADDRESS) ;
+ PROCEDURE vga_white () : INTEGER ;
+ PROCEDURE vga_setegacolor (c: INTEGER) : INTEGER ;
+ PROCEDURE vga_setrgbcolor (r: INTEGER; g: INTEGER; b: INTEGER) : INTEGER ;
+ PROCEDURE vga_bitblt (srcaddr: INTEGER; destaddr: INTEGER; w: INTEGER; h: INTEGER; pitch: INTEGER) ;
+ PROCEDURE vga_imageblt (srcaddr: ADDRESS; destaddr: INTEGER; w: INTEGER; h: INTEGER; pitch: INTEGER) ;
+ PROCEDURE vga_fillblt (destaddr: INTEGER; w: INTEGER; h: INTEGER; pitch: INTEGER; c: INTEGER) ;
+ PROCEDURE vga_hlinelistblt (ymin: INTEGER; n: INTEGER; xmin: ADDRESS; xmax: ADDRESS; pitch: INTEGER; c: INTEGER) ;
+ PROCEDURE vga_blitwait  ;
+ PROCEDURE vga_ext_set (what: CARDINAL; ...) : INTEGER ;
+ PROCEDURE vga_accel (operation: CARDINAL; ...) : INTEGER ;
+ PROCEDURE vga_setcrtcregs (p1: ADDRESS) : INTEGER ;
+ PROCEDURE vga_getcrtcregs (p1: ADDRESS) : INTEGER ;
+ PROCEDURE vga_addtiming (pixelClock: INTEGER; HDisplay: INTEGER; HSyncStart: INTEGER; HSyncEnd: INTEGER; HTotal: INTEGER; VDisplay: INTEGER; VSyncStart: INTEGER; VSyncEnd: INTEGER; VTotal: INTEGER; flags: INTEGER) : INTEGER ;
+ PROCEDURE vga_changetiming (pixelClock: INTEGER; HDisplay: INTEGER; HSyncStart: INTEGER; HSyncEnd: INTEGER; HTotal: INTEGER; VDisplay: INTEGER; VSyncStart: INTEGER; VSyncEnd: INTEGER; VTotal: INTEGER; flags: INTEGER) : INTEGER ;
+ PROCEDURE vga_getcurrenttiming (pixelClock: ADDRESS; HDisplay: ADDRESS; HSyncStart: ADDRESS; HSyncEnd: ADDRESS; HTotal: ADDRESS; VDisplay: ADDRESS; VSyncStart: ADDRESS; VSyncEnd: ADDRESS; VTotal: ADDRESS; flags: ADDRESS) : INTEGER ;
+ PROCEDURE vga_addmode (xdim: INTEGER; ydim: INTEGER; cols: INTEGER; xbytes: INTEGER; bytespp: INTEGER) : INTEGER ;
+ PROCEDURE vga_guesstiming (x: INTEGER; y: INTEGER; clue: INTEGER; arg: INTEGER) : INTEGER ;
+
+CONST
+     VGA_EXT_AVAILABLE =  0 ;
+     VGA_EXT_SET =  1 ;
+     VGA_EXT_CLEAR =  2 ;
+     VGA_EXT_RESET =  3 ;
+     VGA_EXT_PAGE_OFFSET =  4 ;
+     VGA_EXT_FONT_SIZE =  5 ;
+     VGA_AVAIL_SET =  0 ;
+     VGA_AVAIL_ACCEL =  1 ;
+     VGA_AVAIL_FLAGS =  2 ;
+     VGA_AVAIL_ROP =  3 ;
+     VGA_AVAIL_TRANSPARENCY =  4 ;
+     VGA_AVAIL_ROPMODES =  5 ;
+     VGA_AVAIL_TRANSMODES =  6 ;
+     VGA_CLUT8 =  1 ;
+     ACCEL_FILLBOX =  1 ;
+     ACCEL_SCREENCOPY =  2 ;
+     ACCEL_PUTIMAGE =  3 ;
+     ACCEL_DRAWLINE =  4 ;
+     ACCEL_SETFGCOLOR =  5 ;
+     ACCEL_SETBGCOLOR =  6 ;
+     ACCEL_SETTRANSPARENCY =  7 ;
+     ACCEL_SETRASTEROP =  8 ;
+     ACCEL_PUTBITMAP =  9 ;
+     ACCEL_SCREENCOPYBITMAP =  10 ;
+     ACCEL_DRAWHLINELIST =  11 ;
+     ACCEL_SETMODE =  12 ;
+     ACCEL_SYNC =  13 ;
+     ACCEL_SETOFFSET =  14 ;
+     ACCEL_SCREENCOPYMONO =  15 ;
+     ACCEL_POLYLINE =  16 ;
+     ACCEL_POLYHLINE =  17 ;
+     ACCEL_POLYFILLMODE =  18 ;
+     ACCELFLAG_FILLBOX =  1 ;
+     ACCELFLAG_SCREENCOPY =  2 ;
+     ACCELFLAG_PUTIMAGE =  4 ;
+     ACCELFLAG_DRAWLINE =  8 ;
+     ACCELFLAG_SETFGCOLOR =  16 ;
+     ACCELFLAG_SETBGCOLOR =  32 ;
+     ACCELFLAG_SETTRANSPARENCY =  64 ;
+     ACCELFLAG_SETRASTEROP =  128 ;
+     ACCELFLAG_PUTBITMAP =  256 ;
+     ACCELFLAG_SCREENCOPYBITMAP =  512 ;
+     ACCELFLAG_DRAWHLINELIST =  1024 ;
+     ACCELFLAG_SETMODE =  2048 ;
+     ACCELFLAG_SYNC =  4096 ;
+     ACCELFLAG_SETOFFSET =  8192 ;
+     ACCELFLAG_SCREENCOPYMONO =  16384 ;
+     ACCELFLAG_POLYLINE =  32768 ;
+     ACCELFLAG_POLYHLINE =  65536 ;
+     ACCELFLAG_POLYFILLMODE =  131072 ;
+     DISABLE_TRANSPARENCY_COLOR =  0 ;
+     ENABLE_TRANSPARENCY_COLOR =  1 ;
+     DISABLE_BITMAP_TRANSPARENCY =  2 ;
+     ENABLE_BITMAP_TRANSPARENCY =  3 ;
+     BLITS_SYNC =  0 ;
+     BLITS_IN_BACKGROUND =  1 ;
+     ROP_COPY =  0 ;
+     ROP_OR =  1 ;
+     ROP_AND =  2 ;
+     ROP_XOR =  3 ;
+     ROP_INVERT =  4 ;
+     ACCEL_START =  1 ;
+     ACCEL_END =  2 ;
+     
+ PROCEDURE vga_waitevent (which: INTEGER; in: ADDRESS; out: ADDRESS; except: ADDRESS; timeout: ADDRESS) : INTEGER ;
+
+CONST
+     VGA_MOUSEEVENT =  1 ;
+     VGA_KEYEVENT =  2 ;
+     
+ PROCEDURE vga_runinbackground (stat: INTEGER; ...) ;
+
+CONST
+     VGA_GOTOBACK =  -( 1) ;
+     VGA_COMEFROMBACK =  -( 2) ;
+     
+ PROCEDURE vga_runinbackground_version () : INTEGER ;
+
+END vga.

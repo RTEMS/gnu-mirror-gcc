@@ -1,0 +1,73 @@
+
+Getting GNU Modula-2
+====================
+
+There are two options, either download a copy of gcc+gm2 in a large
+tarball or checkout the development sources.  Please be aware that the
+development checkout of gm2 might fail to compile with the current version
+of gcc.  Obtaining a tarball is advisable if you just want to build and
+install a working gm2.
+
+Tarballs
+========
+
+There are some options when downloading the tarballs.  The development
+snapshot, which contains the latest git which has been grafted onto
+the appropriate version of gcc.  There are also release versions of gm2
+which have been combined with appropriate versions of gcc.
+
+The latest git snapshot and combined gcc can be obtained from:
+http://floppsie.comp.glam.ac.uk/download/c/gcc-4.7.4+gm2-git-latest.tar.gz
+
+There are also older snapshots available from
+http://floppsie.comp.glam.ac.uk/download/c.
+
+Building GNU Modula-2
+=====================
+
+Please see the documentation (gm2.texi) and section
+(Building GNU Modula-2 from source).
+
+A simple test
+=============
+
+Once gm2 has been successfully built and installed and you have
+altered your path to see 'gm2' you should be able to perform:
+
+   cd host-build/gcc/gm2/examples/hello
+   make post-install
+
+this should result in creating an a.out for the infamous hello world
+example.
+
+Regression testing GM2
+======================
+
+   cd host-build ; make check-gm2
+
+runs all regression tests.  Currently there are 12 known failures
+gm2/switches/check-all/run/fail/intrange.mod and
+gm2/switches/check-all/run/fail/rangesupport.mod which are really
+extreme programming tests for code yet to be written.
+
+Stress testing GM2
+==================
+
+   cd host-build/gcc ; make gm2.paranoid
+
+builds gm2 using itself and then compiles each module with both
+versions of gm2 comparing the emitted assembler code.
+
+Contributing to GNU Modula-2
+============================
+
+Please do. But also please read the GNU Emacs info under
+
+* Standards: (standards).       GNU coding standards.
+* Intellectual Property::       Keeping Free Software Free
+* Reading Non-Free Code::       Referring to Proprietary Programs
+* Contributions::               Accepting Contributions
+
+you might consider joining the GM2 Mailing list: see URL:
+http://lists.nongnu.org/mailman/listinfo/gm2 before you start coding.
+Many thanks and enjoy your programming!

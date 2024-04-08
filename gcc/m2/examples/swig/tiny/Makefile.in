@@ -1,0 +1,62 @@
+# Copyright (C) 2010, 2011, 2012, 2013, 2014
+#               Free Software Foundation, Inc.
+# This file is part of GNU Modula-2.
+#
+# GNU Modula-2 is free software; you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free
+# Software Foundation; either version 3, or (at your option) any later
+# version.
+# 
+# GNU Modula-2 is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or
+# FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+# for more details.
+# 
+# You should have received a copy of the GNU General Public License along
+# with gm2; see the file COPYING.  If not, write to the Free Software
+# Foundation, 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+
+SHELL=/bin/bash
+
+srcdir = @srcdir@
+gm2dir = $(srcdir)/../../..
+prefix = @prefix@
+libdir = @libdir@
+
+SRC_PATH_PIM=$(srcdir):../../../gm2-libs:$(gm2dir)/gm2-libs:$(gm2dir)/gm2-libs-iso
+OBJ_PATH_PIM=.:../../../gm2-libs/SO:../../../gm2-libs-pim/SO:../../../gm2-libs-iso/SO
+
+XGM2=../../../../xgm2 -B../../../../
+XGPP=../../../../g++ -B../../../../
+XGCC=../../../../xgcc -B../../../../
+
+PYTHON_VERSION=3
+
+all: force
+	@echo "or you can use 'make post-install' to build the examples after installing the compiler"
+
+pre-install: clean
+	@echo "this example can only be run once the compiler has been installed"
+
+post-install: clean
+	gm2 -I$(srcdir) -c -g -fswig $(srcdir)/libtiny.mod
+	gm2 -I$(srcdir) -c -g -fmakelist $(srcdir)/libtiny.mod
+	gm2 -I$(srcdir) -c -g -fmakeinit -fshared $(srcdir)/libtiny.mod
+
+	swig -c++ -python libtiny.i
+
+	libtool --mode=compile g++ -g -c -I$(srcdir) _m2_libtiny.cpp -o _m2_libtiny.lo
+	libtool --tag=CC --mode=compile gm2 -g -c -I$(srcdir) $(srcdir)/libtiny.mod -o libtiny.lo
+	libtool --tag=CC --mode=compile g++ -g -c libtiny_wrap.cxx -I/usr/include/python$(PYTHON_VERSION) -o libtiny_wrap.lo
+
+	libtool --mode=link gcc -g _m2_libtiny.lo libtiny_wrap.lo libtiny.lo \
+             -L$(prefix)/lib64 \
+             -rpath `pwd` -lgm2 -lstdc++ -lpth -lm -o libtiny.la 
+
+	cp .libs/libtiny.so  _libtiny.so 
+	PYTHONPATH=.:$(srcdir) python$(PYTHON_VERSION) $(srcdir)/testtiny.py
+
+clean: force
+	$(RM) -f *.o *.so a.out *.pyc *~ *_wrap* tiny.py *.i *.lst *.cpp
+
+force:

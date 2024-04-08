@@ -163,6 +163,7 @@ target_libraries="target-libgcc \
 		target-libffi \
 		target-libobjc \
 		target-libada \
+		target-libgm2 \
 		target-libgo \
 		target-libphobos \
 		target-zlib"
@@ -451,6 +452,12 @@ ENABLE_LIBADA=yes)
 if test "${ENABLE_LIBADA}" != "yes" ; then
   noconfigdirs="$noconfigdirs gnattools"
 fi
+
+AC_ARG_ENABLE(libgm2,
+[AS_HELP_STRING([--enable-libgm2], [build libgm2 directory])],
+ENABLE_LIBGM2=$enableval,
+ENABLE_LIBGM2=yes)
+
 
 AC_ARG_ENABLE(libssp,
 [AS_HELP_STRING([--enable-libssp], [build libssp directory])],
@@ -3521,6 +3528,7 @@ NCN_STRICT_CHECK_TARGET_TOOLS(GCC_FOR_TARGET, gcc, ${CC_FOR_TARGET})
 NCN_STRICT_CHECK_TARGET_TOOLS(GFORTRAN_FOR_TARGET, gfortran)
 NCN_STRICT_CHECK_TARGET_TOOLS(GOC_FOR_TARGET, gccgo)
 NCN_STRICT_CHECK_TARGET_TOOLS(GDC_FOR_TARGET, gdc)
+NCN_STRICT_CHECK_TARGET_TOOLS(GM2_FOR_TARGET, gm2)
 
 ACX_CHECK_INSTALLED_TARGET_TOOL(AR_FOR_TARGET, ar)
 ACX_CHECK_INSTALLED_TARGET_TOOL(AS_FOR_TARGET, as)
@@ -3559,6 +3567,8 @@ GCC_TARGET_TOOL(gccgo, GOC_FOR_TARGET, GOC,
 		[gcc/gccgo -B$$r/$(HOST_SUBDIR)/gcc/], go)
 GCC_TARGET_TOOL(gdc, GDC_FOR_TARGET, GDC,
 		[gcc/gdc -B$$r/$(HOST_SUBDIR)/gcc/], d)
+GCC_TARGET_TOOL(gm2, GM2_FOR_TARGET, GM2,
+		[gcc/gm2 -B$$r/$(HOST_SUBDIR)/gcc/], m2)
 GCC_TARGET_TOOL(ld, LD_FOR_TARGET, LD, [ld/ld-new])
 GCC_TARGET_TOOL(lipo, LIPO_FOR_TARGET, LIPO)
 GCC_TARGET_TOOL(nm, NM_FOR_TARGET, NM, [binutils/nm-new])
@@ -3685,6 +3695,8 @@ AC_SUBST(stage2_werror_flag)
 # Specify what files to not compare during bootstrap.
 
 compare_exclusions="gcc/cc*-checksum\$(objext) | gcc/ada/*tools/*"
+compare_exclusions="$compare_exclusions | gcc/m2/gm2-compiler-boot/M2Version*"
+compare_exclusions="$compare_exclusions | gcc/m2/gm2-compiler-boot/SYSTEM*"
 case "$target" in
   hppa*64*-*-hpux*) ;;
   hppa*-*-hpux*) compare_exclusions="$compare_exclusions | */libgcc/lib2funcs* | gcc/function-tests.o" ;;

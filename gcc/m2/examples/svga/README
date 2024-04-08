@@ -1,0 +1,8 @@
+
+this example requires svgalib to be installed and also it requires
+root permission to run.
+
+The simple example draws a couple of logic gates and rotates and
+transforms them around the screen. It uses 640x480x2 vgalib.  The
+example uses a primitive vga.def definition, which provides gm2 with
+very limited vgalib functionality.

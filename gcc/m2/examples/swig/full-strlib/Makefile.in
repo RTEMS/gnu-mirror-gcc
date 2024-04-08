@@ -1,0 +1,83 @@
+# Copyright (C) 2010
+#               Free Software Foundation, Inc.
+# This file is part of GNU Modula-2.
+#
+# GNU Modula-2 is free software; you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free
+# Software Foundation; either version 3, or (at your option) any later
+# version.
+# 
+# GNU Modula-2 is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or
+# FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+# for more details.
+# 
+# You should have received a copy of the GNU General Public License along
+# with gm2; see the file COPYING.  If not, write to the Free Software
+# Foundation, 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+
+SHELL=/bin/bash
+
+srcdir = @srcdir@
+gm2dir = $(srcdir)/../../..
+prefix = @prefix@
+libdir = @libdir@
+
+SRC_PATH_PIM=$(srcdir):../../../gm2-libs:$(gm2dir)/gm2-libs:$(gm2dir)/gm2-libs-iso
+OBJ_PATH_PIM=.:../../../gm2-libs/SO:../../../gm2-libs-pim/SO:../../../gm2-libs-iso/SO
+
+XGM2=../../../../xgm2 -B../../../.. -B../../../../stage1/gm2
+XGPP=../../../../g++
+XGCC=../../../../xgcc
+
+PYTHON_VERSION=3
+
+all: force
+	@echo "or you can use 'make post-install' to build the examples after installing the compiler"
+
+pre-install: clean
+	@echo "this example only works when the compiler has been installed, please run make post-install"
+
+post-install: clean strlib numberio
+
+
+strlib: force
+	gm2 -I$(srcdir) -c -g -fswig $(srcdir)/../../../gm2-libs/StrLib.mod
+	gm2 -I$(srcdir) -c -g -fmakelist $(srcdir)/../../../gm2-libs/StrLib.mod
+	gm2 -I$(srcdir) -c -g -fmakeinit -fshared $(srcdir)/../../../gm2-libs/StrLib.mod
+	swig -c++ -python StrLib.i
+
+	libtool --mode=compile g++ -g -c -I$(srcdir) _m2_StrLib.cpp -o _m2_StrLib.lo
+	libtool --tag=CC --mode=compile gm2 -g -c -I$(srcdir)../../../gm2-libs $(srcdir)/../../../gm2-libs/StrLib.mod -o StrLib.lo
+	libtool --tag=CC --mode=compile g++ -g -c StrLib_wrap.cxx -I/usr/include/python$(PYTHON_VERSION) -o StrLib_wrap.lo
+
+	libtool --mode=link gcc -g _m2_StrLib.lo StrLib_wrap.lo \
+             -L$(prefix)/lib64 \
+             -rpath `pwd` -lgm2 -lstdc++ -lpth -lm -o libStrLib.la 
+	cp .libs/libStrLib.so _StrLib.so
+
+	PYTHONPATH=.:$(srcdir) python$(PYTHON_VERSION) $(srcdir)/testlen.py
+	PYTHONPATH=.:$(srcdir) python$(PYTHON_VERSION) $(srcdir)/testequ.py
+	PYTHONPATH=.:$(srcdir) python$(PYTHON_VERSION) $(srcdir)/testcopy.py
+
+numberio: force
+	gm2 -I$(srcdir) -c -g -fswig $(srcdir)/../../../gm2-libs/NumberIO.mod
+	gm2 -I$(srcdir) -c -g -fmakelist $(srcdir)/../../../gm2-libs/NumberIO.mod
+	gm2 -I$(srcdir) -c -g -fmakeinit -fshared $(srcdir)/../../../gm2-libs/NumberIO.mod
+	swig -c++ -python NumberIO.i
+
+	libtool --mode=compile g++ -g -c -I$(srcdir) _m2_NumberIO.cpp -o _m2_NumberIO.lo
+	libtool --tag=CC --mode=compile gm2 -g -c -I$(srcdir)../../../gm2-libs $(srcdir)/../../../gm2-libs/NumberIO.mod -o NumberIO.lo
+	libtool --tag=CC --mode=compile g++ -g -c NumberIO_wrap.cxx -I/usr/include/python$(PYTHON_VERSION) -o NumberIO_wrap.lo
+
+	libtool --mode=link gcc -g _m2_NumberIO.lo NumberIO_wrap.lo \
+             -L$(prefix)/lib64 \
+             -rpath `pwd` -lgm2 -lstdc++ -lpth -lm -o libNumberIO.la 
+	cp .libs/libNumberIO.so _NumberIO.so
+
+	PYTHONPATH=.:$(srcdir) python$(PYTHON_VERSION) $(srcdir)/testnum.py
+
+clean: force
+	$(RM) -f *.o *.so a.out *.pyc *~ *_wrap* StrLib.py NumberIO.py *.i *_m2.cpp
+
+force:

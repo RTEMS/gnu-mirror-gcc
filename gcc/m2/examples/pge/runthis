@@ -1,0 +1,3 @@
+#!/bin/sh
+
+python3 max2code.py -v -o t.mod test.mxm

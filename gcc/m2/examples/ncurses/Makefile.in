@@ -1,0 +1,45 @@
+# Makefile.in build the examples in this directory.
+
+# Copyright (C) 2005-2019 Free Software Foundation, Inc.
+
+#This file is part of GCC.
+
+#GCC is free software; you can redistribute it and/or modify
+#it under the terms of the GNU General Public License as published by
+#the Free Software Foundation; either version 3, or (at your option)
+#any later version.
+
+#GCC is distributed in the hope that it will be useful,
+#but WITHOUT ANY WARRANTY; without even the implied warranty of
+#MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#GNU General Public License for more details.
+
+#You should have received a copy of the GNU General Public License
+#along with GCC; see the file COPYING3.  If not see
+#<http://www.gnu.org/licenses/>.
+
+
+srcdir = @srcdir@
+gm2dir = $(srcdir)/../..
+
+SRC_PATH_PIM=$(srcdir):$(gm2dir)/gm2-compiler:../../gm2-libs:$(gm2dir)/gm2-libs:$(gm2dir)/gm2-libs-iso
+OBJ_PATH_PIM=.:../../gm2-libs
+
+XGM2=../../../xgm2 -B../../../x
+
+all: force
+	@echo "you need to use 'make pre-install' to build the examples using the locally built compiler"
+	@echo "or you can use 'make post-install' to build the examples after installing the compiler"
+
+pre-install: clean
+	$(XGM2) -fmake-I=$(srcdir) \
+                -I../../gm2-libs-coroutines:$(srcdir)/../../gm2-libs-coroutines:$(SRC_PATH_PIM) \
+                -fmakeall -g $(srcdir)/testwin.mod -lncurses
+
+post-install: force
+	gm2 -g -fmake-I=$(srcdir) -flibs=cor,pim,iso -fmakeall -I$(srcdir)/../../gm2-libs-coroutines:$(srcdir) $(srcdir)/testwin.mod -lncurses
+
+clean: force
+	$(RM) *.o a$(EXE) *_m2.cpp
+
+force:

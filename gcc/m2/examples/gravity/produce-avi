@@ -1,0 +1,17 @@
+#!/bin/bash
+
+FRAMESPERSEC=24
+
+echo "processing frame: "
+for i in *.ms ; do
+    f=`basename $i .ms`
+    echo -n "$f "
+    groff -ms $i > f${f}.ps
+    gs -dNOPAUSE -sDEVICE=pnmraw -sOutputFile=t${f}.pnm -dGraphicsAlphaBits=4 -q -dBATCH f${f}.ps > /dev/null 2>&1
+    pnmcrop -quiet < t${f}.pnm | pnmtopng > e${f}.png 2> /dev/null
+    convert e${f}.png -type truecolor f${f}.png 2> /dev/null
+    rm -f t${f}.pnm f${f}.ps e${f}.png
+#    rm -f t${f}.pnm f${f}.ps
+done
+echo "encoding images"
+mencoder "mf://f*.png" -mf w=800:h=600:fps=${FRAMESPERSEC}:type=png -ovc lavc -lavcopts vcodec=mpeg4 -oac copy -o gravity.avi

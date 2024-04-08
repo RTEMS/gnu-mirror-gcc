@@ -611,6 +611,9 @@ struct lang_hooks
   /* Invoked before the early_finish debug hook is invoked.  */
   void (*finalize_early_debug) (void);
 
+  /* Does the language substitute NEW into ALLOCATE and DISPOSE into DEALLOCATE?  */
+  bool (*new_dispose_storage_substitution) (void);
+
   /* Whenever you add entries here, make sure you adjust langhooks-def.h
      and langhooks.c accordingly.  */
 };

@@ -1,0 +1,73 @@
+(* Copyright (C) 2009, 2010
+                 Free Software Foundation, Inc. *)
+(* This file is part of GNU Modula-2.
+
+GNU Modula-2 is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free
+Software Foundation; either version 3, or (at your option) any later
+version.
+
+GNU Modula-2 is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+for more details.
+
+You should have received a copy of the GNU General Public License along
+with gm2; see the file COPYING.  If not, write to the Free Software
+Foundation, 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA. *)
+
+DEFINITION MODULE deviceGnuPic ;
+
+(*
+    Title      : deviceGnuPic
+    Author     : Gaius Mulley
+    System     : GNU Modula-2
+    Date       : Tue Nov 24 20:43:23 2009
+    Revision   : $Version$ 
+    Description: provides a simple interface to producing GNU Pic images.
+*)
+
+TYPE
+   Coord = RECORD
+              x, y: REAL ;
+           END ;
+
+   Colour = (black, red, blue, green, brown, yellow) ;
+
+
+(*
+   newFrame - creates a new frame.
+*)
+
+PROCEDURE newFrame ;
+
+
+(*
+   renderFrame - create png image from frame.
+*)
+
+PROCEDURE renderFrame ;
+
+
+(*
+   circleFrame - add a circle at x0, y0 with radius, r0.
+*)
+
+PROCEDURE circleFrame (pos: Coord; r0: REAL; c: Colour) ;
+
+
+(*
+   polygonFrame - draw a polygon in the current frame.
+*)
+
+PROCEDURE polygonFrame (pos: Coord; n: CARDINAL; p: ARRAY OF Coord; c: Colour) ;
+
+
+(*
+   produceAVI - generate an AVI file from the sequence of png images.
+*)
+
+PROCEDURE produceAVI (fps: CARDINAL) ;
+
+
+END deviceGnuPic.

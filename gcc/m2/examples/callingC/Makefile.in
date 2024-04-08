@@ -1,0 +1,44 @@
+# 
+# Makefile.in build the simple program hello example.
+# 
+# Copyright (C) 2005-2021 Free Software Foundation, Inc.
+# Contributed by Gaius Mulley <gaius.mulley@southwales.ac.uk>.
+# 
+# This file is part of GNU Modula-2.
+# 
+# GNU Modula-2 is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+# 
+# GNU Modula-2 is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with GNU Modula-2; see the file COPYING3.  If not see
+# <http://www.gnu.org/licenses/>.
+#
+srcdir = @srcdir@
+gm2dir = $(srcdir)/../..
+
+SRC_PATH_PIM=-I$(srcdir) -I../../gm2-libs -I$(gm2dir)/gm2-libs -I$(gm2dir)/gm2-libs-iso
+OBJ_PATH_PIM=-fobject-path=. -fobject-path=../../gm2-libs -fobject-path=../../gm2-libs-iso
+
+XGM2=../../../xgm2 -B../../../x
+
+all: force
+	@echo "you need to use 'make pre-install' to build the examples using the locally built compiler"
+	@echo "or you can use 'make post-install' to build the examples after installing the compiler"
+
+pre-install: clean
+	$(XGM2) -g $(SRC_PATH_PIM) -I$(srcdir) $(srcdir)/hello.mod -lc -lm
+
+post-install: clean
+	gm2 -g -I$(srcdir) $(srcdir)/hello.mod -lc -lm
+
+clean:
+	$(RM) *.cpp *.o a.out *~
+
+force:

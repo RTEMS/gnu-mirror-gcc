@@ -1,0 +1,200 @@
+(* WindowDevice.def a text windowing library.
+
+Copyright (C) 1986-2021 Free Software Foundation, Inc.
+Contributed by Gaius Mulley <gaius.mulley@southwales.ac.uk>.
+
+This file is part of GNU Modula-2.
+
+GNU Modula-2 is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 3, or (at your option)
+any later version.
+
+GNU Modula-2 is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with GNU Modula-2; see the file COPYING3.  If not see
+<http://www.gnu.org/licenses/>.  *)
+
+DEFINITION MODULE WindowDevice ;
+
+(*
+   Author      : Gaius Mulley
+   Version     : 1.1
+   Date        : 4/3/86
+   Description : Window Utilities
+   Last Update : 12/7/86
+                 4/8/94
+*)
+
+
+EXPORT QUALIFIED Window,
+                 InitWindow, KillWindow, SetWindow,
+                 SubWindow, AddWindow, NulWindow,
+                 NoCursor, SmallCursor, LargeCursor,
+                 MoveCursor, ClearWindow, MoveWindow,
+                 WriteChar, WriteString, WriteLn,
+                 DefaultWindow, SetDefaultWindow,
+                 ColourWindow, SizeWindow, TitleWindow,
+                 PutOnTop, PutOnBottom, SelectWindow ;
+
+
+TYPE
+   Window ;
+
+
+(*
+   InitWindow - returns a Window handle. This Window is uninitialized.
+*)
+
+PROCEDURE InitWindow () : Window ;
+
+
+(*
+   KillWindow - destroys a Window, w, and returns NIL.
+*)
+
+PROCEDURE KillWindow (w: Window) : Window ;
+
+
+(*
+   SetWindow - sets a Window, w, to contain background colour, bg,
+               foreground colour, fg. The width, height are specified
+               and border indicates whether the window has a Grey border.
+               The Window, w, is returned.
+*)
+
+PROCEDURE SetWindow (w: Window; bg, fg: CARDINAL;
+                     width, height, x, y: CARDINAL;
+                     border: BOOLEAN) : Window ;
+
+(*
+   AddWindow - adds a Window, w, to the display.
+*)
+
+PROCEDURE AddWindow (w: Window) ;
+
+
+(*
+   SubWindow - subtracts a Window, w, from the display.
+*)
+
+PROCEDURE SubWindow (w: Window) ;
+
+
+(*
+   NulWindow - returns TRUE if Window, w, is NIL.
+               (Meaning it does not exist).
+*)
+
+PROCEDURE NulWindow (w: Window) : BOOLEAN ;
+
+
+(*
+   MoveCursor - moves the cursor of Window, w, to x, y.
+*)
+
+PROCEDURE MoveCursor (w: Window; x, y: CARDINAL) ;
+
+PROCEDURE LargeCursor (w: Window) ;
+
+PROCEDURE SmallCursor (w: Window) ;
+
+PROCEDURE NoCursor (w: Window) ;
+
+PROCEDURE ClearWindow (w: Window) ;
+
+
+(*
+   MoveWindow - moves a Window, w, to position, x, y.
+                The Window must have been removed from the display
+                by SubWindow before this is called.
+*)
+
+PROCEDURE MoveWindow (w: Window; x, y: CARDINAL) ;
+
+
+(*
+   WriteChar - writes a character, ch, to Window, w.
+*)
+
+PROCEDURE WriteChar (w: Window; ch: CHAR) ;
+
+
+(*
+   WriteString - writes a string, a, to window, w.
+*)
+
+PROCEDURE WriteString (w: Window; a: ARRAY OF CHAR) ;
+
+
+(*
+   WriteLn - places the cursor onto the beginning of a new line
+             in Window, w.
+*)
+
+PROCEDURE WriteLn (w: Window) ;
+
+(*
+   ColourWindow - alters the foreground and background
+                  colour of Window, w.
+*)
+
+PROCEDURE ColourWindow (w: Window; bg, fg: CARDINAL) ;
+
+
+(*
+   SizeWindow - not implemented.
+*)
+
+PROCEDURE SizeWindow (w: Window; width, height: CARDINAL) ;
+
+
+(*
+   PutOnTop - places window, w, on top of the pile of windows.
+*)
+
+PROCEDURE PutOnTop (w: Window) ;
+
+
+(*
+   PutOnBottom - places Window, w, on the bottom of the pile
+                 of Windows.
+*)
+
+PROCEDURE PutOnBottom (w: Window) ;
+
+(*
+   SelectWindow - returns a Window which can be seen at screen
+                  location, x, y.
+                  If no Window is seen then NIL is returned.
+*)
+
+PROCEDURE SelectWindow (x, y: CARDINAL) : Window ;
+
+
+(*
+   TitleWindow - adds a title to a Window, w.
+*)
+
+PROCEDURE TitleWindow (w: Window; a: ARRAY OF CHAR) ;
+
+
+(*
+   DefaultWindow - returns the default window.
+*)
+
+PROCEDURE DefaultWindow () : Window ;
+
+
+(*
+   SetDefaultWindow - sets the default window.
+*)
+
+PROCEDURE SetDefaultWindow (w: Window) ;
+
+
+END WindowDevice.

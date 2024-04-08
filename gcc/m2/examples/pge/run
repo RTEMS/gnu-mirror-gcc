@@ -1,0 +1,5 @@
+#!/bin/bash
+
+python pgepygame.py &
+sleep 1
+./a.out

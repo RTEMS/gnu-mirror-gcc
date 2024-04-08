@@ -1,0 +1,56 @@
+(* Provides a double buffer for graphic objects.
+
+Copyright (C) 2003-2019 Free Software Foundation, Inc.
+Contributed by Gaius Mulley <gaius.mulley@southwales.ac.uk>.
+
+This file is part of GNU Modula-2.
+
+GNU Modula-2 is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 3, or (at your option)
+any later version.
+
+GNU Modula-2 is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
+
+Under Section 7 of GPL version 3, you are granted additional
+permissions described in the GCC Runtime Library Exception, version
+3.1, as published by the Free Software Foundation.
+
+You should have received a copy of the GNU General Public License and
+a copy of the GCC Runtime Library Exception along with this program;
+see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+<http://www.gnu.org/licenses/>.  *)
+
+DEFINITION MODULE DisplayBuffer ;
+
+(*
+   Title      : DisplayBuffer
+   Author     : Gaius Mulley
+   Date       : 17/7/92
+   LastEdit   : 17/7/92
+   System     : LOGITECH MODULA-2/86
+   Description: Provides a double buffer for graphic objects
+*)
+
+EXPORT QUALIFIED FlipBuffer, AddLine ;
+
+
+(*
+   FlipBuffer - flips the screen onto the other buffer.
+*)
+
+PROCEDURE FlipBuffer ;
+
+
+(*
+   AddLine - adds the line, x1, y1, x2, y2 into the line buffer.
+             This line is displayed in the colour, Colour.
+*)
+
+PROCEDURE AddLine (x1, y1, x2, y2: CARDINAL; Colour: CARDINAL) ;
+
+
+END DisplayBuffer.

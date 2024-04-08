@@ -896,6 +896,13 @@ lhd_finalize_early_debug (void)
     (*debug_hooks->early_global_decl) (cnode->decl);
 }
 
+/* Should the analyzer check for NEW/DISPOSE Storage_ALLOCATE/Storage_DEALLOCATE?  */
+
+bool lhd_new_dispose_storage_substitution (void)
+{
+  return false;
+}
+
 /* Returns true if the current lang_hooks represents the GNU C frontend.  */
 
 bool

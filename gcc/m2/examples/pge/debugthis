@@ -1,0 +1,5 @@
+#!/bin/sh
+
+# python -m pdb max2code.py -v -o t.mod test.mxm
+python3 -m pdb fig.py foo.fig foo.mod
+

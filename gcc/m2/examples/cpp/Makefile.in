@@ -1,0 +1,43 @@
+# Copyright (C) 2010
+#               Free Software Foundation, Inc.
+# This file is part of GNU Modula-2.
+#
+# GNU Modula-2 is free software; you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free
+# Software Foundation; either version 3, or (at your option) any later
+# version.
+# 
+# GNU Modula-2 is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or
+# FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+# for more details.
+# 
+# You should have received a copy of the GNU General Public License along
+# with gm2; see the file COPYING.  If not, write to the Free Software
+# Foundation, 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+
+srcdir = @srcdir@
+gm2dir = $(srcdir)/../..
+
+SRC_PATH_PIM=$(srcdir):../../gm2-libs:$(gm2dir)/gm2-libs:$(gm2dir)/gm2-libs-iso
+OBJ_PATH_PIM=.:../../gm2-libs:../../gm2-libs-iso
+
+XGM2=../../../xgm2 -B../../../x
+
+all: force
+	@echo "you need to use 'make pre-install' to build the examples using the locally built compiler"
+	@echo "or you can use 'make post-install' to build the examples after installing the compiler"
+
+pre-install: clean
+	$(XGM2) -fcpp -c -g -I. $(srcdir)/hello.mod
+	$(XGM2) -fcpp -g -I. $(srcdir)/hello.mod
+
+post-install: clean
+	gm2 -fcpp -c -g -I. $(srcdir)/hello.mod
+	gm2 -fcpp -g -I. $(srcdir)/hello.mod
+
+clean:
+	$(RM) *.o a.out
+
+force:
+

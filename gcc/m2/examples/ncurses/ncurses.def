@@ -1,0 +1,366 @@
+(* ncurses provides a partial interface to the ncurses library.
+
+Copyright (C) 2004-2019 Free Software Foundation, Inc.
+Derived from the ncurses header file.
+
+This file is part of GNU Modula-2.
+
+GNU Modula-2 is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 3, or (at your option)
+any later version.
+
+GNU Modula-2 is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
+
+Under Section 7 of GPL version 3, you are granted additional
+permissions described in the GCC Runtime Library Exception, version
+3.1, as published by the Free Software Foundation.
+
+You should have received a copy of the GNU General Public License and
+a copy of the GCC Runtime Library Exception along with this program;
+see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+<http://www.gnu.org/licenses/>.  *)
+
+DEFINITION MODULE FOR "C" ncurses ;
+
+FROM SYSTEM IMPORT ADDRESS ;
+
+CONST
+   Black   = 0 ;
+   Red     = 1 ;
+   Green   = 2 ;
+   Yellow  = 3 ;
+   Blue    = 4 ;
+   Magenta = 5 ;
+   Cyan    = 6 ;
+   White   = 7 ;
+
+TYPE
+   WINDOW = ADDRESS ;
+   chtype = LONGCARD ;
+   chstring = ADDRESS ;
+   ATTRIBUTE = chtype ;
+   COLORPAIR = SHORTCARD ;
+
+VAR
+   LINES, COLS, TABSIZE,
+   ESCDELAY,
+   COLORS, COLOR_PAIRS   : INTEGER ;
+   stdscr, curscr, newscr: WINDOW ;
+   ttytype               : ADDRESS ;
+
+
+PROCEDURE   curses_version ()                            : ADDRESS ;
+PROCEDURE   assume_default_colors (a, b: INTEGER)        : INTEGER ;
+PROCEDURE   use_default_colors ()                        : INTEGER ;
+PROCEDURE   start_color ()                               : INTEGER ;
+PROCEDURE   resizeterm (x: INTEGER; y: INTEGER)          : INTEGER ;
+PROCEDURE   wresize (w: WINDOW; x: INTEGER; y: INTEGER)  : INTEGER ;
+PROCEDURE   addch (ch: chtype)                           : INTEGER ;
+PROCEDURE   addchnstr (s: chstring; n: INTEGER)		 : INTEGER ;
+PROCEDURE   addchstr (s: chstring)                       : INTEGER ;
+PROCEDURE   addnstr (s: chstring; n: INTEGER)            : INTEGER ;
+PROCEDURE   addstr (s: chstring)                         : INTEGER ;
+PROCEDURE   has_colors ()                                : BOOLEAN ;
+PROCEDURE   getch ()                                     : INTEGER ;
+
+(*
+PROCEDURE   wattr_on (w: WINDOW; attr_t, void: ADDRESS)  : INTEGER ;
+PROCEDURE   wattr_off (w: WINDOW; attr_t, void: ADDRESS) : INTEGER ;
+PROCEDURE   wattr_set (w: WINDOW;
+                       a: ATTRIBUTE; c: COLORPAIR;
+                       void: ADDRESS)  : INTEGER ;
+PROCEDURE   wattr_get (w: WINDOW;
+                       VAR a: ATTRIBUTE;
+                       VAR c: COLORPAIR; void: ADDRESS) : INTEGER ;
+*)
+
+(***********
+PROCEDURE   attr_get (attr_t *, short *, void * )         : INTEGER ;
+PROCEDURE   attr_off (attr_t, void * )                    : INTEGER ;
+PROCEDURE   attr_on (attr_t, void * )                     : INTEGER ;
+PROCEDURE   attr_set (attr_t, short, void * )             : INTEGER ;
+***********)
+
+PROCEDURE   baudrate ()                                  : INTEGER ;
+PROCEDURE   beep  ()                                     : INTEGER ;
+PROCEDURE   bkgd (ch: chtype)                            : INTEGER ;
+PROCEDURE   bkgdset (ch: chtype) ;
+PROCEDURE   border (a, b, c, d, e, f, g, h: chtype)      : INTEGER ;
+PROCEDURE   box (w: WINDOW; a, b: chtype)                : INTEGER ;
+PROCEDURE   can_change_color ()                          : BOOLEAN ;
+PROCEDURE   cbreak ()                                    : INTEGER ;
+
+(* PROCEDURE   chgat (INTEGER; attr_t, short, void * ) : INTEGER ; *)
+
+PROCEDURE   clear ()                                     : INTEGER ;
+PROCEDURE   wclear (w: WINDOW)				 : INTEGER ;
+PROCEDURE   wrefresh (w: WINDOW)                         : INTEGER ;
+PROCEDURE   wmove (w: WINDOW; y, x: INTEGER)             : INTEGER ;
+PROCEDURE   waddch (w: WINDOW; ch: chtype)               : INTEGER ;
+PROCEDURE   wcolor_set (w: WINDOW; p: SHORTCARD; nil: ADDRESS) : INTEGER ;
+
+
+(*
+PROCEDURE   clearok (w: WINDOW,NCURSES_BOOL );			 : INTEGER ;
+PROCEDURE   clrtobot ();				 : INTEGER ;
+PROCEDURE   clrtoeol ();				 : INTEGER ;
+PROCEDURE   color_content (short,short*,short*,short* );	 : INTEGER ;
+PROCEDURE   color_set (short,void* );			 : INTEGER ;
+PROCEDURE   COLOR_PAIR (INTEGER);				 : INTEGER ;
+PROCEDURE   copywin (WINDOW*,WINDOW*,INTEGER;INTEGER;INTEGER;INTEGER;INTEGER;INTEGER;INTEGER);	 : INTEGER ;
+PROCEDURE   curs_set (INTEGER);				 : INTEGER ;
+PROCEDURE   def_prog_mode ();			 : INTEGER ;
+PROCEDURE   def_shell_mode ();			 : INTEGER ;
+PROCEDURE   delay_output (INTEGER);				 : INTEGER ;
+PROCEDURE   delch ();				 : INTEGER ;
+PROCEDURE   delscreen (SCREEN * );
+
+PROCEDURE   deleteln ();				 : INTEGER ;
+PROCEDURE   derwin (w: WINDOW,INTEGER;INTEGER;INTEGER;INTEGER)            : WINDOW ;
+PROCEDURE   doupdate ();				 : INTEGER ;
+PROCEDURE   dupwin (w: WINDOW);			         : WINDOW ;
+PROCEDURE   getwin (FILE * );			         : WINDOW ;
+*)
+
+PROCEDURE   initscr ()                                   : WINDOW ;
+PROCEDURE   savetty ()                                   : INTEGER ;
+PROCEDURE   resetty ()                                   : INTEGER ;
+PROCEDURE   delwin (w: WINDOW)                           : INTEGER ;
+PROCEDURE   endwin ()                                    : INTEGER ;
+PROCEDURE   isendwin ()                                  : BOOLEAN ;
+PROCEDURE   init_pair (pair: COLORPAIR;
+                       fg, bg: SHORTCARD)                : INTEGER ;
+PROCEDURE   noecho ()				         : INTEGER ;
+PROCEDURE   nonl ()					 : INTEGER ;
+
+
+(*
+extern NCURSES_EXPORT(int) echo (void);
+extern NCURSES_EXPORT(int) echochar (const chtype);
+extern NCURSES_EXPORT(int) erase (void);
+extern NCURSES_EXPORT(char) erasechar (void);
+extern NCURSES_EXPORT(void) filter (void);
+extern NCURSES_EXPORT(int) flash (void);
+extern NCURSES_EXPORT(int) flushinp (void);
+extern NCURSES_EXPORT(chtype) getbkgd (WINDOW * );
+extern NCURSES_EXPORT(int) getch (void);
+extern NCURSES_EXPORT(int) getnstr (char *, int);
+extern NCURSES_EXPORT(int) getstr (char * );
+extern NCURSES_EXPORT(WINDOW * ) getwin (FILE * );
+extern NCURSES_EXPORT(int) halfdelay (int);
+extern NCURSES_EXPORT(bool) has_ic (void);
+extern NCURSES_EXPORT(bool) has_il (void);
+extern NCURSES_EXPORT(int) hline (chtype, int);
+extern NCURSES_EXPORT(void) idcok (WINDOW *, bool);
+extern NCURSES_EXPORT(int) idlok (WINDOW *, bool);
+extern NCURSES_EXPORT(void) immedok (WINDOW *, bool);
+extern NCURSES_EXPORT(chtype) inch (void);
+extern NCURSES_EXPORT(int) inchnstr (chtype *, int);
+extern NCURSES_EXPORT(int) inchstr (chtype * );
+*)
+
+(****************
+PROCEDURE   init_color (short,short,short,short);	 : INTEGER ;
+PROCEDURE   innstr (char *, INTEGER);			 : INTEGER ;
+PROCEDURE   insch (chtype);				 : INTEGER ;
+PROCEDURE   insdelln (n: INTEGER)                        : INTEGER ;
+PROCEDURE   insertln ();				 : INTEGER ;
+PROCEDURE   insnstr (char *, INTEGER);			 : INTEGER ;
+PROCEDURE   insstr (char * );			 : INTEGER ;
+PROCEDURE   instr (char * );				 : INTEGER ;
+PROCEDURE   intrflush (w: WINDOW,NCURSES_BOOL );			 : INTEGER ;
+extern    NCURSES_BOOL      isendwin ();
+extern    NCURSES_BOOL      is_linetouched (w: WINDOW,INTEGER);
+extern    NCURSES_BOOL      is_wintouched (w: WINDOW);
+extern     char *     keyname (INTEGER);
+PROCEDURE   keypad (w: WINDOW,NCURSES_BOOL );			 : INTEGER ;
+PROCEDURE   killchar ()                                          : CHAR ;
+PROCEDURE   leaveok (w: WINDOW,NCURSES_BOOL );			 : INTEGER ;
+extern    char *     longname ();
+PROCEDURE   meta (w: WINDOW,NCURSES_BOOL );			 : INTEGER ;
+PROCEDURE   move (INTEGER; INTEGER);				 : INTEGER ;
+PROCEDURE   mvaddch (INTEGER; INTEGER; chtype);		 : INTEGER ;
+PROCEDURE   mvaddchnstr (INTEGER; INTEGER; s: chstring, INTEGER);	 : INTEGER ;
+PROCEDURE   mvaddchstr (INTEGER; INTEGER; s: chstring);	 : INTEGER ;
+PROCEDURE   mvaddnstr (INTEGER; INTEGER; char *, INTEGER);	 : INTEGER ;
+PROCEDURE   mvaddstr (INTEGER; INTEGER; char * );		 : INTEGER ;
+PROCEDURE   mvchgat (INTEGER; INTEGER; INTEGER; attr_t, short, void * );	 : INTEGER ;
+PROCEDURE   mvcur (INTEGER;INTEGER;INTEGER;INTEGER);			 : INTEGER ;
+PROCEDURE   mvdelch (INTEGER; INTEGER);				 : INTEGER ;
+PROCEDURE   mvderwin (w: WINDOW, INTEGER; INTEGER);		 : INTEGER ;
+PROCEDURE   mvgetch (INTEGER; INTEGER);				 : INTEGER ;
+PROCEDURE   mvgetnstr (INTEGER; INTEGER; char *, INTEGER);		 : INTEGER ;
+PROCEDURE   mvgetstr (INTEGER; INTEGER; char * );			 : INTEGER ;
+PROCEDURE   mvhline (INTEGER; INTEGER; chtype, INTEGER);		 : INTEGER ;
+extern    chtype     mvinch (INTEGER; INTEGER);
+PROCEDURE   mvinchnstr (INTEGER; INTEGER; s: chstring, INTEGER);	 : INTEGER ;
+PROCEDURE   mvinchstr (INTEGER; INTEGER; s: chstring);		 : INTEGER ;
+PROCEDURE   mvinnstr (INTEGER; INTEGER; char *, INTEGER);		 : INTEGER ;
+PROCEDURE   mvinsch (INTEGER; INTEGER; chtype);			 : INTEGER ;
+PROCEDURE   mvinsnstr (INTEGER; INTEGER; char *, INTEGER);	 : INTEGER ;
+PROCEDURE   mvinsstr (INTEGER; INTEGER; char * );		 : INTEGER ;
+PROCEDURE   mvinstr (INTEGER; INTEGER; char * );			 : INTEGER ;
+PROCEDURE   mvprintw (INTEGER;INTEGER;  char *,...)	 : INTEGER ;
+PROCEDURE   mvscanw (INTEGER;INTEGER;  char *,...)	 : INTEGER ;
+		 ;
+PROCEDURE   mvvline (INTEGER; INTEGER; chtype, INTEGER);		 : INTEGER ;
+PROCEDURE   mvwaddch (w: WINDOW, INTEGER; INTEGER; chtype);	 : INTEGER ;
+PROCEDURE   mvwaddchnstr (w: WINDOW, INTEGER; INTEGER; s: chstring, INTEGER); : INTEGER ;
+PROCEDURE   mvwaddchstr (w: WINDOW, INTEGER; INTEGER; s: chstring);	 : INTEGER ;
+PROCEDURE   mvwaddnstr (w: WINDOW, INTEGER; INTEGER; char *, INTEGER);	 : INTEGER ;
+PROCEDURE   mvwaddstr (w: WINDOW, INTEGER; INTEGER; char * );	 : INTEGER ;
+PROCEDURE   mvwchgat (w: WINDOW, INTEGER; INTEGER; INTEGER; attr_t, short, void * ); : INTEGER ;
+PROCEDURE   mvwdelch (w: WINDOW, INTEGER; INTEGER);		 : INTEGER ;
+PROCEDURE   mvwgetch (w: WINDOW, INTEGER; INTEGER);		 : INTEGER ;
+PROCEDURE   mvwgetnstr (w: WINDOW, INTEGER; INTEGER; char *, INTEGER);	 : INTEGER ;
+PROCEDURE   mvwgetstr (w: WINDOW, INTEGER; INTEGER; char * );	 : INTEGER ;
+PROCEDURE   mvwhline (w: WINDOW, INTEGER; INTEGER; chtype, INTEGER);	 : INTEGER ;
+PROCEDURE   mvwin (w: WINDOW,INTEGER;INTEGER);			 : INTEGER ;
+extern    chtype     mvwinch (w: WINDOW, INTEGER; INTEGER);
+PROCEDURE   mvwinchnstr (w: WINDOW, INTEGER; INTEGER; s: chstring, INTEGER);	 : INTEGER ;
+PROCEDURE   mvwinchstr (w: WINDOW, INTEGER; INTEGER; s: chstring);		 : INTEGER ;
+PROCEDURE   mvwinnstr (w: WINDOW, INTEGER; INTEGER; char *, INTEGER);		 : INTEGER ;
+PROCEDURE   mvwinsch (w: WINDOW, INTEGER; INTEGER; chtype);		 : INTEGER ;
+PROCEDURE   mvwinsnstr (w: WINDOW, INTEGER; INTEGER; char *, INTEGER);	 : INTEGER ;
+PROCEDURE   mvwinsstr (w: WINDOW, INTEGER; INTEGER; char * );		 : INTEGER ;
+PROCEDURE   mvwinstr (w: WINDOW, INTEGER; INTEGER; char * );		 : INTEGER ;
+PROCEDURE   mvwprintw (WINDOW*,INTEGER;INTEGER;  char *,...)	 : INTEGER ;
+PROCEDURE   mvwscanw (w: WINDOW,INTEGER;INTEGER;  char *,...)	 : INTEGER ;
+PROCEDURE   mvwvline (w: WINDOW,INTEGER; INTEGER; chtype, INTEGER);	 : INTEGER ;
+PROCEDURE   napms (INTEGER);					 : INTEGER ;
+PROCEDURE   nl ();					 : INTEGER ;
+PROCEDURE   nocbreak ();				 : INTEGER ;
+PROCEDURE   nodelay (w: WINDOW,NCURSES_BOOL );			 : INTEGER ;
+PROCEDURE   noqiflush ();
+PROCEDURE   noraw ();				 : INTEGER ;
+PROCEDURE   notimeout (w: WINDOW,NCURSES_BOOL );			 : INTEGER ;
+PROCEDURE   overlay (WINDOW*,w: WINDOW);		 : INTEGER ;
+PROCEDURE   overwrite (WINDOW*,w: WINDOW);		 : INTEGER ;
+PROCEDURE   pair_content (short,short*,short* );		 : INTEGER ;
+PROCEDURE   PAIR_NUMBER (INTEGER);				 : INTEGER ;
+PROCEDURE   pechochar (w: WINDOW, chtype);		 : INTEGER ;
+PROCEDURE   pnoutrefresh (WINDOW*,INTEGER;INTEGER;INTEGER;INTEGER;INTEGER;INTEGER); : INTEGER ;
+PROCEDURE   prefresh (w: WINDOW,INTEGER;INTEGER;INTEGER;INTEGER;INTEGER;INTEGER);	 : INTEGER ;
+PROCEDURE   printw ( char *,...)		 : INTEGER ;
+		 ;
+PROCEDURE   putp (char * );				 : INTEGER ;
+PROCEDURE   putwin (w: WINDOW, FILE * );			 : INTEGER ;
+extern    void     qiflush ();
+PROCEDURE   raw ();					 : INTEGER ;
+PROCEDURE   redrawwin (w: WINDOW);			 : INTEGER ;
+PROCEDURE   refresh ();				 : INTEGER ;
+
+PROCEDURE   reset_prog_mode ();			 : INTEGER ;
+PROCEDURE   reset_shell_mode ();			 : INTEGER ;
+PROCEDURE   ripoffline (INTEGER; int ( *init)(w: WINDOW, INTEGER));	 : INTEGER ;
+
+PROCEDURE   scanw ( char *,...)		 : INTEGER ;
+
+PROCEDURE   scr_dump (char * );			 : INTEGER ;
+PROCEDURE   scr_init (char * );			 : INTEGER ;
+PROCEDURE   scrl (INTEGER);					 : INTEGER ;
+PROCEDURE   scroll (w: WINDOW);				 : INTEGER ;
+PROCEDURE   scrollok (w: WINDOW,NCURSES_BOOL );			 : INTEGER ;
+PROCEDURE   scr_restore (char * );			 : INTEGER ;
+PROCEDURE   scr_set (char * );			 : INTEGER ;
+PROCEDURE   setscrreg (INTEGER;INTEGER);				 : INTEGER ;
+extern    SCREEN *     set_term (SCREEN * );
+PROCEDURE   slk_attroff (chtype);			 : INTEGER ;
+PROCEDURE   slk_attr_off (attr_t, void * );		 : INTEGER ;
+PROCEDURE   slk_attron (chtype);			 : INTEGER ;
+PROCEDURE   slk_attr_on (attr_t,void* );			 : INTEGER ;
+PROCEDURE   slk_attrset (chtype);			 : INTEGER ;
+extern    attr_t     slk_attr ();
+PROCEDURE   slk_attr_set (attr_t,short,void* );	 : INTEGER ;
+PROCEDURE   slk_clear ();				 : INTEGER ;
+PROCEDURE   slk_color (short);				 : INTEGER ;
+PROCEDURE   slk_init (INTEGER);				 : INTEGER ;
+extern    char *     slk_label (INTEGER);
+PROCEDURE   slk_noutrefresh ();			 : INTEGER ;
+PROCEDURE   subpad (w: WINDOW, INTEGER; INTEGER; INTEGER; INTEGER);	         : WINDOW ;
+PROCEDURE   subwin (w: WINDOW,INTEGER;INTEGER;INTEGER;INTEGER);	         : WINDOW ;
+PROCEDURE   syncok (w: WINDOW, NCURSES_BOOL );			 : INTEGER ;
+extern    chtype     termattrs ();
+extern    attr_t     term_attrs ();
+extern    char *     termname ();
+PROCEDURE   tigetflag ( char * );		 : INTEGER ;
+PROCEDURE   tigetnum ( char * );		 : INTEGER ;
+extern    char *     tigetstr ( char * );
+PROCEDURE   timeout (INTEGER);
+PROCEDURE   touchline (w: WINDOW, INTEGER; INTEGER);		 : INTEGER ;
+PROCEDURE   touchwin (w: WINDOW);				 : INTEGER ;
+extern    char *     tparm ( char *, ...);
+PROCEDURE   typeahead (INTEGER);				 : INTEGER ;
+PROCEDURE   ungetch (INTEGER);				 : INTEGER ;
+PROCEDURE   untouchwin (w: WINDOW);			 : INTEGER ;
+PROCEDURE   use_env (NCURSES_BOOL );
+PROCEDURE   vidattr (chtype);				 : INTEGER ;
+PROCEDURE   vid_attr (attr_t, short, void * );		 : INTEGER ;
+PROCEDURE   vidputs (chtype, int ( * )(INTEGER));		 : INTEGER ;
+PROCEDURE   vline (chtype, INTEGER);				 : INTEGER ;
+PROCEDURE   vwprintw (w: WINDOW,  char *,va_list);	 : INTEGER ;
+PROCEDURE   vw_printw (w: WINDOW,  char *,va_list);	 : INTEGER ;
+PROCEDURE   vwscanw (w: WINDOW,  char *,va_list);	 : INTEGER ;
+PROCEDURE   vw_scanw (w: WINDOW,  char *,va_list);	 : INTEGER ;
+
+PROCEDURE   waddchnstr (w: WINDOW,s: chstringconst,INTEGER);  : INTEGER ;
+PROCEDURE   waddchstr (w: WINDOW,s: chstring);		 : INTEGER ;
+PROCEDURE   waddnstr (w: WINDOW,char *const,INTEGER);	 : INTEGER ;
+PROCEDURE   waddstr (w: WINDOW,char * );		 : INTEGER ;
+PROCEDURE   wattron (w: WINDOW, INTEGER);			 : INTEGER ;
+PROCEDURE   wattroff (w: WINDOW, INTEGER);			 : INTEGER ;
+PROCEDURE   wattrset (w: WINDOW, INTEGER);			 : INTEGER ;
+PROCEDURE   wattr_get (w: WINDOW, attr_t *, short *, void * );	 : INTEGER ;
+PROCEDURE   wattr_on (w: WINDOW,  attr_t, void * );	 : INTEGER ;
+PROCEDURE   wattr_off (w: WINDOW,  attr_t, void * );	 : INTEGER ;
+PROCEDURE   wattr_set (w: WINDOW, attr_t, short, void * );		 : INTEGER ;
+PROCEDURE   wbkgd (w: WINDOW,chtype);		 : INTEGER ;
+PROCEDURE   wbkgdset (w: WINDOW,chtype);
+PROCEDURE   wborder (w: WINDOW,chtype,chtype,chtype,chtype,chtype,chtype,chtype,chtype);	 : INTEGER ;
+PROCEDURE   wchgat (w: WINDOW, INTEGER; attr_t, short, void * ); : INTEGER ;
+PROCEDURE   wclrtobot (w: WINDOW);			 : INTEGER ;
+PROCEDURE   wclrtoeol (w: WINDOW);			 : INTEGER ;
+PROCEDURE   wcolor_set (WINDOW*,short,void* );		 : INTEGER ;
+PROCEDURE   wcursyncup (w: WINDOW);
+PROCEDURE   wdelch (w: WINDOW);				 : INTEGER ;
+PROCEDURE   wdeleteln (w: WINDOW);			 : INTEGER ;
+PROCEDURE   wechochar (w: WINDOW, chtype);		 : INTEGER ;
+PROCEDURE   werase (w: WINDOW);				 : INTEGER ;
+PROCEDURE   wgetch (w: WINDOW);				 : INTEGER ;
+PROCEDURE   wgetnstr (w: WINDOW,char *,INTEGER);		 : INTEGER ;
+PROCEDURE   wgetstr (w: WINDOW, char * );			 : INTEGER ;
+PROCEDURE   whline (w: WINDOW, chtype, INTEGER);		 : INTEGER ;
+extern    chtype     winch (w: WINDOW);
+PROCEDURE   winchnstr (w: WINDOW, s: chstring, INTEGER);		 : INTEGER ;
+PROCEDURE   winchstr (w: WINDOW, s: chstring);		 : INTEGER ;
+PROCEDURE   winnstr (w: WINDOW, char *, INTEGER);		 : INTEGER ;
+PROCEDURE   winsch (w: WINDOW, chtype);			 : INTEGER ;
+PROCEDURE   winsdelln (w: WINDOW,INTEGER);			 : INTEGER ;
+PROCEDURE   winsertln (w: WINDOW);			 : INTEGER ;
+PROCEDURE   winsnstr (w: WINDOW, char *,INTEGER);	 : INTEGER ;
+PROCEDURE   winsstr (w: WINDOW, char * );		 : INTEGER ;
+PROCEDURE   winstr (w: WINDOW, char * );			 : INTEGER ;
+PROCEDURE   wnoutrefresh (w: WINDOW);			 : INTEGER ;
+PROCEDURE   wprintw (w: WINDOW,  char *,...)	 : INTEGER ;
+PROCEDURE   wredrawln (w: WINDOW,INTEGER;INTEGER);		 : INTEGER ;
+
+PROCEDURE   wscanw (w: WINDOW, f: ARRAY OF CHAR ,...)	 : INTEGER ;
+PROCEDURE   wscrl (w: WINDOW,INTEGER);			 : INTEGER ;
+PROCEDURE   wsetscrreg (w: WINDOW,INTEGER;INTEGER);		 : INTEGER ;
+PROCEDURE   wstandout (w: WINDOW);			 : INTEGER ;
+PROCEDURE   wstandend (w: WINDOW);			 : INTEGER ;
+PROCEDURE   wsyncdown (w: WINDOW);
+PROCEDURE   wsyncup (w: WINDOW);
+PROCEDURE   wtimeout (w: WINDOW,INTEGER);
+PROCEDURE   wtouchln (w: WINDOW,INTEGER;INTEGER;INTEGER);		 : INTEGER ;
+PROCEDURE   wvline (w: WINDOW; ch: chtype; INTEGER);		 : INTEGER ;
+********************)
+
+PROCEDURE   trace (d: INTEGER);
+
+
+END ncurses.
