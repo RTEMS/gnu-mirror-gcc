@@ -574,12 +574,6 @@ extern int rs6000_vector_align[];
    below.  */
 #define RS6000_FN_TARGET_INFO_HTM 1
 
-/* Whether we have PADDIS support.  */
-#define TARGET_PADDIS			TARGET_FUTURE2
-
-/* Whether we have XVRLW support.  */
-#define TARGET_XVRLW			TARGET_FUTURE2
-
 /* Whether the various reciprocal divide/square root estimate instructions
    exist, and whether we should automatically generate code for the instruction
    by default.  */
@@ -2502,7 +2496,6 @@ typedef struct GTY(()) machine_function
 	    (HOST_WIDE_INT_1 << ((N)-1)) - 1)
 
 #define SIGNED_INTEGER_16BIT_P(VALUE)	SIGNED_INTEGER_NBIT_P (VALUE, 16)
-#define SIGNED_INTEGER_32BIT_P(VALUE)	SIGNED_INTEGER_NBIT_P (VALUE, 32)
 #define SIGNED_INTEGER_34BIT_P(VALUE)	SIGNED_INTEGER_NBIT_P (VALUE, 34)
 
 /* Like SIGNED_INTEGER_16BIT_P and SIGNED_INTEGER_34BIT_P, but with an extra
