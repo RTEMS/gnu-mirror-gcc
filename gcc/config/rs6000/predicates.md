@@ -282,6 +282,15 @@
   (and (match_code "const_int")
        (match_test "(0x80000000 + UINTVAL (op)) >> 32 == 0")))
 
+;; Return 1 if op is a 32-bit unsigned constant where the upper 16-bits is
+;; non-zero along with the lower 16-bits that needs two instructions (ORI/ORIS
+;; or XORI/XORIS to do the operation).
+(define_predicate "u32bit_cint_2_insns_operand"
+  (and (match_code "const_int")
+       (match_test "(INTVAL (op) >> 32) == 0")
+       (match_test "(INTVAL (op) & 0xffff) != 0")
+       (match_test "(INTVAL (op) & 0xffff0000) != 0")))
+
 ;; Return 1 if op is a constant 32-bit unsigned
 (define_predicate "c32bit_cint_operand"
   (and (match_code "const_int")

@@ -3061,7 +3061,12 @@
   [(set (match_operand:DI 0 "gpc_reg_operand" "=&r")
         (iorxor:DI
           (match_operand:DI 1 "gpc_reg_operand" "r")
-          (match_operand:DI 2 "non_logical_cint_operand" "n")))]
+          (match_operand:DI 2 "u32bit_cint_2_insns_operand" "n")))]
   "(TARGET_P10_FUSION)"
-  "<IORXOR_OP>i %0,%1,%w2\;<IORXOR_OP>is %0,%0,%v2"
+{
+  HOST_WIDE_INT value = INTVAL (operands[2]);
+  operands[3] = GEN_INT (value & 0xffff);
+  operands[4] = GEN_INT ((value >> 16) & 0xffff);
+  return "<IORXOR_OP>i %0,%1,%3\;<IORXOR_OP>is %0,%0,%4";
+}
   [(set_attr "length" "8")])
