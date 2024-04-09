@@ -1,6 +1,354 @@
+==================== Branch work164-vpair, patch #305 ====================
+
+Add vector pair optimizations.
+
+2024-03-12  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-pair.md (vpair_add_neg_<vpair_modename>3): New
+	combiner insn to convert vector plus/neg into a minus operation.
+	(vpair_fma_<vpair_modename>_merge): Optimize multiply, add/subtract, and
+	negation into fma operations if the user specifies to create fmas.
+	(vpair_fma_<vpair_modename>_merge): Likewise.
+	(vpair_fma_<vpair_modename>_merge2): Likewise.
+	(vpair_nfma_<vpair_modename>_merge): Likewise.
+	(vpair_nfms_<vpair_modename>_merge): Likewise.
+	(vpair_nfms_<vpair_modename>_merge2): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-7.c: New test.
+	* gcc.target/powerpc/vector-pair-8.c: Likewise.
+	* gcc.target/powerpc/vector-pair-9.c: Likewise.
+	* gcc.target/powerpc/vector-pair-10.c: Likewise.
+	* gcc.target/powerpc/vector-pair-11.c: Likewise.
+	* gcc.target/powerpc/vector-pair-12xs.c: Likewise.
+
+==================== Branch work164-vpair, patch #304 ====================
+
+Add vector pair init and splat.
+
+2024-04-09  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_zero): New
+	built-in function.
+	(__builtin_vpair_f32_splat): Likewise.
+	(__builtin_vpair_f64_splat): Likewise.
+	* config/rs6000/vector-pair.md (UNSPEC_VPAIR_ZERO): New unspec.
+	(UNSPEC_VPAIR_SPLAT): Likewise.
+	(VPAIR_SPLAT_VMODE): New mode iterator.
+	(VPAIR_SPLAT_ELEMENT_TO_VMODE): New mode attribute.
+	(vpair_splat_name): Likewise.
+	(vpair_zero): New insn.
+	(vpair_splat_<vpair_splat_name>): New define_expand.
+	(vpair_splat_<vpair_splat_name>_internal): New insns.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-5.c: New test.
+	* gcc.target/powerpc/vector-pair-6.c: Likewise.
+
+==================== Branch work164-vpair, patch #303 ====================
+
+Add support for vector pair fma operations.
+
+2024-04-09  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_f32_fma): New
+	built-in.
+	(__builtin_vpair_f32_fms): Likewise.
+	(__builtin_vpair_f32_nfma): Likewise.
+	(__builtin_vpair_f32_nfms): Likewise.
+	(__builtin_vpair_f64_fma): Likewise.
+	(__builtin_vpair_f64_fms): Likewise.
+	(__builtin_vpair_f64_nfma): Likewise.
+	* config/rs6000/rs6000/rs6000-proto.h (enum vpair_split_fma): New
+	enumeration.
+	(vpair_split_fma): New declaration.
+	* config/rs6000/rs6000.cc (vpair_split_fma): New function to split
+	vector pair FMA operations.
+	* config/rs6000/vector-pair.md (UNSPEC_VPAIR_FMA): New unspec.
+	(vpair_stdname): Add UNSPEC_VPAIR_FMA.
+	(VPAIR_OP): Likewise.
+	(vpair_fma_<vpair_modename>4): New insns.
+	(vpair_fms_<vpair_modename>4): Likewise.
+	(vpair_nfma_<vpair_modename>4): Likewise.
+	(vpair_nfms_<vpair_modename>4): Likewise.
+	* doc/extend.texi (PowerPC Vector Pair Built-in Functions): Document new
+	vector pair fma built-in functions.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-3.c: New test.
+	* gcc.target/powerpc/vector-pair-4.c: Likewise.
+
+==================== Branch work164-vpair, patch #302 ====================
+
+Add support for vector pair unary and binary operations.
+
+2024-04-09  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-builtins.def (__builtin_vpair_*): Add new
+	built-in functions for vector pair support.
+	* config/rs6000/rs6000-protos.h (enum vpair_split_unary): New
+	enumeration.
+	(vpair_split_unary): New declaration.
+	(vpair_split_binary): Likewise.
+	* config/rs6000/rs6000.cc (vpair_split_unary): New function to split
+	vector pair operations.
+	(vpair_split_binary): Likewise.
+	* config/rs6000/rs6000.md (toplevel): Include vector-pair.md.
+	* config/rs6000/t-rs6000 (MD_INCLUDES): Add vector-pair.md.
+	* config/rs6000/vector-pair.md: New file.
+	* doc/extend.texi (PowerPC Vector Pair Built-in Functions): Add
+	documentation for the new vector pair built-in functions.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-1.c: New test.
+	* gcc.target/powerpc/vector-pair-2.c: Likewise.
+
+==================== Branch work164-vpair, patch #301 ====================
+
+Peter's patches for subreg support.
+
+2024-03-12  Peter Bergner  <bergner@linux.ibm.com>
+
+gcc/
+
+	PR target/109116
+	* gcc/config/rs6000/rs6000.cc (rs6000_modes_tieable_p): Make OOmode
+	tieable with 128-bit vector modes.
+
+2024-01-23  Peter Bergner  <bergner@linux.ibm.com>
+
+gcc/
+
+	PR target/109116
+	* gcc/config/rs6000/mma.md (vsx_disassemble_pair): Use SUBREG's instead
+	of UNSPEC's.
+	(mma_disassemble_acc): Likewise.
+
+==================== Branch work164-vpair, patch #300 ====================
+
+Power10: Add options to disable load and store vector pair.
+
+In working on some future patches that involve utilizing vector pair
+instructions, I wanted to be able to tune my program to enable or disable using
+the vector pair load or store operations while still keeping the other
+operations on the vector pair.
+
+This patch adds two undocumented tuning options.  The -mno-load-vector-pair
+option would tell GCC to generate two load vector instructions instead of a
+single load vector pair.  The -mno-store-vector-pair option would tell GCC to
+generate two store vector instructions instead of a single store vector pair.
+
+If either -mno-load-vector-pair is used, GCC will not generate the indexed
+stxvpx instruction.  Similarly if -mno-store-vector-pair is used, GCC will not
+generate the indexed lxvpx instruction.  The reason for this is to enable
+splitting the {,p}lxvp or {,p}stxvp instructions after reload without needing a
+scratch GPR register.
+
+The default for -mcpu=power10 is that both load vector pair and store vector
+pair are enabled.
+
+I added code so that the user code can modify these settings using either a
+'#pragma GCC target' directive or used __attribute__((__target__(...))) in the
+function declaration.
+
+I added tests for the switches, #pragma, and attribute options.
+
+I have built this on both little endian power10 systems and big endian power9
+systems doing the normal bootstrap and test.  There were no regressions in any
+of the tests, and the new tests passed.  Can I check this patch into the master
+branch?
+
+2024-04-09  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/mma.md (movoo): Add support for -mno-load-vector-pair and
+	-mno-store-vector-pair.
+	* config/rs6000/rs6000-cpus.def (OTHER_POWER10_MASKS): Add support for
+	-mload-vector-pair and -mstore-vector-pair.
+	(POWERPC_MASKS): Likewise.
+	* config/rs6000/rs6000.cc (rs6000_setup_reg_addr_masks): Only allow
+	indexed mode for OOmode if we are generating both load vector pair and
+	store vector pair instructions.
+	(rs6000_option_override_internal): Add support for -mno-load-vector-pair
+	and -mno-store-vector-pair.
+	(rs6000_opt_masks): Likewise.
+	* config/rs6000/rs6000.md (isa attribute): Add lxvp and stxvp
+	attributes.
+	(enabled attribute): Likewise.
+	* config/rs6000/rs6000.opt (-mload-vector-pair): New option.
+	(-mstore-vector-pair): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-attribute.c: New test.
+	* gcc.target/powerpc/vector-pair-pragma.c: New test.
+	* gcc.target/powerpc/vector-pair-switch1.c: New test.
+	* gcc.target/powerpc/vector-pair-switch2.c: New test.
+	* gcc.target/powerpc/vector-pair-switch3.c: New test.
+	* gcc.target/powerpc/vector-pair-switch4.c: New test.
+
+==================== Branch work164-vpair, patch #10 from work164 ====================
+
+Add -mcpu=future support.
+
+This patch adds the future option to the -mcpu= and -mtune= switches.
+
+This patch treats the future like a power11 in terms of costs and reassociation
+width.
+
+This patch issues a ".machine future" to the assembly file if you use
+-mcpu=power11.
+
+This patch defines _ARCH_PWR_FUTURE if the user uses -mcpu=future.
+
+This patch allows GCC to be configured with the --with-cpu=future and
+--with-tune=future options.
+
+This patch passes -mfuture to the assembler if the user uses -mcpu=future.
+
+2024-04-08  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config.gcc (rs6000*-*-*, powerpc*-*-*): Add support for power11.
+	* config/rs6000/aix71.h (ASM_CPU_SPEC): Add support for -mcpu=power11.
+	* config/rs6000/aix72.h (ASM_CPU_SPEC): Likewise.
+	* config/rs6000/aix73.h (ASM_CPU_SPEC): Likewise.
+	* config/rs6000/driver-rs6000.cc (asm_names): Likewise.
+	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Define
+	_ARCH_PWR_FUTURE if -mcpu=future.
+	* config/rs6000/rs6000-cpus.def (ISA_FUTURE_MASKS_SERVER): New define.
+	(POWERPC_MASKS): Add future isa bit.
+	(power11 cpu): Add future definition.
+	* config/rs6000/rs6000-opts.h (PROCESSOR_FUTURE): Add future processor.
+	* config/rs6000/rs6000-string.cc (expand_compare_loop): Likewise.
+	* config/rs6000/rs6000-tables.opt: Regenerate.
+	* config/rs6000/rs6000.cc (rs6000_option_override_internal): Add future
+	support.
+	(rs6000_machine_from_flags): Likewise.
+	(rs6000_reassociation_width): Likewise.
+	(rs6000_adjust_cost): Likewise.
+	(rs6000_issue_rate): Likewise.
+	(rs6000_sched_reorder): Likewise.
+	(rs6000_sched_reorder2): Likewise.
+	(rs6000_register_move_cost): Likewise.
+	(rs6000_opt_masks): Likewise.
+	* config/rs6000/rs6000.h (ASM_CPU_SPEC): Likewise.
+	* config/rs6000/rs6000.md (cpu attribute): Add future.
+	* config/rs6000/rs6000.opt (-mpower11): Add internal future ISA flag.
+	* doc/invoke.texi (RS/6000 and PowerPC Options): Document -mcpu=future.
+
+==================== Branch work164-vpair, patch #3 from work164 ====================
+
+Add -mcpu=power11 tests.
+
+This patch adds some simple tests for -mcpu=power11 support.  In order to run
+these tests, you need an assembler that supports the appropriate option for
+supporting the Power11 processor (-mpower11 under Linux or -mpwr11 under AIX).
+
+2024-04-08  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/power11-1.c: New test.
+	* gcc.target/powerpc/power11-2.c: Likewise.
+	* gcc.target/powerpc/power11-3.c: Likewise.
+	* lib/target-supports.exp (check_effective_target_power11_ok): Add new
+	effective target.
+
+==================== Branch work164-vpair, patch #2 from work164 ====================
+
+Add -mcpu=power11 tuning support.
+
+This patch makes -mtune=power11 use the same tuning decisions as -mtune=power10.
+
+2024-04-08  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/power10.md (all reservations): Add power11 as an
+	alternative to power10.
+
+==================== Branch work164-vpair, patch #1 from work164 ====================
+
+Add -mcpu=power11 support.
+
+This patch adds the power11 option to the -mcpu= and -mtune= switches.
+
+This patch treats the power11 like a power10 in terms of costs and reassociation
+width.
+
+This patch issues a ".machine power11" to the assembly file if you use
+-mcpu=power11.
+
+This patch defines _ARCH_PWR11 if the user uses -mcpu=power11.
+
+This patch allows GCC to be configured with the --with-cpu=power11 and
+--with-tune=power11 options.
+
+This patch passes -mpwr11 to the assembler if the user uses -mcpu=power11.
+
+This patch adds support for using "power11" in the __builtin_cpu_is built-in
+function.
+
+2024-04-08  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config.gcc (rs6000*-*-*, powerpc*-*-*): Add support for power11.
+	* config/rs6000/aix71.h (ASM_CPU_SPEC): Add support for -mcpu=power11.
+	* config/rs6000/aix72.h (ASM_CPU_SPEC): Likewise.
+	* config/rs6000/aix73.h (ASM_CPU_SPEC): Likewise.
+	* config/rs6000/driver-rs6000.cc (asm_names): Likewise.
+	* config/rs6000/ppc-auxv.h (PPC_PLATFORM_POWER11): New define.
+	* config/rs6000/rs6000-builtin.cc (cpu_is_info): Add power11.
+	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Define
+	_ARCH_PWR11 if -mcpu=power11.
+	* config/rs6000/rs6000-cpus.def (ISA_POWER11_MASKS_SERVER): New define.
+	(POWERPC_MASKS): Add power11 isa bit.
+	(power11 cpu): Add power11 definition.
+	* config/rs6000/rs6000-opts.h (PROCESSOR_POWER11): Add power11 processor.
+	* config/rs6000/rs6000-string.cc (expand_compare_loop): Likewise.
+	* config/rs6000/rs6000-tables.opt: Regenerate.
+	* config/rs6000/rs6000.cc (rs6000_option_override_internal): Add power11
+	support.
+	(rs6000_machine_from_flags): Likewise.
+	(rs6000_reassociation_width): Likewise.
+	(rs6000_adjust_cost): Likewise.
+	(rs6000_issue_rate): Likewise.
+	(rs6000_sched_reorder): Likewise.
+	(rs6000_sched_reorder2): Likewise.
+	(rs6000_register_move_cost): Likewise.
+	(rs6000_opt_masks): Likewise.
+	* config/rs6000/rs6000.h (ASM_CPU_SPEC): Likewise.
+	* config/rs6000/rs6000.md (cpu attribute): Add power11.
+	* config/rs6000/rs6000.opt (-mpower11): Add internal power11 ISA flag.
+	* doc/invoke.texi (RS/6000 and PowerPC Options): Document -mcpu=power11.
+
 ==================== Branch work164-vpair, baseline ====================
+
+Add ChangeLog.vpair and update REVISION.
+
+2024-04-08  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* ChangeLog.vpair: New file for branch.
+	* REVISION: Update.
 
 2024-04-08   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
-
