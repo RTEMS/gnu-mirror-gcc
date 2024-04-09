@@ -1,3 +1,15 @@
+==================== Branch work164-bugs, patch #202 ====================
+
+Make sure wide immediate fusion does not generate illegal instructions.
+
+2024-04-09  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/fusion.md: Regenerate.
+	* config/rs6000/genfusion.md (gen_wide_immediate): Fix code.
+	* config/rs6000/predicates.md (u32bit_cint_2_insns_operand): New predicate.
+
 ==================== Branch work164-bugs, patch #201 ====================
 
 Add power10 ori/oris and xori/xoris fusion support.
