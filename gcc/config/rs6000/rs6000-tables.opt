@@ -203,3 +203,6 @@ Enum(rs6000_cpu_opt_value) String(power11) Value(57)
 EnumValue
 Enum(rs6000_cpu_opt_value) String(future) Value(58)
 
+EnumValue
+Enum(rs6000_cpu_opt_value) String(future2) Value(59)
+

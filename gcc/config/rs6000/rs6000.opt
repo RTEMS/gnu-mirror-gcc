@@ -587,6 +587,10 @@ Target Undocumented Mask(POWER11) Var(rs6000_isa_flags) Warn(Do not use %<-mpowe
 mfuture
 Target Undocumented Mask(FUTURE) Var(rs6000_isa_flags) Warn(Do not use %<-mfuture>)
 
+;; Possible future bits beyound -mcpu=future
+mfuture2
+Target Undocumented Mask(FUTURE2) Var(rs6000_isa_flags) Warn(Do not use %<-mfuture2>)
+
 mprefixed
 Target Mask(PREFIXED) Var(rs6000_isa_flags)
 Generate (do not generate) prefixed memory instructions.

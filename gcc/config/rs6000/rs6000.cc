@@ -24643,6 +24643,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "float128-hardware",	OPTION_MASK_FLOAT128_HW,	false, true  },
   { "fprnd",			OPTION_MASK_FPRND,		false, true  },
   { "future",			OPTION_MASK_FUTURE,		false, false },
+  { "future2",			OPTION_MASK_FUTURE2,		false, false },
   { "power10",			OPTION_MASK_POWER10,		false, true  },
   { "power11",			OPTION_MASK_POWER11,		false, false },
   { "hard-dfp",			OPTION_MASK_DFP,		false, true  },
