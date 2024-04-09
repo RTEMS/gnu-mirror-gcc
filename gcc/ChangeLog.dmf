@@ -2,7 +2,7 @@
 
 Add xvrlw support.
 
-2024-04-08  Michael Meissner  <meissner@linux.ibm.com>
+2024-04-09  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -11,13 +11,13 @@ gcc/
 
 gcc/testsuite/
 
-	* gcc.target/powerpc/xvrlw.c: New test.
+	* gcc.target/powerpc/vector-rotate-left.c: New test.
 
 ==================== Branch work164-dmf, patch #121 ====================
 
 Add paddis support.
 
-2024-03-22  Michael Meissner  <meissner@linux.ibm.com>
+2024-04-09  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -40,7 +40,7 @@ gcc/
 
 gcc/testsuite/
 
-	* gcc.target/powerpc/paddis.c: New test.
+	* gcc.target/powerpc/prefixed-addis.c: New test.
 
 ==================== Branch work164-dmf, patch #120 ====================
 
