@@ -1,3 +1,60 @@
+==================== Branch work164-bugs, patch #204 ====================
+
+PR target/112886, Add %S<n> to print_operand for vector pair support.
+
+In looking at support for load vector pair and store vector pair for the
+PowerPC in GCC, I noticed that we were missing a print_operand output modifier
+if you are dealing with vector pairs to print the 2nd register in the vector
+pair.
+
+If the instruction inside of the asm used the Altivec encoding, then we could
+use the %L<n> modifier:
+
+	__vector_pair *p, *q, *r;
+	// ...
+	__asm__ ("vaddudm %0,%1,%2\n\tvaddudm %L0,%L1,%L2"
+		 : "=v" (*p)
+		 : "v" (*q), "v" (*r));
+
+Likewise if we know the value to be in a tradiational FPR register, %L<n> will
+work for instructions that use the VSX encoding:
+
+	__vector_pair *p, *q, *r;
+	// ...
+	__asm__ ("xvadddp %x0,%x1,%x2\n\txvadddp %L0,%L1,%L2"
+		 : "=f" (*p)
+		 : "f" (*q), "f" (*r));
+
+But if have a value that is in a traditional Altivec register, and the
+instruction uses the VSX encoding, %L<n> will a value between 0 and 31, when it
+should give a value between 32 and 63.
+
+This patch adds %S<n> that acts like %x<n>, except that it adds 1 to the
+register number.
+
+This is version 2 of the patch.  The only difference is I made the test case
+simpler to read.
+
+I have tested this on power10 and power9 little endian systems and on a power9
+big endian system.  There were no regressions in the patch.  Can I apply it to
+the trunk?
+
+It would be nice if I could apply it to the open branches.  Can I backport it
+after a burn-in period?
+
+2024-04-10  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/112886
+	* config/rs6000/rs6000.cc (print_operand): Add %S<n> output modifier.
+	* doc/md.texi (Modifiers): Mention %S can be used like %x.
+
+gcc/testsuite/
+
+	PR target/112886
+	* /gcc.target/powerpc/pr112886.c: New test.
+
 ==================== Branch work164-bugs, patch #203 ====================
 
 Add power10 ori/oris and xori/xoris fusion support.
