@@ -1719,6 +1719,7 @@ gfc_trans_class_init_assign (gfc_code *code)
   tree tmp;
   gfc_se dst,src,memsz;
   gfc_expr *lhs, *rhs, *sz;
+  gfc_component *cmp;
 
   gfc_start_block (&block);
 
@@ -1734,6 +1735,21 @@ gfc_trans_class_init_assign (gfc_code *code)
   gfc_add_def_init_component (rhs);
   /* The _def_init is always scalar.  */
   rhs->rank = 0;
+
+  /* Check def_init for initializers.  If this is a dummy with all default
+     initializer components NULL, return NULL_TREE and use the passed value as
+     required by F2018(8.5.10).  */
+  if (!lhs->ref && lhs->symtree->n.sym->attr.dummy)
+    {
+      cmp = rhs->ref->next->u.c.component->ts.u.derived->components;
+      for (; cmp; cmp = cmp->next)
+	{
+	  if (cmp->initializer)
+	    break;
+	  else if (!cmp->next)
+	    return build_empty_stmt (input_location);
+	}
+    }
 
   if (code->expr1->ts.type == BT_CLASS
       && CLASS_DATA (code->expr1)->attr.dimension)
@@ -9650,7 +9666,7 @@ gfc_conv_structure (gfc_se * se, gfc_expr * expr, int init)
   cm = expr->ts.u.derived->components;
 
   for (c = gfc_constructor_first (expr->value.constructor);
-       c; c = gfc_constructor_next (c), cm = cm->next)
+       c && cm; c = gfc_constructor_next (c), cm = cm->next)
     {
       /* Skip absent members in default initializers and allocatable
 	 components.  Although the latter have a default initializer
@@ -10534,12 +10550,9 @@ gfc_trans_pointer_assignment (gfc_expr * expr1, gfc_expr * expr2)
 	{
 	  gfc_symbol *psym = expr1->symtree->n.sym;
 	  tmp = NULL_TREE;
-	  if (psym->ts.type == BT_CHARACTER)
-	    {
-	      gcc_assert (psym->ts.u.cl->backend_decl
-			  && VAR_P (psym->ts.u.cl->backend_decl));
-	      tmp = psym->ts.u.cl->backend_decl;
-	    }
+	  if (psym->ts.type == BT_CHARACTER
+	      && psym->ts.u.cl->backend_decl)
+	    tmp = psym->ts.u.cl->backend_decl;
 	  else if (expr1->ts.u.cl->backend_decl
 		   && VAR_P (expr1->ts.u.cl->backend_decl))
 	    tmp = expr1->ts.u.cl->backend_decl;
@@ -12511,11 +12524,14 @@ gfc_trans_assignment_1 (gfc_expr * expr1, gfc_expr * expr2, bool init_flag,
   gfc_add_block_to_block (&body, &lse.pre);
   gfc_add_expr_to_block (&body, tmp);
 
-  /* Add the post blocks to the body.  */
-  if (!l_is_temp)
+  /* Add the post blocks to the body.  Scalar finalization must appear before
+     the post block in case any dellocations are done.  */
+  if (rse.finalblock.head
+      && (!l_is_temp || (expr2->expr_type == EXPR_FUNCTION
+			 && gfc_expr_attr (expr2).elemental)))
     {
-      gfc_add_block_to_block (&rse.finalblock, &rse.post);
       gfc_add_block_to_block (&body, &rse.finalblock);
+      gfc_add_block_to_block (&body, &rse.post);
     }
   else
     gfc_add_block_to_block (&body, &rse.post);

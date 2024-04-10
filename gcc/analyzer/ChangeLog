@@ -1,3 +1,25 @@
+2024-04-09  Jakub Jelinek  <jakub@redhat.com>
+
+	* analyzer.opt (Wanalyzer-undefined-behavior-strtok): Fix duplicated
+	words; in in -> in.
+	* program-state.cc (sm_state_map::replay_call_summary): Fix duplicated
+	words in comment; to to -> to.
+	(program_state::replay_call_summary): Likewise.
+	* region-model.cc (region_model::replay_call_summary): Likewise.
+
+2024-04-05  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/114588
+	* access-diagram.cc (access_diagram_impl::access_diagram_impl):
+	Replace hardcoded colors for valid_style and invalid_style with
+	calls to text_art::get_style_from_color_cap_name.
+
+2024-04-02  David Malcolm  <dmalcolm@redhat.com>
+
+	* region-model-manager.cc (maybe_undo_optimize_bit_field_compare):
+	Guard against null types.
+	* region-model.cc (apply_constraints_for_gswitch): Likewise.
+
 2024-03-27  David Malcolm  <dmalcolm@redhat.com>
 
 	PR analyzer/114473

@@ -162,6 +162,18 @@ m2.dvi: doc/m2.dvi
 doc/m2.dvi: $(TEXISRC) $(objdir)/m2/images/gnu.eps
 	$(TEXI2DVI) -c -I $(objdir)/m2 -I $(srcdir)/doc/include -o $@ $(srcdir)/doc/gm2.texi
 
+M2_DVIFILES = doc/m2.dvi
+
+m2.install-dvi: $(M2_DVIFILES)
+	@$(NORMAL_INSTALL)
+	test -z "$(dvidir)/gcc" || $(mkinstalldirs) "$(DESTDIR)$(dvidir)/gcc"
+	@list='$(M2_DVIFILES)'; for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  f=$(dvi__strip_dir) \
+	  echo " $(INSTALL_DATA) '$$d$$p' '$(DESTDIR)$(dvidir)/gcc/$$f'"; \
+	  $(INSTALL_DATA) "$$d$$p" "$(DESTDIR)$(dvidir)/gcc/$$f"; \
+	done
+
 doc/m2.ps: doc/m2.dvi
 	dvips -o $@ $<
 
@@ -205,6 +217,25 @@ $(build_htmldir)/m2/index.html: $(TEXISRC) $(objdir)/m2/images/gnu.eps
 	$(mkinstalldirs) $(@D)
 	rm -f $(@D)/*
 	$(TEXI2HTML) -I $(objdir)/m2 -I $(srcdir)/m2 -I $(gcc_docdir)/include -o $(@D) $<
+
+M2_HTMLFILES = $(build_htmldir)/m2
+
+m2.install-html: $(M2_HTMLFILES)
+	@$(NORMAL_INSTALL)
+	test -z "$(htmldir)" || $(mkinstalldirs) "$(DESTDIR)$(htmldir)"
+	@list='$(M2_HTMLFILES)'; for p in $$list; do \
+	  if test -f "$$p" || test -d "$$p"; then d=""; else d="$(srcdir)/"; fi; \
+	  f=$(html__strip_dir) \
+	  if test -d "$$d$$p"; then \
+	    echo " $(mkinstalldirs) '$(DESTDIR)$(htmldir)/$$f'"; \
+	    $(mkinstalldirs) "$(DESTDIR)$(htmldir)/$$f" || exit 1; \
+	    echo " $(INSTALL_DATA) '$$d$$p'/* '$(DESTDIR)$(htmldir)/$$f'"; \
+	    $(INSTALL_DATA) "$$d$$p"/* "$(DESTDIR)$(htmldir)/$$f"; \
+	  else \
+	    echo " $(INSTALL_DATA) '$$d$$p' '$(DESTDIR)$(htmldir)/$$f'"; \
+	    $(INSTALL_DATA) "$$d$$p" "$(DESTDIR)$(htmldir)/$$f"; \
+	  fi; \
+	done
 
 # gm2-libs.texi
 
@@ -381,20 +412,20 @@ m2.install-common: installdirs
          done
 
 m2.install-info: installdirs
-	if [ -d gm2$(exeext) ] ; then \
-	  if [ -f $(objdir)/doc/gm2.info ]; then \
-	    rm -f $(DESTDIR)$(infodir)/gm2.info*; \
-	    for f in $(objdir)/doc/gm2.info*; do \
+	if [ -f gm2$(exeext) ] ; then \
+	  if [ -f $(objdir)/doc/m2.info ]; then \
+	    rm -f $(DESTDIR)$(infodir)/m2.info*; \
+	    for f in $(objdir)/doc/m2.info*; do \
 	      realfile=`echo $$f | sed -e 's|.*/\([^/]*\)$$|\1|'`; \
               rm -f $(DESTDIR)$(infodir)/`basename $$realfile`; \
 	      $(INSTALL_DATA) $$f $(DESTDIR)$(infodir)/`basename $$realfile`; \
 	    done; \
-	    chmod a-x $(DESTDIR)$(infodir)/gm2.info*; \
+	    chmod a-x $(DESTDIR)$(infodir)/m2.info*; \
 	  else true; fi; \
 	else true; fi
-	-if [ -f gm2$(exeext) ] && [ -f $(DESTDIR)$(infodir)/gm2.info ]; then \
+	-if [ -f gm2$(exeext) ] && [ -f $(DESTDIR)$(infodir)/m2.info ]; then \
 	  if $(SHELL) -c 'install-info --version' >/dev/null 2>&1; then \
-	    install-info --dir-file=$(infodir)/dir $(DESTDIR)$(infodir)/gm2.info; \
+	    install-info --dir-file=$(infodir)/dir $(DESTDIR)$(infodir)/m2.info; \
 	  else true; fi; \
 	else true; fi
 

@@ -9984,7 +9984,7 @@ s390_const_int_pool_entry_p (rtx mem, HOST_WIDE_INT *val)
      - (mem (unspec [(symbol_ref) (reg)] UNSPEC_LTREF)).
      - (mem (symbol_ref)).  */
 
-  if (!MEM_P (mem))
+  if (!MEM_P (mem) || GET_MODE_CLASS (GET_MODE (mem)) != MODE_INT)
     return false;
 
   rtx addr = XEXP (mem, 0);
@@ -9998,8 +9998,18 @@ s390_const_int_pool_entry_p (rtx mem, HOST_WIDE_INT *val)
     return false;
 
   rtx val_rtx = get_pool_constant (sym);
-  if (!CONST_INT_P (val_rtx))
+  machine_mode mode = get_pool_mode (sym);
+  if (!CONST_INT_P (val_rtx)
+      || GET_MODE_CLASS (mode) != MODE_INT
+      || GET_MODE_SIZE (mode) < GET_MODE_SIZE (GET_MODE (mem)))
     return false;
+
+  if (mode != GET_MODE (mem))
+    {
+      val_rtx = simplify_subreg (GET_MODE (mem), val_rtx, mode, 0);
+      if (val_rtx == NULL_RTX || !CONST_INT_P (val_rtx))
+	return false;
+    }
 
   if (val != nullptr)
     *val = INTVAL (val_rtx);
@@ -17923,6 +17933,36 @@ expand_perm_as_a_vlbr_vstbr_candidate (const struct expand_vec_perm_d &d)
   return false;
 }
 
+static bool
+expand_perm_as_replicate (const struct expand_vec_perm_d &d)
+{
+  unsigned char i;
+  unsigned char elem;
+  rtx base = d.op0;
+  rtx insn;
+  /* Needed to silence maybe-uninitialized warning.  */
+  gcc_assert (d.nelt > 0);
+  elem = d.perm[0];
+  for (i = 1; i < d.nelt; ++i)
+    if (d.perm[i] != elem)
+      return false;
+  if (!d.testing_p)
+    {
+      if (elem >= d.nelt)
+	{
+	  base = d.op1;
+	  elem -= d.nelt;
+	}
+      insn = maybe_gen_vec_splat (d.vmode, d.target, base, GEN_INT (elem));
+      if (insn == NULL_RTX)
+	return false;
+      emit_insn (insn);
+      return true;
+    }
+  else
+    return maybe_code_for_vec_splat (d.vmode) != CODE_FOR_nothing;
+}
+
 /* Try to find the best sequence for the vector permute operation
    described by D.  Return true if the operation could be
    expanded.  */
@@ -17939,6 +17979,9 @@ vectorize_vec_perm_const_1 (const struct expand_vec_perm_d &d)
     return true;
 
   if (expand_perm_as_a_vlbr_vstbr_candidate (d))
+    return true;
+
+  if (expand_perm_as_replicate (d))
     return true;
 
   return false;

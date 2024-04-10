@@ -1,3 +1,37 @@
+2024-04-08  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* plugin/plugin-gcn.c (init_hsa_context): Add and handle
+	'bool probe' parameter.  Adjust all users; errors during device
+	probing are fatal.
+	* plugin/plugin-nvptx.c (nvptx_get_num_devices): Aside from
+	'CUDA_ERROR_NO_DEVICE', errors during device probing are fatal.
+
+2024-04-05  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* testsuite/libgomp.c/reverse-offload-sm30.c: Set 'GCC_COLORS' to the empty string.
+
+2024-04-05  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/114572
+	* testsuite/libgomp.c++/pr114572.C: New test.
+
+2024-04-04  Tobias Burnus  <tburnus@baylibre.com>
+
+	* libgomp.texi (TR12): Honor post-TR12 directive name change; add
+	item about curly braces/BLOCK permitted in canonical loop nests.
+
+2024-04-02  Jakub Jelinek  <jakub@redhat.com>
+
+	* libgomp.texi (OpenMP 5.2): Fix duplicated words; with with ->
+	with.
+	(omp_target_associate_ptr): Fix duplicated words; either either ->
+	either.
+	(omp_init_allocator): Fix duplicated words; be be -> be.
+	(omp_realloc): Fix duplicated words; is is -> is.
+	(OMP_ALLOCATOR): Fix duplicated words; other other -> other.
+	* priority_queue.h (priority_queue_multi_p): Fix duplicated words;
+	to to -> to.
+
 2024-03-25  Richard Biener  <rguenther@suse.de>
 
 	* plugin/plugin-gcn.c (EF_AMDGPU_MACH): GFX1036.

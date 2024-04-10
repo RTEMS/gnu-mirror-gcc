@@ -640,6 +640,7 @@ Objective-C and Objective-C++ Dialects}.
 @item Program Instrumentation Options
 @xref{Instrumentation Options,,Program Instrumentation Options}.
 @gccoptlist{-p  -pg  -fprofile-arcs  --coverage  -ftest-coverage
+-fcondition-coverage
 -fprofile-abs-path
 -fprofile-dir=@var{path}  -fprofile-generate  -fprofile-generate=@var{path}
 -fprofile-info-section  -fprofile-info-section=@var{name}
@@ -1058,8 +1059,10 @@ Objective-C and Objective-C++ Dialects}.
 -mmax-inline-memcpy-size=@var{n}
 -mexplicit-relocs=@var{style} -mexplicit-relocs -mno-explicit-relocs
 -mdirect-extern-access -mno-direct-extern-access
--mcmodel=@var{code-model} -mrelax -mpass-mrelax-to-as}
--mrecip  -mrecip=@var{opt}
+-mcmodel=@var{code-model} -mrelax -mpass-mrelax-to-as
+-mrecip  -mrecip=@var{opt} -mfrecipe -mno-frecipe -mdiv32 -mno-div32
+-mlam-bh -mno-lam-bh -mlamcas -mno-lamcas -mld-seq-sa -mno-ld-seq-sa
+-mtls-dialect=@var{opt}}
 
 @emph{M32R/D Options}
 @gccoptlist{-m32r2  -m32rx  -m32r
@@ -1262,7 +1265,8 @@ See RS/6000 and PowerPC Options.
 -minline-atomics  -mno-inline-atomics
 -minline-strlen  -mno-inline-strlen
 -minline-strcmp  -mno-inline-strcmp
--minline-strncmp  -mno-inline-strncmp}
+-minline-strncmp  -mno-inline-strncmp
+-mtls-dialect=desc  -mtls-dialect=trad}
 
 @emph{RL78 Options}
 @gccoptlist{-msim  -mmul=none  -mmul=g13  -mmul=g14  -mallregs
@@ -5241,7 +5245,7 @@ The default @env{GCC_COLORS} is
 error=01;31:warning=01;35:note=01;36:range1=32:range2=34:locus=01:\
 quote=01:path=01;36:fixit-insert=32:fixit-delete=31:\
 diff-filename=01:diff-hunk=32:diff-delete=31:diff-insert=32:\
-type-diff=01;32:fnname=01;32:targs=35
+type-diff=01;32:fnname=01;32:targs=35:valid=01;31:invalid=01;32
 @end smallexample
 @noindent
 where @samp{01;31} is bold red, @samp{01;35} is bold magenta,
@@ -5324,6 +5328,14 @@ SGR substring for inserted lines within generated patches.
 @item type-diff=
 SGR substring for highlighting mismatching types within template
 arguments in the C++ frontend.
+
+@vindex valid GCC_COLORS @r{capability}
+@item valid=
+SGR substring for highlighting valid elements within text art diagrams.
+
+@vindex invalid GCC_COLORS @r{capability}
+@item invalid=
+SGR substring for highlighting invalid elements within text art diagrams.
 @end table
 
 @opindex fdiagnostics-urls
@@ -6574,6 +6586,14 @@ disable the error.  Disabling the error for this warning can result in
 poorly optimized code and is useful only in the
 case of very minor changes such as bug fixes to an existing code-base.
 Completely disabling the warning is not recommended.
+
+@opindex Wno-coverage-too-many-conditions
+@opindex Wcoverage-too-many-conditions
+@item -Wno-coverage-too-many-conditions
+Warn if @option{-fcondition-coverage} is used and an expression have too many
+terms and GCC gives up coverage.  Coverage is given up when there are more
+terms in the conditional than there are bits in a @code{gcov_type_unsigned}.
+This warning is enabled by default.
 
 @opindex Wno-coverage-invalid-line-number
 @opindex Wcoverage-invalid-line-number
@@ -11690,7 +11710,7 @@ By default the analyzer attempts to reconstruct the original function
 frames, and to emit events showing the inlined calls.
 
 With @option{-fno-analyzer-undo-inlining} this attempt to reconstruct
-the original frame information can be be disabled, which may be of help
+the original frame information can be disabled, which may be of help
 when debugging issues in the analyzer.
 
 @item -fanalyzer-verbose-edges
@@ -16997,6 +17017,14 @@ loop.  The default value is four.
 
 @end table
 
+The following choices of @var{name} are available on GCN targets:
+
+@table @gcctabopt
+@item gcn-preferred-vectorization-factor
+Preferred vectorization factor: @samp{default}, @samp{32}, @samp{64}.
+
+@end table
+
 The following choices of @var{name} are available on i386 and x86_64 targets:
 
 @table @gcctabopt
@@ -17076,6 +17104,14 @@ Note that if a command line directly links source files, the corresponding
 E.g. @code{gcc a.c b.c -o binary} would generate @file{binary-a.gcda} and
 @file{binary-b.gcda} files.
 
+@item -fcondition-coverage
+@opindex fcondition-coverage
+Add code so that program conditions are instrumented.  During execution the
+program records what terms in a conditional contributes to a decision, which
+can be used to verify that all terms in a Boolean function are tested and have
+an independent effect on the outcome of a decision.  The result can be read
+with @code{gcov --conditions}.
+
 @xref{Cross-profiling}.
 
 @cindex @command{gcov}
@@ -17137,6 +17173,10 @@ compiler adds code to count the number of times that these arcs are
 executed.  When an arc is the only exit or only entrance to a block, the
 instrumentation code can be added to the block; otherwise, a new basic
 block must be created to hold the instrumentation code.
+
+With @option{-fcondition-coverage}, for each conditional in your program GCC
+creates a bitset and records the exercised boolean values that have an
+independent effect on the outcome of that expression.
 
 @need 2000
 @opindex ftest-coverage
@@ -25719,7 +25759,7 @@ Outputs pseudo-c assembly dialect.
 @item -minline-memops-threshold=@var{bytes}
 Specifies a size threshold in bytes at or below which memmove, memcpy
 and memset shall always be expanded inline.  Operations dealing with
-sizes larger than this threshold would have to be be implemented using
+sizes larger than this threshold would have to be implemented using
 a library call instead of being expanded inline, but since BPF doesn't
 allow libcalls, exceeding this threshold results in a compile-time
 error.  The default is @samp{1024} bytes.
@@ -27094,6 +27134,59 @@ Enable the approximation for vectorized reciprocal square root.
 
 So, for example, @option{-mrecip=all,!sqrt} enables
 all of the reciprocal approximations, except for scalar square root.
+
+@opindex mfrecipe
+@opindex mno-frecipe
+@item -mfrecipe
+@itemx -mno-frecipe
+Use (do not use) @code{frecipe.@{s/d@}} and @code{frsqrte.@{s/d@}}
+instructions.  When build with @option{-march=la664}, it is enabled by default.
+The default is @option{-mno-frecipe}.
+
+@opindex mdiv32
+@opindex mno-div32
+@item -mdiv32
+@itemx -mno-div32
+Use (do not use) @code{div.w[u]} and @code{mod.w[u]} instructions with input
+not sign-extended.  When build with @option{-march=la664}, it is enabled by
+default.  The default is @option{-mno-div32}.
+
+@opindex mlam-bh
+@opindex mno-lam-bh
+@item -mlam-bh
+@itemx -mno-lam-bh
+Use (do not use) @code{am@{swap/add@}[_db].@{b/h@}} instructions.  When build
+with @option{-march=la664}, it is enabled by default.  The default is
+@option{-mno-lam-bh}.
+
+@opindex mlamcas
+@opindex mno-lamcas
+@item -mlamcas
+@itemx -mno-lamcas
+Use (do not use) @code{amcas[_db].@{b/h/w/d@}} instructions.  When build with
+@option{-march=la664}, it is enabled by default.  The default is
+@option{-mno-lamcas}.
+
+@opindex mld-seq-sa
+@opindex mno-ld-seq-sa
+@item -mld-seq-sa
+@itemx -mno-ld-seq-sa
+Whether a load-load barrier (@code{dbar 0x700}) is needed.  When build with
+@option{-march=la664}, it is enabled by default.  The default is
+@option{-mno-ld-seq-sa}, the load-load barrier is needed.
+
+@opindex mtls-dialect
+@item -mtls-dialect=@var{opt}
+This option controls which tls dialect may be used for general dynamic and
+local dynamic TLS models.
+
+@table @samp
+@item trad
+Use traditional TLS. This is the default.
+
+@item desc
+Use TLS descriptors.
+@end table
 
 @item loongarch-vect-unroll-limit
 The vectorizer will use available tuning information to determine whether it
@@ -30979,6 +31072,16 @@ which register to use as base register for reading the canary,
 and from what offset from that base register. There is no default
 register or offset as this is entirely for use within the Linux
 kernel.
+
+@opindex mtls-dialect=desc
+@item -mtls-dialect=desc
+Use TLS descriptors as the thread-local storage mechanism for dynamic accesses
+of TLS variables.
+
+@opindex mtls-dialect=trad
+@item -mtls-dialect=trad
+Use traditional TLS as the thread-local storage mechanism for dynamic accesses
+of TLS variables.  This is the default.
 @end table
 
 @node RL78 Options
