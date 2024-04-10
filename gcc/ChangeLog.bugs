@@ -1,3 +1,38 @@
+==================== Branch work164-bugs, patch #205 ====================
+
+Improve 64->128 bit zero extension on PowerPC (PR target/108958)
+
+If we are converting an unsigned DImode to a TImode value, and the TImode value
+will go in a vector register, GCC currently does the DImode to TImode conversion
+in GPR registers, and then moves the value to the vector register via a mtvsrdd
+instruction.
+
+This patch adds a new zero_extendditi2 insn which optimizes moving a GPR to a
+vector register using the mtvsrdd instruction with RA=0, and using lxvrdx to
+load a 64-bit value into the bottom 64-bits of the vector register.
+
+I have tested this patch on the following systems and there was no degration.
+Can I check it into the trunk branch?
+
+    *	Power10, LE, --with-cpu=power10, IBM 128-bit long double
+    *	Power9,  LE, --with-cpu=power9,  IBM 128-bit long double
+    *	Power9,  LE, --with-cpu=power9,  IEEE 128-bit long double
+    *   Power9,  LE, --with-cpu=power9,  64-bit default long double
+    *	Power9,  BE, --with-cpu=power9,  IBM 128-bit long double
+    *	Power8,  BE, --with-cpu=power8,  IBM 128-bit long double
+
+2024-04-10  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/108958
+	* gcc/config/rs6000.md (zero_extendditi2): New insn.
+
+gcc/testsuite/
+
+	PR target/108958
+	* gcc.target/powerpc/pr108958.c: New test.
+
 ==================== Branch work164-bugs, patch #204 ====================
 
 PR target/112886, Add %S<n> to print_operand for vector pair support.
