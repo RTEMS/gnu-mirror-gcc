@@ -3858,6 +3858,24 @@ has_extra_args_mechanism_p (const_tree t)
 	      && IF_STMT_CONSTEXPR_P (t))); /* IF_STMT_EXTRA_ARGS  */
 }
 
+/* Return *_EXTRA_ARGS of the given supported tree T.  */
+
+static tree&
+tree_extra_args (tree t)
+{
+  gcc_checking_assert (has_extra_args_mechanism_p (t));
+
+  if (PACK_EXPANSION_P (t))
+    return PACK_EXPANSION_EXTRA_ARGS (t);
+  else if (TREE_CODE (t) == REQUIRES_EXPR)
+    return REQUIRES_EXPR_EXTRA_ARGS (t);
+  else if (TREE_CODE (t) == IF_STMT
+	   && IF_STMT_CONSTEXPR_P (t))
+    return IF_STMT_EXTRA_ARGS (t);
+
+  gcc_unreachable ();
+}
+
 /* Structure used to track the progress of find_parameter_packs_r.  */
 struct find_parameter_pack_data
 {
@@ -13291,6 +13309,16 @@ extract_locals_r (tree *tp, int *walk_subtrees, void *data_)
     /* Remember local typedefs (85214).  */
     tp = &TYPE_NAME (*tp);
 
+  if (has_extra_args_mechanism_p (*tp))
+    /* Assert *_EXTRA_ARGS is empty, because we don't want to walk it and
+       potentially see a previously captured local in an evaluated context
+       that's really only used in an unevaluated context (PR114303).  This
+       means callers of build_extra_args need to clear *_EXTRA_ARGS of the
+       outermost tree.  Nested *_EXTRA_ARGS should naturally be empty since
+       the outermost (extra-args) tree will intercept any substitution before
+       a nested tree can.  */
+    gcc_checking_assert (tree_extra_args (*tp) == NULL_TREE);
+
   if (TREE_CODE (*tp) == DECL_EXPR)
     {
       tree decl = DECL_EXPR_DECL (*tp);
@@ -18716,10 +18744,11 @@ tsubst_stmt (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 	     of the constexpr if is still dependent.  Don't substitute into the
 	     branches now, just remember the template arguments.  */
 	  do_poplevel (IF_SCOPE (stmt));
+	  IF_SCOPE (stmt) = NULL_TREE;
 	  IF_COND (stmt) = IF_COND (t);
 	  THEN_CLAUSE (stmt) = THEN_CLAUSE (t);
 	  ELSE_CLAUSE (stmt) = ELSE_CLAUSE (t);
-	  IF_STMT_EXTRA_ARGS (stmt) = build_extra_args (t, args, complain);
+	  IF_STMT_EXTRA_ARGS (stmt) = build_extra_args (stmt, args, complain);
 	  add_stmt (stmt);
 	  break;
 	}
@@ -19432,6 +19461,23 @@ tsubst_stmt (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 
     case PREDICT_EXPR:
       RETURN (add_stmt (copy_node (t)));
+
+    case ANNOTATE_EXPR:
+      {
+	/* Although ANNOTATE_EXPR is an expression, it can only appear in
+	   WHILE_COND, DO_COND or FOR_COND expressions, which are tsubsted
+	   using tsubst_stmt rather than tsubst_expr and can contain
+	   DECL_EXPRs.  */
+	tree op1 = RECUR (TREE_OPERAND (t, 0));
+	tree op2 = tsubst_expr (TREE_OPERAND (t, 1), args, complain, in_decl);
+	tree op3 = tsubst_expr (TREE_OPERAND (t, 2), args, complain, in_decl);
+	if (TREE_CODE (op2) == INTEGER_CST
+	    && wi::to_widest (op2) == (int) annot_expr_unroll_kind)
+	  op3 = cp_check_pragma_unroll (EXPR_LOCATION (TREE_OPERAND (t, 2)),
+					op3);
+	RETURN (build3_loc (EXPR_LOCATION (t), ANNOTATE_EXPR,
+			    TREE_TYPE (op1), op1, op2, op3));
+      }
 
     default:
       gcc_assert (!STATEMENT_CODE_P (TREE_CODE (t)));
@@ -21770,19 +21816,6 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 	      op = build1 (VIEW_CONVERT_EXPR, type, op);
 	  }
 	RETURN (op);
-      }
-
-    case ANNOTATE_EXPR:
-      {
-	op1 = RECUR (TREE_OPERAND (t, 0));
-	tree op2 = RECUR (TREE_OPERAND (t, 1));
-	tree op3 = RECUR (TREE_OPERAND (t, 2));
-	if (TREE_CODE (op2) == INTEGER_CST
-	    && wi::to_widest (op2) == (int) annot_expr_unroll_kind)
-	  op3 = cp_check_pragma_unroll (EXPR_LOCATION (TREE_OPERAND (t, 2)),
-					op3);
-	RETURN (build3_loc (EXPR_LOCATION (t), ANNOTATE_EXPR,
-			    TREE_TYPE (op1), op1, op2, op3));
       }
 
     default:
