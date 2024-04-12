@@ -1332,7 +1332,7 @@ See RS/6000 and PowerPC Options.
 -mstack-protector-guard=@var{guard} -mstack-protector-guard-reg=@var{reg}
 -mstack-protector-guard-offset=@var{offset} -mprefixed -mno-prefixed
 -mpcrel -mno-pcrel -mmma -mno-mmma -mrop-protect -mno-rop-protect
--mprivileged -mno-privileged}
+-mprivileged -mno-privileged -mtar -mno-tar}
 
 @emph{RX Options}
 @gccoptlist{-m64bit-doubles  -m32bit-doubles  -fpu  -nofpu
@@ -31307,7 +31307,7 @@ following options:
 -mcrypto  -mhtm  -mpower8-fusion
 -mquad-memory  -mquad-memory-atomic  -mfloat128
 -mfloat128-hardware -mprefixed -mpcrel -mmma
--mrop-protect}
+-mrop-protect -mtar}
 
 The particular options set for any particular CPU varies between
 compiler versions, depending on what setting seems to produce optimal
@@ -32309,6 +32309,14 @@ is enabled.
 Generate (do not generate) ROP protection instructions when the target
 processor supports them.  Currently this option disables the shrink-wrap
 optimization (@option{-fshrink-wrap}).
+
+@opindex mtar
+@opindex mno-tar
+@item -mtar
+@itemx -mno-tar
+Generate (do not generate) code that uses the @code{TAR} register.
+The @option{-mtar} option requires that the option
+@option{-mcpu=power9} (or later) is enabled.
 
 @opindex mprivileged
 @opindex mno-privileged

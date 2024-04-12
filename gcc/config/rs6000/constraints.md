@@ -57,7 +57,7 @@
   "@internal A compatibility alias for @code{wa}.")
 
 (define_register_constraint "h" "SPECIAL_REGS"
-  "@internal A special register (@code{vrsave}, @code{ctr}, or @code{lr}).")
+  "@internal A special register (@code{vrsave}, @code{ctr}, @code{lr} or @code{tar}).")
 
 (define_register_constraint "c" "CTR_REGS"
   "The count register, @code{ctr}.")
@@ -90,6 +90,9 @@
 (define_register_constraint "wr" "rs6000_constraints[RS6000_CONSTRAINT_wr]"
   "@internal Like @code{r}, if @option{-mpowerpc64} is used; otherwise,
    @code{NO_REGS}.")
+
+(define_register_constraint "wt" "rs6000_constraints[RS6000_CONSTRAINT_wt]"
+  "The tar register, @code{tar}.")
 
 (define_register_constraint "wx" "rs6000_constraints[RS6000_CONSTRAINT_wx]"
   "@internal Like @code{d}, if @option{-mpowerpc-gfxopt} is used; otherwise,

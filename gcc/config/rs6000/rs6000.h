@@ -786,7 +786,7 @@ enum data_align { align_abi, align_opt, align_both };
    Another pseudo (not included in DWARF_FRAME_REGISTERS) is soft frame
    pointer, which is eventually eliminated in favor of SP or FP.  */
 
-#define FIRST_PSEUDO_REGISTER 111
+#define FIRST_PSEUDO_REGISTER 112
 
 /* Use standard DWARF numbering for DWARF debugging information.  */
 #define DEBUGGER_REGNO(REGNO) rs6000_debugger_regno ((REGNO), 0)
@@ -822,8 +822,8 @@ enum data_align { align_abi, align_opt, align_both };
    0, 0, 1, 1,					   \
    /* cr0..cr7 */				   \
    0, 0, 0, 0, 0, 0, 0, 0,			   \
-   /* vrsave vscr sfp */			   \
-   1, 1, 1					   \
+   /* vrsave vscr sfp, tar */			   \
+   1, 1, 1, 1					   \
 }
 
 /* Like `CALL_USED_REGISTERS' except this macro doesn't require that
@@ -846,8 +846,8 @@ enum data_align { align_abi, align_opt, align_both };
    1, 1, 1, 1,					   \
    /* cr0..cr7 */				   \
    1, 1, 0, 0, 0, 1, 1, 1,			   \
-   /* vrsave vscr sfp */			   \
-   0, 0, 0					   \
+   /* vrsave vscr sfp, tar */			   \
+   0, 0, 0, 1					   \
 }
 
 #define TOTAL_ALTIVEC_REGS	(LAST_ALTIVEC_REGNO - FIRST_ALTIVEC_REGNO + 1)
@@ -876,6 +876,7 @@ enum data_align { align_abi, align_opt, align_both };
 	r0		(not saved; cannot be base reg)
 	r31 - r13	(saved; order given to save least number)
 	r12		(not saved; if used for DImode or DFmode would use r13)
+	tar		(not saved; tar is preferred over ctr or lr)
 	ctr		(not saved; when we have the choice ctr is better)
 	lr		(saved)
 	r1, r2, ap, ca	(fixed)
@@ -918,7 +919,7 @@ enum data_align { align_abi, align_opt, align_both };
    3, EARLY_R12 11, 0,						\
    31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19,		\
    18, 17, 16, 15, 14, 13, LATE_R12				\
-   97, 96,							\
+   111, 97, 96,							\
    1, MAYBE_R2_FIXED 99, 98,					\
    /* AltiVec registers.  */					\
    64, 65,							\
@@ -1093,6 +1094,7 @@ enum reg_class
   GEN_OR_VSX_REGS,
   LINK_REGS,
   CTR_REGS,
+  TAR_REGS,
   LINK_OR_CTR_REGS,
   SPECIAL_REGS,
   SPEC_OR_GEN_REGS,
@@ -1122,6 +1124,7 @@ enum reg_class
   "GEN_OR_VSX_REGS",							\
   "LINK_REGS",								\
   "CTR_REGS",								\
+  "TAR_REGS",								\
   "LINK_OR_CTR_REGS",							\
   "SPECIAL_REGS",							\
   "SPEC_OR_GEN_REGS",							\
@@ -1162,22 +1165,24 @@ enum reg_class
   { 0x00000000, 0x00000000, 0x00000000, 0x00000001 },			\
   /* CTR_REGS.  */							\
   { 0x00000000, 0x00000000, 0x00000000, 0x00000002 },			\
+  /* TAR_REGS.  */							\
+  { 0x00000000, 0x00000000, 0x00000000, 0x00008000 },			\
   /* LINK_OR_CTR_REGS.  */						\
-  { 0x00000000, 0x00000000, 0x00000000, 0x00000003 },			\
+  { 0x00000000, 0x00000000, 0x00000000, 0x00008003 },			\
   /* SPECIAL_REGS.  */							\
-  { 0x00000000, 0x00000000, 0x00000000, 0x00001003 },			\
+  { 0x00000000, 0x00000000, 0x00000000, 0x00009003 },			\
   /* SPEC_OR_GEN_REGS.  */						\
-  { 0xffffffff, 0x00000000, 0x00000000, 0x0000500b },			\
+  { 0xffffffff, 0x00000000, 0x00000000, 0x0000d00b },			\
   /* CR0_REGS.  */							\
   { 0x00000000, 0x00000000, 0x00000000, 0x00000010 },			\
   /* CR_REGS.  */							\
   { 0x00000000, 0x00000000, 0x00000000, 0x00000ff0 },			\
   /* NON_FLOAT_REGS.  */						\
-  { 0xffffffff, 0x00000000, 0x00000000, 0x00004ffb },			\
+  { 0xffffffff, 0x00000000, 0x00000000, 0x0000cffb },			\
   /* CA_REGS.  */							\
   { 0x00000000, 0x00000000, 0x00000000, 0x00000004 },			\
   /* ALL_REGS.  */							\
-  { 0xffffffff, 0xffffffff, 0xffffffff, 0x00007fff }			\
+  { 0xffffffff, 0xffffffff, 0xffffffff, 0x0000ffff }			\
 }
 
 /* The same information, inverted:
@@ -1199,6 +1204,7 @@ enum r6000_reg_class_enum {
   RS6000_CONSTRAINT_wa,		/* Any VSX register */
   RS6000_CONSTRAINT_we,		/* VSX register if ISA 3.0 vector. */
   RS6000_CONSTRAINT_wr,		/* GPR register if 64-bit  */
+  RS6000_CONSTRAINT_wt,		/* TAR register.  */
   RS6000_CONSTRAINT_wx,		/* FPR register for STFIWX */
   RS6000_CONSTRAINT_wA,		/* BASE_REGS if 64-bit.  */
   RS6000_CONSTRAINT_MAX
@@ -2077,7 +2083,8 @@ extern char rs6000_reg_names[][8];	/* register names (0 vs. %r0).  */
   &rs6000_reg_names[108][0],	/* vrsave  */				\
   &rs6000_reg_names[109][0],	/* vscr  */				\
 									\
-  &rs6000_reg_names[110][0]	/* sfp  */				\
+  &rs6000_reg_names[110][0],	/* sfp  */				\
+  &rs6000_reg_names[111][0]	/* tar  */				\
 }
 
 /* Table of additional register names to use in user input.  */
