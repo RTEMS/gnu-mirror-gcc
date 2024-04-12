@@ -4319,10 +4319,11 @@
 ;; Get the element into the top position and use XVCVSWDP/XVCVUWDP
 (define_insn_and_split "*vsx_extract_si_<uns>float_df"
   [(set (match_operand:DF 0 "gpc_reg_operand" "=wa")
-	(any_float:DF
-	 (vec_select:SI
-	  (match_operand:V4SI 1 "gpc_reg_operand" "v")
-	  (parallel [(match_operand:QI 2 "const_0_to_3_operand" "n")]))))
+	(float:DF
+	 (any_extend:DI
+	  (vec_select:SI
+	   (match_operand:V4SI 1 "gpc_reg_operand" "v")
+	   (parallel [(match_operand:QI 2 "const_0_to_3_operand" "n")])))))
    (clobber (match_scratch:V4SI 3 "=v"))]
   "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
   "#"
@@ -4362,10 +4363,11 @@
 ;; type.
 (define_insn_and_split "*vsx_extract_si_<uns>float_<mode>"
   [(set (match_operand:VSX_EXTRACT_FL 0 "gpc_reg_operand" "=wa")
-	(any_float:VSX_EXTRACT_FL
-	 (vec_select:SI
-	  (match_operand:V4SI 1 "gpc_reg_operand" "v")
-	  (parallel [(match_operand:QI 2 "const_0_to_3_operand" "n")]))))
+	(float:VSX_EXTRACT_FL
+	 (any_extend:DI
+	  (vec_select:SI
+	   (match_operand:V4SI 1 "gpc_reg_operand" "v")
+	   (parallel [(match_operand:QI 2 "const_0_to_3_operand" "n")])))))
    (clobber (match_scratch:V4SI 3 "=v"))
    (clobber (match_scratch:DF 4 "=wa"))]
   "VECTOR_MEM_VSX_P (V4SImode) && TARGET_DIRECT_MOVE_64BIT"
