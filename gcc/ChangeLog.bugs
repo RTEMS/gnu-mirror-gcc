@@ -7,12 +7,17 @@ Simplify converting between SImode and SF/DFmode.
 gcc/
 
 	PR target/90822
-	* gcc/config/rs6000.md (floatsidf2): If SImode can live in the floating
-	point registers, directly issue a conversion to DImode and do the
-	floating point conversion.
+	* gcc/config/rs6000.md (uns code attribute): Add sign_extend and
+	zero_extend.
+	(floatsidf2): If SImode can live in the floating point registers,
+	directly issue a conversion to DImode and do the floating point
+	conversion during expansion instead of using an UNSPEC.
 	(floatunssisf2): Likewise.
 	(floatunssidf2): Likewise.
 	(floatsisf2): Likewise.
+	* gcc/config/rs6000/vsx.md (vsx_extract_si_<uns>float_df): Adjust
+	combiner to expect sign/zero extend of SImode to DImode in optimizing
+	V4SI extracts.
 
 ==================== Branch work164-bugs, patch #205 ====================
 
