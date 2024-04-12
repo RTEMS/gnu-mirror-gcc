@@ -1,3 +1,19 @@
+==================== Branch work164-bugs, patch #206 ====================
+
+Simplify converting between SImode and SF/DFmode.
+
+2024-04-11  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/90822
+	* gcc/config/rs6000.md (floatsidf2): If SImode can live in the floating
+	point registers, directly issue a conversion to DImode and do the
+	floating point conversion.
+	(floatunssisf2): Likewise.
+	(floatunssidf2): Likewise.
+	(floatsisf2): Likewise.
+
 ==================== Branch work164-bugs, patch #205 ====================
 
 Improve 64->128 bit zero extension on PowerPC (PR target/108958)
