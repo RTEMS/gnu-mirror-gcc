@@ -24217,7 +24217,7 @@ rs6000_debugger_regno (unsigned int regno, unsigned int format)
       if (regno == CTR_REGNO)
 	return 109;
       if (regno == TAR_REGNO)
-	return 112;
+	return 111;
       if (regno == CA_REGNO)
 	return 101;  /* XER */
       /* Special handling for CR for .debug_frame: rs6000_emit_prologue has
@@ -24235,7 +24235,7 @@ rs6000_debugger_regno (unsigned int regno, unsigned int format)
 
       /* These do not make much sense.  */
       if (regno == FRAME_POINTER_REGNUM)
-	return 111;
+	return FIRST_PSEUDO_REGISTER;
       if (regno == ARG_POINTER_REGNUM)
 	return 67;
       if (regno == 64)
@@ -24258,6 +24258,8 @@ rs6000_debugger_regno (unsigned int regno, unsigned int format)
     return 65;
   if (regno == CTR_REGNO)
     return 66;
+  if (regno == TAR_REGNO)
+    return 111;
   if (regno == CA_REGNO)
     return 76;  /* XER */
   if (CR_REGNO_P (regno))
