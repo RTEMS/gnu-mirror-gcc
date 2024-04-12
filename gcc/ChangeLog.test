@@ -1,3 +1,14 @@
+==================== Branch work164-test, patch #301 ====================
+
+Update debug register number for the tar register.
+
+2024-04-12  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_debugger_regno): Fix tar register
+	number.
+
 ==================== Branch work164-test, patch #300 ====================
 
 Add support for -mtar
