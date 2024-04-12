@@ -2,7 +2,7 @@
 
 Simplify converting between SImode and SF/DFmode.
 
-2024-04-11  Michael Meissner  <meissner@linux.ibm.com>
+2024-04-12  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
