@@ -1,3 +1,19 @@
+==================== Branch work164-test, patch #302 ====================
+
+Remove moves for tar register.
+
+2024-04-12  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.md (movcc_<mode>): Remove tar register moves.
+	(movsf_hardfloa): Likewise.
+	(movsd_hardfloa): Likewise.
+	(mov<mode>_hardfloat64): Likewise.
+	(mov<mode>_softfloat6): Likewise.
+	(<bd>_<mode>): Likewise.
+	(<bd>tf_<mode>): Likewise.
+
 ==================== Branch work164-test, patch #301 ====================
 
 Update debug register number for the tar register.
