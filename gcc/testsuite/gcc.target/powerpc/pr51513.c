@@ -1,8 +1,8 @@
 /* { dg-do compile { target { powerpc*-*-linux* } } } */
 /* { dg-options "-O2 -fjump-tables --param case-values-threshold=1" } */
 /* Verify we created a jump table.  */
-/* { dg-final { scan-assembler-times "mtctr "  1 } } */
-/* { dg-final { scan-assembler-times "bctr" 1 } } */
+/* { dg-final { scan-assembler-times "mt\(ctr\|tar\) "  1 } } */
+/* { dg-final { scan-assembler-times "b\(ctr\|tar\)" 1 } } */
 /* Verify we eliminated the range check.  */
 /* { dg-final { scan-assembler-not "cmpldi" } } */
 /* { dg-final { scan-assembler-not "cmplwi" } } */
