@@ -1,3 +1,16 @@
+==================== Branch work164-test, patch #304 ====================
+
+Adjust tests for tar register
+
+2024-04-15  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* gcc.target/powerpc/ppc-switch-1.c: Adjust test to account for using
+	the TAR regisgter.
+	* gcc.target/powerpc/safe-indirect-jump-3.c: Likewise.
+	* gcc.target/powerpc/safe-indirect-jump-3.c: Likewise.
+
 ==================== Branch work164-test, patch #303 ====================
 
 Update TAR support.
