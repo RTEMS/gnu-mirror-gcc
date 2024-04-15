@@ -2304,7 +2304,7 @@ rs6000_debug_reg_global (void)
 			  "vs");
   rs6000_debug_reg_print (LR_REGNO, LR_REGNO, "lr");
   rs6000_debug_reg_print (CTR_REGNO, CTR_REGNO, "ctr");
-  rs6000_debug_reg_print (TAR_REGNO, CTR_REGNO, "tar");
+  rs6000_debug_reg_print (TAR_REGNO, TAR_REGNO, "tar");
   rs6000_debug_reg_print (CR0_REGNO, CR7_REGNO, "cr");
   rs6000_debug_reg_print (CA_REGNO, CA_REGNO, "ca");
   rs6000_debug_reg_print (VRSAVE_REGNO, VRSAVE_REGNO, "vrsave");
@@ -2781,7 +2781,7 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 
   rs6000_regno_regclass[LR_REGNO] = LINK_REGS;
   rs6000_regno_regclass[CTR_REGNO] = CTR_REGS;
-  rs6000_regno_regclass[TAR_REGNO] = LINK_OR_CTR_REGS;
+  rs6000_regno_regclass[TAR_REGNO] = TAR_REGS;
   rs6000_regno_regclass[CA_REGNO] = NO_REGS;
   rs6000_regno_regclass[VRSAVE_REGNO] = VRSAVE_REGS;
   rs6000_regno_regclass[VSCR_REGNO] = VRSAVE_REGS;
@@ -2801,6 +2801,7 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
   reg_class_to_reg_type[(int)VSCR_REGS] = SPR_REG_TYPE;
   reg_class_to_reg_type[(int)LINK_REGS] = SPR_REG_TYPE;
   reg_class_to_reg_type[(int)CTR_REGS] = SPR_REG_TYPE;
+  reg_class_to_reg_type[(int)TAR_REGS] = SPR_REG_TYPE;
   reg_class_to_reg_type[(int)LINK_OR_CTR_REGS] = SPR_REG_TYPE;
   reg_class_to_reg_type[(int)CR_REGS] = CR_REG_TYPE;
   reg_class_to_reg_type[(int)CR0_REGS] = CR_REG_TYPE;
