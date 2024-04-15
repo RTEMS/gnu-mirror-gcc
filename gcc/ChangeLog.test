@@ -1,3 +1,28 @@
+==================== Branch work164-test, patch #303 ====================
+
+Update TAR support.
+
+2024-04-15  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_debug_reg_global): Correctly print TAR
+	register.
+	(rs6000_init_hard_regno_mode_ok): Correctly initial TAR register.
+	* config/rs6000/rs6000.md (mov<mode>_internal): Add support for TAR
+	register.
+	(movcc_<mode>): Likewise.
+	(movsf_hardfloat): Likewise.
+	(movsf_hardfloat): Likewise.
+	(movsd_hardfloat): Likewise.
+	(mov<mode>_hardfloat64): Likewise.
+	(mov<mode>_softfloat6): Likewise.
+	(indirect_jump): Likewise.
+	(@indirect_jump<mode>_nospec): Likewise.
+	(<bd>tf_<mode>): Remove TAR register.
+	* lra-constraints.cc (lra_constraints): Add debug_rtx before raising an
+	error.
+
 ==================== Branch work164-test, patch #302 ====================
 
 Remove moves for tar register.
