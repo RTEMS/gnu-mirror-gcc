@@ -1187,6 +1187,9 @@ Specify the default TLS dialect, for systems were there is a choice.
 For ARM targets, possible values for @var{dialect} are @code{gnu} or
 @code{gnu2}, which select between the original GNU dialect and the GNU TLS
 descriptor-based dialect.
+For RISC-V targets, possible values for @var{dialect} are @code{trad} or
+@code{desc}, which select between the traditional GNU dialect and the GNU TLS
+descriptor-based dialect.
 
 @item --enable-multiarch
 Specify whether to enable or disable multiarch support.  The default is
@@ -1266,7 +1269,8 @@ default set of libraries is selected based on the value of
 @item amdgcn*-*-*
 @var{list} is a comma separated list of ISA names (allowed values: @code{fiji},
 @code{gfx900}, @code{gfx906}, @code{gfx908}, @code{gfx90a}, @code{gfx1030},
-@code{gfx1100}, @code{gfx1103}).  It ought not include the name of the default
+@code{gfx1036}, @code{gfx1100}, @code{gfx1103}).
+It ought not include the name of the default
 ISA, specified via @option{--with-arch}.  If @var{list} is empty, then there
 will be no multilibs and only the default run-time library will be built.  If
 @var{list} is @code{default} or @option{--with-multilib-list=} is not
@@ -3943,7 +3947,9 @@ Instead of GNU Binutils, you will need to install LLVM 15, or later, and copy
 by specifying a @code{--with-multilib-list=} that does not list @code{gfx1100}
 and @code{gfx1103}.
 
-Use Newlib (4.3.0 or newer; 4.4.0 or later is recommended).
+Use Newlib (4.3.0 or newer; 4.4.0 contains some improvements and git commit
+7dd4eb1db (2025-03-25, post-4.4.0) fixes device console output for GFX10 and
+GFX11 devices).
 
 To run the binaries, install the HSA Runtime from the
 @uref{https://rocm.docs.amd.com/,,ROCm Platform}, and use
@@ -3953,8 +3959,8 @@ on the GPU.
 To enable support for GCN3 Fiji devices (gfx803), GCC has to be configured with
 @option{--with-arch=@code{fiji}} or
 @option{--with-multilib-list=@code{fiji},...}.  Note that support for Fiji
-devices has been removed in ROCm 4.0 and support in LLVM is deprecated and will
-be removed in LLVM 18.
+devices has been removed in ROCm 4.0 and support in LLVM was deprecated and has
+been removed in LLVM 18.
 
 @html
 <hr />

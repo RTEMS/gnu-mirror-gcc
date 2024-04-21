@@ -1506,7 +1506,7 @@ bitint_large_huge::handle_cast (tree lhs_type, tree rhs1, tree idx)
 	  if (m_bitfld_load)
 	    {
 	      tree t4;
-	      if (!save_first)
+	      if (!save_first && !save_cast_conditional)
 		t4 = m_data[m_bitfld_load + 1];
 	      else
 		t4 = make_ssa_name (m_limb_type);
@@ -1519,6 +1519,24 @@ bitint_large_huge::handle_cast (tree lhs_type, tree rhs1, tree idx)
 	      if (edge_true_true)
 		add_phi_arg (phi, m_data[m_bitfld_load], edge_true_true,
 			     UNKNOWN_LOCATION);
+	      if (save_cast_conditional)
+		for (basic_block bb = gsi_bb (m_gsi);;)
+		  {
+		    edge e1 = single_succ_edge (bb);
+		    edge e2 = find_edge (e1->dest, m_bb), e3;
+		    tree t5 = ((e2 && !save_first) ? m_data[m_bitfld_load + 1]
+			       : make_ssa_name (m_limb_type));
+		    phi = create_phi_node (t5, e1->dest);
+		    edge_iterator ei;
+		    FOR_EACH_EDGE (e3, ei, e1->dest->preds)
+		      add_phi_arg (phi, (e3 == e1 ? t4
+					 : build_zero_cst (m_limb_type)),
+				   e3, UNKNOWN_LOCATION);
+		    t4 = t5;
+		    if (e2)
+		      break;
+		    bb = e1->dest;
+		  }
 	      m_data[m_bitfld_load] = t4;
 	      m_data[m_bitfld_load + 2] = t4;
 	      m_bitfld_load = 0;
@@ -5302,7 +5320,7 @@ bitint_large_huge::lower_call (tree obj, gimple *stmt)
 	  arg = make_ssa_name (TREE_TYPE (arg));
 	  gimple *g = gimple_build_assign (arg, v);
 	  gsi_insert_before (&gsi, g, GSI_SAME_STMT);
-	  if (returns_twice)
+	  if (returns_twice && bb_has_abnormal_pred (gimple_bb (stmt)))
 	    {
 	      m_returns_twice_calls.safe_push (stmt);
 	      returns_twice = false;
@@ -7154,8 +7172,13 @@ gimple_lower_bitint (void)
 	  gimple_stmt_iterator gsi = gsi_after_labels (gimple_bb (stmt));
 	  while (gsi_stmt (gsi) != stmt)
 	    {
-	      arg_stmts.safe_push (gsi_stmt (gsi));
-	      gsi_remove (&gsi, false);
+	      if (is_gimple_debug (gsi_stmt (gsi)))
+		gsi_next (&gsi);
+	      else
+		{
+		  arg_stmts.safe_push (gsi_stmt (gsi));
+		  gsi_remove (&gsi, false);
+		}
 	    }
 	  gimple *g;
 	  basic_block bb = NULL;

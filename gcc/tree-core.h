@@ -983,6 +983,7 @@ enum annot_expr_kind {
   annot_expr_no_vector_kind,
   annot_expr_vector_kind,
   annot_expr_parallel_kind,
+  annot_expr_maybe_infinite_kind,
   annot_expr_kind_last
 };
 
@@ -1600,6 +1601,9 @@ enum omp_clause_linear_kind
 struct GTY(()) tree_exp {
   struct tree_typed typed;
   location_t locus;
+  /* Discriminator for basic conditions in a Boolean expressions.  Trees that
+     are operands of the same Boolean expression should have the same uid.  */
+  unsigned condition_uid;
   tree GTY ((length ("TREE_OPERAND_LENGTH ((tree)&%h)"))) operands[1];
 };
 

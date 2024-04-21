@@ -1072,6 +1072,7 @@ static int riscv_symbol_insns (enum riscv_symbol_type type)
     case SYMBOL_ABSOLUTE: return 2; /* LUI + the reference.  */
     case SYMBOL_PCREL: return 2; /* AUIPC + the reference.  */
     case SYMBOL_TLS_LE: return 3; /* LUI + ADD TP + the reference.  */
+    case SYMBOL_TLSDESC: return 6; /* 4-instruction call + ADD TP + the reference.  */
     case SYMBOL_GOT_DISP: return 3; /* AUIPC + LD GOT + the reference.  */
     case SYMBOL_FORCE_TO_MEM: return 3; /* AUIPC + LD + the reference.  */
     default: gcc_unreachable ();
@@ -2220,7 +2221,7 @@ riscv_call_tls_get_addr (rtx sym, rtx result)
 static rtx
 riscv_legitimize_tls_address (rtx loc)
 {
-  rtx dest, tp, tmp;
+  rtx dest, tp, tmp, a0;
   enum tls_model model = SYMBOL_REF_TLS_MODEL (loc);
 
 #if 0
@@ -2236,9 +2237,24 @@ riscv_legitimize_tls_address (rtx loc)
       /* Rely on section anchors for the optimization that LDM TLS
 	 provides.  The anchor's address is loaded with GD TLS. */
     case TLS_MODEL_GLOBAL_DYNAMIC:
-      tmp = gen_rtx_REG (Pmode, GP_RETURN);
-      dest = gen_reg_rtx (Pmode);
-      emit_libcall_block (riscv_call_tls_get_addr (loc, tmp), dest, tmp, loc);
+      if (TARGET_TLSDESC)
+	{
+	  static unsigned seqno;
+	  tp = gen_rtx_REG (Pmode, THREAD_POINTER_REGNUM);
+	  a0 = gen_rtx_REG (Pmode, GP_ARG_FIRST);
+	  dest = gen_reg_rtx (Pmode);
+
+	  emit_insn (gen_tlsdesc (Pmode, loc, GEN_INT (seqno)));
+	  emit_insn (gen_add3_insn (dest, a0, tp));
+	  seqno++;
+	}
+      else
+	{
+	  tmp = gen_rtx_REG (Pmode, GP_RETURN);
+	  dest = gen_reg_rtx (Pmode);
+	  emit_libcall_block (riscv_call_tls_get_addr (loc, tmp), dest, tmp,
+			      loc);
+	}
       break;
 
     case TLS_MODEL_INITIAL_EXEC:
@@ -4693,7 +4709,7 @@ riscv_expand_conditional_move (rtx dest, rtx op, rtx cons, rtx alt)
 				  gen_rtx_IF_THEN_ELSE (mode, cond1,
 							CONST0_RTX (mode),
 							alt)));
-	  riscv_emit_binary (IOR, dest, reg1, reg2);
+	  riscv_emit_binary (PLUS, dest, reg1, reg2);
 	  return true;
 	}
     }
@@ -5459,6 +5475,152 @@ riscv_v_abi ()
   return v_abi;
 }
 
+static bool
+riscv_vector_int_type_p (const_tree type)
+{
+  machine_mode mode = TYPE_MODE (type);
+
+  if (VECTOR_MODE_P (mode))
+    return INTEGRAL_MODE_P (GET_MODE_INNER (mode));
+
+  const char *name = IDENTIFIER_POINTER (DECL_NAME (TYPE_NAME (type)));
+  return strstr (name, "int") != NULL || strstr (name, "uint") != NULL;
+}
+
+static bool
+riscv_vector_float_type_p (const_tree type)
+{
+  machine_mode mode = TYPE_MODE (type);
+
+  if (VECTOR_MODE_P (mode))
+    return FLOAT_MODE_P (GET_MODE_INNER (mode));
+
+  const char *name = IDENTIFIER_POINTER (DECL_NAME (TYPE_NAME (type)));
+  return strstr (name, "vfloat") != NULL;
+}
+
+static int
+riscv_vector_element_bitsize (const_tree type)
+{
+  machine_mode mode = TYPE_MODE (type);
+
+  if (VECTOR_MODE_P (mode))
+    return GET_MODE_BITSIZE (GET_MODE_INNER (mode));
+
+  const char *name = IDENTIFIER_POINTER (DECL_NAME (TYPE_NAME (type)));
+
+  if (strstr (name, "bool") != NULL)
+    return 1;
+  else if (strstr (name, "int8") != NULL)
+    return 8;
+  else if (strstr (name, "int16") != NULL || strstr (name, "float16") != NULL)
+    return 16;
+  else if (strstr (name, "int32") != NULL || strstr (name, "float32") != NULL)
+    return 32;
+  else if (strstr (name, "int64") != NULL || strstr (name, "float64") != NULL)
+    return 64;
+
+  gcc_unreachable ();
+}
+
+static int
+riscv_vector_required_min_vlen (const_tree type)
+{
+  machine_mode mode = TYPE_MODE (type);
+
+  if (riscv_v_ext_mode_p (mode))
+    return TARGET_MIN_VLEN;
+
+  int element_bitsize = riscv_vector_element_bitsize (type);
+  const char *name = IDENTIFIER_POINTER (DECL_NAME (TYPE_NAME (type)));
+
+  if (strstr (name, "bool64") != NULL)
+    return element_bitsize * 64;
+  else if (strstr (name, "bool32") != NULL)
+    return element_bitsize * 32;
+  else if (strstr (name, "bool16") != NULL)
+    return element_bitsize * 16;
+  else if (strstr (name, "bool8") != NULL)
+    return element_bitsize * 8;
+  else if (strstr (name, "bool4") != NULL)
+    return element_bitsize * 4;
+  else if (strstr (name, "bool2") != NULL)
+    return element_bitsize * 2;
+
+  if (strstr (name, "mf8") != NULL)
+    return element_bitsize * 8;
+  else if (strstr (name, "mf4") != NULL)
+    return element_bitsize * 4;
+  else if (strstr (name, "mf2") != NULL)
+    return element_bitsize * 2;
+
+  return element_bitsize;
+}
+
+static void
+riscv_validate_vector_type (const_tree type, const char *hint)
+{
+  gcc_assert (riscv_vector_type_p (type));
+
+  if (!TARGET_VECTOR)
+    {
+      error_at (input_location, "%s %qT requires the V ISA extension",
+		hint, type);
+      return;
+    }
+
+  int element_bitsize = riscv_vector_element_bitsize (type);
+  bool int_type_p = riscv_vector_int_type_p (type);
+
+  if (int_type_p && element_bitsize == 64
+    && !TARGET_VECTOR_ELEN_64_P (riscv_vector_elen_flags))
+    {
+      error_at (input_location,
+		"%s %qT requires the zve64x, zve64f, zve64d or v ISA extension",
+		hint, type);
+      return;
+    }
+
+  bool float_type_p = riscv_vector_float_type_p (type);
+
+  if (float_type_p && element_bitsize == 16
+    && !TARGET_VECTOR_ELEN_FP_16_P (riscv_vector_elen_flags))
+    {
+      error_at (input_location,
+		"%s %qT requires the zvfhmin or zvfh ISA extension",
+		hint, type);
+      return;
+    }
+
+  if (float_type_p && element_bitsize == 32
+    && !TARGET_VECTOR_ELEN_FP_32_P (riscv_vector_elen_flags))
+    {
+      error_at (input_location,
+		"%s %qT requires the zve32f, zve64f, zve64d or v ISA extension",
+		hint, type);
+      return;
+    }
+
+  if (float_type_p && element_bitsize == 64
+    && !TARGET_VECTOR_ELEN_FP_64_P (riscv_vector_elen_flags))
+    {
+      error_at (input_location,
+		"%s %qT requires the zve64d or v ISA extension", hint, type);
+      return;
+    }
+
+  int required_min_vlen = riscv_vector_required_min_vlen (type);
+
+  if (TARGET_MIN_VLEN < required_min_vlen)
+    {
+      error_at (
+	input_location,
+	"%s %qT requires the minimal vector length %qd but %qd is given",
+	hint, type, required_min_vlen, TARGET_MIN_VLEN);
+      return;
+    }
+}
+
 /* Return true if a function with type FNTYPE returns its value in
    RISC-V V registers.  */
 
@@ -5467,7 +5629,13 @@ riscv_return_value_is_vector_type_p (const_tree fntype)
 {
   tree return_type = TREE_TYPE (fntype);
 
-  return riscv_vector_type_p (return_type);
+  if (riscv_vector_type_p (return_type))
+    {
+      riscv_validate_vector_type (return_type, "return type");
+      return true;
+    }
+  else
+    return false;
 }
 
 /* Return true if a function with type FNTYPE takes arguments in
@@ -5481,7 +5649,10 @@ riscv_arguments_is_vector_type_p (const_tree fntype)
     {
       tree arg_type = TREE_VALUE (chain);
       if (riscv_vector_type_p (arg_type))
-	return true;
+	{
+	  riscv_validate_vector_type (arg_type, "argument type");
+	  return true;
+	}
     }
 
   return false;
@@ -5493,8 +5664,16 @@ riscv_arguments_is_vector_type_p (const_tree fntype)
 static bool
 riscv_vector_cc_function_p (const_tree fntype)
 {
-  return lookup_attribute ("vector_cc", TYPE_ATTRIBUTES (fntype)) != NULL_TREE
-	 || lookup_attribute ("riscv_vector_cc", TYPE_ATTRIBUTES (fntype)) != NULL_TREE;
+  tree attr = TYPE_ATTRIBUTES (fntype);
+  bool vector_cc_p = lookup_attribute ("vector_cc", attr) != NULL_TREE
+    || lookup_attribute ("riscv_vector_cc", attr) != NULL_TREE;
+
+  if (vector_cc_p && !TARGET_VECTOR)
+    error_at (input_location,
+	      "function attribute %qs requires the V ISA extension",
+	      "riscv_vector_cc");
+
+  return vector_cc_p;
 }
 
 /* Implement TARGET_FNTYPE_ABI.  */
@@ -9085,7 +9264,7 @@ riscv_override_options_internal (struct gcc_options *opts)
 
 /* Implement TARGET_OPTION_OVERRIDE.  */
 
-static void
+void
 riscv_option_override (void)
 {
 #ifdef SUBTARGET_OVERRIDE_OPTIONS
@@ -10818,6 +10997,34 @@ riscv_vector_mode_supported_any_target_p (machine_mode)
   return true;
 }
 
+/* Implements hook TARGET_FUNCTION_VALUE_REGNO_P.  */
+
+static bool
+riscv_function_value_regno_p (const unsigned regno)
+{
+  if (GP_RETURN_FIRST <= regno && regno <= GP_RETURN_LAST)
+    return true;
+
+  if (FP_RETURN_FIRST <= regno && regno <= FP_RETURN_LAST)
+    return true;
+
+  if (TARGET_VECTOR && regno == V_RETURN)
+    return true;
+
+  return false;
+}
+
+/* Implements hook TARGET_GET_RAW_RESULT_MODE.  */
+
+static fixed_size_mode
+riscv_get_raw_result_mode (int regno)
+{
+  if (!is_a <fixed_size_mode> (reg_raw_mode[regno]))
+    return as_a <fixed_size_mode> (VOIDmode);
+
+  return default_get_reg_raw_mode (regno);
+}
+
 /* Initialize the GCC target structure.  */
 #undef TARGET_ASM_ALIGNED_HI_OP
 #define TARGET_ASM_ALIGNED_HI_OP "\t.half\t"
@@ -11163,6 +11370,12 @@ riscv_vector_mode_supported_any_target_p (machine_mode)
 
 #undef TARGET_VECTOR_MODE_SUPPORTED_ANY_TARGET_P
 #define TARGET_VECTOR_MODE_SUPPORTED_ANY_TARGET_P riscv_vector_mode_supported_any_target_p
+
+#undef TARGET_FUNCTION_VALUE_REGNO_P
+#define TARGET_FUNCTION_VALUE_REGNO_P riscv_function_value_regno_p
+
+#undef TARGET_GET_RAW_RESULT_MODE
+#define TARGET_GET_RAW_RESULT_MODE riscv_get_raw_result_mode
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

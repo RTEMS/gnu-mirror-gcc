@@ -1963,12 +1963,20 @@ resolve_procedure_expression (gfc_expr* expr)
       || (sym->attr.function && sym->result == sym))
     return true;
 
-  /* A non-RECURSIVE procedure that is used as procedure expression within its
+   /* A non-RECURSIVE procedure that is used as procedure expression within its
      own body is in danger of being called recursively.  */
   if (is_illegal_recursion (sym, gfc_current_ns))
-    gfc_warning (0, "Non-RECURSIVE procedure %qs at %L is possibly calling"
-		 " itself recursively.  Declare it RECURSIVE or use"
-		 " %<-frecursive%>", sym->name, &expr->where);
+    {
+      if (sym->attr.use_assoc && expr->symtree->name[0] == '@')
+	gfc_warning (0, "Non-RECURSIVE procedure %qs from module %qs is "
+		     " possibly calling itself recursively in procedure %qs. "
+		     " Declare it RECURSIVE or use %<-frecursive%>",
+		     sym->name, sym->module, gfc_current_ns->proc_name->name);
+      else
+	gfc_warning (0, "Non-RECURSIVE procedure %qs at %L is possibly calling"
+		     " itself recursively.  Declare it RECURSIVE or use"
+		     " %<-frecursive%>", sym->name, &expr->where);
+    }
 
   return true;
 }
@@ -6820,6 +6828,13 @@ resolve_typebound_static (gfc_expr* e, gfc_symtree** target,
       if (st)
 	*target = st;
     }
+
+  if (is_illegal_recursion ((*target)->n.sym, gfc_current_ns)
+      && !e->value.compcall.tbp->deferred)
+    gfc_warning (0, "Non-RECURSIVE procedure %qs at %L is possibly calling"
+		 " itself recursively.  Declare it RECURSIVE or use"
+		 " %<-frecursive%>", (*target)->n.sym->name, &e->where);
+
   return true;
 }
 
@@ -8262,6 +8277,16 @@ resolve_allocate_expr (gfc_expr *e, gfc_code *code, bool *array_alloc_wo_spec)
 		      &code->expr3->where, &e->where);
 	  goto failure;
 	}
+
+      /* Check F2008:C639: "Corresponding kind type parameters of
+	 allocate-object and source-expr shall have the same values."  */
+      if (e->ts.type == BT_CHARACTER
+	  && !e->ts.deferred
+	  && e->ts.u.cl->length
+	  && code->expr3->ts.type == BT_CHARACTER
+	  && !gfc_check_same_strlen (e, code->expr3, "ALLOCATE with "
+				     "SOURCE= or MOLD= specifier"))
+	    goto failure;
 
       /* Check TS18508, C702/C703.  */
       if (code->expr3->ts.type == BT_DERIVED
@@ -17054,15 +17079,6 @@ resolve_symbol (gfc_symbol *sym)
 
   if (sym->param_list)
     resolve_pdt (sym);
-
-  if (!sym->attr.referenced
-      && (sym->ts.type == BT_CLASS || sym->ts.type == BT_DERIVED))
-    {
-      gfc_expr *final_expr = gfc_lval_expr_from_sym (sym);
-      if (gfc_is_finalizable (final_expr->ts.u.derived, NULL))
-	gfc_set_sym_referenced (sym);
-      gfc_free_expr (final_expr);
-    }
 }
 
 

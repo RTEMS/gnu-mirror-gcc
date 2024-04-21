@@ -3400,6 +3400,7 @@ again:
   LOOP_VINFO_VERSIONING_THRESHOLD (loop_vinfo) = 0;
   LOOP_VINFO_CAN_USE_PARTIAL_VECTORS_P (loop_vinfo)
     = saved_can_use_partial_vectors_p;
+  LOOP_VINFO_USING_PARTIAL_VECTORS_P (loop_vinfo) = false;
 
   goto start_over;
 }
@@ -9197,6 +9198,28 @@ vectorizable_recurr (loop_vec_info loop_vinfo, stmt_vec_info stmt_info,
 		return false;
 	      }
 	}
+
+      /* Verify we have set up compatible types.  */
+      edge le = loop_latch_edge (LOOP_VINFO_LOOP (loop_vinfo));
+      tree latch_vectype = NULL_TREE;
+      if (slp_node)
+	{
+	  slp_tree latch_def = SLP_TREE_CHILDREN (slp_node)[le->dest_idx];
+	  latch_vectype = SLP_TREE_VECTYPE (latch_def);
+	}
+      else
+	{
+	  tree latch_def = PHI_ARG_DEF_FROM_EDGE (phi, le);
+	  if (TREE_CODE (latch_def) == SSA_NAME)
+	    {
+	      stmt_vec_info latch_def_info = loop_vinfo->lookup_def (latch_def);
+	      latch_def_info = vect_stmt_to_vectorize (latch_def_info);
+	      latch_vectype = STMT_VINFO_VECTYPE (latch_def_info);
+	    }
+	}
+      if (!types_compatible_p (latch_vectype, vectype))
+	return false;
+
       /* The recurrence costs the initialization vector and one permute
 	 for each copy.  */
       unsigned prologue_cost = record_stmt_cost (cost_vec, 1, scalar_to_vec,
@@ -9663,6 +9686,8 @@ vectorizable_nonlinear_induction (loop_vec_info loop_vinfo,
   switch (induction_type)
     {
     case vect_step_op_neg:
+      if (maybe_eq (TYPE_VECTOR_SUBPARTS (vectype), 1u))
+	return false;
       if (TREE_CODE (init_expr) != INTEGER_CST
 	  && TREE_CODE (init_expr) != REAL_CST)
 	{
@@ -10940,8 +10965,8 @@ vectorizable_live_operation (vec_info *vinfo, stmt_vec_info stmt_info,
 						 lhs_type, &exit_gsi);
 
 	      auto gsi = gsi_for_stmt (use_stmt);
-	      remove_phi_node (&gsi, false);
 	      tree lhs_phi = gimple_phi_result (use_stmt);
+	      remove_phi_node (&gsi, false);
 	      gimple *copy = gimple_build_assign (lhs_phi, new_tree);
 	      gsi_insert_before (&exit_gsi, copy, GSI_SAME_STMT);
 	      break;
@@ -11568,9 +11593,7 @@ find_in_mapping (tree t, void *context)
    corresponding dr_vec_info need to be reconnected to the EPILOGUE's
    stmt_vec_infos, their statements need to point to their corresponding copy,
    if they are gather loads or scatter stores then their reference needs to be
-   updated to point to its corresponding copy and finally we set
-   'base_misaligned' to false as we have already peeled for alignment in the
-   prologue of the main loop.  */
+   updated to point to its corresponding copy.  */
 
 static void
 update_epilogue_loop_vinfo (class loop *epilogue, tree advance)
@@ -11714,10 +11737,6 @@ update_epilogue_loop_vinfo (class loop *epilogue, tree advance)
 	}
       DR_STMT (dr) = STMT_VINFO_STMT (stmt_vinfo);
       stmt_vinfo->dr_aux.stmt = stmt_vinfo;
-      /* The vector size of the epilogue is smaller than that of the main loop
-	 so the alignment is either the same or lower. This means the dr will
-	 thus by definition be aligned.  */
-      STMT_VINFO_DR_INFO (stmt_vinfo)->base_misaligned = false;
     }
 
   epilogue_vinfo->shared->datarefs_copy.release ();
@@ -12136,14 +12155,17 @@ vect_transform_loop (loop_vec_info loop_vinfo, gimple *loop_vectorized_call)
   bool final_iter_may_be_partial
     = LOOP_VINFO_USING_PARTIAL_VECTORS_P (loop_vinfo)
       || LOOP_VINFO_EARLY_BREAKS (loop_vinfo);
-  /* The minimum number of iterations performed by the epilogue.  This
-     is 1 when peeling for gaps because we always need a final scalar
-     iteration.  */
-  int min_epilogue_iters = LOOP_VINFO_PEELING_FOR_GAPS (loop_vinfo) ? 1 : 0;
-  /* +1 to convert latch counts to loop iteration counts,
-     -min_epilogue_iters to remove iterations that cannot be performed
-       by the vector code.  */
-  int bias_for_lowest = 1 - min_epilogue_iters;
+
+  /* +1 to convert latch counts to loop iteration counts.  */
+  int bias_for_lowest = 1;
+
+  /* When we are peeling for gaps then we take away one scalar iteration
+     from the vector loop.  Thus we can adjust the upper bound by one
+     scalar iteration.  But only when we know the bound applies to the
+     IV exit test which might not be true when we have multiple exits.  */
+  if (!LOOP_VINFO_EARLY_BREAKS (loop_vinfo))
+    bias_for_lowest -= LOOP_VINFO_PEELING_FOR_GAPS (loop_vinfo) ? 1 : 0;
+
   int bias_for_assumed = bias_for_lowest;
   int alignment_npeels = LOOP_VINFO_PEELING_FOR_ALIGNMENT (loop_vinfo);
   if (alignment_npeels && LOOP_VINFO_USING_PARTIAL_VECTORS_P (loop_vinfo))

@@ -4309,7 +4309,8 @@ vect_optimize_slp_pass::is_cfg_latch_edge (graph_edge *ud)
 {
   slp_tree use = m_vertices[ud->src].node;
   slp_tree def = m_vertices[ud->dest].node;
-  if (SLP_TREE_DEF_TYPE (use) != vect_internal_def
+  if ((SLP_TREE_DEF_TYPE (use) != vect_internal_def
+       || SLP_TREE_CODE (use) == VEC_PERM_EXPR)
       || SLP_TREE_DEF_TYPE (def) != vect_internal_def)
     return false;
 
@@ -6646,8 +6647,14 @@ vect_bb_slp_mark_live_stmts (bb_vec_info bb_vinfo)
   auto_vec<slp_tree> worklist;
 
   for (slp_instance instance : bb_vinfo->slp_instances)
-    if (!visited.add (SLP_INSTANCE_TREE (instance)))
-      worklist.safe_push (SLP_INSTANCE_TREE (instance));
+    {
+      if (SLP_INSTANCE_KIND (instance) == slp_inst_kind_bb_reduc)
+	for (tree op : SLP_INSTANCE_REMAIN_DEFS (instance))
+	  if (TREE_CODE (op) == SSA_NAME)
+	    scalar_use_map.put (op, 1);
+      if (!visited.add (SLP_INSTANCE_TREE (instance)))
+	worklist.safe_push (SLP_INSTANCE_TREE (instance));
+    }
 
   do
     {
@@ -6665,7 +6672,8 @@ vect_bb_slp_mark_live_stmts (bb_vec_info bb_vinfo)
 	    if (child && !visited.add (child))
 	      worklist.safe_push (child);
 	}
-    } while (!worklist.is_empty ());
+    }
+  while (!worklist.is_empty ());
 
   visited.empty ();
 

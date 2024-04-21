@@ -1,3 +1,59 @@
+2024-04-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR libgcc/114762
+	* libgcc2.c (__divmodbitint4): Perform the decrement on negative
+	v with most significant limb all ones and the second least
+	significant limb with most significant bit clear always, regardless of
+	un < vn.
+
+2024-04-18  Jakub Jelinek  <jakub@redhat.com>
+
+	PR libgcc/114755
+	* libgcc2.c (__divmodbitint4): Perform the decrement on negative
+	v with most significant limb all ones and the second least
+	significant limb with most significant bit clear always, regardless of
+	un < vn.
+
+2024-04-15  Jakub Jelinek  <jakub@redhat.com>
+
+	PR libgcc/114689
+	* config/m68k/fpgnulib.c (__truncdfsf2): Add parentheses around
+	!!sticky bitwise or operand to quiet up cppcheck.  Add parentheses
+	around mant >> 1 bitwise or operand.
+
+2024-04-10  Andre Vieira  <andre.simoesdiasvieira@arm.com>
+
+	* config/aarch64/t-softfp (softfp_extras): Add floatbitinthf,
+	floatbitintbf, floatbitinttf and fixtfbitint.
+	* config/aarch64/libgcc-softfp.ver (GCC_14.0.0): Add __floatbitinthf,
+	__floatbitintbf, __floatbitinttf and __fixtfbitint.
+
+2024-04-09  Sergey Bugaev  <bugaevc@gmail.com>
+
+	* config.host: Recognize aarch64*-*-gnu* hosts.
+	* config/aarch64/gnu-unwind.h: New file.
+	* config/aarch64/heap-trampoline.c
+	(allocate_trampoline_page): Support GNU/Hurd.
+
+2024-04-04  Jørgen Kvalsvik  <j@lambda.is>
+
+	* libgcov-merge.c (__gcov_merge_ior): New.
+
+2024-04-03  Wilco Dijkstra  <wilco.dijkstra@arm.com>
+
+	* config/aarch64/cpuinfo.c: Add HWCAP_EVTSTRM, HWCAP_CRC32, HWCAP_CPUID,
+	HWCAP_PACA and HWCAP_PACG.
+
+2024-04-02  Jakub Jelinek  <jakub@redhat.com>
+
+	* unwind-dw2-fde.c (struct fde_accumulator): Fix duplicated
+	words in comment; is is -> is.
+
+2024-03-25  Max Filippov  <jcmvbkbc@gmail.com>
+
+	* unwind-arm-common.inc (__gnu_personality_sigframe_fdpic): Cast
+	last argument of _Unwind_VRS_Set to void *.
+
 2024-03-22  Thomas Neumann  <tneumann@users.sourceforge.net>
 
 	PR libgcc/111731

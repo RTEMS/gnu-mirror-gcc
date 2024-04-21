@@ -373,6 +373,8 @@ bit_size_expr::maybe_get_formatted_str (text_art::style_manager &sm,
       if (tree cst = num_bytes->maybe_get_constant ())
 	{
 	  byte_size_t concrete_num_bytes = wi::to_offset (cst);
+	  if (!wi::fits_uhwi_p (concrete_num_bytes))
+	    return nullptr;
 	  if (concrete_num_bytes == 1)
 	    return ::make_unique <text_art::styled_string>
 	      (fmt_styled_string (sm, concrete_single_byte_fmt,
@@ -396,6 +398,8 @@ bit_size_expr::maybe_get_formatted_str (text_art::style_manager &sm,
   else if (tree cst = m_num_bits.maybe_get_constant ())
     {
       bit_size_t concrete_num_bits = wi::to_offset (cst);
+      if (!wi::fits_uhwi_p (concrete_num_bits))
+	return nullptr;
       if (concrete_num_bits == 1)
 	return ::make_unique <text_art::styled_string>
 	  (fmt_styled_string (sm, concrete_single_bit_fmt,
@@ -2059,14 +2063,10 @@ public:
 
     /* Register painting styles.  */
     {
-      style valid_style;
-      valid_style.m_fg_color = style::named_color::GREEN;
-      valid_style.m_bold = true;
+      style valid_style (get_style_from_color_cap_name ("valid"));
       m_valid_style_id = m_sm.get_or_create_id (valid_style);
 
-      style invalid_style;
-      invalid_style.m_fg_color = style::named_color::RED;
-      invalid_style.m_bold = true;
+      style invalid_style (get_style_from_color_cap_name ("invalid"));
       m_invalid_style_id = m_sm.get_or_create_id (invalid_style);
     }
 

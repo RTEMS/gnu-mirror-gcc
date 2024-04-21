@@ -98,4 +98,4 @@ foo (char const *buf, size_t len)
   return sum;
 }
 
-/* { dg-final { scan-assembler-not {vluxei8\.v\tv0,\s*\([a-x0-9]+\),\s*v[0-9]+,\s*v0.t} } } */
+/* { dg-final { scan-assembler-not {vluxei8\.v\tv0,\s*\([a-x0-9]+\),\s*v[0-9]+,\s*v0.t} { xfail riscv*-*-* } } } */

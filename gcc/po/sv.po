@@ -32,7 +32,7 @@ msgstr ""
 "Project-Id-Version: gcc 14.1-b20240218\n"
 "Report-Msgid-Bugs-To: https://gcc.gnu.org/bugs/\n"
 "POT-Creation-Date: 2024-02-16 21:35+0000\n"
-"PO-Revision-Date: 2024-03-17 20:14+0100\n"
+"PO-Revision-Date: 2024-04-10 22:53+0200\n"
 "Last-Translator: Göran Uddeborg <goeran@uddeborg.se>\n"
 "Language-Team: Swedish <tp-sv@listor.tp-sv.se>\n"
 "Language: sv\n"
@@ -40363,16 +40363,14 @@ msgid "either %<-fopenacc%> or %<-fopenmp%> must be set"
 msgstr "antingen %<-fopenacc%> eller %<-fopenmp%> måste vara satt"
 
 #: config/gcn/mkoffload.cc:1039
-#, fuzzy, gcc-internal-format
-#| msgid "unhandled expression"
+#, gcc-internal-format
 msgid "unhandled architecture"
-msgstr "ohanterat uttryck"
+msgstr "ohanterad arkitektur"
 
 #: config/gcn/mkoffload.cc:1079 config/gcn/mkoffload.cc:1231
-#, fuzzy, gcc-internal-format
-#| msgid "cannot open %s"
+#, gcc-internal-format
 msgid "cannot open %qs"
-msgstr "kan inte öppna %s"
+msgstr "kan inte öppna %qs"
 
 #: config/gcn/mkoffload.cc:1217 config/nvptx/mkoffload.cc:841
 #, gcc-internal-format
@@ -40729,16 +40727,14 @@ msgid "%<-mstringop-strategy=rep_8byte%> not supported for 32-bit code"
 msgstr "%<-mstringop-strategy=rep_8byte%> stödjs inte för 32-bitarskod"
 
 #: config/i386/i386-options.cc:2143
-#, fuzzy, gcc-internal-format
-#| msgid "%<-muintr%> not supported for 32-bit code"
+#, gcc-internal-format
 msgid "%<-mapxf%> is not supported for 32-bit code"
-msgstr "%<-muintr%> stödjs inte för 32-bitarskod"
+msgstr "%<-mapxf%> stödjs inte för 32-bitarskod"
 
 #: config/i386/i386-options.cc:2145
-#, fuzzy, gcc-internal-format
-#| msgid "%<-mlam=%> option: [u48|u57] not supported for 32-bit code"
+#, gcc-internal-format
 msgid "%<-mapx-features=%> option is not supported for 32-bit code"
-msgstr "%<-mlam=%> flaggan: [u48|u57] stödjs inte för 32-bitarskod"
+msgstr "flaggan %<-mapx-features=%>- stödjs inte för 32-bitarskod"
 
 #: config/i386/i386-options.cc:2148
 #, gcc-internal-format
@@ -41318,10 +41314,9 @@ msgid "the ABI of passing C structures with zero-width bit-fields has changed in
 msgstr "ABI:et för att skicka C-poster med bitfält med nollbredd har ändrats i GCC %{12.1%}"
 
 #: config/i386/i386.cc:2722 config/i386/i386.cc:4091 config/i386/i386.cc:4101
-#, fuzzy, gcc-internal-format
-#| msgid "SSE register return with SSE disabled"
+#, gcc-internal-format
 msgid "SSE register return with SSE2 disabled"
-msgstr "SSE-registerretur med SSE avaktiverat"
+msgstr "SSE-registerretur med SSE2 avaktiverat"
 
 #: config/i386/i386.cc:2724
 #, gcc-internal-format
@@ -41329,10 +41324,9 @@ msgid "SSE register return with SSE disabled"
 msgstr "SSE-registerretur med SSE avaktiverat"
 
 #: config/i386/i386.cc:2731
-#, fuzzy, gcc-internal-format
-#| msgid "SSE register argument with SSE disabled"
+#, gcc-internal-format
 msgid "SSE register argument with SSE2 disabled"
-msgstr "SSE-registerargument med SSE avaktiverat"
+msgstr "SSE-registerargument med SSE2 avaktiverat"
 
 #: config/i386/i386.cc:2733
 #, gcc-internal-format
@@ -41436,10 +41430,9 @@ msgid "the alignment of %<_Atomic %T%> fields changed in %{GCC 11.1%}"
 msgstr "justeringen av %<_Atomic %T%>-fält ändrades i %{GCC 11.1%}"
 
 #: config/i386/i386.cc:22794
-#, fuzzy, gcc-internal-format
-#| msgid "no low registers available for popping high registers"
+#, gcc-internal-format
 msgid "no register available for profiling %<-mcmodel=large%s%>"
-msgstr "inga låga register tillgängliga för att poppa höga register"
+msgstr "inga register tillgängliga för profilering %<-mcmodel=large%s%>"
 
 #: config/i386/i386.cc:22890
 #, gcc-internal-format
@@ -41447,10 +41440,9 @@ msgid "profiling %<-mcmodel=large%> with PIC is not supported"
 msgstr "profileringen %<-mcmodel=large%> med PIC stödjs inte"
 
 #: config/i386/i386.cc:23603
-#, fuzzy, gcc-internal-format
-#| msgid "%<__bfloat16%> is redefined from typedef %<short%> to real %<__bf16%> since GCC V13, be careful of implicit conversion between %<__bf16%> and %<short%>; a explicit bitcast may be needed here"
+#, gcc-internal-format
 msgid "%<__bfloat16%> is redefined from typedef %<short%> to real %<__bf16%> since GCC 13.1, be careful of implicit conversion between %<__bf16%> and %<short%>; an explicit bitcast may be needed here"
-msgstr "%<__bfloat16%> är omdefinierat från typedef %<short%> till reell %<__bf16%> sedan GCC V13, var vaksam på implicita konverteringar mellan %<__bf16%> och %<short%>; en explicit bittypkonvertering kan behövas här"
+msgstr "%<__bfloat16%> är omdefinierat från typedef %<short%> till reell %<__bf16%> sedan GCC 13.1, var vaksam på implicita konverteringar mellan %<__bf16%> och %<short%>; en explicit bittypkonvertering kan behövas här"
 
 #: config/i386/i386.cc:25052
 #, gcc-internal-format
@@ -41559,16 +41551,14 @@ msgid "unknown processor ID %<0x%x%>, some tuning parameters will fall back to d
 msgstr "okänd processor-ID %<0x%x%>, några trimningsparametrar kommer återställas till standardvärden"
 
 #: config/loongarch/loongarch-cpu.cc:141
-#, fuzzy, gcc-internal-format
-#| msgid "unknown base architecture %<0x%x%>, %qs failed"
+#, gcc-internal-format
 msgid "unknown native base architecture %<0x%x%>, %qs failed"
-msgstr "okänd basarkitektur %<0x%x%>, %qs misslyckades"
+msgstr "okänd nativ basarkitektur %<0x%x%>, %qs misslyckades"
 
 #: config/loongarch/loongarch-cpu.cc:170
-#, fuzzy, gcc-internal-format
-#| msgid "unknown FPU type %<0x%x%>, %qs failed"
+#, gcc-internal-format
 msgid "unknown native FPU type %<0x%x%>, %qs failed"
-msgstr "okänd FPU-typ %<0x%x%>, %qs misslyckades"
+msgstr "okänd nativ FPU-typ %<0x%x%>, %qs misslyckades"
 
 #: config/loongarch/loongarch-cpu.cc:177
 #, gcc-internal-format
@@ -41612,10 +41602,9 @@ msgid "%qs is disabled by %<-m%s%>, because it requires %<%s%s%>"
 msgstr "%qs avaktiveras av %<-m%s%> eftersom det kräver %<%s%s%>"
 
 #: config/loongarch/loongarch-opts.cc:389
-#, fuzzy, gcc-internal-format
-#| msgid "switch %<-mcpu=%s%> conflicts with switch %<-march=%s%>"
+#, gcc-internal-format
 msgid "%<-m%s=%s%> conflicts with %qs, which requires %<%s%s%>"
-msgstr "flaggan %<-mcpu=%s%> står i konflikt med flaggan %<-march=%s%>"
+msgstr "%<-m%s=%s%> står i konflikt med %qs, vilken kräver %<%s%s%>"
 
 #: config/loongarch/loongarch-opts.cc:433
 #, gcc-internal-format
@@ -41835,10 +41824,9 @@ msgid "%qE attribute requires a string argument"
 msgstr "attributet %qE behöver ett strängargument"
 
 #: config/mips/mips.cc:1340
-#, fuzzy, gcc-internal-format
-#| msgid "argument to %qE attribute is neither zero, nor one"
+#, gcc-internal-format
 msgid "argument to %qE attribute is neither no, pcrel nor yes"
-msgstr "argumentet till attributet %qE är varken noll eller ett"
+msgstr "argumentet till attributet %qE är varken no, pcrel eller yes"
 
 #: config/mips/mips.cc:1506 config/mips/mips.cc:1510
 #, gcc-internal-format
@@ -41933,10 +41921,9 @@ msgid "MSA MIPS16 code"
 msgstr "MSA MIPS16-kod"
 
 #: config/mips/mips.cc:20067
-#, fuzzy, gcc-internal-format
-#| msgid "%<-mno-gpopt%> needs %<-mexplicit-relocs%>"
+#, gcc-internal-format
 msgid "MIPS16 requires %<-mexplicit-relocs%>"
-msgstr "%<-mno-gpopt%> behöver %<-mexplicit-relocs%>"
+msgstr "MIPS16 behöver %<-mexplicit-relocs%>"
 
 #: config/mips/mips.cc:20258 config/mips/mips.cc:20263
 #: config/mips/mips.cc:20353 config/mips/mips.cc:20355
@@ -42802,10 +42789,9 @@ msgid "PTX version (%<-mptx%>) needs to be at least %s to support selected %<-mi
 msgstr "PTX-version (%<-mptx%>) behöver vara åtminstone %s för att stödja vald %<-misa%> (sm_%s)"
 
 #: config/nvptx/nvptx.cc:340
-#, fuzzy, gcc-internal-format
-#| msgid "multiple %<-mcpu=%> options specified"
+#, gcc-internal-format
 msgid "%<-march=%> must be specified"
-msgstr "flera %<-mcpu=%>-flaggor angivna"
+msgstr "%<-march=%> måste anges"
 
 #: config/nvptx/nvptx.cc:363
 #, gcc-internal-format
@@ -42984,10 +42970,9 @@ msgid "%<#pragma riscv intrinsic%> requires a string parameter"
 msgstr "%<#pragma riscv intrinsic%> kräver en strängparameter"
 
 #: config/riscv/riscv-c.cc:203
-#, fuzzy, gcc-internal-format
-#| msgid "%<#pragma riscv intrinsic%> option %qs needs 'V' extension enabled"
+#, gcc-internal-format
 msgid "%<#pragma riscv intrinsic%> option %qs needs 'V' or 'XTHEADVECTOR' extension enabled"
-msgstr "%<#pragma riscv intrinsic%>-alternativet %qs behöver ha utvidgningen ”V” aktiverad"
+msgstr "%<#pragma riscv intrinsic%>-alternativet %qs behöver ha utvidgningen ”V” eller ”XTHEADVECTOR” aktiverad"
 
 #: config/riscv/riscv-c.cc:211
 #, gcc-internal-format
@@ -43020,10 +43005,9 @@ msgid "%<target()%> attribute: unknown CPU %qs"
 msgstr "attributet %<target()%>: okänd CPU %qs"
 
 #: config/riscv/riscv-target-attr.cc:195
-#, fuzzy, gcc-internal-format
-#| msgid "target attribute is not supported on this machine"
+#, gcc-internal-format
 msgid "%<target()%> attribute: tune appears more than once"
-msgstr "målattribut stödjs inte på denna maskin"
+msgstr "attributet %<target()%>: trimning förekommer mer än en gång"
 
 #: config/riscv/riscv-target-attr.cc:201
 #, gcc-internal-format
@@ -43031,34 +43015,29 @@ msgid "%<target()%> attribute: unknown TUNE %qs"
 msgstr "attributet %<target()%>: okänd TUNE %qs"
 
 #: config/riscv/riscv-target-attr.cc:240
-#, fuzzy, gcc-internal-format
-#| msgid "malformed %<target()%> pragma or attribute"
+#, gcc-internal-format
 msgid "malformed %<target()%> attribute"
-msgstr "felformaterat pragma eller attribut %<target()%>"
+msgstr "felformaterat attribut %<target()%>"
 
 #: config/riscv/riscv-target-attr.cc:254
-#, fuzzy, gcc-internal-format
-#| msgid "pragma or attribute %<target(\"%s\")%> does not accept an argument"
+#, gcc-internal-format
 msgid "attribute %<target(\"%s\")%> does not accept an argument"
-msgstr "pragmat eller attributet %<target(\"%s\")%> tar inte något argument"
+msgstr "attributet %<target(\"%s\")%> tar inte något argument"
 
 #: config/riscv/riscv-target-attr.cc:271
-#, fuzzy, gcc-internal-format
-#| msgid "unknown attribute %qs"
+#, gcc-internal-format
 msgid "Got unknown attribute %<target(\"%s\")%>"
-msgstr "okänt attribut %qs"
+msgstr "Fick ett okänt attribut %<target(\"%s\")%>"
 
 #: config/riscv/riscv-target-attr.cc:352
-#, fuzzy, gcc-internal-format
-#| msgid "malformed %<target(\"%s\")%> pragma or attribute"
+#, gcc-internal-format
 msgid "malformed %<target(\"%s\")%> attribute"
-msgstr "felformaterat pragma eller attribut %<target(\"%s\")%>"
+msgstr "felformaterat attribut %<target(\"%s\")%>"
 
 #: config/riscv/riscv-vector-builtins.cc:4239
-#, fuzzy, gcc-internal-format
-#| msgid "passing %wd to argument %d of %qE, which expects a value in the range [%wd, %wd]"
+#, gcc-internal-format
 msgid "passing %wd to argument %d of %qE, which expects a value in the range [%wd, %wd] or %wd"
-msgstr "skickar %wd som argument %d till %qE, vilken förväntar sig ett värdet i intervallet [%wd, %wd]"
+msgstr "skickar %wd som argument %d till %qE, vilken förväntar sig ett värdet i intervallet [%wd, %wd] eller %wd"
 
 #: config/riscv/riscv-vector-builtins.cc:4435
 #, gcc-internal-format
@@ -43111,10 +43090,9 @@ msgid "capture by copy of RVV type %qT"
 msgstr "fångst av kopia av RVV-typen %qT"
 
 #: config/riscv/riscv-vector-builtins.cc:4633
-#, fuzzy, gcc-internal-format
-#| msgid "no matching function for call to %<%s(%A)%>"
+#, gcc-internal-format
 msgid "no matching function call to %qE with empty arguments"
-msgstr "ingen funktion som stämmer för anrop av %<%s(%A)%>"
+msgstr "ingen funktion som stämmer för anrop av %qE med tomma argument"
 
 #: config/riscv/riscv.cc:647
 #, gcc-internal-format
@@ -43137,10 +43115,9 @@ msgid "ABI for flattened struct with zero-length bit-fields changed in GCC 10"
 msgstr "ABI:et för en tillplattad post med nollängds bitfält ändrades i GCC 10"
 
 #: config/riscv/riscv.cc:5237
-#, fuzzy, gcc-internal-format
-#| msgid "SVE type %qT cannot be passed to an unprototyped function"
+#, gcc-internal-format
 msgid "RVV type %qT cannot be passed to an unprototyped function"
-msgstr "SVE-typen %qT kan inte skickas till en funktion utan prototyp"
+msgstr "RVV-typen %qT kan inte skickas till en funktion utan prototyp"
 
 #: config/riscv/riscv.cc:5515
 #, gcc-internal-format
@@ -43158,16 +43135,14 @@ msgid "Current RISC-V GCC does not support VLEN greater than 4096bit for 'V' Ext
 msgstr "Aktuell RISC-V GCC stödjer inte VLEN större än 4096 bitar till utökningen ”V”"
 
 #: config/riscv/riscv.cc:8923
-#, fuzzy, gcc-internal-format
-#| msgid "target CPU does not support ARM mode"
+#, gcc-internal-format
 msgid "Current RISC-V GCC does not support RVV in big-endian mode"
-msgstr "målprocessorn stödjer inte ARM-läge"
+msgstr "Nuvarande RISC-V GCC stödjer inte RVV i läget rak byteordning"
 
 #: config/riscv/riscv.cc:8949 config/riscv/riscv.cc:8952
-#, fuzzy, gcc-internal-format
-#| msgid "code model %qs with %<-f%s%>"
+#, gcc-internal-format
 msgid "code model %qs with %qs"
-msgstr "kodmodell %qs med %<-f%s%>"
+msgstr "kodmodell %qs med %qs"
 
 #: config/riscv/riscv.cc:8981
 #, gcc-internal-format
@@ -43180,16 +43155,14 @@ msgid "rv32e requires ilp32e ABI"
 msgstr "rv32e kräver ABI:et ilp32e"
 
 #: config/riscv/riscv.cc:8990
-#, fuzzy, gcc-internal-format
-#| msgid "rv32e requires ilp32e ABI"
+#, gcc-internal-format
 msgid "rv64e requires lp64e ABI"
-msgstr "rv32e kräver ABI:et ilp32e"
+msgstr "rv64e kräver ABI:et lp64e"
 
 #: config/riscv/riscv.cc:8997
-#, fuzzy, gcc-internal-format
-#| msgid "z*inx requires ABI ilp32, ilp32e or lp64"
+#, gcc-internal-format
 msgid "z*inx requires ABI ilp32, ilp32e, lp64 or lp64e"
-msgstr "z*inx kräver ABI ilp32, ilp32e eller lp64"
+msgstr "z*inx kräver ABI:et ilp32, ilp32e, lp64 eller lp64"
 
 #: config/riscv/riscv.cc:9001
 #, gcc-internal-format
@@ -44104,28 +44077,24 @@ msgid "value %qs is not supported by attribute %<target%>"
 msgstr "värdet %qs stödjs inte av attributet %<target%>"
 
 #: config/s390/s390.cc:17531
-#, fuzzy, gcc-internal-format
-#| msgid "invalid constraints"
+#, gcc-internal-format
 msgid "invalid cc output constraint: %qs"
-msgstr "ogiltiga begränsningar"
+msgstr "ogiltig cc-utmatningsbegränsning: %qs"
 
 #: config/s390/s390.cc:17536
-#, fuzzy, gcc-internal-format
-#| msgid "double constants not supported"
+#, gcc-internal-format
 msgid "multiple cc output constraints not supported"
-msgstr "double-konstanter stödjs inte"
+msgstr "flera cc-utmatningsbegränsningar stödjs inte"
 
 #: config/s390/s390.cc:17541
-#, fuzzy, gcc-internal-format
-#| msgid "%<asm%> specifier for variable %qE conflicts with %<asm%> clobber list"
+#, gcc-internal-format
 msgid "%<asm%> specifier for cc output conflicts with %<asm%> clobber list"
-msgstr "%<asm%>-specificerare för variabeln %qE står i konflikt med %<asm%>-överskrivningslista"
+msgstr "%<asm%>-specificerare för cc-utmatning står i konflikt med %<asm%>-överskrivningslista"
 
 #: config/s390/s390.cc:17547
-#, fuzzy, gcc-internal-format
-#| msgid "invalid type for make function"
+#, gcc-internal-format
 msgid "invalid type for cc output constraint"
-msgstr "ogiltig typ för make-funktion"
+msgstr "ogiltig typ för cc-utmatningsbegränsning"
 
 #: config/sh/sh.cc:936
 #, gcc-internal-format
@@ -44692,10 +44661,9 @@ msgid "declaration of %q+D shadows a built-in function"
 msgstr "deklaration av %q+D skuggar en inbyggd funktion"
 
 #: c/c-decl.cc:2153
-#, fuzzy, gcc-internal-format
-#| msgid "redeclaration of enumerator %q+D"
+#, gcc-internal-format
 msgid "conflicting redeclaration of enumerator %q+D"
-msgstr "omdeklaration av uppräkningstyp %q+D"
+msgstr "omdeklaration av uppräkningstyp %q+D som står i konflikt"
 
 #: c/c-decl.cc:2160
 #, gcc-internal-format
@@ -44979,10 +44947,9 @@ msgid "traditional C lacks a separate namespace for labels, identifier %qE confl
 msgstr "traditionell C saknar en separat namnrymd för etiketter, identifierare %qE står i konflikt"
 
 #: c/c-decl.cc:4379
-#, fuzzy, gcc-internal-format
-#| msgid "switch jumps over variable initialization"
+#, gcc-internal-format
 msgid "switch jumps over OpenMP %<allocate%> allocation"
-msgstr "switch hoppar över variabelinitieringar"
+msgstr "switch hoppar över en OpenMP %<allocate%>-allokering"
 
 #: c/c-decl.cc:4385
 #, gcc-internal-format
@@ -45152,10 +45119,9 @@ msgid "%<[*]%> not allowed in other than function prototype scope"
 msgstr "%<[*]%> är inte tillåtet annat än inom en funktionsprototyp"
 
 #: c/c-decl.cc:5475 cp/decl2.cc:1852 cp/name-lookup.cc:8767
-#, fuzzy, gcc-internal-format
-#| msgid "%<omp::%E%> not allowed to be specified in this context"
+#, gcc-internal-format
 msgid "%<omp::%s%> not allowed to be specified in this context"
-msgstr "%<omp::%E%> är inte tillåtet att anges i detta sammanhang"
+msgstr "%<omp::%s%> är inte tillåtet att anges i detta sammanhang"
 
 #: c/c-decl.cc:5555
 #, gcc-internal-format
@@ -45780,10 +45746,9 @@ msgid "ISO C90 does not support %<_Noreturn%>"
 msgstr "ISO C90 stödjer inte %<_Noreturn%>"
 
 #: c/c-decl.cc:8204
-#, fuzzy, gcc-internal-format
-#| msgid "variable previously declared %<static%> redeclared %<extern%>"
+#, gcc-internal-format
 msgid "function previously declared %<static%> redeclared %<extern%>"
-msgstr "variabel tidigare deklarerad %<static%> omdeklarerad som %<extern%>"
+msgstr "funktionen tidigare deklarerad %<static%> omdeklarerad som %<extern%>"
 
 #: c/c-decl.cc:8222
 #, gcc-internal-format
@@ -45991,10 +45956,9 @@ msgid "flexible array member in a struct with no named members"
 msgstr "flexibel vektormedlem i struct utan namngivna medlemmar"
 
 #: c/c-decl.cc:9519
-#, fuzzy, gcc-internal-format
-#| msgid "flexible array member not at end of struct"
+#, gcc-internal-format
 msgid "structure containing a flexible array member is not at the end of another structure"
-msgstr "flexibel vektormedlem inte vid slutet av post"
+msgstr "posten som innehåller en flexibel vektormedlem inte vid slutet av annan post"
 
 #: c/c-decl.cc:9542
 #, gcc-internal-format
@@ -46012,16 +45976,14 @@ msgid "union cannot be made transparent"
 msgstr "unionen kan inte göras transparent"
 
 #: c/c-decl.cc:9686
-#, fuzzy, gcc-internal-format
-#| msgid "redefinition of typedef %q+D with variably modified type"
+#, gcc-internal-format
 msgid "redefinition of struct or union %qT with variably modified type"
-msgstr "omdefinition av typedef %q+D med variabelt modifierad typ"
+msgstr "omdefinition av posten eller unionen %qT med variabelt modifierad typ"
 
 #: c/c-decl.cc:9689
-#, fuzzy, gcc-internal-format
-#| msgid "redefinition of %<struct %E%>"
+#, gcc-internal-format
 msgid "redefinition of struct or union %qT"
-msgstr "omdefinition av %<struct %E%>"
+msgstr "omdefinition av posten eller unionen %qT"
 
 #: c/c-decl.cc:9852
 #, gcc-internal-format
@@ -46054,10 +46016,9 @@ msgid "enumeration values exceed range of %qs"
 msgstr "uppräkningsvärden överskrider gränsen på %qs"
 
 #: c/c-decl.cc:10133
-#, fuzzy, gcc-internal-format
-#| msgid "nested redefinition of %<enum %E%>"
+#, gcc-internal-format
 msgid "conflicting redefinition of enum %qT"
-msgstr "nästad omdefinition av %<enum %E%>"
+msgstr "omdefinition av enum %qT som står i konflikt"
 
 #: c/c-decl.cc:10165 c/c-decl.cc:10181
 #, gcc-internal-format
@@ -46085,10 +46046,9 @@ msgid "enumerator value outside the range of %qs"
 msgstr "uppräkningsvärdet är utanför intervallet för %qs"
 
 #: c/c-decl.cc:10241
-#, fuzzy, gcc-internal-format
-#| msgid "ISO C restricts enumerator values to range of %<int%> before C2X"
+#, gcc-internal-format
 msgid "ISO C restricts enumerator values to range of %<int%> before C23"
-msgstr "ISO C begränsar uppräkningsvärden till intervallet hos %<int%> före C2X"
+msgstr "ISO C begränsar uppräkningsvärden till intervallet hos %<int%> före C23"
 
 #: c/c-decl.cc:10442 cp/decl.cc:5981 cp/decl.cc:17785
 #, gcc-internal-format
@@ -46151,10 +46111,9 @@ msgid "traditional C rejects ISO C style function definitions"
 msgstr "traditionell C tillåter inte ISO C:s stil av funktionsdefinitioner"
 
 #: c/c-decl.cc:10696
-#, fuzzy, gcc-internal-format
-#| msgid "ISO C does not support omitting parameter names in function definitions before C2X"
+#, gcc-internal-format
 msgid "ISO C does not support omitting parameter names in function definitions before C23"
-msgstr "ISO C stödjer inte att utelämna parameternamn i funktionsdefinitioner före C2X"
+msgstr "ISO C stödjer inte att utelämna parameternamn i funktionsdefinitioner före C23"
 
 #: c/c-decl.cc:10736 c/c-decl.cc:10740
 #, gcc-internal-format
@@ -46359,10 +46318,9 @@ msgid "ISO C90 does not support boolean types"
 msgstr "ISO C90 stödjer inte booleska typer"
 
 #: c/c-decl.cc:12451
-#, fuzzy, gcc-internal-format
-#| msgid "ISO C does not support the %<_Float%d%s%> type"
+#, gcc-internal-format
 msgid "ISO C does not support the %<_Float%d%s%> type before C23"
-msgstr "ISO C stödjer inte typen %<_Float%d%s%>"
+msgstr "ISO C stödjer inte typen %<_Float%d%s%> före C23"
 
 #: c/c-decl.cc:12502 cp/parser.cc:20288
 #, gcc-internal-format
@@ -46370,10 +46328,9 @@ msgid "%<_Float%d%s%> is not supported on this target"
 msgstr "%<_Float%d%s%> stödjs inte för denna målarkitektur"
 
 #: c/c-decl.cc:12573
-#, fuzzy, gcc-internal-format
-#| msgid "ISO C does not support decimal floating-point before C2X"
+#, gcc-internal-format
 msgid "ISO C does not support decimal floating-point before C23"
-msgstr "ISO C stödjer inte decimala flyttal före C2X"
+msgstr "ISO C stödjer inte decimala flyttal före C23"
 
 #: c/c-decl.cc:12597 c/c-decl.cc:12974 c/c-parser.cc:10628
 #, gcc-internal-format
@@ -46386,16 +46343,14 @@ msgid "ISO C does not support fixed-point types"
 msgstr "ISO C stödjer inte fixdecimaltyper"
 
 #: c/c-decl.cc:12628
-#, fuzzy, gcc-internal-format
-#| msgid "case label is not an integer constant expression"
+#, gcc-internal-format
 msgid "%<_BitInt%> argument is not an integer constant expression"
-msgstr "case-etikett är inte ett konstant heltalsuttryck"
+msgstr "argumentet till %<_BitInt%> är inte ett konstant heltalsuttryck"
 
 #: c/c-decl.cc:12634
-#, fuzzy, gcc-internal-format
-#| msgid "enumerator value for %qE is not an integer constant expression"
+#, gcc-internal-format
 msgid "%<_BitInt%> argument %qE is not a positive integer constant expression"
-msgstr "uppräkningsvärde för %qE är inte ett konstant heltalsuttryck"
+msgstr "argumentet %qE till %<_BitInt%> är inte ett konstant positivt heltalsuttryck"
 
 #: c/c-decl.cc:12641
 #, gcc-internal-format
@@ -46500,10 +46455,9 @@ msgid "ISO C does not support plain %<complex%> meaning %<double complex%>"
 msgstr "ISO C stödjer inte bara %<complex%> i meningen %<double complex%>"
 
 #: c/c-decl.cc:12997
-#, fuzzy, gcc-internal-format
-#| msgid "ISO C does not support %<auto%> type deduction before C2X"
+#, gcc-internal-format
 msgid "ISO C does not support %<auto%> type deduction before C23"
-msgstr "ISO C stödjer inte %<auto%>-attribut före C2X"
+msgstr "ISO C stödjer inte %<auto%>-attribut före C23"
 
 #: c/c-decl.cc:13026
 #, gcc-internal-format
@@ -46516,16 +46470,14 @@ msgid "ISO C does not support complex integer types"
 msgstr "ISO C stödjer inte komplexa heltalstyper"
 
 #: c/c-decl.cc:13237
-#, fuzzy, gcc-internal-format
-#| msgid "Fixed line length must be at least seven"
+#, gcc-internal-format
 msgid "%<signed _BitInt%> argument must be at least 2"
-msgstr "Fast radlängd måste vara minst sju"
+msgstr "argumentet till %<signed _BitInt%> måste vara åtminstone 2"
 
 #: c/c-decl.cc:13246
-#, fuzzy, gcc-internal-format
-#| msgid "ISO C++ does not support %<__int%d%> for %qs"
+#, gcc-internal-format
 msgid "ISO C does not support %<%s_BitInt(%d)%> before C23"
-msgstr "ISO C++ stödjer inte %<__int%d%> för %qs"
+msgstr "ISO C stödjer inte %<%s_BitInt(%d)%> före C23"
 
 #: c/c-decl.cc:13545 cp/semantics.cc:6316
 #, gcc-internal-format
@@ -46812,10 +46764,9 @@ msgid "%<__GIMPLE%> only valid with %<-fgimple%>"
 msgstr "%<__GIMPLE%> är endast giltigt med %<-fgimple%>"
 
 #: c/c-parser.cc:3699
-#, fuzzy, gcc-internal-format
-#| msgid "ISO C does not support specifying %<enum%> underlying types before C2X"
+#, gcc-internal-format
 msgid "ISO C does not support specifying %<enum%> underlying types before C23"
-msgstr "ISO C stödjer inte att ange underliggande typer för %<enum%> före C2X"
+msgstr "ISO C stödjer inte att ange underliggande typer för %<enum%> före C23"
 
 #: c/c-parser.cc:3708
 #, gcc-internal-format
@@ -46922,10 +46873,9 @@ msgid "expected identifier or %<(%>"
 msgstr "identifierare eller %<(%> förväntades"
 
 #: c/c-parser.cc:4920
-#, fuzzy, gcc-internal-format
-#| msgid "ISO C requires a named argument before %<...%> before C2X"
+#, gcc-internal-format
 msgid "ISO C requires a named argument before %<...%> before C23"
-msgstr "ISO C kräver ett namngivet argument före %<...%> före C2X"
+msgstr "ISO C kräver ett namngivet argument före %<...%> före C23"
 
 #: c/c-parser.cc:5045
 #, gcc-internal-format
@@ -46958,10 +46908,9 @@ msgid "%qE attribute does not take any arguments"
 msgstr "attributet %qE tar inga argument"
 
 #: c/c-parser.cc:5893
-#, fuzzy, gcc-internal-format
-#| msgid "ISO C does not support %<[[]]%> attributes before C2X"
+#, gcc-internal-format
 msgid "ISO C does not support %<[[]]%> attributes before C23"
-msgstr "ISO C stödjer inte %<[[]]%>-attribut före C2X"
+msgstr "ISO C stödjer inte %<[[]]%>-attribut före C23"
 
 #: c/c-parser.cc:6106 c/c-parser.cc:6169 c/c-typeck.cc:8822
 #, gcc-internal-format
@@ -46969,10 +46918,9 @@ msgid "variable-sized object may not be initialized except with an empty initial
 msgstr "objekt med variabel storlek kan inte initieras utom med en tom initierare"
 
 #: c/c-parser.cc:6163
-#, fuzzy, gcc-internal-format
-#| msgid "ISO C forbids empty initializer braces before C2X"
+#, gcc-internal-format
 msgid "ISO C forbids empty initializer braces before C23"
-msgstr "ISO C förbjuder tomma klamrar som initierare före C2X"
+msgstr "ISO C förbjuder tomma klamrar som initierare före C23"
 
 #: c/c-parser.cc:6227
 #, gcc-internal-format
@@ -46995,22 +46943,19 @@ msgid "obsolete use of designated initializer without %<=%>"
 msgstr "föråldrad användning av designerade initierare utan %<=%>"
 
 #: c/c-parser.cc:6567 cp/parser.cc:13308
-#, fuzzy, gcc-internal-format
-#| msgid "no valid clauses specified in %<#pragma acc declare%>"
+#, gcc-internal-format
 msgid "inner loops must be perfectly nested in %<#pragma acc loop%>"
-msgstr "inga giltiga klausuler angivna i %<#pragma acc declare%>"
+msgstr "inre slingor måste vara perfekt nästade i %<#pragma acc loop%>"
 
 #: c/c-parser.cc:6574 cp/parser.cc:13315
-#, fuzzy, gcc-internal-format
-#| msgid "%<ordered%> region must be closely nested inside a loop region with an %<ordered%> clause"
+#, gcc-internal-format
 msgid "inner loops must be perfectly nested with %<ordered%> clause"
-msgstr "en %<ordered%> region måste vara nära innesluten inuti en slingaregion med en %<ordered%>-klausul"
+msgstr "inre slingor måste vara perfekt nästade med en %<ordered%>-klausul"
 
 #: c/c-parser.cc:6581 cp/parser.cc:13322
-#, fuzzy, gcc-internal-format
-#| msgid "%<nogroup%> clause must not be used together with %<reduction%> clause"
+#, gcc-internal-format
 msgid "inner loops must be perfectly nested with %<reduction%> %<inscan%> clause"
-msgstr "en %<nogroup%>-klausul får inte användas tillsammans med en %<reduction%>-klausul"
+msgstr "inre slingor måste vara perfekt nästade med en %<reduction%> %<inscan%>-klausul"
 
 #: c/c-parser.cc:6638 c/c-parser.cc:6793 cp/parser.cc:12240 cp/parser.cc:12390
 #: cp/parser.cc:48555
@@ -47019,17 +46964,15 @@ msgid "mixing OpenMP directives with attribute and pragma syntax on the same sta
 msgstr "OpenMP-direktiv blandas med attribut- och pragma-syntax på samma sats"
 
 #: c/c-parser.cc:6646 cp/parser.cc:12248
-#, fuzzy, gcc-internal-format
-#| msgid "%<omp::%E%> attribute requires argument"
+#, gcc-internal-format
 msgid "OpenMP %<omp::decl%> attribute on a statement"
-msgstr "attributet %<omp::%E%> behöver argument"
+msgstr "OpenMP %<omp::decl%>-attribut på en sats"
 
 #: c/c-parser.cc:6670 c/c-parser.cc:6889 c/c-parser.cc:25015 cp/parser.cc:12272
 #: cp/parser.cc:48535 cp/parser.cc:48675
-#, fuzzy, gcc-internal-format
-#| msgid "unknown OpenMP directive name in %qs clause argument"
+#, gcc-internal-format
 msgid "unknown OpenMP directive name in %qs attribute argument"
-msgstr "okänt OpenMP-direktivnamn i attributargumentet %qs"
+msgstr "okänt OpenMP-direktivnamn i klausulargumentet %qs"
 
 #: c/c-parser.cc:6762 cp/parser.cc:12359
 #, gcc-internal-format
@@ -47498,16 +47441,14 @@ msgid "wrong number of arguments to %<__builtin_shuffle%>"
 msgstr "fel antal argument till %<__builtin_shuffle%>"
 
 #: c/c-parser.cc:11851
-#, fuzzy, gcc-internal-format
-#| msgid "wrong number of arguments"
+#, gcc-internal-format
 msgid "wrong number of arguments to %qs"
-msgstr "fel antal argument"
+msgstr "fel antal argument till %qs"
 
 #: c/c-parser.cc:11860
-#, fuzzy, gcc-internal-format
-#| msgid "%qD does not have integral type"
+#, gcc-internal-format
 msgid "%qs operand not an integral type"
-msgstr "%qD har inte heltalstyp"
+msgstr "operanden %qs är inte en heltalstyp"
 
 #: c/c-parser.cc:12123 cp/parser.cc:6134
 #, gcc-internal-format
@@ -47515,10 +47456,9 @@ msgid "%<omp_all_memory%> may only be used in OpenMP %<depend%> clause"
 msgstr "%<omp_all_memory%> kan bara användas i en OpenMP %<depend%>-klausul"
 
 #: c/c-parser.cc:12133
-#, fuzzy, gcc-internal-format
-#| msgid "ISO C does not support %qs before C2X"
+#, gcc-internal-format
 msgid "ISO C does not support %qs before C23"
-msgstr "ISO C stödjer inte %qs före C2X"
+msgstr "ISO C stödjer inte %qs före C23"
 
 #: c/c-parser.cc:12221
 #, gcc-internal-format
@@ -47551,10 +47491,9 @@ msgid "ISO C90 forbids compound literals"
 msgstr "ISO C90 förbjuder sammansatta litteraler"
 
 #: c/c-parser.cc:12284
-#, fuzzy, gcc-internal-format
-#| msgid "ISO C forbids storage class specifiers in compound literals before C2X"
+#, gcc-internal-format
 msgid "ISO C forbids storage class specifiers in compound literals before C23"
-msgstr "ISO C förbjuder lagringsklasspecificerare i sammansatta litteraler före C2X"
+msgstr "ISO C förbjuder lagringsklasspecificerare i sammansatta litteraler före C23"
 
 #: c/c-parser.cc:12298
 #, gcc-internal-format
@@ -47795,10 +47734,9 @@ msgid "expected %<none%>, %<shared%>, %<private%> or %<firstprivate%>"
 msgstr "%<none%>, %<shared%>, %<private%> eller %<firstprivate%> förväntades"
 
 #: c/c-parser.cc:15925 cp/parser.cc:39100
-#, fuzzy, gcc-internal-format
-#| msgid "expected goto expression"
+#, gcc-internal-format
 msgid "expected constant logical expression"
-msgstr "goto-uttryck förväntades"
+msgstr "ett konstant logiskt uttryck förväntades"
 
 #: c/c-parser.cc:16002 cp/parser.cc:39182
 #, gcc-internal-format
@@ -47870,10 +47808,9 @@ msgid "expected %<alloc%>, %<to%>, %<from%>, %<tofrom%>, %<firstprivate%>, %<non
 msgstr "%<alloc%>, %<to%>, %<from%>, %<tofrom%>, %<firstprivate%>, %<none%> eller %<default%> förväntades"
 
 #: c/c-parser.cc:16552
-#, fuzzy, gcc-internal-format
-#| msgid "expected %<scalar%>, %<aggregate%> or %<pointer%>"
+#, gcc-internal-format
 msgid "expected %<scalar%>, %<aggregate%>, %<pointer%> or %<all%>"
-msgstr "%<scalar%>, %<aggregate%> eller %<pointer%> förväntades"
+msgstr "%<scalar%>, %<aggregate%>, %<pointer%> eller %<all%> förväntades"
 
 #: c/c-parser.cc:16629 cp/parser.cc:39718
 #, gcc-internal-format
@@ -47912,10 +47849,9 @@ msgid "%<tile%> argument needs positive integral constant"
 msgstr "argumentet till %<tile%> behöver en positiv heltalskonstant"
 
 #: c/c-parser.cc:17059 cp/parser.cc:41829
-#, fuzzy, gcc-internal-format
-#| msgid "too many %<if%> clauses"
+#, gcc-internal-format
 msgid "too many %<self%> clauses"
-msgstr "för många %<if%>-klausuler"
+msgstr "för många %<self%>-klausuler"
 
 #: c/c-parser.cc:17101 cp/parser.cc:39771
 #, gcc-internal-format
@@ -48059,16 +47995,14 @@ msgid "too many %<close%> modifiers"
 msgstr "för många %<close%>-modifierare"
 
 #: c/c-parser.cc:18792 cp/parser.cc:41456
-#, fuzzy, gcc-internal-format
-#| msgid "too many %<close%> modifiers"
+#, gcc-internal-format
 msgid "too many %<present%> modifiers"
-msgstr "för många %<close%>-modifierare"
+msgstr "för många %<present%>-modifierare"
 
 #: c/c-parser.cc:18800 cp/parser.cc:41467
-#, fuzzy, gcc-internal-format
-#| msgid "%<#pragma omp target%> with modifier other than %<always%> or %<close%> on %<map%> clause"
+#, gcc-internal-format
 msgid "%<map%> clause with map-type modifier other than %<always%>, %<close%> or %<present%>"
-msgstr "%<#pragma omp target%> med en annan modifierare än en %<always%> eller %<close%> på en %<map%>-klausul"
+msgstr "en klausul %<map%> med en annan avbildningstypsmodifierare än %<always%>, %<close%> eller %<present%>"
 
 #: c/c-parser.cc:18838 cp/parser.cc:41507
 #, gcc-internal-format
@@ -48111,10 +48045,9 @@ msgid "%<detach%> clause event handle has type %qT rather than %<omp_event_handl
 msgstr "%<detach%>-klausulens händelsehandtag har typen %qT istället för %<omp_event_handle_t%>"
 
 #: c/c-parser.cc:19391 cp/parser.cc:42045
-#, fuzzy, gcc-internal-format
-#| msgid "expected assumption clause"
+#, gcc-internal-format
 msgid "expected an OpenACC clause"
-msgstr "assumption-klausul förväntades"
+msgstr "en OpenACC-klausul förväntades"
 
 #: c/c-parser.cc:19402 c/c-parser.cc:19767 cp/parser.cc:42056
 #: cp/parser.cc:42464
@@ -48133,10 +48066,9 @@ msgid "%qs must be the first clause of %qs"
 msgstr "%qs måste vara den första klausulen i %qs"
 
 #: c/c-parser.cc:19756 cp/parser.cc:42453
-#, fuzzy, gcc-internal-format
-#| msgid "expected assumption clause"
+#, gcc-internal-format
 msgid "expected an OpenMP clause"
-msgstr "assumption-klausul förväntades"
+msgstr "en OpenMP-klausul förväntades"
 
 #: c/c-parser.cc:19891 cp/parser.cc:47284
 #, gcc-internal-format
@@ -48234,16 +48166,14 @@ msgid "%<#pragma acc update%> must contain at least one %<device%> or %<host%> o
 msgstr "%<#pragma acc update%> måste innehålla åtminstone en %<device%>- eller %<host%>- eller %<self%>-klausul"
 
 #: c/c-parser.cc:20558
-#, fuzzy, gcc-internal-format
-#| msgid "variables in %<__regio_symbol%> address space must be declared %<extern%>"
+#, gcc-internal-format
 msgid "variable %qD used in the %<allocator%> clause must be declared before %qD"
-msgstr "variabler i adressrymden %<__regio_symbol%> måste deklareras %<extern%>"
+msgstr "variabeln %qD i %<allocator%>-klausulen måste deklareras före %qD"
 
 #: c/c-parser.cc:20562 c/c-parser.cc:20585
-#, fuzzy, gcc-internal-format
-#| msgid "template parameter %qD declared here"
+#, gcc-internal-format
 msgid "to be allocated variable declared here"
-msgstr "mallparametern %qD deklarerad här"
+msgstr "variabeln att allokera deklarerad här"
 
 #: c/c-parser.cc:20580
 #, gcc-internal-format
@@ -48251,10 +48181,9 @@ msgid "variable %qD used in the %<allocator%> clause must not be modified betwee
 msgstr "variabeln %qD använd i klausulen %<allocator%> får inte ändras mellan deklarationen av %qD och dess direktiv %<allocate%>"
 
 #: c/c-parser.cc:20583
-#, fuzzy, gcc-internal-format
-#| msgid "defined here"
+#, gcc-internal-format
 msgid "modified here"
-msgstr "definierad här"
+msgstr "modifierad här"
 
 #: c/c-parser.cc:20651 cp/parser.cc:42578 cp/parser.cc:42593
 #, gcc-internal-format
@@ -48267,22 +48196,19 @@ msgid "%<allocator%> clause allocator expression has type %qT rather than %<omp_
 msgstr "%<allocator%>-klausulens allokeraruttryck har typen %qT istället för %<omp_allocator_handle_t%>"
 
 #: c/c-parser.cc:20692
-#, fuzzy, gcc-internal-format
-#| msgid "parameter %qD may not appear in this context"
+#, gcc-internal-format
 msgid "function parameter %qD may not appear as list item in an %<allocate%> directive"
-msgstr "parametern %qD får inte förekomma i detta sammanhang"
+msgstr "funktionsparametern %qD får inte förekomma som listposter i ett %<allocate%>-direktiv"
 
 #: c/c-parser.cc:20699
-#, fuzzy, gcc-internal-format
-#| msgid "deduction guide %qD must be declared in the same scope as %qT"
+#, gcc-internal-format
 msgid "%<allocate%> directive must be in the same scope as %qD"
-msgstr "härledningsguiden %qD måste deklareras med i samma räckvidd som %qT"
+msgstr "direktivet %<allocate%> måste vara i samma räckvidd som %qD"
 
 #: c/c-parser.cc:20707
-#, fuzzy, gcc-internal-format
-#| msgid "%qD appears more than once in %<allocate%> clauses"
+#, gcc-internal-format
 msgid "%qD already appeared as list item in an %<allocate%> directive"
-msgstr "%qD förekommer mer än en gång i %<allocate%>-klausuler"
+msgstr "%qD förekom redan som ett listelement i ett %<allocate%>-direktiv"
 
 #: c/c-parser.cc:20714
 #, gcc-internal-format
@@ -48290,16 +48216,14 @@ msgid "%<allocator%> clause required for static variable %qD"
 msgstr "klausulen %<allocator%> krävs för den statiska variabeln %qD"
 
 #: c/c-parser.cc:20721
-#, fuzzy, gcc-internal-format
-#| msgid "%<allocate%> clause must specify an allocator here"
+#, gcc-internal-format
 msgid "%<allocator%> clause requires a predefined allocator as %qD is static"
-msgstr "%<allocate%>-klausulen måste ange en allokerare här"
+msgstr "%<allocate%>-klausulen kräver en fördefinierad allokerare eftersom %qD är statisk"
 
 #: c/c-parser.cc:20725
-#, fuzzy, gcc-internal-format
-#| msgid "%<#pragma omp allocate%> not yet supported"
+#, gcc-internal-format
 msgid "%<#pragma omp allocate%> for static variables like %qD not yet supported"
-msgstr "%<#pragma omp allocate%> stödjs inte ännu"
+msgstr "%<#pragma omp allocate%> för statiska variabler som %qD stödjs inte ännu"
 
 #: c/c-parser.cc:20876 cp/parser.cc:42758
 #, gcc-internal-format
@@ -48339,16 +48263,14 @@ msgid "%qs clause requires %qs clause"
 msgstr "en %qs-klausul behöver en %qs-klausul"
 
 #: c/c-parser.cc:21040 cp/parser.cc:42927
-#, fuzzy, gcc-internal-format
-#| msgid "%<#pragma omp atomic write%> incompatible with %<acquire%> clause"
+#, gcc-internal-format
 msgid "%<#pragma omp atomic write%> incompatible with %<acquire%> clause implicitly provided by a %<requires%> directive"
-msgstr "%<#pragma omp atomic write%> är inkompatibelt en %<acquire%>-klausul"
+msgstr "%<#pragma omp atomic write%> är inkompatibelt med en %<acquire%>-klausul implicit tillhandahållen av ett %<requires%>-direktiv"
 
 #: c/c-parser.cc:21051 cp/parser.cc:42938
-#, fuzzy, gcc-internal-format
-#| msgid "%<#pragma omp atomic read%> incompatible with %<release%> clause"
+#, gcc-internal-format
 msgid "%<#pragma omp atomic read%> incompatible with %<release%> clause implicitly provided by a %<requires%> directive"
-msgstr "%<#pragma omp atomic read%> är inkompatibelt med en %<release%>-klausul"
+msgstr "%<#pragma omp atomic read%> är inkompatibelt med en %<release%>-klausul implicit tillhandahållen av ett %<requires%>-direktiv"
 
 #: c/c-parser.cc:21083 cp/parser.cc:42970
 #, gcc-internal-format
@@ -48412,10 +48334,9 @@ msgid "%<depobj%> expression is not lvalue expression"
 msgstr "uttrycket %<depobj%> är inte ett l-värde-uttryck"
 
 #: c/c-parser.cc:21845
-#, fuzzy, gcc-internal-format
-#| msgid "%<depobj%> expression is not lvalue expression"
+#, gcc-internal-format
 msgid "%<destroy%> expression is not lvalue expression"
-msgstr "uttrycket %<depobj%> är inte ett l-värde-uttryck"
+msgstr "uttrycket %<destroy%> är inte ett l-värde-uttryck"
 
 #: c/c-parser.cc:21851 cp/parser.cc:43744
 #, gcc-internal-format
@@ -48453,10 +48374,9 @@ msgid "%<[[omp::directive(%s)]]%> must be the only specified attribute on a stat
 msgstr "%<[[omp::directive(%s)]]%> måste vara det enda angivna attributet på en sats"
 
 #: c/c-parser.cc:22086 cp/parser.cc:44617
-#, fuzzy, gcc-internal-format
-#| msgid "%<#pragma omp ordered%> with %qs clause may only be used in compound statements"
+#, gcc-internal-format
 msgid "%<#pragma omp scan%> with zero preceding executable statements"
-msgstr "%<#pragma omp ordered%> med %qs-klausul får bara användas i sammansatta satser"
+msgstr "%<#pragma omp scan%> med noll föregående körbara satser"
 
 #: c/c-parser.cc:22120 cp/parser.cc:44650
 #, gcc-internal-format
@@ -48469,10 +48389,9 @@ msgid "expected %<#pragma omp scan%>"
 msgstr "%<#pragma omp scan%> förväntades"
 
 #: c/c-parser.cc:22134 cp/parser.cc:44665
-#, fuzzy, gcc-internal-format
-#| msgid "%<#pragma omp ordered%> with %qs clause may only be used in compound statements"
+#, gcc-internal-format
 msgid "%<#pragma omp scan%> with zero succeeding executable statements"
-msgstr "%<#pragma omp ordered%> med %qs-klausul får bara användas i sammansatta satser"
+msgstr "%<#pragma omp scan%> med noll flöljande körbara satser"
 
 #: c/c-parser.cc:22252 cp/semantics.cc:10734 cp/semantics.cc:10819
 #, gcc-internal-format
@@ -48481,10 +48400,9 @@ msgstr "iterationsdeklaration eller initiering förväntades"
 
 #: c/c-parser.cc:22340 c/c-parser.cc:22355 cp/parser.cc:45012
 #: cp/parser.cc:45027
-#, fuzzy, gcc-internal-format
-#| msgid "not enough perfectly nested loops"
+#, gcc-internal-format
 msgid "not enough nested loops"
-msgstr "för få perfekt nästade slingor"
+msgstr "inte tillräckligt med nästade slingor"
 
 #: c/c-parser.cc:22455 cp/parser.cc:45299
 #, gcc-internal-format
@@ -48572,10 +48490,9 @@ msgid "expected trait selector name"
 msgstr "trait-väljarnamn förväntades"
 
 #: c/c-parser.cc:24542 cp/parser.cc:47860
-#, fuzzy, gcc-internal-format
-#| msgid "selector %qs not allowed for context selector set %qs"
+#, gcc-internal-format
 msgid "unknown selector %qs for context selector set %qs"
-msgstr "selektorn %qs är inte tillåten för kontextselektormängd %qs"
+msgstr "okänd selektor %qs för kontextselektormängden %qs"
 
 #: c/c-parser.cc:24570 cp/parser.cc:47889
 #, gcc-internal-format
@@ -48583,22 +48500,19 @@ msgid "selector %qs does not accept any properties"
 msgstr "väljaren %qs tar inte några egenskaper"
 
 #: c/c-parser.cc:24592 cp/parser.cc:47921
-#, fuzzy, gcc-internal-format
-#| msgid "%<friend%> can only be specified inside a class"
+#, gcc-internal-format
 msgid "%<score%> cannot be specified in traits in the %qs trait-selector-set"
-msgstr "%<friend%> kan endast anges inuti en klass"
+msgstr "%<score%> kan inte anges i egenskaper i trait-selector-set %qs"
 
 #: c/c-parser.cc:24601 cp/parser.cc:47931
-#, fuzzy, gcc-internal-format
-#| msgid "score argument must be constant integer expression"
+#, gcc-internal-format
 msgid "%<score%> argument must be constant integer expression"
-msgstr "värdesargument måste vara ett konstant heltalsuttryck"
+msgstr "argumentet till %<score%> måste vara ett konstant heltalsuttryck"
 
 #: c/c-parser.cc:24604 cp/parser.cc:47934
-#, fuzzy, gcc-internal-format
-#| msgid "score argument must be non-negative"
+#, gcc-internal-format
 msgid "%<score%> argument must be non-negative"
-msgstr "värdesargumentet måste vara ickenegativt"
+msgstr "argumentet till %<score%> måste vara ickenegativt"
 
 #: c/c-parser.cc:24645 cp/parser.cc:47980
 #, gcc-internal-format
@@ -48619,16 +48533,14 @@ msgstr "egenskaper för %<simd%>-väljare får inte anges i %<metadirective%>"
 #. Currently only the now-deprecated syntax
 #. from OpenMP 5.0 is supported.
 #: c/c-parser.cc:24705 cp/parser.cc:48035 fortran/openmp.cc:5891
-#, fuzzy, gcc-internal-format
-#| msgid "%<-fpie%> is not supported"
+#, gcc-internal-format
 msgid "%<requires%> selector is not supported yet"
-msgstr "%<-fpie%> stödjs inte"
+msgstr "selektorn %<requires%> stödjs inte ännu"
 
 #: c/c-parser.cc:24764 cp/parser.cc:48098
-#, fuzzy, gcc-internal-format
-#| msgid "expected trait selector name"
+#, gcc-internal-format
 msgid "expected context selector set name"
-msgstr "trait-väljarnamn förväntades"
+msgstr "namn på kontextväljare förväntades"
 
 #: c/c-parser.cc:24841 cp/parser.cc:48413
 #, gcc-internal-format
@@ -48671,16 +48583,14 @@ msgid "%qD specified both in declare target %<link%> and %<to%> or %<enter%> cla
 msgstr "%qD angivet både i deklarationsmålets %<link%>- och %<to%>- eller %<enter%>-klausuler"
 
 #: c/c-parser.cc:25199 cp/parser.cc:48882
-#, fuzzy, gcc-internal-format
-#| msgid "directive with only %<device_type%> clause"
+#, gcc-internal-format
 msgid "directive with only %<device_type%> or %<indirect%> clauses"
-msgstr "direktiv med endast %<device_type%>-klausul"
+msgstr "direktiv med endast %<device_type%>- eller %<indirect%>-klausul"
 
 #: c/c-parser.cc:25202 cp/parser.cc:48885
-#, fuzzy, gcc-internal-format
-#| msgid "%<detach%> clause must not be used together with %<mergeable%> clause"
+#, gcc-internal-format
 msgid "%<device_type%> clause must specify 'any' when used with an %<indirect%> clause"
-msgstr "en %<detach%>-klausul får inte användas tillsammans med en %<mergeable%>-klausul"
+msgstr "klausulen %<device_type%> måste ange ”any” när den används med en %<indirect%>-klausul"
 
 #: c/c-parser.cc:25251 c/c-parser.cc:25293 cp/parser.cc:48940
 #: cp/parser.cc:48987
@@ -48771,10 +48681,9 @@ msgid "expected %<simd%>, %<reduction%>, %<target%> or %<variant%>"
 msgstr "%<simd%>, %<reduction%>, %<target%> eller %<variant%> förväntades"
 
 #: c/c-parser.cc:25837 cp/parser.cc:49589
-#, fuzzy, gcc-internal-format
-#| msgid "expected %<seq_cst%>, %<acq_rel%>, %<release%> or %<acquire%>"
+#, gcc-internal-format
 msgid "expected %<acq_rel%>, %<acquire%>, %<relaxed%>, %<release%> or %<seq_cst%>"
-msgstr "%<seq_cst%>, %<acq_rel%>, %<release%> eller %<acquire%> förväntades"
+msgstr "%<acq_rel%>, %<acquire%>, %<relaxed%>, %<release%> eller %<seq_cst%> förväntades"
 
 #: c/c-parser.cc:25866 cp/parser.cc:49624
 #, gcc-internal-format
@@ -48978,10 +48887,9 @@ msgid "%<_Complex _BitInt(%d)%> unsupported"
 msgstr "%<_Complex _BitInt(%d)%> stödjs inte"
 
 #: c/c-typeck.cc:1472
-#, fuzzy, gcc-internal-format
-#| msgid "invalid use of pointers to arrays with different qualifiers in ISO C before C2X"
+#, gcc-internal-format
 msgid "invalid use of pointers to arrays with different qualifiers in ISO C before C23"
-msgstr "otillåten användning av pekare till vektorer med olika kvalificerare i ISO C före C2X"
+msgstr "otillåten användning av pekare till vektorer med olika kvalificerare i ISO C före C23"
 
 #: c/c-typeck.cc:1476
 #, gcc-internal-format
@@ -48999,10 +48907,9 @@ msgid "function return types not compatible due to %<volatile%>"
 msgstr "funktionsreturtyper är inte kompatibla på grund av %<volatile%>"
 
 #: c/c-typeck.cc:1905
-#, fuzzy, gcc-internal-format
-#| msgid "converting an array compound literal to a pointer is ill-formed in C++"
+#, gcc-internal-format
 msgid "converting an array compound literal to a pointer leads to a dangling pointer in C++"
-msgstr "konvertering av en sammansatt vektorlitteral till en pekare är felaktigt i C++"
+msgstr "konvertering av en sammansatt vektorlitteral till en pekare medför en hängande pekare i C++"
 
 #: c/c-typeck.cc:2599 c/c-typeck.cc:9852
 #, gcc-internal-format
@@ -49378,10 +49285,9 @@ msgid "pointer to array loses qualifier in conditional expression"
 msgstr "pekare till vektor tappar kvalificerare i villkorsuttryck"
 
 #: c/c-typeck.cc:5665
-#, fuzzy, gcc-internal-format
-#| msgid "pointer to array loses qualifier in conditional expression in ISO C before C2X"
+#, gcc-internal-format
 msgid "pointer to array loses qualifier in conditional expression in ISO C before C23"
-msgstr "pekare till vektor tappar kvalificerare i villkorsuttryck i ISO C före C2X"
+msgstr "pekare till vektor tappar kvalificerare i villkorsuttryck i ISO C före C23"
 
 #: c/c-typeck.cc:5670
 #, gcc-internal-format
@@ -49394,16 +49300,14 @@ msgid "pointer type mismatch in conditional expression"
 msgstr "pekartyper stämmer inte i villkorsuttryck"
 
 #: c/c-typeck.cc:5695
-#, fuzzy, gcc-internal-format
-#| msgid "Expected expression type"
+#, gcc-internal-format
 msgid "first expression has type %qT"
-msgstr "Uttryckstyp förväntades"
+msgstr "första uttrycket har typen %qT"
 
 #: c/c-typeck.cc:5696
-#, fuzzy, gcc-internal-format
-#| msgid "Expected expression type"
+#, gcc-internal-format
 msgid "second expression has type %qT"
-msgstr "Uttryckstyp förväntades"
+msgstr "andra uttrycket har typen %qT"
 
 #: c/c-typeck.cc:5707 c/c-typeck.cc:5720
 #, gcc-internal-format
@@ -49479,10 +49383,9 @@ msgid "ISO C forbids casting nonscalar to the same type"
 msgstr "ISO C förbjuder typkonvertering av ickeskalärer till samma typ"
 
 #: c/c-typeck.cc:6199
-#, fuzzy, gcc-internal-format
-#| msgid "useless cast to type %q#T"
+#, gcc-internal-format
 msgid "useless cast to type %qT"
-msgstr "oanvändbar konvertering till typen %q#T"
+msgstr "oanvändbar konvertering till typen %qT"
 
 #: c/c-typeck.cc:6219
 #, gcc-internal-format
@@ -49742,10 +49645,9 @@ msgid "ISO C forbids return between function pointer and %<void *%>"
 msgstr "ISO C förbjuder retur mellan funktionspekare och %<void *%>"
 
 #: c/c-typeck.cc:7769
-#, fuzzy, gcc-internal-format
-#| msgid "array with qualifier on the element is not qualified before C2X"
+#, gcc-internal-format
 msgid "array with qualifier on the element is not qualified before C23"
-msgstr "vektorer med kvalificerare på elementet är inte kvalificerat före C2X"
+msgstr "vektorer med kvalificerare på elementet är inte kvalificerat före C23"
 
 #: c/c-typeck.cc:7786
 #, gcc-internal-format
@@ -50034,10 +49936,9 @@ msgid "enum conversion in initialization is invalid in C++"
 msgstr "enum-konvertering i initiering är ogiltigt i C++"
 
 #: c/c-typeck.cc:10834
-#, fuzzy, gcc-internal-format
-#| msgid "excess elements in union initializer"
+#, gcc-internal-format
 msgid "excess elements in %qT initializer"
-msgstr "överflödiga element i unioninitierare"
+msgstr "överflödiga element i initieraren %qT"
 
 #: c/c-typeck.cc:10846 c/c-typeck.cc:10923
 #, gcc-internal-format
@@ -50638,10 +50539,9 @@ msgstr "vektorsektionen har inte en avbildbar typ i %qs-klausulen"
 
 #: c/c-typeck.cc:15565 c/c-typeck.cc:15641 c/c-typeck.cc:15677
 #: cp/semantics.cc:8326 cp/semantics.cc:8405 cp/semantics.cc:8441
-#, fuzzy, gcc-internal-format
-#| msgid "unsupported memory expression:"
+#, gcc-internal-format
 msgid "unsupported map expression %qE"
-msgstr "ej stött minnesuttryck:"
+msgstr "ej stött avbildningsuttryck %qE"
 
 #: c/c-typeck.cc:15605 c/c-typeck.cc:15782 cp/semantics.cc:8367
 #: cp/semantics.cc:8585
@@ -50903,16 +50803,14 @@ msgid "invalid type of %<__MEM%> operand"
 msgstr "ogiltig typ av %<__MEM%>-operand"
 
 #: c/gimple-parser.cc:1563
-#, fuzzy, gcc-internal-format
-#| msgid "expected constant offset"
+#, gcc-internal-format
 msgid "expected constant offset for %<__MEM%> operand"
-msgstr "ett konstant avstånd förväntades"
+msgstr "ett konstant avstånd förväntades för operanden till %<__MEM%>"
 
 #: c/gimple-parser.cc:1574
-#, fuzzy, gcc-internal-format
-#| msgid "invalid type of %<__MEM%> operand"
+#, gcc-internal-format
 msgid "expected constant step for %<__MEM%> operand"
-msgstr "ogiltig typ av %<__MEM%>-operand"
+msgstr "ett konstant steg som operand till %<__MEM%> förväntades"
 
 #: c/gimple-parser.cc:1627
 #, gcc-internal-format
@@ -51049,10 +50947,9 @@ msgid "%s%#qD (near match)"
 msgstr "%s%#qD (nära träff)"
 
 #: cp/call.cc:3954
-#, fuzzy, gcc-internal-format
-#| msgid "%s%#qD (reversed)"
+#, gcc-internal-format
 msgid "%s%#qD (ignored)"
-msgstr "%s%#qD (omvänd)"
+msgstr "%s%#qD (ignorerad)"
 
 #: cp/call.cc:3956
 #, gcc-internal-format
@@ -51302,16 +51199,14 @@ msgid "enumerated mismatch in conditional expression: %qT vs %qT"
 msgstr "uppräkningsmissmatch i villkorsuttryck: %qT kontra %qT"
 
 #: cp/call.cc:6263
-#, fuzzy, gcc-internal-format
-#| msgid "conditional expression between enumeration type %qT and floating-point type %qT is deprecated"
+#, gcc-internal-format
 msgid "conditional expression between enumeration type %qT and floating-point type %qT"
-msgstr "villkorsuttryck mellan uppräkningstypen %qT och flyttalstypen %qT bör undvikas"
+msgstr "villkorsuttryck mellan uppräkningstypen %qT och flyttalstypen %qT"
 
 #: cp/call.cc:6267
-#, fuzzy, gcc-internal-format
-#| msgid "conditional expression between floating-point type %qT and enumeration type %qT is deprecated"
+#, gcc-internal-format
 msgid "conditional expression between floating-point type %qT and enumeration type %qT"
-msgstr "villkorsuttryck mellan flyttalstypen %qT och uppräkningstypen %qT bör undvikas"
+msgstr "villkorsuttryck mellan flyttalstypen %qT och uppräkningstypen %qT"
 
 #: cp/call.cc:6271
 #, gcc-internal-format
@@ -51469,16 +51364,12 @@ msgid "converting to %qH from %qI requires direct-initialization"
 msgstr "konvertering till %qH från %qI behöver en direktinitiering"
 
 #: cp/call.cc:8447
-#, fuzzy
-#| msgid "converting to %qH from %qI with greater conversion rank"
 msgid "ISO C++ does not allow converting to %qH from %qI with greater conversion rank"
-msgstr "konvertering till %qH från %qI med en större konverteringsordning"
+msgstr "ISO C++ tillåter inte konvertering till %qH från %qI med en större konverteringsordning"
 
 #: cp/call.cc:8455
-#, fuzzy
-#| msgid "converting to %qH from %qI with unordered conversion ranks"
 msgid "ISO C++ does not allow converting to %qH from %qI with unordered conversion rank"
-msgstr "konvertering till %qH från %qI med oordnad konverteringsordningar"
+msgstr "ISO C++ tillåter inte konvertering till %qH från %qI med oordnad konverteringsordningar"
 
 #: cp/call.cc:8471
 msgid "invalid user-defined conversion from %qH to %qI"
@@ -52408,16 +52299,14 @@ msgid "converting overloaded function %qD to type %q#T is ambiguous"
 msgstr "konvertering av överlagrad funktion %qD till typ %q#T är tvetydig"
 
 #: cp/class.cc:8979
-#, fuzzy, gcc-internal-format
-#| msgid "ISO C++ forbids taking the address of an unqualified or parenthesized non-static member function to form a pointer to member function.  Say %<&%T::%D%>"
+#, gcc-internal-format
 msgid "ISO C++ forbids taking the address of an unqualified or parenthesized non-static member function to form a pointer to explicit object member function."
-msgstr "ISO C++ förbjuder att ta adressen till en okvalificerad eller parentetiserad icke-statisk medlemsfunktion för att skapa en pekare till en medlemsfunktion.  Säg %<&%T::%D%>"
+msgstr "ISO C++ förbjuder att ta adressen till en okvalificerad eller parentetiserad icke-statisk medlemsfunktion för att skapa en pekare till en explicit objektmedlemsfunktion."
 
 #: cp/class.cc:8984
-#, fuzzy, gcc-internal-format
-#| msgid "(a pointer to member can only be formed with %<&%E%>)"
+#, gcc-internal-format
 msgid "a pointer to explicit object member function can only be formed with %<&%E%>"
-msgstr "(en pekare på medlem kan bara skapas med %<&%E%>)"
+msgstr "en pekare på en explicit objektmedlemsfunktion kan bara skapas med %<&%E%>)"
 
 #: cp/class.cc:8994
 #, gcc-internal-format
@@ -52676,16 +52565,14 @@ msgid "%<constexpr%> evaluation depth exceeds maximum of %d (use %<-fconstexpr-d
 msgstr "beräkning av %<constexpr%> överskrider maxvärdet på %d (använd %<-fconstexpr-depth=%> för att öka maxvärdet)"
 
 #: cp/constexpr.cc:3538
-#, fuzzy, gcc-internal-format
-#| msgid "expression %qE is not a constant expression"
+#, gcc-internal-format
 msgid "reference to %qD is not a constant expression"
-msgstr "uttrycket %qE är inte ett konstant uttryck"
+msgstr "referensen till %qD är inte ett konstant uttryck"
 
 #: cp/constexpr.cc:3541
-#, fuzzy, gcc-internal-format
-#| msgid "%qE is not a constant expression"
+#, gcc-internal-format
 msgid "pointer to %qD is not a constant expression"
-msgstr "%qE är inte ett konstant uttryck"
+msgstr "pekaren på %qD är inte ett konstant uttryck"
 
 #: cp/constexpr.cc:3547
 #, gcc-internal-format
@@ -52866,10 +52753,9 @@ msgid "allocated here"
 msgstr "allokerad här"
 
 #: cp/constexpr.cc:5981
-#, fuzzy, gcc-internal-format
-#| msgid "Access terminates outside of its parent"
+#, gcc-internal-format
 msgid "accessing %qE outside its lifetime"
-msgstr "Åtkomsten slutar utanför sin förälder"
+msgstr "åtkomst av %qE utanför sin livstid"
 
 #: cp/constexpr.cc:6001
 #, gcc-internal-format
@@ -52912,34 +52798,29 @@ msgid "%qD does not have integral or enumeration type"
 msgstr "%qD har inte heltals- eller uppräkningstyp"
 
 #: cp/constexpr.cc:6342
-#, fuzzy, gcc-internal-format
-#| msgid "use of allocated storage after deallocation in a constant expression"
+#, gcc-internal-format
 msgid "modification of allocated storage after deallocation is not a constant expression"
-msgstr "användning av allokerad lagring efter deallokering i ett konstant uttryck"
+msgstr "ändring av allokerad lagring efter deallokering är inte ett konstant uttryck"
 
 #: cp/constexpr.cc:6351
-#, fuzzy, gcc-internal-format
-#| msgid "modification of %qE is not a constant expression"
+#, gcc-internal-format
 msgid "modification of %qE outside its lifetime is not a constant expression"
-msgstr "ändring av %qE är inte ett konstant uttryck"
+msgstr "ändring av %qE utanför sin livstid är inte ett konstant uttryck"
 
 #: cp/constexpr.cc:6358
-#, fuzzy, gcc-internal-format
-#| msgid "%<reinterpret_cast%> is not a constant expression"
+#, gcc-internal-format
 msgid "destroying %qE from outside current evaluation is not a constant expression"
-msgstr "en %<reinterpret_cast%> är inte ett konstant uttryck"
+msgstr "att förstöra %qE utanför den nuvarande beräkningen är inte ett konstant uttryck"
 
 #: cp/constexpr.cc:6361
-#, fuzzy, gcc-internal-format
-#| msgid "modification of %qE is not a constant expression"
+#, gcc-internal-format
 msgid "modification of %qE from outside current evaluation is not a constant expression"
-msgstr "ändring av %qE är inte ett konstant uttryck"
+msgstr "ändring av %qE från utanför den nuvarande beräkningen är inte ett konstant uttryck"
 
 #: cp/constexpr.cc:6488
-#, fuzzy, gcc-internal-format
-#| msgid "change of the active member of a union from %qD to %qD during initialization"
+#, gcc-internal-format
 msgid "change of the active member of a union from %qD to %qD is not a constant expression before C++20"
-msgstr "ändring av den aktiva medlemmen av en union %qD till %qD under initiering"
+msgstr "ändring av den aktiva medlemmen av en union %qD till %qD är inte ett konstant uttryck före C++20"
 
 #: cp/constexpr.cc:6517
 #, gcc-internal-format
@@ -53039,28 +52920,24 @@ msgid "conversion from pointer type %qT to arithmetic type %qT in a constant exp
 msgstr "konvertering från pekartypen %qT till den aritmetiska typen %qT i ett konstant uttryck"
 
 #: cp/constexpr.cc:8153
-#, fuzzy, gcc-internal-format
-#| msgid "%qE is not a constant expression because it refers to mutable subobjects of %qT"
+#, gcc-internal-format
 msgid "cast from %qT is not allowed in a constant expression because pointed-to type %qT is not similar to %qT"
-msgstr "%qE är inte ett konstant uttryck eftersom det har referenser till muterbara delobjekt av %qT"
+msgstr "typkonvertering från %qT är inte tillåtet i ett konstant uttryck eftersom den utpekade typen %qT inte liknar %qT"
 
 #: cp/constexpr.cc:8160
-#, fuzzy, gcc-internal-format
-#| msgid "pointer member %q+D declared here"
+#, gcc-internal-format
 msgid "pointed-to object declared here"
-msgstr "pekarmedlemmen %q+D är deklarerad här"
+msgstr "utpekat objekt är deklarerat här"
 
 #: cp/constexpr.cc:8165
-#, fuzzy, gcc-internal-format
-#| msgid "%qs is not a constant expression because %qT is a pointer to member type"
+#, gcc-internal-format
 msgid "cast from %qT is not allowed in a constant expression because %qE does not point to an object"
-msgstr "%qs är inte ett konstant uttryck eftersom %qT är en pekare-till-medlem-typ"
+msgstr "typkonvertering från %qT är inte tillåtet i ett konstant uttryck eftersom %qE inte pekar på ett objekt"
 
 #: cp/constexpr.cc:8177
-#, fuzzy, gcc-internal-format
-#| msgid "modifying a const object %qE is not allowed in a constant expression"
+#, gcc-internal-format
 msgid "cast from %qT is not allowed in a constant expression before C++26"
-msgstr "ändring av ett const-objekt %qE är inte tillåten i ett konstant uttryck"
+msgstr "typkonvertering från %qT är inte tillåtet i ett konstant uttryck före C++26"
 
 #: cp/constexpr.cc:8191
 #, gcc-internal-format
@@ -53134,10 +53011,9 @@ msgid "immediate evaluation returns address of immediate function %qD"
 msgstr "omedelbar evaluering returnerar adressen till en omedelbar funktion %qD"
 
 #: cp/constexpr.cc:8913
-#, fuzzy, gcc-internal-format
-#| msgid "immediate evaluation returns address of immediate function %qD"
+#, gcc-internal-format
 msgid "constant evaluation returns address of immediate function %qD"
-msgstr "omedelbar evaluering returnerar adressen till en omedelbar funktion %qD"
+msgstr "konstantevaluering returnerar adressen till en omedelbar funktion %qD"
 
 #: cp/constexpr.cc:9551 rust/backend/rust-constexpr.cc:5667
 #, gcc-internal-format
@@ -53448,10 +53324,9 @@ msgid "  %qT is not an aggregate"
 msgstr "  %qT är inte ett aggregat"
 
 #: cp/constraint.cc:3755
-#, fuzzy, gcc-internal-format
-#| msgid "  %qT is not an aggregate"
+#, gcc-internal-format
 msgid "  %qT is not an array"
-msgstr "  %qT är inte ett aggregat"
+msgstr "  %qT är inte en vektor"
 
 #: cp/constraint.cc:3758
 #, gcc-internal-format
@@ -53464,10 +53339,9 @@ msgid "  %qT is not a base of %qT"
 msgstr "  %qT är inte en bas till %qT"
 
 #: cp/constraint.cc:3764
-#, fuzzy, gcc-internal-format
-#| msgid "  %qT is not an aggregate"
+#, gcc-internal-format
 msgid "  %qT is not a bounded array"
-msgstr "  %qT är inte ett aggregat"
+msgstr "  %qT är inte en begränsad vektor"
 
 #: cp/constraint.cc:3767
 #, gcc-internal-format
@@ -53505,10 +53379,9 @@ msgid "  %qT is not a final class"
 msgstr "  %qT är inte en slutlig klass"
 
 #: cp/constraint.cc:3788
-#, fuzzy, gcc-internal-format
-#| msgid "  %qT is not a union"
+#, gcc-internal-format
 msgid "  %qT is not a function"
-msgstr "  %qT är inte en union"
+msgstr "  %qT är inte en funktion"
 
 #: cp/constraint.cc:3791
 #, gcc-internal-format
@@ -53521,22 +53394,19 @@ msgid "  %qT is not a literal type"
 msgstr "  %qT är inte en literal typ"
 
 #: cp/constraint.cc:3797
-#, fuzzy, gcc-internal-format
-#| msgid "%qD is not a member template function"
+#, gcc-internal-format
 msgid "  %qT is not a member function pointer"
-msgstr "%qD är inte en medlemsmallfunktion"
+msgstr "  %qT är inte en medlemsfunktionspekare"
 
 #: cp/constraint.cc:3800
-#, fuzzy, gcc-internal-format
-#| msgid "%qT is not a member of %qT"
+#, gcc-internal-format
 msgid "  %qT is not a member object pointer"
-msgstr "%qT är inte en medlem av %qT"
+msgstr "  %qT är inte en medlemsobjektspekare"
 
 #: cp/constraint.cc:3803
-#, fuzzy, gcc-internal-format
-#| msgid "%qT is not a member of %qT"
+#, gcc-internal-format
 msgid "  %qT is not a member pointer"
-msgstr "%qT är inte en medlem av %qT"
+msgstr "  %qT är inte en medlemspekare"
 
 #: cp/constraint.cc:3806
 #, gcc-internal-format
@@ -53554,10 +53424,9 @@ msgid "  %qT is not nothrow convertible from %qE"
 msgstr "  %qT är inte nothrow-konvertibel från %qE"
 
 #: cp/constraint.cc:3818
-#, fuzzy, gcc-internal-format
-#| msgid "  %qT is not a POD type"
+#, gcc-internal-format
 msgid "  %qT is not an object type"
-msgstr "  %qT är inte en POD-typ"
+msgstr "  %qT är inte en objekttyp"
 
 #: cp/constraint.cc:3821
 #, gcc-internal-format
@@ -53575,10 +53444,9 @@ msgid "  %qT is not a polymorphic type"
 msgstr "  %qT är inte en polymorf typ"
 
 #: cp/constraint.cc:3831
-#, fuzzy, gcc-internal-format
-#| msgid "  %qT is not an enum"
+#, gcc-internal-format
 msgid "  %qT is not a reference"
-msgstr "  %qT är inte en uppräkningstyp"
+msgstr "  %qT är inte en referens"
 
 #: cp/constraint.cc:3834
 #, gcc-internal-format
@@ -53586,10 +53454,9 @@ msgid "  %qT is not the same as %qT"
 msgstr "  %qT är inte en detsamma som %qT"
 
 #: cp/constraint.cc:3837
-#, fuzzy, gcc-internal-format
-#| msgid "  %qT is not an enum"
+#, gcc-internal-format
 msgid "  %qT is not a scoped enum"
-msgstr "  %qT är inte en uppräkningstyp"
+msgstr "  %qT är inte en enum med räckvidd"
 
 #: cp/constraint.cc:3840
 #, gcc-internal-format
@@ -54001,10 +53868,9 @@ msgid "%qD was promoted to an immediate function because its body contains an im
 msgstr "%qD befordrades till en omedelbar funktion eftersom dess kropp innehåller ett uttryck %qE som omedelbareskalerar"
 
 #: cp/cp-gimplify.cc:539
-#, fuzzy, gcc-internal-format
-#| msgid "%qD is not a template function"
+#, gcc-internal-format
 msgid "%qD was promoted to an immediate function"
-msgstr "%qD är inte en mallfunktion"
+msgstr "%qD befordrades till en omedelbar funktion"
 
 #: cp/cp-gimplify.cc:1164
 #, gcc-internal-format
@@ -54012,10 +53878,9 @@ msgid "taking address of an immediate function %qD"
 msgstr "tar adressen till en omedelbar funktion %qD"
 
 #: cp/cp-gimplify.cc:1263
-#, fuzzy, gcc-internal-format
-#| msgid "address of a call to %qs is not a constant expression"
+#, gcc-internal-format
 msgid "call to consteval function %qE is not a constant expression"
-msgstr "adressen för ett anrop av %qs är inte ett konstant uttryck"
+msgstr "anrop av consteval-funktionen %qE är inte ett konstant uttryck"
 
 #: cp/cp-gimplify.cc:2002
 #, gcc-internal-format
@@ -54639,34 +54504,29 @@ msgid "%q#D previously declared here"
 msgstr "%q#D tidigare deklarerad här"
 
 #: cp/decl.cc:2097
-#, fuzzy, gcc-internal-format
-#| msgid "method declaration not in @interface context"
+#, gcc-internal-format
 msgid "parameter declaration is not name-independent"
-msgstr "metoddeklaration som inte är i @interface-kontext"
+msgstr "parameterdeklarationen är inte namnoberoende"
 
 #: cp/decl.cc:2102
-#, fuzzy, gcc-internal-format
-#| msgid "structured binding declaration set but not used"
+#, gcc-internal-format
 msgid "structured binding at namespace scope is not name-independent"
-msgstr "strukturerad bindningsdeklaration satt men inte använd"
+msgstr "strukturerad bindning vid namnrymdsräckvidd är inte namnoberoende"
 
 #: cp/decl.cc:2106
-#, fuzzy, gcc-internal-format
-#| msgid "structured binding has incomplete type %qT"
+#, gcc-internal-format
 msgid "static structured binding is not name-independent"
-msgstr "strukturerad bindning har en ofullständig typ %qT"
+msgstr "statisk strukturerad bindning är inte namnoberoende"
 
 #: cp/decl.cc:2110
-#, fuzzy, gcc-internal-format
-#| msgid "structured binding has incomplete type %qT"
+#, gcc-internal-format
 msgid "extern structured binding is not name-independent"
-msgstr "strukturerad bindning har en ofullständig typ %qT"
+msgstr "extern strukturerad bindning är inte namnoberoende"
 
 #: cp/decl.cc:2117
-#, fuzzy, gcc-internal-format
-#| msgid "static data member %qD in unnamed class"
+#, gcc-internal-format
 msgid "static data member is not name-independent"
-msgstr "statisk datamedlem %qD i namnlös klass"
+msgstr "statisk datamedlem är inte namnoberoende"
 
 #: cp/decl.cc:2120
 #, gcc-internal-format
@@ -54674,16 +54534,14 @@ msgid "variable at namespace scope is not name-independent"
 msgstr "en variabel i namnrymdsräckvidd är inte namnoberoende"
 
 #: cp/decl.cc:2123
-#, fuzzy, gcc-internal-format
-#| msgid "%qs variable is not a pointer"
+#, gcc-internal-format
 msgid "static variable is not name-independent"
-msgstr "variabeln %qs är inte en pekare"
+msgstr "statisk variabel är inte namnoberoende"
 
 #: cp/decl.cc:2126
-#, fuzzy, gcc-internal-format
-#| msgid "environment variable %qs not defined"
+#, gcc-internal-format
 msgid "extern variable is not name-independent"
-msgstr "miljövariabeln %qs är inte definierad"
+msgstr "extern variabel är inte namnoberoende"
 
 #: cp/decl.cc:2138
 #, gcc-internal-format
@@ -54731,16 +54589,14 @@ msgid "import declared %q#D here"
 msgstr "importdeklarerad %q#D här"
 
 #: cp/decl.cc:2306 cp/decl.cc:16628
-#, fuzzy, gcc-internal-format
-#| msgid "conflicting exporting declaration %qD"
+#, gcc-internal-format
 msgid "conflicting exporting for declaration %qD"
-msgstr "motstridande exporterande deklaration av %qD"
+msgstr "motstridande exporterande för deklaration av %qD"
 
 #: cp/decl.cc:2308 cp/decl.cc:16630
-#, fuzzy, gcc-internal-format
-#| msgid "previously declared here"
+#, gcc-internal-format
 msgid "previously declared here without exporting"
-msgstr "tidigare deklarerad här"
+msgstr "tidigare deklarerad här utan att exporteras"
 
 #: cp/decl.cc:2335
 #, gcc-internal-format
@@ -54923,16 +54779,14 @@ msgid "  enters %<consteval if%> statement"
 msgstr "  går in i %<consteval if%>-sats"
 
 #: cp/decl.cc:3829 cp/decl.cc:4003
-#, fuzzy, gcc-internal-format
-#| msgid "ISO C99 does not support %qE"
+#, gcc-internal-format
 msgid "  does not destroy %qD"
-msgstr "ISO C99 stödjer inte %qE"
+msgstr "  förstör inte %qD"
 
 #: cp/decl.cc:3831 cp/decl.cc:3986
-#, fuzzy, gcc-internal-format
-#| msgid "%s does not take any feature options"
+#, gcc-internal-format
 msgid "  does not clean up handled exception"
-msgstr "%s tar inte några funktionsflaggor"
+msgstr "  städar inte upp det hanterade undantaget"
 
 #: cp/decl.cc:3922
 #, gcc-internal-format
@@ -55773,10 +55627,9 @@ msgid "constraints on a non-templated function"
 msgstr "begränsning av en funktion som inte är en mall"
 
 #: cp/decl.cc:10590
-#, fuzzy, gcc-internal-format
-#| msgid "friend declaration not in class definition"
+#, gcc-internal-format
 msgid "constrained non-template friend declaration must be a definition"
-msgstr "vändeklaration är inte i klassdefinition"
+msgstr "begränsad vändeklaration som inte är en mall måste vara en definition"
 
 #: cp/decl.cc:10597
 #, gcc-internal-format
@@ -55839,10 +55692,9 @@ msgid "static member function %qD cannot have cv-qualifier"
 msgstr "statisk medlemsfunktion %qD kan inte ha cv-kvalificerare"
 
 #: cp/decl.cc:10818
-#, fuzzy, gcc-internal-format
-#| msgid "static member function %qD cannot have cv-qualifier"
+#, gcc-internal-format
 msgid "explicit object member function %qD cannot have cv-qualifier"
-msgstr "statisk medlemsfunktion %qD kan inte ha cv-kvalificerare"
+msgstr "explicit objektmedlemsfunktion %qD kan inte ha cv-kvalificerare"
 
 #: cp/decl.cc:10823
 #, gcc-internal-format
@@ -55855,16 +55707,14 @@ msgid "static member function %qD cannot have ref-qualifier"
 msgstr "statisk medlemsfunktion %qD kan inte ha ref-kvalificerare"
 
 #: cp/decl.cc:10826
-#, fuzzy, gcc-internal-format
-#| msgid "static member function %qD cannot have ref-qualifier"
+#, gcc-internal-format
 msgid "explicit object member function %qD cannot have ref-qualifier"
-msgstr "statisk medlemsfunktion %qD kan inte ha ref-kvalificerare"
+msgstr "explicit objektmedlemsfunktion %qD kan inte ha ref-kvalificerare"
 
 #: cp/decl.cc:10832 cp/decl.cc:13715 cp/decl.cc:13725 cp/parser.cc:11972
-#, fuzzy, gcc-internal-format
-#| msgid "template parameter %qD declared here"
+#, gcc-internal-format
 msgid "explicit object parameter declared here"
-msgstr "mallparametern %qD deklarerad här"
+msgstr "explicit objektparameter deklarerad här"
 
 #: cp/decl.cc:10844
 #, gcc-internal-format
@@ -56446,31 +56296,27 @@ msgstr "onödiga parenteser i deklaration av %qs"
 #: cp/decl.cc:13277
 #, gcc-internal-format
 msgid "remove parentheses"
-msgstr "ta port parenteser"
+msgstr "ta bort parenteser"
 
 #: cp/decl.cc:13345
-#, fuzzy, gcc-internal-format
-#| msgid "alias template deduction only available with %<-std=c++20%> or %<-std=gnu++20%>"
+#, gcc-internal-format
 msgid "explicit object member function only available with %<-std=c++23%> or %<-std=gnu++23%>"
-msgstr "aliasmallhärledning är endast tillgängligt med %<-std=c++20%> eller %<-std=gnu++20%>"
+msgstr "explicita objektmedlemsfunktioner är endast tillgängliga med %<-std=c++23%> eller %<-std=gnu++23%>"
 
 #: cp/decl.cc:13359
-#, fuzzy, gcc-internal-format
-#| msgid "Function %qs at %L cannot have an initializer"
+#, gcc-internal-format
 msgid "a function type cannot have an explicit object parameter"
-msgstr "Funktion %qs vid %L kan inte ha en initierare"
+msgstr "en funktionstyp kan inte ha en explicit objektparameter"
 
 #: cp/decl.cc:13365
-#, fuzzy, gcc-internal-format
-#| msgid "a conversion function cannot have a trailing return type"
+#, gcc-internal-format
 msgid "a pointer to function type cannot have an explicit object parameter"
-msgstr "en konverteringsfunktion kan inte ha en avslutande returtyp"
+msgstr "en pekare på en funktionstyp kan inte ha en explicit objektparameter"
 
 #: cp/decl.cc:13369
-#, fuzzy, gcc-internal-format
-#| msgid "  member function type %qT is not a valid template argument"
+#, gcc-internal-format
 msgid "a pointer to member function type cannot have an explicit object parameter"
-msgstr "  medlemsfunktionstypen %qT är inte ett giltigt mallargument"
+msgstr "en pekare på en medlemsfunktionstyp kan inte ha en explicit objektparameter"
 
 #: cp/decl.cc:13377
 #, gcc-internal-format
@@ -56478,10 +56324,9 @@ msgid "the type of a pointer to explicit object member function is a regular poi
 msgstr "typen på en pekare till en explicit objektmedlemsfunktion är en vanlig pekare på en funktionstyp"
 
 #: cp/decl.cc:13381
-#, fuzzy, gcc-internal-format
-#| msgid "typedef may not be a member function definition"
+#, gcc-internal-format
 msgid "the type of an explicit object member function is a regular function type"
-msgstr "typedef får inte vara en medlemsfunktionsdefinition"
+msgstr "type på en explicit objektmedlemsfunktion är en normal funktionstyp"
 
 #: cp/decl.cc:13402
 #, gcc-internal-format
@@ -56489,10 +56334,9 @@ msgid "only the first parameter of a member function can be declared as an expli
 msgstr "endast den första parametern till en medlemsfunktion kan deklareras som en explicit objektparameter"
 
 #: cp/decl.cc:13407
-#, fuzzy, gcc-internal-format
-#| msgid "template parameter %qD declared here"
+#, gcc-internal-format
 msgid "valid explicit object parameter declared here"
-msgstr "mallparametern %qD deklarerad här"
+msgstr "giltig explicit objektparameter deklarerad här"
 
 #: cp/decl.cc:13411
 #, gcc-internal-format
@@ -56640,16 +56484,14 @@ msgid "friend function definition %qs cannot have a name qualified with %<%D::%>
 msgstr "vänfunktionsdefinitionen %qs får inte ha ett namn kvalificerat med %<%D::%>"
 
 #: cp/decl.cc:13704
-#, fuzzy, gcc-internal-format
-#| msgid "non-member function %qD cannot have cv-qualifier"
+#, gcc-internal-format
 msgid "a non-member function cannot have an explicit object parameter"
-msgstr "icke-medlemsfunktion %qD kan inte ha cv-kvalificerare"
+msgstr "en icke-medlemsfunktion kan inte ha en explicit objektparameter"
 
 #: cp/decl.cc:13712
-#, fuzzy, gcc-internal-format
-#| msgid "implicit templates may not be %<virtual%>"
+#, gcc-internal-format
 msgid "an explicit object member function cannot be %<virtual%>"
-msgstr "implicita mallar får inte vara %<virtual%>"
+msgstr "en explicit objektmedlemsfunktion får inte vara %<virtual%>"
 
 #: cp/decl.cc:13722
 #, gcc-internal-format
@@ -57038,10 +56880,9 @@ msgid "storage class %<thread_local%> invalid for function %qs"
 msgstr "lagringsklassen %<thread_local%> är ogiltig för funktionen %qs"
 
 #: cp/decl.cc:15015
-#, fuzzy, gcc-internal-format
-#| msgid "alignment specified for function %qE"
+#, gcc-internal-format
 msgid "%<constinit%> specifier invalid for function %qs"
-msgstr "minnesjustering angiven för funktionen %qE"
+msgstr "specificeraren %<constinit%> är ogiltig för funktionen %qs"
 
 #: cp/decl.cc:15018
 #, gcc-internal-format
@@ -57419,8 +57260,7 @@ msgid "duplicate base type %qT invalid"
 msgstr "upprepat bastyp %qT ogiltig"
 
 #: cp/decl.cc:16969
-#, fuzzy, gcc-internal-format
-#| msgid "cannot declare %qD in a different module"
+#, gcc-internal-format
 msgid "cannot declare %qD in different module"
 msgstr "det går inte att deklarera %qD i en annan modul"
 
@@ -59347,10 +59187,9 @@ msgid "unknown header kind %qs"
 msgstr "okänd huvudsort %qs"
 
 #: cp/name-lookup.cc:2856 cp/name-lookup.cc:3932 cp/name-lookup.cc:4029
-#, fuzzy, gcc-internal-format
-#| msgid "alias template deduction only available with %<-std=c++20%> or %<-std=gnu++20%>"
+#, gcc-internal-format
 msgid "name-independent declarations only available with %<-std=c++2c%> or %<-std=gnu++2c%>"
-msgstr "aliasmallhärledning är endast tillgängligt med %<-std=c++20%> eller %<-std=gnu++20%>"
+msgstr "namnoberoende deklarationer är endast tillgängliga med %<-std=c++2c%> eller %<-std=gnu++2c%>"
 
 #: cp/name-lookup.cc:2887
 #, gcc-internal-format
@@ -59408,28 +59247,24 @@ msgid "%s %s %p %d"
 msgstr "%s %s %p %d"
 
 #: cp/name-lookup.cc:5101
-#, fuzzy, gcc-internal-format
-#| msgid "%q#D does not have external linkage"
+#, gcc-internal-format
 msgid "exporting %q#D that does not have external linkage"
-msgstr "%q#D har inte extern länkning"
+msgstr "exporterar %q#D som inte har extern länkning"
 
 #: cp/name-lookup.cc:5106
-#, fuzzy, gcc-internal-format
-#| msgid "%q#D declared here"
+#, gcc-internal-format
 msgid "%q#D declared here with no linkage"
-msgstr "%q#D är deklarerad här"
+msgstr "%q#D är deklarerad här utan någon länkning"
 
 #: cp/name-lookup.cc:5109
-#, fuzzy, gcc-internal-format
-#| msgid "%q#D does not have external linkage"
+#, gcc-internal-format
 msgid "%q#D declared here with internal linkage"
-msgstr "%q#D har inte extern länkning"
+msgstr "%q#D är deklarerad här med intern länkning"
 
 #: cp/name-lookup.cc:5112
-#, fuzzy, gcc-internal-format
-#| msgid "%q#D declared here"
+#, gcc-internal-format
 msgid "%q#D declared here with module linkage"
-msgstr "%q#D är deklarerad här"
+msgstr "%q#D är deklarerad här med modullänkning"
 
 #: cp/name-lookup.cc:5877
 #, gcc-internal-format
@@ -59554,10 +59389,9 @@ msgid "  %qE"
 msgstr "  %qE"
 
 #: cp/name-lookup.cc:7085
-#, fuzzy, gcc-internal-format
-#| msgid "%<std::%s%> is defined in header %qs; did you forget to %<#include %s%>?"
+#, gcc-internal-format
 msgid "%<std::%s%> is defined in header %qs; this is probably fixable by adding %<#include %s%>"
-msgstr "%<std::%s%> är definierad i huvudet %qs; glömde du %<#include %s%>?"
+msgstr "%<std::%s%> är definierad i huvudet %qs; detta går förmodligen att lösa genom att lägga till %<#include %s%>"
 
 #: cp/name-lookup.cc:7091
 #, gcc-internal-format
@@ -60137,16 +59971,15 @@ msgid "%<~auto%> only available with %<-std=c++14%> or %<-std=gnu++14%>"
 msgstr "%<~auto%> är endast tillgängligt med %<-std=c++14%> eller %<-std=gnu++14%>"
 
 #: cp/parser.cc:6729 cp/parser.cc:6733
-#, fuzzy, gcc-internal-format
-#| msgid "template-id not allowed for destructor"
+#, gcc-internal-format
 msgid "template-id not allowed for destructor in C++20"
-msgstr "mall-id är inte tillåtet för destruerare"
+msgstr "mall-id är inte tillåtet för destruerare i C++20"
 
+# %qs blir den fixa strängen "< >"
 #: cp/parser.cc:6735 cp/parser.cc:32577
-#, fuzzy, gcc-internal-format
-#| msgid "remove parentheses"
+#, gcc-internal-format
 msgid "remove the %qs"
-msgstr "ta port parenteser"
+msgstr "ta bort %qs"
 
 #: cp/parser.cc:6843
 #, gcc-internal-format
@@ -60239,10 +60072,9 @@ msgid "two consecutive %<[%> shall only introduce an attribute"
 msgstr "två på varandra följande %<[%> får bara introducera ett attribut"
 
 #: cp/parser.cc:8017
-#, fuzzy, gcc-internal-format
-#| msgid "types may not be defined within %<__builtin_offsetof%>"
+#, gcc-internal-format
 msgid "types may not be defined in %<__builtin_classify_type%> calls"
-msgstr "typer får inte definieras i %<__builtin_offsetof%>"
+msgstr "typer får inte definieras inuti anrop av %<__builtin_classify_type%>"
 
 #: cp/parser.cc:8400 cp/parser.cc:8429
 #, gcc-internal-format
@@ -60471,10 +60303,9 @@ msgid "a lambda with captures may not have an explicit object parameter of an un
 msgstr "ett lambda med fångster kan inte ha en explicit objektparameter av en orelaterad typ"
 
 #: cp/parser.cc:11945
-#, fuzzy, gcc-internal-format
-#| msgid "%<static%> lambda specifier with lambda capture"
+#, gcc-internal-format
 msgid "%<mutable%> lambda specifier with explicit object parameter"
-msgstr "lambdaspecificeraren %<static%> med lambdafångst"
+msgstr "lambdaspecificeraren %<mutable%> med en explicit objektparameter"
 
 #: cp/parser.cc:11954
 #, gcc-internal-format
@@ -60492,10 +60323,9 @@ msgid "explicit object parameter is already a mutable reference"
 msgstr "explicit objektparameter är redan en muterbar referens"
 
 #: cp/parser.cc:11969
-#, fuzzy, gcc-internal-format
-#| msgid "%<static%> lambda specifier with lambda capture"
+#, gcc-internal-format
 msgid "%<static%> lambda specifier with explicit object parameter"
-msgstr "lambdaspecificeraren %<static%> med lambdafångst"
+msgstr "lambdaspecificeraren %<static%> med en explicit objektparameter"
 
 #: cp/parser.cc:11987
 #, gcc-internal-format
@@ -60686,10 +60516,9 @@ msgid "expected jump-statement"
 msgstr "hoppsats förväntades"
 
 #: cp/parser.cc:15090
-#, fuzzy, gcc-internal-format
-#| msgid "expected module-name"
+#, gcc-internal-format
 msgid "expected module-partition"
-msgstr "modulnamn förväntades"
+msgstr "modulpartition förväntades"
 
 #: cp/parser.cc:15092
 #, gcc-internal-format
@@ -60833,10 +60662,9 @@ msgid "invalid initializer for structured binding declaration"
 msgstr "ogiltig initierare för deklaration av strukturerad bindning"
 
 #: cp/parser.cc:16371
-#, fuzzy, gcc-internal-format
-#| msgid "DATA array %qs at %L must be specified in a previous declaration"
+#, gcc-internal-format
 msgid "%<this%> must be the first specifier in a parameter declaration"
-msgstr "DATA-vektor %qs vid %L måste anges i en tidigare deklaration"
+msgstr "%<this%> måste anges vara den första specificeraren i en parameterdeklaration"
 
 #: cp/parser.cc:16394
 #, gcc-internal-format
@@ -60924,10 +60752,9 @@ msgid "%<static_assert%> without a message only available with %<-std=c++17%> or
 msgstr "%<static_assert%> utan ett meddelande är endast tillgänglig med %<-std=c++17%> eller %<-std=gnu++17%>"
 
 #: cp/parser.cc:16974
-#, fuzzy, gcc-internal-format
-#| msgid "%<static_assert%> without a message only available with %<-std=c++17%> or %<-std=gnu++17%>"
+#, gcc-internal-format
 msgid "%<static_assert%> with non-string message only available with %<-std=c++2c%> or %<-std=gnu++2c%>"
-msgstr "%<static_assert%> utan ett meddelande är endast tillgänglig med %<-std=c++17%> eller %<-std=gnu++17%>"
+msgstr "%<static_assert%> med ett meddelande som inte är en sträng är endast tillgänglig med %<-std=c++2c%> eller %<-std=gnu++2c%>"
 
 #: cp/parser.cc:17172
 #, gcc-internal-format
@@ -61152,10 +60979,9 @@ msgid "use of %<auto%> in lambda parameter declaration only available with %<-st
 msgstr "användning av %<auto%> i lambdaparameterdeklarationer är endast tillgängligt med %<-std=c++14%> eller %<-std=gnu++14%>"
 
 #: cp/parser.cc:20356
-#, fuzzy, gcc-internal-format
-#| msgid "use of %<auto%> in parameter declaration only available with %<-std=c++20%> or %<-fconcepts%>"
+#, gcc-internal-format
 msgid "use of %<auto%> in template argument only available with %<-fconcepts-ts%>"
-msgstr "användning av %<auto%> i parameterdeklarationer är endast tillgängligt med %<-std=c++20%> eller %<-fconcepts%>"
+msgstr "användning av %<auto%> i mallargument är endast tillgängligt med %<-fconcepts-ts%>"
 
 #: cp/parser.cc:20360
 #, gcc-internal-format
@@ -61443,10 +61269,9 @@ msgid "%<asm%> qualifier outside of function body"
 msgstr "%<asm%>-kvalificerare utanför funktionskropp"
 
 #: cp/parser.cc:22948
-#, fuzzy, gcc-internal-format
-#| msgid "attribute ignored in declaration of %q#T"
+#, gcc-internal-format
 msgid "attributes ignored on %<asm%> declaration"
-msgstr "attribut ignoreras i deklaration av %q#T"
+msgstr "attribut ignoreras på en %<asm%>-deklaration"
 
 #: cp/parser.cc:23035
 #, gcc-internal-format
@@ -61641,16 +61466,14 @@ msgid "types may not be defined in parameter types"
 msgstr "typer får inte definieras i parametertyper"
 
 #: cp/parser.cc:25732
-#, fuzzy, gcc-internal-format
-#| msgid "too few template parameter lists in declaration of %qD"
+#, gcc-internal-format
 msgid "%<this%> specifier in template parameter declaration"
-msgstr "för få mallparameterlistor i deklarationen av %qD"
+msgstr "specificeraren %<this%> i en mallparameterdeklaration"
 
 #: cp/parser.cc:25746
-#, fuzzy, gcc-internal-format
-#| msgid "non-parameter %qs cannot be a parameter pack"
+#, gcc-internal-format
 msgid "an explicit object parameter cannot be a function parameter pack"
-msgstr "icke-parameter %qs kan inte vara ett parameterpaket"
+msgstr "en explicit objektparameter kan inte vara ett funktionsparameterpaket"
 
 #: cp/parser.cc:25838
 #, gcc-internal-format
@@ -61673,10 +61496,9 @@ msgid "parameter pack cannot have a default argument"
 msgstr "parameterpaket kan inte ha ett standardargument"
 
 #: cp/parser.cc:25887
-#, fuzzy, gcc-internal-format
-#| msgid "template parameter pack cannot have a default argument"
+#, gcc-internal-format
 msgid "an explicit object parameter may not have a default argument"
-msgstr "mallparameterpaket kan inte ha ett standardargument"
+msgstr "en explicit objektparameter får inte ha ett standardargument"
 
 #: cp/parser.cc:26011
 #, gcc-internal-format
@@ -61958,10 +61780,9 @@ msgid "expected attribute before %<...%>"
 msgstr "attribut förväntades före %<...%>"
 
 #: cp/parser.cc:30214
-#, fuzzy, gcc-internal-format
-#| msgid "%qE attribute without arguments on a non-prototype"
+#, gcc-internal-format
 msgid "attribute with no arguments contains no parameter packs"
-msgstr "attributet %qE utan argument på en icke-prototyp"
+msgstr "attribut utan några argument innehåller inga parameterpaket"
 
 #: cp/parser.cc:30260
 #, gcc-internal-format
@@ -62044,10 +61865,9 @@ msgid "too many template-parameter-lists"
 msgstr "för många mallparameterlistor"
 
 #: cp/parser.cc:32576
-#, fuzzy, gcc-internal-format
-#| msgid "template-id not allowed for destructor"
+#, gcc-internal-format
 msgid "template-id not allowed for constructor in C++20"
-msgstr "mall-id är inte tillåtet för destruerare"
+msgstr "mall-id är inte tillåtet för konstruerare i C++20"
 
 #: cp/parser.cc:32687
 #, gcc-internal-format
@@ -62461,10 +62281,9 @@ msgid "%<wait%> expression must be integral"
 msgstr "%<wait%>-uttryck måste vara heltal"
 
 #: cp/parser.cc:39638
-#, fuzzy, gcc-internal-format
-#| msgid "expected %<scalar%>, %<aggregate%> or %<pointer%>"
+#, gcc-internal-format
 msgid "expected %<scalar%>, %<aggregate%>, %<all%>"
-msgstr "%<scalar%>, %<aggregate%> eller %<pointer%> förväntades"
+msgstr "%<scalar%>, %<aggregate%>, %<all%> förväntades"
 
 #: cp/parser.cc:40029
 #, gcc-internal-format
@@ -62602,10 +62421,9 @@ msgid "%<#pragma omp assumes%> may only be used at file or namespace scope"
 msgstr "%<#pragma omp assumes%> kan endast användas med fil- eller namnrymdsräckvidd"
 
 #: cp/parser.cc:51053
-#, fuzzy, gcc-internal-format
-#| msgid "%<#pragma GCC ivdep%> must be inside a function"
+#, gcc-internal-format
 msgid "%<#pragma GCC %s%> must be inside a function"
-msgstr "%<#pragma GCC ivdep%> måste vara inuti en funktion"
+msgstr "%<#pragma GCC %s%> måste vara inuti en funktion"
 
 #: cp/parser.cc:51195
 #, gcc-internal-format
@@ -64170,16 +63988,14 @@ msgid "  since %q+#D declared in base class"
 msgstr "  eftersom %q+#D är deklarerad i basklassen"
 
 #: cp/search.cc:2281
-#, fuzzy, gcc-internal-format
-#| msgid "virtual function %q+D overriding final function"
+#, gcc-internal-format
 msgid "explicit object member function overrides virtual function"
-msgstr "virtuell funktion %q+D åsidosätter slutlig funktion"
+msgstr "en explicit objektmedlemsfunktion åsidosätter en virtuell funktion"
 
 #: cp/search.cc:2284
-#, fuzzy, gcc-internal-format
-#| msgid "resolver indirect function declared here"
+#, gcc-internal-format
 msgid "virtual function declared here"
-msgstr "upplösning av indirekt funktion deklarerad här"
+msgstr "den virtuella funktionen deklarerad här"
 
 #: cp/semantics.cc:1109
 #, gcc-internal-format
@@ -64262,22 +64078,19 @@ msgid "arguments to destructor are not allowed"
 msgstr "argument till destruerare är inte tillåtet"
 
 #: cp/semantics.cc:3175
-#, fuzzy, gcc-internal-format
-#| msgid "%<this%> is unavailable for static member functions"
+#, gcc-internal-format
 msgid "%<this%> is unavailable for explicit object member functions"
-msgstr "%<this%> är inte tillgängligt i en statisk medlemsfunktion"
+msgstr "%<this%> är inte tillgängligt i explicita objektmedlemsfunktioner"
 
 #: cp/semantics.cc:3187
-#, fuzzy, gcc-internal-format
-#| msgid "use the apostrophe directive %qs instead"
+#, gcc-internal-format
 msgid "use explicit object parameter %qs instead"
-msgstr "använd apostrofdirektivet %qs istället"
+msgstr "använd en explicit objektparameter %qs istället"
 
 #: cp/semantics.cc:3191
-#, fuzzy, gcc-internal-format
-#| msgid "invalid template non-type parameter"
+#, gcc-internal-format
 msgid "name the explicit object parameter"
-msgstr "ogiltig mallparameter som inte är en typ"
+msgstr "namnge den explicita objektdparametern"
 
 #: cp/semantics.cc:3196
 #, gcc-internal-format
@@ -64436,10 +64249,9 @@ msgid "%qT is not an enumeration type"
 msgstr "%qT är inte ett uppräkningstyp"
 
 #: cp/semantics.cc:4650
-#, fuzzy, gcc-internal-format
-#| msgid "requested alignment is not an integer constant"
+#, gcc-internal-format
 msgid "%<__type_pack_element%> index is not an integral constant"
-msgstr "begärd minnesjustering är inte en heltalskonstant"
+msgstr "indexet till %<__type_pack_element%> är inte en heltalskonstant"
 
 #: cp/semantics.cc:4656
 #, gcc-internal-format
@@ -64447,10 +64259,9 @@ msgid "%<__type_pack_element%> index is negative"
 msgstr "indexet till %<__type_pack_element%> är negativt"
 
 #: cp/semantics.cc:4662
-#, fuzzy, gcc-internal-format
-#| msgid "Reference statement index out of range"
+#, gcc-internal-format
 msgid "%<__type_pack_element%> index is out of range"
-msgstr "Referenssatsindex utanför intervallet"
+msgstr "indexet till %<__type_pack_element%> är utanför intervallet"
 
 #. Parameter packs can only be used in templates
 #: cp/semantics.cc:4785
@@ -64484,10 +64295,9 @@ msgid "%<offsetof%> within non-standard-layout type %qT is conditionally-support
 msgstr "%<offsetof%> inom icke-standardlayouttypen %qT är villkorligt stött"
 
 #: cp/semantics.cc:6046
-#, fuzzy, gcc-internal-format
-#| msgid "constructor priorities are not supported"
+#, gcc-internal-format
 msgid "pointer-to-member mapping %qE not supported"
-msgstr "konstruerarprioriteter stödjs ej"
+msgstr "pekar-till-medlems-avbildningen %qE stödjs ej"
 
 #: cp/semantics.cc:6240
 #, gcc-internal-format
@@ -64771,10 +64581,9 @@ msgid "%<static_assert%> message %<data()%> must be implicitly convertible to %<
 msgstr "meddelandet %<data()%> till %<static_assert%> måste vara implicit konverterbart till %<const char*%>"
 
 #: cp/semantics.cc:11592
-#, fuzzy, gcc-internal-format
-#| msgid "%<hint%> expression must be constant integer expression"
+#, gcc-internal-format
 msgid "%<static_assert%> message %<size()%> must be a constant expression"
-msgstr "%<hint%>-uttryck måste vara ett konstant heltalsuttryck"
+msgstr "meddelandet %<size()%> till %<static_assert%> måste vara ett konstant uttryck"
 
 #: cp/semantics.cc:11600
 #, gcc-internal-format
@@ -64782,22 +64591,19 @@ msgid "%<static_assert%> message %<size()%> %qE too large"
 msgstr "meddelandet %<size()%> till %<static_assert%> %qE är för stort"
 
 #: cp/semantics.cc:11627
-#, fuzzy, gcc-internal-format
-#| msgid "%<reinterpret_cast<%T>(%E)%> is not a constant expression"
+#, gcc-internal-format
 msgid "%<static_assert%> message %<data()[%d]%> must be a constant expression"
-msgstr "%<reinterpret_cast<%T>(%E)%> är inte ett konstant uttryck"
+msgstr "meddelandet %<data()[%d]%> till %<static_assert%> måste vara ett konstant uttryck"
 
 #: cp/semantics.cc:11654
-#, fuzzy, gcc-internal-format
-#| msgid "argument %d of %qE must be an integer constant expression"
+#, gcc-internal-format
 msgid "%<static_assert%> message %<data()%> must be a core constant expression"
-msgstr "argument %d till %qE måste vara ett konstant heltalsuttryck"
+msgstr "meddelandet %<data()%> till %<static_assert%> måste vara ett kärnkonstant uttryck"
 
 #: cp/semantics.cc:11680
-#, fuzzy, gcc-internal-format
-#| msgid "static assertion failed: %s"
+#, gcc-internal-format
 msgid "static assertion failed: %.*s"
-msgstr "statisk försäkran misslyckades: %s"
+msgstr "statisk försäkran misslyckades: %.*s"
 
 #: cp/semantics.cc:11688
 #, gcc-internal-format
@@ -65394,10 +65200,9 @@ msgid "the compiler can assume that the address of %qD will never be NULL"
 msgstr "kompilatorn kan anta att adressen till %qD aldrig kommer att vara NULL"
 
 #: cp/typeck.cc:5055
-#, fuzzy, gcc-internal-format
-#| msgid "bitwise operation between different enumeration types %qT and %qT is deprecated"
+#, gcc-internal-format
 msgid "bitwise operation between different enumeration types %qT and %qT"
-msgstr "bitvis konvertering mellan olika uppräkningstyper %qT och %qT bör undvikas"
+msgstr "bitvis operation mellan olika uppräkningstyper %qT och %qT"
 
 #: cp/typeck.cc:5058
 #, gcc-internal-format
@@ -65405,10 +65210,9 @@ msgid "bitwise operation between different enumeration types %qT and %qT is depr
 msgstr "bitvis konvertering mellan olika uppräkningstyper %qT och %qT bör undvikas"
 
 #: cp/typeck.cc:5064
-#, fuzzy, gcc-internal-format
-#| msgid "arithmetic between different enumeration types %qT and %qT is deprecated"
+#, gcc-internal-format
 msgid "arithmetic between different enumeration types %qT and %qT"
-msgstr "aritmetik mellan olika uppräkningstyper %qT och %qT bör undvikas"
+msgstr "aritmetik mellan olika uppräkningstyper %qT och %qT"
 
 #: cp/typeck.cc:5067
 #, gcc-internal-format
@@ -65416,16 +65220,14 @@ msgid "arithmetic between different enumeration types %qT and %qT is deprecated"
 msgstr "aritmetik mellan olika uppräkningstyper %qT och %qT bör undvikas"
 
 #: cp/typeck.cc:5104
-#, fuzzy, gcc-internal-format
-#| msgid "comparison of enumeration type %qT with floating-point type %qT is deprecated"
+#, gcc-internal-format
 msgid "comparison of enumeration type %qT with floating-point type %qT"
-msgstr "jämförelse av uppräkningstypen %qT med flyttalstypen %qT är föråldrad"
+msgstr "jämförelse av uppräkningstypen %qT med flyttalstypen %qT"
 
 #: cp/typeck.cc:5107
-#, fuzzy, gcc-internal-format
-#| msgid "comparison of floating-point type %qT with enumeration type %qT is deprecated"
+#, gcc-internal-format
 msgid "comparison of floating-point type %qT with enumeration type %qT"
-msgstr "jämförelse av flyttalstypen %qT med uppräkningstypen %qT bör undvikas"
+msgstr "jämförelse av flyttalstypen %qT med uppräkningstypen %qT"
 
 #: cp/typeck.cc:5110
 #, gcc-internal-format
@@ -65438,16 +65240,14 @@ msgid "comparison of floating-point type %qT with enumeration type %qT is deprec
 msgstr "jämförelse av flyttalstypen %qT med uppräkningstypen %qT bör undvikas"
 
 #: cp/typeck.cc:5123
-#, fuzzy, gcc-internal-format
-#| msgid "arithmetic between enumeration type %qT and floating-point type %qT is deprecated"
+#, gcc-internal-format
 msgid "arithmetic between enumeration type %qT and floating-point type %qT"
-msgstr "aritmetik mellan uppräkningstypen %qT och flyttalstypen %qT är föråldrad"
+msgstr "aritmetik mellan uppräkningstypen %qT och flyttalstypen %qT"
 
 #: cp/typeck.cc:5126
-#, fuzzy, gcc-internal-format
-#| msgid "arithmetic between floating-point type %qT and enumeration type %qT is deprecated"
+#, gcc-internal-format
 msgid "arithmetic between floating-point type %qT and enumeration type %qT"
-msgstr "aritmetik mellan flyttalstypen %qT och uppräkningstypen %qT är föråldrad"
+msgstr "aritmetik mellan flyttalstypen %qT och uppräkningstypen %qT"
 
 #: cp/typeck.cc:5129
 #, gcc-internal-format
@@ -65554,10 +65354,9 @@ msgid "ISO C++ forbids taking the address of an unqualified or parenthesized non
 msgstr "ISO C++ förbjuder att ta adressen till en okvalificerad eller parentetiserad icke-statisk medlemsfunktion för att skapa en pekare till en medlemsfunktion.  Säg %<&%T::%D%>"
 
 #: cp/typeck.cc:7154
-#, fuzzy, gcc-internal-format
-#| msgid "ISO C++ forbids taking the address of an unqualified or parenthesized non-static member function to form a pointer to member function.  Say %<&%T::%D%>"
+#, gcc-internal-format
 msgid "ISO C++ forbids taking the address of an unqualified or parenthesized non-static member function to form a pointer to explicit object member function"
-msgstr "ISO C++ förbjuder att ta adressen till en okvalificerad eller parentetiserad icke-statisk medlemsfunktion för att skapa en pekare till en medlemsfunktion.  Säg %<&%T::%D%>"
+msgstr "ISO C++ förbjuder att ta adressen till en okvalificerad eller parentetiserad icke-statisk medlemsfunktion för att skapa en pekare till en explicit objektmedlemsfunktion"
 
 #: cp/typeck.cc:7160
 #, gcc-internal-format
@@ -65565,16 +65364,14 @@ msgid "ISO C++ forbids taking the address of a bound member function to form a p
 msgstr "ISO C++ förbjuder att ta adressen till en bunden medlemsfunktion för att skapa en pekare till medlemsfunktion.  Säg %<&%T::%D%>"
 
 #: cp/typeck.cc:7166
-#, fuzzy, gcc-internal-format
-#| msgid "ISO C++ forbids taking the address of a bound member function to form a pointer to member function.  Say %<&%T::%D%>"
+#, gcc-internal-format
 msgid "ISO C++ forbids taking the address of a bound member function to form a pointer to explicit object member function"
-msgstr "ISO C++ förbjuder att ta adressen till en bunden medlemsfunktion för att skapa en pekare till medlemsfunktion.  Säg %<&%T::%D%>"
+msgstr "ISO C++ förbjuder att ta adressen till en bunden medlemsfunktion för att skapa en pekare på en explicit objektmedlemsfunktion"
 
 #: cp/typeck.cc:7171
-#, fuzzy, gcc-internal-format
-#| msgid "(a pointer to member can only be formed with %<&%E%>)"
+#, gcc-internal-format
 msgid "a pointer to explicit object member function can only be formed with %<&%T::%D%>"
-msgstr "(en pekare på medlem kan bara skapas med %<&%E%>)"
+msgstr "en pekare på en explicit objektmedlemsfunktion kan bara skapas med %<&%T::%D%>"
 
 #. Make this a permerror because we used to accept it.
 #: cp/typeck.cc:7204
@@ -65914,10 +65711,9 @@ msgid "returning reference to temporary"
 msgstr "returnerar referens till en temporär"
 
 #: cp/typeck.cc:10633
-#, fuzzy, gcc-internal-format
-#| msgid "returning reference to temporary"
+#, gcc-internal-format
 msgid "returning pointer to temporary"
-msgstr "returnerar referens till en temporär"
+msgstr "returnerar pekare på en temporär"
 
 #: cp/typeck.cc:10636
 #, gcc-internal-format
@@ -66014,10 +65810,9 @@ msgid "%<operator new%> must not return NULL unless it is declared %<throw()%> (
 msgstr "%<operator new%> får inte returnera NULL om den inte är deklarerad %<throw()%> (eller %<-fcheck-new%> är aktivt)"
 
 #: cp/typeck.cc:11299
-#, fuzzy, gcc-internal-format
-#| msgid "invalid covariant return type for %q#D"
+#, gcc-internal-format
 msgid "not eliding copy on return from %qD"
-msgstr "ogiltig kovariant returtyp för %q#D"
+msgstr "utelämnar inte kopiering vid retur från %qD"
 
 #: cp/typeck.cc:11311
 #, gcc-internal-format
@@ -66528,16 +66323,14 @@ msgid "cast from %qs to %qs will produce zero result"
 msgstr "typkonvertering från %qs till %qs kommer producera ett nollresultat"
 
 #: d/d-convert.cc:748
-#, fuzzy, gcc-internal-format
-#| msgid "cannot convert %qE from type %qT to type %qT"
+#, gcc-internal-format
 msgid "cannot convert parameter %qs from type %qs to type %qs in assignment"
-msgstr "kan inte konvertera %qE från typ %qT till typ %qT"
+msgstr "det går inte att konvertera parametern %qs från typen %qs till typen %qs i en tilldelning"
 
 #: d/d-convert.cc:754
-#, fuzzy, gcc-internal-format
-#| msgid "cannot convert %qH to %qI in argument passing"
+#, gcc-internal-format
 msgid "cannot convert parameter %qs from type %qs to type %qs in argument passing"
-msgstr "det går inte att konvertera %qH till %qI när argument skickas"
+msgstr "det går inte att konvertera parametern %qs från typen %qs till typen %qs när argument skickas"
 
 #: d/d-convert.cc:759
 #, gcc-internal-format
@@ -66565,28 +66358,24 @@ msgid "bad argument for %<-fversion%>: %qs"
 msgstr "felaktigt argument till %<-fversion%>: %qs"
 
 #: d/d-lang.cc:968
-#, fuzzy, gcc-internal-format
-#| msgid "error: unable to open '%s' for writing: %s\n"
+#, gcc-internal-format
 msgid "unable to open %s for writing: %m"
-msgstr "fel: kan inte öppna ”%s” för skrivning: %s\n"
+msgstr "kan inte öppna %s för skrivning: %m"
 
 #: d/d-lang.cc:975
-#, fuzzy, gcc-internal-format
-#| msgid "opening output file %s: %m"
+#, gcc-internal-format
 msgid "writing output file %s: %m"
-msgstr "vid öppnandet av utdatafil %s: %m"
+msgstr "när utdatafil %s skrevs: %m"
 
 #: d/d-lang.cc:995
-#, fuzzy, gcc-internal-format
-#| msgid "error: unable to open '%s' for writing: %s\n"
+#, gcc-internal-format
 msgid "unable to open %s for reading: %m"
-msgstr "fel: kan inte öppna ”%s” för skrivning: %s\n"
+msgstr "kan inte öppna %s för skrivning: %m"
 
 #: d/d-lang.cc:1020
-#, fuzzy, gcc-internal-format
-#| msgid "opening json file %s: %m"
+#, gcc-internal-format
 msgid "reading ddoc file %s: %m"
-msgstr "när json-filen %s öppnades: %m"
+msgstr "när ddoc-filen %s skrevs: %m"
 
 #: d/d-lang.cc:1079
 #, gcc-internal-format
@@ -66665,16 +66454,14 @@ msgid "cannot handle comparison of type %<%s == %s%>"
 msgstr "kan inte hantera jämförelse av typen %<%s == %s%>"
 
 #: d/expr.cc:717
-#, fuzzy, gcc-internal-format
-#| msgid "expression %qs requires %<object.TypeInfo%> and cannot be used with %<-fno-rtti%>"
+#, gcc-internal-format
 msgid "array concatenation of expression %qs requires the GC and cannot be used with %<-fno-druntime%>"
-msgstr "uttrycket %qs kräver %<object.TypeInfo%> och kan inte användas med %<-fno-rtti%>"
+msgstr "vektorkonkatenering av uttrycket %qs kräver GC:n och kan inte användas med %<-fno-druntime%>"
 
 #: d/expr.cc:811
-#, fuzzy, gcc-internal-format
-#| msgid "expression %qs requires %<object.TypeInfo%> and cannot be used with %<-fno-rtti%>"
+#, gcc-internal-format
 msgid "appending to array in %qs requires the GC and cannot be used with %<-fno-druntime%>"
-msgstr "uttrycket %qs kräver %<object.TypeInfo%> och kan inte användas med %<-fno-rtti%>"
+msgstr "tillägg till en vektor i %qs kräver GC:n och kan inte användas med %<-fno-druntime%>"
 
 #. Static arrays have already been handled by the front-end.
 #: d/expr.cc:1285
@@ -66759,8 +66546,7 @@ msgstr "avsaknad av överensstämmelse i anrop till den inbyggda funktionen %qD"
 
 #. It's a D language intrinsic with no library implementation.
 #: d/intrinsics.cc:1479
-#, fuzzy, gcc-internal-format
-#| msgid "built-in function %qE must be directly called"
+#, gcc-internal-format
 msgid "intrinsic function %qE must be directly called"
 msgstr "inbyggd funktion %qE måste anropas direkt"
 
@@ -67325,10 +67111,9 @@ msgid "Array constructor value at %L shall not be unlimited polymorphic [F2008: 
 msgstr "Vektorkonstruerarvärde vid %L får inte vara obegränsat polymorft [F2008: C4106]"
 
 #: fortran/array.cc:2215
-#, fuzzy, gcc-internal-format
-#| msgid "Different CHARACTER lengths (%ld/%ld) in array constructor at %L"
+#, gcc-internal-format
 msgid "Different CHARACTER lengths (%wd/%wd) in array constructor at %L"
-msgstr "Olika CHARACTER-längder (%ld/%ld) i vektorkonstruerare vid %L"
+msgstr "Olika CHARACTER-längder (%wd/%wd) i vektorkonstruerare vid %L"
 
 #: fortran/array.cc:2333
 #, gcc-internal-format
@@ -67552,10 +67337,9 @@ msgid "Unequal character lengths (%ld/%ld) in %s at %L"
 msgstr "Olika teckenlängder (%ld/%ld) i %s vid %L"
 
 #: fortran/check.cc:1269
-#, fuzzy, gcc-internal-format
-#| msgid "Size of %qs argument of %qs intrinsic at %L too small (%i/%i)"
+#, gcc-internal-format
 msgid "Size of %qs argument of %qs intrinsic at %L too small (%wd/%ld)"
-msgstr "Storlek på %qs-argumentet till inbyggd %qs vid %L är för liten (%i/%i)"
+msgstr "Storlek på %qs-argumentet till inbyggd %qs vid %L är för liten (%wd/%ld)"
 
 #: fortran/check.cc:1332
 #, gcc-internal-format, gfc-internal-format
@@ -68364,10 +68148,8 @@ msgid "%<MOLD%> argument of %<TRANSFER%> intrinsic at %L must not be %s"
 msgstr "%<MOLD%>-argumentet till inbyggd %<TRANSFER%> vid %L får inte vara %s"
 
 #: fortran/check.cc:6300
-#, fuzzy
-#| msgid "Intrinsic TRANSFER at %L has partly undefined result: source size %ld < result size %ld"
 msgid "Intrinsic TRANSFER at %L has partly undefined result: source size %zd < result size %zd"
-msgstr "Inbyggd TRANSFER vid %L har delvis odefinierat resultat: källstorlek %ld < resultatstorlek %ld"
+msgstr "Inbyggd TRANSFER vid %L har delvis odefinierat resultat: källstorlek %zd < resultatstorlek %zd"
 
 #: fortran/check.cc:6424
 #, gcc-internal-format
@@ -68380,16 +68162,14 @@ msgid "%qs and %qs arguments of %qs intrinsic at %L must have identical shape."
 msgstr "%qs- och %qs-argumenten till inbyggd %qs vid %L måste ha identiska former."
 
 #: fortran/check.cc:6573
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "COUNT argument to SYSTEM_CLOCK at %L has non-default kind"
+#, gcc-internal-format, gfc-internal-format
 msgid "VALUES argument of DATE_AND_TIME at %L has non-default kind"
-msgstr "Argumentet COUNT till SYSTEM_CLOCK vid %L har icke-standardsort"
+msgstr "Argumentet VALUES till  DATE_AND_TIME vid %L har icke-standardsort"
 
 #: fortran/check.cc:6585
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "Argument of ATANH at %L must be inside the range -1 to 1"
+#, gcc-internal-format, gfc-internal-format
 msgid "VALUES argument of DATE_AND_TIME at %L must have a decimal exponent range of at least four"
-msgstr "Argument till ATANH vid %L måste vara i intervallet -1 till 1"
+msgstr "Argumentet VALUES till  DATE_AND_TIME vid %L måste ha ett decimalt exponentinterval på åtminstone fyra"
 
 #: fortran/check.cc:6724 fortran/check.cc:6756
 #, gcc-internal-format
@@ -68417,10 +68197,9 @@ msgid "COUNT argument to SYSTEM_CLOCK at %L has non-default kind"
 msgstr "Argumentet COUNT till SYSTEM_CLOCK vid %L har icke-standardsort"
 
 #: fortran/check.cc:6843
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "COUNT argument to SYSTEM_CLOCK at %L has non-default kind"
+#, gcc-internal-format, gfc-internal-format
 msgid "COUNT argument to SYSTEM_CLOCK at %L with kind smaller than default integer"
-msgstr "Argumentet COUNT till SYSTEM_CLOCK vid %L har icke-standardsort"
+msgstr "Argumentet COUNT till SYSTEM_CLOCK vid %L med en sort som är mindre än standardheltal"
 
 #: fortran/check.cc:6864
 #, gcc-internal-format, gfc-internal-format
@@ -68433,10 +68212,9 @@ msgid "COUNT_RATE argument to SYSTEM_CLOCK at %L has non-default kind"
 msgstr "Argumentet COUNT_RATE till SYSTEM_CLOCK vid %L har en icke-standardsort"
 
 #: fortran/check.cc:6881
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "COUNT_RATE argument to SYSTEM_CLOCK at %L has non-default kind"
+#, gcc-internal-format, gfc-internal-format
 msgid "COUNT_RATE argument to SYSTEM_CLOCK at %L with kind smaller than default integer"
-msgstr "Argumentet COUNT_RATE till SYSTEM_CLOCK vid %L har en icke-standardsort"
+msgstr "Argumentet COUNT_RATE till SYSTEM_CLOCK vid %L har en sort som är mindre än standardheltal"
 
 #: fortran/check.cc:6901
 #, gcc-internal-format, gfc-internal-format
@@ -68444,16 +68222,14 @@ msgid "COUNT_MAX argument to SYSTEM_CLOCK at %L has non-default kind"
 msgstr "Argumentet COUNT_MAX till SYSTEM_CLOCK vid %L har en icke-standardsort"
 
 #: fortran/check.cc:6911
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "COUNT_MAX argument to SYSTEM_CLOCK at %L has non-default kind"
+#, gcc-internal-format, gfc-internal-format
 msgid "COUNT_MAX argument to SYSTEM_CLOCK at %L with kind smaller than default integer"
-msgstr "Argumentet COUNT_MAX till SYSTEM_CLOCK vid %L har en icke-standardsort"
+msgstr "Argumentet COUNT_MAX till SYSTEM_CLOCK vid %L har en sort som är mindre än standardheltal"
 
 #: fortran/check.cc:6926 fortran/check.cc:6933
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "COUNT argument to SYSTEM_CLOCK at %L has non-default kind"
+#, gcc-internal-format, gfc-internal-format
 msgid "integer arguments to SYSTEM_CLOCK at %L with different kind parameters"
-msgstr "Argumentet COUNT till SYSTEM_CLOCK vid %L har icke-standardsort"
+msgstr "heltalsargumentet till SYSTEM_CLOCK vid %L med en annan parametersort"
 
 #: fortran/check.cc:7147
 #, gcc-internal-format
@@ -68503,16 +68279,14 @@ msgid "non-constant array in DATA statement %L"
 msgstr "ickekonstant vektor i DATA-sats %L"
 
 #: fortran/data.cc:78
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "Array reference at %L is out of bounds (%ld < %ld) in dimension %d"
+#, gcc-internal-format, gfc-internal-format
 msgid "Subscript at %L below array lower bound (%ld < %ld) in dimension %d"
-msgstr "Vektorreferens vid %L är utanför gränsen (%ld < %ld) i dimension %d"
+msgstr "Indexet vid %L är under vektorns lägre gräns (%ld < %ld) i dimension %d"
 
 #: fortran/data.cc:89
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "Lower array reference at %L is out of bounds (%ld > %ld) in dimension %d"
+#, gcc-internal-format, gfc-internal-format
 msgid "Subscript at %L above array upper bound (%ld > %ld) in dimension %d"
-msgstr "Undre vektorreferens vid %L är utanför gränsen (%ld > %ld) i dimension %d"
+msgstr "Indexet vid %L är över vektorns övre gräns (%ld > %ld) i dimension %d"
 
 #: fortran/data.cc:172
 #, gcc-internal-format, gfc-internal-format
@@ -68525,10 +68299,9 @@ msgid "Unused initialization string at %L because variable has zero length"
 msgstr "Oanvänd initieringssträng vid %L för att variabeln har nollängd"
 
 #: fortran/data.cc:211
-#, fuzzy, gcc-internal-format
-#| msgid "Initialization string at %L was truncated to fit the variable (%ld/%ld)"
+#, gcc-internal-format
 msgid "Initialization string at %L was truncated to fit the variable (%wd/%wd)"
-msgstr "Initieringssträng vid %L höggs av för att stämma med variabeln (%ld/%ld)"
+msgstr "Initieringssträng vid %L höggs av för att stämma med variabeln (%wd/%wd)"
 
 #: fortran/data.cc:220 fortran/resolve.cc:5287
 #, gcc-internal-format, gfc-internal-format
@@ -69627,10 +69400,9 @@ msgid "Duplicate symbol %qs in formal argument list at %C"
 msgstr "Dubblerad symbol %qs i formell argumentlista vid %C"
 
 #: fortran/decl.cc:6805
-#, fuzzy, gcc-internal-format
-#| msgid "Mismatch in MODULE PROCEDURE formal argument names (%s/%s) at %C"
+#, gcc-internal-format
 msgid "MODULE PROCEDURE formal argument %qs conflicts with alternate return at %C"
-msgstr "Formella argumentnamnen till MODULE PROCEDURE stämmer inte (%s/%s) vid %C"
+msgstr "Formella argumentet %qs till MODULE PROCEDURE står i konflikt med alternativ retur vid %C"
 
 #: fortran/decl.cc:6809
 #, gcc-internal-format
@@ -71238,10 +71010,9 @@ msgid "%qs at %L associated to expression cannot be used in a variable definitio
 msgstr "%qs vid %L som är associerad med uttryck kan inte användas i ett variabeldefinitionssammanhang (%s)"
 
 #: fortran/expr.cc:6507
-#, fuzzy, gcc-internal-format
-#| msgid "%qs at %L associated to expression cannot be used in a variable definition context (%s)"
+#, gcc-internal-format
 msgid "%qs at %L associated to pointer function target being used in a variable definition context (%s)"
-msgstr "%qs vid %L som är associerad med uttryck kan inte användas i ett variabeldefinitionssammanhang (%s)"
+msgstr "%qs vid %L som är associerad med ett pekarfunktionsmål används i ett variabeldefinitionssammanhang (%s)"
 
 #: fortran/expr.cc:6526
 #, gcc-internal-format
@@ -71766,10 +71537,9 @@ msgid "Actual argument at %L to assumed-type dummy has type parameters or is of 
 msgstr "Aktuellt argument vid %L till attrapp med antagen typ har typparametrar eller är av en härledd typ med typgräns eller FINAL-procedurer"
 
 #: fortran/interface.cc:3355
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "Coindexed polymorphic actual argument at %L is passed polymorphic dummy argument %qs"
+#, gcc-internal-format, gfc-internal-format
 msgid "Unlimited polymorphic actual argument at %L is not matched with either an unlimited polymorphic or assumed type dummy argument"
-msgstr "Co-indexerat polymorft aktuellt argument vid %L skickas ett polymorft attrappargument %qs"
+msgstr "Obegränsat polymorft aktuellt argument vid %L stämmer varken med en obegränsad polymorf eller ett attrappargument med antagen typ"
 
 #: fortran/interface.cc:3379
 #, gcc-internal-format
@@ -73892,10 +73662,9 @@ msgid "Symbol %qs in namelist %qs at %C must be declared before the namelist is 
 msgstr "Symbolen %qs i namnlistan %qs vid %C måste deklareras före namnlistan deklareras."
 
 #: fortran/match.cc:5652
-#, fuzzy, gcc-internal-format
-#| msgid "Symbol %qs at %L conflicts with the symbol at %L"
+#, gcc-internal-format
 msgid "Derived type %qs at %L conflicts with namelist object %qs at %C"
-msgstr "Symbolen %qs vid %L står i konflikt med symbolen vid %L"
+msgstr "Den härledda typen %qs vid %L står i konflikt med namnlisteobjektet %qs vid %C"
 
 #: fortran/match.cc:5672
 #, gcc-internal-format
@@ -74550,10 +74319,9 @@ msgid "Duplicate %s modifier at %L in USES_ALLOCATORS clause"
 msgstr "Dubblerad %s-modifierare vid %L i en USES_ALLOCATORS-klausul"
 
 #: fortran/openmp.cc:1779
-#, fuzzy, gcc-internal-format
-#| msgid "expected %<(%> at %C"
+#, gcc-internal-format
 msgid "Unexpected %<(%> at %C"
-msgstr "%<(%> förväntades vid %C"
+msgstr "Oväntat %<(%> vid %C"
 
 #: fortran/openmp.cc:1826
 #, gcc-internal-format
@@ -74602,16 +74370,14 @@ msgid "COLLAPSE clause argument not constant positive integer at %C"
 msgstr "COLLAPSE-klausulargument är inte ett konstant positivt heltal vid %C"
 
 #: fortran/openmp.cc:2236
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "Expected ALLOC, TO, FROM, TOFROM, FIRSTPRIVATE, NONE or DEFAULT at %C"
+#, gcc-internal-format, gfc-internal-format
 msgid "Expected ALLOC, TO, FROM, TOFROM, FIRSTPRIVATE, PRESENT, NONE or DEFAULT at %C"
-msgstr "ALLOC, TO, FROM, TOFROM, FIRSTPRIVATE, NONE eller DEFAULT förväntades vid %C"
+msgstr "ALLOC, TO, FROM, TOFROM, FIRSTPRIVATE, PRESENT, NONE eller DEFAULT förväntades vid %C"
 
 #: fortran/openmp.cc:2258
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "Expected SCALAR, AGGREGATE, ALLOCATABLE or POINTER at %C"
+#, gcc-internal-format, gfc-internal-format
 msgid "Expected SCALAR, AGGREGATE, ALLOCATABLE, POINTER or ALL at %C"
-msgstr "SCALAR, AGGREGATE, ALLOCATABLE eller POINTER förväntades vid %C"
+msgstr "SCALAR, AGGREGATE, ALLOCATABLE, POINTER eller ALL förväntades vid %C"
 
 #: fortran/openmp.cc:2291
 #, gcc-internal-format, gfc-internal-format
@@ -74704,10 +74470,9 @@ msgid "Expected SEQ_CST, ACQUIRE or RELAXED at %C"
 msgstr "SEQ_CST, ACQUIRE eller RELAXED förväntades vid %C"
 
 #: fortran/openmp.cc:2816
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "WAIT clause at %L requires a scalar INTEGER expression"
+#, gcc-internal-format, gfc-internal-format
 msgid "INDIRECT clause at %C requires a constant logical expression"
-msgstr "WAIT-klausul vid %L kräver ett skalärt INTEGER-uttryck"
+msgstr "INDIRECT-klausul vid %C kräver ett konstant logiskt uttryck"
 
 #: fortran/openmp.cc:3003
 #, gcc-internal-format
@@ -74725,10 +74490,9 @@ msgid "too many %<close%> modifiers at %L"
 msgstr "för många %<close%>-modifierare vid %L"
 
 #: fortran/openmp.cc:3125
-#, fuzzy, gcc-internal-format
-#| msgid "too many %<close%> modifiers at %L"
+#, gcc-internal-format
 msgid "too many %<present%> modifiers at %L"
-msgstr "för många %<close%>-modifierare vid %L"
+msgstr "för många %<present%>-modifierare vid %L"
 
 #: fortran/openmp.cc:3316
 #, gcc-internal-format
@@ -74836,22 +74600,19 @@ msgid "!$ACC ROUTINE with GANG, WORKER, or VECTOR clause is not permitted in PUR
 msgstr "!$ACC ROUTINE med GANG-, WORKER- eller VECTOR-klausul är inte tillåten i PURE-procedur vid %C"
 
 #: fortran/openmp.cc:4568
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "Expected COMPILATION or EXECUTION in AT clause at %C"
+#, gcc-internal-format, gfc-internal-format
 msgid "Expected ALIGN or ALLOCATOR clause at %C"
-msgstr "COMPILATION eller EXECUTION förväntades i AT-klausul vid %C"
+msgstr "ALIGN- eller ALLOCATOR-klausul förväntades vid %C"
 
 #: fortran/openmp.cc:4576
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "Sorry, the event component of derived type at %L is not yet supported"
+#, gcc-internal-format, gfc-internal-format
 msgid "Sorry, structure-element list item at %L in ALLOCATE directive is not yet supported"
-msgstr "Ledsen, händelsekomponenten hos härledd typ vid %L stödjs inte ännu"
+msgstr "Ledsen, postelementlistelementet vid %L i direktivet ALLOCATE stödjs inte ännu"
 
 #: fortran/openmp.cc:4579
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "Expected expression in %s statement at %C"
+#, gcc-internal-format, gfc-internal-format
 msgid "Unexpected expression as list item at %L in ALLOCATE directive"
-msgstr "Förväntade uttryck i %s-sats vid %C"
+msgstr "Oväntat uttryck som listelement vid %L i direktivet ALLOCATE"
 
 #: fortran/openmp.cc:4650
 #, gcc-internal-format, gfc-internal-format
@@ -75014,10 +74775,9 @@ msgid "COMMON at %L set in previous OMP DECLARE TARGET directive to a different 
 msgstr "COMMON vid %L satt i föregående OMP DECLARE TARGET-direktiv till en annan DEVICE_TYPE"
 
 #: fortran/openmp.cc:5611
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "OMP DECLARE TARGET directive at %L with only DEVICE_TYPE clause is ignored"
+#, gcc-internal-format, gfc-internal-format
 msgid "OMP DECLARE TARGET directive at %L with only DEVICE_TYPE or INDIRECT clauses is ignored"
-msgstr "Direktivet OMP DECLARE TARGET vid %L med endast DEVICE_TYPE-klausul ignoreras"
+msgstr "Direktivet OMP DECLARE TARGET vid %L med endast DEVICE_TYPE- eller INDIRECTklausuler ignoreras"
 
 #: fortran/openmp.cc:5622
 #, gcc-internal-format, gfc-internal-format
@@ -75026,10 +74786,9 @@ msgstr "Syntaxfel i !$OMP DECLARE TARGET-lista vid %C"
 
 #. FIXME: constant integer expressions.
 #: fortran/openmp.cc:5661
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "Expected integer expression at %C"
+#, gcc-internal-format, gfc-internal-format
 msgid "Expected trait-property-extension at %C"
-msgstr "Heltalsuttryck förväntades vid %C"
+msgstr "Trait-property-utvidgning förväntades vid %C"
 
 #: fortran/openmp.cc:5676 fortran/openmp.cc:5773 fortran/openmp.cc:5904
 #: fortran/openmp.cc:6054 fortran/openmp.cc:6082
@@ -75043,10 +74802,9 @@ msgid "expected trait selector name at %C"
 msgstr "trait-väljarnamn förväntades vid %C"
 
 #: fortran/openmp.cc:5717
-#, fuzzy, gcc-internal-format
-#| msgid "selector %qs not allowed for context selector set %qs at %C"
+#, gcc-internal-format
 msgid "unknown selector %qs for context selector set %qs at %C"
-msgstr "selektorn %qs är inte tillåten för kontextselektormängd %qs vid %C"
+msgstr "okänd selektor %qs för kontextselektormängden %qs vid %C"
 
 #: fortran/openmp.cc:5735
 #, gcc-internal-format
@@ -75054,10 +74812,9 @@ msgid "selector %qs does not accept any properties at %C"
 msgstr "selektorn %qs tar inte några egenskaper vid %C"
 
 #: fortran/openmp.cc:5744
-#, fuzzy, gcc-internal-format
-#| msgid "The %s directive cannot be specified within a %s region at %L"
+#, gcc-internal-format
 msgid "%<score%> cannot be specified in traits in the %qs trait-selector-set at %C"
-msgstr "Direktivet %s kan inte anges inuti en %s-region vid %L"
+msgstr "%<score%> kan inte anges bland egenskaper i %s trait-selector-set vid %C"
 
 #: fortran/openmp.cc:5751 fortran/openmp.cc:5914 fortran/openmp.cc:6006
 #: fortran/openmp.cc:6073
@@ -75066,16 +74823,14 @@ msgid "expected %<(%> at %C"
 msgstr "%<(%> förväntades vid %C"
 
 #: fortran/openmp.cc:5759
-#, fuzzy, gcc-internal-format
-#| msgid "score argument must be constant integer expression at %C"
+#, gcc-internal-format
 msgid "%<score%> argument must be constant integer expression at %C"
-msgstr "värdesargument måste vara ett konstant heltalsuttryck vid %C"
+msgstr "argument till %<score%> måste vara ett konstant heltalsuttryck vid %C"
 
 #: fortran/openmp.cc:5767
-#, fuzzy, gcc-internal-format
-#| msgid "score argument must be non-negative at %C"
+#, gcc-internal-format
 msgid "%<score%> argument must be non-negative at %C"
-msgstr "värdesargumentet måste vara ickenegativt vid %C"
+msgstr "argumentet till %<score%> måste vara ickenegativt vid %C"
 
 #: fortran/openmp.cc:5779
 #, gcc-internal-format, gfc-internal-format
@@ -75098,22 +74853,19 @@ msgid "expected expression at %C"
 msgstr "uttryck förväntades vid %C"
 
 #: fortran/openmp.cc:5853
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "property must be constant integer or logical expression at %C"
+#, gcc-internal-format, gfc-internal-format
 msgid "property must be a constant logical expression at %C"
-msgstr "egenskapen måste vara ett konstant heltals- eller logiskt uttryck vid %C"
+msgstr "egenskapen måste vara ett konstant logiskt uttryck vid %C"
 
 #: fortran/openmp.cc:5856
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "property must be constant integer expression"
+#, gcc-internal-format, gfc-internal-format
 msgid "property must be a constant integer expression at %C"
-msgstr "egenskapen måste vara ett konstant heltalsuttryck"
+msgstr "egenskapen måste vara ett konstant heltalsuttryck vid %C"
 
 #: fortran/openmp.cc:5868
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "property must be constant integer or logical expression at %C"
+#, gcc-internal-format, gfc-internal-format
 msgid "property must be a conforming device number at %C"
-msgstr "egenskapen måste vara ett konstant heltals- eller logiskt uttryck vid %C"
+msgstr "egenskapen måste vara ett konformt enhetsnummer vid %C"
 
 #: fortran/openmp.cc:5882
 #, gcc-internal-format, gfc-internal-format
@@ -75121,10 +74873,9 @@ msgid "expected simd clause at %C"
 msgstr "simd-klausul förväntades vid %C"
 
 #: fortran/openmp.cc:5955
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "expected trait selector name at %C"
+#, gcc-internal-format, gfc-internal-format
 msgid "expected context selector set name at %C"
-msgstr "trait-väljarnamn förväntades vid %C"
+msgstr "kontextväljarmängdsnamn förväntades vid %C"
 
 #: fortran/openmp.cc:5962
 #, gcc-internal-format
@@ -75222,10 +74973,9 @@ msgid "!$OMP REQUIRES at %C must appear in the specification part of a program u
 msgstr "!$OMP REQUIRES vid %C måste förekomma i specifikationsdelen av en programenhet"
 
 #: fortran/openmp.cc:6456
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "Expected SEQ_CST, ACQ_REL or RELAXED for ATOMIC_DEFAULT_MEM_ORDER clause at %C"
+#, gcc-internal-format, gfc-internal-format
 msgid "Expected ACQ_REL, ACQUIRE, RELAXED, RELEASE or SEQ_CST for ATOMIC_DEFAULT_MEM_ORDER clause at %C"
-msgstr "SEQ_CST, ACQ_REL eller RELAXED förväntades för ATOMIC_DEFAULT_MEM_ORDER-klausulen vid %C"
+msgstr "ACQ_REL, ACQUIRE, RELAXED, RELEASE eller SEQ_CST förväntades till klausulen ATOMIC_DEFAULT_MEM_ORDER vid %C"
 
 #: fortran/openmp.cc:6472
 #, gcc-internal-format, gfc-internal-format
@@ -75278,16 +75028,14 @@ msgid "!$OMP ATOMIC at %L with %s clause requires %s clause"
 msgstr "!$OMP ATOMIC vid %L med %s-klausul kräver %s-klausul"
 
 #: fortran/openmp.cc:6907
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "!$OMP ATOMIC WRITE at %L incompatible with ACQUIRE clause"
+#, gcc-internal-format, gfc-internal-format
 msgid "!$OMP ATOMIC WRITE at %L incompatible with ACQUIRES clause implicitly provided by a REQUIRES directive"
-msgstr "!$OMP ATOMIC WRITE vid %L är inkompatibel med ACQUIRE-klausul"
+msgstr "!$OMP ATOMIC WRITE vid %L är inkompatibel med klausulen ACQUIRES som implicit tillhandahålls av ett direktiv REQUIRES"
 
 #: fortran/openmp.cc:6918
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "!$OMP ATOMIC READ at %L incompatible with RELEASE clause"
+#, gcc-internal-format, gfc-internal-format
 msgid "!$OMP ATOMIC READ at %L incompatible with RELEASE clause implicitly provided by a REQUIRES directive"
-msgstr "!$OMP ATOMIC READ vid %L är inkompatibel med RELEASE-klausul"
+msgstr "!$OMP ATOMIC READ vid %L är inkompatibelt med klausulen RELEASE som implicit tillhandahålls av ett direktiv REQUIRES"
 
 #: fortran/openmp.cc:6936
 #, gcc-internal-format, gfc-internal-format
@@ -75415,10 +75163,9 @@ msgid "Unexpected function-result variable %qs at %L in declarative !$OMP ALLOCA
 msgstr "Oväntad funktionsresultatvariabel %qs vid %L i deklarativt !$OMP ALLOCATE"
 
 #: fortran/openmp.cc:7355
-#, fuzzy, gcc-internal-format
-#| msgid "Procedure pointer %qs in %s clause at %L"
+#, gcc-internal-format
 msgid "Procedure pointer %qs not supported with !$OMP ALLOCATE at %L"
-msgstr "Procedurpekare %qs i %s-klausul vid %L"
+msgstr "Procedurpekaren %qs stödjs inte med !$OMP ALLOCATE vid %L"
 
 #: fortran/openmp.cc:7361
 #, gcc-internal-format
@@ -75431,10 +75178,9 @@ msgid "Argument %qs at %L to declarative !$OMP ALLOCATE shall be in the same sco
 msgstr "Argumentet %qs vid %L till deklarativt !$OMP ALLOCATE skall ligga i samma räckvidd som variabeldeklarationen"
 
 #: fortran/openmp.cc:7375
-#, fuzzy, gcc-internal-format
-#| msgid "Passed-object dummy argument of %qs at %L must not be ALLOCATABLE"
+#, gcc-internal-format
 msgid "Unexpected dummy argument %qs as argument at %L to declarative !$OMP ALLOCATE"
-msgstr "Skickat objekt-attrappargument till %qs vid %L får inte vara ALLOCATABLE"
+msgstr "Oväntat attrappargument %qs som argument vid %L till deklarativt !$OMP ALLOCATE"
 
 #: fortran/openmp.cc:7381
 #, gcc-internal-format
@@ -75472,10 +75218,9 @@ msgid "Unexpected pointer variable %qs at %L in declarative !$OMP ALLOCATE direc
 msgstr "Oväntad pekarvariabel %qs vid %L i deklarativt !$OMP ALLOCATE-direktiv"
 
 #: fortran/openmp.cc:7441 fortran/openmp.cc:7996
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "ALIGN modifier requires at %L a scalar positive constant integer alignment expression that is a power of two"
+#, gcc-internal-format, gfc-internal-format
 msgid "ALIGN requires a scalar positive constant integer alignment expression at %L that is a power of two"
-msgstr "En ALIGN-modifierare kräver vid %L ett skalärt positivt konstant heltals justeringsuttryck som är en potens av två"
+msgstr "ALIGN kräver ett skalärt positivt konstant heltalsjusteringsuttryck vid %L som är en potens av två"
 
 #: fortran/openmp.cc:7456
 #, gcc-internal-format
@@ -75525,10 +75270,9 @@ msgid "IF clause modifier %s at %L not appropriate for the current OpenMP constr
 msgstr "IF-klausulmodifierare %s vid %L passar inte för den aktuella OpenMP-konstruktionen"
 
 #: fortran/openmp.cc:7687
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "IF clause at %L requires a scalar LOGICAL expression"
+#, gcc-internal-format, gfc-internal-format
 msgid "SELF clause at %L requires a scalar LOGICAL expression"
-msgstr "IF-klausul vid %L kräver ett skalärt LOGICAL-uttryck"
+msgstr "SELF-klausulen vid %L kräver ett skalärt LOGICAL-uttryck"
 
 #: fortran/openmp.cc:7696
 #, gcc-internal-format, gfc-internal-format
@@ -75614,10 +75358,9 @@ msgid "Symbol %qs present on both data and map clauses at %L"
 msgstr "Symbolen %qs finns i både data- och avbildningsklausuler vid %L"
 
 #: fortran/openmp.cc:8021
-#, fuzzy, gcc-internal-format
-#| msgid "%qs appears more than once in %<allocate%> clauses at %L"
+#, gcc-internal-format
 msgid "%qs appears more than once in %<allocate%> at %L"
-msgstr "%qs förekommer mer än en gång i %<allocate%>-klausuler vid %L"
+msgstr "%qs förekommer mer än en gång i %<allocate%> vid %L"
 
 #: fortran/openmp.cc:8063
 #, gcc-internal-format
@@ -75625,16 +75368,14 @@ msgid "%qs specified in %<allocate%> clause at %L but not in an explicit privati
 msgstr "%qs angivet i en %<allocate%>-klausul vid %L men inte i en explicit privatiseringsklausul"
 
 #: fortran/openmp.cc:8091
-#, fuzzy, gcc-internal-format
-#| msgid "Unexpected coarray designator at %C"
+#, gcc-internal-format
 msgid "Unexpected coarray %qs in %<allocate%> at %L"
-msgstr "Oväntad co-vektorbeteckning vid %C"
+msgstr "Oväntad co-vektor %qs i %<allocate%> vid %L"
 
 #: fortran/openmp.cc:8105
-#, fuzzy, gcc-internal-format
-#| msgid "%qs specified in %<allocate%> clause at %L but not in an explicit privatization clause"
+#, gcc-internal-format
 msgid "%qs specified in %<allocate%> at %L but not in the associated ALLOCATE statement"
-msgstr "%qs angivet i en %<allocate%>-klausul vid %L men inte i en explicit privatiseringsklausul"
+msgstr "%qs angivet i en %<allocate%> vid %L men inte deN motsvarande ALLOCATE-satsen"
 
 #: fortran/openmp.cc:8139
 #, gcc-internal-format
@@ -75844,10 +75585,9 @@ msgid "Memspace %qs at %L in USES_ALLOCATORS must be a predefined memory space"
 msgstr "Memspace %qs vid %L i USES_ALLOCATORS måste vara ett fördefinierat minnesutrymme"
 
 #: fortran/openmp.cc:8717
-#, fuzzy, gcc-internal-format
-#| msgid "%qs at %L should be a scalar of type integer(kind=omp_event_handle_kind)"
+#, gcc-internal-format
 msgid "Allocator %qs at %L in USES_ALLOCATORS must be a scalar integer of kind %<omp_allocator_handle_kind%>"
-msgstr "%qs vid %L skall vara en skalär av typen integer(kind=omp_event_handle_kind)"
+msgstr "Allokeraren %qs vid %L i USES_ALLOCATORS måste vara ett skalärt heltal av ssorten %<omp_allocator_handle_kind%>"
 
 #: fortran/openmp.cc:8725
 #, gcc-internal-format
@@ -76136,8 +75876,7 @@ msgid "unexpected !$OMP ATOMIC expression at %L"
 msgstr "oväntat !$OMP ATOMIC-uttryck vid %L"
 
 #: fortran/openmp.cc:9948
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "With INSCAN at %L, expected loop body with !$OMP SCAN between two structured-block-sequences"
+#, gcc-internal-format, gfc-internal-format
 msgid "With INSCAN at %L, expected loop body with !$OMP SCAN between two structured block sequences"
 msgstr "Med INSCAN vid %L, slingkropp med !$OMP SCAN förväntades mellan två strukturerade blocksekvenser"
 
@@ -76202,10 +75941,9 @@ msgid "%s iteration variable used in more than one loop at %L"
 msgstr "%s-iterationsvariabel använd i mer än en slinga vid %L"
 
 #: fortran/openmp.cc:10874
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "iteration variable %qE should not be reduction"
+#, gcc-internal-format, gfc-internal-format
 msgid "%s iteration variable at %L is bound in intervening code"
-msgstr "iterationsvariabel %qE får inte vara reduction"
+msgstr "iterationsvariabeln %s vid %L binds i mellanliggande kod"
 
 #: fortran/openmp.cc:10883
 #, gcc-internal-format, gfc-internal-format
@@ -76213,10 +75951,9 @@ msgid "%s loop start expression not in canonical form at %L"
 msgstr "%s-slingans startuttryck är inte i kanonisk form vid %L"
 
 #: fortran/openmp.cc:10890
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "%s loop start expression not in canonical form at %L"
+#, gcc-internal-format, gfc-internal-format
 msgid "%s loop start expression at %L uses variable bound in intervening code"
-msgstr "%s-slingans startuttryck är inte i kanonisk form vid %L"
+msgstr "%s-slingans startuttryck vid %L använder en variabel bunden i mellanliggande kod"
 
 #: fortran/openmp.cc:10899
 #, gcc-internal-format, gfc-internal-format
@@ -76245,16 +75982,14 @@ msgstr "%s-slingans ökningsuttryck vid %L använder variabel begränsning i mel
 
 #. Parse error, can't recover from this.
 #: fortran/openmp.cc:10944
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "not enough DO loops for collapsed %s at %L"
+#, gcc-internal-format, gfc-internal-format
 msgid "not enough DO loops for collapsed %s (level %d) at %L"
-msgstr "för få DO-slingor för kollapsad %s vid %L"
+msgstr "för få DO-slingor för kollapsad %s (nivå %d) vid %L"
 
 #: fortran/openmp.cc:10956
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "%s !$ACC LOOP loops not perfectly nested at %L"
+#, gcc-internal-format, gfc-internal-format
 msgid "%s inner loops must be perfectly nested with ORDERED clause at %L"
-msgstr "%s !$ACC LOOP-slingor är inte perfekt nästade vid %L"
+msgstr "%s inre slingor måste vara perfekt nästade med klausulen ORDERED vid %L"
 
 #: fortran/openmp.cc:10963
 #, gcc-internal-format, gfc-internal-format
@@ -76522,10 +76257,9 @@ msgid "%qs directive at %L associated with an ALLOCATE stmt must be preceded by 
 msgstr "direktivet %qs vid %L associerat med en ALLOCATE-sats måste föregås av en körbar sats eller OpenMP-konstruktion; observera att variablerna i listan har alla attributet allokerbar eller pekare"
 
 #: fortran/parse.cc:1023 fortran/parse.cc:1325
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "OpenACC directives other than ROUTINE may not appear in PURE procedures at %C"
+#, gcc-internal-format, gfc-internal-format
 msgid "OpenMP directive at %C is not pure and thus may not appear in a PURE procedure"
-msgstr "Andra OpenACC-direktiv än ROUTINE får inte förekomma i PURE-procedurer vid %C"
+msgstr "OpenMP-direktivet vid %C är inte rent och får därför inte förekomma i en PURE-procedurer"
 
 #: fortran/parse.cc:1296
 #, gcc-internal-format, gfc-internal-format
@@ -76948,16 +76682,14 @@ msgid "%s statements at %L and %L have both no list item but only one may"
 msgstr "%s-satserna vid %L och %L har saknar båda listelement men bara en får det"
 
 #: fortran/parse.cc:5829
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "Expected expression at %C in PARAMETER statement"
+#, gcc-internal-format, gfc-internal-format
 msgid "Unexpected %s at %C; expected ALLOCATE or %s statement"
-msgstr "Uttryck förväntades vid %C i PARAMETER-sats"
+msgstr "Oväntat %s vid %C; ALLOCATE eller en %s-sats förväntades"
 
 #: fortran/parse.cc:5832
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "Expected %<*%> in coindex specification in ALLOCATE statement at %L"
+#, gcc-internal-format, gfc-internal-format
 msgid "Unexpected %s at %C; expected ALLOCATE statement after %s"
-msgstr "%<*%> förväntades i co-indexspecifikation i ALLOCATE-sats vid %L"
+msgstr "Oväntat %s vid %C; ALLOCATE-sats efter %s förväntades"
 
 #: fortran/parse.cc:6120
 #, gcc-internal-format, gfc-internal-format
@@ -77203,16 +76935,12 @@ msgid "match_string_constant(): Delimiter not found"
 msgstr "match_string_constant(): Avgränsare finns inte"
 
 #: fortran/primary.cc:1193
-#, fuzzy
-#| msgid "Substring start index (%ld) at %L below 1"
 msgid "Substring start index (%td) at %L below 1"
-msgstr "Startindex för delsträng (%ld) vid %L under 1"
+msgstr "Startindex för delsträng (%td) vid %L under 1"
 
 #: fortran/primary.cc:1199
-#, fuzzy
-#| msgid "Substring end index (%ld) at %L exceeds string length"
 msgid "Substring end index (%td) at %L exceeds string length"
-msgstr "Slutindex för delsträng (%ld) vid %L överstiger stränglängden"
+msgstr "Slutindex för delsträng (%td) vid %L överstiger stränglängden"
 
 #: fortran/primary.cc:1284
 #, gcc-internal-format, gfc-internal-format
@@ -77415,10 +77143,8 @@ msgid "Too many components in structure constructor at %L"
 msgstr "För många komponenter i postkonstruerare vid %L"
 
 #: fortran/primary.cc:3242
-#, fuzzy
-#| msgid "CHARACTER expression will be truncated in constructor (%ld/%ld) at %L"
 msgid "CHARACTER expression will be truncated in constructor (%td/%td) at %L"
-msgstr "CHARACTER-uttryck kommer att huggas av i konstruerare (%ld/%ld) vid %L"
+msgstr "CHARACTER-uttryck kommer att huggas av i konstruerare (%td/%td) vid %L"
 
 #: fortran/primary.cc:3260
 #, gcc-internal-format
@@ -77738,10 +77464,9 @@ msgid "%qs at %L cannot appear in COMMON [F2008:C5100]"
 msgstr "%qs vid %L kan inte förekomma i COMMON [F2008:C5100]"
 
 #: fortran/resolve.cc:1016
-#, fuzzy, gcc-internal-format
-#| msgid "Global entity %qs at %L cannot appear in a COMMON block at %L"
+#, gcc-internal-format
 msgid "Automatic object %qs at %L cannot appear in COMMON at %L"
-msgstr "Den globala entiteten %qs vid %L får inte förekomma i ett COMMON-block vid %L"
+msgstr "Det automatiska objektet %qs vid %L får inte förekomma i COMMON vid %L"
 
 #: fortran/resolve.cc:1028
 #, gcc-internal-format
@@ -78413,10 +78138,9 @@ msgid "Assumed-rank variable %s at %L shall not have a subobject reference"
 msgstr "Variabeln %s med antagen ordning vid %L skall inte ha en subobjektreferens"
 
 #: fortran/resolve.cc:5909
-#, fuzzy, gcc-internal-format
-#| msgid "Bad array reference at %L"
+#, gcc-internal-format
 msgid "Scalar variable %qs has an array reference at %L"
-msgstr "Felaktig vektorreferens vid %L"
+msgstr "Den skalära variabeln %qs har en vektorreferens vid %L"
 
 #: fortran/resolve.cc:6054
 #, gcc-internal-format
@@ -79039,16 +78763,14 @@ msgid "gfc_resolve_blocks(): Bad block type"
 msgstr "gfc_resolve_blocks(): Felaktig blocktyp"
 
 #: fortran/resolve.cc:11232
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "Data transfer element at %L cannot have procedure pointer components"
+#, gcc-internal-format, gfc-internal-format
 msgid "Variable in the ordinary assignment at %L is a procedure pointer component"
-msgstr "Dataöverföringselement vid %L får inte ha procedurpekarkomponenter"
+msgstr "Variabeln i den ordinära tilldelningen vid %L är en procedurpekarkomponent"
 
 #: fortran/resolve.cc:11293
-#, fuzzy, gcc-internal-format
-#| msgid "CHARACTER expression will be truncated in assignment (%ld/%ld) at %L"
+#, gcc-internal-format
 msgid "CHARACTER expression will be truncated in assignment (%wd/%wd) at %L"
-msgstr "CHARACTER-uttryck kommer att huggas av i tilldelning (%ld/%ld) vid %L"
+msgstr "CHARACTER-uttryck kommer att huggas av i tilldelning (%wd/%wd) vid %L"
 
 #: fortran/resolve.cc:11325
 #, gcc-internal-format, gfc-internal-format
@@ -80036,10 +79758,9 @@ msgid "DATA statement at %L has more variables than values"
 msgstr "DATA-sats vid %L har fler variabler än värden"
 
 #: fortran/resolve.cc:17044
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "Nonconstant array section at %L in DATA statement"
+#, gcc-internal-format, gfc-internal-format
 msgid "Non-constant character length at %L in DATA statement"
-msgstr "Ickekonstant vektorsektion vid %L i DATA-sats"
+msgstr "Ickekonstant teckenlängd vid %L i DATA-sats"
 
 #: fortran/resolve.cc:17072
 #, gcc-internal-format, gfc-internal-format
@@ -80598,10 +80319,9 @@ msgid "Result of SCALE overflows its kind at %L"
 msgstr "Resultat av SCALE spiller över sin sort vid %L"
 
 #: fortran/simplify.cc:7634
-#, fuzzy, gcc-internal-format, gfc-internal-format
-#| msgid "%qs argument of %qs intrinsic at %L must be of rank %d"
+#, gcc-internal-format, gfc-internal-format
 msgid "DIM argument (%d) to intrinsic SIZE at %L out of range (1:%d)"
-msgstr "%qs-argumentet till inbyggd %qs vid %L måste ha ordning %d"
+msgstr "DIM-argumentet (%d) till inbyggd SIZE vid %L är utanför intervallet (1:%d)"
 
 #: fortran/simplify.cc:7759
 #, gcc-internal-format
@@ -81100,10 +80820,9 @@ msgid "bad expression type during walk (%d)"
 msgstr "felaktig uttryckstyp under genomlöpning (%d)"
 
 #: fortran/trans-common.cc:411
-#, fuzzy, gcc-internal-format
-#| msgid "Named COMMON block %qs at %L shall be of the same size as elsewhere (%lu vs %lu bytes)"
+#, gcc-internal-format
 msgid "Named COMMON block %qs at %L shall be of the same size as elsewhere (%wu vs %wu bytes)"
-msgstr "Namngivet COMMON-block %qs vid %L skall ha samma storlek som på andra håll (%lu mot %lu byte)"
+msgstr "Namngivet COMMON-block %qs vid %L skall ha samma storlek som på andra håll (%wu mot %wu byte)"
 
 #: fortran/trans-common.cc:819
 #, gcc-internal-format
@@ -81212,10 +80931,9 @@ msgid "Sorry, !$OMP allocate for COMMON block variable %qs at %L not supported"
 msgstr "Ledsen, !$OMP allocate för COMMON-blocksvariabeln %qs vid %L stödjs inte"
 
 #: fortran/trans-decl.cc:5231
-#, fuzzy, gcc-internal-format
-#| msgid "Character dummy variable %qs at %L with VALUE attribute must have constant length"
+#, gcc-internal-format
 msgid "Sorry, !$OMP allocate for variable %qs at %L with SAVE attribute not yet implemented"
-msgstr "Teckenvärd attrappvariabel %qs vid %L med attributet VALUE måste ha konstant längd"
+msgstr "Ledsen, !$OMP allokering för variabeln %qs vid %L med attributet SAVE stödjs inte ännu"
 
 #: fortran/trans-decl.cc:5437
 #, gcc-internal-format
@@ -81394,10 +81112,9 @@ msgid "This includes explicit DEALLOCATE, reallocation on intrinsic assignment, 
 msgstr "Detta inkluderar explicit DEALLOCATE, omallokering eller inbyggd tilldelning, INTENT(OUT) för allokerbara attrappargument och omallokering av allokerbara komponenter allokerade med en OpenMP-allokerare"
 
 #: fortran/trans-openmp.cc:5607 fortran/trans-openmp.cc:5627
-#, fuzzy, gcc-internal-format
-#| msgid "non-rectangular loop nest with step other than constant 1 or -1 for %qs"
+#, gcc-internal-format
 msgid "non-rectangular loop nest with non-constant step for %qs"
-msgstr "icke-rektangulär slinga nästar med ett steg annat än konstanten 1 eller -1 till %qs"
+msgstr "icke-rektangulär slinga nästar med ett icke-konstant steg till %qs"
 
 #: fortran/trans-openmp.cc:5629
 #, gcc-internal-format
@@ -81984,16 +81701,14 @@ msgid "constant literal %qs contains %qc, expected 0 or 1"
 msgstr "den konstanta literalen %qs innehåller %qc, 0 eller 1 förväntades"
 
 #: m2/gm2-gcc/m2expr.cc:3964 m2/gm2-gcc/m2expr.cc:3976
-#, fuzzy, gcc-internal-format
-#| msgid "language dialect differs %qs, expected %qs"
+#, gcc-internal-format
 msgid "constant literal %qs contains %qc, expected %qs"
-msgstr "språkdialekten skiljer %qs, %qs förväntades"
+msgstr "den konstanta literalen %qs innehåller %qc, %qs förväntades"
 
 #: m2/gm2-gcc/m2expr.cc:3995
-#, fuzzy, gcc-internal-format
-#| msgid "target & host is %qs:%qs, expected %qs:%qs"
+#, gcc-internal-format
 msgid "constant literal %qs contains %qc, expected %qs or %qs"
-msgstr "mål & värd är %qs:%qs, %qs:%qs förväntades"
+msgstr "dem konstanta literalen %qs innehåller %qc, %qs eller %qs förväntades"
 
 #: m2/gm2-gcc/m2expr.cc:4061
 #, gcc-internal-format
@@ -83158,294 +82873,3 @@ msgstr "oanvänt namn %qE"
 #, gcc-internal-format, gfc-internal-format
 msgid "are you trying to break %s? how dare you?"
 msgstr "försöker du göra sönder %s? hur vågar du?"
-
-#~ msgid "to generate dependencies you must specify '-fcpp' "
-#~ msgstr "för att generera beroenden måste man ange ”-fcpp” "
-
-#, no-c-format
-#~ msgid "When vectorizing for SVE, consider using unpacked vectors for smaller elements and use the cost model to pick the cheapest approach.  Also use the cost model to choose between SVE and Advanced SIMD vectorization."
-#~ msgstr "Vid vektorisering för SVE, överväg att använda opackade vektorer för mindre element och använd kostnadsmodellen för att välja den billigaste metoden.  Använd även kostnadsmodellen för att välja mellan SVE- och avancerad SIMD-vektorisering."
-
-#, no-c-format
-#~ msgid "Generate eBPF for the given Linux kernel version."
-#~ msgstr "Generera eBPF för den angivna versionen av Linuxkärnan."
-
-#, no-c-format
-#~ msgid "Use NewABI-style %reloc() assembly operators."
-#~ msgstr "Använd assembleroperator %reloc() i NewABI-stil."
-
-#, no-c-format
-#~ msgid "Explain what alignment considerations lead to the decision to make an insn short or long."
-#~ msgstr "Förklara vilka justeringsöverväganden som leder till beslutet att göra en instruktion kort eller lång."
-
-#, no-c-format
-#~ msgid "Enable bbit peephole2."
-#~ msgstr "Aktivera bbit peephole2."
-
-#~ msgid "invalid use of %<...%> with builtin function"
-#~ msgstr "ogiltig användning av %<...%> med inbyggd funktion"
-
-#~ msgid "type conversion result count mismatch"
-#~ msgstr "typkonverteringsresultaträknare stämmer inte"
-
-#~ msgid "multiple-value argument in single-value context"
-#~ msgstr "flervärt argument i sammanhang för enstaka värde"
-
-#~ msgid "invalid use of %<...%> with non-slice"
-#~ msgstr "ogiltig användning av %<...%> med annat än skiva"
-
-#~ msgid "invalid use of %<...%> calling non-variadic function"
-#~ msgstr "ogiltig användning av %<.%> i en funktion som inte är variadisk"
-
-#~ msgid "index must be integer"
-#~ msgstr "indexet måste vara ett heltal"
-
-#~ msgid "slice end must be integer"
-#~ msgstr "skivslut måste vara ett heltal"
-
-#~ msgid "slice capacity must be integer"
-#~ msgstr "skivkapacitet måste vara ett heltal"
-
-#~ msgid "inverted slice range"
-#~ msgstr "inverterat skivintervall"
-
-#~ msgid "slice of unaddressable value"
-#~ msgstr "skiva av oadresserbart värde"
-
-#~ msgid "too many expressions for struct"
-#~ msgstr "för många uttryck för post"
-
-#~ msgid "too few expressions for struct"
-#~ msgstr "för få argument för post"
-
-#, gcc-internal-format, gfc-internal-format
-#~ msgid "argument %i of variable length array %s is null but the corresponding bound argument %i value is %s"
-#~ msgstr "argument %i till vektorn %s med variabel längd är null men värdet på det motsvarande bundna argumentet %i är %s"
-
-#, gcc-internal-format
-#~ msgid "argument %i to %<%T[static %E]%> is null where non-null expected"
-#~ msgstr "argument %i till %<%T[static %E]%> är null där icke-null förväntades"
-
-#, gcc-internal-format
-#~ msgid "%qs RHS in assignment statement"
-#~ msgstr "%qs högersida i tilldelningssats"
-
-#, gcc-internal-format
-#~ msgid "assuming signed overflow does not occur when simplifying %</%> or %<%%%> to %<>>%> or %<&%>"
-#~ msgstr "antar att teckenspill inte förekommer vid förenkling av %</%> eller %<%%%> till %<>>%> eller %<&%>"
-
-#, gcc-internal-format
-#~ msgid "assuming signed overflow does not occur when simplifying %<min/max (X,Y)%> to %<X%> or %<Y%>"
-#~ msgstr "antar att teckenspill inte förekommer vid förenkling av %<min/max (X,Y)%> till %<X%> eller %<Y%>"
-
-#, gcc-internal-format
-#~ msgid "assuming signed overflow does not occur when simplifying %<abs (X)%> to %<X%> or %<-X%>"
-#~ msgstr "antar att teckenspill inte förekommer vid förenkling av %<abs (X)%> till %<X%> eller %<-X%>"
-
-#, gcc-internal-format
-#~ msgid "%qE attribute ignored due to conflict with attribute %qs"
-#~ msgstr "attributet %qE ignoreras eftersom det står i konflikt med attributet %qs"
-
-#, gcc-internal-format
-#~ msgid "%qE attribute ignored due to conflict with %qs attribute"
-#~ msgstr "attributet %qE ignoreras eftersom det står i konflikt med attributet %qs"
-
-#, gcc-internal-format
-#~ msgid "converting a packed %qT pointer (alignment %d) to a %qT pointer (alignment %d) may result in an unaligned pointer value"
-#~ msgstr "att konvertera en packad %qT-pekare (justering %d) till en %qT-pekare (justering %d) kan resultera i ett ojusterat pekarvärde"
-
-#, gcc-internal-format
-#~ msgid "%<-march=%s%>: unsupported ISA subset %<%c%>"
-#~ msgstr "%<-march=%s%>: ISA-delmängd som ej stödjs %<%c%>"
-
-#, gcc-internal-format
-#~ msgid "%<-march=%s%>: ISA string is not in canonical order. %<%c%>"
-#~ msgstr "%<-march=%s%>: ISA-strängen är inte i kanonisk ordning. %<%c%>"
-
-#, gcc-internal-format
-#~ msgid "%<-march=%s%>: unexpected ISA string at end: %qs"
-#~ msgstr "%<-march=%s%>: oväntad ISA-sträng på slutet: %qs"
-
-#, gcc-internal-format
-#~ msgid "missing argument to %<target(\"branch-protection=\")%> pragma or attribute"
-#~ msgstr "argument saknas till pragmat eller attributet %<target(\"branch-protection=\")%>"
-
-#, gcc-internal-format
-#~ msgid "invalid protection type %qs in %<target(\"branch-protection=\")%> pragma or attribute"
-#~ msgstr "felaktig skyddstyp %qs i pragmat eller attributet %<target(\"branch-protection=\")%>"
-
-#, gcc-internal-format
-#~ msgid "GCC does not currently support mixed size types for %<simd%> functions"
-#~ msgstr "GCC stödjer för närvarande inte typer av blandad storlek till %<simd%>-funktioner"
-
-#, gcc-internal-format
-#~ msgid "unsupported return type %qT for %<simd%> functions"
-#~ msgstr "returtypen %qT stödjs ej för %<simd%>-funktioner"
-
-#, gcc-internal-format
-#~ msgid "unexpected %<%s%> after %<%s%>"
-#~ msgstr "oväntat %<%s%> efter %<%s%>"
-
-#, gcc-internal-format
-#~ msgid "invalid argument %<%s%> for %<-mbranch-protection=%>"
-#~ msgstr "ogiltigt argument %<%s%> till %<-mbranch-protection=%>"
-
-#, gcc-internal-format
-#~ msgid "missing argument for %<-mbranch-protection=%>"
-#~ msgstr "argumentet saknas till %<-mbranch-protection=%>"
-
-#, gcc-internal-format
-#~ msgid "IO definition for %q+D needs an address"
-#~ msgstr "IO-definition för %q+D behöver en adress"
-
-#, gcc-internal-format
-#~ msgid "unsupported variable field offset"
-#~ msgstr "ej stött variabelt fältavstånd"
-
-#, gcc-internal-format
-#~ msgid "unsupported variable size field access"
-#~ msgstr "ej stödd fältåtkomst av variabel storlek"
-
-#, gcc-internal-format
-#~ msgid "unsupported field expression"
-#~ msgstr "ej stött fältuttryck"
-
-#, gcc-internal-format
-#~ msgid "field size too large"
-#~ msgstr "fältstorleken är för stor"
-
-#, gcc-internal-format
-#~ msgid "invalid second argument to built-in function"
-#~ msgstr "ogiltigt andra argument inbyggd funktion"
-
-#, gcc-internal-format
-#~ msgid "argument is not a field access"
-#~ msgstr "argumentet är inte en fältåtkomst"
-
-#, gcc-internal-format
-#~ msgid "XNACK support"
-#~ msgstr "XNACK-stöd"
-
-#, gcc-internal-format
-#~ msgid "either -fopenacc or -fopenmp must be set"
-#~ msgstr "antingen -fopenacc eller -fopenmp måste vara satt"
-
-#, gcc-internal-format
-#~ msgid "code model %qs needs %s"
-#~ msgstr "kodmodell %qs behöver %s"
-
-#, gcc-internal-format
-#~ msgid "%qE attribute requires %s"
-#~ msgstr "attributet %qE behöver %s"
-
-#, gcc-internal-format
-#~ msgid "expected %<#pragma acc%> clause"
-#~ msgstr "%<#pragma acc%>-klausul förväntades"
-
-#, gcc-internal-format
-#~ msgid "expected %<#pragma omp%> clause"
-#~ msgstr "%<#pragma omp%>-klausul förväntades"
-
-#, gcc-internal-format
-#~ msgid "collapsed loops not perfectly nested"
-#~ msgstr "kollapsade slingor inte perfekt nästade"
-
-#, gcc-internal-format
-#~ msgid "expected %<construct%>, %<device%>, %<implementation%> or %<user%>"
-#~ msgstr "%<construct%>, %<device%>, %<implementation%> eller %<user%> förväntades"
-
-#, gcc-internal-format
-#~ msgid "expected %<seq_cst%>, %<relaxed%> or %<acq_rel%>"
-#~ msgstr "%<seq_cst%>, %<relaxed%> eller %<acq_rel%> förväntades"
-
-#, gcc-internal-format
-#~ msgid "pointer type mismatch between %qT and %qT of %qD and %qD in conditional expression"
-#~ msgstr "pekartyper stämmer inte mellan %qT och %qT hos %qD och %qD i villkorsuttryck"
-
-#, gcc-internal-format
-#~ msgid "excess elements in %<char%> array initializer"
-#~ msgstr "överflödiga element i %<char%>-vektorinitierare"
-
-#, gcc-internal-format
-#~ msgid "cannot dereference %qE in %qs clause"
-#~ msgstr "det går inte att dereferera %qE i en %qs-klausul"
-
-#, gcc-internal-format
-#~ msgid "change of the active member of a union from %qD to %qD"
-#~ msgstr "ändring av den aktiva medlemmen av en union %qD till %qD"
-
-#, gcc-internal-format
-#~ msgid "previous declaration %q#D here"
-#~ msgstr "tidigare deklaration %q#D här"
-
-#, gcc-internal-format
-#~ msgid "deduction guide %q+D redeclared"
-#~ msgstr "härledningsguiden %q+D omdeklarerad"
-
-#, gcc-internal-format
-#~ msgid "  enters scope of %q#D, which has non-trivial destructor"
-#~ msgstr "  går in i räckvidden hos %q#D, som har en icke-trivial destruerare"
-
-#, gcc-internal-format
-#~ msgid "  enters scope of %q#D which has non-trivial destructor"
-#~ msgstr "  går in i räckvidden hos %q#D som har en icke-trivial destruerare"
-
-#, gcc-internal-format
-#~ msgid "cannot define %qD in different module"
-#~ msgstr "det går inte att definiera %qD i en annan modul"
-
-#, gcc-internal-format
-#~ msgid "lambda templates are only available with %<-std=c++14%> or %<-std=gnu++14%>"
-#~ msgstr "lambdamallar är endast tillgängliga med %<-std=c++14%> eller %<-std=gnu++14%>"
-
-#, gcc-internal-format
-#~ msgid "unknown OpenMP directive name in %<omp::directive%> attribute argument"
-#~ msgstr "okänt OpenMP-direktivnamn i attributargumentet %<omp::directive%>"
-
-#, gcc-internal-format
-#~ msgid "not enough for loops to collapse"
-#~ msgstr "för få for-slingor att kollapsa"
-
-#, gcc-internal-format
-#~ msgid "%<#pragma GCC unroll%> must be inside a function"
-#~ msgstr "%<#pragma GCC unroll%> måste vara inuti en funktion"
-
-#, gcc-internal-format
-#~ msgid "taking address of temporary array"
-#~ msgstr "tar adress till temporär vektor"
-
-#, gcc-internal-format
-#~ msgid "closing json file %s: %m"
-#~ msgstr "när json-filen %s stängdes: %m"
-
-#, gcc-internal-format
-#~ msgid "closing mixin file %s: %m"
-#~ msgstr "när mixin-filen %s stängdes: %m"
-
-#, gcc-internal-format
-#~ msgid "opening mixin file %s: %m"
-#~ msgstr "när mixin-filen %s öppnades: %m"
-
-#, gcc-internal-format
-#~ msgid "TODO: Vector sections in data statements"
-#~ msgstr "ATTGÖRA: Vektorsektionen i datasatser"
-
-#, gcc-internal-format, gfc-internal-format
-#~ msgid "property must be constant integer expression or string literal at %C"
-#~ msgstr "egenskaper måste vara ett konstant heltalsuttryck eller en strängkonstant vid %C"
-
-#, gcc-internal-format
-#~ msgid "expected %<construct%>, %<device%>, %<implementation%> or %<user%> at %C"
-#~ msgstr "%<construct%>, %<device%>, %<implementation%> eller %<user%> förväntades vid %C"
-
-#, gcc-internal-format, gfc-internal-format
-#~ msgid "collapsed %s loops not perfectly nested at %L"
-#~ msgstr "kollapsade %s-slingor är inte perfekt nästade vid %L"
-
-#, gcc-internal-format, gfc-internal-format
-#~ msgid "OpenMP directives other than SIMD or DECLARE TARGET at %C may not appear in PURE procedures"
-#~ msgstr "Andra OpenMP-direktiv än SIMD eller DECLARE TARGET vid %C för inte förekomma i PURE-procedurer"
-
-#, gcc-internal-format
-#~ msgid "TODO"
-#~ msgstr "ATTGÖRA"
