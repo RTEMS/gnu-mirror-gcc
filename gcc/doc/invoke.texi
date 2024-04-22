@@ -1265,7 +1265,8 @@ See RS/6000 and PowerPC Options.
 -minline-atomics  -mno-inline-atomics
 -minline-strlen  -mno-inline-strlen
 -minline-strcmp  -mno-inline-strcmp
--minline-strncmp  -mno-inline-strncmp}
+-minline-strncmp  -mno-inline-strncmp
+-mtls-dialect=desc  -mtls-dialect=trad}
 
 @emph{RL78 Options}
 @gccoptlist{-msim  -mmul=none  -mmul=g13  -mmul=g14  -mallregs
@@ -9390,6 +9391,19 @@ In a cast involving pointer to member types this warning warns whenever
 the type cast is changing the pointer to member type.
 This warning is enabled by @option{-Wextra}.
 
+@opindex Wcast-user-defined
+@opindex Wno-cast-user-defined
+@item -Wcast-user-defined
+Warn when a cast to reference type does not involve a user-defined
+conversion that the programmer might expect to be called.
+
+@smallexample
+struct A @{ operator const int&(); @} a;
+auto r = (int&)a; // warning
+@end smallexample
+
+This warning is enabled by default.
+
 @opindex Wwrite-strings
 @opindex Wno-write-strings
 @item -Wwrite-strings
@@ -11709,7 +11723,7 @@ By default the analyzer attempts to reconstruct the original function
 frames, and to emit events showing the inlined calls.
 
 With @option{-fno-analyzer-undo-inlining} this attempt to reconstruct
-the original frame information can be be disabled, which may be of help
+the original frame information can be disabled, which may be of help
 when debugging issues in the analyzer.
 
 @item -fanalyzer-verbose-edges
@@ -17013,6 +17027,14 @@ The vectorizer will use available tuning information to determine whether it
 would be beneficial to unroll the main vectorized loop and by how much.  This
 parameter set's the upper bound of how much the vectorizer will unroll the main
 loop.  The default value is four.
+
+@end table
+
+The following choices of @var{name} are available on GCN targets:
+
+@table @gcctabopt
+@item gcn-preferred-vectorization-factor
+Preferred vectorization factor: @samp{default}, @samp{32}, @samp{64}.
 
 @end table
 
@@ -25750,7 +25772,7 @@ Outputs pseudo-c assembly dialect.
 @item -minline-memops-threshold=@var{bytes}
 Specifies a size threshold in bytes at or below which memmove, memcpy
 and memset shall always be expanded inline.  Operations dealing with
-sizes larger than this threshold would have to be be implemented using
+sizes larger than this threshold would have to be implemented using
 a library call instead of being expanded inline, but since BPF doesn't
 allow libcalls, exceeding this threshold results in a compile-time
 error.  The default is @samp{1024} bytes.
@@ -26989,6 +27011,7 @@ section (on some targets).  The default value is 0.
 Inline all block moves (such as calls to @code{memcpy} or structure copies)
 less than or equal to @var{n} bytes.  The default value of @var{n} is 1024.
 
+@opindex mcmodel
 @item -mcmodel=@var{code-model}
 Set the code model to one of:
 @table @samp
@@ -27051,6 +27074,8 @@ kernels, executables linked with @option{-static} or @option{-static-pie}.
 @option{-mdirect-extern-access} is not compatible with @option{-fPIC} or
 @option{-fpic}.
 
+@opindex mrelax
+@opindex mno-relax
 @item -mrelax
 @itemx -mno-relax
 Take (do not take) advantage of linker relaxations.  If
@@ -27063,6 +27088,8 @@ option and the conditional branch relaxation (it's required or the
 assembly code outputted by GCC may be rejected by the assembler because
 of a relocation overflow), @option{-mno-relax} otherwise.
 
+@opindex mpass-mrelax-to-as
+@opindex mno-pass-mrelax-to-as
 @item -mpass-mrelax-to-as
 @itemx -mno-pass-mrelax-to-as
 Pass (do not pass) the @option{-mrelax} or @option{-mno-relax} option
@@ -27179,7 +27206,7 @@ Use traditional TLS. This is the default.
 Use TLS descriptors.
 @end table
 
-@item loongarch-vect-unroll-limit
+@item --param loongarch-vect-unroll-limit=@var{n}
 The vectorizer will use available tuning information to determine whether it
 would be beneficial to unroll the main vectorized loop and by how much.  This
 parameter set's the upper bound of how much the vectorizer will unroll the main
@@ -31063,6 +31090,16 @@ which register to use as base register for reading the canary,
 and from what offset from that base register. There is no default
 register or offset as this is entirely for use within the Linux
 kernel.
+
+@opindex mtls-dialect=desc
+@item -mtls-dialect=desc
+Use TLS descriptors as the thread-local storage mechanism for dynamic accesses
+of TLS variables.
+
+@opindex mtls-dialect=trad
+@item -mtls-dialect=trad
+Use traditional TLS as the thread-local storage mechanism for dynamic accesses
+of TLS variables.  This is the default.
 @end table
 
 @node RL78 Options

@@ -359,12 +359,17 @@ condition_index (unsigned flag)
    min-max, etc., which leaves ghost identifiers in basic blocks that do not
    end with a conditional jump.  They are not really meaningful for condition
    coverage anymore, but since coverage is unreliable under optimization anyway
-   this is not a big problem.  */
+   this is not a big problem.
+
+   The cond_uids map in FN cannot be expected to exist.  It will only be
+   created if it is needed, and a function may have gconds even though there
+   are none in source.  This can be seen in PR gcov-profile/114601, when
+   -finstrument-functions-once is used and the function has no conditions.  */
 unsigned
 condition_uid (struct function *fn, basic_block b)
 {
     gimple *stmt = gsi_stmt (gsi_last_bb (b));
-    if (!safe_is_a<gcond *> (stmt))
+    if (!safe_is_a <gcond*> (stmt) || !fn->cond_uids)
 	return 0;
 
     unsigned *v = fn->cond_uids->get (as_a <gcond*> (stmt));
@@ -390,7 +395,7 @@ condition_uid (struct function *fn, basic_block b)
    |/ \
    T   F
 
-   T has has multiple incoming edges and is the outcome of a short circuit,
+   T has multiple incoming edges and is the outcome of a short circuit,
    with top = a, bot = b.  The top node (a) is masked when the edge (b, T) is
    taken.
 
@@ -437,7 +442,7 @@ condition_uid (struct function *fn, basic_block b)
    The masking table is represented as two bitfields per term in the expression
    with the index corresponding to the term in the Boolean expression.
    a || b && c becomes the term vector [a b c] and the masking table [a[0]
-   a[1] b[0] ...].  The kth bit of a masking vector is set if the the kth term
+   a[1] b[0] ...].  The kth bit of a masking vector is set if the kth term
    is masked by taking the edge.
 
    The out masks are in uint64_t (the practical maximum for gcov_type_node for
@@ -1049,6 +1054,7 @@ instrument_decisions (array_slice<basic_block> expr, size_t condno,
     zerocounter[2] = zero;
 
     unsigned xi = 0;
+    bool increment = false;
     tree rhs = build_int_cst (gcov_type_node, 1ULL << xi);
     for (basic_block current : expr)
     {
@@ -1057,7 +1063,14 @@ instrument_decisions (array_slice<basic_block> expr, size_t condno,
 	    candidates.safe_push (zerocounter);
 	counters prev = resolve_counters (candidates);
 
-	int increment = 0;
+	if (increment)
+	{
+	    xi += 1;
+	    gcc_checking_assert (xi < sizeof (uint64_t) * BITS_PER_UNIT);
+	    rhs = build_int_cst (gcov_type_node, 1ULL << xi);
+	    increment = false;
+	}
+
 	for (edge e : current->succs)
 	{
 	    counters next = prev;
@@ -1072,7 +1085,7 @@ instrument_decisions (array_slice<basic_block> expr, size_t condno,
 		    tree m = build_int_cst (gcov_type_node, masks[2*xi + k]);
 		    next[2] = emit_bitwise_op (e, prev[2], BIT_IOR_EXPR, m);
 		}
-		increment = 1;
+		increment = true;
 	    }
 	    else if (e->flags & EDGE_COMPLEX)
 	    {
@@ -1085,10 +1098,12 @@ instrument_decisions (array_slice<basic_block> expr, size_t condno,
 	    }
 	    table.get_or_insert (e->dest).safe_push (next);
 	}
-	xi += increment;
-	if (increment)
-	    rhs = build_int_cst (gcov_type_node, 1ULL << xi);
     }
+
+    /* Since this is also the return value, the number of conditions, make sure
+       to include the increment of the last basic block.  */
+    if (increment)
+	xi += 1;
 
     gcc_assert (xi == bitmap_count_bits (core));
 

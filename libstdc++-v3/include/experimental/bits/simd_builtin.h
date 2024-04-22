@@ -278,8 +278,7 @@ template <int _Index, int _Total, int _Combine = 1, size_t _Np>
   __extract_part(const _SimdWrapper<bool, _Np> __x)
   {
     static_assert(_Combine == 1, "_Combine != 1 not implemented");
-    static_assert(__have_avx512f && _Np == _Np);
-    static_assert(_Total >= 2 && _Index + _Combine <= _Total && _Index >= 0);
+    static_assert(__have_avx512f && _Total >= 2 && _Index + _Combine <= _Total && _Index >= 0);
     return __x._M_data >> (_Index * _Np / _Total);
   }
 
@@ -842,7 +841,7 @@ template <typename _Tp, typename _Mp, typename _Abi, size_t _Np>
 
       _GLIBCXX_SIMD_ALWAYS_INLINE explicit
       operator __vector_type_t<_Tp, _Np>() const
-      { return static_cast<const simd<_Tp, _Abi>*>(this)->_M_data.__builtin(); }
+      { return __data(*static_cast<const simd<_Tp, _Abi>*>(this)); }
     };
 
     struct _SimdBase1
@@ -1464,7 +1463,7 @@ template <typename _Abi, typename>
 		   [&](auto __i) constexpr {
 		     return static_cast<_Tp>(__i < _Np ? __mem[__i] : 0);
 		   });
-	else if constexpr (sizeof(_Up) > 8)
+	else if constexpr (sizeof(_Up) > 8 or __vectorized_sizeof<_Up>() <= sizeof(_Up))
 	  return __generate_vector<_Tp, _SimdMember<_Tp>::_S_full_size>(
 		   [&](auto __i) constexpr _GLIBCXX_SIMD_ALWAYS_INLINE_LAMBDA {
 		     return static_cast<_Tp>(__i < _Np ? __mem[__i] : 0);
@@ -1536,7 +1535,7 @@ template <typename _Abi, typename>
 	    for (size_t __i = 0; __i < _Np; ++__i)
 	      __mem[__i] = __v[__i];
 	  }
-	else if constexpr (sizeof(_Up) > 8)
+	else if constexpr (sizeof(_Up) > 8 or __vectorized_sizeof<_Up>() <= sizeof(_Up))
 	  __execute_n_times<_Np>([&](auto __i) constexpr _GLIBCXX_SIMD_ALWAYS_INLINE_LAMBDA {
 	    __mem[__i] = __v[__i];
 	  });
