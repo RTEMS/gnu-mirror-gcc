@@ -262,18 +262,15 @@ is_valid_constexpr_fn (tree fun, bool complain)
 	inform (DECL_SOURCE_LOCATION (fun),
 		"lambdas are implicitly %<constexpr%> only in C++17 and later");
     }
-  else if (DECL_DESTRUCTOR_P (fun))
+  else if (DECL_DESTRUCTOR_P (fun) && cxx_dialect < cxx20)
     {
-      if (cxx_dialect < cxx20)
-	{
-	  ret = false;
-	  if (complain)
-	    error_at (DECL_SOURCE_LOCATION (fun),
-		      "%<constexpr%> destructors only available"
-		      " with %<-std=c++20%> or %<-std=gnu++20%>");
-	}
+      ret = false;
+      if (complain)
+	error_at (DECL_SOURCE_LOCATION (fun),
+		  "%<constexpr%> destructors only available with "
+		  "%<-std=c++20%> or %<-std=gnu++20%>");
     }
-  else if (!DECL_CONSTRUCTOR_P (fun))
+  else if (!DECL_CONSTRUCTOR_P (fun) && !DECL_DESTRUCTOR_P (fun))
     {
       tree rettype = TREE_TYPE (TREE_TYPE (fun));
       if (!literal_type_p (rettype))
@@ -4846,6 +4843,8 @@ check_bit_cast_type (const constexpr_ctx *ctx, location_t loc, tree type,
       if (TREE_CODE (field) == FIELD_DECL
 	  && check_bit_cast_type (ctx, loc, TREE_TYPE (field), orig_type))
 	return true;
+  if (TREE_CODE (type) == ARRAY_TYPE)
+    return check_bit_cast_type (ctx, loc, TREE_TYPE (type), orig_type);
   return false;
 }
 
@@ -7224,7 +7223,7 @@ maybe_warn_about_constant_value (location_t loc, tree decl)
    in bytes.  If COOKIE_SIZE is NULL, return array type
    ELT_TYPE[FULL_SIZE / sizeof(ELT_TYPE)], otherwise return
    struct { size_t[COOKIE_SIZE/sizeof(size_t)]; ELT_TYPE[N]; }
-   where N is is computed such that the size of the struct fits into FULL_SIZE.
+   where N is computed such that the size of the struct fits into FULL_SIZE.
    If ARG_SIZE is non-NULL, it is the first argument to the new operator.
    It should be passed if ELT_TYPE is zero sized type in which case FULL_SIZE
    will be also 0 and so it is not possible to determine the actual array

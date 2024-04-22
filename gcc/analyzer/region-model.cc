@@ -3514,6 +3514,10 @@ region_model::check_region_size (const region *lhs_reg, const svalue *rhs_sval,
       || TYPE_SIZE_UNIT (pointee_type) == NULL_TREE)
     return;
 
+  /* Bail out early on function pointers.  */
+  if (TREE_CODE (pointee_type) == FUNCTION_TYPE)
+    return;
+
   /* Bail out early on pointers to structs where we can
      not deduce whether the buffer size is compatible.  */
   bool is_struct = RECORD_OR_UNION_TYPE_P (pointee_type);
@@ -5623,7 +5627,7 @@ region_model::update_for_return_superedge (const return_superedge &return_edge,
   update_for_return_gcall (call_stmt, ctxt);
 }
 
-/* Attempt to to use R to replay SUMMARY into this object.
+/* Attempt to use R to replay SUMMARY into this object.
    Return true if it is possible.  */
 
 bool
