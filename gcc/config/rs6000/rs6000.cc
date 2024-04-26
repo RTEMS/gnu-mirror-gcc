@@ -22816,7 +22816,8 @@ rs6000_register_move_cost (machine_mode mode,
   /* Make moves from SPR registers (LR, CTR, TAR) more expensive so that the
      register allocator does not think of these registers are useful for saving
      results.  */
-  else if (reg_classes_intersect_p (from, SPECIAL_REGS)
+  else if (TARGET_MFSPR
+	   && reg_classes_intersect_p (from, SPECIAL_REGS)
 	   && reg_classes_intersect_p (to, GENERAL_REGS))
     {
       rclass = from;
