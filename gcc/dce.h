@@ -23,5 +23,6 @@ along with GCC; see the file COPYING3.  If not see
 extern void run_word_dce (void);
 extern void run_fast_dce (void);
 extern void run_fast_df_dce (void);
+extern void run_rtl_ssa_dce (void);
 
 #endif /* GCC_DCE_H */

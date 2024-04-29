@@ -1299,3 +1299,44 @@ make_pass_fast_rtl_dce (gcc::context *ctxt)
 {
   return new pass_fast_rtl_dce (ctxt);
 }
+
+namespace {
+
+const pass_data pass_data_rtl_ssa_dce = {
+  RTL_PASS,	  /* type */
+  "rtl_ssa_dce",  /* name */
+  OPTGROUP_NONE,  /* optinfo_flags */
+  TV_DCE,	  /* tv_id */
+  0,		  /* properties_required */
+  0,		  /* properties_provided */
+  0,		  /* properties_destroyed */
+  0,		  /* todo_flags_start */
+  TODO_df_finish, /* todo_flags_finish */
+};
+
+class pass_rtl_ssa_dce : public rtl_opt_pass
+{
+public:
+  pass_rtl_ssa_dce (gcc::context *ctxt)
+    : rtl_opt_pass (pass_data_rtl_ssa_dce, ctxt)
+  {}
+
+  /* opt_pass methods: */
+  bool gate (function *) final override { return flag_dce; }
+
+  unsigned int execute (function *) final override
+  {
+    if (dump_file)
+      fprintf (dump_file, "pass_rtl_ssa_dce called\n");
+    return 0;
+  }
+
+}; // class pass_fast_rtl_dce
+
+} // namespace
+
+rtl_opt_pass *
+make_pass_rtl_ssa_dce (gcc::context *ctxt)
+{
+  return new pass_rtl_ssa_dce (ctxt);
+}

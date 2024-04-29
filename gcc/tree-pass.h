@@ -562,6 +562,7 @@ extern rtl_opt_pass *make_pass_jump2 (gcc::context *ctxt);
 extern rtl_opt_pass *make_pass_lower_subreg (gcc::context *ctxt);
 extern rtl_opt_pass *make_pass_cse (gcc::context *ctxt);
 extern rtl_opt_pass *make_pass_fast_rtl_dce (gcc::context *ctxt);
+extern rtl_opt_pass *make_pass_rtl_ssa_dce (gcc::context *ctxt);
 extern rtl_opt_pass *make_pass_ud_rtl_dce (gcc::context *ctxt);
 extern rtl_opt_pass *make_pass_rtl_dce (gcc::context *ctxt);
 extern rtl_opt_pass *make_pass_rtl_dse1 (gcc::context *ctxt);
