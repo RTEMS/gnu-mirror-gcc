@@ -1,3 +1,233 @@
+2024-04-26  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-04-26  Patrick Palka  <ppalka@redhat.com>
+
+	* error.cc (print_instantiation_partial_context_line): Clear the
+	pretty printer prefix around the call to diagnostic_show_locus.
+
+2024-04-25  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/111284
+	* constexpr.cc (cxx_bind_parameters_in_call): For PARM_DECLs with
+	TREE_ADDRESSABLE types use vc_glvalue rather than vc_prvalue for
+	cxx_eval_constant_expression and if it doesn't have the same
+	type as it should, cast the reference type to reference to type
+	before convert_from_reference and instead of adjust_temp_type
+	take address of the arg, cast to reference to type and then
+	convert_from_reference.
+	(cxx_eval_constant_expression) <case PARM_DECL>: For lval case
+	on parameters with TREE_ADDRESSABLE types lookup result in
+	ctx->globals if possible.  Otherwise if lookup in ctx->globals
+	was successful for parameter with TREE_ADDRESSABLE type,
+	recurse with vc_prvalue on the returned value.
+
+2024-04-25  Jakub Jelinek  <jakub@redhat.com>
+
+	PR lto/113208
+	* cp-tree.h (maybe_optimize_cdtor): Declare.
+	* decl2.cc (import_export_decl): Call it for cloned cdtors.
+	* optimize.cc (maybe_optimize_cdtor): New function.
+
+2024-04-24  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/114709
+	* constexpr.cc (cxx_fold_indirect_ref): Restrict object/offset
+	canonicalization to RECORD_TYPE member accesses.
+
+2024-04-23  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	* parser.cc (cp_parser_parameter_declaration): Check if
+	decl_specifiers.type is null.
+
+2024-04-23  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/114795
+	* module.cc (trees_in::is_matching_decl): Propagate deduced
+	function return type.
+
+2024-04-23  Jakub Jelinek  <jakub@redhat.com>
+
+	* parser.cc (cp_parser_using_declaration): Spelling fix: favour
+	-> favor.
+
+2024-04-23  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/114784
+	* method.cc (implicitly_declare_fn): Call clone_attrs
+	on DECL_ATTRIBUTES on STRIP_TEMPLATE (inherited_ctor) rather than
+	inherited_ctor.  Also copy DECL_DISREGARD_INLINE_LIMITS flag from it.
+
+2024-04-23  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/114078
+	* decl.cc (grokdeclarator): Check allocation functions for xobj
+	parameters.
+
+2024-04-16  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/114706
+	* constexpr.cc (check_bit_cast_type): Handle ARRAY_TYPE.
+
+2024-04-15  Nathaniel Shead  <nathanieloshead@gmail.com>
+	    Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/114600
+	* module.cc (depset::hash::add_binding_entity): Require both
+	WMB_Using and WMB_Export for GMF entities.
+
+2024-04-14  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/106820
+	* module.cc (trees_in::decl_value): Assemble alias when needed.
+
+2024-04-13  Patrick Palka  <ppalka@redhat.com>
+
+	* module.cc (struct bytes_in::bits_in): Define defaulted
+	move ctor.
+	(struct bytes_out::bits_out): Likewise.
+
+2024-04-13  Patrick Palka  <ppalka@redhat.com>
+
+	* module.cc: Update comment about classes defined within.
+	(class data): Enclose in an anonymous namespace.
+	(data::calc_crc): Moved from bytes::calc_crc.
+	(class bytes): Remove.  Move bit_flush to namespace scope.
+	(class bytes_in): Enclose in an anonymous namespace.  Inherit
+	directly from data and adjust accordingly.  Move b and bflush
+	members to bits_in.
+	(class bytes_out): As above.  Remove is_set static data member.
+	(bit_flush): Moved from class bytes.
+	(struct bytes_in::bits_in): Define.
+	(struct bytes_out::bits_out): Define.
+	(bytes_in::stream_bits): Define.
+	(bytes_out::stream_bits): Define.
+	(bytes_out::bflush): Moved to bits_out/in.
+	(bytes_in::bflush): Likewise
+	(bytes_in::bfill): Removed.
+	(bytes_out::b): Moved to bits_out/in.
+	(bytes_in::b): Likewise.
+	(class trees_in): Enclose in an anonymous namespace.
+	(class trees_out): Enclose in an anonymous namespace.
+	(trees_out::core_bools): Add bits_out/in parameter and use it.
+	Unconditionally stream a bit for public_flag.  Add early exits
+	as appropriate.
+	(trees_out::core_bools): Likewise.
+	(trees_out::lang_decl_bools): Add bits_out/in parameter and use
+	it.  Flush the current bit buffer at the start.  Unconditionally
+	stream a bit for module_keyed_decls_p.
+	(trees_in::lang_decl_bools): Likewise.
+	(trees_out::lang_type_bools): Add bits_out/in parameter and use
+	it.  Flush the current bit buffer at the start.
+	(trees_in::lang_type_bools): Likewise.
+	(trees_out::tree_node_bools): Construct a bits_out object and
+	use/pass it.
+	(trees_in::tree_node_bools): Likewise.
+	(trees_out::decl_value): Likewise.
+	(trees_in::decl_value): Likewise.
+	(module_state::write_define): Likewise.
+	(module_state::read_define): Likewise.
+
+2024-04-12  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/109966
+	* typeck2.cc (potential_prvalue_result_of): Remove.
+	(replace_placeholders_for_class_temp_r): Check TARGET_EXPR_ELIDING_P.
+	Use a pset.  Don't replace_placeholders in TARGET_EXPRs that initialize
+	a function argument.
+
+2024-04-12  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/99426
+	* module.cc (merge_kind::MK_local_type): New enumerator.
+	(merge_kind_name): Update.
+	(trees_out::chained_decls): Move BLOCK-specific handling
+	of DECL_LOCAL_DECL_P decls to ...
+	(trees_out::core_vals) <case BLOCK>: ... here.  Stream
+	BLOCK_VARS manually.
+	(trees_in::core_vals) <case BLOCK>: Stream BLOCK_VARS
+	manually.  Handle deduplicated local types..
+	(trees_out::key_local_type): Define.
+	(trees_in::key_local_type): Define.
+	(trees_out::get_merge_kind) <case FUNCTION_DECL>: Return
+	MK_local_type for a local type.
+	(trees_out::key_mergeable) <case FUNCTION_DECL>: Use
+	key_local_type.
+	(trees_in::key_mergeable) <case FUNCTION_DECL>: Likewise.
+	(trees_in::is_matching_decl): Be flexible with type mismatches
+	for local entities.
+	(trees_in::register_duplicate): Also register the
+	DECL_TEMPLATE_RESULT of a TEMPLATE_DECL as a duplicate.
+	(depset_cmp): Return 0 for equal IDENTIFIER_HASH_VALUEs.
+
+2024-04-12  Jason Merrill  <jason@redhat.com>
+	    Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/113141
+	* call.cc (reference_binding): For an invalid cast, warn and don't
+	recalculate.
+
+2024-04-12  Jason Merrill  <jason@redhat.com>
+	    Patrick Palka  <ppalka@redhat.com>
+
+	DR 1996
+	PR c++/113141
+	* call.cc (reference_binding): Check direct binding from
+	a single-element list.
+
+2024-04-12  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/114691
+	* semantics.cc (simplify_loop_decl_cond): Use cp_build_unary_op with
+	TRUTH_NOT_EXPR on ANNOTATE_EXPR argument (if any) rather than
+	ANNOTATE_EXPR itself.
+
+2024-04-12  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/114393
+	* pt.cc (tsubst_lambda_expr): Also defer all dependent
+	substitution.
+
+2024-04-12  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/114426
+	* constexpr.cc (is_valid_constexpr_fn): Return false/diagnose with
+	complain destructors in classes with virtual bases.
+
+2024-04-12  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/114393
+	PR c++/107457
+	PR c++/93595
+	* cp-tree.h (LAMBDA_EXPR_EXTRA_ARGS): Define.
+	(tree_lambda_expr::extra_args): New field.
+	* module.cc (trees_out::core_vals) <case LAMBDA_EXPR>: Stream
+	LAMBDA_EXPR_EXTRA_ARGS.
+	(trees_in::core_vals) <case LAMBDA_EXPR>: Likewise.
+	* pt.cc (has_extra_args_mechanism_p): Return true for LAMBDA_EXPR.
+	(tree_extra_args): Handle LAMBDA_EXPR.
+	(tsubst_lambda_expr): Use LAMBDA_EXPR_EXTRA_ARGS to defer templated
+	substitution into a lambda-expr if we lost the template context.
+	Add sanity check for error_mark_node result from begin_lambda_type.
+
+2024-04-11  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/114303
+	* constraint.cc (tsubst_requires_expr): Clear
+	REQUIRES_EXPR_EXTRA_ARGS before calling build_extra_args.
+	* pt.cc (tree_extra_args): Define.
+	(extract_locals_r): Assert *_EXTRA_ARGS is empty.
+	(tsubst_stmt) <case IF_STMT>: Clear IF_SCOPE on the new
+	IF_STMT.  Call build_extra_args on the new IF_STMT instead
+	of t which might already have IF_STMT_EXTRA_ARGS.
+
+2024-04-11  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/114409
+	* pt.cc (tsubst_expr) <case ANNOTATE_EXPR>: Move to ...
+	(tsubst_stmt) <case ANNOTATE_EXPR>: ... here.  Use tsubst_expr
+	instead of RECUR for the last 2 arguments.
+
 2024-04-10  Jakub Jelinek  <jakub@redhat.com>
 
 	PR c++/114462

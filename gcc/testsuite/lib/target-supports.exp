@@ -7698,7 +7698,8 @@ proc check_effective_target_vect_long_long { } {
 	     || ([istarget riscv*-*-*]
 		 && [check_effective_target_riscv_v])
 	     || ([istarget loongarch*-*-*]
-		 && [check_effective_target_loongarch_sx])}}]
+		 && [check_effective_target_loongarch_sx])
+	     || [istarget amdgcn-*-*] }}]
 }
 
 
@@ -11580,6 +11581,17 @@ proc check_effective_target_stpcpy {} {
     return [check_function_available "stpcpy"]
 }
 
+# Returns 1 if "strndup" is available on the target system.
+
+proc check_effective_target_strndup {} {
+    if { [istarget *-*-vxworks*] } {
+	# VxWorks doesn't have strndup but our way to test fails
+	# to detect as we're doing partial links for kernel modules.
+	return 0
+    }
+    return [check_function_available "strndup"]
+}
+
 # Returns 1 if "sigsetjmp" is available on the target system.
 # Also check if "__sigsetjmp" is defined since that's what glibc
 # uses.
@@ -12378,6 +12390,20 @@ proc check_effective_target_profile_update_atomic {} {
     return [check_no_compiler_messages profile_update_atomic assembly {
 	int main (void) { return 0; }
     } "-fprofile-update=atomic -fprofile-generate"]
+}
+
+# Return 1 if the target has a vector facility.
+proc check_effective_target_s390_mvx { } {
+    if ![istarget s390*-*-*] then {
+	return 0;
+    }
+
+    return [check_no_compiler_messages_nocache s390_mvx assembly {
+	#if !defined __VX__
+	#error no vector facility.
+	#endif
+	int dummy;
+    } [current_compiler_flags]]
 }
 
 # Return 1 if vector (va - vector add) instructions are understood by

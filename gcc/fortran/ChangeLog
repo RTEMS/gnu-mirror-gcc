@@ -1,3 +1,50 @@
+2024-04-25  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/93678
+	* trans-expr.cc (gfc_conv_procedure_call): Use the interface,
+	where possible, to obtain the type of character procedure
+	pointers of class entities.
+
+2024-04-25  Paul Thomas  <pault@gcc.gnu.org>
+	    Jakub Jelinek  <jakub@gcc.gnu.org>
+
+	PR fortran/89462
+	* decl.cc (build_sym): Add an extra argument 'elem'. If 'elem'
+	is greater than 1, gfc_new_charlen is called to generate a new
+	charlen, registered in the symbol namespace.
+	(variable_decl, enumerator_decl): Set the new argument in the
+	calls to build_sym.
+
+2024-04-21  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/103471
+	* resolve.cc (resolve_actual_arglist): Catch variables silently
+	set as untyped, resetting the flag so that gfc_resolve_expr can
+	generate the no implicit type error.
+	(gfc_resolve_index_1): Block index expressions of unknown type
+	from being converted to default integer, avoiding the fatal
+	error in trans-decl.cc.
+	* symbol.cc (gfc_set_default_type): Remove '(symbol)' from the
+	'no IMPLICIT type' error message.
+	* trans-decl.cc (gfc_get_symbol_decl): Change fatal error locus
+	to that of the symbol declaration.
+	(gfc_trans_deferred_vars): Remove two trailing tabs.
+
+2024-04-18  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/114739
+	* primary.cc (gfc_match_varspec): Check for default type before
+	checking for derived types with the right component name.
+
+2024-04-16  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/113793
+	* resolve.cc (resolve_allocate_expr): Reject ALLOCATE with SOURCE=
+	or MOLD= specifier for unequal length.
+	* trans-stmt.cc (gfc_trans_allocate): If an allocatable character
+	variable has fixed length, use it and do not use the source length.
+	With bounds-checking enabled, add a runtime check for same length.
+
 2024-04-10  Harald Anlauf  <anlauf@gmx.de>
 
 	PR fortran/106500

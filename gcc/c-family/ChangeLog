@@ -1,3 +1,28 @@
+2024-04-23  Jakub Jelinek  <jakub@redhat.com>
+
+	* c-attribs.cc (handle_objc_nullability_attribute): Spelling fix:
+	recognised -> recognized.
+
+2024-04-23  Jakub Jelinek  <jakub@redhat.com>
+
+	* c.opt (Wstrict-flex-arrays): Spelling fix: inproper -> improper.
+
+2024-04-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/114780
+	* c-common.cc (check_function_sentinel): Allow as sentinel any
+	argument of NULLPTR_TYPE.
+
+2024-04-13  Mark Wielaard  <mark@klomp.org>
+
+	* c.opt.urls: Regenerate.
+
+2024-04-12  Jason Merrill  <jason@redhat.com>
+	    Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/113141
+	* c.opt: Add -Wcast-user-defined.
+
 2024-04-05  Marek Polacek  <polacek@redhat.com>
 
 	* c-warn.cc (warn_about_parentheses): Remove an #undef.
