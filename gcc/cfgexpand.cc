@@ -640,26 +640,46 @@ add_scope_conflicts_1 (basic_block bb, bitmap work, bool for_conflict)
 	{
 	  if (for_conflict && visit == visit_op)
 	    {
-	      /* If this is the first real instruction in this BB we need
-	         to add conflicts for everything live at this point now.
-		 Unlike classical liveness for named objects we can't
-		 rely on seeing a def/use of the names we're interested in.
-		 There might merely be indirect loads/stores.  We'd not add any
-		 conflicts for such partitions.  */
+	      /* When we are inheriting live variables from our predecessors
+		 through a CFG merge we might not see an actual mention of
+		 the variables to record the approprate conflict as defs/uses
+		 might be through indirect stores/loads.  For this reason
+		 we have to make sure each live variable conflicts with
+		 each other.  When there's just a single predecessor the
+		 set of conflicts is already up-to-date.
+		 We perform this delayed at the first real instruction to
+		 allow clobbers starting this block to remove variables from
+		 the set of live variables.  */
 	      bitmap_iterator bi;
 	      unsigned i;
-	      EXECUTE_IF_SET_IN_BITMAP (work, 0, i, bi)
-		{
-		  class stack_var *a = &stack_vars[i];
-		  if (!a->conflicts)
-		    a->conflicts = BITMAP_ALLOC (&stack_var_bitmap_obstack);
-		  bitmap_ior_into (a->conflicts, work);
-		}
+	      if (EDGE_COUNT (bb->preds) > 1)
+		EXECUTE_IF_SET_IN_BITMAP (work, 0, i, bi)
+		  {
+		    class stack_var *a = &stack_vars[i];
+		    if (!a->conflicts)
+		      a->conflicts = BITMAP_ALLOC (&stack_var_bitmap_obstack);
+		    bitmap_ior_into (a->conflicts, work);
+		  }
 	      visit = visit_conflict;
 	    }
 	  walk_stmt_load_store_addr_ops (stmt, work, visit, visit, visit);
 	  FOR_EACH_SSA_USE_OPERAND (use_p, stmt, iter, SSA_OP_USE)
 	    add_scope_conflicts_2 (USE_FROM_PTR (use_p), work, visit);
+	}
+    }
+
+  /* When there was no real instruction but there's a CFG merge we need
+     to add the conflicts now.  */
+  if (for_conflict && visit == visit_op && EDGE_COUNT (bb->preds) > 1)
+    {
+      bitmap_iterator bi;
+      unsigned i;
+      EXECUTE_IF_SET_IN_BITMAP (work, 0, i, bi)
+	{
+	  class stack_var *a = &stack_vars[i];
+	  if (!a->conflicts)
+	    a->conflicts = BITMAP_ALLOC (&stack_var_bitmap_obstack);
+	  bitmap_ior_into (a->conflicts, work);
 	}
     }
 }
@@ -4002,17 +4022,16 @@ expand_gimple_stmt_1 (gimple *stmt)
 	else
 	  {
 	    rtx target, temp;
-	    bool nontemporal = gimple_assign_nontemporal_move_p (assign_stmt);
+	    gcc_assert (!gimple_assign_nontemporal_move_p (assign_stmt));
 	    bool promoted = false;
 
 	    target = expand_expr (lhs, NULL_RTX, VOIDmode, EXPAND_WRITE);
 	    if (GET_CODE (target) == SUBREG && SUBREG_PROMOTED_VAR_P (target))
 	      promoted = true;
 
-	   /* If we want to use a nontemporal store, force the value to
-	      register first.  If we store into a promoted register,
-	      don't directly expand to target.  */
-	    temp = nontemporal || promoted ? NULL_RTX : target;
+	   /* If we store into a promoted register, don't directly
+	      expand to target.  */
+	    temp = promoted ? NULL_RTX : target;
 	    temp = expand_expr_real_gassign (assign_stmt, temp,
 					     GET_MODE (target), EXPAND_NORMAL);
 
@@ -4034,8 +4053,6 @@ expand_gimple_stmt_1 (gimple *stmt)
 
 		convert_move (SUBREG_REG (target), temp, unsignedp);
 	      }
-	    else if (nontemporal && emit_storent_insn (target, temp))
-	      ;
 	    else
 	      {
 		temp = force_operand (temp, target);

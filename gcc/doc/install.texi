@@ -764,7 +764,9 @@ The default value refers to the FSF's GCC bug tracker.
 Specify the URL root that contains GCC option documentation.  The @var{url}
 should end with a @code{/} character.
 
-The default value is @uref{https://gcc.gnu.org/onlinedocs/,,https://gcc.gnu.org/onlinedocs/}.
+The default value is @uref{https://gcc.gnu.org/onlinedocs/,,https://gcc.gnu.org/onlinedocs/}
+on the GCC main development trunk.  On release branches, the default
+is @code{https://gcc.gnu.org/onlinedocs/gcc-@var{major}.@var{minor}.0/}.
 
 @item --with-changes-root-url=@var{url}
 Specify the URL root that contains information about changes in GCC
@@ -1268,8 +1270,8 @@ default set of libraries is selected based on the value of
 
 @item amdgcn*-*-*
 @var{list} is a comma separated list of ISA names (allowed values: @code{fiji},
-@code{gfx900}, @code{gfx906}, @code{gfx908}, @code{gfx90a}, @code{gfx1030},
-@code{gfx1036}, @code{gfx1100}, @code{gfx1103}).
+@code{gfx900}, @code{gfx906}, @code{gfx908}, @code{gfx90a}, @code{gfx90c}, 
+@code{gfx1030}, @code{gfx1036}, @code{gfx1100}, @code{gfx1103}).
 It ought not include the name of the default
 ISA, specified via @option{--with-arch}.  If @var{list} is empty, then there
 will be no multilibs and only the default run-time library will be built.  If
@@ -4090,22 +4092,20 @@ This configuration is intended for embedded systems.
 We support FreeBSD using the ELF file format with DWARF 2 debugging
 for all CPU architectures.  There are
 no known issues with mixing object files and libraries with different
-debugging formats.  Otherwise, this release of GCC should now match
-more of the configuration used in the stock FreeBSD configuration of
-GCC@.  In particular, @option{--enable-threads} is now configured by
-default.  However, as a general user, do not attempt to replace the
-system compiler with this release.  Known to bootstrap and check with
-good results on FreeBSD 7.2-STABLE@.  In the past, known to bootstrap
-and check with good results on FreeBSD 3.0, 3.4, 4.0, 4.2, 4.3, 4.4,
-4.5, 4.8, 4.9 and 5-CURRENT@.
+debugging formats.
 
-The version of binutils installed in @file{/usr/bin} probably works
-with this release of GCC@.  Bootstrapping against the latest GNU
-binutils and/or the version found in @file{/usr/ports/devel/binutils} has
-been known to enable additional features and improve overall testsuite
-results.  However, it is currently known that boehm-gc may not configure
-properly on FreeBSD prior to the FreeBSD 7.0 release with GNU binutils
-after 2.16.1.
+We recommend bootstrapping against the latest GNU binutils or the
+version found in the @file{devel/binutils} port. This also has been
+known to enable additional features and improve overall testsuite
+results.
+
+@c Bugs 112958 and 112957
+Ada and D (or rather their respective libraries) are broken on
+FreeBSD/i386. This also affects building 32-bit libraries on
+FreeBSD/amd64, so configure with @option{--disable-multilib}
+there in case you are building one of these front ends.
+
+Go (or rather libgo) is generally broken on FreeBSD.
 
 @html
 <hr />
@@ -4318,12 +4318,6 @@ later.
 Building GCC on this target requires the GNU Assembler.  The bundled HP
 assembler will not work.  To prevent GCC from using the wrong assembler,
 the option @option{--with-gnu-as} may be necessary.
-
-The GCC libunwind library has not been ported to HPUX@.  This means that for
-GCC versions 3.2.3 and earlier, @option{--enable-libunwind-exceptions}
-is required to build GCC@.  For GCC 3.3 and later, this is the default.
-For gcc 3.4.3 and later, @option{--enable-libunwind-exceptions} is
-removed and the system libunwind library will always be used.
 
 @html
 <hr />

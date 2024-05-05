@@ -1,3 +1,85 @@
+2024-05-03  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/114929
+	* gm2-compiler/M2LangDump.mod (GenQualidentSymString): Add
+	missing return result into identstr.
+	* gm2-compiler/M2Quads.mod (ForLoopLastIteratorVariable): New
+	procedure.
+	(ForLoopLastIteratorConstant): Ditto.
+	(ForLoopLastIterator): Ditto.
+	(BuildForToByDo): Remove LastIterator calculation and call
+	ForLoopLastIterator instead.
+	(FinalValue): Replace with ...
+	(LastIterator): ... this.
+
+2024-05-02  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/113836
+	* gm2-compiler/M2AsmUtil.def: Remove export qualified and
+	unused import.
+	* gm2-compiler/M2LangDump.mod (AddRuleTextDump): New procedure.
+	(AddRuleScopeQualidentDump): Add warning check against unmatched
+	rule.
+	(GenQualidentSymString): New procedure function.
+	(IdentQualidentMatch): New procedure function.
+	(IsRuleFilenameMatch): New procedure function.
+	(CheckRuleMatch): New procedure function.
+	(AddRuleFilenameDump): New procedure function.
+	* gm2-gcc/m2misc.cc (m2misc_warning_m2_dump_filter): New function.
+	* gm2-gcc/m2misc.def (warning_m2_dump_filter): New procedure.
+	* gm2-gcc/m2misc.h (m2misc_warning_m2_dump_filter): New prototype.
+	* gm2-gcc/m2pp.cc (VERBOSE_TYPE_DESC): New define.
+	(m2pp_identifier): Define out verbose type info.
+	(m2pp_constructor): Define out verbose type info.
+	(m2pp_assignment): Define out verbose type info.
+	* gm2-lang.cc (ENABLE_M2DUMP_ALL): Remove.
+	* lang.opt (fm2-dump): Add.
+	(fm2-dump-decl=): Add.
+	(fm2-dump-gimple=): Add.
+	(fm2-dump-quad=): Add.
+	(fm2-dump-filter=): Add.
+
+2024-04-25  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/114836
+	* gm2-compiler/M2Range.mod (FoldTypeAssign): Avoid error
+	string concatenation.
+
+2024-04-25  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* gm2-compiler/M2FileName.def (CalculateFileName): Remove
+	quoted string in comment.
+	* gm2-compiler/M2Range.mod (FoldTypeParam): Generate dialect
+	specific parameter incompatibility error message.
+
+2024-04-23  Jakub Jelinek  <jakub@redhat.com>
+
+	* lang.opt (fdef=, fmod=): Spelling fix: recognise -> recognize.
+
+2024-04-23  Jakub Jelinek  <jakub@redhat.com>
+
+	* lang.opt (fuse-list=): Spelling fix: finalializations ->
+	finalizations.
+
+2024-04-22  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/114811
+	* gm2-compiler/M2GenGCC.mod (FoldBinarySet): Add condition
+	checking to ensure op2 and op3 are fully resolved before
+	type checking is performed.
+
+2024-04-22  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/114807
+	* gm2-compiler/M2Check.mod (checkUnbounded): Remove unused
+	local variables.
+	(constCheckMeta): Include check for IsReallyPointer in the
+	failure case.
+	* gm2-compiler/M2Quads.mod (MoveWithMode): Remove CopyConstString.
+	* gm2-compiler/SymbolTable.def (IsHiddenReallyPointer): Export.
+	* gm2-compiler/SymbolTable.mod (SkipHiddenType): Remove.
+	(IsReallyPointer): Include IsHiddenReallyPointer test.
+
 2024-04-20  Gaius Mulley  <gaiusmod2@gmail.com>
 
 	PR modula2/112893

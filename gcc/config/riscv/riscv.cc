@@ -725,6 +725,9 @@ riscv_build_integer_1 (struct riscv_integer_op codes[RISCV_MAX_INTEGER_OPS],
   HOST_WIDE_INT low_part = CONST_LOW_PART (value);
   int cost = RISCV_MAX_INTEGER_OPS + 1, alt_cost;
   struct riscv_integer_op alt_codes[RISCV_MAX_INTEGER_OPS];
+  int upper_trailing_ones = ctz_hwi (~value >> 32);
+  int lower_leading_ones = clz_hwi (~value << 32);
+
 
   if (SMALL_OPERAND (value) || LUI_OPERAND (value))
     {
@@ -825,22 +828,58 @@ riscv_build_integer_1 (struct riscv_integer_op codes[RISCV_MAX_INTEGER_OPS],
 	  cost = 2;
 	}
       /* Handle the case where the 11 bit range of zero bits wraps around.  */
-      else
+      else if (upper_trailing_ones < 32 && lower_leading_ones < 32
+	       && ((64 - upper_trailing_ones - lower_leading_ones) < 12))
 	{
-	  int upper_trailing_ones = ctz_hwi (~value >> 32);
-	  int lower_leading_ones = clz_hwi (~value << 32);
+	  codes[0].code = UNKNOWN;
+	  /* The sign-bit might be zero, so just rotate to be safe.  */
+	  codes[0].value = ((value << (32 - upper_trailing_ones))
+			    | ((unsigned HOST_WIDE_INT) value
+			       >> (32 + upper_trailing_ones)));
+	  codes[1].code = ROTATERT;
+	  codes[1].value = 32 - upper_trailing_ones;
+	  cost = 2;
+	}
+      /* Final cases, particularly focused on bseti.  */
+      else if (cost > 2 && TARGET_ZBS)
+	{
+	  int i = 0;
 
-	  if (upper_trailing_ones < 32 && lower_leading_ones < 32
-	      && ((64 - upper_trailing_ones - lower_leading_ones) < 12))
+	  /* First handle any bits set by LUI.  Be careful of the
+	     SImode sign bit!.  */
+	  if (value & 0x7ffff800)
 	    {
-	      codes[0].code = UNKNOWN;
-	      /* The sign-bit might be zero, so just rotate to be safe.  */
-	      codes[0].value = ((value << (32 - upper_trailing_ones))
-				| ((unsigned HOST_WIDE_INT) value
-				   >> (32 + upper_trailing_ones)));
-	      codes[1].code = ROTATERT;
-	      codes[1].value = 32 - upper_trailing_ones;
-	      cost = 2;
+	      alt_codes[i].code = (i == 0 ? UNKNOWN : IOR);
+	      alt_codes[i].value = value & 0x7ffff800;
+	      value &= ~0x7ffff800;
+	      i++;
+	    }
+
+	  /* Next, any bits we can handle with addi.  */
+	  if (value & 0x7ff)
+	    {
+	      alt_codes[i].code = (i == 0 ? UNKNOWN : PLUS);
+	      alt_codes[i].value = value & 0x7ff;
+	      value &= ~0x7ff;
+	      i++;
+	    }
+
+	  /* And any residuals with bseti.  */
+	  while (i < cost && value)
+	    {
+	      HOST_WIDE_INT bit = ctz_hwi (value);
+	      alt_codes[i].code = (i == 0 ? UNKNOWN : IOR);
+	      alt_codes[i].value = 1UL << bit;
+	      value &= ~(1ULL << bit);
+	      i++;
+	    }
+
+	  /* If LUI+ADDI+BSETI resulted in a more efficient
+	     sequence, then use it.  */
+	  if (i < cost)
+	    {
+	      memcpy (codes, alt_codes, sizeof (alt_codes));
+	      cost = i;
 	    }
 	}
     }
@@ -1219,7 +1258,9 @@ riscv_legitimate_constant_p (machine_mode mode ATTRIBUTE_UNUSED, rtx x)
   return riscv_const_insns (x) > 0;
 }
 
-/* Implement TARGET_CANNOT_FORCE_CONST_MEM.  */
+/* Implement TARGET_CANNOT_FORCE_CONST_MEM.
+   Return true if X cannot (or should not) be spilled to the
+   constant pool.  */
 
 static bool
 riscv_cannot_force_const_mem (machine_mode mode ATTRIBUTE_UNUSED, rtx x)
@@ -2786,6 +2827,45 @@ riscv_v_adjust_scalable_frame (rtx target, poly_int64 offset, bool epilogue)
   REG_NOTES (insn) = dwarf;
 }
 
+/* Take care below subreg const_poly_int move:
+
+   1. (set (subreg:DI (reg:TI 237) 8)
+	   (subreg:DI (const_poly_int:TI [4, 2]) 8))
+      =>
+      (set (subreg:DI (reg:TI 237) 8)
+	   (const_int 0)) */
+
+static bool
+riscv_legitimize_subreg_const_poly_move (machine_mode mode, rtx dest, rtx src)
+{
+  gcc_assert (SUBREG_P (src) && CONST_POLY_INT_P (SUBREG_REG (src)));
+  gcc_assert (SUBREG_BYTE (src).is_constant ());
+
+  int byte_offset = SUBREG_BYTE (src).to_constant ();
+  rtx const_poly = SUBREG_REG (src);
+  machine_mode subreg_mode = GET_MODE (const_poly);
+
+  if (subreg_mode != TImode) /* Only TImode is needed for now.  */
+    return false;
+
+  if (byte_offset == 8)
+    {
+      /* The const_poly_int cannot exceed int64, just set zero here.  */
+      emit_move_insn (dest, CONST0_RTX (mode));
+      return true;
+    }
+
+  /* The below transform will be covered in somewhere else.
+     Thus, ignore this here.
+     (set (subreg:DI (reg:TI 237) 0)
+	  (subreg:DI (const_poly_int:TI [4, 2]) 0))
+     =>
+     (set (subreg:DI (reg:TI 237) 0)
+	  (const_poly_int:DI [4, 2])) */
+
+  return false;
+}
+
 /* If (set DEST SRC) is not a valid move instruction, emit an equivalent
    sequence that is valid.  */
 
@@ -2839,6 +2919,11 @@ riscv_legitimize_move (machine_mode mode, rtx dest, rtx src)
 	}
       return true;
     }
+
+  if (SUBREG_P (src) && CONST_POLY_INT_P (SUBREG_REG (src))
+    && riscv_legitimize_subreg_const_poly_move (mode, dest, src))
+    return true;
+
   /* Expand
        (set (reg:DI target) (subreg:DI (reg:V8QI reg) 0))
      Expand this data movement instead of simply forbid it since
@@ -8541,7 +8626,7 @@ riscv_modes_tieable_p (machine_mode mode1, machine_mode mode2)
 	       && GET_MODE_CLASS (mode2) == MODE_FLOAT));
 }
 
-/* Implement CLASS_MAX_NREGS.  */
+/* Implement TARGET_CLASS_MAX_NREGS.  */
 
 static unsigned char
 riscv_class_max_nregs (reg_class_t rclass, machine_mode mode)
@@ -8830,26 +8915,43 @@ riscv_macro_fusion_pair_p (rtx_insn *prev, rtx_insn *curr)
 	  extract_base_offset_in_addr (SET_DEST (prev_set), &base_prev, &offset_prev);
 	  extract_base_offset_in_addr (SET_DEST (curr_set), &base_curr, &offset_curr);
 
-	  /* The two stores must be contained within opposite halves of the same
-	     16 byte aligned block of memory.  We know that the stack pointer and
-	     the frame pointer have suitable alignment.  So we just need to check
-	     the offsets of the two stores for suitable alignment.
+	  /* Fail if we did not find both bases.  */
+	  if (base_prev == NULL_RTX || base_curr == NULL_RTX)
+	    return false;
 
-	     Originally the thought was to check MEM_ALIGN, but that was reporting
-	     incorrect alignments, even for SP/FP accesses, so we gave up on that
-	     approach.  */
-	  if (base_prev != NULL_RTX
-	      && base_curr != NULL_RTX
-	      && REG_P (base_prev)
-	      && REG_P (base_curr)
-	      && REGNO (base_prev) == REGNO (base_curr)
-	      && (REGNO (base_prev) == STACK_POINTER_REGNUM
-		  || REGNO (base_prev) == HARD_FRAME_POINTER_REGNUM)
-	      && ((INTVAL (offset_prev) == INTVAL (offset_curr) + 8
-		   && (INTVAL (offset_prev) % 16) == 0)
-		  || ((INTVAL (offset_curr) == INTVAL (offset_prev) + 8)
-		      && (INTVAL (offset_curr) % 16) == 0)))
-	    return true;
+	  /* Fail if either base is not a register.  */
+	  if (!REG_P (base_prev) || !REG_P (base_curr))
+	    return false;
+
+	  /* Fail if the bases are not the same register.  */
+	  if (REGNO (base_prev) != REGNO (base_curr))
+	    return false;
+
+	  /* Originally the thought was to check MEM_ALIGN, but that was
+	     reporting incorrect alignments, even for SP/FP accesses, so we
+	     gave up on that approach.  Instead just check for stack/hfp
+	     which we know are aligned.  */
+	  if (REGNO (base_prev) != STACK_POINTER_REGNUM
+	      && REGNO (base_prev) != HARD_FRAME_POINTER_REGNUM)
+	    return false;
+
+	  /* The two stores must be contained within opposite halves of the
+	     same 16 byte aligned block of memory.  We know that the stack
+	     pointer and the frame pointer have suitable alignment.  So we
+	     just need to check the offsets of the two stores for suitable
+	     alignment.  */
+	  /* Get the smaller offset into OFFSET_PREV.  */
+	  if (INTVAL (offset_prev) > INTVAL (offset_curr))
+	    std::swap (offset_prev, offset_curr);
+
+	  /* If the smaller offset (OFFSET_PREV) is not 16 byte aligned,
+	     then fail.  */
+	  if ((INTVAL (offset_prev) % 16) != 0)
+	    return false;
+
+	  /* The higher offset must be 8 bytes more than the lower
+	     offset.  */
+	  return (INTVAL (offset_prev) + 8 == INTVAL (offset_curr));
 	}
     }
 

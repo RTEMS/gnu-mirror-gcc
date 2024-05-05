@@ -1,3 +1,785 @@
+2024-05-03  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	* gfortran.dg/gomp/atomic-21.f90: Update testcase for the removal of `;`.
+
+2024-05-03  Jason Merrill  <jason@redhat.com>
+
+	PR c++/114935
+	* g++.dg/cpp0x/initlist-eh1.C: New test.
+
+2024-05-03  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/114929
+	* gm2/pim/run/pass/testforloopchar.mod: New test.
+	* gm2/pim/run/pass/testforloopchar2.mod: New test.
+	* gm2/pim/run/pass/testforloopenum.mod: New test.
+
+2024-05-03  Ken Matsui  <kmatsui@gcc.gnu.org>
+
+	* g++.dg/ext/has-builtin-1.C: Test existence of __is_pointer.
+	Arrange the order lexically around __is_pointer.
+	* g++.dg/ext/is_pointer.C: New test.
+
+2024-05-03  Ken Matsui  <kmatsui@gcc.gnu.org>
+
+	* g++.dg/ext/has-builtin-1.C: Test existence of __is_volatile.
+	* g++.dg/ext/is_volatile.C: New test.
+
+2024-05-03  Ken Matsui  <kmatsui@gcc.gnu.org>
+
+	* g++.dg/ext/has-builtin-1.C: Test existence of __is_const.
+	* g++.dg/ext/is_const.C: New test.
+
+2024-05-03  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/111475
+	* c-c++-common/analyzer/fd-glibc-byte-stream-socket.c: Add
+	-fno-exceptions for now.
+	* c-c++-common/analyzer/fd-manpage-getaddrinfo-client.c: Likewise.
+	* c-c++-common/analyzer/fd-mappage-getaddrinfo-server.c: Rename to...
+	* c-c++-common/analyzer/fd-manpage-getaddrinfo-server.c: ...this, and
+	add -fno-exceptions for now.
+	* c-c++-common/analyzer/fd-socket-meaning.c: Add -fno-exceptions
+	for now.
+	* c-c++-common/analyzer/fd-symbolic-socket.c: Likewise.
+	* c-c++-common/analyzer/flexible-array-member-1.c: Use regexp to
+	handle C vs C++ differences in spelling of function name, which
+	could have a "std::" prefix on some targets.
+	* c-c++-common/analyzer/pr106539.c: Likewise.
+	* c-c++-common/analyzer/malloc-ipa-8-unchecked.c: Move back to...
+	* gcc.dg/analyzer/malloc-ipa-8-unchecked.c: ...here, dropping
+	attempt to generalize output for C vs C++.
+	* c-c++-common/analyzer/signal-4a.c: Move back to...
+	* gcc.dg/analyzer/signal-4a.c: ...here, dropping attempt to
+	generalize output for C vs C++.
+	* c-c++-common/analyzer/signal-4b.c: Move back to...
+	* gcc.dg/analyzer/signal-4b.c: ...here, dropping attempt to
+	generalize output for C vs C++.
+
+2024-05-03  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/113596
+	* gcc.dg/pr113596.c: New test.
+	* gcc.dg/tree-ssa/pr113596.c: New test.
+
+2024-05-03  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/114929
+	* gm2/pim/run/pass/testforloopzero.mod: New test.
+	* gm2/pim/run/pass/testforloopzero2.mod: New test.
+	* gm2/pim/run/pass/testforloopzero3.mod: New test.
+	* gm2/pim/run/pass/testforloopzero4.mod: New test.
+
+2024-05-02  Jeff Law  <jlaw@ventanamicro.com>
+
+	* gcc.target/riscv/synthesis-1.c: New test.
+
+2024-05-02  Patrick O'Neill  <patrick@rivosinc.com>
+
+	PR middle-end/114734
+	* gcc.target/riscv/rvv/autovec/pr114734.c: New test.
+
+2024-05-02  Jeff Law  <jlaw@ventanamicro.com>
+
+	* gcc.target/riscv/round_32.c: Add require-effective-target glibc.
+	* gcc.target/riscv/round_64.c: Likewise.
+
+2024-05-02  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/114917
+	* g++.dg/modules/export-5_a.C: New test.
+	* g++.dg/modules/export-5_b.C: New test.
+	* g++.dg/parse/linkage4.C: New test.
+
+2024-05-02  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/114458
+	* g++.dg/cpp26/feat-cxx26.C (__cpp_deleted_function): Add test.
+	* g++.dg/cpp26/delete-reason1.C: New test.
+	* g++.dg/cpp26/delete-reason2.C: New test.
+	* g++.dg/parse/error65.C (f1): Adjust expected diagnostics.
+
+2024-05-02  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	* gcc.target/s390/risbg-ll-2.c: Fix start offset for rosbg of
+	f10.
+
+2024-05-02  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/114630
+	* g++.dg/modules/partial-3.C: New test.
+
+2024-05-02  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	* gcc.dg/zero_bits_compound-1.c: Fix for s390.
+
+2024-05-02  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/105224
+	* g++.dg/modules/virt-2_a.C: Update linkage requirements.
+	* g++.dg/modules/virt-2_b.C: Likewise.
+	* g++.dg/modules/virt-2_c.C: Likewise.
+	* g++.dg/modules/virt-4_a.C: New test.
+	* g++.dg/modules/virt-4_b.C: New test.
+
+2024-05-01  Jason Merrill  <jason@redhat.com>
+
+	* g++.dg/debug/dwarf2/array-3.C: No more 'int' for in-chrg parm.
+	* g++.dg/debug/dwarf2/array-4.C: Likewise.
+
+2024-05-01  Jason Merrill  <jason@redhat.com>
+
+	PR c++/113706
+	* g++.dg/opt/const-builtin1.C: New test.
+	* c-c++-common/pr103798-2.c: Remove xfail.
+
+2024-05-01  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	* g++.dg/modules/using-16_a.C: New test.
+	* g++.dg/modules/using-16_b.C: New test.
+	* g++.dg/modules/using-16_c.C: New test.
+
+2024-05-01  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/114868
+	* g++.dg/modules/using-15_a.C: New test.
+	* g++.dg/modules/using-15_b.C: New test.
+	* g++.dg/modules/using-15_c.C: New test.
+
+2024-05-01  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/107688
+	* g++.dg/modules/contracts-1_a.C: Avoid now-illegal syntax.
+	* g++.dg/modules/contracts-2_a.C: Likewise.
+	* g++.dg/modules/contracts-3_a.C: Likewise.
+	* g++.dg/modules/contracts-4_a.C: Likewise.
+	* g++.dg/modules/lang-1_c.C: Clarify now-legal syntax.
+	* g++.dg/modules/pr101582-1.C: Remove now-legal XFAILS.
+	* g++.dg/template/crash71.C: Update error messages.
+	* g++.dg/cpp2a/linkage-spec1.C: New test.
+	* g++.dg/modules/export-3.C: New test.
+	* g++.dg/modules/export-4_a.C: New test.
+	* g++.dg/modules/export-4_b.C: New test.
+
+2024-04-30  Jivan Hakobyan  <jivanhakobyan9@gmail.com>
+
+	* gcc.target/riscv/fix.c: New test.
+	* gcc.target/riscv/round.c: New test.
+	* gcc.target/riscv/round_32.c: New test.
+	* gcc.target/riscv/round_64.c: New test.
+
+2024-04-30  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	PR modula2/114886
+	* lib/gm2.exp: Don't load timeout-dg.exp.
+	Don't set gm2_previous_timeout.
+	Don't call dg-timeout.
+	(gm2_push_timeout, gm2_pop_timeout): Remove.
+	(gm2_init): Don't call dg-timeout.
+	* lib/gm2-torture.exp: Don't load timeout-dg.exp.
+	Don't set gm2_previous_timeout.
+	Don't call dg-timeout.
+	(gm2_push_timeout, gm2_pop_timeout): Remove.
+	* gm2/coroutines/pim/run/pass/coroutines-pim-run-pass.exp: Don't
+	load timeout-dg.exp.
+	Don't call gm2_push_timeout, gm2_pop_timeout.
+	* gm2/examples/map/pass/examples-map-pass.exp: Don't call
+	gm2_push_timeout, gm2_pop_timeout.
+	* gm2/iso/run/pass/iso-run-pass.exp: Don't load timeout-dg.exp.
+	Don't call gm2_push_timeout, gm2_pop_timeout.
+	* gm2/pimlib/base/run/pass/pimlib-base-run-pass.exp: Don't load
+	timeout-dg.exp.
+	Don't call gm2_push_timeout, gm2_pop_timeout.
+	* gm2/projects/iso/run/pass/halma/projects-iso-run-pass-halma.exp:
+	Don't call gm2_push_timeout, gm2_pop_timeout.
+	* gm2/switches/whole-program/pass/run/switches-whole-program-pass-run.exp:
+	Don't load timeout-dg.exp.
+	Don't call gm2_push_timeout, gm2_pop_timeout.
+
+2024-04-30  Richard Biener  <rguenther@suse.de>
+
+	* gcc.dg/gimplefe-53.c: New testcase.
+
+2024-04-30  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/114876
+	* gcc.dg/pr114876.c: New test.
+	* gcc.dg/tree-ssa/builtin-sprintf-warn-1.c: Adjust expected
+	diagnostics.
+
+2024-04-30  Jakub Jelinek  <jakub@redhat.com>
+	    Hongtao Liu  <hongtao.liu@intel.com>
+
+	PR tree-optimization/114883
+	* gfortran.dg/pr114883.f90: New test.
+
+2024-04-30  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/114456
+	* g++.dg/cpp26/decomp1.C: New test.
+	* g++.dg/cpp26/decomp2.C: New test.
+	* g++.dg/cpp26/feat-cxx26.C (__cpp_structured_bindings): Expect
+	202403 rather than 201606.
+
+2024-04-30  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/105320
+	PR c++/114275
+	* g++.dg/modules/tpl-friend-10_a.C: New test.
+	* g++.dg/modules/tpl-friend-10_b.C: New test.
+	* g++.dg/modules/tpl-friend-10_c.C: New test.
+	* g++.dg/modules/tpl-friend-10_d.C: New test.
+	* g++.dg/modules/tpl-friend-11_a.C: New test.
+	* g++.dg/modules/tpl-friend-11_b.C: New test.
+	* g++.dg/modules/tpl-friend-12_a.C: New test.
+	* g++.dg/modules/tpl-friend-12_b.C: New test.
+	* g++.dg/modules/tpl-friend-12_c.C: New test.
+	* g++.dg/modules/tpl-friend-12_d.C: New test.
+	* g++.dg/modules/tpl-friend-12_e.C: New test.
+	* g++.dg/modules/tpl-friend-12_f.C: New test.
+	* g++.dg/modules/tpl-friend-13_a.C: New test.
+	* g++.dg/modules/tpl-friend-13_b.C: New test.
+	* g++.dg/modules/tpl-friend-13_c.C: New test.
+	* g++.dg/modules/tpl-friend-13_d.C: New test.
+	* g++.dg/modules/tpl-friend-13_e.C: New test.
+	* g++.dg/modules/tpl-friend-13_f.C: New test.
+	* g++.dg/modules/tpl-friend-13_g.C: New test.
+	* g++.dg/modules/tpl-friend-14_a.C: New test.
+	* g++.dg/modules/tpl-friend-14_b.C: New test.
+	* g++.dg/modules/tpl-friend-14_c.C: New test.
+	* g++.dg/modules/tpl-friend-14_d.C: New test.
+	* g++.dg/modules/tpl-friend-9.C: New test.
+
+2024-04-30  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	* g++.dg/modules/enum-12.C: Update error message.
+	* g++.dg/modules/friend-5_b.C: Likewise.
+	* g++.dg/modules/shadow-1_b.C: Likewise.
+
+2024-04-30  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/114889
+	* g++.dg/modules/friend-8_a.H: New test.
+	* g++.dg/modules/friend-8_b.C: New test.
+
+2024-04-30  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/114888
+	* g++.dg/template/sizeof19.C: New test.
+
+2024-04-29  Alexandre Oliva  <oliva@gnu.org>
+
+	Revert:
+	2024-04-28  Alexandre Oliva  <oliva@adacore.com>
+
+	* lib/target-supports.exp (check_vect_support_and_set_flags):
+	Decay to link rather than compile.
+
+2024-04-29  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	* gfortran.dg/selected_logical_kind_1.f90: New test.
+	* gfortran.dg/selected_logical_kind_2.f90: New test.
+	* gfortran.dg/selected_logical_kind_3.f90: New test.
+	* gfortran.dg/selected_logical_kind_4.f90: New test.
+
+2024-04-29  Francois-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	* gfortran.dg/iso_fortran_env_8.f90: New test.
+	* gfortran.dg/iso_fortran_env_9.f90: New test.
+
+2024-04-29  demin.han  <demin.han@starfivetech.com>
+
+	PR target/114506
+	* gcc.dg/vect/costmodel/riscv/rvv/pr114506.c: New test.
+
+2024-04-29  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/114959
+	* gfortran.dg/pr114959.f90: New test.
+
+2024-04-29  Jie Mei  <jie.mei@oss.cipunited.com>
+
+	* gcc.target/mips/mips-minmax1.c: New test for MIPS R6.
+	* gcc.target/mips/mips-minmax2.c: Same as above.
+
+2024-04-28  liuhongt  <hongtao.liu@intel.com>
+
+	* gcc.target/i386/zero_extendkmask.c: New file.
+
+2024-04-28  Alexandre Oliva  <oliva@adacore.com>
+
+	* gcc.dg/cdce3.c: Require sqrt_insn effective target.
+	* gcc.target/powerpc/pr46728-10.c: Likewise.  Drop darwin
+	explicit skipping.
+	* gcc.target/powerpc/pr46728-11.c: Likewise.  Likewise.
+	* gcc.target/powerpc/pr46728-13.c: Likewise.  Likewise.
+	* gcc.target/powerpc/pr46728-14.c: Likewise.  Likewise.
+
+2024-04-28  Alexandre Oliva  <oliva@adacore.com>
+
+	PR target/58684
+	* gcc.dg/torture/pr91323.c: Expect execution fail on
+	powerpc*-*-*.
+
+2024-04-28  Alexandre Oliva  <oliva@adacore.com>
+
+	* gcc.target/powerpc/vec-mul.c: Run on target vsx_hw, just
+	compile otherwise.
+
+2024-04-28  Alexandre Oliva  <oliva@adacore.com>
+
+	* gcc.dg/vect/costmodel/ppc/costmodel-vect-31a.c: Disable
+	ldist.
+
+2024-04-28  Olivier Hainque  <hainque@adacore.com>
+
+	* gcc.target/powerpc/swaps-p8-20.c: Change powerpc_altivec_ok
+	require-effective-target test into vmx_hw.
+	* gcc.target/powerpc/vsx-vector-5.c: Change powerpc_vsx_ok
+	require-effective-target test into vsx_hw.
+
+2024-04-28  Alexandre Oliva  <oliva@adacore.com>
+
+	* gcc.target/powerpc/pr106680-1.c: Error on vxworks too.
+	* gcc.target/powerpc/pr106680-2.c: Likewise.
+	* gcc.target/powerpc/pr106680-3.c: Likewise.
+
+2024-04-28  Alexandre Oliva  <oliva@adacore.com>
+
+	* lib/target-supports.exp (check_vect_support_and_set_flags):
+	Decay to link rather than compile.
+
+2024-04-28  Jiufu Guo  <guojiufu@linux.ibm.com>
+
+	PR target/95782
+	* g++.target/s390/pr95782.C: New test.
+
+2024-04-27  Xi Ruoyao  <xry111@xry111.site>
+
+	PR target/114861
+	* gcc.target/loongarch/pr114861.c: New test.
+
+2024-04-26  Wilco Dijkstra  <wilco.dijkstra@arm.com>
+
+	* gcc.target/aarch64/ldp_stp_q_disable.c: Remove test.
+
+2024-04-26  Patrick Palka  <ppalka@redhat.com>
+
+	* g++.dg/concepts/diagnostic2.C: Expect source line printed
+	for the "required from here" message.
+	* g++.dg/template/error60a.C: New test.
+
+2024-04-26  Haochen Jiang  <haochen.jiang@intel.com>
+
+	PR target/110621
+	* gcc.target/i386/pr105354-2.c: As mentioned.
+
+2024-04-25  David Faust  <david.faust@oracle.com>
+
+	* gcc.target/bpf/bpf-debug-options-1.c: New test.
+	* gcc.target/bpf/bpf-debug-options-2.c: Likewise.
+	* gcc.target/bpf/bpf-debug-options-3.c: Likewise.
+	* gcc.target/bpf/core-options-4.c: Likewise.
+
+2024-04-25  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/111284
+	* g++.dg/cpp1z/constexpr-111284.C: New test.
+	* g++.dg/cpp1y/constexpr-lifetime7.C: Expect one error on a different
+	line.
+
+2024-04-25  Jakub Jelinek  <jakub@redhat.com>
+
+	PR lto/113208
+	* g++.dg/abi/comdat2.C: New test.
+	* g++.dg/abi/comdat5.C: New test.
+	* g++.dg/lto/pr113208_0.C: New test.
+	* g++.dg/lto/pr113208_1.C: New file.
+	* g++.dg/lto/pr113208.h: New file.
+
+2024-04-25  David Faust  <david.faust@oracle.com>
+
+	* gcc.target/bpf/core-options-1.c: New test.
+	* gcc.target/bpf/core-options-2.c: Likewise.
+	* gcc.target/bpf/core-options-3.c: Likewise.
+
+2024-04-25  Jakub Jelinek  <jakub@redhat.com>
+
+	PR fortran/114825
+	* gfortran.dg/gomp/pr114825.f90: New test.
+
+2024-04-25  Jose E. Marchesi  <jose.marchesi@oracle.com>
+
+	* gcc.target/bpf/alu-1.c: Specify conventional asm dialect.
+	* gcc.target/bpf/xbpf-indirect-call-1.c: Likewise.
+	* gcc.target/bpf/sync-fetch-and-add.c: Likewise.
+	* gcc.target/bpf/smov-2.c: Likewise.
+	* gcc.target/bpf/smov-1.c: Likewise.
+	* gcc.target/bpf/smod-1.c: Likewise.
+	* gcc.target/bpf/sload-1.c: Likewise.
+	* gcc.target/bpf/sdiv-1.c: Likewise.
+	* gcc.target/bpf/nop-1.c: Likewise.
+	* gcc.target/bpf/neg-1.c: Likewise.
+	* gcc.target/bpf/ldxdw.c: Likewise.
+	* gcc.target/bpf/jmp-1.c: Likewise.
+	* gcc.target/bpf/inline-memops-threshold-1.c: Likewise.
+	* gcc.target/bpf/float-1.c: Likewise.
+	* gcc.target/bpf/double-2.c: Likewise.
+	* gcc.target/bpf/double-1.c: Likewise.
+	* gcc.target/bpf/core-builtin-type-id.c: Likewise.
+	* gcc.target/bpf/core-builtin-type-based.c: Likewise.
+	* gcc.target/bpf/core-builtin-fieldinfo-size-1.c: Likewise.
+	* gcc.target/bpf/core-builtin-fieldinfo-sign-2.c: Likewise.
+	* gcc.target/bpf/core-builtin-fieldinfo-sign-1.c: Likewise.
+	* gcc.target/bpf/core-builtin-fieldinfo-rshift-2.c: Likewise.
+	* gcc.target/bpf/core-builtin-fieldinfo-rshift-1.c: Likewise.
+	* gcc.target/bpf/core-builtin-fieldinfo-offset-1.c: Likewise.
+	* gcc.target/bpf/core-builtin-fieldinfo-lshift-2.c: Likewise.
+	* gcc.target/bpf/core-builtin-fieldinfo-lshift-1-le.c: Likewise.
+	* gcc.target/bpf/core-builtin-fieldinfo-lshift-1-be.c: Likewise.
+	* gcc.target/bpf/core-builtin-fieldinfo-existence-1.c: Likewise.
+	* gcc.target/bpf/core-builtin-fieldinfo-errors-2.c: Likewise.
+	* gcc.target/bpf/core-builtin-fieldinfo-errors-1.c: Likewise.
+	* gcc.target/bpf/core-builtin-fieldinfo-const-elimination.c:
+	Likewise.
+	* gcc.target/bpf/core-builtin-exprlist-4.c: Likewise.
+	* gcc.target/bpf/core-builtin-exprlist-3.c: Likewise.
+	* gcc.target/bpf/core-builtin-exprlist-2.c: Likewise.
+	* gcc.target/bpf/core-builtin-exprlist-1.c: Likewise.
+	* gcc.target/bpf/core-builtin-enumvalue-opt.c: Likewise.
+	* gcc.target/bpf/core-builtin-enumvalue-errors.c: Likewise.
+	* gcc.target/bpf/core-builtin-enumvalue.c: Likewise.
+	* gcc.target/bpf/core-builtin-3.c: Likewise.
+	* gcc.target/bpf/core-builtin-2.c: Likewise.
+	* gcc.target/bpf/core-builtin-1.c: Likewise.
+	* gcc.target/bpf/core-attr-struct-as-array.c: Likewise.
+	* gcc.target/bpf/core-attr-6.c: Likewise.
+	* gcc.target/bpf/core-attr-5.c: Likewise.
+	* gcc.target/bpf/core-attr-4.c: Likewise.
+	* gcc.target/bpf/core-attr-3.c: Likewise.
+	* gcc.target/bpf/core-attr-2.c: Likewise.
+	* gcc.target/bpf/core-attr-1.c: Likewise.
+	* gcc.target/bpf/builtin-load.c: Likewise.
+	* gcc.target/bpf/btfext-funcinfo-nocore.c: Likewise.
+	* gcc.target/bpf/btfext-funcinfo.c: Likewise.
+	* gcc.target/bpf/bswap-1.c: Likewise.
+	* gcc.target/bpf/bswap-2.c: Likewise.
+	* gcc.target/bpf/attr-kernel-helper.c: Likewise.
+	* gcc.target/bpf/atomic-xchg-2.c: Likewise.
+	* gcc.target/bpf/atomic-xchg-1.c: Likewise.
+	* gcc.target/bpf/atomic-op-3.c: Likewise.
+	* gcc.target/bpf/atomic-op-2.c: Likewise.
+	* gcc.target/bpf/atomic-op-1.c: Likewise.
+	* gcc.target/bpf/atomic-fetch-op-3.c: Likewise.
+	* gcc.target/bpf/atomic-fetch-op-2.c: Likewise.
+	* gcc.target/bpf/atomic-fetch-op-1.c: Likewise.
+	* gcc.target/bpf/atomic-cmpxchg-2.c: Likewise.
+	* gcc.target/bpf/atomic-cmpxchg-1.c: Likewise.
+	* gcc.target/bpf/alu-2.c: Likewise.
+
+2024-04-25  Richard Ball  <richard.ball@arm.com>
+
+	* gcc.target/arm/cmse/extend-param.c: New test.
+	* gcc.target/arm/cmse/extend-return.c: New test.
+
+2024-04-25  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/114792
+	* gcc.dg/torture/pr114792.c: New testcase.
+
+2024-04-25  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gcc.target/sparc/small-struct-1.c: New test.
+	* gcc.target/sparc/pr105573.c: Rename to...
+	* gcc.target/sparc/20230425-1.c: ...this.
+	* gcc.target/sparc/pr109541.c: Rename to...
+	* gcc.target/sparc/20230607-1.c: ...this
+
+2024-04-25  Pan Li  <pan2.li@intel.com>
+	    Kito Cheng  <kito.cheng@sifive.com>
+
+	PR target/114714
+	* g++.target/riscv/rvv/base/pr114714-1.C: New test.
+	* g++.target/riscv/rvv/base/pr114714-2.C: New test.
+
+2024-04-25  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/93678
+	* gfortran.dg/pr93678.f90: New test.
+
+2024-04-25  Paul Thomas  <pault@gcc.gnu.org>
+	    Jakub Jelinek  <jakub@gcc.gnu.org>
+
+	PR fortran/89462
+	* gfortran.dg/pr89462.f90: New test.
+
+2024-04-25  Haochen Gui  <guihaoc@gcc.gnu.org>
+
+	* gcc.target/powerpc/bcd-4.c: Adjust the number of bcdadd and
+	bcdsub.
+
+2024-04-25  Pan Li  <pan2.li@intel.com>
+
+	* gcc.target/riscv/rvv/base/pr112431-1.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-2.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-3.c: New test.
+
+2024-04-24  Patrick Palka  <ppalka@redhat.com>
+
+	* g++.dg/modules/pr99023_a.X: Run only in C++20 mode.
+	* g++.dg/modules/pr99023_b.X: Likewise.
+
+2024-04-24  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/114709
+	* g++.dg/cpp0x/constexpr-union8.C: New test.
+
+2024-04-24  Pan Li  <pan2.li@intel.com>
+
+	Revert:
+	2024-04-24  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+		    kito-cheng  <kito.cheng@sifive.com>
+		    kito-cheng  <kito.cheng@gmail.com>
+
+	PR target/112431
+	* gcc.target/riscv/rvv/base/pr112431-1.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-2.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-3.c: New test.
+
+2024-04-24  Jose E. Marchesi  <jose.marchesi@oracle.com>
+
+	* gcc.target/bpf/feature-macro-1.c: New test.
+	* gcc.target/bpf/feature-macro-2.c: Likewise.
+
+2024-04-24  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/114787
+	* gcc.dg/torture/pr114787.c: New testcase.
+
+2024-04-24  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/114832
+	* gcc.dg/vect/pr114832.c: New testcase.
+
+2024-04-24  Haochen Jiang  <haochen.jiang@intel.com>
+
+	* gcc.target/i386/avx10_1-24.c: New test.
+
+2024-04-24  Pan Li  <pan2.li@intel.com>
+
+	* gcc.target/riscv/rvv/base/unop_v_constraint-2.c: Adjust asm
+	check cond.
+	* gcc.target/riscv/rvv/base/pr112431-4.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-5.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-6.c: New test.
+
+2024-04-24  Pan Li  <pan2.li@intel.com>
+
+	Revert:
+	2024-04-24  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	* gcc.target/riscv/rvv/base/unop_v_constraint-2.c: Adapt test.
+	* gcc.target/riscv/rvv/base/pr112431-4.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-5.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-6.c: New test.
+
+2024-04-23  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	* g++.dg/cpp23/explicit-obj-basic7.C: New test.
+
+2024-04-23  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/114810
+	* g++.target/i386/pr114810.C: New test.
+
+2024-04-23  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103496
+	* gfortran.dg/c_sizeof_8.f90: New test.
+
+2024-04-23  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/114795
+	* g++.dg/modules/auto-4_a.H: New test.
+	* g++.dg/modules/auto-4_b.C: New test.
+
+2024-04-23  Jakub Jelinek  <jakub@redhat.com>
+
+	* objc.dg/attributes/nullability-00.m: Adjust expected diagnostic
+	spelling: recognised -> recognized.
+	* obj-c++.dg/attributes/nullability-00.mm: Likewise.
+
+2024-04-23  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	* gcc.dg/tree-ssa/forwprop-40.c: Xfail for s390.
+	* gcc.dg/tree-ssa/forwprop-41.c: Xfail for s390.
+	* lib/target-supports.exp: Add target check s390_mvx.
+
+2024-04-23  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/102597
+	* gfortran.dg/pr102597.f90: New test.
+
+2024-04-23  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/114799
+	* gcc.dg/vect/bb-slp-pr114799.c: New testcase.
+
+2024-04-23  Andreas Krebbel  <krebbel@linux.ibm.com>
+
+	PR target/114676
+	* gcc.target/s390/zvector/pr114676.c: New test.
+
+2024-04-23  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/114784
+	* g++.dg/cpp0x/inh-ctor39.C: New test.
+
+2024-04-23  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/114078
+	* g++.dg/cpp23/explicit-obj-ops-alloc.C: New test.
+
+2024-04-22  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/114811
+	* lib/gm2-torture.exp: Correct regexp checking for internal
+	compiler error strings in compiler output.
+
+2024-04-22  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/114807
+	* gm2/pim/fail/badproctype.mod: Change MYSHORTREAL
+	to SHORTREAL.
+	* gm2/pim/fail/badprocbool.mod: New test.
+	* gm2/pim/fail/badproccard.mod: New test.
+	* gm2/pim/fail/badprocint.mod: New test.
+	* gm2/pim/fail/badprocint2.mod: New test.
+	* gm2/pim/pass/goodproccard2.mod: New test.
+	* gm2/pim/pass/goodprocint.mod: New test.
+	* gm2/pim/pass/goodprocint3.mod: New test.
+	* gm2/pim/run/pass/genconststr.mod: New test.
+
+2024-04-22  Marek Polacek  <polacek@redhat.com>
+
+	* lib/prune.exp (prune_gcc_output): Also prune -freport-bug output.
+
+2024-04-22  Pan Li  <pan2.li@intel.com>
+
+	* gcc.target/riscv/rvv/base/pr112431-10.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-11.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-12.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-13.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-14.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-15.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-7.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-8.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-9.c: New test.
+
+2024-04-22  Pan Li  <pan2.li@intel.com>
+
+	Revert:
+	2024-04-22  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	PR target/112431
+	* gcc.target/riscv/rvv/base/pr112431-10.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-11.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-12.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-13.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-14.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-15.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-7.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-8.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-9.c: New test.
+
+2024-04-22  Pan Li  <pan2.li@intel.com>
+
+	* gcc.target/riscv/rvv/base/pr112431-34.c: Remove xfail for vluxei8 check.
+	* gcc.target/riscv/rvv/base/pr112431-28.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-29.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-30.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-31.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-32.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-33.c: New test.
+
+2024-04-22  Pan Li  <pan2.li@intel.com>
+
+	Revert:
+	2024-04-22  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	PR target/112431
+	* gcc.target/riscv/rvv/base/pr112431-28.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-29.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-30.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-31.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-32.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-33.c: New test.
+
+2024-04-22  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	* gcc.target/s390/vxe/popcount-1.c: Remove xfail.
+
+2024-04-22  Pan Li  <pan2.li@intel.com>
+
+	* gcc.target/riscv/rvv/base/pr112431-37.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-38.c: New test.
+
+2024-04-22  Pan Li  <pan2.li@intel.com>
+
+	Revert:
+	2024-04-22  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	PR target/112431
+	* gcc.target/riscv/rvv/base/pr112431-37.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-38.c: New test.
+
+2024-04-22  Pan Li  <pan2.li@intel.com>
+
+	* gcc.target/riscv/rvv/base/pr112431-16.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-17.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-18.c: New test.
+
+2024-04-22  Pan Li  <pan2.li@intel.com>
+
+	Revert:
+	2024-04-22  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	PR target/112431
+	* gcc.target/riscv/rvv/base/pr112431-16.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-17.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-18.c: New test.
+
+2024-04-22  Pan Li  <pan2.li@intel.com>
+
+	* gcc.target/riscv/rvv/base/pr112431-22.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-23.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-24.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-25.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-26.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-27.c: New test.
+
+2024-04-21  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/103471
+	* gfortran.dg/pr103471.f90: New test.
+
+2024-04-21  Pan Li  <pan2.li@intel.com>
+
+	Revert:
+	2024-04-21  Juzhe-Zhong  <juzhe.zhong@rivai.ai>
+
+	PR target/112431
+	* gcc.target/riscv/rvv/base/pr112431-22.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-23.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-24.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-25.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-26.c: New test.
+	* gcc.target/riscv/rvv/base/pr112431-27.c: New test.
+
+2024-04-21  Pan Li  <pan2.li@intel.com>
+
+	* gcc.target/riscv/rvv/base/pr112431-34.c: New test.
+
 2024-04-20  Pan Li  <pan2.li@intel.com>
 
 	Revert:

@@ -1156,6 +1156,16 @@ decls_match (tree newdecl, tree olddecl, bool record_versions /* = true */)
       tree r2 = fndecl_declared_return_type (olddecl);
       tree r1 = fndecl_declared_return_type (newdecl);
 
+      /* For memchr et al, allow const void* return type (as specified by C++)
+	 when we expect void* (as in C).  */
+      if (DECL_IS_UNDECLARED_BUILTIN (olddecl)
+	  && DECL_EXTERN_C_P (olddecl)
+	  && !same_type_p (r1, r2)
+	  && TREE_CODE (r1) == POINTER_TYPE
+	  && TREE_CODE (r2) == POINTER_TYPE
+	  && comp_ptr_ttypes (TREE_TYPE (r1), TREE_TYPE (r2)))
+	r2 = r1;
+
       tree p1 = TYPE_ARG_TYPES (f1);
       tree p2 = TYPE_ARG_TYPES (f2);
 
@@ -2276,40 +2286,35 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 
   if (modules_p ()
       && TREE_CODE (CP_DECL_CONTEXT (olddecl)) == NAMESPACE_DECL
-      && TREE_CODE (olddecl) != NAMESPACE_DECL
-      && !hiding)
+      && TREE_CODE (olddecl) != NAMESPACE_DECL)
     {
-      if (!module_may_redeclare (olddecl))
-	{
-	  if (DECL_ARTIFICIAL (olddecl))
-	    error ("declaration %qD conflicts with builtin", newdecl);
-	  else
-	    {
-	      error ("declaration %qD conflicts with import", newdecl);
-	      inform (olddecl_loc, "import declared %q#D here", olddecl);
-	    }
+      if (!module_may_redeclare (olddecl, newdecl))
+	return error_mark_node;
 
-	  return error_mark_node;
-	}
-
-      tree not_tmpl = STRIP_TEMPLATE (olddecl);
-      if (DECL_LANG_SPECIFIC (not_tmpl)
-	  && DECL_MODULE_ATTACH_P (not_tmpl)
-	  /* Typedefs are not entities and so are OK to be redeclared
-	     as exported: see [module.interface]/p6.  */
-	  && TREE_CODE (olddecl) != TYPE_DECL)
+      if (!hiding)
 	{
-	  if (DECL_MODULE_EXPORT_P (STRIP_TEMPLATE (newdecl))
-	      && !DECL_MODULE_EXPORT_P (not_tmpl))
+	  /* The old declaration should match the exportingness of the new
+	     declaration.  But hidden friend declarations just keep the
+	     exportingness of the old declaration; see CWG2588.  */
+	  tree not_tmpl = STRIP_TEMPLATE (olddecl);
+	  if (DECL_LANG_SPECIFIC (not_tmpl)
+	      && DECL_MODULE_ATTACH_P (not_tmpl)
+	      /* Typedefs are not entities and so are OK to be redeclared
+		 as exported: see [module.interface]/p6.  */
+	      && TREE_CODE (olddecl) != TYPE_DECL)
 	    {
-	      auto_diagnostic_group d;
-	      error ("conflicting exporting for declaration %qD", newdecl);
-	      inform (olddecl_loc,
-		      "previously declared here without exporting");
+	      if (DECL_MODULE_EXPORT_P (newdecl)
+		  && !DECL_MODULE_EXPORT_P (not_tmpl))
+		{
+		  auto_diagnostic_group d;
+		  error ("conflicting exporting for declaration %qD", newdecl);
+		  inform (olddecl_loc,
+			  "previously declared here without exporting");
+		}
 	    }
+	  else if (DECL_MODULE_EXPORT_P (newdecl))
+	    DECL_MODULE_EXPORT_P (not_tmpl) = true;
 	}
-      else if (DECL_MODULE_EXPORT_P (newdecl))
-	DECL_MODULE_EXPORT_P (not_tmpl) = true;
     }
 
   /* We have committed to returning OLDDECL at this point.  */
@@ -2415,6 +2420,10 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 			"previous declaration of %qD", olddecl);
 	    }
 	  DECL_DELETED_FN (newdecl) |= DECL_DELETED_FN (olddecl);
+	  if (DECL_DELETED_FN (olddecl)
+	      && DECL_INITIAL (olddecl)
+	      && TREE_CODE (DECL_INITIAL (olddecl)) == STRING_CST)
+	    DECL_INITIAL (newdecl) = DECL_INITIAL (olddecl);
 	}
     }
 
@@ -4569,7 +4578,6 @@ make_typename_type (tree context, tree name, enum tag_types tag_type,
     {
       t = lookup_template_class (t, TREE_OPERAND (fullname, 1),
 				 NULL_TREE, context,
-				 /*entering_scope=*/0,
 				 complain | tf_user);
       if (t == error_mark_node)
 	return error_mark_node;
@@ -8592,17 +8600,20 @@ cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
   if (init && TREE_CODE (decl) == FUNCTION_DECL)
     {
       tree clone;
-      if (init == ridpointers[(int)RID_DELETE])
+      if (init == ridpointers[(int)RID_DELETE]
+	  || (TREE_CODE (init) == STRING_CST
+	      && TREE_TYPE (init) == ridpointers[(int)RID_DELETE]))
 	{
 	  /* FIXME check this is 1st decl.  */
 	  DECL_DELETED_FN (decl) = 1;
 	  DECL_DECLARED_INLINE_P (decl) = 1;
-	  DECL_INITIAL (decl) = error_mark_node;
+	  DECL_INITIAL (decl)
+	    = TREE_CODE (init) == STRING_CST ? init : error_mark_node;
 	  FOR_EACH_CLONE (clone, decl)
 	    {
 	      DECL_DELETED_FN (clone) = 1;
 	      DECL_DECLARED_INLINE_P (clone) = 1;
-	      DECL_INITIAL (clone) = error_mark_node;
+	      DECL_INITIAL (clone) = DECL_INITIAL (decl);
 	    }
 	  init = NULL_TREE;
 	}
@@ -9163,7 +9174,7 @@ get_tuple_size (tree type)
   tree inst = lookup_template_class (tuple_size_identifier, args,
 				     /*in_decl*/NULL_TREE,
 				     /*context*/std_node,
-				     /*entering_scope*/false, tf_none);
+				     tf_none);
   inst = complete_type (inst);
   if (inst == error_mark_node
       || !COMPLETE_TYPE_P (inst)
@@ -9192,7 +9203,6 @@ get_tuple_element_type (tree type, unsigned i)
   tree inst = lookup_template_class (tuple_element_identifier, args,
 				     /*in_decl*/NULL_TREE,
 				     /*context*/std_node,
-				     /*entering_scope*/false,
 				     tf_warning_or_error);
   return make_typename_type (inst, type_identifier,
 			     none_type, tf_warning_or_error);
@@ -13728,6 +13738,12 @@ grokdeclarator (const cp_declarator *declarator,
 			inform (DECL_SOURCE_LOCATION (xobj_parm),
 				"explicit object parameter declared here");
 		      }
+		    if (unqualified_id
+			&& identifier_p (unqualified_id)
+			&& IDENTIFIER_NEWDEL_OP_P (unqualified_id))
+		      error_at (DECL_SOURCE_LOCATION (xobj_parm),
+				"%qD cannot be an explicit object member "
+				"function", unqualified_id);
 		  }
 	      }
 	    tree pushed_scope = NULL_TREE;
@@ -16620,12 +16636,7 @@ xref_tag (enum tag_types tag_code, tree name,
 	{
 	  tree decl = TYPE_NAME (t);
 	  if (!module_may_redeclare (decl))
-	    {
-	      auto_diagnostic_group d;
-	      error ("cannot declare %qD in a different module", decl);
-	      inform (DECL_SOURCE_LOCATION (decl), "previously declared here");
-	      return error_mark_node;
-	    }
+	    return error_mark_node;
 
 	  tree not_tmpl = STRIP_TEMPLATE (decl);
 	  if (DECL_LANG_SPECIFIC (not_tmpl)
@@ -16973,12 +16984,7 @@ start_enum (tree name, tree enumtype, tree underlying_type,
 	{
 	  tree decl = TYPE_NAME (enumtype);
 	  if (!module_may_redeclare (decl))
-	    {
-	      auto_diagnostic_group d;
-	      error ("cannot declare %qD in different module", decl);
-	      inform (DECL_SOURCE_LOCATION (decl), "previously declared here");
-	      enumtype = error_mark_node;
-	    }
+	    enumtype = error_mark_node;
 	  else
 	    set_instantiating_module (decl);
 	}
@@ -18480,7 +18486,13 @@ record_key_method_defined (tree fndecl)
     {
       tree fnclass = DECL_CONTEXT (fndecl);
       if (fndecl == CLASSTYPE_KEY_METHOD (fnclass))
-	vec_safe_push (keyed_classes, fnclass);
+	{
+	  tree classdecl = TYPE_NAME (fnclass);
+	  /* Classes attached to a named module are already handled.  */
+	  if (!DECL_LANG_SPECIFIC (classdecl)
+	      || !DECL_MODULE_ATTACH_P (classdecl))
+	    vec_safe_push (keyed_classes, fnclass);
+	}
     }
 }
 

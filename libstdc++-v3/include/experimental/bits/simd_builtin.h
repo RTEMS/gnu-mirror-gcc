@@ -278,8 +278,7 @@ template <int _Index, int _Total, int _Combine = 1, size_t _Np>
   __extract_part(const _SimdWrapper<bool, _Np> __x)
   {
     static_assert(_Combine == 1, "_Combine != 1 not implemented");
-    static_assert(__have_avx512f && _Np == _Np);
-    static_assert(_Total >= 2 && _Index + _Combine <= _Total && _Index >= 0);
+    static_assert(__have_avx512f && _Total >= 2 && _Index + _Combine <= _Total && _Index >= 0);
     return __x._M_data >> (_Index * _Np / _Total);
   }
 
@@ -842,7 +841,7 @@ template <typename _Tp, typename _Mp, typename _Abi, size_t _Np>
 
       _GLIBCXX_SIMD_ALWAYS_INLINE explicit
       operator __vector_type_t<_Tp, _Np>() const
-      { return static_cast<const simd<_Tp, _Abi>*>(this)->_M_data.__builtin(); }
+      { return __data(*static_cast<const simd<_Tp, _Abi>*>(this)); }
     };
 
     struct _SimdBase1

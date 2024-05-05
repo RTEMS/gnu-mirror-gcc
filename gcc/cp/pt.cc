@@ -185,8 +185,6 @@ static int unify_pack_expansion (tree, tree, tree,
 static tree copy_template_args (tree);
 static tree tsubst_template_parms (tree, tree, tsubst_flags_t);
 static void tsubst_each_template_parm_constraints (tree, tree, tsubst_flags_t);
-static tree tsubst_aggr_type (tree, tree, tsubst_flags_t, tree, int);
-static tree tsubst_aggr_type_1 (tree, tree, tsubst_flags_t, tree, int);
 static tree tsubst_arg_types (tree, tree, tree, tsubst_flags_t, tree);
 static tree tsubst_function_type (tree, tree, tsubst_flags_t, tree);
 static bool check_specialization_scope (void);
@@ -9901,6 +9899,35 @@ maybe_get_template_decl_from_type_decl (tree decl)
     ? CLASSTYPE_TI_TEMPLATE (TREE_TYPE (decl)) : decl;
 }
 
+/* If TYPE is the generic implicit instantiation A<T>, return the primary
+   template type A<T> (which is suitable for entering into, e.g. for defining
+   a member of A<T>), otherwise return TYPE.  */
+
+tree
+adjust_type_for_entering_scope (tree type)
+{
+  if (CLASS_TYPE_P (type)
+      && dependent_type_p (type)
+      && TYPE_TEMPLATE_INFO (type)
+      /* We detect the generic implicit instantiation A<T> by inspecting
+	 TYPE_CANONICAL, which lookup_template_class sets to the primary
+	 template type A<T>.  */
+      && TYPE_CANONICAL (type) == TREE_TYPE (TYPE_TI_TEMPLATE (type)))
+    type = TYPE_CANONICAL (type);
+
+  return type;
+}
+
+/* Convenience wrapper over tsubst that does adjust_type_for_entering_scope
+   on the result.  */
+
+static tree
+tsubst_entering_scope (tree t, tree args, tsubst_flags_t complain, tree in_decl)
+{
+  t = tsubst (t, args, complain, in_decl);
+  return adjust_type_for_entering_scope (t);
+}
+
 /* Given an IDENTIFIER_NODE (or type TEMPLATE_DECL) and a chain of
    parameters, find the desired type.
 
@@ -9908,9 +9935,6 @@ maybe_get_template_decl_from_type_decl (tree decl)
 
    IN_DECL, if non-NULL, is the template declaration we are trying to
    instantiate.
-
-   If ENTERING_SCOPE is nonzero, we are about to enter the scope of
-   the class we are looking up.
 
    Issue error and warning messages under control of COMPLAIN.
 
@@ -9927,7 +9951,7 @@ maybe_get_template_decl_from_type_decl (tree decl)
 
 tree
 lookup_template_class (tree d1, tree arglist, tree in_decl, tree context,
-		       int entering_scope, tsubst_flags_t complain)
+		       tsubst_flags_t complain)
 {
   auto_timevar tv (TV_TEMPLATE_INST);
 
@@ -10139,9 +10163,10 @@ lookup_template_class (tree d1, tree arglist, tree in_decl, tree context,
 	   template <class T> class C { void f(C<T>); }
 
 	 the `C<T>' is just the same as `C'.  Outside of the
-	 class, however, such a reference is an instantiation.  */
-      if (entering_scope
-	  || !PRIMARY_TEMPLATE_P (gen_tmpl)
+	 class, however, such a reference is an instantiation.
+	 One can use adjust_type_for_entering_scope to make
+	 this adjustment as needed.  */
+      if (!PRIMARY_TEMPLATE_P (gen_tmpl)
 	  || currently_open_class (template_type))
 	{
 	  tree tinfo = TYPE_TEMPLATE_INFO (template_type);
@@ -10207,8 +10232,8 @@ lookup_template_class (tree d1, tree arglist, tree in_decl, tree context,
 	    context = DECL_CONTEXT (templ);
 	  else
 	    {
-	      context = tsubst_aggr_type (context, arglist,
-					  complain, in_decl, true);
+	      context = tsubst_entering_scope (context, arglist,
+					       complain, in_decl);
 	      /* Try completing the enclosing context if it's not already so.  */
 	      if (context != error_mark_node
 		  && !COMPLETE_TYPE_P (context))
@@ -11512,6 +11537,10 @@ tsubst_friend_function (tree decl, tree args)
 	  new_friend_result_template_info = DECL_TEMPLATE_INFO (not_tmpl);
 	}
 
+      /* We need to propagate module attachment for the new friend from the
+	 owner of this template.  */
+      propagate_defining_module (new_friend, decl);
+
       /* Inside pushdecl_namespace_level, we will push into the
 	 current namespace. However, the friend function should go
 	 into the namespace of the template.  */
@@ -11715,6 +11744,12 @@ tsubst_friend_class (tree friend_tmpl, tree args)
   tmpl = lookup_name (DECL_NAME (friend_tmpl), LOOK_where::CLASS_NAMESPACE,
 		      LOOK_want::NORMAL | LOOK_want::HIDDEN_FRIEND);
 
+  if (!tmpl)
+    /* If we didn't find by name lookup, the type may still exist but as a
+       'hidden' import; we should check for this too to avoid accidentally
+       instantiating a duplicate.  */
+    tmpl = lookup_imported_hidden_friend (friend_tmpl);
+
   if (tmpl && DECL_CLASS_TEMPLATE_P (tmpl))
     {
       /* The friend template has already been declared.  Just
@@ -11723,6 +11758,12 @@ tsubst_friend_class (tree friend_tmpl, tree args)
 	 of course.  We only need the innermost template parameters
 	 because that is all that redeclare_class_template will look
 	 at.  */
+
+      if (modules_p ())
+	/* Check that the existing declaration's module attachment is
+	   compatible with the attachment of the friend template.  */
+	module_may_redeclare (tmpl, friend_tmpl);
+
       if (TMPL_PARMS_DEPTH (DECL_TEMPLATE_PARMS (friend_tmpl))
 	  > TMPL_ARGS_DEPTH (args))
 	{
@@ -11751,9 +11792,16 @@ tsubst_friend_class (tree friend_tmpl, tree args)
       if (tmpl != error_mark_node)
 	{
 	  /* The new TMPL is not an instantiation of anything, so we
-	     forget its origins.  We don't reset CLASSTYPE_TI_TEMPLATE
+	     forget its origins.  It is also not a specialization of
+	     anything.  We don't reset CLASSTYPE_TI_TEMPLATE
 	     for the new type because that is supposed to be the
 	     corresponding template decl, i.e., TMPL.  */
+	  spec_entry elt;
+	  elt.tmpl = friend_tmpl;
+	  elt.args = CLASSTYPE_TI_ARGS (TREE_TYPE (tmpl));
+	  elt.spec = TREE_TYPE (tmpl);
+	  type_specializations->remove_elt (&elt);
+
 	  DECL_USE_TEMPLATE (tmpl) = 0;
 	  DECL_TEMPLATE_INFO (tmpl) = NULL_TREE;
 	  CLASSTYPE_USE_TEMPLATE (TREE_TYPE (tmpl)) = 0;
@@ -11771,6 +11819,10 @@ tsubst_friend_class (tree friend_tmpl, tree args)
 	      tsubst_each_template_parm_constraints (DECL_TEMPLATE_PARMS (tmpl),
 						     args, tf_warning_or_error);
 	    }
+
+	  /* We need to propagate the attachment of the original template to the
+	     newly instantiated template type.  */
+	  propagate_defining_module (tmpl, friend_tmpl);
 
 	  /* Inject this template into the enclosing namspace scope.  */
 	  tmpl = pushdecl_namespace_level (tmpl, /*hiding=*/true);
@@ -14121,94 +14173,6 @@ tsubst_each_template_parm_constraints (tree parms, tree args,
   --processing_template_decl;
 }
 
-/* Substitute the ARGS into the indicated aggregate (or enumeration)
-   type T.  If T is not an aggregate or enumeration type, it is
-   handled as if by tsubst.  IN_DECL is as for tsubst.  If
-   ENTERING_SCOPE is nonzero, T is the context for a template which
-   we are presently tsubst'ing.  Return the substituted value.  */
-
-static tree
-tsubst_aggr_type (tree t,
-		  tree args,
-		  tsubst_flags_t complain,
-		  tree in_decl,
-		  int entering_scope)
-{
-  if (t == NULL_TREE)
-    return NULL_TREE;
-
-  /* Handle typedefs via tsubst so that they get consistently reused.  */
-  if (typedef_variant_p (t))
-    {
-      t = tsubst (t, args, complain, in_decl);
-      if (t == error_mark_node)
-	return error_mark_node;
-
-      /* The effect of entering_scope is that for a dependent specialization
-	 A<T>, lookup_template_class prefers to return A's primary template
-	 type instead of the implicit instantiation.  So when entering_scope,
-	 we mirror this behavior by inspecting TYPE_CANONICAL appropriately,
-	 taking advantage of the fact that lookup_template_class links the two
-	 types by setting TYPE_CANONICAL of the latter to the former.  */
-      if (entering_scope
-	  && CLASS_TYPE_P (t)
-	  && dependent_type_p (t)
-	  && TYPE_TEMPLATE_INFO (t)
-	  && TYPE_CANONICAL (t) == TREE_TYPE (TYPE_TI_TEMPLATE (t)))
-	t = TYPE_CANONICAL (t);
-
-      return t;
-    }
-
-  switch (TREE_CODE (t))
-    {
-      case RECORD_TYPE:
-      case ENUMERAL_TYPE:
-      case UNION_TYPE:
-	return tsubst_aggr_type_1 (t, args, complain, in_decl, entering_scope);
-
-      default:
-	return tsubst (t, args, complain, in_decl);
-    }
-}
-
-/* The part of tsubst_aggr_type that's shared with the RECORD_, UNION_
-   and ENUMERAL_TYPE cases of tsubst.  */
-
-static tree
-tsubst_aggr_type_1 (tree t,
-		    tree args,
-		    tsubst_flags_t complain,
-		    tree in_decl,
-		    int entering_scope)
-{
-  if (TYPE_TEMPLATE_INFO (t) && uses_template_parms (t))
-    {
-      complain &= ~tf_qualifying_scope;
-
-      /* Figure out what arguments are appropriate for the
-	 type we are trying to find.  For example, given:
-
-	   template <class T> struct S;
-	   template <class T, class U> void f(T, U) { S<U> su; }
-
-	 and supposing that we are instantiating f<int, double>,
-	 then our ARGS will be {int, double}, but, when looking up
-	 S we only want {double}.  */
-      tree argvec = tsubst_template_args (TYPE_TI_ARGS (t), args,
-					  complain, in_decl);
-      if (argvec == error_mark_node)
-	return error_mark_node;
-
-      tree r = lookup_template_class (t, argvec, in_decl, NULL_TREE,
-				      entering_scope, complain);
-      return cp_build_qualified_type (r, cp_type_quals (t), complain);
-    }
-  else
-    /* This is not a template type, so there's nothing to do.  */
-    return t;
-}
-
 /* Map from a FUNCTION_DECL to a vec of default argument instantiations,
    indexed in reverse order of the parameters.  */
 
@@ -14574,8 +14538,7 @@ tsubst_function_decl (tree t, tree args, tsubst_flags_t complain,
     lambda_fntype = static_fn_type (lambda_fntype);
 
   if (member && !closure)
-    ctx = tsubst_aggr_type (ctx, args,
-			    complain, t, /*entering_scope=*/1);
+    ctx = tsubst_entering_scope (ctx, args, complain, t);
 
   tree type = (lambda_fntype ? lambda_fntype
 	       : tsubst (TREE_TYPE (t), args,
@@ -14969,8 +14932,7 @@ tsubst_template_decl (tree t, tree args, tsubst_flags_t complain,
 	  inner = TREE_TYPE (inner);
 	}
       if (class_p)
-	inner = tsubst_aggr_type (inner, args, complain,
-				  in_decl, /*entering*/1);
+	inner = tsubst_entering_scope (inner, args, complain, in_decl);
       else
 	inner = tsubst_decl (inner, args, complain, /*use_spec_table=*/false);
     }
@@ -15474,9 +15436,7 @@ tsubst_decl (tree t, tree args, tsubst_flags_t complain,
 	    local_p = false;
 	    if (DECL_CLASS_SCOPE_P (t))
 	      {
-		ctx = tsubst_aggr_type (ctx, args,
-					complain,
-					in_decl, /*entering_scope=*/1);
+		ctx = tsubst_entering_scope (ctx, args, complain, in_decl);
 		if (DECL_SELF_REFERENCE_P (t))
 		  /* The context and type of an injected-class-name are
 		     the same, so we don't need to substitute both.  */
@@ -16272,8 +16232,29 @@ tsubst (tree t, tree args, tsubst_flags_t complain, tree in_decl)
       /* Fall through.  */
     case UNION_TYPE:
     case ENUMERAL_TYPE:
-      return tsubst_aggr_type_1 (t, args, complain, in_decl,
-				 /*entering_scope=*/0);
+      if (TYPE_TEMPLATE_INFO (t) && uses_template_parms (t))
+	{
+	  /* Figure out what arguments are appropriate for the
+	     type we are trying to find.  For example, given:
+
+	       template <class T> struct S;
+	       template <class T, class U> void f(T, U) { S<U> su; }
+
+	     and supposing that we are instantiating f<int, double>,
+	     then our ARGS will be {int, double}, but, when looking up
+	     S we only want {double}.  */
+	  tree argvec = tsubst_template_args (TYPE_TI_ARGS (t), args,
+					      complain, in_decl);
+	  if (argvec == error_mark_node)
+	    return error_mark_node;
+
+	  tree r = lookup_template_class (t, argvec, in_decl, NULL_TREE,
+					  complain);
+	  return cp_build_qualified_type (r, cp_type_quals (t), complain);
+	}
+      else
+	/* This is not a template type, so there's nothing to do.  */
+	return t;
 
     case ERROR_MARK:
     case IDENTIFIER_NODE:
@@ -16465,7 +16446,6 @@ tsubst (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 		r = lookup_template_class (arg,
 					   argvec, in_decl,
 					   DECL_CONTEXT (arg),
-					    /*entering_scope=*/0,
 					   complain);
 		return cp_build_qualified_type
 		  (r, cp_type_quals (t) | cp_type_quals (r), complain);
@@ -16557,7 +16537,7 @@ tsubst (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 	      if (argvec == error_mark_node)
 		return error_mark_node;
 	      r = lookup_template_class (tmpl, argvec, in_decl, NULL_TREE,
-					 /*entering_scope=*/false, complain);
+					 complain);
 	      r = cp_build_qualified_type (r, cp_type_quals (t), complain);
 	      break;
 	    }
@@ -16812,9 +16792,9 @@ tsubst (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 	    ctx = TREE_VEC_ELT (ctx, 0);
 	  }
 	else
-	  ctx = tsubst_aggr_type (ctx, args,
-				  complain | tf_qualifying_scope,
-				  in_decl, /*entering_scope=*/1);
+	  ctx = tsubst_entering_scope (ctx, args,
+				       complain | tf_qualifying_scope,
+				       in_decl);
 	if (ctx == error_mark_node)
 	  return error_mark_node;
 
@@ -16887,8 +16867,10 @@ tsubst (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 
     case UNBOUND_CLASS_TEMPLATE:
       {
-	tree ctx = tsubst_aggr_type (TYPE_CONTEXT (t), args, complain,
-				     in_decl, /*entering_scope=*/1);
+	++processing_template_decl;
+	tree ctx = tsubst_entering_scope (TYPE_CONTEXT (t), args,
+					  complain, in_decl);
+	--processing_template_decl;
 	tree name = TYPE_IDENTIFIER (t);
 	tree parm_list = DECL_TEMPLATE_PARMS (TYPE_NAME (t));
 
@@ -21537,9 +21519,7 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 
 	   When we instantiate f<7>::S::g(), say, lookup_name is not
 	   clever enough to find f<7>::a.  */
-	enum_type
-	  = tsubst_aggr_type (DECL_CONTEXT (t), args, complain, in_decl,
-			      /*entering_scope=*/0);
+	enum_type = tsubst (DECL_CONTEXT (t), args, complain, in_decl);
 
 	for (v = TYPE_VALUES (enum_type);
 	     v != NULL_TREE;
@@ -21559,8 +21539,8 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 	{
 	  tree ctx;
 
-	  ctx = tsubst_aggr_type (DECL_CONTEXT (t), args, complain, in_decl,
-				  /*entering_scope=*/1);
+	  ctx = tsubst_entering_scope (DECL_CONTEXT (t), args,
+				       complain, in_decl);
 	  if (ctx != DECL_CONTEXT (t))
 	    {
 	      tree r = lookup_field (ctx, DECL_NAME (t), 0, false);
@@ -21603,8 +21583,8 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 	     TEMPLATE_DECL with `D<T>' as its DECL_CONTEXT.  Now we
 	     have to substitute this with one having context `D<int>'.  */
 
-	  tree context = tsubst_aggr_type (DECL_CONTEXT (t), args, complain,
-					   in_decl, /*entering_scope=*/true);
+	  tree context = tsubst_entering_scope (DECL_CONTEXT (t), args,
+						complain, in_decl);
 	  RETURN (lookup_field (context, DECL_NAME(t), 0, false));
 	}
       else
@@ -22134,8 +22114,8 @@ instantiate_template (tree tmpl, tree orig_args, tsubst_flags_t complain)
 	   already non-dependent, then we might as well use it.  */
 	ctx = DECL_CONTEXT (tmpl);
       else
-	ctx = tsubst_aggr_type (DECL_CONTEXT (gen_tmpl), targ_ptr,
-				complain, gen_tmpl, true);
+	ctx = tsubst_entering_scope (DECL_CONTEXT (gen_tmpl), targ_ptr,
+				     complain, gen_tmpl);
       push_nested_class (ctx);
     }
 
@@ -29297,8 +29277,8 @@ resolve_typename_type (tree type, bool only_current_p)
       tree args = TREE_OPERAND (fullname, 1);
       /* Instantiate the template.  */
       result = lookup_template_class (tmpl, args, NULL_TREE, NULL_TREE,
-				      /*entering_scope=*/true,
 				      tf_error | tf_user);
+      result = adjust_type_for_entering_scope (result);
       if (result == error_mark_node)
 	result = NULL_TREE;
     }
@@ -29537,7 +29517,7 @@ listify (tree arg)
   TREE_VEC_ELT (argvec, 0) = arg;
 
   return lookup_template_class (std_init_list, argvec, NULL_TREE,
-				NULL_TREE, 0, tf_warning_or_error);
+				NULL_TREE, tf_warning_or_error);
 }
 
 /* Replace auto in TYPE with std::initializer_list<auto>.  */
@@ -30483,7 +30463,7 @@ alias_ctad_tweaks (tree tmpl, tree uguides)
 	    fprime = copy_decl (fprime);
 	  tree fntype = TREE_TYPE (fprime);
 	  ret = lookup_template_class (TPARMS_PRIMARY_TEMPLATE (atparms), targs,
-				       in_decl, NULL_TREE, false, complain);
+				       in_decl, NULL_TREE, complain);
 	  fntype = build_function_type (ret, TYPE_ARG_TYPES (fntype));
 	  TREE_TYPE (fprime) = fntype;
 	  if (TREE_CODE (fprime) == TEMPLATE_DECL)

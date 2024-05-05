@@ -1720,6 +1720,7 @@ gfc_trans_class_init_assign (gfc_code *code)
   gfc_se dst,src,memsz;
   gfc_expr *lhs, *rhs, *sz;
   gfc_component *cmp;
+  gfc_symbol *sym;
 
   gfc_start_block (&block);
 
@@ -1736,18 +1737,25 @@ gfc_trans_class_init_assign (gfc_code *code)
   /* The _def_init is always scalar.  */
   rhs->rank = 0;
 
-  /* Check def_init for initializers.  If this is a dummy with all default
-     initializer components NULL, return NULL_TREE and use the passed value as
-     required by F2018(8.5.10).  */
-  if (!lhs->ref && lhs->symtree->n.sym->attr.dummy)
+  /* Check def_init for initializers.  If this is an INTENT(OUT) dummy with all
+     default initializer components NULL, return NULL_TREE and use the passed
+     value as required by F2018(8.5.10).  */
+  sym = code->expr1->expr_type == EXPR_VARIABLE ? code->expr1->symtree->n.sym
+						: NULL;
+  if (code->op != EXEC_ALLOCATE
+      && sym && sym->attr.dummy
+      && sym->attr.intent == INTENT_OUT)
     {
-      cmp = rhs->ref->next->u.c.component->ts.u.derived->components;
-      for (; cmp; cmp = cmp->next)
+      if (!lhs->ref && lhs->symtree->n.sym->attr.dummy)
 	{
-	  if (cmp->initializer)
-	    break;
-	  else if (!cmp->next)
-	    return build_empty_stmt (input_location);
+	  cmp = rhs->ref->next->u.c.component->ts.u.derived->components;
+	  for (; cmp; cmp = cmp->next)
+	    {
+	      if (cmp->initializer)
+		break;
+	      else if (!cmp->next)
+		return NULL_TREE;
+	    }
 	}
     }
 
@@ -7879,8 +7887,14 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
 	{
 	  gcc_assert (se->loop && info);
 
-	  /* Set the type of the array.  */
-	  tmp = gfc_typenode_for_spec (&comp->ts);
+	  /* Set the type of the array. vtable charlens are not always reliable.
+	     Use the interface, if possible.  */
+	  if (comp->ts.type == BT_CHARACTER
+	      && expr->symtree->n.sym->ts.type == BT_CLASS
+	      && comp->ts.interface && comp->ts.interface->result)
+	    tmp = gfc_typenode_for_spec (&comp->ts.interface->result->ts);
+	  else
+	    tmp = gfc_typenode_for_spec (&comp->ts);
 	  gcc_assert (se->ss->dimen == se->loop->dimen);
 
 	  /* Evaluate the bounds of the result, if known.  */

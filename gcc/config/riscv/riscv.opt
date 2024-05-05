@@ -152,7 +152,7 @@ required to materialize symbol addresses.
 
 mcsr-check
 Target Var(riscv_mcsr_check) Init(0)
-Enable the CSR checking for the ISA-dependent CRS and the read-only CSR.
+Enable the CSR checking for the ISA-dependent CSR and the read-only CSR.
 The ISA-dependent CSR are only valid when the specific ISA is set.  The
 read-only CSR can not be written by the CSR instructions.
 
@@ -236,8 +236,6 @@ Mask(ZIHINTNTL)   Var(riscv_zi_subext)
 Mask(ZIHINTPAUSE) Var(riscv_zi_subext)
 
 Mask(ZICOND)      Var(riscv_zi_subext)
-
-Mask(ZIC64B)      Var(riscv_zi_subext)
 
 Mask(ZICCAMOA)    Var(riscv_zi_subext)
 
@@ -389,6 +387,8 @@ Mask(ZICBOZ) Var(riscv_zicmo_subext)
 Mask(ZICBOM) Var(riscv_zicmo_subext)
 
 Mask(ZICBOP) Var(riscv_zicmo_subext)
+
+Mask(ZIC64B) Var(riscv_zicmo_subext)
 
 TargetVariable
 int riscv_zf_subext
