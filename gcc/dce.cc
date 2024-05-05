@@ -17,6 +17,8 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+#define INCLUDE_ALGORITHM
+#define INCLUDE_FUNCTIONAL
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -25,6 +27,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree.h"
 #include "predict.h"
 #include "df.h"
+#include "rtl-ssa.h"
 #include "memmodel.h"
 #include "tm_p.h"
 #include "emit-rtl.h"  /* FIXME: Can go away once crtl is moved to rtl.h.  */
@@ -1292,7 +1295,37 @@ public:
 
 }; // class pass_fast_rtl_dce
 
-} // anon namespace
+} // namespace
+
+static void
+rtl_ssa_dce_init ()
+{
+    calculate_dominance_info (CDI_DOMINATORS);
+    crtl->ssa = new rtl_ssa::function_info (cfun);
+}
+
+static void
+rtl_ssa_dce_done ()
+{
+    free_dominance_info (CDI_DOMINATORS);
+    if (crtl->ssa->perform_pending_updates ())
+      cleanup_cfg (0);
+
+    delete crtl->ssa;
+    crtl->ssa = nullptr;
+
+    if (dump_file)
+      fprintf (dump_file, "\nFinished running rtl_ssa_dce\n\n");
+}
+
+static unsigned int
+rtl_ssa_dce ()
+{
+    rtl_ssa_dce_init ();
+
+    rtl_ssa_dce_done ();
+    return 0;
+}
 
 rtl_opt_pass *
 make_pass_fast_rtl_dce (gcc::context *ctxt)
@@ -1324,12 +1357,7 @@ public:
   /* opt_pass methods: */
   bool gate (function *) final override { return flag_dce; }
 
-  unsigned int execute (function *) final override
-  {
-    if (dump_file)
-      fprintf (dump_file, "pass_rtl_ssa_dce called\n");
-    return 0;
-  }
+  unsigned int execute (function *) final override { return rtl_ssa_dce (); }
 
 }; // class pass_fast_rtl_dce
 
