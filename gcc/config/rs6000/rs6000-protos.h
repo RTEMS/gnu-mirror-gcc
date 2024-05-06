@@ -162,6 +162,18 @@ extern bool rs6000_pcrel_p (void);
 extern bool rs6000_fndecl_pcrel_p (const_tree);
 extern void rs6000_output_addr_vec_elt (FILE *, int);
 
+/* If we are splitting a vector pair unary operator into two separate vector
+   operations, we need to generate a NEG if this is NABS.  */
+
+enum vpair_split_unary {
+  VPAIR_SPLIT_NORMAL,		/* No extra processing is needed.  */
+  VPAIR_SPLIT_NEGATE		/* Wrap operation with a NEG.  */
+};
+
+extern void vpair_split_unary (rtx [], machine_mode, enum rtx_code,
+			       enum vpair_split_unary);
+extern void vpair_split_binary (rtx [], machine_mode, enum rtx_code);
+
 /* Different PowerPC instruction formats that are used by GCC.  There are
    various other instruction formats used by the PowerPC hardware, but these
    formats are not currently used by GCC.  */
