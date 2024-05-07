@@ -1,8 +1,8 @@
 /* { dg-do compile { target { powerpc*-*-* } } } */
 /* { dg-skip-if "" { powerpc*-*-darwin* } } */
 /* { dg-options "-O2 --param case-values-threshold=2" } */
-/* { dg-final { scan-assembler {\mmtctr\M\|\mmttar\M} } } */
-/* { dg-final { scan-assembler {\mbctr\M\|\mbtar\M} } } */
+/* { dg-final { scan-assembler "mtctr" } } */
+/* { dg-final { scan-assembler "bctr" } } */
 
 /* Force using a dispatch table even though by default we would generate
    ifs.  */
