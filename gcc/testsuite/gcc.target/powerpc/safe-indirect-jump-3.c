@@ -47,5 +47,5 @@ int foo (int x)
 }
 
 /* { dg-final { scan-assembler "crset" } } */
-/* { dg-final { scan-assembler "beqctr-" } } */
+/* { dg-final { scan-assembler {\mbeqctr-\M\|\mbeqtar-\M} } } */
 /* { dg-final { scan-assembler {b \$} } } */
