@@ -1,3 +1,16 @@
+==================== Branch work165-tar, patch #201 ====================
+
+Fix tests if -mtar is used.
+
+2024-05-06  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/ppc-switch-1.c: Add support for using the TAR
+	register.
+	* gcc.target/powerpc/pr51513.c: Likewise.
+	* gcc.target/powerpc/safe-indirect-jump-3.c: Likewise.
+
 ==================== Branch work165-tar, patch #200 ====================
 
 Add support for -mtar
