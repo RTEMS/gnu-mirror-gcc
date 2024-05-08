@@ -1,3 +1,15 @@
+==================== Branch work165-tar, patch #202 ====================
+
+Add -mfspr option.
+
+2024-05-08  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-cpus.def (ISA_2_7_MASKS_SERVER): Add -mfspr
+	support.
+	(POWERPC_MASKS): Likewise.
+	* config/rs6000/rs6000.cc (rs6000_register_move_cost): Likewise.
+	* config/rs6000/rs6000.opt (-mfspr): Likewise.
+
 ==================== Branch work165-tar, patch #201 ====================
 
 Fix tests if -mtar is used.
