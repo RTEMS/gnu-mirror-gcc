@@ -22804,6 +22804,18 @@ rs6000_register_move_cost (machine_mode mode,
       ret = 2 * hard_regno_nregs (reg, mode);
     }
 
+  /* Make moves from the CTR/TAR registers more expensive so that the register
+     allocator does not think of these registers are useful for saving
+     results.  */
+  else if (TARGET_MFSPR
+	   && reg_classes_intersect_p (to, GENERAL_REGS)
+	   && (reg_classes_intersect_p (from, CTR_REGS)
+	       || reg_classes_intersect_p (from, TAR_REGS)))
+    {
+      rclass = from;
+      ret = 32;
+    }
+
   /*  Moves from/to GENERAL_REGS.  */
   else if ((rclass = from, reg_classes_intersect_p (to, GENERAL_REGS))
 	   || (rclass = to, reg_classes_intersect_p (from, GENERAL_REGS)))
