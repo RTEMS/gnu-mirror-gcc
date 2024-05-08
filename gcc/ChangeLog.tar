@@ -1,3 +1,12 @@
+==================== Branch work165-tar, patch #203 ====================
+
+Limit SPR registers to hold only DImode/SImode.
+
+2024-05-08  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached): Limit
+	SPR registers to only hold SImode/DImode.
+
 ==================== Branch work165-tar, patch #202 ====================
 
 Add -mfspr option.
