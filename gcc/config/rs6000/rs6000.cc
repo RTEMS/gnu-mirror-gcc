@@ -1848,6 +1848,7 @@ static int
 rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
 {
   int last_regno = regno + rs6000_hard_regno_nregs[mode][regno] - 1;
+  machine_mode orig_mode = mode;
 
   if (COMPLEX_MODE_P (mode))
     mode = GET_MODE_INNER (mode);
@@ -1929,8 +1930,21 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
   if (CR_REGNO_P (regno))
     return GET_MODE_CLASS (mode) == MODE_CC;
 
-  if (CA_REGNO_P (regno))
-    return mode == Pmode || mode == SImode;
+  /* Limit SPR registers to integer modes that can fit in a single register.
+     Do not allow complex modes or modes that need sign/zero extension.  */
+  switch (regno)
+    {
+    case LR_REGNO:
+    case CTR_REGNO:
+    case TAR_REGNO:
+    case VRSAVE_REGNO:
+    case VSCR_REGNO:
+    case CA_REGNO:
+      return (orig_mode == Pmode || orig_mode == SImode);
+
+    default:
+      break;
+    }
 
   /* AltiVec only in AldyVec registers.  */
   if (ALTIVEC_REGNO_P (regno))
