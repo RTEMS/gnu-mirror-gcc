@@ -1930,8 +1930,11 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
   if (CR_REGNO_P (regno))
     return GET_MODE_CLASS (mode) == MODE_CC;
 
+  if (CA_REGNO_P (regno))
+    return mode == Pmode || mode == SImode;
+
   /* Limit SPR registers to integer modes that can fit in a single register.
-     Do not allow complex modes or modes that need sign/zero extension.  */
+     Do not allow complex modes.  */
   switch (regno)
     {
     case LR_REGNO:
@@ -1939,8 +1942,10 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
     case TAR_REGNO:
     case VRSAVE_REGNO:
     case VSCR_REGNO:
-    case CA_REGNO:
-      return (orig_mode == Pmode || orig_mode == SImode);
+      return (orig_mode == Pmode
+	      || orig_mode == SImode
+	      || orig_mode == HImode
+	      || orig_mode == QImode);
 
     default:
       break;
