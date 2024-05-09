@@ -1,6 +1,103 @@
+==================== Branch work165-test, patch #400 ====================
+
+Limit SPR registers to hold only small integer modes.
+
+2024-05-08  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached): Limit
+	SPR registers to only hold only small integer modes.
+
+==================== Branch work165-tar, patch #203 ====================
+
+Limit SPR registers to hold only DImode/SImode.
+
+2024-05-08  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached): Limit
+	SPR registers to only hold SImode/DImode.
+
+==================== Branch work165-tar, patch #202 ====================
+
+Add -mfspr option.
+
+2024-05-08  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-cpus.def (ISA_2_7_MASKS_SERVER): Add -mfspr
+	support.
+	(POWERPC_MASKS): Likewise.
+	* config/rs6000/rs6000.cc (rs6000_register_move_cost): Likewise.
+	* config/rs6000/rs6000.opt (-mfspr): Likewise.
+
+==================== Branch work165-tar, patch #201 ====================
+
+Fix tests if -mtar is used.
+
+2024-05-06  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/ppc-switch-1.c: Add support for using the TAR
+	register.
+	* gcc.target/powerpc/pr51513.c: Likewise.
+	* gcc.target/powerpc/safe-indirect-jump-3.c: Likewise.
+
+==================== Branch work165-tar, patch #200 ====================
+
+Add support for -mtar
+
+2024-05-03  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/constraints.md (h constraint): Add tar register to
+	documentation.
+	(wt constraint): New constraint.
+	* config/rs6000/rs6000-cpus.def (ISA_2_7_MASKS_SERVER): Add -mtar.
+	(POWERPC_MASKS): Likewise.
+	* config/rs6000/rs6000.cc (rs6000_reg_names): Add new tar register.
+	(alt_reg_names): Likewise.
+	(rs6000_debug_reg_global): Likewise.
+	(rs6000_init_hard_regno_mode_ok): Likewise.
+	(rs6000_option_override_internal): Likewise.
+	(rs6000_conditional_register_usage): Likewise.
+	(print_operand): Likewise.
+	(rs6000_debugger_regno): Likewise.
+	(rs6000_opt_masks): Likewise.
+	* config/rs6000/rs6000.h (FIRST_PSEUDO_REGISTER): Likewise.
+	(FiXED_REGISTERS): Likewise.
+	(CALL_REALLY_USED_REGISTERS): Likewise.
+	(REG_ALLOC_ORDER): Likewise.
+	(reg_class): Add new TAR_REGS register class.
+	(REG_CLASS_NAMES): Likewise.
+	(REG_CLASS_CONTENTS): Likewise.
+	(r6000_reg_class_enum): Add RS6000_CONSTRAINT_wt.
+	(REG_NAMES): Add tar register.
+	* config/rs6000/rs6000.md (TAR_REGNO): New constant.
+	(mov<mode>_internal): Add support for tar register.
+	(movcc_<mode>): Likewise.
+	(movsf_hardfloat): Likewise.
+	(movsd_hardfloat): Likewise.
+	(mov<mode>_softfloat): Likewise.
+	(mov<mode>_hardfloat64): Likewise.
+	(mov<mode>_softfloat64): Likewise.
+	(@tablejump<mode>_insn_normal); Likewise.
+	(@tablejump<mode>_insn_nospec); Likewise.
+	* config/rs6000/rs6000.opt (-mtar): New option.
+	* doc/invoke.texi (RS/6000 options): Document -mtar.
+	* lra-constraints.md (lra_constraints): Print out insn that we can't
+	generate reloads for.
+
 ==================== Branch work165-test, baseline ====================
+
+Add ChangeLog.test and update REVISION.
+
+2024-05-02  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* ChangeLog.test: New file for branch.
+	* REVISION: Update.
 
 2024-05-02   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
-
