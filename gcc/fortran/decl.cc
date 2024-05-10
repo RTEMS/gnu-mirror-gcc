@@ -1335,6 +1335,10 @@ get_proc_name (const char *name, gfc_symbol **result, bool module_fcn_entry)
       /* Create a partially populated interface symbol to carry the
 	 characteristics of the procedure and the result.  */
       sym->tlink = gfc_new_symbol (name, sym->ns);
+      gfc_symtree *s = gfc_get_unique_symtree (sym->ns);
+      s->n.sym = sym->tlink;
+      s->n.sym->refs++;
+
       gfc_add_type (sym->tlink, &(sym->ts), &gfc_current_locus);
       gfc_copy_attr (&sym->tlink->attr, &sym->attr, NULL);
       if (sym->attr.dimension)
