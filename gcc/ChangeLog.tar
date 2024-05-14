@@ -1,3 +1,20 @@
+==================== Branch work165-tar, patch #204 ====================
+
+Add -mintspr.  Default -mtar for power10, not power9.
+
+2024-05-14  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-cpus.def (ISA_2_7_MASKS_SERVER): Don't set TAR
+	options here.
+	(OTHER_POWER10_MASKS): Set TAR options here.  Add -mintspr.
+	(POWERPC_MASKS): Add -mintspr.
+	* config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached): Add
+	support for -mintspr.
+	(rs6000_option_override_internal): Require -mcpu=power9 or -mcpu=power10
+	to use -mtar.
+	(rs6000_opt_masks): Add -mmfspr and -mintspr.
+	* config/rs6000/rs6000.opt (-mintspr): New option.
+
 ==================== Branch work165-tar, patch #203 ====================
 
 Limit SPR registers to hold only DImode/SImode.
