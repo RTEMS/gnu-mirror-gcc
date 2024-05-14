@@ -1930,8 +1930,8 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
   if (CR_REGNO_P (regno))
     return GET_MODE_CLASS (mode) == MODE_CC;
 
-  /* Limit SPR registers to integer modes that can fit in a single register.
-     Do not allow complex modes or modes that need sign/zero extension.  */
+  /* If desired, limit SPR registers to integer modes that can fit in a single
+     register.  Do not allow complex modes.  */
   switch (regno)
     {
     case LR_REGNO:
@@ -1940,7 +1940,9 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
     case VRSAVE_REGNO:
     case VSCR_REGNO:
     case CA_REGNO:
-      return (orig_mode == Pmode || orig_mode == SImode);
+      return (GET_MODE_SIZE (mode) <= GET_MODE_SIZE (Pmode)
+	      && !COMPLEX_MODE_P (orig_mode)
+	      && (!TARGET_INTSPR || SCALAR_INT_MODE_P (mode)));
 
     default:
       break;
@@ -4214,6 +4216,15 @@ rs6000_option_override_internal (bool global_init_p)
 	error ("%qs requires %qs", "%<-mfloat128-hardware%>", "-m64");
 
       rs6000_isa_flags &= ~OPTION_MASK_FLOAT128_HW;
+    }
+
+  /* If -mtar, make sure we have at least a power9.  */
+  if (TARGET_TAR && !TARGET_P9_MISC)
+    {
+      if ((rs6000_isa_flags_explicit & OPTION_MASK_TAR) != 0)
+	error ("%qs requires %qs", "-mtar", "-mcpu=power9");
+
+      rs6000_isa_flags &= ~OPTION_MASK_TAR;
     }
 
   /* Enable -mprefixed by default on power10 systems.  */
@@ -24514,9 +24525,11 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "power11",			OPTION_MASK_POWER11,		false, false },
   { "hard-dfp",			OPTION_MASK_DFP,		false, true  },
   { "htm",			OPTION_MASK_HTM,		false, true  },
+  { "intspr",			OPTION_MASK_INTSPR,		false, true  },
   { "isel",			OPTION_MASK_ISEL,		false, true  },
   { "mfcrf",			OPTION_MASK_MFCRF,		false, true  },
   { "mfpgpr",			0,				false, true  },
+  { "mfspr",			OPTION_MASK_MFSPR,		false, true  },
   { "mma",			OPTION_MASK_MMA,		false, true  },
   { "modulo",			OPTION_MASK_MODULO,		false, true  },
   { "mulhw",			OPTION_MASK_MULHW,		false, true  },
