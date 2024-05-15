@@ -1,3 +1,20 @@
+==================== Branch work165-test, patch #401 ====================
+
+Update to tar branch.
+
+2024-05-14  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-cpus.def (ISA_2_7_MASKS_SERVER): Remove -mtar
+	support from -mcpu=power8.
+	(OTHER_POWER10_MASKS): Add -mtar, -mmfspr, and -mintspr.
+	(POWERPC_MASKS): Add -mintspr.
+	* config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached): Add
+	support for -mintspr.
+	(rs6000_option_override_internal): Do not allow -mtar unless power9 or
+	power10.
+	(rs6000_opt_masks): Add -mmfspr and -minttar.
+	* config/rs6000/rs6000.opt (-mintspr): New switch.
+
 ==================== Branch work165-test, patch #400 ====================
 
 Limit SPR registers to hold only small integer modes.
