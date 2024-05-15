@@ -1,3 +1,60 @@
+==================== Branch work165-tar, patch #210 ====================
+
+Add -mtar, -mintspr, and -mmfspr, but don't enable them.
+
+gcc/
+
+2024-05-14  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/constraints.md (h constraint): Add documentation for TAR
+	register.
+	(wt constraint): New constraint.
+	* config/rs6000/rs6000-cpus.def (POWERPC_MASKS): Add -mtar, -mintspr,
+	and -mmfspr.
+	* config/rs6000/rs6000.cc (rs6000_reg_names): Add TAR register.
+	(alt_reg_names): Likewise.
+	(rs6000_hard_regno_mode_ok_uncached): Add support for -mintspr.
+	(rs6000_debug_reg_global): Print information about the TAR register and
+	the wt constraint.
+	(rs6000_init_hard_regno_mode_ok): Setup the TAR register.  Set up the wt
+	constraint if -mtar.
+	(rs6000_option_override_internal): If -mtar, make sure we are running on
+	at least a power9.
+	(rs6000_conditional_register_usage): Enable TAR register if -mtar.
+	(print_operand): Handle the TAR register.
+	(rs6000_debugger_regno): Likewise.
+	(rs6000_opt_masks): Add -mtar, -mintspr, and -mmfspr.
+	* config/rs6000/rs6000.h (FIRST_PSEUDO_REGISTER): Add TAR register.
+	(FIXED_REGISTERS): Likewise.
+	(CALL_REALLY_USED_REGISTERS): Likewise.
+	(REG_ALLOC_ORDER): Likewise.
+	(enum reg_class): Add TAR_REGS register class.
+	(REG_CLASS_NAMES): Likewise.
+	(REG_CLASS_CONTENTS): Likewise.
+	(enum r6000_reg_class_enum): Add wt constraint.
+	(rs6000_reg_names): Add TAR register.
+	* config/rs6000/rs6000.md (TAR_REGNO): New constant.
+	(mov<mode>_internal): Add support for the TAR register.
+	(movcc_<mode>): Likewise.
+	(movsf_hardfloat): Likewise.
+	(movsf_hardfloat): Likewise.
+	(movsd_hardfloat): Likewise.
+	(mov<mode>_hardfloat64): Likewise.
+	(mov<mode>_softfloat64): Likewise.
+	(@tablejump<mode>_insn_normal): Likewise.
+	(@tablejump<mode>_insn_nospec): Likewise.
+	* config/rs6000/rs6000.opt (-mtar): New option.
+	(-mmfspr): Likewise.
+	(-mintspr): Likewise.
+
+gcc/testsuite/
+
+2024-05-14  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/ppc-switch-1.c: Update test for the TAR register.
+	* gcc.target/powerpc/pr51513.c: Likewise.
+	* gcc.target/powerpc/safe-indirect-jump-3.c: Likewise.
+
 ==================== Branch work165-tar, patch #204 was reverted ====================
 ==================== Branch work165-tar, patch #203 was reverted ====================
 ==================== Branch work165-tar, patch #202 was reverted ====================
