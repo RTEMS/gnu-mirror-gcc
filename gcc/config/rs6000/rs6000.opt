@@ -607,6 +607,18 @@ mmma
 Target Mask(MMA) Var(rs6000_isa_flags)
 Generate (do not generate) MMA instructions.
 
+mtar
+Target Mask(TAR) Var(rs6000_isa_flags)
+Generate (do not generate) code using the TAR register.
+
+mmfspr
+Target Undocumented Mask(MFSPR) Var(rs6000_isa_flags)
+Generate (do not generate) code making move from SPR register expensive.
+
+mintspr
+Target Undocumented Mask(INTSPR) Var(rs6000_isa_flags)
+Require (disallow) SPR registers to hold only integer modes and not floating point modes.
+
 mrelative-jumptables
 Target Undocumented Var(rs6000_relative_jumptables) Init(1) Save
 
