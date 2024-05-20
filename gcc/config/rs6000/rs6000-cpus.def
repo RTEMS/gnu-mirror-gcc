@@ -136,6 +136,7 @@
 				 | OPTION_MASK_INTSPR			\
 				 | OPTION_MASK_ISEL			\
 				 | OPTION_MASK_MFCRF			\
+				 | OPTION_MASK_MFSPR			\
 				 | OPTION_MASK_MMA			\
 				 | OPTION_MASK_MODULO			\
 				 | OPTION_MASK_MULHW			\

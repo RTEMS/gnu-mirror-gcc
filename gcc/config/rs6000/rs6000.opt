@@ -634,6 +634,10 @@ mintspr
 Target Undocumented Mask(INTSPR) Var(rs6000_isa_flags)
 Disallow (allow) non-integer types in SPR registers.
 
+mmfspr
+Target Undocumented Mask(MFSPR) Var(rs6000_isa_flags)
+Disallow (allow) non-integer types in SPR registers.
+
 ; Documented parameters
 
 -param=rs6000-vect-unroll-limit=
