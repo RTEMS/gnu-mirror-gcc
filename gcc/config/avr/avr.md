@@ -8418,7 +8418,22 @@
    (set (match_dup 0)
         (reg:HI 24))])
 
-(define_insn_and_split "*parityqihi2"
+(define_insn_and_split "*parityqihi2.1"
+  [(set (match_operand:HI 0 "register_operand"            "=r")
+        (zero_extend:HI
+         (parity:QI (match_operand:QI 1 "register_operand" "r"))))
+   (clobber (reg:HI 24))]
+  "!reload_completed"
+  { gcc_unreachable(); }
+  "&& 1"
+  [(set (reg:QI 24)
+        (match_dup 1))
+   (set (reg:HI 24)
+        (zero_extend:HI (parity:QI (reg:QI 24))))
+   (set (match_dup 0)
+        (reg:HI 24))])
+
+(define_insn_and_split "*parityqihi2.2"
   [(set (match_operand:HI 0 "register_operand"           "=r")
         (parity:HI (match_operand:QI 1 "register_operand" "r")))
    (clobber (reg:HI 24))]
@@ -8526,6 +8541,19 @@
   {
     operands[2] = gen_reg_rtx (HImode);
   })
+
+(define_insn_and_split "*popcounthi2.split8"
+  [(set (reg:HI 24)
+        (zero_extend:HI (popcount:QI (match_operand:QI 0 "register_operand"))))]
+  "! reload_completed"
+  { gcc_unreachable(); }
+  "&& 1"
+  [(set (reg:QI 24)
+        (match_dup 0))
+   (set (reg:QI 24)
+        (popcount:QI (reg:QI 24)))
+   (set (reg:QI 25)
+        (const_int 0))])
 
 (define_insn_and_split "*popcounthi2.libgcc_split"
   [(set (reg:HI 24)

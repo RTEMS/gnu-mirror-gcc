@@ -1,3 +1,221 @@
+2024-05-21  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-05-21  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/115139
+	* g++.dg/template/non-dependent33.C: New test.
+
+2024-05-21  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2024-05-11  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/115039
+	* gfortran.dg/statement_function_5.f90: New test.
+
+2024-05-21  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	Backported from master:
+	2024-05-21  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	PR tree-optimization/115154
+	* c-c++-common/ubsan/signed1bitfield-1.c: New test.
+	* gcc.c-torture/execute/signed1bitfield-1.c: New test.
+
+2024-05-20  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	Backported from master:
+	2024-05-20  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	PR tree-optimization/115143
+	* gcc.c-torture/compile/pr115143-1.c: New test.
+	* gcc.c-torture/compile/pr115143-2.c: New test.
+	* gcc.c-torture/compile/pr115143-3.c: New test.
+
+2024-05-20  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-05-17  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/115114
+	* g++.dg/cpp2a/class-deduction-aggr15.C: New test.
+
+2024-05-20  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-05-15  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/114994
+	* g++.dg/template/non-dependent32.C: New test.
+
+2024-05-17  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2024-05-17  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/114874
+	* gfortran.dg/pr114874_1.f90: New test for valid code.
+	* gfortran.dg/pr114874_2.f90: New test for invalid code.
+
+2024-05-17  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-05-10  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/114998
+	* gcc.dg/torture/pr114998.c: New testcase.
+
+2024-05-15  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-05-07  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/114931
+	* gcc.dg/pr114931.c: New testcase.
+
+2024-05-13  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-05-13  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/114974
+	PR c++/114901
+	PR c++/114903
+	* g++.dg/cpp2a/class-deduction-aggr14.C: New test.
+	* g++.dg/cpp2a/class-deduction-alias20.C: New test.
+	* g++.dg/cpp2a/class-deduction-alias21.C: New test.
+
+2024-05-10  Georg-Johann Lay  <avr@gjlay.de>
+
+	Backported from master:
+	2024-05-10  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR target/114981
+	* gcc.target/avr/pr114981-powif.c: New test.
+
+2024-05-09  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2024-05-05  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/114827
+	* gfortran.dg/asan/unlimited_polymorphic_34.f90: New test.
+
+2024-05-09  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-05-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/89224
+	* g++.dg/torture/vector-subaccess-1.C: Add -Wno-psabi as additional
+	options.
+
+2024-05-09  Georg-Johann Lay  <avr@gjlay.de>
+
+	Backported from master:
+	2024-05-08  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR target/114975
+	* gcc.target/avr/pr114975-parity.c: New test.
+
+2024-05-09  Georg-Johann Lay  <avr@gjlay.de>
+
+	Backported from master:
+	2024-05-08  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR target/114975
+	* gcc.target/avr/pr114975-popcount.c: New test.
+
+2024-05-09  Georg-Johann Lay  <avr@gjlay.de>
+
+	Backported from master:
+	2024-05-08  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR target/114981
+	* gcc.target/avr/pr114981-powil.c: New test.
+
+2024-05-08  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-05-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/114965
+	* gcc.c-torture/execute/pr114965.c: New test.
+
+2024-05-07  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	Backported from master:
+	2024-05-07  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	PR c++/89224
+	* g++.dg/torture/vector-subaccess-1.C: New test.
+	* gcc.dg/pr83415.c: Change warning to error.
+
+2024-05-07  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	Backported from master:
+	2024-05-07  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/114856
+	* g++.dg/modules/pr114856.h: New test.
+	* g++.dg/modules/pr114856_a.H: New test.
+	* g++.dg/modules/pr114856_b.C: New test.
+
+2024-05-07  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-05-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/114907
+	* gcc.dg/pr114907.c: New test.
+
+2024-05-07  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-05-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR sanitizer/114956
+	* gcc.dg/asan/pr114956.c: New test.
+
+2024-05-07  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/113768
+	PR modula2/114133
+	* gm2/extensions/run/pass/callingc10.mod: Convert constant literal
+	numbers into INTEGER.
+	* gm2/extensions/run/pass/callingc11.mod: Ditto.
+	* gm2/extensions/run/pass/vararg2.mod: Ditto.
+	* gm2/iso/run/pass/packed.mod: Emit a printf as a runtime
+	diagnostic.
+
+2024-05-07  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-04-30  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/114876
+	* gcc.dg/pr114876.c: New test.
+	* gcc.dg/tree-ssa/builtin-sprintf-warn-1.c: Adjust expected
+	diagnostics.
+
+2024-05-07  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-04-30  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/114889
+	* g++.dg/modules/friend-8_a.H: New test.
+	* g++.dg/modules/friend-8_b.C: New test.
+
+2024-05-07  Georg-Johann Lay  <avr@gjlay.de>
+
+	Backported from master:
+	2024-05-06  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR ipa/92606
+	* gcc.target/avr/torture/pr92606.c: New test.
+
 2024-05-07  Release Manager
 
 	* GCC 14.1.0 released.

@@ -1,3 +1,196 @@
+2024-05-21  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	Backported from master:
+	2024-05-21  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	PR tree-optimization/115154
+	* match.pd (convert (mult zero_one_valued_p@1 INTEGER_CST@2)): Disable
+	for 1bit signed types.
+
+2024-05-20  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	Backported from master:
+	2024-05-20  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	PR tree-optimization/115143
+	* tree-ssa-phiopt.cc (minmax_replacement): Check for empty
+	phi nodes for middle bbs for the case where middle bb is not empty.
+
+2024-05-17  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-05-10  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/114998
+	* tree-loop-distribution.cc (free_rdg): Take loop argument.
+	Reset UIDs of stmts still in the IL rather than all stmts
+	referenced from the RDG.
+	(loop_distribution::build_rdg): Pass loop to free_rdg.
+	(loop_distribution::distribute_loop): Likewise.
+	(loop_distribution::transform_reduction_loop): Likewise.
+
+2024-05-15  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-05-07  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/114931
+	* tree.cc (type_hash_canon_hash): Hash TYPE_STRUCTURAL_EQUALITY_P.
+	(type_cache_hasher::equal): Compare TYPE_STRUCTURAL_EQUALITY_P.
+	(build_array_type_1): Set TYPE_STRUCTURAL_EQUALITY_P before
+	probing with type_hash_canon.
+	(build_function_type): Likewise.
+	(build_method_type_directly): Likewise.
+	(build_offset_type): Likewise.
+	(build_complex_type): Likewise.
+	* attribs.cc (build_type_attribute_qual_variant): Likewise.
+
+2024-05-15  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-05-03  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/114931
+	* tree.cc (build_array_type_1): Return early when type_hash_canon
+	returned an older existing type.
+	(build_function_type): Likewise.
+	(build_method_type_directly): Likewise.
+	(build_offset_type): Likewise.
+
+2024-05-12  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	Backported from master:
+	2024-05-01  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	PR target/69374
+	PR target/112959
+	* doc/install.texi (Specific) <*-*-freebsd*>: The Ada and D
+	run-time libraries are broken on i386 which also can affect
+	64-bit builds. Go is broken.
+
+2024-05-12  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	Backported from master:
+	2024-05-01  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	PR target/69374
+	PR target/112959
+	* doc/install.texi (Specific) <*-*-freebsd*>: No longer refer
+	to GCC or binutils in base. Recommend bootstrap using binutils.
+
+2024-05-12  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	Backported from master:
+	2024-05-01  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	PR target/69374
+	* doc/install.texi (Specific) <ia64-*-hpux*>: Remove details
+	on libunwind for GCC 3.4 and earlier.
+
+2024-05-12  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	Backported from master:
+	2024-04-28  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	PR target/69374
+	PR target/112959
+	* doc/install.texi (Specific) <*-*-freebsd*>: Remove references to
+	FreeBSD 7 and older.
+
+2024-05-10  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-05-10  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/114968
+	* target.def (use_atexit_for_cxa_atexit): Remove spurious space
+	from comment.
+	(adjust_cdtor_callabi_fntype): New cxx target hook.
+	* targhooks.h (default_cxx_adjust_cdtor_callabi_fntype): Declare.
+	* targhooks.cc (default_cxx_adjust_cdtor_callabi_fntype): New
+	function.
+	* doc/tm.texi.in (TARGET_CXX_ADJUST_CDTOR_CALLABI_FNTYPE): Add.
+	* doc/tm.texi: Regenerate.
+	* config/i386/i386.cc (ix86_cxx_adjust_cdtor_callabi_fntype): New
+	function.
+	(TARGET_CXX_ADJUST_CDTOR_CALLABI_FNTYPE): Redefine.
+
+2024-05-10  Xi Ruoyao  <xry111@xry111.site>
+
+	Backported from master:
+	2024-05-10  Xi Ruoyao  <xry111@xry111.site>
+
+	PR driver/114980
+	* opts-common.cc (prune_options): Move -fdiagnostics-urls=
+	early like -fdiagnostics-color=.
+
+2024-05-09  Georg-Johann Lay  <avr@gjlay.de>
+
+	Backported from master:
+	2024-05-08  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR target/114975
+	* config/avr/avr.md: Add combine pattern for
+	8-bit parity detection.
+
+2024-05-09  Georg-Johann Lay  <avr@gjlay.de>
+
+	Backported from master:
+	2024-05-08  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR target/114975
+	* config/avr/avr.md: Add combine pattern for
+	8-bit popcount detection.
+
+2024-05-08  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-05-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/114965
+	* tree-ssa-reassoc.cc (optimize_range_tests_to_bit_test): Don't try to
+	optimize away exp - lowi subtraction from shift count unless entry
+	test is emitted or unless r.upper_bound () is smaller than prec.
+
+2024-05-07  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-05-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/114907
+	* expr.cc (convert_mode_scalar): Use trunc_optab rather than
+	sext_optab for HF->BF conversions.
+	* optabs-libfuncs.cc (gen_trunc_conv_libfunc): Likewise.
+
+2024-05-07  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-05-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR sanitizer/114956
+	* tree-inline.cc: Include asan.h.
+	(copy_bb): Remove also .ASAN_MARK calls if id->dst_fn has asan/hwasan
+	sanitization disabled.
+
+2024-05-07  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-04-30  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/114876
+	* gimple-ssa-sprintf.cc (format_character): For min == 0 && max == 0,
+	set max, likely and unlikely members to 1 rather than 0.  Remove
+	useless res.knownrange = true;.  Formatting fixes.
+
+2024-05-07  Georg-Johann Lay  <avr@gjlay.de>
+
+	Backported from master:
+	2024-05-06  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR ipa/92606
+	* config/avr/avr.cc (avr_option_override): Set
+	flag_ipa_icf_variables = 0.
+
 2024-05-07  Release Manager
 
 	* GCC 14.1.0 released.
