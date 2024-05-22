@@ -1,3 +1,177 @@
+2024-05-21  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-05-21  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/107800
+	* cxxapi-data.csv <to_address>: Change dialect to cxx20.
+	* std-name-hint.gperf: Regenerate.
+	* std-name-hint.h: Regenerate.
+
+2024-05-21  Release Manager
+
+	* GCC 13.3.0 released.
+
+2024-05-14  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-04-11  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/114303
+	* constraint.cc (tsubst_requires_expr): Clear
+	REQUIRES_EXPR_EXTRA_ARGS before calling build_extra_args.
+	* pt.cc (tree_extra_args): Define.
+	(extract_locals_r): Assert *_EXTRA_ARGS is empty.
+	(tsubst_stmt) <case IF_STMT>: Clear IF_SCOPE on the new
+	IF_STMT.  Call build_extra_args on the new IF_STMT instead
+	of t which might already have IF_STMT_EXTRA_ARGS.
+
+2024-05-13  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-04-24  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/114709
+	* constexpr.cc (cxx_fold_indirect_ref): Restrict object/offset
+	canonicalization to RECORD_TYPE member accesses.
+
+2024-05-09  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-04-25  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/111284
+	* constexpr.cc (cxx_bind_parameters_in_call): For PARM_DECLs with
+	TREE_ADDRESSABLE types use vc_glvalue rather than vc_prvalue for
+	cxx_eval_constant_expression and if it doesn't have the same
+	type as it should, cast the reference type to reference to type
+	before convert_from_reference and instead of adjust_temp_type
+	take address of the arg, cast to reference to type and then
+	convert_from_reference.
+	(cxx_eval_constant_expression) <case PARM_DECL>: For lval case
+	on parameters with TREE_ADDRESSABLE types lookup result in
+	ctx->globals if possible.  Otherwise if lookup in ctx->globals
+	was successful for parameter with TREE_ADDRESSABLE type,
+	recurse with vc_prvalue on the returned value.
+
+2024-05-07  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	Backported from master:
+	2024-05-07  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	PR c++/89224
+	* constexpr.cc (cxx_eval_array_reference): Compare main variants
+	for the vector/array types instead of the types directly.
+
+2024-05-01  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/113141
+	* call.cc (reference_binding): Remove badness criteria sanity
+	check in the recursive case.
+
+2024-05-01  centurion  <centurion009@proton.me>
+
+	Backported from master:
+	2024-04-04  centurion  <centurion009@proton.me>
+
+	PR c++/114377
+	* pt.cc (find_template_parameter_info::found): Use TREE_TYPE for
+	TEMPLATE_DECL instead of DECL_INITIAL.
+
+2024-05-01  Jason Merrill  <jason@redhat.com>
+
+	Backported from master:
+	2024-04-02  Jason Merrill  <jason@redhat.com>
+
+	PR c++/114561
+	PR c++/114562
+	* call.cc (convert_like_internal): Avoid adding qualification
+	conversion in direct reference binding.
+
+2024-05-01  Jason Merrill  <jason@redhat.com>
+
+	Backported from master:
+	2024-03-28  Jason Merrill  <jason@redhat.com>
+
+	PR c++/100667
+	* semantics.cc (same_type_ref_bind_p): New.
+	(finish_trait_expr): Use it.
+
+2024-04-21  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-04-12  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/114691
+	* semantics.cc (simplify_loop_decl_cond): Use cp_build_unary_op with
+	TRUTH_NOT_EXPR on ANNOTATE_EXPR argument (if any) rather than
+	ANNOTATE_EXPR itself.
+
+2024-04-21  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-04-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/114580
+	* semantics.cc (finish_if_stmt_cond): Call
+	maybe_warn_for_constant_evaluated with IF_STMT_CONSTEXPR_P (if_stmt)
+	as the second argument, rather than true/false depending on if
+	it is if constexpr with non-dependent constant expression with
+	bool type.
+
+2024-04-21  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-04-05  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/114572
+	* cp-gimplify.cc (cxx_omp_clause_apply_fn): Call build_cplus_new
+	on build_call_a result if it has class type.
+
+2024-04-15  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-02-19  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/113966
+	* constraint.cc (tsubst_compound_requirement): Don't check
+	the noexcept condition or the return-type-requirement when
+	partially substituting.
+
+2024-04-15  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-02-03  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/110006
+	PR c++/112769
+	* constraint.cc (subst_info::quiet): Accomodate non-diagnostic
+	tsubst flags.
+	(tsubst_valid_expression_requirement): Likewise.
+	(tsubst_simple_requirement): Return a substituted _REQ node when
+	processing_template_decl.
+	(tsubst_type_requirement_1): Accomodate non-diagnostic tsubst
+	flags.
+	(tsubst_type_requirement): Return a substituted _REQ node when
+	processing_template_decl.
+	(tsubst_compound_requirement): Likewise.  Accomodate non-diagnostic
+	tsubst flags.
+	(tsubst_nested_requirement): Likewise.
+	(tsubst_requires_expr): Don't defer partial substitution when
+	processing_constraint_expression_p is true, in which case return
+	a substituted REQUIRES_EXPR.
+	* pt.cc (tsubst_expr) <case REQUIRES_EXPR>: Accomodate
+	non-diagnostic tsubst flags.
+
+2024-04-02  Marek Polacek  <polacek@redhat.com>
+
+	Backported from master:
+	2024-04-02  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/103825
+	* typeck.cc (is_bitfield_expr_with_lowered_type): Handle
+	CLEANUP_POINT_EXPR.
+
 2024-02-16  Marek Polacek  <polacek@redhat.com>
 
 	Backported from master:
