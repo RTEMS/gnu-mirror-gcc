@@ -1,4 +1,87 @@
-a==================== Branch work167-tar, patch #11 from work167 branch ====================
+==================== Branch work167-tar, patch #202 ====================
+
+Add -mtar.
+
+gcc/
+
+2024-05-23  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/constraints.md (h constraint): Add documentation for TAR
+	register.
+	(wt constraint): New constraint.
+	* config/rs6000/rs6000-cpus.def (ISA_3_0_MASKS_SERVER): Document that we
+	are intentionally not setting -mtar for power9.
+	(OTHER_POWER10_MASKS): Add -mtar.
+	(POWERPC_MASKS): Likewise.
+	* config/rs6000/rs6000.cc (rs6000_reg_names): Add TAR register.
+	(alt_reg_names): Likewise.
+	(rs6000_hard_regno_mode_ok_uncached): Add support for -mtar.
+	(rs6000_debug_reg_global): Print information about the TAR register and
+	the wt constraint.
+	(rs6000_init_hard_regno_mode_ok): Setup the TAR register.  Set up the wt
+	constraint if -mtar.
+	(rs6000_option_override_internal): If -mtar, make sure we are running on
+	at least a power9.
+	(rs6000_conditional_register_usage): Enable TAR register if -mtar.
+	(print_operand): Handle the TAR register.
+	(rs6000_debugger_regno): Likewise.
+	(rs6000_opt_masks): Add -mtar.
+	* config/rs6000/rs6000.h (FIRST_PSEUDO_REGISTER): Add TAR register.
+	(FIXED_REGISTERS): Likewise.
+	(CALL_REALLY_USED_REGISTERS): Likewise.
+	(REG_ALLOC_ORDER): Likewise.
+	(enum reg_class): Add TAR_REGS register class.
+	(REG_CLASS_NAMES): Likewise.
+	(REG_CLASS_CONTENTS): Likewise.
+	(enum r6000_reg_class_enum): Add wt constraint.
+	(rs6000_reg_names): Add TAR register.
+	* config/rs6000/rs6000.md (TAR_REGNO): New constant.
+	(@tablejump<mode>_insn_normal): Add support for the TAR register.
+	(@tablejump<mode>_insn_nospec): Likewise.
+	* config/rs6000/rs6000.opt (-mtar): New option.
+
+gcc/testsuite/
+
+2024-05-23  Michael Meissner  <meissner@linux.ibm.com>
+
+	* gcc.target/powerpc/ppc-switch-1.c: Update test for the TAR register.
+	* gcc.target/powerpc/pr51513.c: Likewise.
+	* gcc.target/powerpc/safe-indirect-jump-3.c: Likewise.
+
+==================== Branch work167-tar, patch #201 ====================
+
+Remove insn alternatives for SPRs with non-integer modes
+
+The previous patch changed the modes that SPR registers can hold to just be
+appropriate sized integers (VSAVE and VSCR can only hold SImode, while CTR and
+LR can only hold pointer sized values).  This patch updates all of the move
+insns for CC modes and floating point types from having alternatives to move
+values to and from SPR registers.
+
+2024-05-23  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.md (mov<mode>_internal): Remove alternatives
+	moving values to and from SPR registers.
+	(movcc_<mode>): Likewise.
+	(movsf_hardfloat): Likewise.
+	(movsd_hardfloat): Likewise.
+	(mov<mode>_softfloat): Likewise.
+	(mov<mode>_hardfloat64): Likewise.
+	(mov<mode>_softfloat64): Likewise.
+
+==================== Branch work167-tar, patch #200 ====================
+
+Restrict SPR registers to only use integer modes.
+
+2024-05-23  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached): Restrict
+	VRSAVE and VSCR to only hold hold SImode.  Restrict LR and CTR to only
+	hold SImode or DImode, based on the address size.
+
+==================== Branch work167-tar, patch #11 from work167 branch ====================
 
 Add -mcpu=future tuning support.
 
