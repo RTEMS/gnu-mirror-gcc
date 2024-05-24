@@ -634,6 +634,10 @@ mtar
 Target Undocumented Mask(TAR) Var(rs6000_isa_flags)
 Allow (do not allow) use the TAR register.
 
+mintspr
+Target Undocumented Var(TARGET_INTSPR) Init(0) Save
+Allow (do not allow) small integers in SPR registers.
+
 ; Documented parameters
 
 -param=rs6000-vect-unroll-limit=

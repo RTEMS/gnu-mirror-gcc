@@ -1952,7 +1952,11 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
     case LR_REGNO:
     case CTR_REGNO:
     case TAR_REGNO:
-      return (!orig_complex_p && mode == Pmode);
+      return (!orig_complex_p
+	      && (mode == Pmode
+		  || (TARGET_INTSPR
+		      && SCALAR_INT_MODE_P (mode)
+		      && GET_MODE_SIZE (mode) <= UNITS_PER_WORD)));
 
     default:
       break;
