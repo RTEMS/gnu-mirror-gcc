@@ -1,3 +1,15 @@
+==================== Branch work167-tar, patch #203 ====================
+
+Add -mintspr.
+
+2024-05-24  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached): Add
+	support for -mintspr.
+	* config/rs6000/rs6000.md (mov<mode>_internal): Add support for moving
+	QI/HImode to/from SPRs back.
+	* config/rs6000/rs6000.opt (-mintspr): New switch.
+
 ==================== Branch work167-tar, patch #202 ====================
 
 Add -mtar.
