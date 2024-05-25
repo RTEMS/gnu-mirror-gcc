@@ -1,3 +1,23 @@
+==================== Branch work167-tar, patch #204 ====================
+
+Add -mccspr and -mfpspr
+
+2024-05-24  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached): Add
+	support for -mccspr and -mfpspr debug switches
+	* config/rs6000/rs6000.md (movcc_<mode>): Add spr support back in.
+	(movsf_hardfloat): Likewise.
+	(movsd_hardfloat): Likewise.
+	(mov<mode>_softfloat): Likewise.
+	(mov<mode>_softfloat32): Likewise.
+	(ov<mode>_hardfloat64): Likewise.
+	(mov<mode>_softfloat64): Likewise.
+	(indirect_jump<mode>): Add TAR register support.
+	(@indirect_jump<mode>_nospec): Likewise.
+	* config/rs6000/rs6000.opt (-mccspr): New switch.
+	(-mfpspr): Likewise.
+
 ==================== Branch work167-tar, patch #203 ====================
 
 Add -mintspr.
