@@ -638,6 +638,14 @@ mintspr
 Target Undocumented Var(TARGET_INTSPR) Init(0) Save
 Allow (do not allow) small integers in SPR registers.
 
+mccspr
+Target Undocumented Var(TARGET_CCSPR) Init(0) Save
+Allow (do not allow) condition codes in SPR registers.
+
+mfpspr
+Target Undocumented Var(TARGET_FPSPR) Init(0) Save
+Allow (do not allow) floating point in SPR registers.
+
 ; Documented parameters
 
 -param=rs6000-vect-unroll-limit=

@@ -1943,20 +1943,33 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
      SPR.  */
   switch (regno)
     {
-      /* 32-bit registers.  */
     case VRSAVE_REGNO:
     case VSCR_REGNO:
-      return (!orig_complex_p && mode == SImode);
-
-      /* Registers that hold addresses.  */
     case LR_REGNO:
     case CTR_REGNO:
     case TAR_REGNO:
-      return (!orig_complex_p
-	      && (mode == Pmode
-		  || (TARGET_INTSPR
-		      && SCALAR_INT_MODE_P (mode)
-		      && GET_MODE_SIZE (mode) <= UNITS_PER_WORD)));
+      {
+	unsigned reg_size = ((regno == VRSAVE_REGNO || regno == VSCR_REGNO)
+			     ? 4
+			     : UNITS_PER_WORD);
+
+	if (orig_complex_p || GET_MODE_SIZE (mode) > reg_size)
+	  return false;
+
+	if (GET_MODE_CLASS (mode) == MODE_CC)
+	  return TARGET_CCSPR != 0;
+
+	if (SCALAR_FLOAT_MODE_P (mode))
+	  return TARGET_FPSPR != 0;
+
+	if (!SCALAR_INT_MODE_P (mode))
+	  return false;
+
+	if (TARGET_INTSPR)
+	  return true;
+
+	return GET_MODE_SIZE (mode) == reg_size;
+      }
 
     default:
       break;
