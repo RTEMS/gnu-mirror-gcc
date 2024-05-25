@@ -1,3 +1,14 @@
+==================== Branch work167-tar, patch #205 ====================
+
+Fix test for TAR register.
+
+2024-05-25  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/safe-indirect-jump-2.c: Fix test for generating the
+	TAR register.
+
 ==================== Branch work167-tar, patch #204 ====================
 
 Add -mccspr and -mfpspr
