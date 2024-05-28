@@ -638,6 +638,18 @@ mintspr
 Target Undocumented Var(TARGET_INTSPR) Init(0) Save
 Allow (do not allow) small integers in SPR registers.
 
+msispr
+Target Undocumented Var(TARGET_SISPR) Init(0) Save
+Allow (do not allow) SImode in SPR registers.
+
+mhispr
+Target Undocumented Var(TARGET_HISPR) Init(0) Save
+Allow (do not allow) HImode in SPR registers.
+
+mqispr
+Target Undocumented Var(TARGET_QISPR) Init(0) Save
+Allow (do not allow) QImode in SPR registers.
+
 mccspr
 Target Undocumented Var(TARGET_CCSPR) Init(0) Save
 Allow (do not allow) condition codes in SPR registers.
@@ -645,6 +657,14 @@ Allow (do not allow) condition codes in SPR registers.
 mfpspr
 Target Undocumented Var(TARGET_FPSPR) Init(0) Save
 Allow (do not allow) floating point in SPR registers.
+
+msfspr
+Target Undocumented Var(TARGET_SFSPR) Init(0) Save
+Allow (do not allow) SFmode in SPR registers.
+
+mdfspr
+Target Undocumented Var(TARGET_DFSPR) Init(0) Save
+Allow (do not allow) DFmode in SPR registers.
 
 ; Documented parameters
 

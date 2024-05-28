@@ -1959,16 +1959,32 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
 	if (GET_MODE_CLASS (mode) == MODE_CC)
 	  return TARGET_CCSPR != 0;
 
-	if (SCALAR_FLOAT_MODE_P (mode))
-	  return TARGET_FPSPR != 0;
+	switch (mode)
+	  {
+	  case E_QImode:
+	    return (TARGET_INTSPR || TARGET_QISPR);
 
-	if (!SCALAR_INT_MODE_P (mode))
-	  return false;
+	  case E_HImode:
+	    return (TARGET_INTSPR || TARGET_HISPR);
 
-	if (TARGET_INTSPR)
-	  return true;
+	  case E_SImode:
+	    return (TARGET_INTSPR || TARGET_SISPR || reg_size == 4);
 
-	return GET_MODE_SIZE (mode) == reg_size;
+	  case E_DImode:
+	    return (reg_size == 8);
+
+	  case E_SFmode:
+	  case E_SDmode:
+	    return (TARGET_FPSPR || TARGET_SFSPR);
+
+	  case E_DFmode:
+	  case E_DDmode:
+	    return (TARGET_FPSPR || TARGET_DFSPR);
+
+	  default:
+	    break;
+	  }
+	return false;
       }
 
     default:
