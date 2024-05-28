@@ -1,3 +1,19 @@
+==================== Branch work167-tar, patch #206 ====================
+
+Add more SPR register debug options.
+
+2024-05-28  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached): Add more
+	debug options for seeing what modes get stored in SPR registers.
+	* config/rs6000/rs6000.opt (-msispr): New SPR mode debut option.
+	(-mhispr): Likewise.
+	(-mqispr): Likewise.): Likewise.
+	(-msfspr): Likewise.
+	(-mdfspr): Likewise.
+
 ==================== Branch work167-tar, patch #205 ====================
 
 Fix test for TAR register.
