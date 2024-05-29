@@ -3961,7 +3961,8 @@ riscv_setup_incoming_varargs (cumulative_args_t cum,
      argument.  Advance a local copy of CUM past the last "real" named
      argument, to find out how many registers are left over.  */
   local_cum = *get_cumulative_args (cum);
-  if (!TYPE_NO_NAMED_ARGS_STDARG_P (TREE_TYPE (current_function_decl)))
+  if (!TYPE_NO_NAMED_ARGS_STDARG_P (TREE_TYPE (current_function_decl))
+      || arg.type != NULL_TREE)
     riscv_function_arg_advance (pack_cumulative_args (&local_cum), arg);
 
   /* Found out how many registers we need to save.  */
@@ -5392,7 +5393,15 @@ riscv_expand_prologue (void)
       /* Second step for constant frame.  */
       HOST_WIDE_INT constant_frame = size.to_constant ();
       if (constant_frame == 0)
-	return;
+	{
+	  /* We must have allocated stack space for the scalable frame.
+	     Emit a stack tie if we have a frame pointer so that the
+	     allocation is ordered WRT fp setup and subsequent writes
+	     into the frame.  */
+	  if (frame_pointer_needed)
+	    riscv_emit_stack_tie ();
+	  return;
+	}
 
       if (SMALL_OPERAND (-constant_frame))
 	{
@@ -5412,6 +5421,13 @@ riscv_expand_prologue (void)
 	  insn = gen_rtx_SET (stack_pointer_rtx, insn);
 	  riscv_set_frame_expr (insn);
 	}
+
+      /* We must have allocated the remainder of the stack frame.
+	 Emit a stack tie if we have a frame pointer so that the
+	 allocation is ordered WRT fp setup and subsequent writes
+	 into the frame.  */
+      if (frame_pointer_needed)
+	riscv_emit_stack_tie ();
     }
 }
 

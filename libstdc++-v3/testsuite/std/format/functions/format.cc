@@ -169,6 +169,12 @@ test_alternate_forms()
   // PR libstdc++/108046
   s = std::format("{0:#.0} {0:#.1} {0:#.0g}", 10.0);
   VERIFY( s == "1.e+01 1.e+01 1.e+01" );
+
+  // PR libstdc++/113512
+  s = std::format("{:#.3g}", 0.025);
+  VERIFY( s == "0.0250" );
+  s = std::format("{:#07.3g}", 0.02);
+  VERIFY( s == "00.0200" );
 }
 
 void
@@ -225,6 +231,14 @@ test_locale()
   s = std::format(cloc, "{:05L}", -1.0); // PR libstdc++/110968
   VERIFY( s == "-0001" );
 
+  // PR libstdc++/114863 grouping applied to nan and inf
+  double inf = std::numeric_limits<double>::infinity();
+  s = std::format(eloc, "{0:Le} {0:Lf} {0:Lg}", -inf);
+  VERIFY( s == "-inf -inf -inf" );
+  double nan = std::numeric_limits<double>::quiet_NaN();
+  s = std::format(eloc, "{0:Le} {0:Lf} {0:Lg}", -nan);
+  VERIFY( s == "-nan -nan -nan" );
+
   // Restore
   std::locale::global(cloc);
 }
@@ -255,14 +269,16 @@ test_width()
   }
 
   try {
-    auto args = std::make_format_args(false, true);
+    bool no = false, yes = true;
+    auto args = std::make_format_args(no, yes);
     s = std::vformat("DR 3720: restrict type of width arg-id {0:{1}}", args);
     VERIFY(false);
   } catch (const std::format_error&) {
   }
 
   try {
-    auto args = std::make_format_args('?', '!');
+    char wat = '?', bang = '!';
+    auto args = std::make_format_args(wat, bang);
     s = std::vformat("DR 3720: restrict type of width arg-id {0:{1}}", args);
     VERIFY(false);
   } catch (const std::format_error&) {

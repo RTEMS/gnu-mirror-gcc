@@ -4836,7 +4836,7 @@ strlen_pass::count_nonzero_bytes_addr (tree exp, tree vuse, gimple *stmt,
       if (maxlen + 1 < nbytes)
 	return false;
 
-      if (nbytes <= minlen)
+      if (nbytes <= minlen || !si->full_string_p)
 	*nulterm = false;
 
       if (nbytes < minlen)
@@ -4845,6 +4845,9 @@ strlen_pass::count_nonzero_bytes_addr (tree exp, tree vuse, gimple *stmt,
 	  if (nbytes < maxlen)
 	    maxlen = nbytes;
 	}
+
+      if (!si->full_string_p)
+	maxlen = nbytes;
 
       if (minlen < lenrange[0])
 	lenrange[0] = minlen;
@@ -5053,6 +5056,9 @@ strlen_pass::handle_store (bool *zero_write)
 
   if (si != NULL)
     {
+      /* The count_nonzero_bytes call above might have unshared si.
+	 Fetch it again from the vector.  */
+      si = get_strinfo (idx);
       /* The corresponding element is set to 1 if the first and last
 	 element, respectively, of the sequence of characters being
 	 written over the string described by SI ends before

@@ -4074,7 +4074,7 @@ aarch64_reg_save_mode (unsigned int regno)
       case ARM_PCS_SIMD:
 	/* The vector PCS saves the low 128 bits (which is the full
 	   register on non-SVE targets).  */
-	return TFmode;
+	return V16QImode;
 
       case ARM_PCS_SVE:
 	/* Use vectors of DImode for registers that need frame
@@ -8863,6 +8863,10 @@ aarch64_gen_storewb_pair (machine_mode mode, rtx base, rtx reg, rtx reg2,
       return gen_storewb_pairtf_di (base, base, reg, reg2,
 				    GEN_INT (-adjustment),
 				    GEN_INT (UNITS_PER_VREG - adjustment));
+    case E_V16QImode:
+      return gen_storewb_pairv16qi_di (base, base, reg, reg2,
+				       GEN_INT (-adjustment),
+				       GEN_INT (UNITS_PER_VREG - adjustment));
     default:
       gcc_unreachable ();
     }
@@ -8908,6 +8912,10 @@ aarch64_gen_loadwb_pair (machine_mode mode, rtx base, rtx reg, rtx reg2,
     case E_TFmode:
       return gen_loadwb_pairtf_di (base, base, reg, reg2, GEN_INT (adjustment),
 				   GEN_INT (UNITS_PER_VREG));
+    case E_V16QImode:
+      return gen_loadwb_pairv16qi_di (base, base, reg, reg2,
+				      GEN_INT (adjustment),
+				      GEN_INT (UNITS_PER_VREG));
     default:
       gcc_unreachable ();
     }
@@ -8990,6 +8998,9 @@ aarch64_gen_load_pair (machine_mode mode, rtx reg1, rtx mem1, rtx reg2,
 
     case E_V4SImode:
       return gen_load_pairv4siv4si (reg1, mem1, reg2, mem2);
+
+    case E_V16QImode:
+      return gen_load_pairv16qiv16qi (reg1, mem1, reg2, mem2);
 
     default:
       gcc_unreachable ();
@@ -23070,6 +23081,8 @@ aarch64_expand_compare_and_swap (rtx operands[])
         rval = copy_to_mode_reg (r_mode, oldval);
       else
 	emit_move_insn (rval, gen_lowpart (r_mode, oldval));
+      if (mode == TImode)
+	newval = force_reg (mode, newval);
 
       emit_insn (gen_aarch64_compare_and_swap_lse (mode, rval, mem,
 						   newval, mod_s));
@@ -27016,7 +27029,7 @@ aarch64_simd_clone_compute_vecsize_and_simdlen (struct cgraph_node *node,
 					bool explicit_p)
 {
   tree t, ret_type;
-  unsigned int elt_bits, count;
+  unsigned int elt_bits, count = 0;
   unsigned HOST_WIDE_INT const_simdlen;
   poly_uint64 vec_bits;
 
@@ -27089,8 +27102,17 @@ aarch64_simd_clone_compute_vecsize_and_simdlen (struct cgraph_node *node,
   elt_bits = GET_MODE_BITSIZE (SCALAR_TYPE_MODE (base_type));
   if (known_eq (clonei->simdlen, 0U))
     {
-      count = 2;
-      vec_bits = (num == 0 ? 64 : 128);
+      /* We don't support simdlen == 1.  */
+      if (known_eq (elt_bits, 64))
+	{
+	  count = 1;
+	  vec_bits = 128;
+	}
+      else
+	{
+	  count = 2;
+	  vec_bits = (num == 0 ? 64 : 128);
+	}
       clonei->simdlen = exact_div (vec_bits, elt_bits);
     }
   else
@@ -27110,6 +27132,7 @@ aarch64_simd_clone_compute_vecsize_and_simdlen (struct cgraph_node *node,
 	  return 0;
 	}
     }
+
   clonei->vecsize_int = vec_bits;
   clonei->vecsize_float = vec_bits;
   return count;

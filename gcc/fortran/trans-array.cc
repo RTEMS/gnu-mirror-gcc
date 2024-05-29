@@ -3962,7 +3962,10 @@ gfc_conv_array_ref (gfc_se * se, gfc_array_ref * ar, gfc_expr *expr,
     }
 
   decl = se->expr;
-  if (IS_CLASS_ARRAY (sym) && sym->attr.dummy && ar->as->type != AS_DEFERRED)
+  if (UNLIMITED_POLY(sym)
+      && IS_CLASS_ARRAY (sym)
+      && sym->attr.dummy
+      && ar->as->type != AS_DEFERRED)
     decl = sym->backend_decl;
 
   cst_offset = offset = gfc_index_zero_node;
@@ -7323,6 +7326,17 @@ gfc_get_dataptr_offset (stmtblock_t *block, tree parm, tree desc, tree offset,
 
   /* Set the target data pointer.  */
   offset = gfc_build_addr_expr (gfc_array_dataptr_type (desc), tmp);
+
+  /* Check for optional dummy argument being present.  Arguments of BIND(C)
+     procedures are excepted here since they are handled differently.  */
+  if (expr->expr_type == EXPR_VARIABLE
+      && expr->symtree->n.sym->attr.dummy
+      && expr->symtree->n.sym->attr.optional
+      && !is_CFI_desc (NULL, expr))
+    offset = build3_loc (input_location, COND_EXPR, TREE_TYPE (offset),
+			 gfc_conv_expr_present (expr->symtree->n.sym), offset,
+			 fold_convert (TREE_TYPE (offset), gfc_index_zero_node));
+
   gfc_conv_descriptor_data_set (block, parm, offset);
 }
 
@@ -10994,6 +11008,19 @@ gfc_alloc_allocatable_for_assignment (gfc_loopinfo *loop,
 	gfc_add_modify (&fblock, linfo->delta[dim], tmp);
     }
 
+  /* Take into account _len of unlimited polymorphic entities, so that span
+     for array descriptors and allocation sizes are computed correctly.  */
+  if (UNLIMITED_POLY (expr2))
+    {
+      tree len = gfc_class_len_get (TREE_OPERAND (desc2, 0));
+      len = fold_build2_loc (input_location, MAX_EXPR, size_type_node,
+			     fold_convert (size_type_node, len),
+			     size_one_node);
+      elemsize2 = fold_build2_loc (input_location, MULT_EXPR,
+				   gfc_array_index_type, elemsize2,
+				   fold_convert (gfc_array_index_type, len));
+    }
+
   if (GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (desc)))
     gfc_conv_descriptor_span_set (&fblock, desc, elemsize2);
 
@@ -11040,6 +11067,9 @@ gfc_alloc_allocatable_for_assignment (gfc_loopinfo *loop,
 	    gfc_add_modify (&fblock, tmp,
 			    fold_convert (TREE_TYPE (tmp),
 					  TYPE_SIZE_UNIT (type)));
+	  else if (UNLIMITED_POLY (expr2))
+	    gfc_add_modify (&fblock, tmp,
+			    gfc_class_len_get (TREE_OPERAND (desc2, 0)));
 	  else
 	    gfc_add_modify (&fblock, tmp,
 			    build_int_cst (TREE_TYPE (tmp), 0));

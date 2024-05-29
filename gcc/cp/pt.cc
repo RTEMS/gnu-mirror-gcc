@@ -3861,6 +3861,24 @@ has_extra_args_mechanism_p (const_tree t)
 	      && IF_STMT_CONSTEXPR_P (t))); /* IF_STMT_EXTRA_ARGS  */
 }
 
+/* Return *_EXTRA_ARGS of the given supported tree T.  */
+
+static tree&
+tree_extra_args (tree t)
+{
+  gcc_checking_assert (has_extra_args_mechanism_p (t));
+
+  if (PACK_EXPANSION_P (t))
+    return PACK_EXPANSION_EXTRA_ARGS (t);
+  else if (TREE_CODE (t) == REQUIRES_EXPR)
+    return REQUIRES_EXPR_EXTRA_ARGS (t);
+  else if (TREE_CODE (t) == IF_STMT
+	   && IF_STMT_CONSTEXPR_P (t))
+    return IF_STMT_EXTRA_ARGS (t);
+
+  gcc_unreachable ();
+}
+
 /* Structure used to track the progress of find_parameter_packs_r.  */
 struct find_parameter_pack_data
 {
@@ -5409,9 +5427,14 @@ process_partial_specialization (tree decl)
     }
 
   if (VAR_P (decl))
-    /* We didn't register this in check_explicit_specialization so we could
-       wait until the constraints were set.  */
-    decl = register_specialization (decl, maintmpl, specargs, false, 0);
+    {
+      /* We didn't register this in check_explicit_specialization so we could
+	 wait until the constraints were set.  */
+      tree reg = register_specialization (decl, maintmpl, specargs, false, 0);
+      if (reg != decl)
+	/* Redeclaration.  */
+	return reg;
+    }
   else
     associate_classtype_constraints (type);
 
@@ -10912,7 +10935,8 @@ find_template_parameter_info::found (tree parm)
 {
   if (TREE_CODE (parm) == TREE_LIST)
     parm = TREE_VALUE (parm);
-  if (TREE_CODE (parm) == TYPE_DECL)
+  if (TREE_CODE (parm) == TYPE_DECL
+      || TREE_CODE (parm) == TEMPLATE_DECL)
     parm = TREE_TYPE (parm);
   else
     parm = DECL_INITIAL (parm);
@@ -13179,6 +13203,16 @@ extract_locals_r (tree *tp, int *walk_subtrees, void *data_)
     /* Remember local typedefs (85214).  */
     tp = &TYPE_NAME (*tp);
 
+  if (has_extra_args_mechanism_p (*tp))
+    /* Assert *_EXTRA_ARGS is empty, because we don't want to walk it and
+       potentially see a previously captured local in an evaluated context
+       that's really only used in an unevaluated context (PR114303).  This
+       means callers of build_extra_args need to clear *_EXTRA_ARGS of the
+       outermost tree.  Nested *_EXTRA_ARGS should naturally be empty since
+       the outermost (extra-args) tree will intercept any substitution before
+       a nested tree can.  */
+    gcc_checking_assert (tree_extra_args (*tp) == NULL_TREE);
+
   if (TREE_CODE (*tp) == DECL_EXPR)
     {
       tree decl = DECL_EXPR_DECL (*tp);
@@ -14628,6 +14662,7 @@ tsubst_function_decl (tree t, tree args, tsubst_flags_t complain,
     }
   determine_visibility (r);
   if (DECL_DEFAULTED_OUTSIDE_CLASS_P (r)
+      && COMPLETE_TYPE_P (DECL_CONTEXT (r))
       && !processing_template_decl)
     defaulted_late_check (r);
 
@@ -19182,10 +19217,11 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 	     of the constexpr if is still dependent.  Don't substitute into the
 	     branches now, just remember the template arguments.  */
 	  do_poplevel (IF_SCOPE (stmt));
+	  IF_SCOPE (stmt) = NULL_TREE;
 	  IF_COND (stmt) = IF_COND (t);
 	  THEN_CLAUSE (stmt) = THEN_CLAUSE (t);
 	  ELSE_CLAUSE (stmt) = ELSE_CLAUSE (t);
-	  IF_STMT_EXTRA_ARGS (stmt) = build_extra_args (t, args, complain);
+	  IF_STMT_EXTRA_ARGS (stmt) = build_extra_args (stmt, args, complain);
 	  add_stmt (stmt);
 	  break;
 	}
@@ -19889,13 +19925,6 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 				    RECUR (TREE_OPERAND (t, 1)),
 				    templated_operator_saved_lookups (t),
 				    complain));
-
-    case ANNOTATE_EXPR:
-      tmp = RECUR (TREE_OPERAND (t, 0));
-      RETURN (build3_loc (EXPR_LOCATION (t), ANNOTATE_EXPR,
-			  TREE_TYPE (tmp), tmp,
-			  RECUR (TREE_OPERAND (t, 1)),
-			  RECUR (TREE_OPERAND (t, 2))));
 
     case PREDICT_EXPR:
       RETURN (add_stmt (copy_node (t)));
@@ -21777,7 +21806,8 @@ tsubst_copy_and_build (tree t,
 
     case REQUIRES_EXPR:
       {
-	tree r = tsubst_requires_expr (t, args, tf_none, in_decl);
+	complain &= ~tf_warning_or_error;
+	tree r = tsubst_requires_expr (t, args, complain, in_decl);
 	RETURN (r);
       }
 
@@ -21824,6 +21854,13 @@ tsubst_copy_and_build (tree t,
 	  }
 	RETURN (op);
       }
+
+    case ANNOTATE_EXPR:
+      op1 = RECUR (TREE_OPERAND (t, 0));
+      RETURN (build3_loc (EXPR_LOCATION (t), ANNOTATE_EXPR,
+			  TREE_TYPE (op1), op1,
+			  RECUR (TREE_OPERAND (t, 1)),
+			  RECUR (TREE_OPERAND (t, 2))));
 
     default:
       /* Handle Objective-C++ constructs, if appropriate.  */
@@ -22155,6 +22192,13 @@ instantiate_template (tree tmpl, tree orig_args, tsubst_flags_t complain)
      template, not the most general template.  */
   DECL_TI_TEMPLATE (fndecl) = tmpl;
   DECL_TI_ARGS (fndecl) = targ_ptr;
+  if (VAR_P (pattern))
+    {
+      /* Remember if the variable was declared with [].  */
+      if (TREE_CODE (TREE_TYPE (fndecl)) == ARRAY_TYPE
+	  && TYPE_DOMAIN (TREE_TYPE (fndecl)) == NULL_TREE)
+	SET_VAR_HAD_UNKNOWN_BOUND (fndecl);
+    }
 
   set_instantiating_module (fndecl);
 

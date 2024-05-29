@@ -38,7 +38,7 @@
 #include <iomanip> // setw, setfill
 #include <format>
 
-#include <bits/charconv.h>
+#include <bits/streambuf_iterator.h>
 
 namespace std _GLIBCXX_VISIBILITY(default)
 {
@@ -69,34 +69,9 @@ namespace __detail
 #define _GLIBCXX_WIDEN_(C, S) ::std::chrono::__detail::_Widen<C>(S, L##S)
 #define _GLIBCXX_WIDEN(S) _GLIBCXX_WIDEN_(_CharT, S)
 
-
-  // Write an arbitrary duration suffix into the buffer.
-  template<typename _Period>
-    constexpr const char*
-    __units_suffix_misc(char* __buf, size_t /* TODO check length? */) noexcept
-    {
-      namespace __tc = std::__detail;
-      char* __p = __buf;
-      __p[0] = '[';
-      unsigned __nlen = __tc::__to_chars_len((uintmax_t)_Period::num);
-      __tc::__to_chars_10_impl(__p + 1, __nlen, (uintmax_t)_Period::num);
-      __p += 1 + __nlen;
-      if constexpr (_Period::den != 1)
-	{
-	  __p[0] = '/';
-	  unsigned __dlen = __tc::__to_chars_len((uintmax_t)_Period::den);
-	  __tc::__to_chars_10_impl(__p + 1, __dlen, (uintmax_t)_Period::den);
-	  __p += 1 + __dlen;
-	}
-      __p[0] = ']';
-      __p[1] = 's';
-      __p[2] = '\0';
-      return __buf;
-    }
-
   template<typename _Period, typename _CharT>
-    constexpr auto
-    __units_suffix(char* __buf, size_t __n) noexcept
+    constexpr basic_string_view<_CharT>
+    __units_suffix() noexcept
     {
       // The standard say these are all narrow strings, which would need to
       // be widened at run-time when inserted into a wide stream. We use
@@ -134,7 +109,22 @@ namespace __detail
       _GLIBCXX_UNITS_SUFFIX(ratio<3600>,  "h")
       _GLIBCXX_UNITS_SUFFIX(ratio<86400>, "d")
 #undef _GLIBCXX_UNITS_SUFFIX
-      return __detail::__units_suffix_misc<_Period>(__buf, __n);
+	return {};
+    }
+
+  template<typename _Period, typename _CharT, typename _Out>
+    inline _Out
+    __fmt_units_suffix(_Out __out) noexcept
+    {
+      if (auto __s = __detail::__units_suffix<_Period, _CharT>(); __s.size())
+	return __format::__write(std::move(__out), __s);
+      else if constexpr (_Period::den == 1)
+	return std::format_to(std::move(__out), _GLIBCXX_WIDEN("[{}]s"),
+			      (uintmax_t)_Period::num);
+      else
+	return std::format_to(std::move(__out), _GLIBCXX_WIDEN("[{}/{}]s"),
+			      (uintmax_t)_Period::num,
+			      (uintmax_t)_Period::den);
     }
 } // namespace __detail
 /// @endcond
@@ -149,14 +139,14 @@ namespace __detail
     operator<<(std::basic_ostream<_CharT, _Traits>& __os,
 	       const duration<_Rep, _Period>& __d)
     {
+      using _Out = ostreambuf_iterator<_CharT, _Traits>;
       using period = typename _Period::type;
-      char __buf[sizeof("[/]s") + 2 * numeric_limits<intmax_t>::digits10];
       std::basic_ostringstream<_CharT, _Traits> __s;
       __s.flags(__os.flags());
       __s.imbue(__os.getloc());
       __s.precision(__os.precision());
       __s << __d.count();
-      __s << __detail::__units_suffix<period, _CharT>(__buf, sizeof(__buf));
+      __detail::__fmt_units_suffix<period, _CharT>(_Out(__s));
       __os << std::move(__s).str();
       return __os;
     }
@@ -687,6 +677,7 @@ namespace __format
 	    return __fc.locale();
 	}
 
+      // Format for empty chrono-specs, e.g. "{}" (C++20 [time.format] p6).
       // TODO: consider moving body of every operator<< into this function
       // and use std::format("{}", t) to implement those operators. That
       // would avoid std::format("{}", t) calling operator<< which calls
@@ -708,6 +699,22 @@ namespace __format
 
 	      if constexpr (__is_specialization_of<_Tp, __utc_leap_second>)
 		__os << __t._M_date << ' ' << __t._M_time;
+	      else if constexpr (chrono::__is_time_point_v<_Tp>)
+		{
+		  // Need to be careful here because not all specializations
+		  // of chrono::sys_time can be written to an ostream.
+		  // For the specializations of time_point that can be
+		  // formatted with an empty chrono-specs, either it's a
+		  // sys_time with period greater or equal to days:
+		  if constexpr (is_convertible_v<_Tp, chrono::sys_days>)
+		    __os << _S_date(__t);
+		  else // Or it's formatted as "{:L%F %T}":
+		    {
+		      auto __days = chrono::floor<chrono::days>(__t);
+		      __os << chrono::year_month_day(__days) << ' '
+			 << chrono::hh_mm_ss(__t - __days);
+		    }
+		}
 	      else
 		{
 		  if constexpr (chrono::__is_duration_v<_Tp>)
@@ -1057,32 +1064,16 @@ namespace __format
       template<typename _Tp, typename _FormatContext>
 	typename _FormatContext::iterator
 	_M_q(const _Tp&, typename _FormatContext::iterator __out,
-	     _FormatContext& __ctx) const
+	     _FormatContext&) const
 	{
 	  // %q The duration's unit suffix
 	  if constexpr (!chrono::__is_duration_v<_Tp>)
 	    __throw_format_error("format error: argument is not a duration");
 	  else
 	    {
+	      namespace __d = chrono::__detail;
 	      using period = typename _Tp::period;
-	      char __buf[sizeof("[/]s") + 2 * numeric_limits<intmax_t>::digits10];
-	      constexpr size_t __n = sizeof(__buf);
-	      auto __s = chrono::__detail::__units_suffix<period, _CharT>(__buf,
-									  __n);
-	      if constexpr (is_same_v<decltype(__s), const _CharT*>)
-		return std::format_to(std::move(__out), _S_empty_spec, __s);
-	      else
-		{
-		  // Suffix was written to __buf as narrow string.
-		  _CharT __wbuf[__n];
-		  size_t __len = __builtin_strlen(__buf);
-		  locale __loc = _M_locale(__ctx);
-		  auto& __ct = use_facet<ctype<_CharT>>(__loc);
-		  __ct.widen(__buf, __len, __wbuf);
-		  __wbuf[__len] = 0;
-		  return std::format_to(std::move(__out), _S_empty_spec,
-					__wbuf);
-		}
+	      return __d::__fmt_units_suffix<period, _CharT>(std::move(__out));
 	    }
 	}
 
@@ -1150,39 +1141,43 @@ namespace __format
 				   'S', 'O');
 	    }
 
-	  __out = __format::__write(std::move(__out),
-				    _S_two_digits(__hms.seconds().count()));
-	  if constexpr (__hms.fractional_width != 0)
+	  if constexpr (__hms.fractional_width == 0)
+	    __out = __format::__write(std::move(__out),
+				      _S_two_digits(__hms.seconds().count()));
+	  else
 	    {
 	      locale __loc = _M_locale(__ctx);
+	      auto __s = __hms.seconds();
 	      auto __ss = __hms.subseconds();
 	      using rep = typename decltype(__ss)::rep;
 	      if constexpr (is_floating_point_v<rep>)
 		{
+		  chrono::duration<rep> __fs = __s + __ss;
 		  __out = std::format_to(std::move(__out), __loc,
-					 _GLIBCXX_WIDEN("{:.{}Lg}"),
-					 __ss.count(),
-					 __hms.fractional_width);
-		}
-	      else if constexpr (is_integral_v<rep>)
-		{
-		  const auto& __np
-		    = use_facet<numpunct<_CharT>>(__loc);
-		  __out = std::format_to(std::move(__out),
-					 _GLIBCXX_WIDEN("{}{:0{}}"),
-					 __np.decimal_point(),
-					 __ss.count(),
+					 _GLIBCXX_WIDEN("{:#0{}.{}Lf}"),
+					 __fs.count(),
+					 3 + __hms.fractional_width,
 					 __hms.fractional_width);
 		}
 	      else
 		{
 		  const auto& __np
 		    = use_facet<numpunct<_CharT>>(__loc);
+		  __out = __format::__write(std::move(__out),
+					    _S_two_digits(__s.count()));
 		  *__out++ = __np.decimal_point();
-		  auto __str = std::format(_S_empty_spec, __ss.count());
-		  __out = std::format_to(_GLIBCXX_WIDEN("{:0>{}s}"),
-							__str,
-							__hms.fractional_width);
+		  if constexpr (is_integral_v<rep>)
+		    __out = std::format_to(std::move(__out),
+					   _GLIBCXX_WIDEN("{:0{}}"),
+					   __ss.count(),
+					   __hms.fractional_width);
+		  else
+		    {
+		      auto __str = std::format(_S_empty_spec, __ss.count());
+		      __out = std::format_to(_GLIBCXX_WIDEN("{:0>{}s}"),
+					     __str,
+					     __hms.fractional_width);
+		    }
 		}
 	    }
 	  return __out;
@@ -1373,18 +1368,18 @@ namespace __format
 	    {
 	      if (__t._M_abbrev)
 		{
-		  __string_view __wsv;
+		  string_view __sv = *__t._M_abbrev;
 		  if constexpr (is_same_v<_CharT, char>)
-		    __wsv = *__t._M_abbrev;
+		    return __format::__write(std::move(__out), __sv);
 		  else
 		    {
-		      string_view __sv = *__t._M_abbrev;
+		      // TODO use resize_and_overwrite
 		      basic_string<_CharT> __ws(__sv.size(), _CharT());
 		      auto& __ct = use_facet<ctype<_CharT>>(_M_locale(__ctx));
 		      __ct.widen(__sv.begin(), __sv.end(), __ws.data());
-		      __wsv = __ws;
+		      __string_view __wsv = __ws;
+		      return __format::__write(std::move(__out), __wsv);
 		    }
-		  return __format::__write(std::move(__out), __wsv);
 		}
 	    }
 	  else if constexpr (__is_specialization_of<_Tp, __utc_leap_second>)
@@ -1939,7 +1934,13 @@ namespace __format
       template<typename _ParseContext>
 	constexpr typename _ParseContext::iterator
 	parse(_ParseContext& __pc)
-	{ return _M_f._M_parse(__pc, __format::_ZonedDateTime); }
+	{
+	  auto __next = _M_f._M_parse(__pc, __format::_ZonedDateTime);
+	  if constexpr (!__stream_insertable)
+	    if (_M_f._M_spec._M_chrono_specs.empty())
+	      __format::__invalid_chrono_spec(); // chrono-specs can't be empty
+	  return __next;
+	}
 
       template<typename _FormatContext>
 	typename _FormatContext::iterator
@@ -1948,6 +1949,10 @@ namespace __format
 	{ return _M_f._M_format(__t, __fc); }
 
     private:
+      static constexpr bool __stream_insertable
+	= requires (basic_ostream<_CharT>& __os,
+		    chrono::sys_time<_Duration> __t) { __os << __t; };
+
       __format::__formatter_chrono<_CharT> _M_f;
     };
 
@@ -2164,7 +2169,8 @@ namespace chrono
       _Str __s = _GLIBCXX_WIDEN("{:02d} is not a valid day");
       if (__d.ok())
 	__s = __s.substr(0, 6);
-      __os << std::vformat(__s, make_format_args<_Ctx>((unsigned)__d));
+      auto __u = (unsigned)__d;
+      __os << std::vformat(__s, make_format_args<_Ctx>(__u));
       return __os;
     }
 
@@ -2182,8 +2188,10 @@ namespace chrono
 	__os << std::vformat(__os.getloc(), __s.substr(0, 6),
 			     make_format_args<_Ctx>(__m));
       else
-	__os << std::vformat(__s.substr(6),
-			     make_format_args<_Ctx>((unsigned)__m));
+	{
+	  auto __u = (unsigned)__m;
+	  __os << std::vformat(__s.substr(6), make_format_args<_Ctx>(__u));
+	}
       return __os;
     }
 
@@ -2222,8 +2230,10 @@ namespace chrono
 	__os << std::vformat(__os.getloc(), __s.substr(0, 6),
 			     make_format_args<_Ctx>(__wd));
       else
-	__os << std::vformat(__s.substr(6),
-			     make_format_args<_Ctx>(__wd.c_encoding()));
+	{
+	  auto __c = __wd.c_encoding();
+	  __os << std::vformat(__s.substr(6), make_format_args<_Ctx>(__c));
+	}
       return __os;
     }
 

@@ -2400,6 +2400,7 @@ is_bitfield_expr_with_lowered_type (const_tree exp)
     case NEGATE_EXPR:
     case NON_LVALUE_EXPR:
     case BIT_NOT_EXPR:
+    case CLEANUP_POINT_EXPR:
       return is_bitfield_expr_with_lowered_type (TREE_OPERAND (exp, 0));
 
     case COMPONENT_REF:
@@ -10755,7 +10756,9 @@ treat_lvalue_as_rvalue_p (tree expr, bool return_p)
       for (tree decl = b->names; decl; decl = TREE_CHAIN (decl))
 	if (decl == retval)
 	  return set_implicit_rvalue_p (move (expr));
-      if (b->kind == sk_function_parms || b->kind == sk_try)
+      if (b->kind == sk_function_parms
+	  || b->kind == sk_try
+	  || b->kind == sk_namespace)
 	return NULL_TREE;
     }
 }

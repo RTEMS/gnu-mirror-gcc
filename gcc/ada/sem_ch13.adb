@@ -2921,10 +2921,10 @@ package body Sem_Ch13 is
             end case;
 
             if Delay_Required
-
                and then (A_Id = Aspect_Stable_Properties
                           or else A_Id = Aspect_Designated_Storage_Model
-                          or else A_Id = Aspect_Storage_Model_Type)
+                          or else A_Id = Aspect_Storage_Model_Type
+                          or else A_Id = Aspect_Aggregate)
                --  ??? It seems like we should do this for all aspects, not
                --  just these, but that causes as-yet-undiagnosed regressions.
 
@@ -4211,6 +4211,9 @@ package body Sem_Ch13 is
                   Aitem := Empty;
 
                when Aspect_Aggregate =>
+                  --  We will be checking that the aspect is not specified on a
+                  --  non-array type in Check_Aspect_At_Freeze_Point
+
                   Validate_Aspect_Aggregate (Expr);
                   Record_Rep_Item (E, Aspect);
                   goto Continue;
@@ -11142,6 +11145,11 @@ package body Sem_Ch13 is
             return;
 
          when Aspect_Aggregate =>
+            if Is_Array_Type (Entity (ASN)) then
+               Error_Msg_N
+                 ("aspect& can only be applied to non-array type",
+                  Ident);
+            end if;
             Resolve_Aspect_Aggregate (Entity (ASN), Expression (ASN));
             return;
 

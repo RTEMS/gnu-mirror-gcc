@@ -1800,13 +1800,18 @@ cxx_bind_parameters_in_call (const constexpr_ctx *ctx, tree t, tree fun,
 	  x = build_address (x);
 	}
       if (TREE_ADDRESSABLE (type))
-	/* Undo convert_for_arg_passing work here.  */
-	x = convert_from_reference (x);
-      /* Normally we would strip a TARGET_EXPR in an initialization context
-	 such as this, but here we do the elision differently: we keep the
-	 TARGET_EXPR, and use its CONSTRUCTOR as the value of the parm.  */
-      arg = cxx_eval_constant_expression (ctx, x, vc_prvalue,
-					  non_constant_p, overflow_p);
+	{
+	  /* Undo convert_for_arg_passing work here.  */
+	  x = convert_from_reference (x);
+	  arg = cxx_eval_constant_expression (ctx, x, vc_glvalue,
+					      non_constant_p, overflow_p);
+	}
+      else
+	/* Normally we would strip a TARGET_EXPR in an initialization context
+	   such as this, but here we do the elision differently: we keep the
+	   TARGET_EXPR, and use its CONSTRUCTOR as the value of the parm.  */
+	arg = cxx_eval_constant_expression (ctx, x, vc_prvalue,
+					    non_constant_p, overflow_p);
       /* Don't VERIFY_CONSTANT here.  */
       if (*non_constant_p && ctx->quiet)
 	break;
@@ -1818,7 +1823,16 @@ cxx_bind_parameters_in_call (const constexpr_ctx *ctx, tree t, tree fun,
 	{
 	  /* Make sure the binding has the same type as the parm.  But
 	     only for constant args.  */
-	  if (!TYPE_REF_P (type))
+	  if (TREE_ADDRESSABLE (type))
+	    {
+	      if (!same_type_p (type, TREE_TYPE (arg)))
+		{
+		  arg = build_fold_addr_expr (arg);
+		  arg = cp_fold_convert (build_reference_type (type), arg);
+		  arg = convert_from_reference (arg);
+		}
+	    }
+	  else if (!TYPE_REF_P (type))
 	    arg = adjust_temp_type (type, arg);
 	  if (!TREE_CONSTANT (arg))
 	    *non_constant_args = true;
@@ -4187,7 +4201,8 @@ cxx_eval_array_reference (const constexpr_ctx *ctx, tree t,
   if (!lval
       && TREE_CODE (ary) == VIEW_CONVERT_EXPR
       && VECTOR_TYPE_P (TREE_TYPE (TREE_OPERAND (ary, 0)))
-      && TREE_TYPE (t) == TREE_TYPE (TREE_TYPE (TREE_OPERAND (ary, 0))))
+      && (TYPE_MAIN_VARIANT (TREE_TYPE (t))
+	  == TYPE_MAIN_VARIANT (TREE_TYPE (TREE_TYPE (TREE_OPERAND (ary, 0))))))
     ary = TREE_OPERAND (ary, 0);
 
   tree oldidx = TREE_OPERAND (t, 1);
@@ -5532,6 +5547,9 @@ cxx_fold_indirect_ref (const constexpr_ctx *ctx, location_t loc, tree type,
      more folding opportunities.  */
   auto canonicalize_obj_off = [] (tree& obj, tree& off) {
     while (TREE_CODE (obj) == COMPONENT_REF
+	   /* We need to preserve union member accesses so that we can
+	      later properly diagnose accessing the wrong member.  */
+	   && TREE_CODE (TREE_TYPE (TREE_OPERAND (obj, 0))) == RECORD_TYPE
 	   && (tree_int_cst_sign_bit (off) || integer_zerop (off)))
       {
 	tree field = TREE_OPERAND (obj, 1);
@@ -6298,6 +6316,7 @@ cxx_eval_store_expression (const constexpr_ctx *ctx, tree t,
      object.  Make a note of this fact by marking the CONSTRUCTOR
      TREE_READONLY.  */
   if (TREE_CODE (t) == INIT_EXPR
+      && !empty_base
       && TREE_CODE (*valp) == CONSTRUCTOR
       && TYPE_READONLY (type))
     {
@@ -6721,6 +6740,16 @@ cxx_eval_switch_expr (const constexpr_ctx *ctx, tree t,
   cond = cxx_eval_constant_expression (ctx, cond, vc_prvalue,
 				       non_constant_p, overflow_p);
   VERIFY_CONSTANT (cond);
+  if (TREE_CODE (cond) != INTEGER_CST)
+    {
+      /* If the condition doesn't reduce to an INTEGER_CST it isn't a usable
+	 switch condition even if it's constant enough for other things
+	 (c++/113545).  */
+      gcc_checking_assert (ctx->quiet);
+      *non_constant_p = true;
+      return t;
+    }
+
   *jump_target = cond;
 
   tree body
@@ -7090,9 +7119,19 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
 
     case PARM_DECL:
       if (lval && !TYPE_REF_P (TREE_TYPE (t)))
-	/* glvalue use.  */;
+	{
+	  /* glvalue use.  */
+	  if (TREE_ADDRESSABLE (TREE_TYPE (t)))
+	    if (tree v = ctx->global->get_value (t))
+	      r = v;
+	}
       else if (tree v = ctx->global->get_value (r))
-	r = v;
+	{
+	  r = v;
+	  if (TREE_ADDRESSABLE (TREE_TYPE (t)))
+	    r = cxx_eval_constant_expression (ctx, r, vc_prvalue,
+					      non_constant_p, overflow_p);
+	}
       else if (lval)
 	/* Defer in case this is only used for its type.  */;
       else if (COMPLETE_TYPE_P (TREE_TYPE (t))

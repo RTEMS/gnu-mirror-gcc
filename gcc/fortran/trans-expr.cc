@@ -1692,6 +1692,7 @@ gfc_trans_class_init_assign (gfc_code *code)
   tree tmp;
   gfc_se dst,src,memsz;
   gfc_expr *lhs, *rhs, *sz;
+  gfc_component *cmp;
 
   gfc_start_block (&block);
 
@@ -1707,6 +1708,21 @@ gfc_trans_class_init_assign (gfc_code *code)
   gfc_add_def_init_component (rhs);
   /* The _def_init is always scalar.  */
   rhs->rank = 0;
+
+  /* Check def_init for initializers.  If this is a dummy with all default
+     initializer components NULL, return NULL_TREE and use the passed value as
+     required by F2018(8.5.10).  */
+  if (!lhs->ref && lhs->symtree->n.sym->attr.dummy)
+    {
+      cmp = rhs->ref->next->u.c.component->ts.u.derived->components;
+      for (; cmp; cmp = cmp->next)
+	{
+	  if (cmp->initializer)
+	    break;
+	  else if (!cmp->next)
+	    return build_empty_stmt (input_location);
+	}
+    }
 
   if (code->expr1->ts.type == BT_CLASS
       && CLASS_DATA (code->expr1)->attr.dimension)
@@ -2875,11 +2891,13 @@ conv_inquiry (gfc_se * se, gfc_ref * ref, gfc_expr *expr, gfc_typespec *ts)
     case INQUIRY_KIND:
       res = build_int_cst (gfc_typenode_for_spec (&expr->ts),
 			   ts->kind);
+      se->string_length = NULL_TREE;
       break;
 
     case INQUIRY_LEN:
       res = fold_convert (gfc_typenode_for_spec (&expr->ts),
 			  se->string_length);
+      se->string_length = NULL_TREE;
       break;
 
     default:
@@ -6518,6 +6536,10 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
 			    {
 			      tree efield;
 
+			      /* Evaluate arguments just once.  */
+			      if (e->expr_type != EXPR_VARIABLE)
+				parmse.expr = save_expr (parmse.expr);
+
 			      /* Set the _data field.  */
 			      tmp = gfc_class_data_get (var);
 			      efield = fold_convert (TREE_TYPE (tmp),
@@ -7046,8 +7068,10 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
 	 with an interface indicating an optional argument.  When we call
 	 an intrinsic subroutine, however, fsym is NULL, but we might still
 	 have an optional argument, so we proceed to the substitution
-	 just in case.  */
-      if (e && (fsym == NULL || fsym->attr.optional))
+	 just in case.  Arguments passed to bind(c) procedures via CFI
+	 descriptors are handled elsewhere.  */
+      if (e && (fsym == NULL || fsym->attr.optional)
+	  && !(sym->attr.is_bind_c && is_CFI_desc (fsym, NULL)))
 	{
 	  /* If an optional argument is itself an optional dummy argument,
 	     check its presence and substitute a null if absent.  This is
@@ -7602,8 +7626,14 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
 	{
 	  gcc_assert (se->loop && info);
 
-	  /* Set the type of the array.  */
-	  tmp = gfc_typenode_for_spec (&comp->ts);
+	  /* Set the type of the array. vtable charlens are not always reliable.
+	     Use the interface, if possible.  */
+	  if (comp->ts.type == BT_CHARACTER
+	      && expr->symtree->n.sym->ts.type == BT_CLASS
+	      && comp->ts.interface && comp->ts.interface->result)
+	    tmp = gfc_typenode_for_spec (&comp->ts.interface->result->ts);
+	  else
+	    tmp = gfc_typenode_for_spec (&comp->ts);
 	  gcc_assert (se->ss->dimen == se->loop->dimen);
 
 	  /* Evaluate the bounds of the result, if known.  */
@@ -9358,7 +9388,7 @@ gfc_conv_structure (gfc_se * se, gfc_expr * expr, int init)
   cm = expr->ts.u.derived->components;
 
   for (c = gfc_constructor_first (expr->value.constructor);
-       c; c = gfc_constructor_next (c), cm = cm->next)
+       c && cm; c = gfc_constructor_next (c), cm = cm->next)
     {
       /* Skip absent members in default initializers and allocatable
 	 components.  Although the latter have a default initializer
@@ -9718,7 +9748,8 @@ trans_get_upoly_len (stmtblock_t *block, gfc_expr *expr)
 static tree
 trans_class_vptr_len_assignment (stmtblock_t *block, gfc_expr * le,
 				 gfc_expr * re, gfc_se *rse,
-				 tree * to_lenp, tree * from_lenp)
+				 tree * to_lenp, tree * from_lenp,
+				 tree * from_vptrp)
 {
   gfc_se se;
   gfc_expr * vptr_expr;
@@ -9726,10 +9757,11 @@ trans_class_vptr_len_assignment (stmtblock_t *block, gfc_expr * le,
   bool set_vptr = false, temp_rhs = false;
   stmtblock_t *pre = block;
   tree class_expr = NULL_TREE;
+  tree from_vptr = NULL_TREE;
 
   /* Create a temporary for complicated expressions.  */
   if (re->expr_type != EXPR_VARIABLE && re->expr_type != EXPR_NULL
-      && rse->expr != NULL_TREE && !DECL_P (rse->expr))
+      && rse->expr != NULL_TREE)
     {
       if (re->ts.type == BT_CLASS && !GFC_CLASS_TYPE_P (TREE_TYPE (rse->expr)))
 	class_expr = gfc_get_class_from_expr (rse->expr);
@@ -9826,6 +9858,7 @@ trans_class_vptr_len_assignment (stmtblock_t *block, gfc_expr * le,
 		tmp = rse->expr;
 
 	      se.expr = gfc_class_vptr_get (tmp);
+	      from_vptr = se.expr;
 	      if (UNLIMITED_POLY (re))
 		from_len = gfc_class_len_get (tmp);
 
@@ -9847,6 +9880,7 @@ trans_class_vptr_len_assignment (stmtblock_t *block, gfc_expr * le,
 	  gfc_free_expr (vptr_expr);
 	  gfc_add_block_to_block (block, &se.pre);
 	  gcc_assert (se.post.head == NULL_TREE);
+	  from_vptr = se.expr;
 	}
       gfc_add_modify (pre, lhs_vptr, fold_convert (TREE_TYPE (lhs_vptr),
 						se.expr));
@@ -9875,11 +9909,13 @@ trans_class_vptr_len_assignment (stmtblock_t *block, gfc_expr * le,
 	}
     }
 
-  /* Return the _len trees only, when requested.  */
+  /* Return the _len and _vptr trees only, when requested.  */
   if (to_lenp)
     *to_lenp = to_len;
   if (from_lenp)
     *from_lenp = from_len;
+  if (from_vptrp)
+    *from_vptrp = from_vptr;
   return lhs_vptr;
 }
 
@@ -9948,7 +9984,7 @@ trans_class_pointer_fcn (stmtblock_t *block, gfc_se *lse, gfc_se *rse,
     {
       expr1_vptr = trans_class_vptr_len_assignment (block, expr1,
 						    expr2, rse,
-						    NULL, NULL);
+						    NULL, NULL, NULL);
       gfc_add_block_to_block (block, &rse->pre);
       tmp = gfc_create_var (TREE_TYPE (rse->expr), "ptrtemp");
       gfc_add_modify (&lse->pre, tmp, rse->expr);
@@ -10024,7 +10060,7 @@ gfc_trans_pointer_assignment (gfc_expr * expr1, gfc_expr * expr2)
       if (non_proc_ptr_assign && expr1->ts.type == BT_CLASS)
 	{
 	  trans_class_vptr_len_assignment (&block, expr1, expr2, &rse, NULL,
-					   NULL);
+					   NULL, NULL);
 	  lse.expr = gfc_class_data_get (lse.expr);
 	}
 
@@ -10153,7 +10189,8 @@ gfc_trans_pointer_assignment (gfc_expr * expr1, gfc_expr * expr2)
 	      if (expr1->ts.type == BT_CLASS)
 		expr1_vptr = trans_class_vptr_len_assignment (&block, expr1,
 							      expr2, &rse,
-							      NULL, NULL);
+							      NULL, NULL,
+							      NULL);
 	    }
 	}
       else if (expr2->expr_type == EXPR_VARIABLE)
@@ -10170,7 +10207,7 @@ gfc_trans_pointer_assignment (gfc_expr * expr1, gfc_expr * expr2)
 	      rse.expr = NULL_TREE;
 	      rse.string_length = strlen_rhs;
 	      trans_class_vptr_len_assignment (&block, expr1, expr2, &rse,
-					       NULL, NULL);
+					       NULL, NULL, NULL);
 	    }
 
 	  if (remap == NULL)
@@ -10203,7 +10240,7 @@ gfc_trans_pointer_assignment (gfc_expr * expr1, gfc_expr * expr2)
 	    {
 	      expr1_vptr = trans_class_vptr_len_assignment (&block, expr1,
 							    expr2, &rse, NULL,
-							    NULL);
+							    NULL, NULL);
 	      gfc_add_block_to_block (&block, &rse.pre);
 	      tmp = gfc_create_var (TREE_TYPE (rse.expr), "ptrtemp");
 	      gfc_add_modify (&lse.pre, tmp, rse.expr);
@@ -10233,12 +10270,9 @@ gfc_trans_pointer_assignment (gfc_expr * expr1, gfc_expr * expr2)
 	{
 	  gfc_symbol *psym = expr1->symtree->n.sym;
 	  tmp = NULL_TREE;
-	  if (psym->ts.type == BT_CHARACTER)
-	    {
-	      gcc_assert (psym->ts.u.cl->backend_decl
-			  && VAR_P (psym->ts.u.cl->backend_decl));
-	      tmp = psym->ts.u.cl->backend_decl;
-	    }
+	  if (psym->ts.type == BT_CHARACTER
+	      && psym->ts.u.cl->backend_decl)
+	    tmp = psym->ts.u.cl->backend_decl;
 	  else if (expr1->ts.u.cl->backend_decl
 		   && VAR_P (expr1->ts.u.cl->backend_decl))
 	    tmp = expr1->ts.u.cl->backend_decl;
@@ -11594,7 +11628,7 @@ trans_class_assignment (stmtblock_t *block, gfc_expr *lhs, gfc_expr *rhs,
 			gfc_se *lse, gfc_se *rse, bool use_vptr_copy,
 			bool class_realloc)
 {
-  tree tmp, fcn, stdcopy, to_len, from_len, vptr, old_vptr;
+  tree tmp, fcn, stdcopy, to_len, from_len, vptr, old_vptr, rhs_vptr;
   vec<tree, va_gc> *args = NULL;
   bool final_expr;
 
@@ -11618,7 +11652,9 @@ trans_class_assignment (stmtblock_t *block, gfc_expr *lhs, gfc_expr *rhs,
     }
 
   vptr = trans_class_vptr_len_assignment (block, lhs, rhs, rse, &to_len,
-					 &from_len);
+					  &from_len, &rhs_vptr);
+  if (rhs_vptr == NULL_TREE)
+    rhs_vptr = vptr;
 
   /* Generate (re)allocation of the lhs.  */
   if (class_realloc)
@@ -11631,7 +11667,20 @@ trans_class_assignment (stmtblock_t *block, gfc_expr *lhs, gfc_expr *rhs,
       else
 	old_vptr = build_int_cst (TREE_TYPE (vptr), 0);
 
-      size = gfc_vptr_size_get (vptr);
+      size = gfc_vptr_size_get (rhs_vptr);
+
+      /* Take into account _len of unlimited polymorphic entities.
+	 TODO: handle class(*) allocatable function results on rhs.  */
+      if (UNLIMITED_POLY (rhs) && rhs->expr_type == EXPR_VARIABLE)
+	{
+	  tree len = trans_get_upoly_len (block, rhs);
+	  len = fold_build2_loc (input_location, MAX_EXPR, size_type_node,
+				 fold_convert (size_type_node, len),
+				 size_one_node);
+	  size = fold_build2_loc (input_location, MULT_EXPR, TREE_TYPE (size),
+				  size, fold_convert (TREE_TYPE (size), len));
+	}
+
       tmp = lse->expr;
       class_han = GFC_CLASS_TYPE_P (TREE_TYPE (tmp))
 	  ? gfc_class_data_get (tmp) : tmp;
@@ -11645,12 +11694,14 @@ trans_class_assignment (stmtblock_t *block, gfc_expr *lhs, gfc_expr *rhs,
 
       /* Reallocate if dynamic types are different. */
       gfc_init_block (&re_alloc);
+      tmp = fold_convert (pvoid_type_node, class_han);
       re = build_call_expr_loc (input_location,
 				builtin_decl_explicit (BUILT_IN_REALLOC), 2,
-				fold_convert (pvoid_type_node, class_han),
-				size);
+				tmp, size);
+      re = fold_build2_loc (input_location, MODIFY_EXPR, TREE_TYPE (tmp), tmp,
+			    re);
       tmp = fold_build2_loc (input_location, NE_EXPR,
-			     logical_type_node, vptr, old_vptr);
+			     logical_type_node, rhs_vptr, old_vptr);
       re = fold_build3_loc (input_location, COND_EXPR, void_type_node,
 			    tmp, re, build_empty_stmt (input_location));
       gfc_add_expr_to_block (&re_alloc, re);
@@ -12174,11 +12225,14 @@ gfc_trans_assignment_1 (gfc_expr * expr1, gfc_expr * expr2, bool init_flag,
   gfc_add_block_to_block (&body, &lse.pre);
   gfc_add_expr_to_block (&body, tmp);
 
-  /* Add the post blocks to the body.  */
-  if (!l_is_temp)
+  /* Add the post blocks to the body.  Scalar finalization must appear before
+     the post block in case any dellocations are done.  */
+  if (rse.finalblock.head
+      && (!l_is_temp || (expr2->expr_type == EXPR_FUNCTION
+			 && gfc_expr_attr (expr2).elemental)))
     {
-      gfc_add_block_to_block (&rse.finalblock, &rse.post);
       gfc_add_block_to_block (&body, &rse.finalblock);
+      gfc_add_block_to_block (&body, &rse.post);
     }
   else
     gfc_add_block_to_block (&body, &rse.post);

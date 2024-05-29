@@ -2957,6 +2957,7 @@ again:
   LOOP_VINFO_VERSIONING_THRESHOLD (loop_vinfo) = 0;
   LOOP_VINFO_CAN_USE_PARTIAL_VECTORS_P (loop_vinfo)
     = saved_can_use_partial_vectors_p;
+  LOOP_VINFO_USING_PARTIAL_VECTORS_P (loop_vinfo) = false;
 
   goto start_over;
 }
@@ -7065,17 +7066,18 @@ vectorizable_reduction (loop_vec_info loop_vinfo,
 		  < GET_MODE_SIZE (SCALAR_TYPE_MODE (TREE_TYPE (vectype_op[i]))))))
 	vectype_in = vectype_op[i];
 
-      if (op.code == COND_EXPR)
+      /* Record how the non-reduction-def value of COND_EXPR is defined.
+	 ???  For a chain of multiple CONDs we'd have to match them up all.  */
+      if (op.code == COND_EXPR && reduc_chain_length == 1)
 	{
-	  /* Record how the non-reduction-def value of COND_EXPR is defined.  */
 	  if (dt == vect_constant_def)
 	    {
 	      cond_reduc_dt = dt;
 	      cond_reduc_val = op.ops[i];
 	    }
-	  if (dt == vect_induction_def
-	      && def_stmt_info
-	      && is_nonwrapping_integer_induction (def_stmt_info, loop))
+	  else if (dt == vect_induction_def
+		   && def_stmt_info
+		   && is_nonwrapping_integer_induction (def_stmt_info, loop))
 	    {
 	      cond_reduc_dt = dt;
 	      cond_stmt_vinfo = def_stmt_info;
@@ -8730,7 +8732,7 @@ vect_peel_nonlinear_iv_init (gimple_seq* stmts, tree init_expr,
 	wi::to_mpz (skipn, exp, UNSIGNED);
 	mpz_ui_pow_ui (mod, 2, TYPE_PRECISION (type));
 	mpz_powm (res, base, exp, mod);
-	begin = wi::from_mpz (type, res, TYPE_SIGN (type));
+	begin = wi::from_mpz (utype, res, true);
 	tree mult_expr = wide_int_to_tree (utype, begin);
 	init_expr = gimple_build (stmts, MULT_EXPR, utype,
 				  init_expr, mult_expr);
@@ -8943,6 +8945,8 @@ vectorizable_nonlinear_induction (loop_vec_info loop_vinfo,
   switch (induction_type)
     {
     case vect_step_op_neg:
+      if (maybe_eq (TYPE_VECTOR_SUBPARTS (vectype), 1u))
+	return false;
       if (TREE_CODE (init_expr) != INTEGER_CST
 	  && TREE_CODE (init_expr) != REAL_CST)
 	{
@@ -9284,6 +9288,15 @@ vectorizable_induction (loop_vec_info loop_vinfo,
 
   step_expr = STMT_VINFO_LOOP_PHI_EVOLUTION_PART (stmt_info);
   gcc_assert (step_expr != NULL_TREE);
+  if (INTEGRAL_TYPE_P (TREE_TYPE (step_expr))
+      && !type_has_mode_precision_p (TREE_TYPE (step_expr)))
+    {
+      if (dump_enabled_p ())
+	dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+			 "bit-precision induction vectorization not "
+			 "supported.\n");
+      return false;
+    }
   tree step_vectype = get_same_sized_vectype (TREE_TYPE (step_expr), vectype);
 
   /* Check for backend support of PLUS/MINUS_EXPR. */
@@ -10531,7 +10544,16 @@ vect_transform_loop_stmt (loop_vec_info loop_vinfo, stmt_vec_info stmt_info,
 
   if (!STMT_VINFO_RELEVANT_P (stmt_info)
       && !STMT_VINFO_LIVE_P (stmt_info))
-    return false;
+    {
+      if (is_gimple_call (stmt_info->stmt)
+	  && gimple_call_internal_p (stmt_info->stmt, IFN_MASK_CALL))
+	{
+	  gcc_assert (!gimple_call_lhs (stmt_info->stmt));
+	  *seen_store = stmt_info;
+	  return false;
+	}
+      return false;
+    }
 
   if (STMT_VINFO_VECTYPE (stmt_info))
     {
@@ -10588,9 +10610,7 @@ find_in_mapping (tree t, void *context)
    corresponding dr_vec_info need to be reconnected to the EPILOGUE's
    stmt_vec_infos, their statements need to point to their corresponding copy,
    if they are gather loads or scatter stores then their reference needs to be
-   updated to point to its corresponding copy and finally we set
-   'base_misaligned' to false as we have already peeled for alignment in the
-   prologue of the main loop.  */
+   updated to point to its corresponding copy.  */
 
 static void
 update_epilogue_loop_vinfo (class loop *epilogue, tree advance)
@@ -10731,10 +10751,6 @@ update_epilogue_loop_vinfo (class loop *epilogue, tree advance)
 	}
       DR_STMT (dr) = STMT_VINFO_STMT (stmt_vinfo);
       stmt_vinfo->dr_aux.stmt = stmt_vinfo;
-      /* The vector size of the epilogue is smaller than that of the main loop
-	 so the alignment is either the same or lower. This means the dr will
-	 thus by definition be aligned.  */
-      STMT_VINFO_DR_INFO (stmt_vinfo)->base_misaligned = false;
     }
 
   epilogue_vinfo->shared->datarefs_copy.release ();

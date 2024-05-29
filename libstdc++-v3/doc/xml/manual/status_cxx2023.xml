@@ -20,8 +20,8 @@ presence of the required flag.
 </para>
 
 <para>
-This section describes the C++23 and library TS support in mainline GCC,
-not in any particular release.
+This section describes the C++23 and library TS support in
+the GCC 13 release series, not in any particular release.
 </para>
 
 <para>
@@ -491,7 +491,7 @@ or any notes about the implementation.
         P2255R2
         </link>
       </entry>
-      <entry align="center"> 13.1 (missing changes to <code>std::tuple</code> </entry>
+      <entry align="center"> 13.1 (missing changes to <code>std::tuple</code>) </entry>
       <entry> <code>__cpp_lib_reference_from_temporary &gt;= 202202L</code> </entry>
     </row>
 
