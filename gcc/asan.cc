@@ -2251,6 +2251,8 @@ asan_protect_global (tree decl, bool ignore_decl_rtl_set_p)
       || (DECL_SECTION_NAME (decl) != NULL
 	  && !symtab_node::get (decl)->implicit_section
 	  && !section_sanitized_p (DECL_SECTION_NAME (decl)))
+      /* Don't protect variables in non-generic address-space.  */
+      || !ADDR_SPACE_GENERIC_P (TYPE_ADDR_SPACE (TREE_TYPE (decl)))
       || DECL_SIZE (decl) == 0
       || ASAN_RED_ZONE_SIZE * BITS_PER_UNIT > MAX_OFILE_ALIGNMENT
       || TREE_CODE (DECL_SIZE_UNIT (decl)) != INTEGER_CST
@@ -2708,6 +2710,10 @@ instrument_derefs (gimple_stmt_iterator *iter, tree t,
     return;
 
   if (VAR_P (inner) && DECL_HARD_REGISTER (inner))
+    return;
+
+  /* Accesses to non-generic address-spaces should not be instrumented.  */
+  if (!ADDR_SPACE_GENERIC_P (TYPE_ADDR_SPACE (TREE_TYPE (inner))))
     return;
 
   poly_int64 decl_size;
@@ -3746,9 +3752,7 @@ asan_expand_mark_ifn (gimple_stmt_iterator *iter)
     }
   tree len = gimple_call_arg (g, 2);
 
-  gcc_assert (tree_fits_shwi_p (len));
-  unsigned HOST_WIDE_INT size_in_bytes = tree_to_shwi (len);
-  gcc_assert (size_in_bytes);
+  gcc_assert (poly_int_tree_p (len));
 
   g = gimple_build_assign (make_ssa_name (pointer_sized_int_node),
 			   NOP_EXPR, base);
@@ -3757,9 +3761,10 @@ asan_expand_mark_ifn (gimple_stmt_iterator *iter)
   tree base_addr = gimple_assign_lhs (g);
 
   /* Generate direct emission if size_in_bytes is small.  */
-  if (size_in_bytes
-      <= (unsigned)param_use_after_scope_direct_emission_threshold)
+  unsigned threshold = param_use_after_scope_direct_emission_threshold;
+  if (tree_fits_uhwi_p (len) && tree_to_uhwi (len) <= threshold)
     {
+      unsigned HOST_WIDE_INT size_in_bytes = tree_to_uhwi (len);
       const unsigned HOST_WIDE_INT shadow_size
 	= shadow_mem_size (size_in_bytes);
       const unsigned int shadow_align
