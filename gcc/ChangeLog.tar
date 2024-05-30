@@ -1,3 +1,29 @@
+==================== Branch work167-tar, patch #207 ====================
+
+Add wt to move constraints.
+
+2024-05-30  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.md (mov<mode>_internal): Add wt to various move
+	constraints to support -m*spr debug switches.
+	(movcc_<mode>): Likewise.
+	(movsf_hardfloat): Likewise.
+	(movsd_hardfloat): Likewise.
+	(mov<mode>_hardfloat64): Likewise.
+	(mov<mode>_softfloat64): Likewise.
+	(*call_indirect_nonlocal_sysv<mode>): Add wt to call constraints.
+	(call_value_indirect_nonlocal_sysv<mode>): Likewise.
+	(call_indirect_aix<mode>): Likewise.
+	(call_value_indirect_aix<mode>): Likewise.
+	(call_indirect_elfv2<mode>): Likewise.
+	(call_indirect_pcrel<mode>): Likewise.
+	(call_value_indirect_elfv2<mode>): Likewise.
+	(call_value_indirect_pcrel): Likewise.
+	(sibcall_indirect_nonlocal_sysv<mode): Likewise.
+	(sibcall_value_indirect_nonlocal_sysv<mode>): Likewise.
+
 ==================== Branch work167-tar, patch #206 ====================
 
 Add more SPR register debug options.
