@@ -1,3 +1,256 @@
+2024-06-06  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-06-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/114493
+	* gcc.dg/pr114493-1.c: New test.
+	* gcc.dg/pr114493-2.c: New test.
+
+2024-06-05  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	* gcc.target/i386/avx10_1-25.c: Require ifunc support.
+	* gcc.target/i386/avx10_1-26.c: Likewise.
+
+2024-06-04  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-06-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/115337
+	* gcc.dg/bitint-106.c: New test.
+
+2024-06-04  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-06-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/108789
+	* gcc.c-torture/execute/pr108789.c: New test.
+
+2024-06-04  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-05-15  Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/114902
+	PR rtl-optimization/115092
+	* gcc.dg/pr114902.c: New test.
+	* gcc.dg/pr115092.c: New test.
+
+2024-06-04  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	Backported from master:
+	2024-04-30  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	PR modula2/114886
+	* lib/gm2.exp: Don't load timeout-dg.exp.
+	Don't set gm2_previous_timeout.
+	Don't call dg-timeout.
+	(gm2_push_timeout, gm2_pop_timeout): Remove.
+	(gm2_init): Don't call dg-timeout.
+	* lib/gm2-torture.exp: Don't load timeout-dg.exp.
+	Don't set gm2_previous_timeout.
+	Don't call dg-timeout.
+	(gm2_push_timeout, gm2_pop_timeout): Remove.
+	* gm2/coroutines/pim/run/pass/coroutines-pim-run-pass.exp: Don't
+	load timeout-dg.exp.
+	Don't call gm2_push_timeout, gm2_pop_timeout.
+	* gm2/examples/map/pass/examples-map-pass.exp: Don't call
+	gm2_push_timeout, gm2_pop_timeout.
+	* gm2/iso/run/pass/iso-run-pass.exp: Don't load timeout-dg.exp.
+	Don't call gm2_push_timeout, gm2_pop_timeout.
+	* gm2/pimlib/base/run/pass/pimlib-base-run-pass.exp: Don't load
+	timeout-dg.exp.
+	Don't call gm2_push_timeout, gm2_pop_timeout.
+	* gm2/projects/iso/run/pass/halma/projects-iso-run-pass-halma.exp:
+	Don't call gm2_push_timeout, gm2_pop_timeout.
+	* gm2/switches/whole-program/pass/run/switches-whole-program-pass-run.exp:
+	Don't load timeout-dg.exp.
+	Don't call gm2_push_timeout, gm2_pop_timeout.
+
+2024-06-03  Haochen Jiang  <haochen.jiang@intel.com>
+
+	* gcc.target/i386/avx10_1-25.c: New test.
+	* gcc.target/i386/avx10_1-26.c: Ditto.
+
+2024-06-01  Georg-Johann Lay  <avr@gjlay.de>
+
+	Backported from master:
+	2024-06-01  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR target/115317
+	* gcc.target/avr/torture/pr115317-isinf.c: New test.
+
+2024-06-01  Georg-Johann Lay  <avr@gjlay.de>
+
+	Backported from master:
+	2024-06-01  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR tree-optimization/115307
+	* gcc.target/avr/torture/pr115307-isinf.c: New test.
+
+2024-05-31  Uros Bizjak  <ubizjak@gmail.com>
+
+	Backported from master:
+	2024-05-31  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/115297
+	* gcc.target/alpha/pr115297.c: New test.
+
+2024-05-31  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2024-05-24  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR tree-optimization/115192
+	* gcc.dg/vect/pr115192.c: New test.
+
+2024-05-29  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-05-21  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/115149
+	* gcc.dg/pr115149.c: New testcase.
+
+2024-05-29  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-05-23  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/115197
+	* gcc.dg/pr115197.c: New testcase.
+
+2024-05-28  Tobias Burnus  <tburnus@baylibre.com>
+
+	Backported from master:
+	2024-05-20  Tobias Burnus  <tburnus@baylibre.com>
+
+	PR fortran/115150
+	* gfortran.dg/shape_12.f90: New test.
+
+2024-05-27  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-05-27  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/115232
+	* g++.dg/pr115232.C: New testcase.
+
+2024-05-25  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2024-05-24  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/86100
+	* gfortran.dg/bounds_check_25.f90: New test.
+
+2024-05-24  Jason Merrill  <jason@redhat.com>
+
+	PR c++/115187
+	* g++.dg/cpp1z/array-prvalue3.C: New test.
+
+2024-05-24  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	Backported from master:
+	2024-05-01  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/114868
+	* g++.dg/modules/using-15_a.C: New test.
+	* g++.dg/modules/using-15_b.C: New test.
+	* g++.dg/modules/using-15_c.C: New test.
+
+2024-05-24  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/105320
+	PR c++/114275
+	* g++.dg/modules/tpl-friend-10_a.C: New test.
+	* g++.dg/modules/tpl-friend-10_b.C: New test.
+	* g++.dg/modules/tpl-friend-10_c.C: New test.
+	* g++.dg/modules/tpl-friend-10_d.C: New test.
+	* g++.dg/modules/tpl-friend-11_a.C: New test.
+	* g++.dg/modules/tpl-friend-11_b.C: New test.
+	* g++.dg/modules/tpl-friend-12_a.C: New test.
+	* g++.dg/modules/tpl-friend-12_b.C: New test.
+	* g++.dg/modules/tpl-friend-12_c.C: New test.
+	* g++.dg/modules/tpl-friend-12_d.C: New test.
+	* g++.dg/modules/tpl-friend-12_e.C: New test.
+	* g++.dg/modules/tpl-friend-12_f.C: New test.
+	* g++.dg/modules/tpl-friend-13_a.C: New test.
+	* g++.dg/modules/tpl-friend-13_b.C: New test.
+	* g++.dg/modules/tpl-friend-13_c.C: New test.
+	* g++.dg/modules/tpl-friend-13_d.C: New test.
+	* g++.dg/modules/tpl-friend-13_e.C: New test.
+	* g++.dg/modules/tpl-friend-13_f.C: New test.
+	* g++.dg/modules/tpl-friend-13_g.C: New test.
+	* g++.dg/modules/tpl-friend-14_a.C: New test.
+	* g++.dg/modules/tpl-friend-14_b.C: New test.
+	* g++.dg/modules/tpl-friend-14_c.C: New test.
+	* g++.dg/modules/tpl-friend-14_d.C: New test.
+	* g++.dg/modules/tpl-friend-9.C: New test.
+
+2024-05-24  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	Backported from master:
+	2024-04-30  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	* g++.dg/modules/enum-12.C: Update error message.
+	* g++.dg/modules/friend-5_b.C: Likewise.
+	* g++.dg/modules/shadow-1_b.C: Likewise.
+
+2024-05-23  Martin Jambor  <mjambor@suse.cz>
+
+	Backported from master:
+	2024-05-09  Martin Jambor  <mjambor@suse.cz>
+
+	* g++.dg/tree-ssa/pr109849.C: Also check that the aggeegate store
+	to cur disappears.
+	* gcc.dg/tree-ssa/ssa-dse-26.c: Instead of relying on DSE,
+	check that the unwanted stores were removed at early SRA time.
+
+2024-05-22  Marek Polacek  <polacek@redhat.com>
+
+	Backported from master:
+	2024-05-09  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/114983
+	* g++.dg/warn/Wsizeof-array-div3.C: New test.
+
+2024-05-22  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	Backported from master:
+	2024-05-22  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	* gcc.target/arm/cmse/extend-param.c: Add regression test. Add
+	-fshort-enums.
+	* gcc.target/arm/cmse/extend-return.c: Add -fshort-enums option.
+
+2024-05-22  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* g++.dg/opt/fmo1.C: New test.
+
+2024-05-22  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-05-22  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/115152
+	* gcc.dg/pr115152.c: New test.
+
+2024-05-22  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-05-22  Jakub Jelinek  <jakub@redhat.com>
+
+	PR sanitizer/115172
+	* gcc.dg/asan/pr115172.c: New test.
+
+2024-05-22  Haochen Jiang  <haochen.jiang@intel.com>
+
+	PR target/115069
+	* gcc.target/i386/pr115069.c: New.
+
 2024-05-21  Patrick Palka  <ppalka@redhat.com>
 
 	Backported from master:

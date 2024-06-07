@@ -2306,6 +2306,8 @@ finish_parenthesized_expr (cp_expr expr)
       /* This inhibits warnings in maybe_warn_unparenthesized_assignment
 	 and c_common_truthvalue_conversion.  */
       suppress_warning (STRIP_REFERENCE_REF (*expr), OPT_Wparentheses);
+      /* And maybe_warn_sizeof_array_div.  */
+      suppress_warning (STRIP_REFERENCE_REF (*expr), OPT_Wsizeof_array_div);
     }
 
   if (TREE_CODE (expr) == OFFSET_REF
@@ -3777,11 +3779,7 @@ begin_class_definition (tree t)
   if (modules_p ())
     {
       if (!module_may_redeclare (TYPE_NAME (t)))
-	{
-	  error ("cannot declare %qD in a different module", TYPE_NAME (t));
-	  inform (DECL_SOURCE_LOCATION (TYPE_NAME (t)), "declared here");
-	  return error_mark_node;
-	}
+	return error_mark_node;
       set_instantiating_module (TYPE_NAME (t));
       set_defining_module (TYPE_NAME (t));
     }
