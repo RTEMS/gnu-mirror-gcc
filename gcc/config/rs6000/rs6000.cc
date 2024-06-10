@@ -1946,18 +1946,44 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
     {
     case VRSAVE_REGNO:
     case VSCR_REGNO:
+      return (!orig_complex_p && mode == SImode);
+
     case LR_REGNO:
+      return (!orig_complex_p && mode == Pmode);
+
     case CTR_REGNO:
     case TAR_REGNO:
-      {
-	unsigned reg_size = ((regno == VRSAVE_REGNO || regno == VSCR_REGNO)
-			     ? 4
-			     : UNITS_PER_WORD);
+      if (orig_complex_p)
+	return 0;
 
-	return (!orig_complex_p
-		&& GET_MODE_SIZE (mode) <= reg_size
-		&& SCALAR_INT_MODE_P (mode));
-      }
+      if (GET_MODE_CLASS (mode) == MODE_CC)
+	return TARGET_CCSPR != 0;
+
+      switch (mode)
+	{
+	case E_QImode:
+	  return TARGET_QISPR != 0;
+
+	case E_HImode:
+	  return TARGET_HISPR != 0;
+
+	case E_SImode:
+	  return (TARGET_SISPR != 0 || !TARGET_POWERPC64);
+
+	case E_DImode:
+	  return TARGET_POWERPC64;
+
+	case E_SFmode:
+	  return (TARGET_SFSPR != 0);
+
+	case E_DFmode:
+	  return (TARGET_DFSPR != 0 && TARGET_POWERPC64);
+
+	default:
+	  break;
+	}
+
+      return false;
 
     default:
       break;
@@ -2621,6 +2647,24 @@ rs6000_debug_reg_global (void)
   if (TARGET_DIRECT_MOVE_128)
     fprintf (stderr, DEBUG_FMT_D, "VSX easy 64-bit mfvsrld element",
 	     (int)VECTOR_ELEMENT_MFVSRLD_64BIT);
+
+  if (TARGET_CCSPR)
+    fprintf (stderr, DEBUG_FMT_S, "Condition modes in SPR", "yes");
+
+  if (TARGET_QISPR)
+    fprintf (stderr, DEBUG_FMT_S, "QImode in SPR", "yes");
+
+  if (TARGET_HISPR)
+    fprintf (stderr, DEBUG_FMT_S, "HImode in SPR", "yes");
+
+  if (TARGET_SISPR)
+    fprintf (stderr, DEBUG_FMT_S, "SImode in SPR", "yes");
+
+  if (TARGET_SFSPR)
+    fprintf (stderr, DEBUG_FMT_S, "SFmode in SPR", "yes");
+
+  if (TARGET_DFSPR)
+    fprintf (stderr, DEBUG_FMT_S, "DFmode in SPR", "yes");
 }
 
 
