@@ -445,6 +445,10 @@
 ;; target-independent code.
 (define_attr "is_call" "no,yes" (const_string "no"))
 
+;; Indicates whether we want to enable the pattern with an optional early
+;; clobber for SVE predicates.
+(define_attr "pred_clobber" "any,no,yes" (const_string "any"))
+
 ;; [For compatibility with Arm in pipeline models]
 ;; Attribute that specifies whether or not the instruction touches fp
 ;; registers.
@@ -460,7 +464,17 @@
 
 (define_attr "arch_enabled" "no,yes"
   (if_then_else
-    (ior
+    (and
+      (ior
+	(and
+	  (eq_attr "pred_clobber" "no")
+	  (match_test "!TARGET_SVE_PRED_CLOBBER"))
+	(and
+	  (eq_attr "pred_clobber" "yes")
+	  (match_test "TARGET_SVE_PRED_CLOBBER"))
+	(eq_attr "pred_clobber" "any"))
+
+      (ior
 	(eq_attr "arch" "any")
 
 	(and (eq_attr "arch" "rcpc8_4")
@@ -488,7 +502,7 @@
 	     (match_test "TARGET_SVE"))
 
 	(and (eq_attr "arch" "sme")
-	     (match_test "TARGET_SME")))
+	     (match_test "TARGET_SME"))))
     (const_string "yes")
     (const_string "no")))
 
@@ -1447,7 +1461,7 @@
      [w  , m  ; load_4   , fp  , 4] ldr\t%s0, %1
      [m  , r Z; store_4  , *   , 4] str\t%w1, %0
      [m  , w  ; store_4  , fp  , 4] str\t%s1, %0
-     [r  , Usw; load_4   , *   , 8] adrp\t%x0, %A1;ldr\t%w0, [%x0, %L1]
+     [r  , Usw; load_4   , *   , 8] adrp\t%x0, %A1\;ldr\t%w0, [%x0, %L1]
      [r  , Usa; adr      , *   , 4] adr\t%x0, %c1
      [r  , Ush; adr      , *   , 4] adrp\t%x0, %A1
      [w  , r Z; f_mcr    , fp  , 4] fmov\t%s0, %w1
@@ -1484,7 +1498,7 @@
      [w, m  ; load_8   , fp  , 4] ldr\t%d0, %1
      [m, r Z; store_8  , *   , 4] str\t%x1, %0
      [m, w  ; store_8  , fp  , 4] str\t%d1, %0
-     [r, Usw; load_8   , *   , 8] << TARGET_ILP32 ? "adrp\t%0, %A1;ldr\t%w0, [%0, %L1]" : "adrp\t%0, %A1;ldr\t%0, [%0, %L1]";
+     [r, Usw; load_8   , *   , 8] << TARGET_ILP32 ? "adrp\t%0, %A1\;ldr\t%w0, [%0, %L1]" : "adrp\t%0, %A1\;ldr\t%0, [%0, %L1]";
      [r, Usa; adr      , *   , 4] adr\t%x0, %c1
      [r, Ush; adr      , *   , 4] adrp\t%x0, %A1
      [w, r Z; f_mcr    , fp  , 4] fmov\t%d0, %x1
