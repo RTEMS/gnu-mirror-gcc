@@ -1,3 +1,21 @@
+==================== Branch work168-tar, patch #202 ====================
+
+Add options for modes in SPR registers.
+
+2024-06-10  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached): Add
+	support for -m{cc,qi,hi,si,sf,df}spr.
+	(rs6000_debug_reg_global): Print out SPR mode options.
+	* config/rs6000/rs6000.opt (-mccspr): New option.
+	(-mqispr): Likewise.
+	(-mhispr): Likewise.
+	(-msispr): Likewise.
+	(-msfspr): Likewise.
+	(-mdfspr): Likewise.
+
 ==================== Branch work168-tar, patch #201 ====================
 
 Add support for the TAR register.
