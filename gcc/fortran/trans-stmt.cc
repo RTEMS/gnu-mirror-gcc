@@ -6449,8 +6449,9 @@ gfc_trans_allocate (gfc_code * code, gfc_omp_namelist *omp_allocate)
       else
 	gfc_add_block_to_block (&post, &se.post);
 
-      /* Special case when string in expr3 is zero.  */
+      /* Special case when string in expr3 is scalar and has length zero.  */
       if (code->expr3->ts.type == BT_CHARACTER
+	  && code->expr3->rank == 0
 	  && integer_zerop (se.string_length))
 	{
 	  gfc_init_se (&se, NULL);
@@ -7215,6 +7216,46 @@ gfc_trans_allocate (gfc_code * code, gfc_omp_namelist *omp_allocate)
 	  gfc_expr *rhs = e3rhs ? e3rhs : gfc_copy_expr (code->expr3);
 	  flag_realloc_lhs = 0;
 
+	  /* The handling of code->expr3 above produces a derived type of
+	     type "STAR", whose size defaults to size(void*). In order to
+	     have the right type information for the assignment, we must
+	     reconstruct an unlimited polymorphic rhs.  */
+	  if (UNLIMITED_POLY (code->expr3)
+	      && e3rhs && e3rhs->ts.type == BT_DERIVED
+	      && !strcmp (e3rhs->ts.u.derived->name, "STAR"))
+	    {
+	      gfc_ref *ref;
+	      gcc_assert (TREE_CODE (expr3_vptr) == COMPONENT_REF);
+	      tmp = gfc_create_var (gfc_typenode_for_spec (&code->expr3->ts),
+				    "e3");
+	      gfc_add_modify (&block, tmp,
+			      gfc_get_class_from_expr (expr3_vptr));
+	      rhs->symtree->n.sym->backend_decl = tmp;
+	      rhs->ts = code->expr3->ts;
+	      rhs->symtree->n.sym->ts = rhs->ts;
+	      for (ref = init_expr->ref; ref; ref = ref->next)
+		{
+		  /* Copy over the lhs _data component ref followed by the
+		     full array reference for source expressions with rank.
+		     Otherwise, just copy the _data component ref.  */
+		  if (code->expr3->rank
+		      && ref && ref->next && !ref->next->next)
+		    {
+		      rhs->ref = gfc_copy_ref (ref);
+		      break;
+		    }
+		  else if ((init_expr->rank && !code->expr3->rank
+			    && ref && ref->next && !ref->next->next)
+			   || (ref && !ref->next))
+		    {
+		      rhs->ref = gfc_copy_ref (ref);
+		      gfc_free_ref_list (rhs->ref->next);
+		      rhs->ref->next = NULL;
+		      break;
+		    }
+		}
+	    }
+
 	  /* Set the symbol to be artificial so that the result is not finalized.  */
 	  init_expr->symtree->n.sym->attr.artificial = 1;
 	  tmp = gfc_trans_assignment (init_expr, rhs, true, false, true,
@@ -7262,11 +7303,12 @@ gfc_trans_allocate (gfc_code * code, gfc_omp_namelist *omp_allocate)
 	{
 	  /* Use class_init_assign to initialize expr.  */
 	  gfc_code *ini;
-	  ini = gfc_get_code (EXEC_INIT_ASSIGN);
+	  ini = gfc_get_code (EXEC_ALLOCATE);
 	  ini->expr1 = gfc_find_and_cut_at_last_class_ref (expr, true);
 	  tmp = gfc_trans_class_init_assign (ini);
 	  gfc_free_statements (ini);
-	  gfc_add_expr_to_block (&block, tmp);
+	  if (tmp != NULL_TREE)
+	    gfc_add_expr_to_block (&block, tmp);
 	}
       else if ((init_expr = allocate_get_initializer (code, expr)))
 	{
