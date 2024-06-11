@@ -1,3 +1,15 @@
+==================== Branch work168-tar, patch #203 ====================
+
+Add -mlrspr.
+
+2024-06-11  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached): Add
+	support for -mlrspr.
+	* config/rs6000/rs6000.opt (-mlrspr): New debug option.
+
 ==================== Branch work168-tar, patch #202 ====================
 
 Add options for modes in SPR registers.
