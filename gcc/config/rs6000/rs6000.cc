@@ -1949,7 +1949,9 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
       return (!orig_complex_p && mode == SImode);
 
     case LR_REGNO:
-      return (!orig_complex_p && mode == Pmode);
+      if (!TARGET_LRSPR)
+	return (!orig_complex_p && mode == Pmode);
+      /* fall through.  */
 
     case CTR_REGNO:
     case TAR_REGNO:
