@@ -1940,16 +1940,33 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
     return mode == Pmode || mode == SImode;
 
   /* Do some consistancy checks for SPRs.  Don't allow complex modes.
-     VRSAVE/VSCR are always 32-bit SPRs.  Don't allow floating point modes in
-     the other SPRs.  Don't allow large modes that don't fit in a single
-     register. */
+
+     VRSAVE/VSCR are always 32-bit SPRs.
+
+     Don't allow floating point modes in the other SPRs.  Don't allow large
+     modes that don't fit in a single register.
+
+     Optionally restrict integer modes to be size of pointers which means the
+     register allocator will not use the SPR to hold QImode, HImode, and maybe
+     SImode values instead of spilling them to the stack.
+
+     Optionally restrict SPRs not to hold condition codes.  */
   if (regno == VRSAVE_REGNO || regno == VSCR_REGNO)
     return (!orig_complex_p && mode == SImode);
 
   if (regno == LR_REGNO || regno == CTR_REGNO)
-    return (!orig_complex_p
-	    && GET_MODE_SIZE (mode) <= UNITS_PER_WORD
-	    && !SCALAR_FLOAT_MODE_P (mode));
+    {
+      if (orig_complex_p || GET_MODE_SIZE (mode) > UNITS_PER_WORD)
+	return 0;
+
+      if (GET_MODE_CLASS (mode) == MODE_CC)
+	return TARGET_CCSPR != 0;
+
+      if (GET_MODE_CLASS (mode) == MODE_INT)
+	return (TARGET_INTSPR || mode == Pmode);
+
+      return 0;
+    }
 
   /* AltiVec only in AldyVec registers.  */
   if (ALTIVEC_REGNO_P (regno))
@@ -2606,6 +2623,12 @@ rs6000_debug_reg_global (void)
   if (TARGET_DIRECT_MOVE_128)
     fprintf (stderr, DEBUG_FMT_D, "VSX easy 64-bit mfvsrld element",
 	     (int)VECTOR_ELEMENT_MFVSRLD_64BIT);
+
+  fprintf (stderr, DEBUG_FMT_S, "Condition modes in SPRS",
+	   TARGET_CCSPR ? "yes" : "no");
+
+  fprintf (stderr, DEBUG_FMT_S, "Small integer modes in SPRS",
+	   TARGET_INTSPR ? "yes" : "no");
 }
 
 
