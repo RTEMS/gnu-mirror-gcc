@@ -1851,9 +1851,13 @@ static int
 rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
 {
   int last_regno = regno + rs6000_hard_regno_nregs[mode][regno] - 1;
+  bool orig_complex_p = false;
 
   if (COMPLEX_MODE_P (mode))
-    mode = GET_MODE_INNER (mode);
+    {
+      mode = GET_MODE_INNER (mode);
+      orig_complex_p = true;
+    }
 
   /* Vector pair modes need even/odd VSX register pairs.  Only allow vector
      registers.  */
@@ -1934,6 +1938,18 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
 
   if (CA_REGNO_P (regno))
     return mode == Pmode || mode == SImode;
+
+  /* Do some consistancy checks for SPRs.  Don't allow complex modes.
+     VRSAVE/VSCR are always 32-bit SPRs.  Don't allow floating point modes in
+     the other SPRs.  Don't allow large modes that don't fit in a single
+     register. */
+  if (regno == VRSAVE_REGNO || regno == VSCR_REGNO)
+      return (!orig_complex_p && mode == SImode);
+
+  if (regno == LR_REGNO || regno == CTR_REGNO)
+    return (!orig_complex_p
+	    && GET_MODE_SIZE (mode) <= UNITS_PER_WORD
+	    && !SCALAR_FLOAT_MODE_P (mode));
 
   /* AltiVec only in AldyVec registers.  */
   if (ALTIVEC_REGNO_P (regno))
