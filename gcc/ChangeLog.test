@@ -1,13 +1,33 @@
 ==================== Branch work168-test, patch #300 ====================
 
+Possibly restrict SPRs from holding small integers or CCs.
+
+2024-06-13  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached): Add
+	support for -mccspr and -mintspr which controls whether SPRs can hold
+	condition code modes or small integers.
+	(rs6000_debug_reg_global): Print out -mccspr and -mintspr options.
+	* config/rs6000/rs6000.opt (-mccspr): New option.
+	(-mintspr): Likewise.
+
+==================== Branch work168-test, patch #300 ====================
+
 Restrict modes that can got in SPRs.
 
-2024-06-04  Michael Meissner  <meissner@linux.ibm.com>
+2024-06-13  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
 	* config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached): Restrict
 	the modes that can go in SPR registers.
+	* config/rs6000/rs6000.md (movsf_hardfloat): Eliminate alternatives for
+	moving floating point to/from SPRs.
+	(movsd_hardfloat): Likewise.
+	(mov<mode>_softfloat): Likewise.
+	(mov<mode>_softfloat32): Likewise.
+	(mov<mode>_hardfloat64): Likewise.
+	(mov<mode>_softfloat64): Likewise.
 
 ==================== Branch work168-test, patch #11 from work168 branch ====================
 
