@@ -1,3 +1,16 @@
+==================== Branch work168-bugs, patch #402 ====================
+
+Do not build libgcc if GCC is not configured for at least power8
+
+2024-06-15  Michael Meissner  <meissner@linux.ibm.com>
+
+libgcc/
+
+	* config.host (powerpc*-linux*): Do not build the IEEE 128-bit support
+	libraries unless GCC is configured for at least power8 by default.
+	* configure.ac (powerpc*-linux*): Likewise.
+	* configure: Regenerate.
+
 ==================== Branch work168-bugs, patch #401 ====================
 
 Disable IEEE 128 on little endian 32-bit systems.
