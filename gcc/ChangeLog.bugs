@@ -1,3 +1,25 @@
+==================== Branch work168-bugs, patch #401 ====================
+
+Disable IEEE 128 on little endian 32-bit systems.
+
+2024-06-14  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_option_override_internal): Do not
+	allow IEEE 128-bit on little endian 32-bit systems.
+
+==================== Branch work168-bugs, patch #400 ====================
+
+Little endian PowerPC without VSX cannot support IEEE 128-bit.
+
+2024-06-14  Michael Meissner  <meissner@linux.ibm.com>
+
+libgfortran/
+
+	* kinds-override.h: Do not enable IEEE 128-bit floating point support on
+	little endian PowerPC that does not have VSX support.
+
 ==================== Branch work168-bugs, patch #11 from work168 branch ====================
 
 Add -mcpu=future tuning support.
