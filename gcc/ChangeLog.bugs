@@ -1,3 +1,29 @@
+==================== Branch work169-bugs, patch #400 ====================
+
+Do not build IEEE 128-bit support for little endian power5.
+
+2024-06-17  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_option_override_internal): Do not
+	allow IEEE 128-bit on little endian 32-bit systems.
+
+libgcc/
+
+	* config.host (powerpc*-linux*): Do not build the IEEE 128-bit support
+	libraries unless GCC is configured for at least power8 by default.
+	* configure.ac (powerpc*-linux*): Likewise.
+	* configure: Regenerate.
+
+libgfortran/
+
+	* configure.ac (powerpc64le*-linux*): Check to see that the compiler
+	uses VSX before enabling IEEE 128-bit support.
+	* configure: Regenerate.
+	* kinds-override.h: Do not enable IEEE 128-bit floating point support on
+	little endian PowerPC that does not have VSX support.
+
 ==================== Branch work169-bugs, patch #11 (work169 branch) ====================
 
 Add -mcpu=future tuning support.
