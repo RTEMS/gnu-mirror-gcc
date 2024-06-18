@@ -1,8 +1,8 @@
-==================== Branch work169-bugs, patch #400 ====================
+==================== Branch work169-bugs, patch #401 ====================
 
 Do not build IEEE 128-bit support for little endian power5.
 
-2024-06-17  Michael Meissner  <meissner@linux.ibm.com>
+2024-06-18  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -11,9 +11,10 @@ gcc/
 
 libgcc/
 
-	* config.host (powerpc*-linux*): Do not build the IEEE 128-bit support
-	libraries unless GCC is configured for at least power8 by default.
-	* configure.ac (powerpc*-linux*): Likewise.
+	* config.host (powerpc*-linux*): Do not enable ieee 128-bit hardware
+	support unless ieee 128-bit basic support is provided.
+	* configure.ac (powerpc*-linux*): Disable building libgcc on legacy
+	32-bit little endian systems which will never support VSX.
 	* configure: Regenerate.
 
 libgfortran/
@@ -23,6 +24,8 @@ libgfortran/
 	* configure: Regenerate.
 	* kinds-override.h: Do not enable IEEE 128-bit floating point support on
 	little endian PowerPC that does not have VSX support.
+
+==================== Branch work169-bugs, patch #400 was reverted ====================
 
 ==================== Branch work169-bugs, patch #11 (work169 branch) ====================
 
