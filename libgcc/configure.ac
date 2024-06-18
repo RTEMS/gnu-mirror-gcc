@@ -403,17 +403,24 @@ esac
 esac
 
 case ${host} in
-# At present, we cannot turn -mfloat128 on via #pragma GCC target, so just
-# check if we have VSX (ISA 2.06) support to build the software libraries, and
-# whether the assembler can handle xsaddqp for hardware support.  Also check if
-# a new glibc is being used so that __builtin_cpu_supports can be used.
+# Determine if the system can support VSX, which is needed to support
+# __float128.  Little endian 32-bit cannot be supported, since those systems do
+# not support VSX.  All of the little endian 64-bit systems require VSX support
+# (power8 and above).  With big endian, the default might not include VSX, but
+# we can build the libgcc __float128 support with VSX enabled.
 powerpc*-*-linux*)
   saved_CFLAGS="$CFLAGS"
-  CFLAGS="$CFLAGS -mabi=altivec -mvsx -mfloat128"
+  CFLAGS="$CFLAGS -mabi=altivec -mfloat128"
   AC_CACHE_CHECK([for PowerPC ISA 2.06 to build __float128 libraries],
 		 [libgcc_cv_powerpc_float128],
 		 [AC_COMPILE_IFELSE(
-    [AC_LANG_SOURCE([vector double dadd (vector double a, vector double b) { return a + b; }])],
+    [AC_LANG_SOURCE([#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__ && !defined(_ARCH_PPC64)
+    #error "32-bit little endian does not support VSX for __float128"
+    #endif
+    #if !defined(__ARCH_PWR8)
+    #pragma GCC target ("cpu=power8")
+    #endif
+    vector double dadd (vector double a, vector double b) { return a + b; }])],
     [libgcc_cv_powerpc_float128=yes],
     [libgcc_cv_powerpc_float128=no])])
 
