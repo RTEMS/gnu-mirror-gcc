@@ -1,6 +1,6 @@
-==================== Branch work169-bugs, patch #402 ====================
+==================== Branch work169-bugs, patch #403 ====================
 
-Do not build IEEE 128-bit support for little endian power5.
+Do not build IEEE 128-bit support if VSX is not available.
 
 2024-06-18  Michael Meissner  <meissner@linux.ibm.com>
 
@@ -9,20 +9,19 @@ libgfortran/
 	* configure.ac (powerpc64le*-linux*): Check to see that the compiler
 	uses VSX before enabling IEEE 128-bit support.
 	* configure: Regenerate.
-	* kinds-override.h: Do not enable IEEE 128-bit floating point support on
-	little endian PowerPC that does not have VSX support.
-	* libgfortran.h (POWER_IEEE128): Add check for __VSX__.
+	* kinds-override.h (GFC_REAL_17): Add check for __VSX__.
+	* libgfortran.h (POWER_IEEE128): Likewise.
 
 libstdc++-v3/
 
-	* configure.ac (powerpc*-*-linux*): Skip IEEE 128-bit on little endian
-	PowerPC systems without VSX.
+	* configure.ac (powerpc*-*-linux*): Don't enable IEEE 128-bit on PowerPC
+	systems without VSX.
 	* configure: Regenerate.
 	* numeric_traits.h: Don't enable IEEE 128-bit on PowerPC systems without
 	VSX.
 
+==================== Branch work169-bugs, patch #402 was reverted ====================
 ==================== Branch work169-bugs, patch #401 was reverted ====================
-
 ==================== Branch work169-bugs, patch #400 was reverted ====================
 
 ==================== Branch work169-bugs, patch #11 (work169 branch) ====================
