@@ -4146,24 +4146,13 @@ rs6000_option_override_internal (bool global_init_p)
      the keyword as well as the type.  */
   TARGET_FLOAT128_TYPE = TARGET_FLOAT128_ENABLE_TYPE && TARGET_VSX;
 
-  /* IEEE 128-bit floating point requires VSX support.  Disable IEEE 128-bit on
-     legacy 32-bit LE systems.  */
+  /* IEEE 128-bit floating point requires VSX support.  */
   if (TARGET_FLOAT128_KEYWORD)
     {
       if (!TARGET_VSX)
 	{
 	  if ((rs6000_isa_flags_explicit & OPTION_MASK_FLOAT128_KEYWORD) != 0)
 	    error ("%qs requires VSX support", "-mfloat128");
-
-	  TARGET_FLOAT128_TYPE = 0;
-	  rs6000_isa_flags &= ~(OPTION_MASK_FLOAT128_KEYWORD
-				| OPTION_MASK_FLOAT128_HW);
-	}
-      else if (!TARGET_POWERPC64 && !BYTES_BIG_ENDIAN)
-	{
-	  if ((rs6000_isa_flags_explicit & OPTION_MASK_FLOAT128_KEYWORD) != 0)
-	    error ("%qs requires 64-bit support on little endian systems",
-		   "-mfloat128");
 
 	  TARGET_FLOAT128_TYPE = 0;
 	  rs6000_isa_flags &= ~(OPTION_MASK_FLOAT128_KEYWORD

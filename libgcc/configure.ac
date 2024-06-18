@@ -407,16 +407,9 @@ case ${host} in
 # check if we have VSX (ISA 2.06) support to build the software libraries, and
 # whether the assembler can handle xsaddqp for hardware support.  Also check if
 # a new glibc is being used so that __builtin_cpu_supports can be used.
-#
-# Originally we added -mabi=altivec -mvsx to the tests to see if we could
-# support IEEE 128-bit.  This would mean that even if the compiler was
-# configured for power5, it would build the IEEE 128-bit libraries by adding
-# -mvsx.  Instead if you want IEEE 128-bit support, you have to configure the
-# compiler to build ISA 2.06 (power8) by default.  We do add -mfloat128 to
-# cater to systems where IEEE 128-bit might not be enabled by default.
 powerpc*-*-linux*)
   saved_CFLAGS="$CFLAGS"
-  CFLAGS="$CFLAGS -mfloat128"
+  CFLAGS="$CFLAGS -mabi=altivec -mvsx -mfloat128"
   AC_CACHE_CHECK([for PowerPC ISA 2.06 to build __float128 libraries],
 		 [libgcc_cv_powerpc_float128],
 		 [AC_COMPILE_IFELSE(
