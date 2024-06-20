@@ -1,3 +1,119 @@
+2024-06-17  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-06-17  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/115290
+	* c-c++-common/Warray-compare-3.c: New test.
+
+2024-06-17  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-06-17  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/111343
+	PR c++/115511
+	* g++.dg/cpp23/ext-floating18.C: New test.
+
+2024-06-17  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-06-13  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/99678
+	* g++.dg/cpp2a/concepts-requires38.C: New test.
+
+2024-06-17  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-06-13  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/115239
+	* g++.dg/overload/error7.C: New test.
+
+2024-06-17  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-06-13  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/115283
+	* g++.dg/template/linkage5.C: New test.
+
+2024-06-17  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	Backported from master:
+	2024-06-17  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	* gcc.target/s390/ifcvt-one-insn-bool.c: Fix loc.
+
+2024-06-17  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	Backported from master:
+	2024-05-23  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	* gcc.target/s390/ccor.c: Order of loads are reversed, now, as a
+	consequence the condition has to be reversed.
+
+2024-06-12  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	Backported from master:
+	2024-06-12  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+		    Yvan ROUX  <yvan.roux@foss.st.com>
+
+	PR target/115253
+	* gcc.target/arm/cmse/extend-return.c: Update test case
+	condition for Armv8.1-M.
+
+2024-06-11  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2024-05-30  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR rtl-optimization/115281
+	* gfortran.dg/pr115281.f90: New test.
+
+2024-06-10  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-06-07  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/115378
+	* g++.dg/cpp1y/decltype-auto-103497.C: Adjust expected diagnostic.
+	* g++.dg/template/pr95672.C: Likewise.
+	* g++.dg/cpp2a/lambda-targ5.C: New test.
+
+2024-06-10  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gnat.dg/incomplete8.adb: New test.
+
+2024-06-10  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR ada/114398
+	* gnat.dg/access11.adb: New test.
+
+2024-06-08  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2024-06-04  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/83865
+	* gfortran.dg/allocate_with_source_32.f90: New test.
+
+2024-06-07  Richard Ball  <richard.ball@arm.com>
+
+	Backported from master:
+	2024-06-06  Richard Ball  <richard.ball@arm.com>
+
+	* gcc.target/arm/thumb2-switchstatement.c: New test.
+
+2024-06-07  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-06-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/115352
+	* gcc.dg/torture/bitint-71.c: New test.
+
 2024-06-06  Jakub Jelinek  <jakub@redhat.com>
 
 	Backported from master:

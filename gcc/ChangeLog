@@ -1,3 +1,61 @@
+2024-06-17  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	Backported from master:
+	2024-05-23  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
+
+	PR target/109549
+	* config/s390/s390.cc (TARGET_NOCE_CONVERSION_PROFITABLE_P):
+	Define.
+	(s390_noce_conversion_profitable_p): Implement.
+
+2024-06-15  Christoph Müllner  <christoph.muellner@vrull.eu>
+
+	Backported from master:
+	2024-06-15  Christoph Müllner  <christoph.muellner@vrull.eu>
+
+	* config/riscv/riscv-target-attr.cc (riscv_target_attr_parser::parse_arch):
+	Fix allocation size of buffer.
+	(riscv_process_one_target_attr): Likewise.
+	(riscv_process_target_attr): Likewise.
+
+2024-06-12  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	Backported from master:
+	2024-06-12  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+		    Yvan ROUX  <yvan.roux@foss.st.com>
+
+	PR target/115253
+	* config/arm/arm.cc (cmse_nonsecure_call_inline_register_clear):
+	Sign extend for Thumb1.
+	(thumb1_expand_prologue): Add zero/sign extend.
+
+2024-06-11  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2024-05-30  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR rtl-optimization/115281
+	* ira-conflicts.cc (go_through_subreg): Use the natural size of
+	the inner mode rather than the outer mode.
+
+2024-06-07  Richard Ball  <richard.ball@arm.com>
+
+	Backported from master:
+	2024-06-06  Richard Ball  <richard.ball@arm.com>
+
+	PR target/115353
+	* config/arm/arm.h (enum arm_auto_incmodes):
+	Correct CASE_VECTOR_SHORTEN_MODE query.
+
+2024-06-07  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-06-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/115352
+	* gimple-lower-bitint.cc (lower_addsub_overflow): Don't disable
+	single_comparison if cmp_code is GE_EXPR.
+
 2024-06-06  Richard Ball  <richard.ball@arm.com>
 
 	Backported from master:
