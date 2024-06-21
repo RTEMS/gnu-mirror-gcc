@@ -634,6 +634,38 @@ mtar
 Target Undocumented Mask(TAR) Var(rs6000_isa_flags)
 Allow (do not allow) use the TAR register.
 
+mccspr
+Target Undocumented Var(TARGET_CCSPR) Init(0)
+Allow (do not allow) condition modes to be in the CTR or TAR registers.
+
+mqispr
+Target Undocumented Var(TARGET_QISPR) Init(1)
+Allow (do not allow) 8-bit integers to be in the CTR or TAR registers.
+
+mhispr
+Target Undocumented Var(TARGET_HISPR) Init(1)
+Allow (do not allow) 16-bit integers to be in the CTR or TAR registers.
+
+msispr
+Target Undocumented Var(TARGET_SISPR) Init(1)
+Allow (do not allow) 32-bit integers to be in the CTR or TAR registers.
+
+mintspr
+Target Undocumented Var(TARGET_INTSPR) Init(0)
+Allow (do not allow) small integers to be in the CTR or TAR registers.
+
+msfspr
+Target Undocumented Var(TARGET_SFSPR) Init(0)
+Allow (do not allow) 32-bit floating point to be in the CTR or TAR registers.
+
+mdfspr
+Target Undocumented Var(TARGET_DFSPR) Init(0)
+Allow (do not allow) 64-bit floating point to be in the CTR or TAR registers.
+
+mfpspr
+Target Undocumented Var(TARGET_FPSPR) Init(0)
+Allow (do not allow) floating point values to be in the CTR or TAR registers.
+
 ; Documented parameters
 
 -param=rs6000-vect-unroll-limit=
