@@ -1,3 +1,32 @@
+==================== Branch work169-tar, patch #204 ====================
+
+Add -mlrspr.
+
+2024-06-21  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached): Add
+	support for -mlrspr.
+	* config/rs6000/rs6000.opt (-mlrspr): New debug option.
+
+==================== Branch work169-tar, patch #203 ====================
+
+Fix up TAR errors
+
+2024-06-21  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.md (movcc_<mode>): Add alternatives to allowing
+	Cmode and floating point (under debug switches) back.  Add support for
+	the TAR register.
+	(movsf_hardfloat): Likewise.
+	(movsd_hardfloat): Likewise.
+	(mov<mode>_softfloat): Likewise.
+	(mov<mode>_hardfloat64): Likewise.
+	(mov<mode>_softfloat64): Likewise.
+	* lra-constraints.cc (lra_constraints): Change internal_error to
+	fatal_insn.
+
 ==================== Branch work169-tar, patch #202 ====================
 
 Add options for modes in SPR registers.
