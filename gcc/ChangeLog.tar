@@ -1,3 +1,14 @@
+==================== Branch work169-tar, patch #205 ====================
+
+Allow CCmodes in TAR register.
+
+2024-06-21  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.md (movcc_<mode>): Add support for the TAR
+	register.
+
 ==================== Branch work169-tar, patch #204 ====================
 
 Add -mlrspr.
