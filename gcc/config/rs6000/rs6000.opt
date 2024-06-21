@@ -666,6 +666,10 @@ mfpspr
 Target Undocumented Var(TARGET_FPSPR) Init(0)
 Allow (do not allow) floating point values to be in the CTR or TAR registers.
 
+mlrspr
+Target Undocumented Var(TARGET_LRSPR) Init(1)
+Treat (do not treat) the LR register like CTR/TAR in terms of what modes it can hold.
+
 ; Documented parameters
 
 -param=rs6000-vect-unroll-limit=
