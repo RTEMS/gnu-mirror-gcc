@@ -1,3 +1,108 @@
+==================== Branch work169-tar, patch #202 ====================
+
+Add options for modes in SPR registers.
+
+2024-06-10  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached): Add
+	support for -m{cc,qi,hi,si,sf,df}spr.
+	(rs6000_debug_reg_global): Print out SPR mode options.
+	* config/rs6000/rs6000.opt (-mccspr): New option.
+	(-mqispr): Likewise.
+	(-mhispr): Likewise.
+	(-msispr): Likewise.
+	(-msfspr): Likewise.
+	(-mdfspr): Likewise.
+
+==================== Branch work169-tar, patch #201 ====================
+
+Add support for the TAR register.
+
+2024-06-20  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/constraints.md (h constraint): Add TAR register to the
+	documentation.
+	(wt constraint): New constraint.
+	* config/rs6000/rs6000-cpus.def (ISA_3_0_MASKS_SERVER): Document that we
+	do not explicitly add -mtar for power9.
+	(OTHER_POWER10_MASKS): Add -mtar.
+	(POWERPC_MASKS): Likewise.
+	* config/rs6000/rs6000.cc (rs6000_reg_names): Add TAR register support.
+	(alt_reg_names): Likewise.
+	(rs6000_hard_regno_mode_ok_uncached): Likewise.
+	(rs6000_debug_reg_global): Print the register class that wt maps too.
+	(rs6000_init_hard_regno_mode_ok): Add TAR register support.
+	(rs6000_option_override_internal): Restrict -mtar to power9 and above.
+	(rs6000_conditional_register_usage): Add TAR register support.
+	(print_operand): Likewise.
+	(rs6000_debugger_regno): Likewise.
+	(rs6000_opt_masks): Add support for -mtar.
+	* config/rs6000/rs6000.h (FIRST_PSEUDO_REGISTER): Add TAR register
+	support.
+	(FIXED_REGISTERS): Likewise.
+	(CALL_REALLY_USED_REGISTERS): Likewise.
+	(REG_ALLOC_ORDER): Likewise.
+	(enum reg_class): Likewise.
+	(REG_CLASS_NAMES): Likewise.
+	(REG_CLASS_CONTENTS): Likewise.
+	(enum r6000_reg_class_enum): Add support for the wt constraint.
+	* config/rs6000/rs6000.md (TAR_REGNO): New constant.
+	(mov<mode>_internal): Add TAR register support.
+	(call_indirect_nonlocal_sysv<mode>): Likewise.
+	(call_value_indirect_nonlocal_sysv<mode>): Likewise.
+	(call_indirect_aix<mode>): Likewise.
+	(call_value_indirect_aix<mode>): Likewise.
+	(call_indirect_elfv2<mode>): Likewise.
+	(call_indirect_pcrel<mode>): Likewise.
+	(call_value_indirect_elfv2<mode>): Likewise.
+	(call_value_indirect_pcrel<mode>): Likewise.
+	(*sibcall_indirect_nonlocal_sysv<mode>): Likewise.
+	(sibcall_value_indirect_nonlocal_sysv<mode>): Likewise.
+	(indirect_jump<mode>): Likewise.
+	(@indirect_jump<mode>_nospec): Likewise.
+	(@tablejump<mode>_insn_normal): Likewise.
+	(@tablejump<mode>_insn_nospec): Likewise.
+	* config/rs6000/rs6000.opt (-mtar): New option.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/ppc-switch-1.c: Update test for the TAR register.
+	* gcc.target/powerpc/pr51513.c: Likewise.
+	* gcc.target/powerpc/safe-indirect-jump-2.c: Likewise.
+	* gcc.target/powerpc/safe-indirect-jump-3.c: Likewise.
+	* gcc.target/powerpc/tar-register.c: New test.
+
+==================== Branch work169-tar, patch #200 ====================
+
+Restrict SPR to appropriate integer modes.
+
+In preparation for the patches to add support for the TAR register, I restricted
+the modes that special purpose registers (SPRs) could hold to be appropriate
+sized scalar integers.  I have discovered occasionally when GCC has run out of
+registers, it will use the SPRs to hold values instead of spilling them to the
+stack.  The LR/CTR registers can hold 8/16/32-bit values and on 64-bit systems,
+they can also hold 64-bit values.  The VRSAVE and VSCR registers can only hold
+32-bit values.
+
+2024-06-20  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached): Restrict
+	SPR registers to only hold scalar integer modes of an appropriate size.
+	* config/rs6000/rs6000.md (movcc_<mode>): Remove alternatives that move
+	values to/from the SPRs.
+	(movsf_hardfloat): Likewise.
+	(movsd_hardfloat): Likewise.
+	(mov<mode>_softfloat): Likewise.
+	(mov<mode>_softfloat32): Likewise.
+	(mov<mode>_hardfloat64): Likewise.
+	(*mov<mode>_softfloat64): Likewise.
+
 ==================== Branch work169-tar, patch #11 (work169 branch) ====================
 
 Add -mcpu=future tuning support.
