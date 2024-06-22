@@ -650,10 +650,6 @@ msispr
 Target Undocumented Var(TARGET_SISPR) Init(1)
 Allow (do not allow) 32-bit integers to be in the CTR or TAR registers.
 
-mintspr
-Target Undocumented Var(TARGET_INTSPR) Init(0)
-Allow (do not allow) small integers to be in the CTR or TAR registers.
-
 msfspr
 Target Undocumented Var(TARGET_SFSPR) Init(0)
 Allow (do not allow) 32-bit floating point to be in the CTR or TAR registers.
@@ -661,14 +657,6 @@ Allow (do not allow) 32-bit floating point to be in the CTR or TAR registers.
 mdfspr
 Target Undocumented Var(TARGET_DFSPR) Init(0)
 Allow (do not allow) 64-bit floating point to be in the CTR or TAR registers.
-
-mfpspr
-Target Undocumented Var(TARGET_FPSPR) Init(0)
-Allow (do not allow) floating point values to be in the CTR or TAR registers.
-
-mlrspr
-Target Undocumented Var(TARGET_LRSPR) Init(1)
-Treat (do not treat) the LR register like CTR/TAR in terms of what modes it can hold.
 
 ; Documented parameters
 

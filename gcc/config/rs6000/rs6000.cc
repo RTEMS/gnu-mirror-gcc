@@ -1949,10 +1949,6 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
       return (!orig_complex_p && mode == SImode);
 
     case LR_REGNO:
-      if (!TARGET_LRSPR)
-	return (!orig_complex_p && mode == Pmode);
-      /* fall through.  */
-
     case CTR_REGNO:
     case TAR_REGNO:
       if (orig_complex_p)
@@ -1964,22 +1960,22 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
       switch (mode)
 	{
 	case E_QImode:
-	  return (TARGET_QISPR || TARGET_INTSPR);
+	  return TARGET_QISPR != 0;
 
 	case E_HImode:
-	  return (TARGET_HISPR || TARGET_INTSPR);
+	  return TARGET_HISPR != 0;
 
 	case E_SImode:
-	  return (TARGET_SISPR || TARGET_INTSPR || !TARGET_POWERPC64);
+	  return TARGET_SISPR || !TARGET_POWERPC64;
 
 	case E_DImode:
-	  return TARGET_POWERPC64;
+	  return TARGET_POWERPC64 != 0;
 
 	case E_SFmode:
-	  return (TARGET_SFSPR || TARGET_FPSPR);
+	  return TARGET_SFSPR != 0;
 
 	case E_DFmode:
-	  return ((TARGET_DFSPR || TARGET_FPSPR) && TARGET_POWERPC64);
+	  return TARGET_DFSPR && TARGET_POWERPC64;
 
 	default:
 	  break;
@@ -2654,22 +2650,22 @@ rs6000_debug_reg_global (void)
 	   TARGET_CCSPR ? "yes" : "no");
 
   fprintf (stderr, DEBUG_FMT_S, "QImode in SPR",
-	   (TARGET_QISPR || TARGET_INTSPR) ? "yes" : "no");
+	   TARGET_QISPR ? "yes" : "no");
 
   fprintf (stderr, DEBUG_FMT_S, "HImode in SPR",
-	   TARGET_HISPR || TARGET_INTSPR ? "yes" : "no");
+	   TARGET_HISPR ? "yes" : "no");
 
   fprintf (stderr, DEBUG_FMT_S, "SImode in SPR",
-	   TARGET_SISPR || TARGET_INTSPR || !TARGET_POWERPC64 ? "yes" : "no");
+	   TARGET_SISPR || !TARGET_POWERPC64 ? "yes" : "no");
 
   fprintf (stderr, DEBUG_FMT_S, "DImode in SPR",
 	   TARGET_POWERPC64 ? "yes" : "no");
 
   fprintf (stderr, DEBUG_FMT_S, "SFmode in SPR",
-	   TARGET_SFSPR || TARGET_FPSPR ? "yes" : "no");
+	   TARGET_SFSPR ? "yes" : "no");
 
   fprintf (stderr, DEBUG_FMT_S, "DFmode in SPR",
-	   TARGET_DFSPR || TARGET_FPSPR ? "yes" : "no");
+	   TARGET_DFSPR ? "yes" : "no");
 }
 
 
