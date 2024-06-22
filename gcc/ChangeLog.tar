@@ -1,3 +1,20 @@
+==================== Branch work169-tar, patch #207 ====================
+
+Change TAR debug options.
+
+2024-06-22  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached): Delete
+	-mqispr, -mhispr, -msispr, -mfpspr, -mdfspr.  Add -mintspr and -mfpspr.
+	(rs6000_debug_reg_global): Likewise.
+	* config/rs6000/rs6000.opt (-mqispr): Delete.
+	(-mhispr): Likewise.
+	(-msispr): Likewise.
+	(-msfspr): Likewise.
+	(-mdfspr): Likewise.
+	(-mintspr): New option.
+	(-mfpspr): Likewise.
+
 ==================== Branch work169-tar, patch #206 ====================
 
 Delete -mlrspr, -mintspr, -mfpspr
