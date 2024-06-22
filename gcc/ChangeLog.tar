@@ -1,3 +1,16 @@
+==================== Branch work169-tar, patch #206 ====================
+
+Delete -mlrspr, -mintspr, -mfpspr
+
+2024-06-21  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached): Delete
+	-mlrspr, -mintspr, and -mfpspr.
+	(rs6000_debug_reg_global): Likewise.
+	* config/rs6000/rs6000.opt (-mlrspr): Delete.
+	(-mintspr): Likewise.
+	(-mfpspr): Likewise.
+
 ==================== Branch work169-tar, patch #205 ====================
 
 Allow CCmodes in TAR register.
