@@ -2643,6 +2643,7 @@ struct GTY(()) ix86_frame
   /* When save_regs_using_mov is set, emit prologue using
      move instead of push instructions.  */
   bool save_regs_using_mov;
+  bool cannot_use_moves;
 
   /* Assume without checking that:
        EXPENSIVE_P = expensive_function_p (EXPENSIVE_COUNT).  */
@@ -2752,6 +2753,10 @@ struct GTY(()) machine_function {
   int varargs_gpr_size;
   int varargs_fpr_size;
   int optimize_mode_switching[MAX_386_ENTITIES];
+  unsigned ssw_min_reg, ssw_max_reg;
+  bool reg_wrapped_separately[FIRST_PSEUDO_REGISTER];
+  bool frame_alloc_separately;
+  bool anything_separately;
 
   /* Cached initial frame layout for the current function.  */
   struct ix86_frame frame;

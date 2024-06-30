@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-options "-O2 -mabi=sysv" } */
+/* { dg-options "-O2 -mabi=sysv -fno-shrink-wrap-separate" } */
 
 extern int glb1, gbl2, gbl3;
 

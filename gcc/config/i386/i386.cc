@@ -7133,8 +7133,7 @@ ix86_compute_frame_layout (void)
   /* Size prologue needs to allocate.  */
   to_allocate = offset - frame->sse_reg_save_offset;
 
-  if ((!to_allocate && frame->nregs <= 1)
-      || (TARGET_64BIT && to_allocate >= HOST_WIDE_INT_C (0x80000000))
+  if ((TARGET_64BIT && to_allocate >= HOST_WIDE_INT_C (0x80000000))
        /* If static stack checking is enabled and done with probes,
 	  the registers need to be saved before allocating the frame.  */
       || flag_stack_check == STATIC_BUILTIN_STACK_CHECK
@@ -7147,6 +7146,10 @@ ix86_compute_frame_layout (void)
       || (flag_stack_clash_protection
 	  && !ix86_target_stack_probe ()
 	  && to_allocate > get_probe_interval ()))
+    frame->cannot_use_moves = true;
+
+  if ((!to_allocate && frame->nregs <= 1)
+      || frame->cannot_use_moves)
     frame->save_regs_using_mov = false;
 
   if (ix86_using_red_zone ()
@@ -7431,6 +7434,8 @@ ix86_emit_save_regs (void)
   rtx_insn *insn;
   bool use_ppx = TARGET_APX_PPX && !crtl->calls_eh_return;
 
+  gcc_assert (!cfun->machine->anything_separately);
+
   if (!TARGET_APX_PUSH2POP2
       || !ix86_can_use_push2pop2 ()
       || cfun->machine->func_type != TYPE_NORMAL)
@@ -7603,7 +7608,8 @@ ix86_emit_save_regs_using_mov (HOST_WIDE_INT cfa_offset)
   for (regno = 0; regno < FIRST_PSEUDO_REGISTER; regno++)
     if (GENERAL_REGNO_P (regno) && ix86_save_reg (regno, true, true))
       {
-        ix86_emit_save_reg_using_mov (word_mode, regno, cfa_offset);
+	if (!cfun->machine->reg_wrapped_separately[regno])
+	  ix86_emit_save_reg_using_mov (word_mode, regno, cfa_offset);
 	cfa_offset -= UNITS_PER_WORD;
       }
 }
@@ -7618,7 +7624,8 @@ ix86_emit_save_sse_regs_using_mov (HOST_WIDE_INT cfa_offset)
   for (regno = 0; regno < FIRST_PSEUDO_REGISTER; regno++)
     if (SSE_REGNO_P (regno) && ix86_save_reg (regno, true, true))
       {
-	ix86_emit_save_reg_using_mov (V4SFmode, regno, cfa_offset);
+	if (!cfun->machine->reg_wrapped_separately[regno])
+	  ix86_emit_save_reg_using_mov (V4SFmode, regno, cfa_offset);
 	cfa_offset -= GET_MODE_SIZE (V4SFmode);
       }
 }
@@ -8983,7 +8990,7 @@ ix86_expand_prologue (void)
   if (!int_registers_saved)
     {
       /* If saving registers via PUSH, do so now.  */
-      if (!frame.save_regs_using_mov)
+      if (!frame.save_regs_using_mov && !m->anything_separately)
 	{
 	  ix86_emit_save_regs ();
 	  m->fs.apx_ppx_used = TARGET_APX_PPX && !crtl->calls_eh_return;
@@ -9104,6 +9111,7 @@ ix86_expand_prologue (void)
 	= frame.sse_reg_save_offset - frame.reg_save_offset;
 
       gcc_assert (int_registers_saved);
+      gcc_assert (!m->frame_alloc_separately);
 
       /* No need to do stack checking as the area will be immediately
 	 written.  */
@@ -9121,6 +9129,7 @@ ix86_expand_prologue (void)
       && flag_stack_clash_protection
       && !ix86_target_stack_probe ())
     {
+      gcc_assert (!m->frame_alloc_separately);
       ix86_adjust_stack_and_probe (allocate, int_registers_saved, false);
       allocate = 0;
     }
@@ -9131,6 +9140,7 @@ ix86_expand_prologue (void)
     {
       const HOST_WIDE_INT probe_interval = get_probe_interval ();
 
+      gcc_assert (!m->frame_alloc_separately);
       if (STACK_CHECK_MOVING_SP)
 	{
 	  if (crtl->is_leaf
@@ -9187,9 +9197,21 @@ ix86_expand_prologue (void)
   else if (!ix86_target_stack_probe ()
 	   || frame.stack_pointer_offset < CHECK_STACK_LIMIT)
     {
-      pro_epilogue_adjust_stack (stack_pointer_rtx, stack_pointer_rtx,
-			         GEN_INT (-allocate), -1,
-			         m->fs.cfa_reg == stack_pointer_rtx);
+      if (!m->frame_alloc_separately)
+	pro_epilogue_adjust_stack (stack_pointer_rtx, stack_pointer_rtx,
+				   GEN_INT (-allocate), -1,
+				   m->fs.cfa_reg == stack_pointer_rtx);
+      else
+	{
+	  /* Even when shrink-wrapping separately we call emit_prologue
+	     which will reset the frame-state with the expectation that
+	     we leave this routine with the state valid for the normal
+	     body of the function, i.e. reflecting allocated frame.
+	     So track this by hand.  */
+	  if (m->fs.cfa_reg == stack_pointer_rtx)
+	    m->fs.cfa_offset -= allocate;
+	  m->fs.sp_offset += allocate;
+	}
     }
   else
     {
@@ -9198,6 +9220,8 @@ ix86_expand_prologue (void)
       const bool sp_is_cfa_reg = (m->fs.cfa_reg == stack_pointer_rtx);
       bool eax_live = ix86_eax_live_at_start_p ();
       bool r10_live = false;
+
+      gcc_assert (!m->frame_alloc_separately);
 
       if (TARGET_64BIT)
         r10_live = (DECL_STATIC_CHAIN (current_function_decl) != 0);
@@ -9353,6 +9377,7 @@ ix86_emit_restore_reg_using_pop (rtx reg, bool ppx_p)
   struct machine_function *m = cfun->machine;
   rtx_insn *insn = emit_insn (gen_pop (reg, ppx_p));
 
+  gcc_assert (!m->reg_wrapped_separately[REGNO (reg)]);
   ix86_add_cfa_restore_note (insn, reg, m->fs.sp_offset);
   m->fs.sp_offset -= UNITS_PER_WORD;
 
@@ -9410,6 +9435,9 @@ ix86_emit_restore_reg_using_pop2 (rtx reg1, rtx reg2, bool ppx_p = false)
   struct machine_function *m = cfun->machine;
   const int offset = UNITS_PER_WORD * 2;
   rtx_insn *insn;
+
+  gcc_assert (!m->reg_wrapped_separately[REGNO (reg1)]
+	      && !m->reg_wrapped_separately[REGNO (reg2)]);
 
   rtx mem = gen_rtx_MEM (TImode, gen_rtx_POST_INC (Pmode,
 						   stack_pointer_rtx));
@@ -9483,6 +9511,7 @@ ix86_emit_restore_regs_using_pop (bool ppx_p)
 {
   unsigned int regno;
 
+  gcc_assert (!cfun->machine->anything_separately);
   for (regno = 0; regno < FIRST_PSEUDO_REGISTER; regno++)
     if (GENERAL_REGNO_P (regno) && ix86_save_reg (regno, false, true))
       ix86_emit_restore_reg_using_pop (gen_rtx_REG (word_mode, regno), ppx_p);
@@ -9499,6 +9528,7 @@ ix86_emit_restore_regs_using_pop2 (void)
   int loaded_regnum = 0;
   bool aligned = cfun->machine->fs.sp_offset % 16 == 0;
 
+  gcc_assert (!cfun->machine->anything_separately);
   for (regno = 0; regno < FIRST_PSEUDO_REGISTER; regno++)
     if (GENERAL_REGNO_P (regno) && ix86_save_reg (regno, false, true))
       {
@@ -9566,42 +9596,72 @@ ix86_emit_leave (rtx_insn *insn)
 			     m->fs.fp_offset);
 }
 
+static void
+ix86_emit_restore_reg_using_mov (unsigned regno, HOST_WIDE_INT cfa_offset,
+				 bool cfi_here)
+{
+  if (GENERAL_REGNO_P (regno))
+    {
+      struct machine_function *m = cfun->machine;
+      rtx reg = gen_rtx_REG (word_mode, regno);
+      rtx mem;
+      rtx_insn *insn;
+
+      mem = choose_baseaddr (cfa_offset, NULL);
+      mem = gen_frame_mem (word_mode, mem);
+      insn = emit_move_insn (reg, mem);
+
+      if (m->fs.cfa_reg == crtl->drap_reg && regno == REGNO (crtl->drap_reg))
+	{
+	  /* Previously we'd represented the CFA as an expression
+	     like *(%ebp - 8).  We've just popped that value from
+	     the stack, which means we need to reset the CFA to
+	     the drap register.  This will remain until we restore
+	     the stack pointer.  */
+	  add_reg_note (insn, REG_CFA_DEF_CFA, reg);
+	  RTX_FRAME_RELATED_P (insn) = 1;
+
+	  /* This means that the DRAP register is valid for addressing.  */
+	  m->fs.drap_valid = true;
+	}
+      else
+	ix86_add_cfa_restore_note (cfi_here ? insn : NULL, reg, cfa_offset);
+    }
+  else if (SSE_REGNO_P (regno))
+    {
+      rtx reg = gen_rtx_REG (V4SFmode, regno);
+      rtx mem;
+      unsigned int align = GET_MODE_ALIGNMENT (V4SFmode);
+      rtx_insn *insn;
+
+      mem = choose_baseaddr (cfa_offset, &align);
+      mem = gen_rtx_MEM (V4SFmode, mem);
+
+      /* The location aligment depends upon the base register.  */
+      align = MIN (GET_MODE_ALIGNMENT (V4SFmode), align);
+      gcc_assert (! (cfa_offset & (align / BITS_PER_UNIT - 1)));
+      set_mem_align (mem, align);
+      insn = emit_insn (gen_rtx_SET (reg, mem));
+
+      ix86_add_cfa_restore_note (cfi_here ? insn : NULL, reg, cfa_offset);
+    }
+  else
+    abort ();
+}
+
 /* Emit code to restore saved registers using MOV insns.
    First register is restored from CFA - CFA_OFFSET.  */
 static void
 ix86_emit_restore_regs_using_mov (HOST_WIDE_INT cfa_offset,
 				  bool maybe_eh_return)
 {
-  struct machine_function *m = cfun->machine;
   unsigned int regno;
 
   for (regno = 0; regno < FIRST_PSEUDO_REGISTER; regno++)
     if (GENERAL_REGNO_P (regno) && ix86_save_reg (regno, maybe_eh_return, true))
       {
-	rtx reg = gen_rtx_REG (word_mode, regno);
-	rtx mem;
-	rtx_insn *insn;
-
-	mem = choose_baseaddr (cfa_offset, NULL);
-	mem = gen_frame_mem (word_mode, mem);
-	insn = emit_move_insn (reg, mem);
-
-        if (m->fs.cfa_reg == crtl->drap_reg && regno == REGNO (crtl->drap_reg))
-	  {
-	    /* Previously we'd represented the CFA as an expression
-	       like *(%ebp - 8).  We've just popped that value from
-	       the stack, which means we need to reset the CFA to
-	       the drap register.  This will remain until we restore
-	       the stack pointer.  */
-	    add_reg_note (insn, REG_CFA_DEF_CFA, reg);
-	    RTX_FRAME_RELATED_P (insn) = 1;
-
-	    /* This means that the DRAP register is valid for addressing.  */
-	    m->fs.drap_valid = true;
-	  }
-	else
-	  ix86_add_cfa_restore_note (NULL, reg, cfa_offset);
-
+	if (!cfun->machine->reg_wrapped_separately[regno])
+	  ix86_emit_restore_reg_using_mov (regno, cfa_offset, false);
 	cfa_offset -= UNITS_PER_WORD;
       }
 }
@@ -9617,21 +9677,8 @@ ix86_emit_restore_sse_regs_using_mov (HOST_WIDE_INT cfa_offset,
   for (regno = 0; regno < FIRST_PSEUDO_REGISTER; regno++)
     if (SSE_REGNO_P (regno) && ix86_save_reg (regno, maybe_eh_return, true))
       {
-	rtx reg = gen_rtx_REG (V4SFmode, regno);
-	rtx mem;
-	unsigned int align = GET_MODE_ALIGNMENT (V4SFmode);
-
-	mem = choose_baseaddr (cfa_offset, &align);
-	mem = gen_rtx_MEM (V4SFmode, mem);
-
-	/* The location aligment depends upon the base register.  */
-	align = MIN (GET_MODE_ALIGNMENT (V4SFmode), align);
-	gcc_assert (! (cfa_offset & (align / BITS_PER_UNIT - 1)));
-	set_mem_align (mem, align);
-	emit_insn (gen_rtx_SET (reg, mem));
-
-	ix86_add_cfa_restore_note (NULL, reg, cfa_offset);
-
+	if (!cfun->machine->reg_wrapped_separately[regno])
+	  ix86_emit_restore_reg_using_mov (regno, cfa_offset, false);
 	cfa_offset -= GET_MODE_SIZE (V4SFmode);
       }
 }
@@ -9869,6 +9916,11 @@ ix86_expand_epilogue (int style)
   /* EH_RETURN requires the use of moves to function properly.  */
   if (crtl->calls_eh_return)
     restore_regs_via_mov = true;
+  else if (m->anything_separately)
+    {
+      gcc_assert (!TARGET_SEH);
+      restore_regs_via_mov = true;
+    }
   /* SEH requires the use of pops to identify the epilogue.  */
   else if (TARGET_SEH)
     restore_regs_via_mov = false;
@@ -9897,6 +9949,11 @@ ix86_expand_epilogue (int style)
   else
     restore_regs_via_mov = false;
 
+  /* If we've (de)allocated the frame separately, then that's done already,
+     and SP is in fact at a word offset.  */
+  if (m->frame_alloc_separately)
+    m->fs.sp_offset = UNITS_PER_WORD;
+
   if (restore_regs_via_mov || frame.nsseregs)
     {
       /* Ensure that the entire register save area is addressable via
@@ -9906,6 +9963,7 @@ ix86_expand_epilogue (int style)
 	  && sp_valid_at (frame.stack_realign_offset + 1)
 	  && (frame.nsseregs + frame.nregs) != 0)
 	{
+	  gcc_assert (!m->frame_alloc_separately);
 	  pro_epilogue_adjust_stack (stack_pointer_rtx, stack_pointer_rtx,
 				     GEN_INT (m->fs.sp_offset
 					      - frame.sse_reg_save_offset),
@@ -9963,6 +10021,7 @@ ix86_expand_epilogue (int style)
 	  rtx sa = EH_RETURN_STACKADJ_RTX;
 	  rtx_insn *insn;
 
+	  gcc_assert (!m->frame_alloc_separately);
 	  /* Stack realignment doesn't work with eh_return.  */
 	  if (crtl->stack_realign_needed)
 	    sorry ("Stack realignment not supported with "
@@ -10035,6 +10094,7 @@ ix86_expand_epilogue (int style)
     }
   else
     {
+      gcc_assert (!m->frame_alloc_separately);
       /* SEH requires that the function end with (1) a stack adjustment
 	 if necessary, (2) a sequence of pops, and (3) a return or
 	 jump instruction.  Prevent insns from the function body from
@@ -10087,6 +10147,7 @@ ix86_expand_epilogue (int style)
      then do so now.  */
   if (m->fs.fp_valid)
     {
+      gcc_assert (!m->frame_alloc_separately);
       /* If the stack pointer is valid and pointing at the frame
 	 pointer store address, then we only need a pop.  */
       if (sp_valid_at (frame.hfp_save_offset)
@@ -10113,6 +10174,7 @@ ix86_expand_epilogue (int style)
       rtx_insn *insn;
 
       gcc_assert (stack_realign_drap);
+      gcc_assert (!m->frame_alloc_separately);
 
       if (ix86_static_chain_on_stack)
 	param_ptr_offset += UNITS_PER_WORD;
@@ -10148,9 +10210,10 @@ ix86_expand_epilogue (int style)
   gcc_assert (!m->fs.realigned);
   if (m->fs.sp_offset != UNITS_PER_WORD)
     {
-      pro_epilogue_adjust_stack (stack_pointer_rtx, stack_pointer_rtx,
-				 GEN_INT (m->fs.sp_offset - UNITS_PER_WORD),
-				 style, true);
+      if (!m->frame_alloc_separately)
+	pro_epilogue_adjust_stack (stack_pointer_rtx, stack_pointer_rtx,
+				   GEN_INT (m->fs.sp_offset - UNITS_PER_WORD),
+				   style, true);
     }
   else
     ix86_add_queued_cfa_restore_notes (get_last_insn ());
@@ -10747,6 +10810,332 @@ ix86_live_on_entry (bitmap regs)
       bitmap_set_bit (regs, split_stack_prologue_scratch_regno ());
     }
 }
+
+/* Separate shrink-wrapping.  */
+
+/* On x86 we have one component for each hardreg (a component is handled
+   if it's a callee saved register), and one additional component for
+   the frame allocation.  */
+
+#define NCOMPONENTS (FIRST_PSEUDO_REGISTER + 1)
+#define SW_FRAME FIRST_PSEUDO_REGISTER
+
+/* Returns false when we can't allocate the frame as a separate
+   component.  Otherwise return true.  */
+
+static bool
+separate_frame_alloc_p (void)
+{
+  struct machine_function *m = cfun->machine;
+  if (frame_pointer_needed
+      || TARGET_SEH
+      || crtl->stack_realign_needed
+      || m->call_ms2sysv)
+    return false;
+  return true;
+}
+
+/* Implements TARGET_SHRINK_WRAP_GET_SEPARATE_COMPONENTS.
+   Returns an sbitmap with all components that we intend to possibly
+   handle for the current function.  */
+
+static sbitmap
+ix86_get_separate_components (void)
+{
+  struct machine_function *m = cfun->machine;
+  struct ix86_frame *frame = &m->frame;
+  sbitmap components;
+  unsigned min, max;
+
+  ix86_finalize_stack_frame_flags ();
+  if (frame->cannot_use_moves
+      || crtl->drap_reg
+      || cfun->machine->func_type != TYPE_NORMAL)
+    return NULL;
+
+  min = max = INVALID_REGNUM;
+
+  components = sbitmap_alloc (NCOMPONENTS);
+  bitmap_clear (components);
+
+  for (unsigned regno = 0; regno < FIRST_PSEUDO_REGISTER; regno++)
+    if (ix86_save_reg (regno, true, true))
+      {
+	if (min == INVALID_REGNUM)
+	  min = regno;
+	max = regno;
+	bitmap_set_bit (components, regno);
+      }
+
+  if (max >= FIRST_PSEUDO_REGISTER)
+    {
+      sbitmap_free (components);
+      return NULL;
+    }
+
+  m->ssw_min_reg = min;
+  m->ssw_max_reg = max;
+
+  if (separate_frame_alloc_p ())
+    bitmap_set_bit (components, SW_FRAME);
+
+  return components;
+}
+
+/* Implements TARGET_SHRINK_WRAP_COMPONENTS_FOR_BB.  Given a BB
+   return all components that are necessary for it.  */
+
+static sbitmap
+ix86_components_for_bb (basic_block bb)
+{
+  struct machine_function *m = cfun->machine;
+  bool need_frame = false;
+  sbitmap components = sbitmap_alloc (NCOMPONENTS);
+  bitmap_clear (components);
+
+  bitmap in = DF_LIVE_IN (bb);
+  bitmap gen = &DF_LIVE_BB_INFO (bb)->gen;
+  bitmap kill = &DF_LIVE_BB_INFO (bb)->kill;
+
+  for (unsigned regno = m->ssw_min_reg; regno <= m->ssw_max_reg; regno++)
+    if (ix86_save_reg (regno, true, true)
+	&& (bitmap_bit_p (in, regno)
+	    || bitmap_bit_p (gen, regno)
+	    || bitmap_bit_p (kill, regno)))
+      {
+	bitmap_set_bit (components, regno);
+	/* XXX we don't really need a frame for saving registers,
+	   we sometimes can use the red-zone.  */
+	need_frame = true;
+      }
+
+  if (!need_frame && separate_frame_alloc_p ())
+    {
+      HARD_REG_SET set_up_by_prologue, prologue_used;
+      rtx_insn *insn;
+
+      CLEAR_HARD_REG_SET (prologue_used);
+      CLEAR_HARD_REG_SET (set_up_by_prologue);
+      add_to_hard_reg_set (&set_up_by_prologue, Pmode, STACK_POINTER_REGNUM);
+      add_to_hard_reg_set (&set_up_by_prologue, Pmode, ARG_POINTER_REGNUM);
+      add_to_hard_reg_set (&set_up_by_prologue, Pmode,
+			   HARD_FRAME_POINTER_REGNUM);
+
+      FOR_BB_INSNS (bb, insn)
+	{
+	  if (NONDEBUG_INSN_P (insn)
+	      && requires_stack_frame_p (insn, prologue_used,
+					 set_up_by_prologue))
+	    {
+	      need_frame = true;
+	      break;
+	    }
+	}
+    }
+  if (need_frame)
+    bitmap_set_bit (components, SW_FRAME);
+
+  return components;
+}
+
+/* Implements TARGET_SHRINK_WRAP_DISQUALIFY_COMPONENTS.  Filter out
+   from COMPONENTS those that we can't handle on edge E.  */
+
+static void
+ix86_disqualify_components (sbitmap components, edge e, sbitmap, bool)
+{
+  /* If the flags are needed at the start of e->dest then we can't insert
+     our stack adjustment insns (they default to flag-clobbering add/sub).  */
+  if (bitmap_bit_p (DF_LIVE_IN (e->dest), FLAGS_REG))
+    bitmap_clear_bit (components, SW_FRAME);
+}
+
+/* Helper for frame allocation.  This resets cfun->machine->fs to
+   reflect the state at the first instruction before prologue (i.e.
+   the call just happened).  */
+
+static void
+ix86_init_frame_state (void)
+{
+  struct machine_function *m = cfun->machine;
+
+  memset (&m->fs, 0, sizeof (m->fs));
+
+  /* Initialize CFA state for before the prologue.  */
+  m->fs.cfa_reg = stack_pointer_rtx;
+  m->fs.cfa_offset = INCOMING_FRAME_SP_OFFSET;
+
+  /* Track SP offset to the CFA.  We continue tracking this after we've
+     swapped the CFA register away from SP.  In the case of re-alignment
+     this is fudged; we're interested to offsets within the local frame.  */
+  m->fs.sp_offset = INCOMING_FRAME_SP_OFFSET;
+  m->fs.sp_valid = true;
+  m->fs.sp_realigned = false;
+}
+
+/* Helper for shrink wrapping the frame allocation.  This emits the
+   stack pointer adjustment reflecting the allocation.  Only easy cases
+   are handled, more complicated ones must be ruled out by the other
+   shrink wrapping hooks.  */
+
+static void
+ix86_alloc_frame (void)
+{
+  struct machine_function *m = cfun->machine;
+  const struct ix86_frame &frame = m->frame;
+  HOST_WIDE_INT allocate;
+
+  allocate = frame.stack_pointer_offset - m->fs.sp_offset;
+
+  /* We should have ruled out all cases of frame allocation
+     that are too complicated for us to handle separately.  Check
+     them.  (They mostly reflect conditions in ix86_expand_prologue).  */
+
+  gcc_assert (!(TARGET_SEH
+		&& frame.stack_pointer_offset > SEH_MAX_FRAME_SIZE));
+
+  gcc_assert (!(allocate >= 0
+		&& flag_stack_clash_protection
+		&& !ix86_target_stack_probe ()));
+
+  gcc_assert (!(allocate >= 0
+		&& flag_stack_check == STATIC_BUILTIN_STACK_CHECK));
+
+  if (allocate == 0)
+    ;
+  else if (!ix86_target_stack_probe ()
+	   || frame.stack_pointer_offset < CHECK_STACK_LIMIT)
+    {
+      pro_epilogue_adjust_stack (stack_pointer_rtx, stack_pointer_rtx,
+				 GEN_INT (-allocate), -1,
+				 m->fs.cfa_reg == stack_pointer_rtx);
+    }
+  else
+    abort();
+  gcc_assert (m->fs.sp_offset == frame.stack_pointer_offset);
+}
+
+/* Undoes the frame allocation for easy cases.  */
+
+static void
+ix86_dealloc_frame (void)
+{
+  struct machine_function *m = cfun->machine;
+  struct machine_frame_state frame_state_save = m->fs;
+
+  /* At this point the stack pointer must be valid, and we must have
+     restored all of the registers.  We may not have deallocated the
+     entire stack frame.  We've delayed this until now because it may
+     be possible to merge the local stack deallocation with the
+     deallocation forced by ix86_static_chain_on_stack.   */
+  gcc_assert (m->fs.sp_valid);
+  gcc_assert (!m->fs.sp_realigned);
+  gcc_assert (!m->fs.fp_valid);
+  gcc_assert (!m->fs.realigned);
+  if (m->fs.sp_offset != UNITS_PER_WORD)
+    {
+      int style = -1;
+      pro_epilogue_adjust_stack (stack_pointer_rtx, stack_pointer_rtx,
+				 GEN_INT (m->fs.sp_offset - UNITS_PER_WORD),
+				 style, true);
+    }
+
+  m->fs = frame_state_save;
+}
+
+/* Helper for ix86_emit_prologue_components and
+   ix86_emit_epilogue_components.  Implements the saving and restoring
+   of callee saved registers (it always uses moves to do that, no
+   push/pop).  */
+
+static void
+ix86_process_reg_components (sbitmap components, bool prologue_p)
+{
+  struct machine_function *m = cfun->machine;
+  struct ix86_frame *frame = &m->frame;
+  HOST_WIDE_INT cfa_offset = frame->reg_save_offset;
+  HOST_WIDE_INT sse_cfa_offset = frame->sse_reg_save_offset;
+
+  for (unsigned regno = m->ssw_min_reg; regno <= m->ssw_max_reg; regno++)
+    if (ix86_save_reg (regno, true, true))
+      {
+	HOST_WIDE_INT *poffset;
+	machine_mode mode;
+	if (GENERAL_REGNO_P (regno))
+	  {
+	    poffset = &cfa_offset;
+	    mode = word_mode;
+	  }
+	else if (SSE_REGNO_P (regno))
+	  {
+	    poffset = &sse_cfa_offset;
+	    mode = V4SFmode;
+	  }
+	else
+	  abort ();
+	if (bitmap_bit_p (components, regno))
+	  {
+	    m->reg_wrapped_separately[regno] = true;
+	    m->anything_separately = true;
+	    if (prologue_p)
+	      ix86_emit_save_reg_using_mov (mode, regno, *poffset);
+	    else
+	      ix86_emit_restore_reg_using_mov (regno, *poffset, true);
+	  }
+	*poffset -= GET_MODE_SIZE (mode);
+      }
+}
+
+/* Implements TARGET_SHRINK_WRAP_EMIT_PROLOGUE_COMPONENTS.
+   Emit prologue code for everything in COMPONENTS.  */
+
+static void
+ix86_emit_prologue_components (sbitmap components)
+{
+  if (bitmap_bit_p (components, SW_FRAME))
+    ix86_init_frame_state ();
+
+  ix86_process_reg_components (components, true);
+
+  if (bitmap_bit_p (components, SW_FRAME))
+    {
+      cfun->machine->frame_alloc_separately = true;
+      cfun->machine->anything_separately = true;
+      ix86_alloc_frame ();
+    }
+}
+
+/* Implements TARGET_SHRINK_WRAP_EMIT_EPILOGUE_COMPONENTS.
+   Emit epilogue code for everything in COMPONENTS.  */
+
+static void
+ix86_emit_epilogue_components (sbitmap components)
+{
+  ix86_process_reg_components (components, false);
+  if (bitmap_bit_p (components, SW_FRAME))
+    ix86_dealloc_frame ();
+}
+
+/* Implements TARGET_SHRINK_WRAP_SET_HANDLED_COMPONENTS.  */
+
+static void
+ix86_set_handled_components (sbitmap)
+{
+  /* We track stuff ourself.  */
+}
+
+#undef TARGET_SHRINK_WRAP_GET_SEPARATE_COMPONENTS
+#define TARGET_SHRINK_WRAP_GET_SEPARATE_COMPONENTS ix86_get_separate_components
+#undef TARGET_SHRINK_WRAP_COMPONENTS_FOR_BB
+#define TARGET_SHRINK_WRAP_COMPONENTS_FOR_BB ix86_components_for_bb
+#undef TARGET_SHRINK_WRAP_DISQUALIFY_COMPONENTS
+#define TARGET_SHRINK_WRAP_DISQUALIFY_COMPONENTS ix86_disqualify_components
+#undef TARGET_SHRINK_WRAP_EMIT_PROLOGUE_COMPONENTS
+#define TARGET_SHRINK_WRAP_EMIT_PROLOGUE_COMPONENTS ix86_emit_prologue_components
+#undef TARGET_SHRINK_WRAP_EMIT_EPILOGUE_COMPONENTS
+#define TARGET_SHRINK_WRAP_EMIT_EPILOGUE_COMPONENTS ix86_emit_epilogue_components
+#undef TARGET_SHRINK_WRAP_SET_HANDLED_COMPONENTS
+#define TARGET_SHRINK_WRAP_SET_HANDLED_COMPONENTS ix86_set_handled_components
 
 /* Extract the parts of an RTL expression that is a valid memory address
    for an instruction.  Return false if the structure of the address is
