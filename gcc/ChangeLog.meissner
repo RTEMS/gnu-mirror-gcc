@@ -1,6 +1,40 @@
 ==================== Branch work171, baseline ====================
 
+2024-07-02   Michael Meissner  <meissner@linux.ibm.com>
+
+	Merge up to a7ad9cb813063ddf51269910f33b56116c10462c.
+
+2024-06-28  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* REVISION: New file for branch.
+	* ChangeLog.meissner: New file.
+
+gcc/c-family/
+
+	* ChangeLog.meissner: New file.
+
+gcc/c/
+
+	* ChangeLog.meissner: New file.
+
+gcc/cp/
+
+	* ChangeLog.meissner: New file.
+
+gcc/fortran/
+
+	* ChangeLog.meissner: New file.
+
+gcc/testsuite/
+
+	* ChangeLog.meissner: New file.
+
+libgcc/
+
+	* ChangeLog.meissner: New file.
+
 2024-06-28   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
-
