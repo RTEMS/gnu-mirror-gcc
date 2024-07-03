@@ -1,3 +1,18 @@
+==================== Branch work171-tar, patch #201 ====================
+
+Remove SPR alternatives for move insns.
+
+2024-07-03  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.md (mov<mode>_internal): Remove alternatives for
+	moving values to/from SPR registers.
+	(movcc_<mode>): Likewise.
+	(movsf_hardfloat): Likewise.
+	(movsd_hardfloat): Likewise.
+	(mov<mode>_softfloat): Likewise.
+	(mov<mode>_hardfloat64): Likewise.
+	(mov<mode>_softfloat64): Likewise.
+
 ==================== Branch work171-tar, patch #200 ====================
 
 Restrict SPR to appropriate integer modes.
