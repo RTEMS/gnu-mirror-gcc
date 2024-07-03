@@ -1,3 +1,7 @@
+2024-07-03  Peter Bergner  <bergner@linux.ibm.com>
+
+	Merge up to releases/gcc-12 5f699cb08eed44a903393f601009e9c6d0b59c59
+
 2024-06-22  Peter Bergner  <bergner@linux.ibm.com>
 
 	Merge up to releases/gcc-12 218adac0fce6135fcb5c0c56911272687f05872b
