@@ -1,6 +1,41 @@
+==================== Branch work171-tar, patch #200 ====================
+
+Restrict SPR to appropriate integer modes.
+
+In preparation for the patches to add support for the TAR register, I restricted
+the modes that special purpose registers (SPRs) could hold to be appropriate
+sized scalar integers.  I have discovered occasionally when GCC has run out of
+registers, it will use the SPRs to hold values instead of spilling them to the
+stack.  The LR/CTR registers can hold 8/16/32-bit values and on 64-bit systems,
+they can also hold 64-bit values.  The VRSAVE and VSCR registers can only hold
+32-bit values.
+
+2024-06-20  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached): Restrict
+	SPR registers to only hold scalar integer modes of an appropriate size.
+	* config/rs6000/rs6000.md (movcc_<mode>): Remove alternatives that move
+	values to/from the SPRs.
+	(movsf_hardfloat): Likewise.
+	(movsd_hardfloat): Likewise.
+	(mov<mode>_softfloat): Likewise.
+	(mov<mode>_softfloat32): Likewise.
+	(mov<mode>_hardfloat64): Likewise.
+	(*mov<mode>_softfloat64): Likewise.
+
 ==================== Branch work171-tar, baseline ====================
+
+Add ChangeLog.tar and update REVISION.
+
+2024-06-17  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* ChangeLog.tar: New file for branch.
+	* REVISION: Update.
 
 2024-06-28   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
-
