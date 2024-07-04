@@ -1,3 +1,336 @@
+2024-07-03  John David Anglin  <danglin@gcc.gnu.org>
+
+	PR target/115691
+	* config/pa/pa.md: Remove incorrect xmpyu patterns.
+
+2024-07-03  Georg-Johann Lay  <avr@gjlay.de>
+
+	Backported from master:
+	2024-07-03  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR target/98762
+	* config/avr/avr.cc (avr_out_movqi_r_mr_reg_disp_tiny): Properly
+	restore the base register when it is partially clobbered.
+
+2024-07-03  Kewen Lin  <linkw@linux.ibm.com>
+
+	Backported from master:
+	2024-06-26  Kewen Lin  <linkw@linux.ibm.com>
+		    Xionghu Luo  <xionghuluo@tencent.com>
+
+	PR target/106069
+	PR target/115355
+	* config/rs6000/altivec.md (altivec_vmrghh_direct): Rename to ...
+	(altivec_vmrghh_direct_be): ... this.  Add condition BYTES_BIG_ENDIAN.
+	(altivec_vmrghh_direct_le): New define_insn.
+	(altivec_vmrglh_direct): Rename to ...
+	(altivec_vmrglh_direct_be): ... this.  Add condition BYTES_BIG_ENDIAN.
+	(altivec_vmrglh_direct_le): New define_insn.
+	(altivec_vmrghh): Adjust by calling gen_altivec_vmrghh_direct_be
+	for BE and gen_altivec_vmrglh_direct_le for LE.
+	(altivec_vmrglh): Adjust by calling gen_altivec_vmrglh_direct_be
+	for BE and gen_altivec_vmrghh_direct_le for LE.
+	(vec_widen_umult_hi_v16qi): Adjust the call to
+	gen_altivec_vmrghh_direct by gen_altivec_vmrghh for BE
+	and by gen_altivec_vmrglh for LE.
+	(vec_widen_smult_hi_v16qi): Likewise.
+	(vec_widen_umult_lo_v16qi): Adjust the call to
+	gen_altivec_vmrglh_direct by gen_altivec_vmrglh for BE
+	and by gen_altivec_vmrghh for LE.
+	(vec_widen_smult_lo_v16qi): Likewise.
+	* config/rs6000/rs6000.cc (altivec_expand_vec_perm_const): Replace
+	CODE_FOR_altivec_vmrghh_direct by
+	CODE_FOR_altivec_vmrghh_direct_be for BE and
+	CODE_FOR_altivec_vmrghh_direct_le for LE.  And replace
+	CODE_FOR_altivec_vmrglh_direct by
+	CODE_FOR_altivec_vmrglh_direct_be for BE and
+	CODE_FOR_altivec_vmrglh_direct_le for LE.
+
+2024-07-03  Kewen Lin  <linkw@linux.ibm.com>
+
+	Backported from master:
+	2024-06-26  Kewen Lin  <linkw@linux.ibm.com>
+		    Xionghu Luo  <xionghuluo@tencent.com>
+
+	PR target/106069
+	PR target/115355
+	* config/rs6000/altivec.md (altivec_vmrghb_direct): Rename to ...
+	(altivec_vmrghb_direct_be): ... this.  Add condition BYTES_BIG_ENDIAN.
+	(altivec_vmrghb_direct_le): New define_insn.
+	(altivec_vmrglb_direct): Rename to ...
+	(altivec_vmrglb_direct_be): ... this.  Add condition BYTES_BIG_ENDIAN.
+	(altivec_vmrglb_direct_le): New define_insn.
+	(altivec_vmrghb): Adjust by calling gen_altivec_vmrghb_direct_be
+	for BE and gen_altivec_vmrglb_direct_le for LE.
+	(altivec_vmrglb): Adjust by calling gen_altivec_vmrglb_direct_be
+	for BE and gen_altivec_vmrghb_direct_le for LE.
+	* config/rs6000/rs6000.cc (altivec_expand_vec_perm_const): Replace
+	CODE_FOR_altivec_vmrghb_direct by
+	CODE_FOR_altivec_vmrghb_direct_be for BE and
+	CODE_FOR_altivec_vmrghb_direct_le for LE.  And replace
+	CODE_FOR_altivec_vmrglb_direct by
+	CODE_FOR_altivec_vmrglb_direct_be for BE and
+	CODE_FOR_altivec_vmrglb_direct_le for LE.
+
+2024-07-01  Georg-Johann Lay  <avr@gjlay.de>
+
+	Backported from master:
+	2024-07-01  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR target/88236
+	PR target/115726
+	* config/avr/avr.md (mov<mode>) [avr_mem_memx_p]: Expand in such a
+	way that the destination does not overlap with any hard register
+	clobbered / used by xload8qi_A resp. xload<mode>_A.
+	* config/avr/avr.cc (avr_out_xload): Avoid early-clobber
+	situation for Z by executing just one load when the output register
+	overlaps with Z.
+
+2024-06-28  Kewen Lin  <linkw@linux.ibm.com>
+
+	Backported from master:
+	2024-06-21  Kewen Lin  <linkw@linux.ibm.com>
+		    Xionghu Luo  <xionghuluo@tencent.com>
+
+	PR target/106069
+	PR target/115355
+	* config/rs6000/altivec.md (altivec_vmrghw_direct_<VSX_W:mode>): Rename
+	to ...
+	(altivec_vmrghw_direct_<VSX_W:mode>_be): ... this.  Add the condition
+	BYTES_BIG_ENDIAN.
+	(altivec_vmrghw_direct_<VSX_W:mode>_le): New define_insn.
+	(altivec_vmrglw_direct_<VSX_W:mode>): Rename to ...
+	(altivec_vmrglw_direct_<VSX_W:mode>_be): ... this.  Add the condition
+	BYTES_BIG_ENDIAN.
+	(altivec_vmrglw_direct_<VSX_W:mode>_le): New define_insn.
+	(altivec_vmrghw): Adjust by calling gen_altivec_vmrghw_direct_v4si_be
+	for BE and gen_altivec_vmrglw_direct_v4si_le for LE.
+	(altivec_vmrglw): Adjust by calling gen_altivec_vmrglw_direct_v4si_be
+	for BE and gen_altivec_vmrghw_direct_v4si_le for LE.
+	(vec_widen_umult_hi_v8hi): Adjust the call to
+	gen_altivec_vmrghw_direct_v4si by gen_altivec_vmrghw for BE
+	and by gen_altivec_vmrglw for LE.
+	(vec_widen_smult_hi_v8hi): Likewise.
+	(vec_widen_umult_lo_v8hi): Adjust the call to
+	gen_altivec_vmrglw_direct_v4si by gen_altivec_vmrglw for BE
+	and by gen_altivec_vmrghw for LE
+	(vec_widen_smult_lo_v8hi): Likewise.
+	* config/rs6000/rs6000.cc (altivec_expand_vec_perm_const): Replace
+	CODE_FOR_altivec_vmrghw_direct_v4si by
+	CODE_FOR_altivec_vmrghw_direct_v4si_be for BE and
+	CODE_FOR_altivec_vmrghw_direct_v4si_le for LE.  And replace
+	CODE_FOR_altivec_vmrglw_direct_v4si by
+	CODE_FOR_altivec_vmrglw_direct_v4si_be for BE and
+	CODE_FOR_altivec_vmrglw_direct_v4si_le for LE.
+	* config/rs6000/vsx.md (vsx_xxmrghw_<VSX_W:mode>): Adjust by calling
+	gen_altivec_vmrghw_direct_v4si_be for BE and
+	gen_altivec_vmrglw_direct_v4si_le for LE.
+	(vsx_xxmrglw_<VSX_W:mode>): Adjust by calling
+	gen_altivec_vmrglw_direct_v4si_be for BE and
+	gen_altivec_vmrghw_direct_v4si_le for LE.
+
+2024-06-27  Wilco Dijkstra  <wilco.dijkstra@arm.com>
+
+	Backported from master:
+	2023-11-30  Wilco Dijkstra  <wilco.dijkstra@arm.com>
+
+	PR target/103100
+	* config/aarch64/aarch64.md (cpymemdi): Remove pattern condition.
+	(setmemdi): Likewise.
+	* config/aarch64/aarch64.cc (aarch64_expand_cpymem): Support
+	strict-align.  Cleanup condition for using MOPS.
+	(aarch64_expand_setmem): Likewise.
+
+2024-06-27  Andrew Carlotti  <andrew.carlotti@arm.com>
+
+	Backported from master:
+	2023-12-16  Andrew Carlotti  <andrew.carlotti@arm.com>
+
+	PR target/115618
+	* common/config/aarch64/aarch64-common.cc
+	(aarch64_get_extension_string_for_isa_flags): Fix generation of
+	the "+nocrypto" extension.
+	* config/aarch64/aarch64.h (AARCH64_ISA_CRYPTO): Remove.
+	(TARGET_CRYPTO): Remove.
+	* config/aarch64/aarch64-c.cc (aarch64_update_cpp_builtins):
+	Don't use TARGET_CRYPTO.
+
+2024-06-27  Kyrylo Tkachov  <ktkachov@nvidia.com>
+
+	* config/aarch64/aarch64-cores.def (grace): New entry.
+	* config/aarch64/aarch64-tune.md: Regenerate.
+	* doc/invoke.texi (AArch64 Options): Document the above.
+
+2024-06-24  Kewen Lin  <linkw@linux.ibm.com>
+
+	Backported from master:
+	2024-05-29  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR target/114846
+	* config/rs6000/rs6000-logue.cc (rs6000_emit_epilogue): As
+	EPILOGUE_TYPE_EH_RETURN would be passed as epilogue_type directly
+	now, adjust the relevant handlings on it.
+	* config/rs6000/rs6000.md (eh_return expander): Append by calling
+	gen_eh_return_internal and emit_barrier.
+	(eh_return_internal): New define_insn_and_split, call function
+	rs6000_emit_epilogue with epilogue type EPILOGUE_TYPE_EH_RETURN.
+
+2024-06-20  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-06-17  Jakub Jelinek  <jakub@redhat.com>
+
+	PR driver/115440
+	* opts-common.cc (add_misspelling_candidates): If opt1 is non-NULL,
+	add a space and opt1 to the alternative suggestion text.
+
+2024-06-12  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	Backported from master:
+	2024-06-12  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+		    Yvan ROUX  <yvan.roux@foss.st.com>
+
+	PR target/115253
+	* config/arm/arm.cc (cmse_nonsecure_call_inline_register_clear):
+	Sign extend for Thumb1.
+	(thumb1_expand_prologue): Add zero/sign extend.
+
+2024-06-11  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-06-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/115337
+	* fold-const.cc (tree_call_nonnegative_warnv_p) <CASE_CFN_CLZ>:
+	If fn is CFN_CLZ, use CLZ_DEFINED_VALUE_AT.
+
+2024-06-11  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-06-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/108789
+	* builtins.cc (fold_builtin_arith_overflow): For ovf_only,
+	don't call save_expr and don't build REALPART_EXPR, otherwise
+	set TREE_SIDE_EFFECTS on call before calling save_expr.
+
+2024-06-11  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-06-04  Jakub Jelinek  <jakub@redhat.com>
+
+	* doc/invoke.texi (lujiazui): Clarify that while the CPUs do support
+	AVX and F16C, -march=lujiazui actually doesn't enable those.
+
+2024-06-11  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-06-03  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/115324
+	* config/rs6000/rs6000-gen-builtins.cc (write_decls): Remove
+	GTY markup from struct bifdata and struct ovlddata and remove their
+	fntype members.  Change next member in struct ovlddata and
+	first_instance member of struct ovldrecord to have int type rather
+	than struct ovlddata *.  Remove GTY markup from rs6000_builtin_info
+	and rs6000_instance_info arrays, declare new
+	rs6000_builtin_info_fntype and rs6000_instance_info_fntype arrays,
+	which have GTY markup.
+	(write_bif_static_init): Adjust for the above changes.
+	(write_ovld_static_init): Likewise.
+	(write_init_bif_table): Likewise.
+	(write_init_ovld_table): Likewise.
+	* config/rs6000/rs6000-builtin.cc (rs6000_init_builtins): Likewise.
+	* config/rs6000/rs6000-c.cc (find_instance): Likewise.  Make static.
+	(altivec_resolve_overloaded_builtin): Adjust for the above changes.
+
+2024-06-11  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-05-15  Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/114902
+	PR rtl-optimization/115092
+	* combine.cc (simplify_compare_const): Don't optimize
+	GE op0 SIGNED_MIN or LT op0 SIGNED_MIN into NE op0 const0_rtx or
+	EQ op0 const0_rtx.
+
+2024-06-07  Jan Hubicka  <jh@suse.cz>
+
+	Backported from master:
+	2023-12-29  Jan Hubicka  <jh@suse.cz>
+
+	* config/i386/x86-tune.def (X86_TUNE_AVOID_128FMA_CHAINS,
+	X86_TUNE_AVOID_256FMA_CHAINS): Enable for znver4 and Core.
+
+2024-06-03  Uros Bizjak  <ubizjak@gmail.com>
+
+	Backported from master:
+	2024-05-31  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/115297
+	* config/alpha/alpha.md (<any_divmod:code>si3): Wrap DImode
+	operands 3 and 4 with truncate:SI RTX.
+	(*divmodsi_internal_er): Ditto for operands 1 and 2.
+	(*divmodsi_internal_er_1): Ditto.
+	(*divmodsi_internal): Ditto.
+	* config/alpha/constraints.md ("b"): Correct register
+	number in the description.
+
+2024-06-01  Georg-Johann Lay  <avr@gjlay.de>
+
+	Backported from master:
+	2024-06-01  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR tree-optimization/115307
+	* config/avr/avr.md (SFDF): New mode iterator.
+	(isinf<mode>2) [sf, df]: New expanders.
+
+2024-05-31  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2024-01-29  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR target/113281
+	* tree-vect-patterns.cc (vect_recog_over_widening_pattern): Remove
+	workaround for right shifts.
+	(vect_truncatable_operation_p): Handle NEGATE_EXPR and BIT_NOT_EXPR.
+	(vect_determine_precisions_from_range): Be more selective about
+	which codes can be narrowed based on their input and output ranges.
+	For shifts, require at least one more bit of precision than the
+	maximum shift amount.
+
+2024-05-31  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2024-05-24  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR tree-optimization/115192
+	* tree-data-ref.cc (create_intersect_range_checks): Take the
+	alignment of the access sizes into account.
+
+2024-05-31  Hongyu Wang  <hongyu.wang@intel.com>
+
+	Backported from master:
+	2024-05-29  Hongyu Wang  <hongyu.wang@intel.com>
+
+	PR target/113719
+	* config/i386/i386-options.cc (ix86_override_options_after_change):
+	Remove call to ix86_default_align and
+	ix86_recompute_optlev_based_flags.
+	(ix86_option_override_internal): Call ix86_default_align and
+	ix86_recompute_optlev_based_flags.
+
+2024-05-30  YunQiang Su  <syq@gcc.gnu.org>
+
+	Backported from master:
+	2024-05-29  YunQiang Su  <syq@gcc.gnu.org>
+
+	* config/mips/mips.cc(mips16_gp_pseudo_reg): Mark
+	MIPS16_PIC_TEMP and MIPS_PROLOGUE_TEMP clobbered.
+	(mips_emit_call_insn): Mark MIPS16_PIC_TEMP and
+	MIPS_PROLOGUE_TEMP clobbered if MIPS16 and CALL_CLOBBERED_GP.
+
 2024-05-22  Jakub Jelinek  <jakub@redhat.com>
 
 	Backported from master:
