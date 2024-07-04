@@ -1,6 +1,42 @@
+==================== Branch work171-bugs, patch #301 ====================
+
+Do not build IEEE 128-bit libstdc++ support if VSX is not available.
+
+2024-07-03  Michael Meissner  <meissner@linux.ibm.com>
+
+libstdc++-v3/
+
+	* configure.ac (powerpc*-*-linux*): Don't enable IEEE 128-bit on PowerPC
+	systems without VSX.
+	* configure: Regenerate.
+	* numeric_traits.h: Don't enable IEEE 128-bit on PowerPC systems without
+	VSX.
+
+==================== Branch work171-bugs, patch #300 ====================
+
+Do not build IEEE 128-bit libgfortran support if VSX is not available.
+
+2024-07-03  Michael Meissner  <meissner@linux.ibm.com>
+
+libgfortran/
+
+	* configure.ac (powerpc64le*-linux*): Check to see that the compiler
+	uses VSX before enabling IEEE 128-bit support.
+	* configure: Regenerate.
+	* kinds-override.h (GFC_REAL_17): Add check for __VSX__.
+	* libgfortran.h (POWER_IEEE128): Likewise.
+
 ==================== Branch work171-bugs, baseline ====================
+
+Add ChangeLog.bugs and update REVISION.
+
+2024-06-28  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* ChangeLog.bugs: New file for branch.
+	* REVISION: Update.
 
 2024-06-28   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
-
