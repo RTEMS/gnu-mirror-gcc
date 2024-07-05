@@ -101,8 +101,7 @@ riscv_target_attr_parser::parse_arch (const char *str)
     {
       /* Parsing the extension list like "+<ext>[,+<ext>]*".  */
       size_t len = strlen (str);
-      std::unique_ptr<char[]> buf (new char[len+1]);
-      char *str_to_check = buf.get ();
+      char *str_to_check = (char *) alloca (len + 1);
       strcpy (str_to_check, str);
       const char *token = strtok_r (str_to_check, ",", &str_to_check);
       const char *local_arch_str = global_options.x_riscv_arch_string;
@@ -254,8 +253,7 @@ riscv_process_one_target_attr (char *arg_str,
       return false;
     }
 
-  std::unique_ptr<char[]> buf (new char[len+1]);
-  char *str_to_check = buf.get();
+  char *str_to_check = (char *) alloca (len + 1);
   strcpy (str_to_check, arg_str);
 
   char *arg = strchr (str_to_check, '=');
@@ -341,8 +339,7 @@ riscv_process_target_attr (tree args, location_t loc)
       return false;
     }
 
-  std::unique_ptr<char[]> buf (new char[len+1]);
-  char *str_to_check = buf.get ();
+  char *str_to_check = (char *) alloca (len + 1);
   strcpy (str_to_check, TREE_STRING_POINTER (args));
 
   /* Used to catch empty spaces between semi-colons i.e.
