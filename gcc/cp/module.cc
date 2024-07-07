@@ -10142,7 +10142,7 @@ trees_in::tree_node (bool is_use)
       TREE_USED (res) = true;
 
       /* And for structured bindings also the underlying decl.  */
-      if (DECL_DECOMPOSITION_P (res) && DECL_DECOMP_BASE (res))
+      if (DECL_DECOMPOSITION_P (res) && !DECL_DECOMP_IS_BASE (res))
 	TREE_USED (DECL_DECOMP_BASE (res)) = true;
 
       if (DECL_CLONED_FUNCTION_P (res))
@@ -10686,9 +10686,7 @@ trees_out::get_merge_kind (tree decl, depset *dep)
 	       g++.dg/modules/lambda-6_a.C.  */
 	    if (DECL_IMPLICIT_TYPEDEF_P (STRIP_TEMPLATE (decl))
 		&& LAMBDA_TYPE_P (TREE_TYPE (decl)))
-	      if (tree scope
-		  = LAMBDA_EXPR_EXTRA_SCOPE (CLASSTYPE_LAMBDA_EXPR
-					     (TREE_TYPE (decl))))
+	      if (tree scope = LAMBDA_TYPE_EXTRA_SCOPE (TREE_TYPE (decl)))
 		{
 		  /* Lambdas attached to fields are keyed to its class.  */
 		  if (TREE_CODE (scope) == FIELD_DECL)
@@ -10993,8 +10991,7 @@ trees_out::key_mergeable (int tag, merge_kind mk, tree decl, tree inner,
 	case MK_keyed:
 	  {
 	    gcc_checking_assert (LAMBDA_TYPE_P (TREE_TYPE (inner)));
-	    tree scope = LAMBDA_EXPR_EXTRA_SCOPE (CLASSTYPE_LAMBDA_EXPR
-						  (TREE_TYPE (inner)));
+	    tree scope = LAMBDA_TYPE_EXTRA_SCOPE (TREE_TYPE (inner));
 	    gcc_checking_assert (TREE_CODE (scope) == VAR_DECL
 				 || TREE_CODE (scope) == FIELD_DECL
 				 || TREE_CODE (scope) == PARM_DECL
@@ -13253,8 +13250,12 @@ depset::hash::add_binding_entity (tree decl, WMB_Flags flags, void *data_)
       data->met_namespace = true;
       if (data->hash->add_namespace_entities (decl, data->partitions))
 	{
-	  /* It contains an exported thing, so it is exported.  */
-	  gcc_checking_assert (DECL_MODULE_PURVIEW_P (decl));
+	  /* It contains an exported thing, so it is exported.
+
+	     FIXME we have to set DECL_MODULE_PURVIEW_P instead of asserting
+	     that it is already set because of the c++/114683 issue with
+	     exported using-declarations; see do_nonmember_using_decl.  */
+	  DECL_MODULE_PURVIEW_P (decl) = true;
 	  DECL_MODULE_EXPORT_P (decl) = true;
 	}
 

@@ -155,7 +155,8 @@ along with GCC; see the file COPYING3.  If not see
 
 #define m_LUJIAZUI (HOST_WIDE_INT_1U<<PROCESSOR_LUJIAZUI)
 #define m_YONGFENG (HOST_WIDE_INT_1U<<PROCESSOR_YONGFENG)
-#define m_ZHAOXIN  (m_LUJIAZUI | m_YONGFENG)
+#define m_SHIJIDADAO (HOST_WIDE_INT_1U<<PROCESSOR_SHIJIDADAO)
+#define m_ZHAOXIN  (m_LUJIAZUI | m_YONGFENG | m_SHIJIDADAO)
 
 #define m_GEODE (HOST_WIDE_INT_1U<<PROCESSOR_GEODE)
 #define m_K6 (HOST_WIDE_INT_1U<<PROCESSOR_K6)
@@ -793,6 +794,7 @@ static const struct processor_costs *processor_cost_table[] =
   &intel_cost,
   &lujiazui_cost,
   &yongfeng_cost,
+  &shijidadao_cost,
   &geode_cost,
   &k6_cost,
   &athlon_cost,
@@ -1911,37 +1913,58 @@ ix86_recompute_optlev_based_flags (struct gcc_options *opts,
     }
 }
 
+/* Implement part of TARGET_OVERRIDE_OPTIONS_AFTER_CHANGE hook.  */
+
+static void
+ix86_override_options_after_change_1 (struct gcc_options *opts,
+				      struct gcc_options *opts_set)
+{
+#define OPTS_SET_P(OPTION) opts_set->x_ ## OPTION
+#define OPTS(OPTION) opts->x_ ## OPTION
+
+  /* Disable unrolling small loops when there's explicit
+     -f{,no}unroll-loop.  */
+  if ((OPTS_SET_P (flag_unroll_loops))
+     || (OPTS_SET_P (flag_unroll_all_loops)
+	 && OPTS (flag_unroll_all_loops)))
+    {
+      if (!OPTS_SET_P (ix86_unroll_only_small_loops))
+	OPTS (ix86_unroll_only_small_loops) = 0;
+      /* Re-enable -frename-registers and -fweb if funroll-loops
+	 enabled.  */
+      if (!OPTS_SET_P (flag_web))
+	OPTS (flag_web) = OPTS (flag_unroll_loops);
+      if (!OPTS_SET_P (flag_rename_registers))
+	OPTS (flag_rename_registers) = OPTS (flag_unroll_loops);
+      /* -fcunroll-grow-size default follws -f[no]-unroll-loops.  */
+      if (!OPTS_SET_P (flag_cunroll_grow_size))
+	OPTS (flag_cunroll_grow_size)
+	  = (OPTS (flag_unroll_loops)
+	     || OPTS (flag_peel_loops)
+	     || OPTS (optimize) >= 3);
+    }
+  else
+    {
+      if (!OPTS_SET_P (flag_cunroll_grow_size))
+	OPTS (flag_cunroll_grow_size)
+	  = (OPTS (flag_peel_loops)
+	     || OPTS (optimize) >= 3);
+    }
+
+#undef OPTS
+#undef OPTS_SET_P
+}
+
 /* Implement TARGET_OVERRIDE_OPTIONS_AFTER_CHANGE hook.  */
 
 void
 ix86_override_options_after_change (void)
 {
-  /* Disable unrolling small loops when there's explicit
-     -f{,no}unroll-loop.  */
-  if ((OPTION_SET_P (flag_unroll_loops))
-     || (OPTION_SET_P (flag_unroll_all_loops)
-	 && flag_unroll_all_loops))
-    {
-      if (!OPTION_SET_P (ix86_unroll_only_small_loops))
-	ix86_unroll_only_small_loops = 0;
-      /* Re-enable -frename-registers and -fweb if funroll-loops
-	 enabled.  */
-      if (!OPTION_SET_P (flag_web))
-	flag_web = flag_unroll_loops;
-      if (!OPTION_SET_P (flag_rename_registers))
-	flag_rename_registers = flag_unroll_loops;
-      /* -fcunroll-grow-size default follws -f[no]-unroll-loops.  */
-      if (!OPTION_SET_P (flag_cunroll_grow_size))
-	flag_cunroll_grow_size = flag_unroll_loops
-				 || flag_peel_loops
-				 || optimize >= 3;
-    }
-  else
-    {
-      if (!OPTION_SET_P (flag_cunroll_grow_size))
-	flag_cunroll_grow_size = flag_peel_loops || optimize >= 3;
-    }
+  ix86_default_align (&global_options);
 
+  ix86_recompute_optlev_based_flags (&global_options, &global_options_set);
+
+  ix86_override_options_after_change_1 (&global_options, &global_options_set);
 }
 
 /* Clear stack slot assignments remembered from previous functions.
@@ -2113,15 +2136,18 @@ ix86_option_override_internal (bool main_args_p,
       opts->x_ix86_stringop_alg = no_stringop;
     }
 
-  if (TARGET_APX_F && !TARGET_64BIT)
+  if (TARGET_APX_F_P (opts->x_ix86_isa_flags2)
+      && !TARGET_64BIT_P (opts->x_ix86_isa_flags))
     error ("%<-mapxf%> is not supported for 32-bit code");
-  else if (opts->x_ix86_apx_features != apx_none && !TARGET_64BIT)
+  else if (opts->x_ix86_apx_features != apx_none
+	   && !TARGET_64BIT_P (opts->x_ix86_isa_flags))
     error ("%<-mapx-features=%> option is not supported for 32-bit code");
 
-  if (TARGET_UINTR && !TARGET_64BIT)
+  if (TARGET_UINTR_P (opts->x_ix86_isa_flags2)
+      && !TARGET_64BIT_P (opts->x_ix86_isa_flags))
     error ("%<-muintr%> not supported for 32-bit code");
 
-  if (ix86_lam_type && !TARGET_LP64)
+  if (ix86_lam_type && !TARGET_LP64_P (opts->x_ix86_isa_flags))
     error ("%<-mlam=%> option: [u48|u57] not supported for 32-bit code");
 
   if (!opts->x_ix86_arch_string)
@@ -2488,7 +2514,7 @@ ix86_option_override_internal (bool main_args_p,
 
   ix86_recompute_optlev_based_flags (opts, opts_set);
 
-  ix86_override_options_after_change ();
+  ix86_override_options_after_change_1 (opts, opts_set);
 
   ix86_tune_cost = processor_cost_table[ix86_tune];
   /* TODO: ix86_cost should be chosen at instruction or function granuality
@@ -2502,7 +2528,8 @@ ix86_option_override_internal (bool main_args_p,
   init_machine_status = ix86_init_machine_status;
 
   /* Override APX flag here if ISA bit is set.  */
-  if (TARGET_APX_F && !OPTION_SET_P (ix86_apx_features))
+  if (TARGET_APX_F_P (opts->x_ix86_isa_flags2)
+      && !OPTION_SET_P (ix86_apx_features))
     opts->x_ix86_apx_features = apx_all;
 
   /* Validate -mregparm= value.  */

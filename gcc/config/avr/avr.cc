@@ -4471,28 +4471,21 @@ avr_out_lpm_no_lpmx (rtx_insn *insn, rtx *xop, int *plen)
       gcc_assert (REG_Z == REGNO (XEXP (addr, 0))
 		  && n_bytes <= 4);
 
-      if (regno_dest == LPM_REGNO)
-	avr_asm_len ("%4lpm"      CR_TAB
-		     "adiw %2,1", xop, plen, 2);
-      else
-	avr_asm_len ("%4lpm"      CR_TAB
-		     "mov %A0,%3" CR_TAB
-		     "adiw %2,1", xop, plen, 3);
+      for (int i = 0; i < n_bytes; ++i)
+	{
+	  rtx reg = simplify_gen_subreg (QImode, dest, GET_MODE (dest), i);
 
-      if (n_bytes >= 2)
-	avr_asm_len ("%4lpm"      CR_TAB
-		     "mov %B0,%3" CR_TAB
-		     "adiw %2,1", xop, plen, 3);
+	  if (i > 0)
+	    avr_asm_len ("adiw %2,1", xop, plen, 1);
 
-      if (n_bytes >= 3)
-	avr_asm_len ("%4lpm"      CR_TAB
-		     "mov %C0,%3" CR_TAB
-		     "adiw %2,1", xop, plen, 3);
+	  avr_asm_len ("%4lpm", xop, plen, 1);
 
-      if (n_bytes >= 4)
-	avr_asm_len ("%4lpm"      CR_TAB
-		     "mov %D0,%3" CR_TAB
-		     "adiw %2,1", xop, plen, 3);
+	  if (REGNO (reg) != LPM_REGNO)
+	    avr_asm_len ("mov %0,r0", &reg, plen, 1);
+	}
+
+      if (! _reg_unused_after (insn, xop[2], false))
+	avr_asm_len ("adiw %2,1", xop, plen, 1);
 
       break; /* POST_INC */
 
@@ -4686,7 +4679,13 @@ avr_out_xload (rtx_insn * /*insn*/, rtx *op, int *plen)
   xop[2] = lpm_addr_reg_rtx;
   xop[3] = AVR_HAVE_LPMX ? op[0] : lpm_reg_rtx;
 
-  avr_asm_len (AVR_HAVE_LPMX ? "lpm %3,%a2" : "lpm", xop, plen, -1);
+  if (plen)
+    *plen = 0;
+
+  if (reg_overlap_mentioned_p (xop[3], lpm_addr_reg_rtx))
+    avr_asm_len ("sbrs %1,7", xop, plen, 1);
+
+  avr_asm_len (AVR_HAVE_LPMX ? "lpm %3,%a2" : "lpm", xop, plen, 1);
 
   avr_asm_len ("sbrc %1,7" CR_TAB
 	       "ld %3,%a2", xop, plen, 2);
@@ -4832,13 +4831,30 @@ avr_out_movqi_r_mr_reg_disp_tiny (rtx_insn *insn, rtx op[], int *plen)
   rtx dest = op[0];
   rtx src = op[1];
   rtx x = XEXP (src, 0);
+  rtx base = XEXP (x, 0);
 
-  avr_asm_len (TINY_ADIW (%I1, %J1, %o1) CR_TAB
-	       "ld %0,%b1" , op, plen, -3);
+  if (plen)
+    *plen = 0;
 
-  if (!reg_overlap_mentioned_p (dest, XEXP (x, 0))
-      && !reg_unused_after (insn, XEXP (x, 0)))
-    avr_asm_len (TINY_SBIW (%I1, %J1, %o1), op, plen, 2);
+  if (!reg_overlap_mentioned_p (dest, base))
+    {
+      avr_asm_len (TINY_ADIW (%I1, %J1, %o1) CR_TAB
+		   "ld %0,%b1", op, plen, 3);
+      if (!reg_unused_after (insn, base))
+	avr_asm_len (TINY_SBIW (%I1, %J1, %o1), op, plen, 2);
+    }
+  else
+    {
+      // PR98762: The base register overlaps dest and is only partly clobbered.
+      rtx base2 = all_regs_rtx[1 ^ REGNO (dest)];
+
+      if (!reg_unused_after (insn, base2))
+	avr_asm_len ("mov __tmp_reg__,%0" , &base2, plen, 1);
+      avr_asm_len (TINY_ADIW (%I1, %J1, %o1) CR_TAB
+		   "ld %0,%b1", op, plen, 3);
+      if (!reg_unused_after (insn, base2))
+	avr_asm_len ("mov %0,__tmp_reg__" , &base2, plen, 1);
+    }
 
   return "";
 }
@@ -6662,6 +6678,14 @@ avr_split_tiny_move (rtx_insn * /*insn*/, rtx *xop)
   if (REGNO (base) > REG_Z)
     return false;
 
+  if (! AVR_TINY
+      // Only keep base registers that can't do PLUS addressing.
+      && ((REGNO (base) != REG_X
+	   && ADDR_SPACE_GENERIC_P (MEM_ADDR_SPACE (mem)))
+	  || avr_load_libgcc_p (mem)
+	  || avr_mem_memx_p (mem)))
+    return false;
+
   bool volatile_p = MEM_VOLATILE_P (mem);
   bool mem_volatile_p = false;
   if (frame_pointer_needed
@@ -6928,6 +6952,20 @@ avr_canonicalize_comparison (int *icode, rtx *op0, rtx *op1, bool op0_fixed)
 	  return;
 	}
     }
+}
+
+/* Implement TARGET_C_MODE_FOR_FLOATING_TYPE.  Return SFmode or DFmode
+   for TI_{LONG_,}DOUBLE_TYPE which is for {long,} double type, go with
+   the default one for the others.  */
+
+static machine_mode
+avr_c_mode_for_floating_type (enum tree_index ti)
+{
+  if (ti == TI_DOUBLE_TYPE)
+    return avr_double == 32 ? SFmode : DFmode;
+  if (ti == TI_LONG_DOUBLE_TYPE)
+    return avr_long_double == 32 ? SFmode : DFmode;
+  return default_mode_for_floating_type (ti);
 }
 
 
@@ -16410,6 +16448,9 @@ avr_float_lib_compare_returns_bool (machine_mode mode, enum rtx_code)
    against unsafe speculation."  */
 #undef  TARGET_HAVE_SPECULATION_SAFE_VALUE
 #define TARGET_HAVE_SPECULATION_SAFE_VALUE speculation_safe_value_not_needed
+
+#undef TARGET_C_MODE_FOR_FLOATING_TYPE
+#define TARGET_C_MODE_FOR_FLOATING_TYPE avr_c_mode_for_floating_type
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
