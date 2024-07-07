@@ -4489,27 +4489,39 @@ vect_recog_mult_pattern (vec_info *vinfo,
 
 extern bool gimple_unsigned_integer_sat_add (tree, tree*, tree (*)(tree));
 extern bool gimple_unsigned_integer_sat_sub (tree, tree*, tree (*)(tree));
+extern bool gimple_unsigned_integer_sat_trunc (tree, tree*, tree (*)(tree));
 
-static gcall *
-vect_recog_build_binary_gimple_call (vec_info *vinfo, gimple *stmt,
+static gimple *
+vect_recog_build_binary_gimple_stmt (vec_info *vinfo, stmt_vec_info stmt_info,
 				     internal_fn fn, tree *type_out,
-				     tree op_0, tree op_1)
+				     tree lhs, tree op_0, tree op_1)
 {
   tree itype = TREE_TYPE (op_0);
-  tree vtype = get_vectype_for_scalar_type (vinfo, itype);
+  tree otype = TREE_TYPE (lhs);
+  tree v_itype = get_vectype_for_scalar_type (vinfo, itype);
+  tree v_otype = get_vectype_for_scalar_type (vinfo, otype);
 
-  if (vtype != NULL_TREE
-    && direct_internal_fn_supported_p (fn, vtype, OPTIMIZE_FOR_BOTH))
+  if (v_itype != NULL_TREE && v_otype != NULL_TREE
+    && direct_internal_fn_supported_p (fn, v_itype, OPTIMIZE_FOR_BOTH))
     {
       gcall *call = gimple_build_call_internal (fn, 2, op_0, op_1);
+      tree in_ssa = vect_recog_temp_ssa_var (itype, NULL);
 
-      gimple_call_set_lhs (call, vect_recog_temp_ssa_var (itype, NULL));
+      gimple_call_set_lhs (call, in_ssa);
       gimple_call_set_nothrow (call, /* nothrow_p */ false);
-      gimple_set_location (call, gimple_location (stmt));
+      gimple_set_location (call, gimple_location (STMT_VINFO_STMT (stmt_info)));
 
-      *type_out = vtype;
+      *type_out = v_otype;
 
-      return call;
+      if (types_compatible_p (itype, otype))
+	return call;
+      else
+	{
+	  append_pattern_def_seq (vinfo, stmt_info, call, v_itype);
+	  tree out_ssa = vect_recog_temp_ssa_var (otype, NULL);
+
+	  return gimple_build_assign (out_ssa, NOP_EXPR, in_ssa);
+	}
     }
 
   return NULL;
@@ -4541,13 +4553,13 @@ vect_recog_sat_add_pattern (vec_info *vinfo, stmt_vec_info stmt_vinfo,
 
   if (gimple_unsigned_integer_sat_add (lhs, ops, NULL))
     {
-      gcall *call = vect_recog_build_binary_gimple_call (vinfo, last_stmt,
-							 IFN_SAT_ADD, type_out,
-							 ops[0], ops[1]);
-      if (call)
+      gimple *stmt = vect_recog_build_binary_gimple_stmt (vinfo, stmt_vinfo,
+							  IFN_SAT_ADD, type_out,
+							  lhs, ops[0], ops[1]);
+      if (stmt)
 	{
 	  vect_pattern_detected ("vect_recog_sat_add_pattern", last_stmt);
-	  return call;
+	  return stmt;
 	}
     }
 
@@ -4579,12 +4591,64 @@ vect_recog_sat_sub_pattern (vec_info *vinfo, stmt_vec_info stmt_vinfo,
 
   if (gimple_unsigned_integer_sat_sub (lhs, ops, NULL))
     {
-      gcall *call = vect_recog_build_binary_gimple_call (vinfo, last_stmt,
-							 IFN_SAT_SUB, type_out,
-							 ops[0], ops[1]);
-      if (call)
+      gimple *stmt = vect_recog_build_binary_gimple_stmt (vinfo, stmt_vinfo,
+							  IFN_SAT_SUB, type_out,
+							  lhs, ops[0], ops[1]);
+      if (stmt)
 	{
 	  vect_pattern_detected ("vect_recog_sat_sub_pattern", last_stmt);
+	  return stmt;
+	}
+    }
+
+  return NULL;
+}
+
+/*
+ * Try to detect saturation truncation pattern (SAT_TRUNC), aka below gimple:
+ *   overflow_5 = x_4(D) > 4294967295;
+ *   _1 = (unsigned int) x_4(D);
+ *   _2 = (unsigned int) overflow_5;
+ *   _3 = -_2;
+ *   _6 = _1 | _3;
+ *
+ * And then simplied to
+ *   _6 = .SAT_TRUNC (x_4(D));
+ */
+
+static gimple *
+vect_recog_sat_trunc_pattern (vec_info *vinfo, stmt_vec_info stmt_vinfo,
+			      tree *type_out)
+{
+  gimple *last_stmt = STMT_VINFO_STMT (stmt_vinfo);
+
+  if (!is_gimple_assign (last_stmt))
+    return NULL;
+
+  tree ops[1];
+  tree lhs = gimple_assign_lhs (last_stmt);
+
+  if (gimple_unsigned_integer_sat_trunc (lhs, ops, NULL))
+    {
+      tree itype = TREE_TYPE (ops[0]);
+      tree otype = TREE_TYPE (lhs);
+      tree v_itype = get_vectype_for_scalar_type (vinfo, itype);
+      tree v_otype = get_vectype_for_scalar_type (vinfo, otype);
+      internal_fn fn = IFN_SAT_TRUNC;
+
+      if (v_itype != NULL_TREE && v_otype != NULL_TREE
+	&& direct_internal_fn_supported_p (fn, tree_pair (v_otype, v_itype),
+					   OPTIMIZE_FOR_BOTH))
+	{
+	  gcall *call = gimple_build_call_internal (fn, 1, ops[0]);
+	  tree out_ssa = vect_recog_temp_ssa_var (otype, NULL);
+
+	  gimple_call_set_lhs (call, out_ssa);
+	  gimple_call_set_nothrow (call, /* nothrow_p */ false);
+	  gimple_set_location (call, gimple_location (last_stmt));
+
+	  *type_out = v_otype;
+
 	  return call;
 	}
     }
@@ -7054,6 +7118,7 @@ static vect_recog_func vect_vect_recog_func_ptrs[] = {
   { vect_recog_mult_pattern, "mult" },
   { vect_recog_sat_add_pattern, "sat_add" },
   { vect_recog_sat_sub_pattern, "sat_sub" },
+  { vect_recog_sat_trunc_pattern, "sat_trunc" },
   { vect_recog_mixed_size_cond_pattern, "mixed_size_cond" },
   { vect_recog_gcond_pattern, "gcond" },
   { vect_recog_bool_pattern, "bool" },

@@ -122,6 +122,9 @@
 ;; This attribute gives the format suffix for atomic memory operations.
 (define_mode_attr amo [(SI "w") (DI "d")])
 
+;; This attribute gives the format suffix for byte and halfword atomic memory operations.
+(define_mode_attr amobh [(QI "b") (HI "h")])
+
 ;; This attribute gives the upper-case mode name for one unit of a
 ;; floating-point mode.
 (define_mode_attr UNITMODE [(HF "HF") (SF "SF") (DF "DF")])
@@ -274,6 +277,9 @@
 			 (zero_extract "zero_extract")
 			 (fix "fix_trunc")
 			 (unsigned_fix "fixuns_trunc")])
+
+(define_code_attr bit_optab [(ior "bset")
+			     (xor "binv")])
 
 ;; <or_optab> code attributes
 (define_code_attr or_optab [(ior "ior")
