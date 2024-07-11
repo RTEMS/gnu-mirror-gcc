@@ -23,6 +23,7 @@ libgcc/
 	* config.host (powerpc*-*-linux*): Do not enable the float128 hardware
 	and float128 power10 hardware support unless the basic float128 support
 	is added.
+	* config/rs6000/t-float128 (FP128_CFLAGS_SW): Do not add -mvsx.
 	* configure.ac (powerpc*-*-linux*): Don't enable IEEE 128-bit on PowerPC
 	systems without VSX.
 	* configure: Regenerate.
