@@ -1,8 +1,37 @@
 ==================== Branch work171-bugs, patch #301 ====================
 
+Do not build IEEE 128-bit libgcc support if VSX is not available.
+
+In the past, we would build libgcc and eable the float128 libraries by adding
+-mvsx -mabi=altivec to build the support libraries.  However, this causes
+problems if the default cpu is a 7450.
+
+With this fix, in order to build the float128 support, the compiler must be
+configured to default to at least power7 to enable using the VSX register set,
+which is required for passing float128 values.
+
+If somebody wanted to enable float128 on big endian systems, they would need to
+use a compiler that defaults to at least power7.
+
+
+2024-07-11  Michael Meissner  <meissner@linux.ibm.com>
+
+libgcc/
+
+	PR target/115800
+	PR target/113652
+	* config.host (powerpc*-*-linux*): Do not enable the float128 hardware
+	and float128 power10 hardware support unless the basic float128 support
+	is added.
+	* configure.ac (powerpc*-*-linux*): Don't enable IEEE 128-bit on PowerPC
+	systems without VSX.
+	* configure: Regenerate.
+
+==================== Branch work171-bugs, patch #301 ====================
+
 Do not build IEEE 128-bit libstdc++ support if VSX is not available.
 
-2024-07-03  Michael Meissner  <meissner@linux.ibm.com>
+2024-07-10  Michael Meissner  <meissner@linux.ibm.com>
 
 libstdc++-v3/
 
@@ -16,7 +45,7 @@ libstdc++-v3/
 
 Do not build IEEE 128-bit libgfortran support if VSX is not available.
 
-2024-07-03  Michael Meissner  <meissner@linux.ibm.com>
+2024-07-10  Michael Meissner  <meissner@linux.ibm.com>
 
 libgfortran/
 
