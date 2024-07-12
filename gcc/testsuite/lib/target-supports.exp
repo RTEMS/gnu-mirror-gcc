@@ -3005,7 +3005,7 @@ proc check_ppc_float128_hw_available { } {
 	     || [istarget *-*-darwin*]} {
 	    expr 0
 	} else {
-	    set options "-mfloat128 -mcpu=power9"
+	    set options "-mfloat128 -mcpu=native"
 	    check_runtime_nocache ppc_float128_hw_available {
 		volatile __float128 x = 1.0q;
 		volatile __float128 y = 2.0q;
