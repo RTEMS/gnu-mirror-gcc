@@ -403,22 +403,17 @@ esac
 esac
 
 case ${host} in
-# Check if we can enable float128 support.  Some systems (big endian) do not
-# enable float128 by default, but they can enable it if -mfloat128 is used.
-# However, the compiler must be compiled using at least --with-cpu=power7 to
-# enable VSX support.  If we build a default big endian system without using
-# --with-cpu=power7, do not build the float128 libraries.  VSX support is
-# needed because float128 values are passed in VSX registers.
-#
-# Also check if a new glibc is being used so that __builtin_cpu_supports can be
-# used.
+# At present, we cannot turn -mfloat128 on via #pragma GCC target, so just
+# check if we have VSX (ISA 2.06) support to build the software libraries, and
+# whether the assembler can handle xsaddqp for hardware support.  Also check if
+# a new glibc is being used so that __builtin_cpu_supports can be used.
 powerpc*-*-linux*)
   saved_CFLAGS="$CFLAGS"
-  CFLAGS="$CFLAGS -mfloat128"
+  CFLAGS="$CFLAGS -mabi=altivec -mvsx -mfloat128"
   AC_CACHE_CHECK([for PowerPC ISA 2.06 to build __float128 libraries],
 		 [libgcc_cv_powerpc_float128],
 		 [AC_COMPILE_IFELSE(
-    [AC_LANG_SOURCE([__float128 f128_add (__float128 a, __float128 b) { return a+b; }])],
+    [AC_LANG_SOURCE([vector double dadd (vector double a, vector double b) { return a + b; }])],
     [libgcc_cv_powerpc_float128=yes],
     [libgcc_cv_powerpc_float128=no])])
 
