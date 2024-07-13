@@ -1,49 +1,14 @@
-==================== Branch work171-bugs, patch #304 ====================
+==================== Branch work171-bugs, patch #310 ====================
 
-Use -mcpu=native instead of -mcpu=power9 when checking for float128 hardware support.
-
-2024-07-12  Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/testsuite/
-
-	PR target/115800
-	PR target/113652
-	* lib/target-supports.exp (check_ppc_float128_hw_available): Use
-	-mcpu=native rather than -mcpu=power9 to check if the machine has
-	float128 hardware support.
-
-==================== Branch work171-bugs, patch #303 ====================
-
-Disable adding -mvsx when checking for float128 support.
-
-2024-07-12  Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/testsuite/
-
-	PR target/115800
-	PR target/113652
-	* lib/target-supports.exp (check_ppc_float128_sw_available): Do not add
-	-mvsx when checking for float128 support.
-	(check_ppc_float128_hw_available): Likewise.
-	(check_effective_target___float128): Likewise.
-
-==================== Branch work171-bugs, patch #302 ====================
-
-Do not build IEEE 128-bit libgcc support if VSX is not available.
+Add checks for building the IEEE 128-bit libgcc support if VSX is not available.
 
 In the past, we would build libgcc and eable the float128 libraries by adding
 -mvsx -mabi=altivec to build the support libraries.  However, this causes
-problems if the default cpu is a 7450.
+problems if the default cpu is a 7450.  This patch checks to see if can link a
+program using the options, and if we can't link the program, do not build the
+float128 libraries.
 
-With this fix, in order to build the float128 support, the compiler must be
-configured to default to at least power7 to enable using the VSX register set,
-which is required for passing float128 values.
-
-If somebody wanted to enable float128 on big endian systems, they would need to
-use a compiler that defaults to at least power7.
-
-
-2024-07-11  Michael Meissner  <meissner@linux.ibm.com>
+2024-07-12  Michael Meissner  <meissner@linux.ibm.com>
 
 libgcc/
 
@@ -52,10 +17,13 @@ libgcc/
 	* config.host (powerpc*-*-linux*): Do not enable the float128 hardware
 	and float128 power10 hardware support unless the basic float128 support
 	is added.
-	* config/rs6000/t-float128 (FP128_CFLAGS_SW): Do not add -mvsx.
-	* configure.ac (powerpc*-*-linux*): Don't enable IEEE 128-bit on PowerPC
-	systems without VSX.
+	* configure.ac (powerpc*-*-linux*): Check whether the linker and
+	assembler will be able to build the float128 libraries.
 	* configure: Regenerate.
+
+==================== Branch work171-bugs, patch #304 was reverted ====================
+==================== Branch work171-bugs, patch #303 was reverted ====================
+==================== Branch work171-bugs, patch #302 was reverted ====================
 
 ==================== Branch work171-bugs, patch #301 ====================
 
