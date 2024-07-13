@@ -1,26 +1,4 @@
-==================== Branch work171-bugs, patch #310 ====================
-
-Add checks for building the IEEE 128-bit libgcc support if VSX is not available.
-
-In the past, we would build libgcc and eable the float128 libraries by adding
--mvsx -mabi=altivec to build the support libraries.  However, this causes
-problems if the default cpu is a 7450.  This patch checks to see if can link a
-program using the options, and if we can't link the program, do not build the
-float128 libraries.
-
-2024-07-12  Michael Meissner  <meissner@linux.ibm.com>
-
-libgcc/
-
-	PR target/115800
-	PR target/113652
-	* config.host (powerpc*-*-linux*): Do not enable the float128 hardware
-	and float128 power10 hardware support unless the basic float128 support
-	is added.
-	* configure.ac (powerpc*-*-linux*): Check whether the linker and
-	assembler will be able to build the float128 libraries.
-	* configure: Regenerate.
-
+==================== Branch work171-bugs, patch #310 was reverted ====================
 ==================== Branch work171-bugs, patch #304 was reverted ====================
 ==================== Branch work171-bugs, patch #303 was reverted ====================
 ==================== Branch work171-bugs, patch #302 was reverted ====================
