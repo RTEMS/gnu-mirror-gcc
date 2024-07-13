@@ -1,0 +1,3 @@
+# Add -mcpu=power7 option if the default compiler does not support VSX
+
+FLOAT128_CFLAGS_VSX	= -mabi=altivec -mcpu=power7

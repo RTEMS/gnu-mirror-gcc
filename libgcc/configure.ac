@@ -403,13 +403,20 @@ esac
 esac
 
 case ${host} in
-# At present, we cannot turn -mfloat128 on via #pragma GCC target, so just
-# check if we have VSX (ISA 2.06) support to build the software libraries, and
-# whether the assembler can handle xsaddqp for hardware support.  Also check if
-# a new glibc is being used so that __builtin_cpu_supports can be used.
+# Test if the default compiler enables VSX.  If it does not, we need to build
+# the float128 bit support using -mcpu=power7 to enable the VSX instruction set.
+#
+# Also check if a new glibc is being used so that __builtin_cpu_supports can be
+# used.
 powerpc*-*-linux*)
   saved_CFLAGS="$CFLAGS"
-  CFLAGS="$CFLAGS -mabi=altivec -mvsx -mfloat128"
+  AC_CACHE_CHECK([if VSX is enabled by default],
+		 [libgcc_cv_powerpc_vsx],
+		 [AC_COMPILE_IFELSE(
+    [AC_LANG_SOURCE([vector double dadd (vector double a, vector double b) { return a + b; }])],
+    [libgcc_cv_powerpc_vsx=yes],
+    [libgcc_cv_powerpc_vsx=no])])
+  CFLAGS="$CFLAGS -mabi=altivec -mcpu=power7 -mfloat128"
   AC_CACHE_CHECK([for PowerPC ISA 2.06 to build __float128 libraries],
 		 [libgcc_cv_powerpc_float128],
 		 [AC_COMPILE_IFELSE(
