@@ -407,13 +407,26 @@ case ${host} in
 # check if we have VSX (ISA 2.06) support to build the software libraries, and
 # whether the assembler can handle xsaddqp for hardware support.  Also check if
 # a new glibc is being used so that __builtin_cpu_supports can be used.
+#
+# We use AC_LINK_IFELSE to verify that the assembler will not abort if given
+# the -mvsx -mabi=altivec options to compile the float128 support with VSX.
+# Otherwise if the default CPU is something like the 7450, the assembler will
+# complain when we build the float128 support.
+
 powerpc*-*-linux*)
   saved_CFLAGS="$CFLAGS"
   CFLAGS="$CFLAGS -mabi=altivec -mvsx -mfloat128"
   AC_CACHE_CHECK([for PowerPC ISA 2.06 to build __float128 libraries],
 		 [libgcc_cv_powerpc_float128],
-		 [AC_COMPILE_IFELSE(
-    [AC_LANG_SOURCE([vector double dadd (vector double a, vector double b) { return a + b; }])],
+		 [AC_LINK_IFELSE(
+    [AC_LANG_SOURCE([volatile vector double a;
+		     volatile vector double b = { 1.0, 2.0 };
+		     volatile vector double c = { 3.0, 4.0 };
+		     int main (void)
+		     {
+		       a = b + c;
+		       return 0;
+		     }])],
     [libgcc_cv_powerpc_float128=yes],
     [libgcc_cv_powerpc_float128=no])])
 
