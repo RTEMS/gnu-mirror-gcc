@@ -1,3 +1,51 @@
+==================== Branch work171-bugs, patch #320 ====================
+
+Do not add -mvsx when building or testing the float128 support.
+
+In the past, we would add -mvsx when building the float128 support in libgcc.
+This allowed us to build the float128 support on a big endian system where the
+default cpu is power4.  While the libgcc support can be built, given there is no
+glibc support for float128 available.
+
+However, adding -mvsx and building the libgcc float128 support causes problems
+if you set the default cpu to something like a 7540, which does not have VSX
+support.  The assembler complains that when the code does a ".machine 7450", you
+cannot use VSX instructions.
+
+With these patches, the float128 libgcc support is only built if the default
+compiler has VSX support.  If somebody wanted to enable the glibc support for
+big endian, they would need to set the base cpu to power8 to enable building the
+libgcc float128 libraries.
+
+In addition to the changes in libgcc, this patch also changes the GCC tests so
+that it will only test float128 if the default compiler enables the VSX
+instruction set.  Otherwise all of the float128 tests will fail because the
+libgcc support is not available.
+
+2024-07-15  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	PR target/115800
+	PR target/113652
+	* lib/target-supports.exp (check_ppc_float128_sw_available): Do not add
+	the -mvsx option.
+	(check_effective_target___float128): Likewise.
+
+libgcc/
+
+	PR target/115800
+	PR target/113652
+	* config.host (powerpc*-*-linux*): Do not add t-float128-hw or
+	t-float128-p10-hw if the default compiler does not support float128.
+	* config/rs6000/t-float128 (FP128_CFLAGS_SW): Do not add -mvsx when
+	building the basic float128 support.
+	* config/rs6000/t-float128-hw (FP128_CFLAGS_HW): Likewise.
+	* config/rs6000/t-float128-p10-hw (FP128_3_1_CFLAGS_HW): Likewise.
+	* configure.ac (powerpc*-*-linux*): Do not add -mvsx when testing
+	whether to build the float128 support.
+	* configure: Regenerate.
+
 ==================== Branch work171-bugs, patch #311 was reverted ====================
 ==================== Branch work171-bugs, patch #310 was reverted ====================
 ==================== Branch work171-bugs, patch #304 was reverted ====================
