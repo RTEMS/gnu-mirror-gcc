@@ -1,24 +1,4 @@
-==================== Branch work171-bugs, patch #311 ====================
-
-Use -mcpu=power7 if needed and not -mvsx to build float128 support.
-
-2024-07-12  Michael Meissner  <meissner@linux.ibm.com>
-
-libgcc/
-
-	PR target/115800
-	PR target/113652
-	* config.host (powerpc*-*-linux*): Do not enable the float128 hardware
-	and float128 power10 hardware support unless the basic float128 support
-	is added. Add support for building the float128 support when the default
-	compiler does not enable VSX.
-	* config/rs6000/t-float128 (FP128_CFLAGS_SW): Do not use -mvsx, instead
-	use FP128_CFLAGS_VSX to optionally add -mcpu=power7.
-	* config/rs6000/t-float128-vsx: New file.
-	* configure.ac (powerpc*-*-linux*): Determine if the default powerpc cpu
-	includes VSX support.
-	* configure: Regenerate.
-
+==================== Branch work171-bugs, patch #311 was reverted ====================
 ==================== Branch work171-bugs, patch #310 was reverted ====================
 ==================== Branch work171-bugs, patch #304 was reverted ====================
 ==================== Branch work171-bugs, patch #303 was reverted ====================
