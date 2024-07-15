@@ -2979,7 +2979,6 @@ proc check_ppc_float128_sw_available { } {
 	     || [istarget *-*-darwin*]} {
 	    expr 0
 	} else {
-	    set options "-mfloat128"
 	    check_runtime_nocache ppc_float128_sw_available {
 		volatile __float128 x = 1.0q;
 		volatile __float128 y = 2.0q;
@@ -3005,7 +3004,7 @@ proc check_ppc_float128_hw_available { } {
 	     || [istarget *-*-darwin*]} {
 	    expr 0
 	} else {
-	    set options "-mfloat128 -mfloat128-hardware -mcpu=power9"
+	    set options "-mfloat128-hardware -mcpu=power9"
 	    check_runtime_nocache ppc_float128_hw_available {
 		volatile __float128 x = 1.0q;
 		volatile __float128 y = 2.0q;
@@ -3030,7 +3029,6 @@ proc check_effective_target_ppc_ieee128_ok { } {
 	     || [istarget *-*-vxworks*]} {
 	    expr 0
 	} else {
-	    set options "-mfloat128"
 	    check_runtime_nocache ppc_ieee128_ok {
 		int main()
 		{
@@ -3946,9 +3944,6 @@ proc check_effective_target___float128 { } {
 }
 
 proc add_options_for___float128 { flags } {
-    if { [istarget powerpc*-*-linux*] } {
-	return "$flags -mfloat128"
-    }
     return "$flags"
 }
 
@@ -7217,8 +7212,9 @@ proc check_effective_target_power10_ok { } {
     }
 }
 
-# Return 1 if this is a PowerPC target supporting -mfloat128 via either
-# software emulation on power7/power8 systems or hardware support on power9.
+# Return 1 if this is a PowerPC target supporting IEEE 128-bit floating point
+# via either software emulation on power7/power8 systems or hardware support on
+# power9.
 
 proc check_effective_target_powerpc_float128_sw_ok { } {
     if { [istarget powerpc*-*-*]
@@ -7234,14 +7230,14 @@ proc check_effective_target_powerpc_float128_sw_ok { } {
 		    __float128 z = x + y;
 		    return (z == 3.0q);
 		}
-	    } "-mfloat128"]
+	    }]
     } else {
 	return 0
     }
 }
 
-# Return 1 if this is a PowerPC target supporting -mfloat128 via hardware
-# support on power9.
+# Return 1 if this is a PowerPC target supporting IEEE 128-bit floating point
+# via hardware support on power9.
 
 proc check_effective_target_powerpc_float128_hw_ok { } {
     if { [istarget powerpc*-*-*]
