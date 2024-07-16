@@ -1,5 +1,6 @@
-/* { dg-do run { target { powerpc64*-*-* && p8vector_hw && ppc_float128_sw } } } */
+/* { dg-do run { target { powerpc64*-*-* && p8vector_hw } } } */
 /* { dg-options "-mvsx" } */
+/* { dg-require-effective-target ppc_float128_sw } */
 
 void abort ();
 
