@@ -1,3 +1,21 @@
+==================== Branch work171-bugs, patch #332 ====================
+
+Do not add -mvsx or -mfloat128 when testing the float128 support.
+
+2024-07-16 Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	PR target/115800
+	PR target/113652
+	* lib/target-supports.exp (check_ppc_float128_sw_available): Do not add
+	-mfloat128 or -mfloat128-hardware.
+	(check_ppc_float128_hw_available): Likewise.
+	(check_effective_target_ppc_ieee128_ok): Likewise.
+	(add_options_for___float128): Likewise.
+	(check_effective_target_powerpc_float128_sw_ok): Likewise.
+	(check_effective_target_powerpc_float128_hw_ok): Likewise.
+
 ==================== Branch work171-bugs, patch #331 ====================
 
 Do not add -mvsx when testing the float128 support.
