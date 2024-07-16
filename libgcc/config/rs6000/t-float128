@@ -74,7 +74,13 @@ fp128_includes		= $(srcdir)/soft-fp/double.h \
 			  $(srcdir)/soft-fp/soft-fp.h
 
 # Build the emulator without ISA 3.0 hardware support.
-FP128_CFLAGS_SW		 = -Wno-type-limits -mvsx -mfloat128 \
+#
+# In the past we added -mvsx to build the float128 specific libraries with the
+# VSX instruction set.  This allowed the big endian GCC on server platforms to
+# build the float128 support.  However, is causes problems when other default
+# cpu targets are used such as the 7450.
+
+FP128_CFLAGS_SW		 = -Wno-type-limits -mfloat128 \
 			   -mno-float128-hardware -mno-gnu-attribute \
 			   -I$(srcdir)/soft-fp \
 			   -I$(srcdir)/config/rs6000 \
