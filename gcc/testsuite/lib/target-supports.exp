@@ -2987,7 +2987,7 @@ proc check_ppc_float128_sw_available { } {
 		    __float128 z = x + y;
 		    return (z != 3.0q);
 		}
-	    } $options
+	    } ""
 	}
     }]
 }
@@ -3035,7 +3035,7 @@ proc check_effective_target_ppc_ieee128_ok { } {
 		  __ieee128 a;
 		  return 0;
 		}
-	    } $options
+	    } ""
 	}
     }]
 }
