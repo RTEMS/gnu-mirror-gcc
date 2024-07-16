@@ -1,7 +1,8 @@
 /* { dg-do compile { target { powerpc64*-*-* && lp64 } } } */
-/* { dg-options "-mvsx -O2 -mfloat128" } */
+/* { dg-options "-O2 -mfloat128" } */
 /* { dg-additional-options "-mdejagnu-cpu=power9" { target { ! has_arch_pwr9 } } } */
 /* { dg-require-effective-target powerpc_vsx } */
+/* { dg-require-effective-target ppc_float128_sw } */
 
 /* PR 81959, the compiler raised on unrecognizable insn message in converting
    int to __float128, where the int had a PRE_INC in the address.  */
