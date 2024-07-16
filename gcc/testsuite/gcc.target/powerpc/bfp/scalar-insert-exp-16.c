@@ -2,6 +2,7 @@
 /* { dg-require-effective-target lp64 } */
 /* { dg-require-effective-target p9vector_hw } */
 /* { dg-options "-mdejagnu-cpu=power9 -save-temps" } */
+/* { dg-require-effective-target ppc_float128_sw } */
 
 #include <altivec.h>
 #include <stdlib.h>

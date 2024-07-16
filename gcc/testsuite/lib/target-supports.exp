@@ -3953,7 +3953,7 @@ proc add_options_for___float128 { flags } {
 
 proc check_effective_target_base_quadfloat_support { } {
     if { [istarget powerpc*-*-*] } {
-	return [check_vsx_hw_available]
+	return [check_effective_target_powerpc_float128_sw_ok]
     }
     return 1
 }
