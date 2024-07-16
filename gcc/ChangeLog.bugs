@@ -1,3 +1,20 @@
+==================== Branch work171-bugs, patch #325 ====================
+
+Fix last change.
+
+2024-07-16  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	PR target/115800
+	PR target/113652
+
+	* gcc.target/powerpc/bfp/scalar-insert-exp-16.c: Require float128
+	support.
+	* lib/target-supports.exp
+	(check_effective_target_base_quadfloat_support): Add check for explicit
+	float128.
+
 ==================== Branch work171-bugs, patch #324 ====================
 
 Fix last change.
