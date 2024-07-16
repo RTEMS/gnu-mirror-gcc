@@ -1,5 +1,5 @@
-/* { dg-do run { target { powerpc64*-*-* && vsx_hw } } } */
-/* { dg-options "-mfloat128 -mvsx" } */
+/* { dg-do run { target { powerpc64*-*-* && vsx_hw && ppc_float128_sw } } } */
+/* { dg-options "-mvsx" } */
 
 void abort ();
 

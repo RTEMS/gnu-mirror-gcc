@@ -1,6 +1,6 @@
 /* { dg-do run } */
 /* { dg-require-effective-target ppc_float128_sw } */
-/* { dg-options "-mdejagnu-cpu=power7 -O2 -mfloat128 -lm" } */
+/* { dg-options "-mdejagnu-cpu=power7 -O2 -lm" } */
 
 #ifdef DEBUG
 #include <stdio.h>

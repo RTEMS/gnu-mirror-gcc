@@ -1,6 +1,6 @@
 /* { dg-do compile { target { powerpc*-*-linux* } } } */
 /* { dg-require-effective-target powerpc_float128_sw_ok } */
-/* { dg-options "-O2 -mdejagnu-cpu=power8 -mfloat128" } */
+/* { dg-options "-O2 -mdejagnu-cpu=power8" } */
 
 __float128 foo (__float128 a) { return -a; }
 
