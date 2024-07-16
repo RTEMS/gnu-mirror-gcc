@@ -1,3 +1,38 @@
+==================== Branch work171-bugs, patch #323 ====================
+
+Remove -mfloat128 option.
+
+2024-07-16  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	PR target/115800
+	PR target/113652
+
+	* gcc.target/powerpc/abs128-1.c: Remove passing -mfloat128.  If needed,
+	add explicit requires for float128.
+	* gcc.target/powerpc/copysign128-1.c: Likewise.
+	* gcc.target/powerpc/divkc3-1.c: Likewise.
+	* gcc.target/powerpc/float128-3.c: Likewise.
+	* gcc.target/powerpc/float128-5.c: Likewise.
+	* gcc.target/powerpc/float128-math.c: Likewise.
+	* gcc.target/powerpc/inf128-1.c: Likewise.
+	* gcc.target/powerpc/mulkc3-1.c: Likewise.
+	* gcc.target/powerpc/nan128-1.c: Likewise.
+	* gcc.target/powerpc/p9-lxvx-stxvx-3.c: Likewise.
+	* gcc.target/powerpc/pr104253.c: Likewise.
+	* gcc.target/powerpc/pr70640.c: Likewise.
+	* gcc.target/powerpc/pr70669.c: Likewise.
+	* gcc.target/powerpc/pr79004.c: Likewise.
+	* gcc.target/powerpc/pr79038-1.c: Likewise.
+	* gcc.target/powerpc/pr81959.c: Likewise.
+	* gcc.target/powerpc/pr85657-1.c: Likewise.
+	* gcc.target/powerpc/pr85657-2.c: Likewise.
+	* gcc.target/powerpc/pr99708.c: Likewise.
+	* gcc.target/powerpc/signbit-1.c: Likewise.
+	* gcc.target/powerpc/signbit-2.c: Likewise.
+	* gcc.target/powerpc/signbit-3.c: Likewise.
+
 ==================== Branch work171-bugs, patch #322 ====================
 
 Fix typos.
