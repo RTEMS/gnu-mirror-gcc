@@ -1,3 +1,16 @@
+==================== Branch work171-bugs, patch #334 ====================
+
+Fix typo.
+
+2024-07-17 Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	PR target/115800
+	PR target/113652
+	* gcc.target/powerpc/pr99708.c: Use dg-require-effective-target, not
+	require-effective-target.
+
 ==================== Branch work171-bugs, patch #333 ====================
 
 Remove -mfloat128 on pr99708.c
