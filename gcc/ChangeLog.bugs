@@ -1,4 +1,69 @@
-==================== Branch work171-bugs, patch #334 was reverted ====================
+==================== Branch work171-bugs, patch #335 ====================
+
+Do not add -mvsx when testing the float128 support.
+
+In the past, we would add -mvsx when building the float128 support in libgcc.
+This allowed us to build the float128 support on a big endian system where the
+default cpu is power4.  While the libgcc support can be built, given there is no
+glibc support for float128 available.
+
+However, adding -mvsx and building the libgcc float128 support causes problems
+if you set the default cpu to something like a 7540, which does not have VSX
+support.  The assembler complains that when the code does a ".machine 7450", you
+cannot use VSX instructions.
+
+After patching libgcc to not build the float128 support unless the host can
+support float128 normally, this patch changes the GCC tests so that it will only
+do the IEEE 128-bit tests if the default compiler enables the VSX instruction
+set by default.  Otherwise all of the float128 tests will fail because the
+libgcc support is not available.
+
+In addition to not doing the float128 tests when the compiler does not natively
+support float128, this patch also removes adding -mvsx, -mfloat128, and
+-mfloat128-hardware enable the support if the compiler did not natively enable
+it.
+
+2024-07-17 Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	PR target/115800
+	PR target/113652
+	* gcc.target/powerpc/abs128-1.c: Remove adding -mvsx, -mfloat128, and
+	-mfloat128-hardware options to float128 test.  Add explicit checks for
+	the float128 support, rather than just using VSX as a stand in, or
+	assuming we can silently enable VSX if the default is power4.  For
+	pr99708.c, also use the correct spelling to disable the float128 tests.
+	* gcc.target/powerpc/bfp/scalar-insert-exp-16.c: Likewise.
+	* gcc.target/powerpc/copysign128-1.c: Likewise.
+	* gcc.target/powerpc/divkc3-1.c: Likewise.
+	* gcc.target/powerpc/float128-3.c: Likewise.
+	* gcc.target/powerpc/float128-5.c: Likewise.
+	* gcc.target/powerpc/float128-complex-2.: Likewise.
+	* gcc.target/powerpc/float128-math.: Likewise.
+	* gcc.target/powerpc/inf128-1.: Likewise.
+	* gcc.target/powerpc/mulkc3-1.c: Likewise.
+	* gcc.target/powerpc/nan128-1.c: Likewise.
+	* gcc.target/powerpc/p9-lxvx-stxvx-3.: Likewise.
+	* gcc.target/powerpc/pr104253.: Likewise.
+	* gcc.target/powerpc/pr70669.c: Likewise.
+	* gcc.target/powerpc/pr79004.c: Likewise.
+	* gcc.target/powerpc/pr79038-1.c: Likewise.
+	* gcc.target/powerpc/pr81959.c: Likewise.
+	* gcc.target/powerpc/pr85657-1.: Likewise.
+	* gcc.target/powerpc/pr85657-2.c: Likewise.
+	* gcc.target/powerpc/pr99708.: Likewise.
+	* gcc.target/powerpc/signbit-1.c: Likewise.
+	* gcc.target/powerpc/signbit-2.c: Likewise.
+	* lib/target-supports.exp (check_ppc_float128_sw_available): Likewise.
+	(check_ppc_float128_hw_available): Likewise.
+	(check_effective_target_ppc_ieee128_ok): Likewise.
+	(add_options_for___float128): Likewise.
+	(check_effective_target___float128): Likewise.
+	(check_effective_target_base_quadfloat_support): Likewise.
+	(check_effective_target_powerpc_float128_sw_ok): Likewise.
+	(check_effective_target_powerpc_float128_hw_ok): Likewise.
+
 ==================== Branch work171-bugs, patch #333 was reverted ====================
 ==================== Branch work171-bugs, patch #332 was reverted ====================
 ==================== Branch work171-bugs, patch #331 was reverted ====================
