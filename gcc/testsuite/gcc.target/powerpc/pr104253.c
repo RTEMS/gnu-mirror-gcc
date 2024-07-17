@@ -7,7 +7,7 @@
 
 /* { dg-do run } */
 /* { dg-require-effective-target ppc_float128_sw } */
-/* { dg-options "-O2 -mvsx -mfloat128" } */
+/* { dg-options "-O2 -mfloat128" } */
 /* { dg-prune-output ".-mfloat128. option may not be fully supported" } */
 
 /*
