@@ -25,10 +25,14 @@ gcc/
 	(struct rs6000_arch_mask): New structure.
 	(rs6000_arch_masks): Likewise.
 	(rs6000_pragma_target_parse): Likewise.
+	(rs6000_function_specific_save): Likewise.
+	(rs6000_function_specific_restore): Likewise.
 	(rs6000_function_specific_print): Likewise.
 	(rs6000_print_options_internal): Likewise.
 	(rs6000_print_isa_options): Likewise.
 	(rs6000_clone_priority): Switch to using architecture flags.
+	(rs6000_can_inline_p): Check if the arch flags match along with the isa
+	flags.
 	* config/rs6000/rs6000.h (enum arch_bits): New enumeration.
 	(ARCH_MASK_*): New architecture masks for a specific processor.
 	(ARCH_FLAGS_*): New architecture masks for all of the architecture masks
