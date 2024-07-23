@@ -2517,3 +2517,8 @@ enum arch_bits {
 #define ARCH_FLAGS_POWER9	(ARCH_FLAGS_POWER8  | ARCH_MASK_POWER9)
 #define ARCH_FLAGS_POWER10	(ARCH_FLAGS_POWER9  | ARCH_MASK_POWER10)
 #define ARCH_FLAGS_POWER11	(ARCH_FLAGS_POWER10 | ARCH_MASK_POWER11)
+
+/* We used to use -mpower8-internal and -mpower10 as an ISA bit, switch to use
+   an architecture bit.  */
+#define TARGET_POWER8		((rs6000_arch_flags & ARCH_MASK_POWER8)  != 0)
+#define TARGET_POWER10		((rs6000_arch_flags & ARCH_MASK_POWER10) != 0)
