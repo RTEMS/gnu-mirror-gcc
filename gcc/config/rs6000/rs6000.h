@@ -2481,39 +2481,3 @@ while (0)
    issues have been resolved.  */
 #define RS6000_DISABLE_SCALAR_MODULO 1
 
-
-/* List of architecture masks (to set the _ARCH_PWR<x> flag that don't have a
-   separate -m option.  It the past, we would have -mpower11, -mpower10,
-   -mpower9, etc. but bad things would happen if the user did -mpower10 instead
-   of -mcpu=power10.  Over time, older options will be removed as -m<option>
-   and moved into this list.  */
-
-enum arch_bits {
-  ARCH_ENUM_POWER4	= 1,
-  ARCH_ENUM_POWER5,
-  ARCH_ENUM_POWER6,
-  ARCH_ENUM_POWER7,
-  ARCH_ENUM_POWER8,
-  ARCH_ENUM_POWER9,
-  ARCH_ENUM_POWER10,
-  ARCH_ENUM_POWER11
-};
-
-#define ARCH_MASK_POWER4	(HOST_WIDE_INT_1 << ARCH_ENUM_POWER4)
-#define ARCH_MASK_POWER5	(HOST_WIDE_INT_1 << ARCH_ENUM_POWER5)
-#define ARCH_MASK_POWER6	(HOST_WIDE_INT_1 << ARCH_ENUM_POWER6)
-#define ARCH_MASK_POWER7	(HOST_WIDE_INT_1 << ARCH_ENUM_POWER7)
-#define ARCH_MASK_POWER8	(HOST_WIDE_INT_1 << ARCH_ENUM_POWER8)
-#define ARCH_MASK_POWER9	(HOST_WIDE_INT_1 << ARCH_ENUM_POWER9)
-#define ARCH_MASK_POWER10	(HOST_WIDE_INT_1 << ARCH_ENUM_POWER10)
-#define ARCH_MASK_POWER11	(HOST_WIDE_INT_1 << ARCH_ENUM_POWER11)
-
-/* Flags to set the architecture bits for a given cpu.  */
-#define ARCH_FLAGS_POWER4	ARCH_MASK_POWER4
-#define ARCH_FLAGS_POWER5	(ARCH_FLAGS_POWER4  | ARCH_MASK_POWER5)
-#define ARCH_FLAGS_POWER6	(ARCH_FLAGS_POWER5  | ARCH_MASK_POWER6)
-#define ARCH_FLAGS_POWER7	(ARCH_FLAGS_POWER6  | ARCH_MASK_POWER7)
-#define ARCH_FLAGS_POWER8	(ARCH_FLAGS_POWER7  | ARCH_MASK_POWER8)
-#define ARCH_FLAGS_POWER9	(ARCH_FLAGS_POWER8  | ARCH_MASK_POWER9)
-#define ARCH_FLAGS_POWER10	(ARCH_FLAGS_POWER9  | ARCH_MASK_POWER10)
-#define ARCH_FLAGS_POWER11	(ARCH_FLAGS_POWER10 | ARCH_MASK_POWER11)
