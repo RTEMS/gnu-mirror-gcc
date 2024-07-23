@@ -1,6 +1,76 @@
+==================== Branch work173, patch #1 ====================
+
+Move architecture flags from isa flags
+
+2024-07-22  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Add
+	support for separating the architecture flags from the ISA flags.
+	(rs6000_cpu_cpp_builtins): Likewise.
+	* config/rs6000/rs6000-protos.h (rs6000_target_modify_macros): Update
+	declaration.
+	(rs6000_target_modify_macros_ptr): Likewise.
+	* config/rs6000/rs6000.cc (struct clone_map): Switch to using
+	architecture flags instead of isa flags.
+	(rs6000_clone_map): Likewise.
+	(rs6000_target_modify_macros_ptr): Update declaration.
+	(get_arch_flags): New function.
+	(rs6000_debug_reg_global): Add support for separating architecture
+	flags from the ISA flags.
+	(rs6000_print_isa_options):Likewise.
+	(rs6000_option_override_internal): Likewise.
+	(rs6000_machine_from_flags): Likewise.
+	(struct rs6000_arch_mask): New structure.
+	(rs6000_arch_masks): Likewise.
+	(rs6000_pragma_target_parse): Likewise.
+	(rs6000_function_specific_print): Likewise.
+	(rs6000_print_options_internal): Likewise.
+	(rs6000_print_isa_options): Likewise.
+	(rs6000_clone_priority): Switch to using architecture flags.
+	* config/rs6000/rs6000.h (enum arch_bits): New enumeration.
+	(ARCH_MASK_*): New architecture masks for a specific processor.
+	(ARCH_FLAGS_*): New architecture masks for all of the architecture masks
+	set for a specific processor.
+	* config/rs6000/rs6000.opt (rs6000_arch_flags): New target variable.
+	(x_rs6000_arch_flags): New target save area.
+
 ==================== Branch work173, baseline ====================
+
+Add ChangeLog.meissner and REVISION.
+
+2024-07-22  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* REVISION: New file for branch.
+	* ChangeLog.meissner: New file.
+
+gcc/c-family/
+
+	* ChangeLog.meissner: New file.
+
+gcc/c/
+
+	* ChangeLog.meissner: New file.
+
+gcc/cp/
+
+	* ChangeLog.meissner: New file.
+
+gcc/fortran/
+
+	* ChangeLog.meissner: New file.
+
+gcc/testsuite/
+
+	* ChangeLog.meissner: New file.
+
+libgcc/
+
+	* ChangeLog.meissner: New file.
 
 2024-07-22   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
-
