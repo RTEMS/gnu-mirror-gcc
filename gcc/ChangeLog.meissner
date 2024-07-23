@@ -1,3 +1,24 @@
+==================== Branch work173, patch #2 ====================
+
+Remove -mpower10 and -mpower8-internal
+
+2024-07-23  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-cpus.def (ISA_2_7_MASKS_SERVER): Remove internal
+	options -mpower8-internal, -mpower10, and -mpower11.
+	(ISA_3_1_MASKS_SERVER): Likewise.
+	(POWER11_MASKS_SERVER): Likewise.
+	(POWERPC_MASKS): Likewise.
+	* config/rs6000/rs6000.cc (rs6000_opt_masks): Likewise.
+	* config/rs6000/rs6000.h (TARGET_POWER8): Define in terms of hardware
+	flags.
+	(TARGET_POWER10): Likewise.
+	* config/rs6000/rs6000.opt (-mpower8-internal): Do not create ISA bit.
+	(-mpower10): Likewise.
+	(-mpower11): Delete.
+
 ==================== Branch work173, patch #1 ====================
 
 Move architecture flags from isa flags
