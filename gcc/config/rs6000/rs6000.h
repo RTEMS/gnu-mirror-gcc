@@ -2480,4 +2480,3 @@ while (0)
    with certain input values.  This can be removed in the future when the
    issues have been resolved.  */
 #define RS6000_DISABLE_SCALAR_MODULO 1
-

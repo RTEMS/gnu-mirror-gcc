@@ -158,6 +158,21 @@
 
 #endif
 
+/* List of architecture masks (to set the _ARCH_PWR<x> flag that don't have a
+   separate -m option.  It the past, we would have -mpower11, -mpower10,
+   -mpower9, etc. but bad things would happen if the user did -mpower10 instead
+   of -mcpu=power10.  Over time, older options will be removed as -m<option>
+   and moved into this list.  */
+
+#define ARCH_MASK_POWER4	(HOST_WIDE_INT_1 << 1)
+#define ARCH_MASK_POWER5	(HOST_WIDE_INT_1 << 2)
+#define ARCH_MASK_POWER6	(HOST_WIDE_INT_1 << 3)
+#define ARCH_MASK_POWER7	(HOST_WIDE_INT_1 << 4)
+#define ARCH_MASK_POWER8	(HOST_WIDE_INT_1 << 5)
+#define ARCH_MASK_POWER9	(HOST_WIDE_INT_1 << 6)
+#define ARCH_MASK_POWER10	(HOST_WIDE_INT_1 << 7)
+#define ARCH_MASK_POWER11	(HOST_WIDE_INT_1 << 8)
+
 /* This table occasionally claims that a processor does not support a
    particular feature even though it does, but the feature is slower than the
    alternative.  Thus, it shouldn't be relied on as a complete description of
