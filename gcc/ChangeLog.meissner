@@ -1,5 +1,17 @@
 ==================== Branch work173, patch #2 ====================
 
+Modify how arch flags are set.
+
+2024-07-24  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (get_arch_flags): Modify how arch flags are
+	set.
+	* config/rs6000/rs6000.h (ARCH_FLAGS_*): Delete.
+
+==================== Branch work173, patch #2 ====================
+
 Remove -mpower10 and -mpower8-internal
 
 2024-07-23  Michael Meissner  <meissner@linux.ibm.com>
