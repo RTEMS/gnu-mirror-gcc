@@ -1824,27 +1824,48 @@ rs6000_cpu_name_lookup (const char *name)
 static HOST_WIDE_INT
 get_arch_flags (int cpu_index)
 {
-  if (cpu_index < 0)
-    return 0;
+  HOST_WIDE_INT ret = 0;
 
-  enum processor_type processor = processor_target_table[cpu_index].processor;
+  if (cpu_index >= 0)
+    switch (processor_target_table[cpu_index].processor)
+      {
+      case PROCESSOR_POWER11:
+	ret |= ARCH_MASK_POWER11;
+	/* fall through.  */
 
-  switch (processor)
-    {
-    case PROCESSOR_POWER4:  return ARCH_FLAGS_POWER4;
-    case PROCESSOR_POWER5:  return ARCH_FLAGS_POWER5;
-    case PROCESSOR_POWER6:  return ARCH_FLAGS_POWER6;
-    case PROCESSOR_POWER7:  return ARCH_FLAGS_POWER7;
-    case PROCESSOR_POWER8:  return ARCH_FLAGS_POWER8;
-    case PROCESSOR_POWER9:  return ARCH_FLAGS_POWER9;
-    case PROCESSOR_POWER10: return ARCH_FLAGS_POWER10;
-    case PROCESSOR_POWER11: return ARCH_FLAGS_POWER11;
+      case PROCESSOR_POWER10:
+	ret |= ARCH_MASK_POWER10;
+	/* fall through.  */
 
-    default:
-      break;
-    }
+      case PROCESSOR_POWER9:
+	ret |= ARCH_MASK_POWER9;
+	/* fall through.  */
 
-  return 0;
+      case PROCESSOR_POWER8:
+	ret |= ARCH_MASK_POWER8;
+	/* fall through.  */
+
+      case PROCESSOR_POWER7:
+	ret |= ARCH_MASK_POWER7;
+	/* fall through.  */
+
+      case PROCESSOR_POWER6:
+	ret |= ARCH_MASK_POWER6;
+	/* fall through.  */
+
+      case PROCESSOR_POWER5:
+	ret |= ARCH_MASK_POWER5;
+	/* fall through.  */
+
+      case PROCESSOR_POWER4:
+	ret |= ARCH_MASK_POWER4;
+	break;
+
+      default:
+	break;
+      }
+
+  return ret;
 }
 
 
