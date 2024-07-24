@@ -5960,27 +5960,28 @@ rs6000_machine_from_flags (void)
     return "ppc64";
 #endif
 
+  HOST_WIDE_INT arch_flags = rs6000_arch_flags;
   HOST_WIDE_INT flags = rs6000_isa_flags;
 
   /* Disable the flags that should never influence the .machine selection.  */
   flags &= ~(OPTION_MASK_PPC_GFXOPT | OPTION_MASK_PPC_GPOPT | OPTION_MASK_ISEL
 	     | OPTION_MASK_ALTIVEC);
 
-  if ((flags & (POWER11_MASKS_SERVER & ~ISA_3_1_MASKS_SERVER)) != 0)
+  if ((arch_flags & ARCH_MASK_POWER11) != 0)
     return "power11";
-  if ((flags & (ISA_3_1_MASKS_SERVER & ~ISA_3_0_MASKS_SERVER)) != 0)
+  if ((arch_flags & ARCH_MASK_POWER10) != 0)
     return "power10";
-  if ((flags & (ISA_3_0_MASKS_SERVER & ~ISA_2_7_MASKS_SERVER)) != 0)
+  if ((arch_flags & ARCH_MASK_POWER9) != 0)
     return "power9";
-  if ((flags & (ISA_2_7_MASKS_SERVER & ~ISA_2_6_MASKS_SERVER)) != 0)
+  if ((arch_flags & ARCH_MASK_POWER8) != 0)
     return "power8";
-  if ((flags & (ISA_2_6_MASKS_SERVER & ~ISA_2_5_MASKS_SERVER)) != 0)
+  if ((arch_flags & ARCH_MASK_POWER7) != 0)
     return "power7";
-  if ((flags & (ISA_2_5_MASKS_SERVER & ~ISA_2_4_MASKS)) != 0)
+  if ((arch_flags & ARCH_MASK_POWER6) != 0)
     return "power6";
-  if ((flags & (ISA_2_4_MASKS & ~ISA_2_1_MASKS)) != 0)
+  if ((arch_flags & ARCH_MASK_POWER5) != 0)
     return "power5";
-  if ((flags & ISA_2_1_MASKS) != 0)
+  if ((arch_flags & ARCH_MASK_POWER4) != 0)
     return "power4";
   if ((flags & OPTION_MASK_POWERPC64) != 0)
     return "ppc64";
