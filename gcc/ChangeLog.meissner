@@ -12,6 +12,14 @@ gcc/
 	(rs6000_option_override_internal): Move some ISA checking code into
 	report_architecture_mismatch.
 
+gcc/testsuite/
+
+	* gcc.target/powerpc/ppc-target-4.c: Rewrite the test to add cpu=power7
+	when we need to add VSX support.  Add test for adding cpu=power7 no-vsx
+	to generate only Altivec instructions.
+	* gcc.target/powerpc/pr115688.c: Add cpu=power7 when requestion VSX
+	instructions.
+
 ==================== Branch work173, patch #13 ====================
 
 Use architecture flags for defining _ARCH_PWR macros.
