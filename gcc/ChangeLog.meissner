@@ -7,7 +7,7 @@ Do not allow -mvsx to boost processor to power7.
 gcc/
 
 	* config/rs6000/rs6000.cc (report_architecture_mismatch): New function.
-	Report and error if the user used an option such as -mvsx when the
+	Report an error if the user used an option such as -mvsx when the
 	default processor would not allow the option.
 	(rs6000_option_override_internal): Move some ISA checking code into
 	report_architecture_mismatch.
