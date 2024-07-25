@@ -1,3 +1,17 @@
+==================== Branch work173, patch #14 ====================
+
+Do not allow -mvsx to boost processor to power7.
+
+2024-07-25  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (report_architecture_mismatch): New function.
+	Report and error if the user used an option such as -mvsx when the
+	default processor would not allow the option.
+	(rs6000_option_override_internal): Move some ISA checking code into
+	report_architecture_mismatch.
+
 ==================== Branch work173, patch #13 ====================
 
 Use architecture flags for defining _ARCH_PWR macros.
