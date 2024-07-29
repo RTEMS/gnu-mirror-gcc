@@ -1,5 +1,16 @@
 ==================== Branch work173, patch #14 ====================
 
+Use old arch code for power4-power6.
+
+2024-07-29  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Use original
+	code for _ARCH_PWR* if older than power7.
+
+==================== Branch work173, patch #14 ====================
+
 Do not allow -mvsx to boost processor to power7.
 
 2024-07-25  Michael Meissner  <meissner@linux.ibm.com>
