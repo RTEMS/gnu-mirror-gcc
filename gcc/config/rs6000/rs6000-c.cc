@@ -426,7 +426,7 @@ rs6000_target_modify_macros (bool define_p, HOST_WIDE_INT flags,
     rs6000_define_or_undefine_macro (define_p, "_ARCH_PWR5");
   if ((flags & OPTION_MASK_FPRND) != 0)
     rs6000_define_or_undefine_macro (define_p, "_ARCH_PWR5X");
-  if ((flags & OPTION_MASK_CMPB) != 0)
+  if ((arch_flags & ARCH_MASK_POWER6) != 0)
     rs6000_define_or_undefine_macro (define_p, "_ARCH_PWR6");
   if ((arch_flags & ARCH_MASK_POWER7) != 0)
     rs6000_define_or_undefine_macro (define_p, "_ARCH_PWR7");

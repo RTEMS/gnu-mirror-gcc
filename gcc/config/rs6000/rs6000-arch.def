@@ -37,8 +37,6 @@
    the appropriate architecture flags based on the actual processor
    enumeration.  */
 
-ARCH_EXPAND(POWER4,  "power4")
-ARCH_EXPAND(POWER5,  "power5")
 ARCH_EXPAND(POWER6,  "power6")
 ARCH_EXPAND(POWER7,  "power7")
 ARCH_EXPAND(POWER8,  "power8")
