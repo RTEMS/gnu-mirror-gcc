@@ -3943,7 +3943,7 @@ rs6000_option_override_internal (bool global_init_p)
   /* Disable VSX and Altivec silently if the user switched cpus to power7 in a
      target attribute or pragma which automatically enables both options,
      unless the altivec ABI was set.  This is set by default for 64-bit, but
-     not for 32-bit.  Don't move this before the above code using ignore_masks,
+     not for 32-bit.  Don't move this before report_architecture_mismatch
      since it can reset the cleared VSX/ALTIVEC flag again.  */
   if (main_target_opt && !main_target_opt->x_rs6000_altivec_abi)
     {
@@ -25359,12 +25359,7 @@ report_architecture_mismatch (void)
     {
       OPTION_MASK_VSX | OPTION_MASK_POPCNTD,
       ARCH_MASK_POWER7,
-      "cpu=power7" },
-
-    {
-      OPTION_MASK_DFP | OPTION_MASK_CMPB,
-      ARCH_MASK_POWER6,
-      "cpu=power6"
+      "cpu=power7"
     },
   };
 
@@ -25395,7 +25390,11 @@ report_architecture_mismatch (void)
 
   /* The following old options are used in multiple processors, so silently
      enable the appropriate ISA options as previous GCC revisions did.  */
-  if (TARGET_FPRND)
+  if (TARGET_DFP)
+    rs6000_isa_flags |= (ISA_2_5_MASKS_SERVER & ~ignore_masks);
+  else if (TARGET_CMPB)
+    rs6000_isa_flags |= (ISA_2_5_MASKS_EMBEDDED & ~ignore_masks);
+  else if (TARGET_FPRND)
     rs6000_isa_flags |= (ISA_2_4_MASKS & ~ignore_masks);
   else if (TARGET_POPCNTB)
     rs6000_isa_flags |= (ISA_2_2_MASKS & ~ignore_masks);
