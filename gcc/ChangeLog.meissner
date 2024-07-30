@@ -1,27 +1,5 @@
-==================== Branch work174, patch #9 ====================
-
-Add a2 processor to arch flags.
-
-2024-07-30  Michael Meissner  <meissner@linux.ibm.com>
-
-	* config/rs6000/rs6000-arch.def: Add a2 processor.
-
-==================== Branch work174, patch #8 ====================
-
-Remove arch flags power4 and power5.  Use const HOST_WIDE_INT for arch masks.
-
-2024-07-30  Michael Meissner  <meissner@linux.ibm.com>
-
-	* config/rs6000/rs6000-arch.def: Remove power4 and power5 architecture
-	masks.
-	* config/rs6000/rs6000-c.c (rs6000_target_modify_macros): Use arch flags
-	for power6.
-	* config/rs6000/rs6000-opts.h (ARCH_MASK_*): Encode the masks as const
-	HOST_WIDE_INT and not as an enumeratio.
-	* config/rs6000/rs6000.cc (get_arch_flags): Drop power4 and power5 arch
-	flags support.
-	(rs6000_machine_from_flags): Likewise.
-
+==================== Branch work174, patch #9 was reverted ====================
+==================== Branch work174, patch #8 was reverted ====================
 ==================== Branch work174, patch #7 was reverted ====================
 
 ==================== Branch work174, patch #6 ====================

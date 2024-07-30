@@ -1852,6 +1852,14 @@ get_arch_flags (int cpu_index)
 
       case PROCESSOR_POWER6:
 	ret |= ARCH_MASK_POWER6;
+	/* fall through.  */
+
+      case PROCESSOR_POWER5:
+	ret |= ARCH_MASK_POWER5;
+	/* fall through.  */
+
+      case PROCESSOR_POWER4:
+	ret |= ARCH_MASK_POWER4;
 	break;
 
       default:
@@ -5929,9 +5937,9 @@ rs6000_machine_from_flags (void)
     return "power7";
   if ((arch_flags & ARCH_MASK_POWER6) != 0)
     return "power6";
-  if ((flags & (ISA_2_4_MASKS & ~ISA_2_1_MASKS)) != 0)
+  if ((arch_flags & ARCH_MASK_POWER5) != 0)
     return "power5";
-  if ((flags & ISA_2_1_MASKS) != 0)
+  if ((arch_flags & ARCH_MASK_POWER4) != 0)
     return "power4";
   if ((flags & OPTION_MASK_POWERPC64) != 0)
     return "ppc64";
