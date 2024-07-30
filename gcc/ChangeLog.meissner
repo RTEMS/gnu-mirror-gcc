@@ -1,4 +1,15 @@
-==================== Branch work173, patch #14 ====================
+==================== Branch work173, patch #16 ====================
+
+Use old arch code for power4-power6 part 2.
+
+2024-07-29  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (report_architecture_mismatch): Use old code
+	for power6 options.
+
+==================== Branch work173, patch #15 ====================
 
 Use old arch code for power4-power6.
 
