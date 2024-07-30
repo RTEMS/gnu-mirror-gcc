@@ -71,6 +71,26 @@ enum processor_type
    PROCESSOR_TITAN
 };
 
+/* Define an enumeration to number the architecture masks.  */
+#undef  ARCH_EXPAND
+#define ARCH_EXPAND(PROC, NAME)	ARCH_ENUM_ ## PROC,
+
+enum {
+#include "rs6000-arch.def"
+  ARCH_ENUM_LAST
+};
+
+/* Create an architecture mask for the newer architectures (power7 and
+   up)..  */
+#undef  ARCH_EXPAND
+#define ARCH_EXPAND(PROC, NAME)	ARCH_MASK_ ## PROC = 1 << ARCH_ENUM_ ## PROC,
+
+enum {
+#include "rs6000-arch.def"
+  ARCH_MASK_ZERO	= 0
+};
+
+#undef ARCH_EXPAND
 
 /* Types of costly dependences.  */
 enum rs6000_dependence_cost
