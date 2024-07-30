@@ -1,3 +1,11 @@
+==================== Branch work174, patch #9 ====================
+
+Add a2 processor to arch flags.
+
+2024-07-30  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-arch.def: Add a2 processor.
+
 ==================== Branch work174, patch #8 ====================
 
 Remove arch flags power4 and power5.  Use const HOST_WIDE_INT for arch masks.
