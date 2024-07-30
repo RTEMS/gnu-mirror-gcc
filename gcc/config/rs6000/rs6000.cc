@@ -1851,18 +1851,14 @@ get_arch_flags (int cpu_index)
 	/* fall through.  */
 
       case PROCESSOR_POWER6:
-      case PROCESSOR_PPCA2:
 	ret |= ARCH_MASK_POWER6;
 	/* fall through.  */
 
-      case PROCESSOR_PPC476:
       case PROCESSOR_POWER5:
 	ret |= ARCH_MASK_POWER5;
 	/* fall through.  */
 
-      case PROCESSOR_CELL:
       case PROCESSOR_POWER4:
-      case PROCESSOR_PPCE6500:
 	ret |= ARCH_MASK_POWER4;
 	break;
 

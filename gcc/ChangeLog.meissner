@@ -1,15 +1,4 @@
-==================== Branch work174, patch #7 ====================
-
-Add more processors to arch flags.
-
-2024-07-30  Michael Meissner  <meissner@linux.ibm.com>
-
-	* config/rs6000/rs6000-arch.def: Add support for 476, a2, and cell
-	processors.
-	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Use arch
-	flags for power4, power5, and power6.
-	* config/rs6000/rs6000.cc (get_arch_flags): Add 476, a2, and cell
-	processors.
+==================== Branch work174, patch #7 was reverted ====================
 
 ==================== Branch work174, patch #6 ====================
 
