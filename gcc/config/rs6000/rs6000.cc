@@ -251,17 +251,17 @@ enum {
 
 /* Map compiler ISA bits into HWCAP names.  */
 struct clone_map {
-  HOST_WIDE_INT isa_mask;	/* rs6000_isa mask */
+  HOST_WIDE_INT arch_mask;	/* rs6000_arch_mask.  */
   const char *name;		/* name to use in __builtin_cpu_supports.  */
 };
 
 static const struct clone_map rs6000_clone_map[CLONE_MAX] = {
-  { 0,				"" },		/* Default options.  */
-  { OPTION_MASK_CMPB,		"arch_2_05" },	/* ISA 2.05 (power6).  */
-  { OPTION_MASK_POPCNTD,	"arch_2_06" },	/* ISA 2.06 (power7).  */
-  { OPTION_MASK_P8_VECTOR,	"arch_2_07" },	/* ISA 2.07 (power8).  */
-  { OPTION_MASK_P9_VECTOR,	"arch_3_00" },	/* ISA 3.0 (power9).  */
-  { OPTION_MASK_POWER10,	"arch_3_1" },	/* ISA 3.1 (power10).  */
+  { 0,			"" },		/* Default options.  */
+  { ARCH_MASK_POWER6,	"arch_2_05" },	/* ISA 2.05 (power6).  */
+  { ARCH_MASK_POWER7,	"arch_2_06" },	/* ISA 2.06 (power7).  */
+  { ARCH_MASK_POWER8,	"arch_2_07" },	/* ISA 2.07 (power8).  */
+  { ARCH_MASK_POWER9,	"arch_3_00" },	/* ISA 3.0 (power9).  */
+  { ARCH_MASK_POWER10,	"arch_3_1" },	/* ISA 3.1 (power10).  */
 };
 
 
@@ -25433,7 +25433,7 @@ static int
 rs6000_clone_priority (tree fndecl)
 {
   tree fn_opts = DECL_FUNCTION_SPECIFIC_TARGET (fndecl);
-  HOST_WIDE_INT isa_masks;
+  HOST_WIDE_INT arch_masks;
   int ret = CLONE_DEFAULT;
   tree attrs = lookup_attribute ("target", DECL_ATTRIBUTES (fndecl));
   const char *attrs_str = NULL;
@@ -25449,12 +25449,12 @@ rs6000_clone_priority (tree fndecl)
 	fn_opts = target_option_default_node;
 
       if (!fn_opts || !TREE_TARGET_OPTION (fn_opts))
-	isa_masks = rs6000_isa_flags;
+	arch_masks = rs6000_arch_flags;
       else
-	isa_masks = TREE_TARGET_OPTION (fn_opts)->x_rs6000_isa_flags;
+	arch_masks = TREE_TARGET_OPTION (fn_opts)->x_rs6000_arch_flags;
 
       for (ret = CLONE_MAX - 1; ret != 0; ret--)
-	if ((rs6000_clone_map[ret].isa_mask & isa_masks) != 0)
+	if ((rs6000_clone_map[ret].arch_mask & arch_masks) != 0)
 	  break;
     }
 
