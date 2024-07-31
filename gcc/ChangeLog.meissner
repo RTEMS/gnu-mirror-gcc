@@ -1,3 +1,17 @@
+==================== Branch work174, patch #13 ====================
+
+Add gp, gfx to arch flags.
+
+2024-07-31  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-arch.def (ARCH_MASK_GP): Add gp.
+	(ARCH_MASK_GFX): Add gfx.
+	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Use arch
+	masks for gp and gfx.
+	* config/rs6000/rs6000.cc (get_arch_flags): Add support for gp and gfx.
+
 ==================== Branch work174, patch #12 ====================
 
 Update arch flags.
