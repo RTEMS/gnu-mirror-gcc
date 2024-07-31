@@ -1827,41 +1827,52 @@ get_arch_flags (int cpu_index)
 {
   HOST_WIDE_INT ret = 0;
 
+  const HOST_WIDE_INT ARCH_COMBO_POWER4  = ARCH_MASK_POWER4;
+  const HOST_WIDE_INT ARCH_COMBO_POWER5  = ARCH_MASK_POWER5  | ARCH_COMBO_POWER4;
+  const HOST_WIDE_INT ARCH_COMBO_POWER5X = ARCH_MASK_POWER5X | ARCH_COMBO_POWER5;
+  const HOST_WIDE_INT ARCH_COMBO_POWER6  = ARCH_MASK_POWER6  | ARCH_COMBO_POWER5X;
+  const HOST_WIDE_INT ARCH_COMBO_POWER7  = ARCH_MASK_POWER7  | ARCH_COMBO_POWER6;
+  const HOST_WIDE_INT ARCH_COMBO_POWER8  = ARCH_MASK_POWER8  | ARCH_COMBO_POWER7;
+  const HOST_WIDE_INT ARCH_COMBO_POWER9  = ARCH_MASK_POWER9  | ARCH_COMBO_POWER8;
+  const HOST_WIDE_INT ARCH_COMBO_POWER10 = ARCH_MASK_POWER10 | ARCH_COMBO_POWER9;
+  const HOST_WIDE_INT ARCH_COMBO_POWER11 = ARCH_MASK_POWER11 | ARCH_COMBO_POWER10;
+
   if (cpu_index >= 0)
     switch (processor_target_table[cpu_index].processor)
       {
       case PROCESSOR_POWER11:
-	ret |= ARCH_MASK_POWER11;
-	/* fall through.  */
+	ret = ARCH_COMBO_POWER11;
+	break;
 
       case PROCESSOR_POWER10:
-	ret |= ARCH_MASK_POWER10;
-	/* fall through.  */
+	ret = ARCH_COMBO_POWER10;
+	break;
 
       case PROCESSOR_POWER9:
-	ret |= ARCH_MASK_POWER9;
-	/* fall through.  */
+	ret = ARCH_COMBO_POWER9;
+	break;
 
       case PROCESSOR_POWER8:
-	ret |= ARCH_MASK_POWER8;
-	/* fall through.  */
+	ret = ARCH_COMBO_POWER8;
+	break;
 
       case PROCESSOR_POWER7:
-	ret |= ARCH_MASK_POWER7;
-	/* fall through.  */
+	ret = ARCH_COMBO_POWER7;
+	break;
 
+      case PROCESSOR_PPCA2:
       case PROCESSOR_POWER6:
-	ret |= ARCH_MASK_POWER6;
-	/* fall through.  */
+	ret = ARCH_COMBO_POWER6;
+	break;
 
       case PROCESSOR_POWER5:
-	ret |= ARCH_MASK_POWER5;
+	ret = ARCH_COMBO_POWER5;
 	if (TARGET_FPRND)
 	  ret |= ARCH_MASK_POWER5X;
-	/* fall through.  */
+	break;
 
       case PROCESSOR_POWER4:
-	ret |= ARCH_MASK_POWER4;
+	ret = ARCH_COMBO_POWER4;
 	break;
 
       default:
