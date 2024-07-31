@@ -1,3 +1,14 @@
+==================== Branch work174, patch #26 ====================
+
+Move ARCH_* to rs6000.h.
+
+2024-07-31  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-opts.h: Move ARCH_* stuff from here.
+	* config/rs6000/rs6000.h: Move ARCH_* stuff here.
+
 ==================== Branch work174, patch #25 ====================
 
 Update tests to work with architecture flags changes.
