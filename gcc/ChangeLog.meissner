@@ -1,3 +1,19 @@
+==================== Branch work174, patch #11 ====================
+
+Add power5+ to arch flags.
+
+2024-07-31  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-arch.def (ARCH_MASK_POWER5X): Add power5+
+	support.
+	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Use arch
+	masks for power4, power5, power5+, and power6.
+	* config/rs6000/rs6000.cc (get_arch_flags): Add support for setting arch
+	flags for non power* processors.  Add support for power5+.
+	(report_architecture_mismatch): Improve error message.
+
 ==================== Branch work174, patch #10 ====================
 
 Use const HOST_WIDE_INT for arch masks.
