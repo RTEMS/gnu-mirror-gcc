@@ -520,12 +520,6 @@ extern int rs6000_vector_align[];
 #define MASK_LITTLE_ENDIAN		OPTION_MASK_LITTLE_ENDIAN
 #endif
 
-/* In the past we represented power8, power10 as an ISA bit and used internal
-   switches the user was not supposed to use for -mpower8-internal and
-   -mpower10.  Now we use architecture flags for this.  */
-#define TARGET_POWER8		((rs6000_arch_flags & ARCH_MASK_POWER8)  != 0)
-#define TARGET_POWER10		((rs6000_arch_flags & ARCH_MASK_POWER10) != 0)
-
 /* For power systems, we want to enable Altivec and VSX builtins even if the
    user did not use -maltivec or -mvsx to allow the builtins to be used inside
    of #pragma GCC target or the target attribute to change the code level for a
