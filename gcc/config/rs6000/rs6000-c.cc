@@ -414,9 +414,9 @@ rs6000_target_modify_macros (bool define_p, HOST_WIDE_INT flags,
 
   /* rs6000_isa_flags and rs6000_arch_flags based options.  */
   rs6000_define_or_undefine_macro (define_p, "_ARCH_PPC");
-  if ((arch_flags & ARCH_MASK_GPOPT) != 0)
+  if ((flags & OPTION_MASK_PPC_GPOPT) != 0)
     rs6000_define_or_undefine_macro (define_p, "_ARCH_PPCSQ");
-  if ((arch_flags & ARCH_MASK_GFXOPT) != 0)
+  if ((flags & OPTION_MASK_PPC_GFXOPT) != 0)
     rs6000_define_or_undefine_macro (define_p, "_ARCH_PPCGR");
   if ((flags & OPTION_MASK_POWERPC64) != 0)
     rs6000_define_or_undefine_macro (define_p, "_ARCH_PPC64");
