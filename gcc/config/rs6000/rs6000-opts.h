@@ -71,6 +71,7 @@ enum processor_type
    PROCESSOR_TITAN
 };
 
+
 /* Types of costly dependences.  */
 enum rs6000_dependence_cost
 {

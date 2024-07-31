@@ -520,12 +520,6 @@ extern int rs6000_vector_align[];
 #define MASK_LITTLE_ENDIAN		OPTION_MASK_LITTLE_ENDIAN
 #endif
 
-/* In the past we represented power8, power10 as an ISA bit and used internal
-   switches the user was not supposed to use for -mpower8-internal and
-   -mpower10.  Now we use architecture flags for this.  */
-#define TARGET_POWER8		((rs6000_arch_flags & ARCH_MASK_POWER8)  != 0)
-#define TARGET_POWER10		((rs6000_arch_flags & ARCH_MASK_POWER10) != 0)
-
 /* For power systems, we want to enable Altivec and VSX builtins even if the
    user did not use -maltivec or -mvsx to allow the builtins to be used inside
    of #pragma GCC target or the target attribute to change the code level for a
@@ -2487,27 +2481,3 @@ while (0)
    issues have been resolved.  */
 #define RS6000_DISABLE_SCALAR_MODULO 1
 
-
-
-/* Create the architecture flags.  */
-/* Define an enumeration to number the architecture masks.  */
-#ifdef GCC_HWINT_H
-#undef  ARCH_EXPAND
-#define ARCH_EXPAND(PROC, NAME)	ARCH_ENUM_ ## PROC,
-
-enum {
-#include "rs6000-arch.def"
-  ARCH_ENUM_LAST
-};
-
-/* Create an architecture mask for the newer architectures (power6 and
-   up)..  */
-#undef  ARCH_EXPAND
-#define ARCH_EXPAND(PROC, NAME)						\
-  static const HOST_WIDE_INT ARCH_MASK_ ## PROC				\
-    = HOST_WIDE_INT_1 << ARCH_ENUM_ ## PROC;
-
-#include "rs6000-arch.def"
-
-#undef ARCH_EXPAND
-#endif	/* GCC_HWINT_H.  */
