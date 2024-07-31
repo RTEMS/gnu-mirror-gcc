@@ -1856,6 +1856,8 @@ get_arch_flags (int cpu_index)
 
       case PROCESSOR_POWER5:
 	ret |= ARCH_MASK_POWER5;
+	if (TARGET_FPRND)
+	  ret |= ARCH_MASK_POWER5X;
 	/* fall through.  */
 
       case PROCESSOR_POWER4:
@@ -1863,6 +1865,18 @@ get_arch_flags (int cpu_index)
 	break;
 
       default:
+	/* For other processors, set the arch flags based on the ISA bits.  */
+	if (TARGET_MFCRF)
+	  ret |= ARCH_MASK_POWER4;
+
+	if (TARGET_POPCNTB)
+	  ret |= ARCH_MASK_POWER5;
+
+	if (TARGET_FPRND)
+	  ret |= ARCH_MASK_POWER5X;
+
+	if (TARGET_CMPB)
+	  ret |= ARCH_MASK_POWER6;
 	break;
       }
 
@@ -25359,19 +25373,19 @@ report_architecture_mismatch (void)
       OPTION_MASK_P9_VECTOR | OPTION_MASK_P9_MISC | OPTION_MASK_P9_MINMAX
       | OPTION_MASK_MODULO,
       ARCH_MASK_POWER9,
-      "cpu=power9"
+      "-mcpu=power9"
     },
 
     {
       OPTION_MASK_P8_VECTOR | OPTION_MASK_CRYPTO,
       ARCH_MASK_POWER8,
-      "cpu=power8"
+      "-mcpu=power8"
     },
 
     {
       OPTION_MASK_VSX | OPTION_MASK_POPCNTD,
       ARCH_MASK_POWER7,
-      "cpu=power7"
+      "-mcpu=power7"
     },
   };
 
