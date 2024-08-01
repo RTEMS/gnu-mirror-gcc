@@ -520,9 +520,11 @@ extern int rs6000_vector_align[];
 #define MASK_LITTLE_ENDIAN		OPTION_MASK_LITTLE_ENDIAN
 #endif
 
-/* In the past we represented power8, power10 as an ISA bit and used internal
-   switches the user was not supposed to use for -mpower8-internal and
-   -mpower10.  Now we use architecture flags for this.  */
+/* In the past we represented the various power cpus (power4, power5, power6,
+   etc.) via ISA bits that highlighted a new instruction or we used an extra
+   option to represent the hardware (i.e. -mpower8-internal or -mpower10).  Now
+   we use architecture flags for this.  */
+#define TARGET_POWER5		((rs6000_arch_flags & ARCH_MASK_POWER5)  != 0)
 #define TARGET_POWER8		((rs6000_arch_flags & ARCH_MASK_POWER8)  != 0)
 #define TARGET_POWER10		((rs6000_arch_flags & ARCH_MASK_POWER10) != 0)
 
@@ -533,7 +535,7 @@ extern int rs6000_vector_align[];
 
 #define TARGET_EXTRA_BUILTINS	(TARGET_POWERPC64			 \
 				 || TARGET_PPC_GPOPT /* 970/power4 */	 \
-				 || TARGET_POPCNTB   /* ISA 2.02 */	 \
+				 || TARGET_POWER5    /* ISA 2.02 */	 \
 				 || TARGET_CMPB      /* ISA 2.05 */	 \
 				 || TARGET_POPCNTD   /* ISA 2.06 */	 \
 				 || TARGET_ALTIVEC			 \
@@ -549,9 +551,9 @@ extern int rs6000_vector_align[];
 #define TARGET_FRES	(TARGET_HARD_FLOAT && TARGET_PPC_GFXOPT)
 
 #define TARGET_FRE	(TARGET_HARD_FLOAT \
-			 && (TARGET_POPCNTB || VECTOR_UNIT_VSX_P (DFmode)))
+			 && (TARGET_POWER5 || VECTOR_UNIT_VSX_P (DFmode)))
 
-#define TARGET_FRSQRTES	(TARGET_HARD_FLOAT && TARGET_POPCNTB \
+#define TARGET_FRSQRTES	(TARGET_HARD_FLOAT && TARGET_POWER5 \
 			 && TARGET_PPC_GFXOPT)
 
 #define TARGET_FRSQRTE	(TARGET_HARD_FLOAT \
