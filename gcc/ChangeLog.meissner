@@ -1,3 +1,22 @@
+==================== Branch work174, patch #44 ====================
+
+Change TARGET_MODULO to TARGET_POWER9
+
+As part of the architecture flags patches, this patch changes the use of
+TARGET_POPCNTD to TARGET_POWER7.  The modulo instructions were added in power9 (ISA
+3.0).  Note, I did not change the uses of TARGET_MODULO where it was explicitly
+generating different code if the machine had a modulo instruction.
+
+2024-08-01  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_builtin_is_supported): Use
+	TARGET_POWER9 instead of TARGET_MODULO.
+	* config/rs6000/rs6000.h (TARGET_CTZ): Likewise.
+	(TARGET_EXTSWSLI): Likewise.
+	(TARGET_MADDLD): Likewise.
+	(TARGET_POWER9): New macro.
+	* config/rs6000/rs6000.md (enabled attribute): Likewise.
+
 ==================== Branch work174, patch #43 ====================
 
 Change TARGET_POPCNTD to TARGET_POWER7
