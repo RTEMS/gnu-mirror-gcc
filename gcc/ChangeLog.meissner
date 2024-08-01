@@ -1,3 +1,114 @@
+==================== Branch work174, patch #43 ====================
+
+Change TARGET_POPCNTD to TARGET_POWER7
+
+As part of the architecture flags patches, this patch changes the use of
+TARGET_POPCNTD to TARGET_POWER7.  The FPRND instruction was added in power6 (ISA
+2.05).
+
+2024-07-31  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/dfp.md (floatdidd2): Change TARGET_POPCNTD to
+	TARGET_POWER7.
+	* config/rs6000/rs6000-builtin.cc (rs6000_builtin_is_supported):
+	Likewise.
+	* config/rs6000/rs6000-string.cc (expand_block_compare_gpr): Likewise.
+	* config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached):
+	Likewise.
+	(rs6000_rtx_costs): Likewise.
+	(rs6000_emit_popcount): Likewise.
+	* config/rs6000/rs6000.h (TARGET_FCFID): Likewise.
+	(TARGET_LFIWZX): Likewise.
+	(TARGET_FCFIDS): Likewise.
+	(TARGET_FCFIDU): Likewise.
+	(TARGET_FCFIDUS): Likewise.
+	(TARGET_FCTIDUZ): Likewise.
+	(TARGET_FCTIWUZ): Likewise.
+	(TARGET_POWER7): New macro.
+	(CTZ_DEFINED_VALUE_AT_ZERO): Change TARGET_POPCNTD to TARGET_POWER7.
+	* config/rs6000/rs6000.md (enabled attribute): Likewise.
+	(ctz<mode>2): Likewise.
+	(popcntd<mode>2): Likewise.
+	(lrint<mode>si2): Likewise.
+	(lrint<mode>si): Likewise.
+	(lrint<mode>si_di): Likewise.
+	(cmpmemsi): Likewise.
+	(bpermd_<mode>"): Likewise.
+	(addg6s): Likewise.
+	(cdtbcd): Likewise.
+	(cbcdtd): Likewise.
+	(div<div_extend>_<mode>): Likewise.
+
+==================== Branch work174, patch #42 ====================
+
+Change TARGET_CMPB to TARGET_POWER6
+
+As part of the architecture flags patches, this patch changes the use of
+TARGET_FPRND to TARGET_POWER6.  The CMPB instruction was added in power6 (ISA
+2.05).
+
+2024-07-31  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_builtin_is_supported): Use
+	TARGET_POWER6 instead of TARGET_CMPB.
+	* config/rs6000/rs6000.h (TARGET_FCFID): Likewise.
+	(TARGET_LFIWAX): Likewise.
+	(TARGET_POWER6): New macro.
+	(TARGET_EXTRA_BUILTINS): Use TARGET_POWER6 instead of TARGET_CMPB.
+	* config/rs6000/rs6000.md (enabled attribute): Likewise.
+	(parity<mode>2_cmp): Likewise.
+	(copysign<mode>3): Likewise.
+	(copysign<mode>3_fcpsgn): Likewise.
+	(cmpstrns): Likewise.
+	(cmpstrsi): Likewise.
+
+==================== Branch work174, patch #41 ====================
+
+Change TARGET_FPRND to TARGET_POWER5X
+
+As part of the architecture flags patches, this patch changes the use of
+TARGET_FPRND to TARGET_POWER5X.  The FPRND instruction was added in power5+.
+
+2024-07-31  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.cc (report_architecture_mismatch): Use
+	TARGET_POWER5X instead of TARGET_FPRND.
+	* config/rs6000/rs6000.h (TARGET_POWER5X): New macro.
+	* config/rs6000/rs6000.md (fmod<mode>3): Use TARGET_POWER5X instead of
+	TARGET_FPRND.
+	(remainder<mode>3): Likewise.
+	(fctiwuz_<mode>): Likewise.
+	(btrunc<mode>2): Likewise.
+	(ceil<mode>2): Likewise.
+	(floor<mode>2): Likewise.
+	(round<mode>): Likewise.
+
+==================== Branch work174, patch #40 ====================
+
+Change TARGET_POPCNTB to TARGET_POWER5
+
+As part of the architecture flags patches, this patch changes the use of
+TARGET_POPCNTB to TARGET_POWER5.  The POPCNTB instruction was added in ISA 2.02
+(power5).
+
+2024-07-31  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_builtin_is_supported): Use
+	TARGET_POWER5 instead of TARGET_POPCNTB.
+	* config/rs6000/rs6000.h (TARGET_POWER5): New macro.
+	(TARGET_EXTRA_BUILTINS): Use TARGET_POWER5 instead of TARGET_POPCNTB.
+	(TARGET_FRE): Likewise.
+	(TARGET_FRSQRTES): Likewise.
+	* config/rs6000/rs6000.md (enabled attribute): Likewise.
+	(popcount<mode>): Use TARGET_POWER5 instead of TARGET_POPCNTB.  Drop
+	test for TARGET_POPCNTD (i.e power7), since TARGET_POPCNTB will always
+	be set if TARGET_POPCNTD is set.
+	(popcntb<mode>2): Use TARGET_POWER5 instead of TARGET_POPCNTB.
+	(parity<mode>2): Likewise.
+	(parity<mode>2_cmpb): Remove TARGET_POPCNTB test, since it will always
+	be true when TARGET_CMPB (i.e. power6) is set.
+
+
 ==================== Branch work174, patch #35 ====================
 
 Update tests to work with architecture flags changes.
