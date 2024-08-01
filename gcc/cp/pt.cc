@@ -994,6 +994,7 @@ maybe_new_partial_specialization (tree& type)
       tree t = make_class_type (TREE_CODE (type));
       CLASSTYPE_DECLARED_CLASS (t) = CLASSTYPE_DECLARED_CLASS (type);
       SET_TYPE_TEMPLATE_INFO (t, build_template_info (tmpl, args));
+      TYPE_CONTEXT (t) = TYPE_CONTEXT (type);
 
       /* We only need a separate type node for storing the definition of this
 	 partial specialization; uses of S<T*> are unconstrained, so all are
@@ -6655,6 +6656,11 @@ complex_alias_template_p (const_tree tmpl, tree *seen_out)
   if (get_constraints (tmpl))
     return true;
 
+  /* An alias with dependent type attributes is complex.  */
+  if (any_dependent_type_attributes_p (DECL_ATTRIBUTES
+				       (DECL_TEMPLATE_RESULT (tmpl))))
+    return true;
+
   if (!complex_alias_tmpl_info)
     complex_alias_tmpl_info = hash_map<const_tree, tree>::create_ggc (13);
 
@@ -6805,6 +6811,11 @@ get_underlying_template (tree tmpl)
       /* If TMPL adds or changes any constraints, it isn't equivalent.  I think
 	 it's appropriate to treat a less-constrained alias as equivalent.  */
       if (!at_least_as_constrained (underlying, tmpl))
+	break;
+
+      /* If TMPL adds dependent type attributes, it isn't equivalent.  */
+      if (any_dependent_type_attributes_p (DECL_ATTRIBUTES
+					   (DECL_TEMPLATE_RESULT (tmpl))))
 	break;
 
       /* Alias is equivalent.  Strip it and repeat.  */

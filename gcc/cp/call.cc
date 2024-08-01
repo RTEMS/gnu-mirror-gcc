@@ -6742,7 +6742,8 @@ add_candidates (tree fns, tree first_arg, const vec<tree, va_gc> *args,
 
       if (cand->viable == -1
 	  && shortcut_bad_convs
-	  && missing_conversion_p (cand))
+	  && (missing_conversion_p (cand)
+	      || TREE_CODE (cand->fn) == TEMPLATE_DECL))
 	{
 	  /* This candidate has been tentatively marked non-strictly viable,
 	     and we didn't compute all argument conversions for it (having
@@ -11819,7 +11820,7 @@ build_new_method_call (tree instance, tree fns, vec<tree, va_gc> **args,
 			 fn);
 	    }
 
-	  if (TREE_CODE (TREE_TYPE (fn)) == METHOD_TYPE
+	  if (DECL_OBJECT_MEMBER_FUNCTION_P (fn)
 	      && !DECL_CONSTRUCTOR_P (fn)
 	      && is_dummy_object (instance))
 	    {

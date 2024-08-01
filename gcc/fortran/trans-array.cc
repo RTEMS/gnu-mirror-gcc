@@ -2137,7 +2137,9 @@ gfc_trans_array_constructor_value (stmtblock_t * pblock,
 	      p = gfc_constructor_next (p);
 	      n++;
 	    }
-	  if (n < 4)
+	  /* Constructor with few constant elements, or element size not
+	     known at compile time (e.g. deferred-length character).  */
+	  if (n < 4 || !INTEGER_CST_P (TYPE_SIZE_UNIT (type)))
 	    {
 	      /* Scalar values.  */
 	      gfc_init_se (&se, NULL);
@@ -5961,6 +5963,11 @@ gfc_array_init_size (tree descriptor, int rank, int corank, tree * poffset,
       type = gfc_get_character_type_len (expr->ts.kind, tmp);
       tmp = gfc_conv_descriptor_dtype (descriptor);
       gfc_add_modify (pblock, tmp, gfc_get_dtype_rank_type (rank, type));
+    }
+  else if (expr3_desc && GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (expr3_desc)))
+    {
+      tmp = gfc_conv_descriptor_dtype (descriptor);
+      gfc_add_modify (pblock, tmp, gfc_conv_descriptor_dtype (expr3_desc));
     }
   else
     {
