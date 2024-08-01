@@ -525,6 +525,7 @@ extern int rs6000_vector_align[];
    option to represent the hardware (i.e. -mpower8-internal or -mpower10).  Now
    we use architecture flags for this.  */
 #define TARGET_POWER5		((rs6000_arch_flags & ARCH_MASK_POWER5)  != 0)
+#define TARGET_POWER5X		((rs6000_arch_flags & ARCH_MASK_POWER5X) != 0)
 #define TARGET_POWER8		((rs6000_arch_flags & ARCH_MASK_POWER8)  != 0)
 #define TARGET_POWER10		((rs6000_arch_flags & ARCH_MASK_POWER10) != 0)
 
