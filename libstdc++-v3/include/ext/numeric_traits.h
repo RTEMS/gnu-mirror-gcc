@@ -218,7 +218,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     struct __numeric_traits<__ibm128>
     : public __numeric_traits_floating<__ibm128>
     { };
-# elif defined __LONG_DOUBLE_IBM128__
+# elif defined __LONG_DOUBLE_IBM128__ && defined __VSX__
   // long double is __ibm128, define traits for __ieee128
   template<>
     struct __numeric_traits_floating<__ieee128>
