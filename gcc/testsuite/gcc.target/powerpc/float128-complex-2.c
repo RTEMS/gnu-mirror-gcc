@@ -1,6 +1,6 @@
 /* { dg-do compile { target { powerpc*-*-linux* } } } */
 /* { dg-require-effective-target powerpc_float128_hw_ok } */
-/* { dg-options "-O2 -mvsx -mfloat128-hardware" } */
+/* { dg-options "-O2 -mfloat128-hardware" } */
 /* { dg-additional-options "-mdejagnu-cpu=power9" { target { ! has_arch_pwr9 } } } */
 
 #ifndef NO_FLOAT
