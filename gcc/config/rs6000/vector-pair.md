@@ -261,6 +261,31 @@
    (set (attr "type") (if_then_else (match_test "<VPAIR_OP> == DIV")
 				    (const_string "<vpair_divtype>")
 				    (const_string "<vpair_type>")))])
+
+;; Optimize vector pair add of a negative value into a subtract.
+(define_insn_and_split "*vpair_add_neg_<vpair_modename>3"
+  [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
+	(unspec:OO
+	 [(match_operand:OO 1 "vsx_register_operand" "wa")
+	  (unspec:OO
+	   [(match_operand:OO 2 "vsx_register_operand" "wa")
+	    (const_int VPAIR_FP_ELEMENT)]
+	   UNSPEC_VPAIR_NEG)
+	  (const_int VPAIR_FP_ELEMENT)]
+	 VPAIR_FP_BINARY))]
+  "TARGET_MMA"
+  "#"
+  "&& 1"
+  [(set (match_dup 0)
+	(unspec:OO
+	 [(match_dup 1)
+	  (match_dup 2)
+	  (const_int VPAIR_FP_ELEMENT)]
+	 UNSPEC_VPAIR_MINUS))]
+{
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "<vpair_type>")])
 
 ;; Vector pair fused-multiply (FMA) operations.  The last argument in the
 ;; UNSPEC is a CONST_INT which identifies what the scalar element is.
@@ -351,6 +376,205 @@
 {
   vpair_split_fma (operands, <VPAIR_VMODE>mode, VPAIR_SPLIT_NFMS);
   DONE;
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "<vpair_type>")])
+
+;; Optimize vector pair multiply and vector pair add into vector pair fma,
+;; providing the compiler would do this optimization for scalar and vectors.
+;; Unlike most of the define_insn_and_splits, this can be done before register
+;; allocation.
+(define_insn_and_split "*vpair_fma_<vpair_modename>_merge"
+  [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
+	(unspec:OO
+	 [(unspec:OO
+	   [(match_operand:OO 1 "vsx_register_operand" "%wa,wa")
+	    (match_operand:OO 2 "vsx_register_operand" "wa,0")
+	    (const_int VPAIR_FP_ELEMENT)]
+	   UNSPEC_VPAIR_MULT)
+	  (match_operand:OO 3 "vsx_register_operand" "0,wa")
+	  (const_int VPAIR_FP_ELEMENT)]
+	 UNSPEC_VPAIR_PLUS))]
+  "TARGET_MMA && flag_fp_contract_mode == FP_CONTRACT_FAST"
+  "#"
+  "&& 1"
+  [(set (match_dup 0)
+	(unspec:OO
+	 [(match_dup 1)
+	  (match_dup 2)
+	  (match_dup 3)
+	  (const_int VPAIR_FP_ELEMENT)]
+	 UNSPEC_VPAIR_FMA))]
+{
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "<vpair_type>")])
+
+;; Merge multiply and subtract.
+(define_insn_and_split "*vpair_fma_<vpair_modename>_merge"
+  [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
+	(unspec:OO
+	 [(unspec:OO
+	   [(match_operand:OO 1 "vsx_register_operand" "%wa,wa")
+	    (match_operand:OO 2 "vsx_register_operand" "wa,0")
+	    (const_int VPAIR_FP_ELEMENT)]
+	   UNSPEC_VPAIR_MULT)
+	  (match_operand:OO 3 "vsx_register_operand" "0,wa")
+	  (const_int VPAIR_FP_ELEMENT)]
+	 UNSPEC_VPAIR_MINUS))]
+  "TARGET_MMA && flag_fp_contract_mode == FP_CONTRACT_FAST"
+  "#"
+  "&& 1"
+  [(set (match_dup 0)
+	(unspec:OO
+	 [(match_dup 1)
+	  (match_dup 2)
+	  (unspec:OO
+	   [(match_dup 3)
+	    (const_int VPAIR_FP_ELEMENT)]
+	   UNSPEC_VPAIR_NEG)
+	  (const_int VPAIR_FP_ELEMENT)]
+	 UNSPEC_VPAIR_FMA))]
+{
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "<vpair_type>")])
+
+(define_insn_and_split "*vpair_fma_<vpair_modename>_merge2"
+  [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
+	(unspec:OO
+	 [(unspec:OO
+	   [(match_operand:OO 1 "vsx_register_operand" "%wa,wa")
+	    (match_operand:OO 2 "vsx_register_operand" "wa,0")
+	    (const_int VPAIR_FP_ELEMENT)]
+	   UNSPEC_VPAIR_MULT)
+	  (unspec:OO
+	   [(match_operand:OO 3 "vsx_register_operand" "0,wa")
+	    (const_int VPAIR_FP_ELEMENT)]
+	   UNSPEC_VPAIR_NEG)
+	  (const_int VPAIR_FP_ELEMENT)]
+	 UNSPEC_VPAIR_PLUS))]
+  "TARGET_MMA && flag_fp_contract_mode == FP_CONTRACT_FAST"
+  "#"
+  "&& 1"
+  [(set (match_dup 0)
+	(unspec:OO
+	 [(match_dup 1)
+	  (match_dup 2)
+	  (unspec:OO
+	   [(match_dup 3)
+	    (const_int VPAIR_FP_ELEMENT)]
+	   UNSPEC_VPAIR_NEG)
+	  (const_int VPAIR_FP_ELEMENT)]
+	 UNSPEC_VPAIR_FMA))]
+{
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "<vpair_type>")])
+
+;; Merge negate, multiply, and add.
+(define_insn_and_split "*vpair_nfma_<vpair_modename>_merge"
+  [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
+	(unspec:OO
+	 [(unspec:OO
+	   [(unspec:OO
+	     [(match_operand:OO 1 "vsx_register_operand" "%wa,wa")
+	      (match_operand:OO 2 "vsx_register_operand" "wa,0")
+	      (const_int VPAIR_FP_ELEMENT)]
+	     UNSPEC_VPAIR_MULT)
+	    (match_operand:OO 3 "vsx_register_operand" "0,wa")
+	    (const_int VPAIR_FP_ELEMENT)]
+	   UNSPEC_VPAIR_PLUS)
+	  (const_int VPAIR_FP_ELEMENT)]
+	 UNSPEC_VPAIR_NEG))]
+  "TARGET_MMA && flag_fp_contract_mode == FP_CONTRACT_FAST"
+  "#"
+  "&& 1"
+  [(set (match_dup 0)
+	(unspec:OO
+	 [(unspec:OO
+	   [(match_dup 1)
+	    (match_dup 2)
+	    (match_dup 3)
+	    (const_int VPAIR_FP_ELEMENT)]
+	   UNSPEC_VPAIR_FMA)
+	  (const_int VPAIR_FP_ELEMENT)]
+	 UNSPEC_VPAIR_NEG))]
+{
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "<vpair_type>")])
+
+;; Merge negate, multiply, and subtract.
+(define_insn_and_split "*vpair_nfms_<vpair_modename>_merge"
+  [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
+	(unspec:OO
+	 [(unspec:OO
+	   [(unspec:OO
+	     [(match_operand:OO 1 "vsx_register_operand" "%wa,wa")
+	      (match_operand:OO 2 "vsx_register_operand" "wa,0")
+	      (const_int VPAIR_FP_ELEMENT)]
+	     UNSPEC_VPAIR_MULT)
+	    (match_operand:OO 3 "vsx_register_operand" "0,wa")
+	    (const_int VPAIR_FP_ELEMENT)]
+	   UNSPEC_VPAIR_MINUS)
+	  (const_int VPAIR_FP_ELEMENT)]
+	 UNSPEC_VPAIR_NEG))]
+  "TARGET_MMA && flag_fp_contract_mode == FP_CONTRACT_FAST"
+  "#"
+  "&& 1"
+  [(set (match_dup 0)
+	(unspec:OO
+	 [(unspec:OO
+	   [(match_dup 1)
+	    (match_dup 2)
+	    (unspec:OO
+	     [(match_dup 3)
+	      (const_int VPAIR_FP_ELEMENT)]
+	     UNSPEC_VPAIR_NEG)
+	    (const_int VPAIR_FP_ELEMENT)]
+	   UNSPEC_VPAIR_FMA)
+	  (const_int VPAIR_FP_ELEMENT)]
+	 UNSPEC_VPAIR_NEG))]
+{
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "<vpair_type>")])
+
+(define_insn_and_split "*vpair_nfms_<vpair_modename>_merge2"
+  [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
+	(unspec:OO
+	 [(unspec:OO
+	   [(unspec:OO
+	     [(match_operand:OO 1 "vsx_register_operand" "%wa,wa")
+	      (match_operand:OO 2 "vsx_register_operand" "wa,0")
+	      (const_int VPAIR_FP_ELEMENT)]
+	     UNSPEC_VPAIR_MULT)
+	    (unspec:OO
+	     [(match_operand:OO 3 "vsx_register_operand" "0,wa")
+	      (const_int VPAIR_FP_ELEMENT)]
+	     UNSPEC_VPAIR_NEG)
+	    (const_int VPAIR_FP_ELEMENT)]
+	   UNSPEC_VPAIR_PLUS)
+	  (const_int VPAIR_FP_ELEMENT)]
+	 UNSPEC_VPAIR_NEG))]
+  "TARGET_MMA && flag_fp_contract_mode == FP_CONTRACT_FAST"
+  "#"
+  "&& 1"
+  [(set (match_dup 0)
+	(unspec:OO
+	 [(unspec:OO
+	   [(match_dup 1)
+	    (match_dup 2)
+	    (unspec:OO
+	     [(match_dup 3)
+	      (const_int VPAIR_FP_ELEMENT)]
+	     UNSPEC_VPAIR_NEG)
+	    (const_int VPAIR_FP_ELEMENT)]
+	   UNSPEC_VPAIR_FMA)
+	  (const_int VPAIR_FP_ELEMENT)]
+	 UNSPEC_VPAIR_NEG))]
+{
 }
   [(set_attr "length" "8")
    (set_attr "type" "<vpair_type>")])
