@@ -148,6 +148,9 @@ if test "x$GCC" = "xyes"; then
       AC_PREPROC_IFELSE(
         [AC_LANG_PROGRAM([[#if __SIZEOF_LONG_DOUBLE__ != 16
 			   #error long double is double
+			   #endif
+			   #if !defined(__VSX__)
+			   #error VSX is not available
 			   #endif]],
                          [[(void) 0;]])],
         [AM_FCFLAGS="$AM_FCFLAGS -mabi=ibmlongdouble -mno-gnu-attribute";

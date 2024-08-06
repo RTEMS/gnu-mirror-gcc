@@ -104,7 +104,7 @@ typedef off_t gfc_offset;
 #endif
 
 #if defined(__powerpc64__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__ \
-    && defined __GLIBC_PREREQ
+    && defined __GLIBC_PREREQ && defined(__VSX__)
 #if __GLIBC_PREREQ (2, 32)
 #define POWER_IEEE128 1
 #endif
