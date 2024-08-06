@@ -64,7 +64,8 @@
 				  | OPTION_MASK_MODULO			\
 				  | OPTION_MASK_P9_MINMAX		\
 				  | OPTION_MASK_P9_MISC			\
-				  | OPTION_MASK_P9_VECTOR)		\
+				  | OPTION_MASK_P9_VECTOR		\
+				  | OPTION_MASK_TAR)			\
 				 & ~OTHER_FUSION_MASKS)
 
 /* Support for the IEEE 128-bit floating point hardware requires a lot of the
@@ -150,6 +151,7 @@
 				 | OPTION_MASK_RECIP_PRECISION		\
 				 | OPTION_MASK_SOFT_FLOAT		\
 				 | OPTION_MASK_STRICT_ALIGN_OPTIONAL	\
+				 | OPTION_MASK_TAR			\
 				 | OPTION_MASK_VSX)
 
 #endif
