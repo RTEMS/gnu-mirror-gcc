@@ -194,6 +194,7 @@ and warnings}.
 -finit-character=@var{n} -finit-integer=@var{n} -finit-local-zero
 -finit-derived -finit-logical=@var{<true|false>}
 -finit-real=@var{<zero|inf|-inf|nan|snan>}
+-finline-intrinsics[=<@var{minloc},@var{maxloc}>]
 -finline-matmul-limit=@var{n}
 -finline-arg-packing -fmax-array-constructor=@var{n}
 -fmax-stack-var-size=@var{n} -fno-align-commons -fno-automatic
@@ -1993,6 +1994,29 @@ involved are not square, the size comparison is performed using the
 geometric mean of the dimensions of the argument and result matrices.
 
 The default value for @var{n} is 30.
+
+@opindex @code{finline-intrinsics}
+@item -finline-intrinsics
+@itemx -finline-intrinsics=@var{intr1},@var{intr2},...
+Usage of intrinsics can be implemented either by generating a call to the
+libgfortran library function implementing it, or by directly generating the
+implementation code inline.  For most intrinsics, only a single of those
+variants is available and there is no choice of implementation.  For some of
+them, however, both are available, and for them the @code{-finline-intrinsics}
+flag permits the selection of inline code generation in its positive form, or
+library call generation in its negative form @code{-fno-inline-intrinsics}.
+With @code{-finline-intrinsics=...} or @code{-fno-inline-intrinsics=...}, the
+choice applies only to the intrinsics present in the comma-separated list
+provided as argument.
+
+For each intrinsic, if no choice of implementation was made through either of
+the flag variants, a default behaviour is chosen depending on optimization:
+library calls are generated when not optimizing or when optimizing for size;
+otherwise inline code is preferred.
+
+The set of intrinsics permitting the choice of implementation variant through
+@code{-finline-intrinsics} is currently limited to non-scalar @code{MAXLOC} and
+@code{MINLOC}.
 
 @opindex @code{finline-matmul-limit}
 @item -finline-matmul-limit=@var{n}
