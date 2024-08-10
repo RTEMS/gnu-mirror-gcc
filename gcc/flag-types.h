@@ -451,6 +451,25 @@ enum gfc_convert
 };
 
 
+/* gfortran -finline-intrinsics= values;
+   We use two identical bits for each value, and initialize with alternating
+   bits, so that we can check whether a value has been set by checking whether
+   the two bits have identical value.  */
+#define GFC_INLINABLE_INTRINSICS_COUNT 2
+enum gfc_inlinable_intrinsics
+{
+  GFC_FLAG_INLINE_INTRINSIC_NONE = 0,
+  GFC_FLAG_INLINE_INTRINSIC_MAXLOC = 3 << 0,
+  GFC_FLAG_INLINE_INTRINSIC_MINLOC = 3 << 2,
+  GFC_FLAG_INLINE_INTRINSIC_ALL = (1 << (2 * GFC_INLINABLE_INTRINSICS_COUNT)) - 1,
+  GFC_FLAG_INLINE_INTRINSIC_NONE_UNSET = 0x55555555 & GFC_FLAG_INLINE_INTRINSIC_NONE,
+  GFC_FLAG_INLINE_INTRINSIC_MAXLOC_UNSET = 0x55555555 & GFC_FLAG_INLINE_INTRINSIC_MAXLOC,
+  GFC_FLAG_INLINE_INTRINSIC_MINLOC_UNSET = 0x55555555 & GFC_FLAG_INLINE_INTRINSIC_MINLOC,
+  GFC_FLAG_INLINE_INTRINSIC_ALL_UNSET = 0x55555555 & GFC_FLAG_INLINE_INTRINSIC_ALL
+};
+#undef GFC_INLINABLE_INTRINSICS_COUNT
+
+
 /* Inline String Operations functions.  */
 enum ilsop_fn
 {
