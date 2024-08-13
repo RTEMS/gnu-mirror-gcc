@@ -1,9 +1,22 @@
-==================== Branch work175-bugs, patch #310 ====================
+==================== Branch work175-bugs, patch #311 ====================
 
 Add better support for shifting vectors with 64-bit elements
 
 This patch fixes PR target/89213 to allow better code to be generated to do
-constant shifts of V2DI/V2DF vectors.
+constant shifts of V2DI/V2DF vectors.  Previously GCC would do constant shifts
+of vectors with 64-bit elements by using:
+
+	XXSPLTIB 32,4
+	VEXTSB2D 0,0
+	VSRAD 2,2,0
+
+I.e., the PowerPC does not have a VSPLTISD instruction to load -15..14 for the
+64-bit shift count in one instruction.  Instead, it would need to load a byte
+and then convert it to 64-bit.
+
+With this patch, GCC now realizes that the vector shift instructions will look
+at the bottom 6 bits for the shift count, and it can use either a VSPLTISW or
+XXSPLTIB instruction to load the shift count.
 
 [gcc]
 2024-08-12  Michael Meissner  <meissner@linux.ibm.com>
@@ -25,6 +38,9 @@ constant shifts of V2DI/V2DF vectors.
 
 	PR target/89213
 	* gcc.target/powerpc/pr89213.c: New test.
+	* gcc.target/powerpc/vec-rlmi-rlnm.c: Update instruction count.
+
+==================== Branch work175-bugs, patch #310 was reverted ====================
 
 ==================== Branch work175-bugs, patch #303 ====================
 
