@@ -2,6 +2,33 @@
 
 Optimize splat of a V2DF/V2DI extract with constant element
 
+We had optimizations for splat of a vector extract for the other vector
+types, but we missed having one for V2DI and V2DF.  This patch adds a
+combiner insn to do this optimization.
+
+In looking at the source, we had similar optimizations for V4SI and V4SF
+extract and splats, but we missed doing V2DI/V2DF.
+
+Without the patch for the code:
+
+	vector long long splat_dup_l_0 (vector long long v)
+	{
+	  return __builtin_vec_splats (__builtin_vec_extract (v, 0));
+	}
+
+the compiler generates (on a little endian power9):
+
+	splat_dup_l_0:
+		mfvsrld 9,34
+	        mtvsrdd 34,9,9
+		blr
+
+Now it generates:
+
+	splat_dup_l_0:
+		xxpermdi 34,34,34,3
+	        blr
+
 2024-08-14  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
@@ -33,7 +60,7 @@ With this patch, GCC now realizes that the vector shift instructions will look
 at the bottom 6 bits for the shift count, and it can use either a VSPLTISW or
 XXSPLTIB instruction to load the shift count.
 
-[gcc]
+gcc/
 2024-08-12  Michael Meissner  <meissner@linux.ibm.com>
 
 	PR target/89213
@@ -48,7 +75,7 @@ XXSPLTIB instruction to load the shift count.
 	* config/rs6000/predicates.md (vector_shift_constant): New
 	predicate.
 
-[gcc/testsuite]
+gcc/testsuite/
 2024-08-12  Michael Meissner  <meissner@linux.ibm.com>
 
 	PR target/89213
