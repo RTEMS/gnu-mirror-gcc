@@ -1,3 +1,18 @@
+==================== Branch work175-bugs, patch #312 ====================
+
+Optimize splat of a V2DF/V2DI extract with constant element
+
+2024-08-14  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vsx.md (vsx_splat_extract_<mode>): New insn.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/pr99293.c: New test.
+
+
 ==================== Branch work175-bugs, patch #311 ====================
 
 Add better support for shifting vectors with 64-bit elements
