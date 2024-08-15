@@ -1643,7 +1643,7 @@ check_load_store_for_partial_vectors (loop_vec_info loop_vinfo, tree vectype,
    MASK_TYPE is the type of both masks.  If new statements are needed,
    insert them before GSI.  */
 
-static tree
+tree
 prepare_vec_mask (loop_vec_info loop_vinfo, tree mask_type, tree loop_mask,
 		  tree vec_mask, gimple_stmt_iterator *gsi)
 {
@@ -4317,9 +4317,14 @@ vectorizable_simd_clone_call (vec_info *vinfo, stmt_vec_info stmt_info,
 	    case SIMD_CLONE_ARG_TYPE_MASK:
 	      if (loop_vinfo
 		  && LOOP_VINFO_CAN_USE_PARTIAL_VECTORS_P (loop_vinfo))
-		vect_record_loop_mask (loop_vinfo,
-				       &LOOP_VINFO_MASKS (loop_vinfo),
-				       ncopies, vectype, op);
+		{
+		  unsigned nmasks
+		    = exact_div (ncopies * bestn->simdclone->simdlen,
+				 TYPE_VECTOR_SUBPARTS (vectype)).to_constant ();
+		  vect_record_loop_mask (loop_vinfo,
+					 &LOOP_VINFO_MASKS (loop_vinfo),
+					 nmasks, vectype, op);
+		}
 
 	      break;
 	    }
@@ -4716,7 +4721,12 @@ vectorizable_simd_clone_call (vec_info *vinfo, stmt_vec_info stmt_info,
 		      SIMD_CLONE_ARG_TYPE_MASK);
 
 	  tree masktype = bestn->simdclone->args[mask_i].vector_type;
-	  callee_nelements = TYPE_VECTOR_SUBPARTS (masktype);
+	  if (SCALAR_INT_MODE_P (bestn->simdclone->mask_mode))
+	    /* Guess the number of lanes represented by masktype.  */
+	    callee_nelements = exact_div (bestn->simdclone->simdlen,
+					  bestn->simdclone->nargs - nargs);
+	  else
+	    callee_nelements = TYPE_VECTOR_SUBPARTS (masktype);
 	  o = vector_unroll_factor (nunits, callee_nelements);
 	  for (m = j * o; m < (j + 1) * o; m++)
 	    {

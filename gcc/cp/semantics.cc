@@ -1501,7 +1501,7 @@ finish_for_cond (tree cond, tree for_stmt, bool ivdep, tree unroll,
 				  build_int_cst (integer_type_node,
 						 annot_expr_unroll_kind),
 				  unroll);
-  if (novector && cond != error_mark_node)
+  if (novector && cond && cond != error_mark_node)
     FOR_COND (for_stmt) = build3 (ANNOTATE_EXPR,
 				  TREE_TYPE (FOR_COND (for_stmt)),
 				  FOR_COND (for_stmt),
@@ -2951,7 +2951,7 @@ finish_call_expr (tree fn, vec<tree, va_gc> **args, bool disallow_virtual,
 	     -Wredundant-move warning.  */
 	  suppress_warning (result, OPT_Wpessimizing_move);
 
-	  if (cfun)
+	  if (cfun && cp_function_chain && !cp_unevaluated_operand)
 	    {
 	      bool abnormal = true;
 	      for (lkp_iterator iter (maybe_get_fns (fn)); iter; ++iter)
@@ -12744,7 +12744,6 @@ finish_trait_expr (location_t loc, cp_trait_kind kind, tree type1, tree type2)
     case CPTK_HAS_NOTHROW_COPY:
     case CPTK_HAS_TRIVIAL_COPY:
     case CPTK_HAS_TRIVIAL_DESTRUCTOR:
-    case CPTK_HAS_UNIQUE_OBJ_REPRESENTATIONS:
       if (!check_trait_type (type1))
 	return error_mark_node;
       break;
@@ -12754,6 +12753,7 @@ finish_trait_expr (location_t loc, cp_trait_kind kind, tree type1, tree type2)
     case CPTK_IS_STD_LAYOUT:
     case CPTK_IS_TRIVIAL:
     case CPTK_IS_TRIVIALLY_COPYABLE:
+    case CPTK_HAS_UNIQUE_OBJ_REPRESENTATIONS:
       if (!check_trait_type (type1, /* kind = */ 2))
 	return error_mark_node;
       break;

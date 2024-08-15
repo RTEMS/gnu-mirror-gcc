@@ -1,3 +1,214 @@
+2024-08-06  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-08-01  Jakub Jelinek  <jakub@redhat.com>
+
+	* trans-types.cc (gfc_get_array_descr_info): Don't test if
+	!integer_zerop (dtype_off), use fold_build_pointer_plus
+	unconditionally.
+
+2024-08-05  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2024-07-18  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/108889
+	* gfortran.h: Add bit field 'allocated_in_scope' to gfc_symbol.
+	* trans-array.cc (gfc_array_allocate): Set 'allocated_in_scope'
+	after allocation if not a component reference.
+	(gfc_alloc_allocatable_for_assignment): If 'allocated_in_scope'
+	not set, not a component ref and not allocated, set the array
+	bounds and offset to give zero length in all dimensions. Then
+	set allocated_in_scope.
+
+2024-08-01  Release Manager
+
+	* GCC 14.2.0 released.
+
+2024-07-20  Paul Thomas  <pault@gcc.gnu.org>
+
+	Revert:
+	2024-07-19  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/59104
+	* dependency.cc (dependency_fcn, gfc_function_dependency): New
+	functions to detect dependency in array bounds and character
+	lengths on old style function results.
+	* dependency.h : Add prototype for gfc_function_dependency.
+	* error.cc (error_print): Remove trailing space.
+	* gfortran.h : Remove dummy_order and add fn_result_spec.
+	* symbol.cc : Remove declaration of next_dummy_order..
+	(gfc_set_sym_referenced): remove setting of symbol dummy order.
+	* trans-array.cc (gfc_trans_auto_array_allocation): Detect
+	non-dummy symbols with function dependencies and put the
+	allocation at the end of the initialization code.
+	* trans-decl.cc : Include dependency.h.
+	(decl_order): New function that determines uses the location
+	field of the symbol 'declared_at' to determine the order of two
+	declarations.
+	(gfc_defer_symbol_init): Call gfc_function_dependency to put
+	dependent symbols in the right part of the tlink chain. Use
+	the location field of the symbol declared_at to determine the
+	order of declarations.
+	(gfc_trans_auto_character_variable): Put character length
+	initialization of dependent symbols at the end of the chain.
+	* trans.cc (gfc_add_init_cleanup): Add boolean argument with
+	default false that determines whther an expression is placed at
+	the back or the front of the initialization chain.
+	* trans.h : Update the prototype for gfc_add_init_cleanup.
+
+2024-07-19  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2024-05-13  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/113363
+	* trans-array.cc (gfc_array_init_size): Use the expr3 dtype so
+	that the correct element size is used.
+	* trans-expr.cc (gfc_conv_procedure_call): Remove restriction
+	that ss and ss->loop be present for the finalization of class
+	array function results.
+	(trans_class_assignment): Use free and malloc, rather than
+	realloc, for character expressions assigned to unlimited poly
+	entities.
+	* trans-stmt.cc (gfc_trans_allocate): Build a correct rhs for
+	the assignment of an unlimited polymorphic 'source'.
+
+2024-07-19  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2024-06-20  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/59104
+	* dependency.cc (dependency_fcn, gfc_function_dependency): New
+	functions to detect dependency in array bounds and character
+	lengths on old style function results.
+	* dependency.h : Add prototype for gfc_function_dependency.
+	* error.cc (error_print): Remove trailing space.
+	* gfortran.h : Remove dummy_order and add fn_result_spec.
+	* symbol.cc : Remove declaration of next_dummy_order..
+	(gfc_set_sym_referenced): remove setting of symbol dummy order.
+	* trans-array.cc (gfc_trans_auto_array_allocation): Detect
+	non-dummy symbols with function dependencies and put the
+	allocation at the end of the initialization code.
+	* trans-decl.cc : Include dependency.h.
+	(decl_order): New function that determines uses the location
+	field of the symbol 'declared_at' to determine the order of two
+	declarations.
+	(gfc_defer_symbol_init): Call gfc_function_dependency to put
+	dependent symbols in the right part of the tlink chain. Use
+	the location field of the symbol declared_at to determine the
+	order of declarations.
+	(gfc_trans_auto_character_variable): Put character length
+	initialization of dependent symbols at the end of the chain.
+	* trans.cc (gfc_add_init_cleanup): Add boolean argument with
+	default false that determines whther an expression is placed at
+	the back or the front of the initialization chain.
+	* trans.h : Update the prototype for gfc_add_init_cleanup.
+
+2024-07-19  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2024-07-19  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103115
+	* trans-array.cc (gfc_trans_array_constructor_value): If the first
+	element of an array constructor is deferred-length character and
+	therefore does not have an element size known at compile time, do
+	not try to collect subsequent constant elements into a constructor
+	for optimization.
+
+2024-07-15  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2024-05-24  Harald Anlauf  <anlauf@gmx.de>
+		    Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/93635
+	* symbol.cc (conflict_std): Helper function for reporting attribute
+	conflicts depending on the Fortran standard version.
+	(conf_std): Helper macro for checking standard-dependent conflicts.
+	(gfc_check_conflict): Use it.
+
+2024-07-14  Mikael Morin  <mikael@gcc.gnu.org>
+
+	Backported from master:
+	2024-05-20  Mikael Morin  <mikael@gcc.gnu.org>
+
+	PR fortran/99798
+	* symbol.cc (gfc_release_symbol): Move the condition guarding
+	the handling cyclic references...
+	(cyclic_reference_break_needed): ... here as a new predicate.
+	Remove superfluous parts.  Add a condition preventing any premature
+	release with submodule symbols.
+
+2024-07-14  Mikael Morin  <mikael@gcc.gnu.org>
+
+	Backported from master:
+	2024-07-13  Mikael Morin  <mikael@gcc.gnu.org>
+
+	* trans-intrinsic.cc (gfc_conv_intrinsic_minmaxloc): Add the
+	preliminary code generated for MASK to the preliminary code of
+	MINLOC/MAXLOC.
+
+2024-07-12  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2024-05-23  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/103312
+	* dependency.cc (gfc_dep_compare_expr): Handle component call
+	expressions. Return -2 as default and return 0 if compared with
+	a function expression that is from an interface body and has
+	the same name.
+	* expr.cc (gfc_reduce_init_expr): If the expression is a comp
+	call do not attempt to reduce, defer to resolution and return
+	false.
+	* trans-types.cc (gfc_get_dtype_rank_type,
+	gfc_get_nodesc_array_type): Fix whitespace.
+
+2024-07-08  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2024-05-12  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/84006
+	PR fortran/100027
+	PR fortran/98534
+	* iresolve.cc (gfc_resolve_transfer): Emit a TODO error for
+	unlimited polymorphic mold.
+	* trans-expr.cc (gfc_resize_class_size_with_len): Use the fold
+	even if a block is not available in which to fix the result.
+	(trans_class_assignment): Enable correct assignment of
+	character expressions to unlimited polymorphic variables using
+	lhs _len field and rse string_length.
+	* trans-intrinsic.cc (gfc_conv_intrinsic_storage_size): Extract
+	the class expression so that the unlimited polymorphic class
+	expression can be used in gfc_resize_class_size_with_len to
+	obtain the storage size for character payloads. Guard the use
+	of GFC_DECL_SAVED_DESCRIPTOR by testing for DECL_LANG_SPECIFIC
+	to prevent the ICE. Also, invert the order to use the class
+	expression extracted from the argument.
+	(gfc_conv_intrinsic_transfer): In same way as 'storage_size',
+	use the _len field to obtaining the correct length for arg 1.
+	Add a branch for the element size in bytes of class expressions
+	with provision to make use of the unlimited polymorphic _len
+	field. Again, the class references are explicitly identified.
+	'mold_expr' was already declared. Use it instead of 'arg'. Do
+	not fix 'dest_word_len' for deferred character sources because
+	reallocation on assign makes use of it before it is assigned.
+
+2024-07-07  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2024-07-03  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/115700
+	* trans-stmt.cc (trans_associate_var): When the associate target
+	is an array-valued character variable, the length is known at entry
+	of the associate block.  Move setting of string length of the
+	selector to the initialization part of the block.
+
 2024-06-30  Harald Anlauf  <anlauf@gmx.de>
 
 	Backported from master:

@@ -1,3 +1,225 @@
+2024-08-06  Jason Merrill  <jason@redhat.com>
+
+	Backported from master:
+	2024-08-06  Jason Merrill  <jason@redhat.com>
+
+	PR c++/116223
+	PR c++/112632
+	* pt.cc (deducible_expression): Also look through
+	IMPLICIT_CONV_EXPR_FORCED.
+	(unify): Likewise.
+
+2024-08-06  Jason Merrill  <jason@redhat.com>
+
+	Backported from master:
+	2024-07-24  Jason Merrill  <jason@redhat.com>
+
+	PR c++/116071
+	* parser.cc (cp_parser_simple_type_specifier): Call
+	cp_parser_simulate_error if nothing worked.
+
+2024-08-02  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-07-29  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/88313
+	* parser.cc (cp_parser_lambda_declarator_opt): Pass
+	lambda_p=true to cp_parser_parameter_declaration_clause.
+	(cp_parser_direct_declarator): Pass lambda_p=false to
+	to cp_parser_parameter_declaration_clause.
+	(cp_parser_parameter_declaration_clause): Add bool lambda_p
+	parameter.  Consider lambda_p instead of current_class_type
+	when setting parser->auto_is_implicit_function_template_parm_p.
+	Don't consider processing_template_parmlist.
+	(cp_parser_requirement_parameter_list): Pass lambda_p=false
+	to cp_parser_parameter_declaration_clause.
+
+2024-08-02  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-07-25  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/115897
+	* tree.cc (strip_typedefs): Move up the typedef recursion case.
+	Never strip a dependent alias template-id that has dependent
+	attributes.
+
+2024-08-02  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-07-23  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/115656
+	* constraint.cc (weakly_subsumes): Pass in_decl=tmpl to
+	get_normalized_constraints_from_info.  Rename to ...
+	(ttp_subsumes): ... this.
+	* cp-tree.h (weakly_subsumes): Rename to ...
+	(ttp_subsumes): ... this.
+	* pt.cc (is_compatible_template_arg): Adjust after renaming.
+
+2024-08-02  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-07-23  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/115296
+	* pt.cc (alias_ctad_tweaks): Use complain=tf_none instead of
+	tf_warning_or_error.
+
+2024-08-02  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-07-18  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/112288
+	* pt.cc (tsubst_friend_function): When adjusting existing
+	specializations after defining a previously declared template
+	friend, consider the most general template and correct
+	DECL_TI_ARGS adjustment.
+
+2024-08-01  Release Manager
+
+	* GCC 14.2.0 released.
+
+2024-07-29  Marek Polacek  <polacek@redhat.com>
+
+	Backported from master:
+	2024-07-17  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/115900
+	* constexpr.cc (cxx_eval_call_expression): Set new_obj to NULL_TREE
+	if cxx_fold_indirect_ref set empty_base to true.
+
+2024-07-29  Jason Merrill  <jason@redhat.com>
+
+	Backported from master:
+	2024-07-28  Jason Merrill  <jason@redhat.com>
+
+	PR c++/115583
+	* constexpr.cc (cxx_eval_conditional_expression): Don't
+	cp_fold_immediate for if consteval.
+
+2024-07-29  Jason Merrill  <jason@redhat.com>
+
+	Backported from master:
+	2024-07-27  Jason Merrill  <jason@redhat.com>
+
+	PR c++/115986
+	* cp-gimplify.cc (remember_escalating_expr): Skip function
+	templates.
+
+2024-07-29  Jason Merrill  <jason@redhat.com>
+
+	Backported from master:
+	2024-07-27  Jason Merrill  <jason@redhat.com>
+
+	PR c++/115561
+	* semantics.cc (finish_call_expr): Check cp_unevaluated_operand.
+
+2024-07-23  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-07-23  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/104981
+	PR c++/115550
+	* coroutines.cc (morph_fn_to_coro): Remove unneeded calls
+	to convert_to_reference and convert_from_reference when
+	passing *this.  Use cp_build_fold_indirect_ref instead
+	of directly building INDIRECT_REF.
+
+2024-07-23  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-07-19  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/115783
+	* call.cc (build_new_method_call): Generalize METHOD_TYPE
+	check to DECL_OBJECT_MEMBER_FUNCTION_P.
+
+2024-07-18  Marek Polacek  <polacek@redhat.com>
+
+	Backported from master:
+	2024-06-25  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/115476
+	* semantics.cc (finish_trait_expr)
+	<case CPTK_HAS_UNIQUE_OBJ_REPRESENTATIONS>: Move below to call
+	check_trait_type with kind==2.
+
+2024-07-18  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/115165
+	* module.cc (lazy_load_binding): Use 'timevar_cond*' APIs.
+	(lazy_load_pendings): Likewise.
+
+2024-07-17  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-07-17  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/111890
+	* pt.cc (maybe_new_partial_specialization): Propagate TYPE_CONTEXT
+	to the newly created partial specialization.
+
+2024-07-17  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-07-15  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/115897
+	* pt.cc (complex_alias_template_p): Return true for an alias
+	template with attributes.
+	(get_underlying_template): Don't look through an alias template
+	with attributes.
+
+2024-07-17  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-06-28  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/106760
+	* call.cc (add_candidates): Relax test for adding a candidate
+	to 'bad_cands' to also accept an uninstantiated template candidate
+	that has no missing conversions.
+
+2024-07-17  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-07-02  Jakub Jelinek  <jakub@redhat.com>
+		    Jason Merrill  <jason@redhat.com>
+
+	PR c++/115754
+	* constexpr.cc (cxx_eval_constant_expression) <case CONVERT_EXPR>:
+	For conversions to void, pass vc_discard to the recursive call
+	and otherwise for tcode other than VIEW_CONVERT_EXPR pass vc_prvalue.
+
+2024-07-17  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	Backported from master:
+	2024-07-17  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/99242
+	* name-lookup.cc (append_imported_binding_slot): Propagate dups
+	flags.
+
+2024-07-11  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	Backported from master:
+	2024-07-11  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/99241
+	* decl.cc (duplicate_decls): Merge module entity information.
+
+2024-07-04  Tamar Christina  <tamar.christina@arm.com>
+
+	Backported from master:
+	2024-07-04  Tamar Christina  <tamar.christina@arm.com>
+
+	PR c++/115623
+	* semantics.cc (finish_for_cond): Add check for C++ cond.
+
 2024-06-28  Patrick Palka  <ppalka@redhat.com>
 
 	Backported from master:

@@ -994,6 +994,7 @@ maybe_new_partial_specialization (tree& type)
       tree t = make_class_type (TREE_CODE (type));
       CLASSTYPE_DECLARED_CLASS (t) = CLASSTYPE_DECLARED_CLASS (type);
       SET_TYPE_TEMPLATE_INFO (t, build_template_info (tmpl, args));
+      TYPE_CONTEXT (t) = TYPE_CONTEXT (type);
 
       /* We only need a separate type node for storing the definition of this
 	 partial specialization; uses of S<T*> are unconstrained, so all are
@@ -6655,6 +6656,11 @@ complex_alias_template_p (const_tree tmpl, tree *seen_out)
   if (get_constraints (tmpl))
     return true;
 
+  /* An alias with dependent type attributes is complex.  */
+  if (any_dependent_type_attributes_p (DECL_ATTRIBUTES
+				       (DECL_TEMPLATE_RESULT (tmpl))))
+    return true;
+
   if (!complex_alias_tmpl_info)
     complex_alias_tmpl_info = hash_map<const_tree, tree>::create_ggc (13);
 
@@ -6805,6 +6811,11 @@ get_underlying_template (tree tmpl)
       /* If TMPL adds or changes any constraints, it isn't equivalent.  I think
 	 it's appropriate to treat a less-constrained alias as equivalent.  */
       if (!at_least_as_constrained (underlying, tmpl))
+	break;
+
+      /* If TMPL adds dependent type attributes, it isn't equivalent.  */
+      if (any_dependent_type_attributes_p (DECL_ATTRIBUTES
+					   (DECL_TEMPLATE_RESULT (tmpl))))
 	break;
 
       /* Alias is equivalent.  Strip it and repeat.  */
@@ -8493,7 +8504,7 @@ is_compatible_template_arg (tree parm, tree arg, tree args)
         return false;
     }
 
-  return weakly_subsumes (parm_cons, arg);
+  return ttp_subsumes (parm_cons, arg);
 }
 
 // Convert a placeholder argument into a binding to the original
@@ -11571,6 +11582,7 @@ tsubst_friend_function (tree decl, tree args)
 	    ;
 	  else
 	    {
+	      tree old_template = most_general_template (old_decl);
 	      tree new_template = TI_TEMPLATE (new_friend_template_info);
 	      tree new_args = TI_ARGS (new_friend_template_info);
 
@@ -11608,7 +11620,7 @@ tsubst_friend_function (tree decl, tree args)
 		  /* Reassign any specializations already in the hash table
 		     to the new more general template, and add the
 		     additional template args.  */
-		  for (t = DECL_TEMPLATE_INSTANTIATIONS (old_decl);
+		  for (t = DECL_TEMPLATE_INSTANTIATIONS (old_template);
 		       t != NULL_TREE;
 		       t = TREE_CHAIN (t))
 		    {
@@ -11621,15 +11633,15 @@ tsubst_friend_function (tree decl, tree args)
 
 		      decl_specializations->remove_elt (&elt);
 
-		      DECL_TI_ARGS (spec)
-			= add_outermost_template_args (new_args,
-						       DECL_TI_ARGS (spec));
+		      tree& spec_args = DECL_TI_ARGS (spec);
+		      spec_args = add_outermost_template_args
+			(new_args, INNERMOST_TEMPLATE_ARGS (spec_args));
 
 		      register_specialization
-			(spec, new_template, DECL_TI_ARGS (spec), true, 0);
+			(spec, new_template, spec_args, true, 0);
 
 		    }
-		  DECL_TEMPLATE_INSTANTIATIONS (old_decl) = NULL_TREE;
+		  DECL_TEMPLATE_INSTANTIATIONS (old_template) = NULL_TREE;
 		}
 	    }
 
@@ -23061,6 +23073,8 @@ deducible_expression (tree expr)
   /* Strip implicit conversions and implicit INDIRECT_REFs.  */
   while (CONVERT_EXPR_P (expr)
 	 || TREE_CODE (expr) == VIEW_CONVERT_EXPR
+	 || (TREE_CODE (expr) == IMPLICIT_CONV_EXPR
+	     && IMPLICIT_CONV_EXPR_FORCED (expr))
 	 || REFERENCE_REF_P (expr))
     expr = TREE_OPERAND (expr, 0);
   return (TREE_CODE (expr) == TEMPLATE_PARM_INDEX);
@@ -24590,7 +24604,9 @@ unify (tree tparms, tree targs, tree parm, tree arg, int strict,
      signedness is the only information lost, and I think that will be
      okay.  VIEW_CONVERT_EXPR can appear with class NTTP, thanks to
      finish_id_expression_1, and are also OK.  */
-  while (CONVERT_EXPR_P (parm) || TREE_CODE (parm) == VIEW_CONVERT_EXPR)
+  while (CONVERT_EXPR_P (parm) || TREE_CODE (parm) == VIEW_CONVERT_EXPR
+	 || (TREE_CODE (parm) == IMPLICIT_CONV_EXPR
+	     && IMPLICIT_CONV_EXPR_FORCED (parm)))
     parm = TREE_OPERAND (parm, 0);
 
   if (arg == error_mark_node)
@@ -30357,7 +30373,7 @@ alias_ctad_tweaks (tree tmpl, tree uguides)
 			  (INNERMOST_TEMPLATE_PARMS (fullatparms)));
     }
 
-  tsubst_flags_t complain = tf_warning_or_error;
+  tsubst_flags_t complain = tf_none;
   tree aguides = NULL_TREE;
   tree atparms = INNERMOST_TEMPLATE_PARMS (fullatparms);
   unsigned natparms = TREE_VEC_LENGTH (atparms);

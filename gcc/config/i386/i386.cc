@@ -14203,7 +14203,8 @@ ix86_print_operand (FILE *file, rtx x, int code)
 
 	    if (!optimize
 	        || optimize_function_for_size_p (cfun)
-		|| !TARGET_BRANCH_PREDICTION_HINTS)
+		|| (!TARGET_BRANCH_PREDICTION_HINTS_NOT_TAKEN
+		    && !TARGET_BRANCH_PREDICTION_HINTS_TAKEN))
 	      return;
 
 	    x = find_reg_note (current_output_insn, REG_BR_PROB, 0);
@@ -14212,25 +14213,13 @@ ix86_print_operand (FILE *file, rtx x, int code)
 		int pred_val = profile_probability::from_reg_br_prob_note
 				 (XINT (x, 0)).to_reg_br_prob_base ();
 
-		if (pred_val < REG_BR_PROB_BASE * 45 / 100
-		    || pred_val > REG_BR_PROB_BASE * 55 / 100)
-		  {
-		    bool taken = pred_val > REG_BR_PROB_BASE / 2;
-		    bool cputaken
-		      = final_forward_branch_p (current_output_insn) == 0;
-
-		    /* Emit hints only in the case default branch prediction
-		       heuristics would fail.  */
-		    if (taken != cputaken)
-		      {
-			/* We use 3e (DS) prefix for taken branches and
-			   2e (CS) prefix for not taken branches.  */
-			if (taken)
-			  fputs ("ds ; ", file);
-			else
-			  fputs ("cs ; ", file);
-		      }
-		  }
+		bool taken = pred_val > REG_BR_PROB_BASE / 2;
+		/* We use 3e (DS) prefix for taken branches and
+		   2e (CS) prefix for not taken branches.  */
+		if (taken && TARGET_BRANCH_PREDICTION_HINTS_TAKEN)
+		  fputs ("ds ; ", file);
+		else if (!taken && TARGET_BRANCH_PREDICTION_HINTS_NOT_TAKEN)
+		  fputs ("cs ; ", file);
 	      }
 	    return;
 	  }
@@ -18682,9 +18671,11 @@ ix86_fold_builtin (tree fndecl, int n_args,
 	      unsigned int prec = TYPE_PRECISION (TREE_TYPE (args[0]));
 	      unsigned int start = tree_to_uhwi (args[1]);
 	      unsigned int len = (start & 0xff00) >> 8;
+	      tree lhs_type = TREE_TYPE (TREE_TYPE (fndecl));
 	      start &= 0xff;
 	      if (start >= prec || len == 0)
-		res = 0;
+		return omit_one_operand (lhs_type, build_zero_cst (lhs_type),
+					 args[0]);
 	      else if (!tree_fits_uhwi_p (args[0]))
 		break;
 	      else
@@ -18693,7 +18684,7 @@ ix86_fold_builtin (tree fndecl, int n_args,
 		len = prec;
 	      if (len < HOST_BITS_PER_WIDE_INT)
 		res &= (HOST_WIDE_INT_1U << len) - 1;
-	      return build_int_cstu (TREE_TYPE (TREE_TYPE (fndecl)), res);
+	      return build_int_cstu (lhs_type, res);
 	    }
 	  break;
 
@@ -18703,15 +18694,17 @@ ix86_fold_builtin (tree fndecl, int n_args,
 	  if (tree_fits_uhwi_p (args[1]))
 	    {
 	      unsigned int idx = tree_to_uhwi (args[1]) & 0xff;
+	      tree lhs_type = TREE_TYPE (TREE_TYPE (fndecl));
 	      if (idx >= TYPE_PRECISION (TREE_TYPE (args[0])))
 		return args[0];
 	      if (idx == 0)
-		return build_int_cst (TREE_TYPE (TREE_TYPE (fndecl)), 0);
+		return omit_one_operand (lhs_type, build_zero_cst (lhs_type),
+					 args[0]);
 	      if (!tree_fits_uhwi_p (args[0]))
 		break;
 	      unsigned HOST_WIDE_INT res = tree_to_uhwi (args[0]);
 	      res &= ~(HOST_WIDE_INT_M1U << idx);
-	      return build_int_cstu (TREE_TYPE (TREE_TYPE (fndecl)), res);
+	      return build_int_cstu (lhs_type, res);
 	    }
 	  break;
 
@@ -21875,6 +21868,49 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
 	      return true;
 	    }
 	  *total = ix86_vec_cost (mode, cost->sse_op);
+	}
+      else if (TARGET_64BIT
+	       && mode == TImode
+	       && GET_CODE (XEXP (x, 0)) == ASHIFT
+	       && GET_CODE (XEXP (XEXP (x, 0), 0)) == ZERO_EXTEND
+	       && GET_MODE (XEXP (XEXP (XEXP (x, 0), 0), 0)) == DImode
+	       && CONST_INT_P (XEXP (XEXP (x, 0), 1))
+	       && INTVAL (XEXP (XEXP (x, 0), 1)) == 64
+	       && GET_CODE (XEXP (x, 1)) == ZERO_EXTEND
+	       && GET_MODE (XEXP (XEXP (x, 1), 0)) == DImode)
+	{
+	  /* *concatditi3 is cheap.  */
+	  rtx op0 = XEXP (XEXP (XEXP (x, 0), 0), 0);
+	  rtx op1 = XEXP (XEXP (x, 1), 0);
+	  *total = (SUBREG_P (op0) && GET_MODE (SUBREG_REG (op0)) == DFmode)
+		   ? COSTS_N_INSNS (1)    /* movq.  */
+		   : set_src_cost (op0, DImode, speed);
+	  *total += (SUBREG_P (op1) && GET_MODE (SUBREG_REG (op1)) == DFmode)
+		    ? COSTS_N_INSNS (1)    /* movq.  */
+		    : set_src_cost (op1, DImode, speed);
+	  return true;
+	}
+      else if (TARGET_64BIT
+	       && mode == TImode
+	       && GET_CODE (XEXP (x, 0)) == AND
+	       && REG_P (XEXP (XEXP (x, 0), 0))
+	       && CONST_WIDE_INT_P (XEXP (XEXP (x, 0), 1))
+	       && CONST_WIDE_INT_NUNITS (XEXP (XEXP (x, 0), 1)) == 2
+	       && CONST_WIDE_INT_ELT (XEXP (XEXP (x, 0), 1), 0) == -1
+	       && CONST_WIDE_INT_ELT (XEXP (XEXP (x, 0), 1), 1) == 0
+	       && GET_CODE (XEXP (x, 1)) == ASHIFT
+	       && GET_CODE (XEXP (XEXP (x, 1), 0)) == ZERO_EXTEND
+	       && GET_MODE (XEXP (XEXP (XEXP (x, 1), 0), 0)) == DImode
+	       && CONST_INT_P (XEXP (XEXP (x, 1), 1))
+	       && INTVAL (XEXP (XEXP (x, 1), 1)) == 64)
+	{
+	  /* *insvti_highpart is cheap.  */
+	  rtx op = XEXP (XEXP (XEXP (x, 1), 0), 0);
+	  *total = COSTS_N_INSNS (1) + 1;
+	  *total += (SUBREG_P (op) && GET_MODE (SUBREG_REG (op)) == DFmode)
+		    ? COSTS_N_INSNS (1)    /* movq.  */
+		    : set_src_cost (op, DImode, speed);
+	  return true;
 	}
       else if (GET_MODE_SIZE (mode) > UNITS_PER_WORD)
 	*total = cost->add * 2;
