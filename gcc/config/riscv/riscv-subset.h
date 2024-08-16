@@ -62,9 +62,6 @@ private:
   /* X-len of m_arch. */
   unsigned m_xlen;
 
-  /* Allow adding the same extension more than once.  */
-  bool m_allow_adding_dup;
-
   /* Number of subsets. */
   unsigned m_subset_num;
 
