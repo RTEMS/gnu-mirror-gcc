@@ -1172,6 +1172,7 @@ const int INSN_NOT_AVAILABLE = -1;
 static void rs6000_print_isa_options (FILE *, int, const char *,
 				      HOST_WIDE_INT, HOST_WIDE_INT);
 static HOST_WIDE_INT rs6000_disable_incompatible_switches (void);
+static void report_architecture_mismatch (void);
 
 static enum rs6000_reg_type register_to_reg_type (rtx, bool *);
 static bool rs6000_secondary_reload_move (enum rs6000_reg_type,
@@ -3694,7 +3695,6 @@ rs6000_option_override_internal (bool global_init_p)
   bool ret = true;
 
   HOST_WIDE_INT set_masks;
-  HOST_WIDE_INT ignore_masks;
   int cpu_index = -1;
   int tune_index;
   struct cl_target_option *main_target_opt
@@ -3963,59 +3963,13 @@ rs6000_option_override_internal (bool global_init_p)
     dwarf_offset_size = POINTER_SIZE_UNITS;
 #endif
 
-  /* Handle explicit -mno-{altivec,vsx} and turn off all of
-     the options that depend on those flags.  */
-  ignore_masks = rs6000_disable_incompatible_switches ();
-
-  /* For the newer switches (vsx, dfp, etc.) set some of the older options,
-     unless the user explicitly used the -mno-<option> to disable the code.  */
-  if (TARGET_P9_VECTOR || TARGET_MODULO || TARGET_P9_MISC)
-    rs6000_isa_flags |= (ISA_3_0_MASKS_SERVER & ~ignore_masks);
-  else if (TARGET_P9_MINMAX)
-    {
-      if (cpu_index >= 0)
-	{
-	  if (cpu_index == PROCESSOR_POWER9)
-	    {
-	      /* legacy behavior: allow -mcpu=power9 with certain
-		 capabilities explicitly disabled.  */
-	      rs6000_isa_flags |= (ISA_3_0_MASKS_SERVER & ~ignore_masks);
-	    }
-	  else
-	    error ("power9 target option is incompatible with %<%s=<xxx>%> "
-		   "for <xxx> less than power9", "-mcpu");
-	}
-      else if ((ISA_3_0_MASKS_SERVER & rs6000_isa_flags_explicit)
-	       != (ISA_3_0_MASKS_SERVER & rs6000_isa_flags
-		   & rs6000_isa_flags_explicit))
-	/* Enforce that none of the ISA_3_0_MASKS_SERVER flags
-	   were explicitly cleared.  */
-	error ("%qs incompatible with explicitly disabled options",
-	       "-mpower9-minmax");
-      else
-	rs6000_isa_flags |= ISA_3_0_MASKS_SERVER;
-    }
-  else if (TARGET_P8_VECTOR || TARGET_POWER8 || TARGET_CRYPTO)
-    rs6000_isa_flags |= (ISA_2_7_MASKS_SERVER & ~ignore_masks);
-  else if (TARGET_VSX)
-    rs6000_isa_flags |= (ISA_2_6_MASKS_SERVER & ~ignore_masks);
-  else if (TARGET_POPCNTD)
-    rs6000_isa_flags |= (ISA_2_6_MASKS_EMBEDDED & ~ignore_masks);
-  else if (TARGET_DFP)
-    rs6000_isa_flags |= (ISA_2_5_MASKS_SERVER & ~ignore_masks);
-  else if (TARGET_CMPB)
-    rs6000_isa_flags |= (ISA_2_5_MASKS_EMBEDDED & ~ignore_masks);
-  else if (TARGET_FPRND)
-    rs6000_isa_flags |= (ISA_2_4_MASKS & ~ignore_masks);
-  else if (TARGET_POPCNTB)
-    rs6000_isa_flags |= (ISA_2_2_MASKS & ~ignore_masks);
-  else if (TARGET_ALTIVEC)
-    rs6000_isa_flags |= (OPTION_MASK_PPC_GFXOPT & ~ignore_masks);
+  /* Report trying to use things like -mmodulo to imply -mcpu=power9.  */
+  report_architecture_mismatch ();
 
   /* Disable VSX and Altivec silently if the user switched cpus to power7 in a
      target attribute or pragma which automatically enables both options,
      unless the altivec ABI was set.  This is set by default for 64-bit, but
-     not for 32-bit.  Don't move this before the above code using ignore_masks,
+     not for 32-bit.  Don't move this before report_architecture_mismatch
      since it can reset the cleared VSX/ALTIVEC flag again.  */
   if (main_target_opt && !main_target_opt->x_rs6000_altivec_abi)
     {
@@ -25404,6 +25358,81 @@ rs6000_disable_incompatible_switches (void)
     }
 
   return ignore_masks;
+}
+
+/* In the past, we would boost up the ISA if you selected an -m<foo> option but
+   did not specify the correct -mcpu=<bar> option.  I.e. if you added -mvsx,
+   GCC implictly would assume that you were building for at least power7.  Now,
+   don't allow the -m<foo> option to boost up the ISA level.  But you can still
+   do -mcpu=power7 -mno-vsx or -mcpu=power5 -mno-vsx.  */
+
+static void
+report_architecture_mismatch (void)
+{
+  HOST_WIDE_INT ignore_masks = rs6000_disable_incompatible_switches ();
+
+  static const struct {
+    const HOST_WIDE_INT isa_flags;		/* -m<foo> optiona.  */
+    const HOST_WIDE_INT arch_flags;		/* -mcpu=<proc> level.  */
+    const char *const arch_name;		/* architecture needed.  */
+  } mismatches[] = {
+    {
+      OPTION_MASK_P9_VECTOR | OPTION_MASK_P9_MISC | OPTION_MASK_P9_MINMAX
+      | OPTION_MASK_MODULO,
+      ARCH_MASK_POWER9,
+      "-mcpu=power9"
+    },
+
+    {
+      OPTION_MASK_P8_VECTOR | OPTION_MASK_CRYPTO,
+      ARCH_MASK_POWER8,
+      "-mcpu=power8"
+    },
+
+    {
+      OPTION_MASK_VSX | OPTION_MASK_POPCNTD,
+      ARCH_MASK_POWER7,
+      "-mcpu=power7"
+    },
+  };
+
+  HOST_WIDE_INT isa_flags  = rs6000_isa_flags;
+  HOST_WIDE_INT arch_flags = rs6000_arch_flags;
+
+  for (size_t i = 0; i < ARRAY_SIZE (mismatches); i++)
+    {
+      HOST_WIDE_INT mismatch_isa_flags  = mismatches[i].isa_flags  & isa_flags;
+      HOST_WIDE_INT mismatch_arch_flags = mismatches[i].arch_flags & arch_flags;
+
+      if (mismatch_isa_flags != 0 && mismatch_arch_flags == 0)
+	{
+	  for (size_t j = 0; j < ARRAY_SIZE (rs6000_opt_masks); j++)
+	    {
+	      HOST_WIDE_INT mask = rs6000_opt_masks[j].mask;
+
+	      if ((mask & mismatch_isa_flags) != 0
+		  && (mask & rs6000_isa_flags_explicit) != 0)
+		error ("%qs needs at least %qs",
+		       rs6000_opt_masks[j].name,
+		       mismatches[i].arch_name);
+	    }
+
+	  rs6000_isa_flags &= ~mismatch_isa_flags;
+	}
+    }
+
+  /* The following old options are used in multiple processors, so silently
+     enable the appropriate ISA options as previous GCC revisions did.  */
+  if (TARGET_DFP)
+    rs6000_isa_flags |= (ISA_2_5_MASKS_SERVER & ~ignore_masks);
+  else if (TARGET_CMPB)
+    rs6000_isa_flags |= (ISA_2_5_MASKS_EMBEDDED & ~ignore_masks);
+  else if (TARGET_FPRND)
+    rs6000_isa_flags |= (ISA_2_4_MASKS & ~ignore_masks);
+  else if (TARGET_POPCNTB)
+    rs6000_isa_flags |= (ISA_2_2_MASKS & ~ignore_masks);
+  else if (TARGET_ALTIVEC)
+    rs6000_isa_flags |= (OPTION_MASK_PPC_GFXOPT & ~ignore_masks);
 }
 
 
