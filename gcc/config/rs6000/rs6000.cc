@@ -1998,7 +1998,7 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
 	  if(GET_MODE_SIZE (mode) == UNITS_PER_FP_WORD)
 	    return 1;
 
-	  if (TARGET_POPCNTD && mode == SImode)
+	  if (TARGET_POWER7 && mode == SImode)
 	    return 1;
 
 	  if (TARGET_P9_VECTOR && (mode == QImode || mode == HImode))
@@ -22472,7 +22472,7 @@ rs6000_rtx_costs (rtx x, machine_mode mode, int outer_code,
       return false;
 
     case POPCOUNT:
-      *total = COSTS_N_INSNS (TARGET_POPCNTD ? 1 : 6);
+      *total = COSTS_N_INSNS (TARGET_POWER7 ? 1 : 6);
       return false;
 
     case PARITY:
@@ -23259,7 +23259,7 @@ rs6000_emit_popcount (rtx dst, rtx src)
   rtx tmp1, tmp2;
 
   /* Use the PPC ISA 2.06 popcnt{w,d} instruction if we can.  */
-  if (TARGET_POPCNTD)
+  if (TARGET_POWER7)
     {
       if (mode == SImode)
 	emit_insn (gen_popcntdsi2 (dst, src));

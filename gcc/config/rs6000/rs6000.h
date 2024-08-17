@@ -442,7 +442,7 @@ extern int rs6000_vector_align[];
 #define TARGET_LONG_DOUBLE_128 (rs6000_long_double_type_size > 64)
 #define TARGET_IEEEQUAD rs6000_ieeequad
 #define TARGET_ALTIVEC_ABI rs6000_altivec_abi
-#define TARGET_LDBRX (TARGET_POPCNTD || rs6000_cpu == PROCESSOR_CELL)
+#define TARGET_LDBRX (TARGET_POWER7 || rs6000_cpu == PROCESSOR_CELL)
 
 /* ISA 2.01 allowed FCFID to be done in 32-bit, previously it was 64-bit only.
    Enable 32-bit fcfid's on any of the switches for newer ISA machines.  */
@@ -453,12 +453,12 @@ extern int rs6000_vector_align[];
 #define TARGET_FCTIDZ	TARGET_FCFID
 #define TARGET_STFIWX	TARGET_PPC_GFXOPT
 #define TARGET_LFIWAX	TARGET_POWER6
-#define TARGET_LFIWZX	TARGET_POPCNTD
-#define TARGET_FCFIDS	TARGET_POPCNTD
-#define TARGET_FCFIDU	TARGET_POPCNTD
-#define TARGET_FCFIDUS	TARGET_POPCNTD
-#define TARGET_FCTIDUZ	TARGET_POPCNTD
-#define TARGET_FCTIWUZ	TARGET_POPCNTD
+#define TARGET_LFIWZX	TARGET_POWER7
+#define TARGET_FCFIDS	TARGET_POWER7
+#define TARGET_FCFIDU	TARGET_POWER7
+#define TARGET_FCFIDUS	TARGET_POWER7
+#define TARGET_FCTIDUZ	TARGET_POWER7
+#define TARGET_FCTIWUZ	TARGET_POWER7
 /* Only powerpc64 and powerpc476 support fctid.  */
 #define TARGET_FCTID	(TARGET_POWERPC64 || rs6000_cpu == PROCESSOR_PPC476)
 #define TARGET_CTZ	TARGET_MODULO
@@ -1752,7 +1752,7 @@ typedef struct rs6000_args
    zero.  The hardware instructions added in Power9 and the sequences using
    popcount return 32 or 64.  */
 #define CTZ_DEFINED_VALUE_AT_ZERO(MODE, VALUE)				\
-  (TARGET_CTZ || TARGET_POPCNTD						\
+  (TARGET_CTZ || TARGET_POWER7						\
    ? ((VALUE) = GET_MODE_BITSIZE (MODE), 2)				\
    : ((VALUE) = -1, 2))
 
