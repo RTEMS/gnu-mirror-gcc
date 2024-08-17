@@ -1,3 +1,52 @@
+==================== Branch work176, patch #21 ====================
+
+Add -mcpu=future tuning support.
+
+This patch makes -mtune=future use the same tuning decision as -mtune=power11.
+
+2024-08-02  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/power10.md (all reservations): Add future as an
+	alterntive to power10 and power11.
+
+==================== Branch work176, patch #20 ====================
+
+Add support for -mcpu=future
+
+This patch adds the support that can be used in developing GCC support for
+future PowerPC processors.
+
+2024-08-02  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config.gcc (powerpc*-*-*): Add support for --with-cpu=future.
+	* config/rs6000/aix71.h (ASM_CPU_SPEC): Add support for -mcpu=future.
+	* config/rs6000/aix72.h (ASM_CPU_SPEC): Likewise.
+	* config/rs6000/aix73.h (ASM_CPU_SPEC): Likewise.
+	* config/rs6000/driver-rs6000.cc (asm_names): Likewise.
+	* config/rs6000/rs6000-arch.def: Add future cpu.
+	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): If
+	-mcpu=future, define _ARCH_FUTURE.
+	* config/rs6000/rs6000-cpus.def (FUTURE_MASKS_SERVER): New macro.
+	(future cpu): Define.
+	* config/rs6000/rs6000-opts.h (enum processor_type): Add
+	PROCESSOR_FUTURE.
+	* config/rs6000/rs6000-tables.opt: Regenerate.
+	* config/rs6000/rs6000.cc (power10_cost): Update comment.
+	(get_arch_flags): Add support for future processor.
+	(rs6000_option_override_internal): Likewise.
+	(rs6000_machine_from_flags): Likewise.
+	(rs6000_reassociation_width): Likewise.
+	(rs6000_adjust_cost): Likewise.
+	(rs6000_issue_rate): Likewise.
+	(rs6000_sched_reorder): Likewise.
+	(rs6000_sched_reorder2): Likewise.
+	(rs6000_register_move_cost): Likewise.
+	* config/rs6000/rs6000.h (ASM_CPU_SPEC): Likewise.
+	(TARGET_POWER11): New macro.
+	* config/rs6000/rs6000.md (cpu attribute): Likewise.
+
 ==================== Branch work176, patch #9 ====================
 
 Add support for -mcpu=future
