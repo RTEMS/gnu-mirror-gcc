@@ -1,6 +1,404 @@
+==================== Branch work176, patch #9 ====================
+
+Add support for -mcpu=future
+
+This patch adds the support that can be used in developing GCC support for
+future PowerPC processors.
+
+2024-08-02  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-arch.def: Add future processor.
+	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Define
+	_ARCH_FUTURE if -mcpu=future.
+	* config/rs6000/rs6000-cpus.def (FUTURE_MASKS_SERVER): New macro.
+	(future cpu): Add support for -mcpu=future.
+	* config/rs6000/rs6000-opts.h (enum processor_type): Likewise.
+	* config/rs6000/rs6000-tables.opt: Regenerate.
+	* config/rs6000/rs6000.cc (get_arch_flags): Likewise.
+	(rs6000_option_override_internal): Likewise.
+	(rs6000_machine_from_flags): Likewise.
+	(rs6000_reassociation_width): Likewise.
+	(rs6000_adjust_cost): Likewise.
+	(rs6000_issue_rate): Likewise.
+	(rs6000_sched_reorder): Likewise.
+	(rs6000_issue_rate): Likewise.
+	(rs6000_register_move_cost): Likewise.
+	* config/rs6000/rs6000.h (TARGET_FUTURE): New macro.
+	* config/rs6000/rs6000.md (cpu attribute): Add future processor.
+
+==================== Branch work176, patch #8 ====================
+
+Change TARGET_MODULO to TARGET_POWER9
+
+As part of the architecture flags patches, this patch changes the use of
+TARGET_MODULO to TARGET_POWER9.  The modulo instructions were added in power9 (ISA
+3.0).  Note, I did not change the uses of TARGET_MODULO where it was explicitly
+generating different code if the machine had a modulo instruction.
+
+I have built both big endian and little endian bootstrap compilers and there
+were no regressions.
+
+In addition, I constructed a test case that used every archiecture define (like
+_ARCH_PWR4, etc.) and I also looked at the .machine directive generated.  I ran
+this test for all supported combinations of -mcpu, big/little endian, and 32/64
+bit support.  Every single instance generated exactly the same code with the
+patches installed compared to the compiler before installing the patches.
+
+Can I install this patch on the GCC 15 trunk?
+
+2024-08-01  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_builtin_is_supported): Use
+	TARGET_POWER9 instead of TARGET_MODULO.
+	* config/rs6000/rs6000.h (TARGET_CTZ): Likewise.
+	(TARGET_EXTSWSLI): Likewise.
+	(TARGET_MADDLD): Likewise.
+	* config/rs6000/rs6000.md (enabled attribute): Likewise.
+
+==================== Branch work176, patch #7 ====================
+
+Change TARGET_POPCNTD to TARGET_POWER7
+
+As part of the architecture flags patches, this patch changes the use of
+TARGET_POPCNTD to TARGET_POWER7.  The POPCNTD instruction was added in power7
+(ISA 2.06).
+
+I have built both big endian and little endian bootstrap compilers and there
+were no regressions.
+
+In addition, I constructed a test case that used every archiecture define (like
+_ARCH_PWR4, etc.) and I also looked at the .machine directive generated.  I ran
+this test for all supported combinations of -mcpu, big/little endian, and 32/64
+bit support.  Every single instance generated exactly the same code with the
+patches installed compared to the compiler before installing the patches.
+
+Can I install this patch on the GCC 15 trunk?
+
+2024-08-01  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/dfp.md (floatdidd2): Change TARGET_POPCNTD to
+	TARGET_POWER7.
+	* config/rs6000/rs6000-builtin.cc (rs6000_builtin_is_supported):
+	Likewise.
+	* config/rs6000/rs6000-string.cc (expand_block_compare_gpr): Likewise.
+	* config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached):
+	Likewise.
+	(rs6000_rtx_costs): Likewise.
+	(rs6000_emit_popcount): Likewise.
+	* config/rs6000/rs6000.h (TARGET_LDBRX): Likewise.
+	(TARGET_LFIWZX): Likewise.
+	(TARGET_FCFIDS): Likewise.
+	(TARGET_FCFIDU): Likewise.
+	(TARGET_FCFIDUS): Likewise.
+	(TARGET_FCTIDUZ): Likewise.
+	(TARGET_FCTIWUZ): Likewise.
+	(CTZ_DEFINED_VALUE_AT_ZERO): Likewise.
+	* config/rs6000/rs6000.md (enabled attribute): Likewise.
+	(ctz<mode>2): Likewise.
+	(popcntd<mode>2): Likewise.
+	(lrint<mode>si2): Likewise.
+	(lrint<mode>si): Likewise.
+	(lrint<mode>si_di): Likewise.
+	(cmpmemsi): Likewise.
+	(bpermd_<mode>"): Likewise.
+	(addg6s): Likewise.
+	(cdtbcd): Likewise.
+	(cbcdtd): Likewise.
+	(div<div_extend>_<mode>): Likewise.
+
+==================== Branch work176, patch #6 ====================
+
+Change TARGET_CMPB to TARGET_POWER6
+
+As part of the architecture flags patches, this patch changes the use of
+TARGET_FPRND to TARGET_POWER6.  The CMPB instruction was added in power6 (ISA
+2.05).
+
+I have built both big endian and little endian bootstrap compilers and there
+were no regressions.
+
+In addition, I constructed a test case that used every archiecture define (like
+_ARCH_PWR4, etc.) and I also looked at the .machine directive generated.  I ran
+this test for all supported combinations of -mcpu, big/little endian, and 32/64
+bit support.  Every single instance generated exactly the same code with the
+patches installed compared to the compiler before installing the patches.
+
+Can I install this patch on the GCC 15 trunk?
+
+2024-08-01  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_builtin_is_supported): Use
+	TARGET_POWER6 instead of TARGET_CMPB.
+	* config/rs6000/rs6000.h (TARGET_FCFID): Merge tests for popcntb, cmpb,
+	and popcntd into a single test for TARGET_POWER5.
+	(TARGET_LFIWAX): Use TARGET_POWER6 instead of TARGET_CMPB.
+	* config/rs6000/rs6000.md (enabled attribute): Likewise.
+	(parity<mode>2_cmp): Likewise.
+	(cmpb): Likewise.
+	(copysign<mode>3): Likewise.
+	(copysign<mode>3_fcpsgn): Likewise.
+	(cmpstrnsi): Likewise.
+	(cmpstrsi): Likewise.
+
+==================== Branch work176, patch #5 ====================
+
+Change TARGET_FPRND to TARGET_POWER5X
+
+As part of the architecture flags patches, this patch changes the use of
+TARGET_FPRND to TARGET_POWER5X.  The FPRND instruction was added in power5+.
+
+I have built both big endian and little endian bootstrap compilers and there
+were no regressions.
+
+In addition, I constructed a test case that used every archiecture define (like
+_ARCH_PWR4, etc.) and I also looked at the .machine directive generated.  I ran
+this test for all supported combinations of -mcpu, big/little endian, and 32/64
+bit support.  Every single instance generated exactly the same code with the
+patches installed compared to the compiler before installing the patches.
+
+Can I install this patch on the GCC 15 trunk?
+
+2024-09-01  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.cc (report_architecture_mismatch): Use
+	TARGET_POWER5X instead of TARGET_FPRND.
+	* config/rs6000/rs6000.md (fmod<mode>3): Use TARGET_POWER5X instead of
+	TARGET_FPRND.
+	(remainder<mode>3): Likewise.
+	(fctiwuz_<mode>): Likewise.
+	(btrunc<mode>2): Likewise.
+	(ceil<mode>2): Likewise.
+	(floor<mode>2): Likewise.
+	(round<mode>): Likewise.
+
+==================== Branch work176, patch #4 ====================
+
+Change TARGET_POPCNTB to TARGET_POWER5
+
+As part of the architecture flags patches, this patch changes the use of
+TARGET_POPCNTB to TARGET_POWER5.  The POPCNTB instruction was added in ISA 2.02
+(power5).
+
+I have built both big endian and little endian bootstrap compilers and there
+were no regressions.
+
+In addition, I constructed a test case that used every archiecture define (like
+_ARCH_PWR4, etc.) and I also looked at the .machine directive generated.  I ran
+this test for all supported combinations of -mcpu, big/little endian, and 32/64
+bit support.  Every single instance generated exactly the same code with the
+patches installed compared to the compiler before installing the patches.
+
+Can I install this patch on the GCC 15 trunk?
+
+2024-08-01  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_builtin_is_supported): Use
+	TARGET_POWER5 instead of TARGET_POPCNTB.
+	* config/rs6000/rs6000.h (TARGET_EXTRA_BUILTINS): Use TARGET_POWER5
+	instead of TARGET_POPCNTB.  Eliminate TARGET_CMPB and TARGET_POPCNTD
+	tests since TARGET_POWER5 will always be true for those tests.
+	(TARGET_FRE): Use TARGET_POWER5 instead of TARGET_POPCNTB.
+	(TARGET_FRSQRTES): Likewise.
+	* config/rs6000/rs6000.md (enabled attribute): Likewise.
+	(popcount<mode>): Use TARGET_POWER5 instead of TARGET_POPCNTB.  Drop
+	test for TARGET_POPCNTD (i.e power7), since TARGET_POPCNTB will always
+	be set if TARGET_POPCNTD is set.
+	(popcntb<mode>2): Use TARGET_POWER5 instead of TARGET_POPCNTB.
+	(parity<mode>2): Likewise.
+	(parity<mode>2_cmpb): Remove TARGET_POPCNTB test, since it will always
+	be true when TARGET_CMPB (i.e. power6) is set.
+
+
+==================== Branch work176, patch #3 ====================
+
+Do not allow -mvsx to boost processor to power7.
+
+This patch restructures the code so that -mvsx for example will not silently
+convert the processor to power7.  The user must now use -mcpu=power7 or higher.
+This means if the user does -mvsx and the default processor does not have VSX
+support, it will be an error.
+
+I have built both big endian and little endian bootstrap compilers and there
+were no regressions.
+
+In addition, I constructed a test case that used every archiecture define (like
+_ARCH_PWR4, etc.) and I also looked at the .machine directive generated.  I ran
+this test for all supported combinations of -mcpu, big/little endian, and 32/64
+bit support.  Every single instance generated exactly the same code with the
+patches installed compared to the compiler before installing the patches.
+
+Can I install this patch on the GCC 15 trunk?
+
+2024-08-01  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (report_architecture_mismatch): New function.
+	Report an error if the user used an option such as -mvsx when the
+	default processor would not allow the option.
+	(rs6000_option_override_internal): Move some ISA checking code into
+	report_architecture_mismatch.
+
+==================== Branch work176, patch #2 ====================
+
+Use architecture flags for defining _ARCH_PWR macros.
+
+For the newer architectures, this patch changes GCC to define the _ARCH_PWR<n>
+macros using the new architecture flags instead of relying on isa options like
+-mpower10.
+
+The -mpower8-internal, -mpower10, and -mpower11 options were removed.  The
+-mpower11 option was removed completely, since it was just added in GCC 15.  The
+other two options were marked as WarnRemoved, and the various ISA bits were
+removed.
+
+TARGET_POWER8 and TARGET_POWER10 were re-defined to use the architeture bits
+instead of the ISA bits.
+
+There are other internal isa bits that aren't removed with this patch because
+the built-in function support uses those bits.
+
+I have built both big endian and little endian bootstrap compilers and there
+were no regressions.
+
+In addition, I constructed a test case that used every archiecture define (like
+_ARCH_PWR4, etc.) and I also looked at the .machine directive generated.  I ran
+this test for all supported combinations of -mcpu, big/little endian, and 32/64
+bit support.  Every single instance generated exactly the same code with the
+patches installed compared to the compiler before installing the patches.
+
+Can I install this patch on the GCC 15 trunk?
+
+2024-08-01  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros) Add support to
+	use architecture flags instead of ISA flags for setting most of the
+	_ARCH_PWR* macros.
+	(rs6000_cpu_cpp_builtins): Update rs6000_target_modify_macros call.
+	* config/rs6000/rs6000-cpus.def (ISA_2_7_MASKS_SERVER): Remove
+	OPTION_MASK_POWER8.
+	(ISA_3_1_MASKS_SERVER): Remove OPTION_MASK_POWER10.
+	(POWER11_MASKS_SERVER): Remove OPTION_MASK_POWER11.
+	(POWERPC_MASKS): Remove OPTION_MASK_POWER8, OPTION_MASK_POWER10, and
+	OPTION_MASK_POWER11.
+	* config/rs6000/rs6000-protos.h (rs6000_target_modify_macros): Update
+	declaration.
+	(rs6000_target_modify_macros_ptr): Likewise.
+	* config/rs6000/rs6000.cc (rs6000_target_modify_macros_ptr): Likewise.
+	(rs6000_option_override_internal): Use architecture flags instead of ISA
+	flags.
+	(rs6000_opt_masks): Remove -mpower10 and -mpower11, which are no longer
+	in the ISA flags.
+	(rs6000_pragma_target_parse): Use architecture flags as well as ISA
+	flags.
+	* config/rs6000/rs6000.h (TARGET_POWER4): New macro.
+	(TARGET_POWER5): Likewise.
+	(TARGET_POWER5X): Likewise.
+	(TARGET_POWER6): Likewise.
+	(TARGET_POWER7): Likewise.
+	(TARGET_POWER8): Likewise.
+	(TARGET_POWER9): Likewise.
+	(TARGET_POWER10): Likewise.
+	(TARGET_POWER11): Likewise.
+	* config/rs6000/rs6000.opt (-mpower8-internal): Remove ISA flag bits.
+	(-mpower10): Likewise.
+	(-mpower11): Likewise.
+
+==================== Branch work176, patch #1 ====================
+
+Add rs6000 architecture masks.
+
+This patch begins the journey to move architecture bits that are not user ISA
+options from rs6000_isa_flags to a new targt variable rs6000_arch_flags.  The
+intention is to remove switches that are currently isa options, but the user
+should not be using this particular option. For example, we want users to use
+-mcpu=power10 and not just -mpower10.
+
+This patch also changes the target_clones support to use an architecture mask
+instead of isa bits.
+
+This patch also switches the handling of .machine to use architecture masks if
+they exist (power4 through power11).  All of the other PowerPCs will continue to
+use the existing code for setting the .machine option.
+
+I have built both big endian and little endian bootstrap compilers and there
+were no regressions.
+
+In addition, I constructed a test case that used every archiecture define (like
+_ARCH_PWR4, etc.) and I also looked at the .machine directive generated.  I ran
+this test for all supported combinations of -mcpu, big/little endian, and 32/64
+bit support.  Every single instance generated exactly the same code with the
+patches installed compared to the compiler before installing the patches.
+
+Can I install this patch on the GCC 15 trunk?
+
+2024-08-01  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-arch.def: New file.
+	* config/rs6000/rs6000.cc (struct clone_map): Switch to using
+	architecture masks instead of ISA masks.
+	(rs6000_clone_map): Likewise.
+	(rs6000_print_isa_options): Add an architecture flags argument, change
+	all callers.
+	(get_arch_flag): New function.
+	(rs6000_debug_reg_global): Update rs6000_print_isa_options calls.
+	(rs6000_option_override_internal): Likewise.
+	(rs6000_machine_from_flags): Switch to using architecture masks instead
+	of ISA masks.
+	(struct rs6000_arch_mask): New structure.
+	(rs6000_arch_masks): New table of architecutre masks and names.
+	(rs6000_function_specific_save): Save architecture flags.
+	(rs6000_function_specific_restore): Restore architecture flags.
+	(rs6000_function_specific_print): Update rs6000_print_isa_options calls.
+	(rs6000_print_options_internal): Add architecture flags options.
+	(rs6000_clone_priority): Switch to using architecture masks instead of
+	ISA masks.
+	(rs6000_can_inline_p): Don't allow inling if the callee requires a newer
+	architecture than the caller.
+	* config/rs6000/rs6000.h: Use rs6000-arch.def to create the architecture
+	masks.
+	* config/rs6000/rs6000.opt (rs6000_arch_flags): New target variable.
+	(x_rs6000_arch_flags): New save/restore field for rs6000_arch_flags.
+
 ==================== Branch work176, baseline ====================
+
+Add ChangeLog.meissner and REVISION.
+
+2024-08-01  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* REVISION: New file for branch.
+	* ChangeLog.meissner: New file.
+
+gcc/c-family/
+
+	* ChangeLog.meissner: New file.
+
+gcc/c/
+
+	* ChangeLog.meissner: New file.
+
+gcc/cp/
+
+	* ChangeLog.meissner: New file.
+
+gcc/fortran/
+
+	* ChangeLog.meissner: New file.
+
+gcc/testsuite/
+
+	* ChangeLog.meissner: New file.
+
+libgcc/
+
+	* ChangeLog.meissner: New file.
 
 2024-08-16   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
-
