@@ -1,7 +1,8 @@
 /* { dg-do compile { target { powerpc*-*-linux* && lp64 } } } */
-/* { dg-options "-O2 -mvsx -mno-float128" } */
+/* { dg-options "-O2 -mno-float128" } */
 /* { dg-additional-options "-mdejagnu-cpu=power9" { target { ! has_arch_pwr9 } } } */
 /* { dg-require-effective-target powerpc_vsx } */
+/* { dg-require-effective-target ppc_float128_sw } */
 
 /* Test that we can use #pragma GCC target to enable -mfloat128 and generate
    code on ISA 3.0 for the float128 built-in functions.  Lp64 is required

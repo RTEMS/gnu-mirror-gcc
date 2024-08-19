@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-options "-mdejagnu-cpu=power8 -mvsx -O2 -mfloat128" } */
+/* { dg-options "-mdejagnu-cpu=power8 -O2 -mfloat128" } */
 /* { dg-require-effective-target lp64 } */
 /* { dg-require-effective-target ppc_float128_sw } */
 /* { dg-require-effective-target powerpc_vsx } */
