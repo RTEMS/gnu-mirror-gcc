@@ -1225,8 +1225,8 @@ char rs6000_reg_names[][8] =
      "lr", "ctr", "ca", "ap",
   /* cr0..cr7 */
       "0",  "1",  "2",  "3",  "4",  "5",  "6",  "7",
-  /* vrsave vscr sfp */
-      "vrsave", "vscr", "sfp",
+  /* vrsave vscr sfp, tar */
+      "vrsave", "vscr", "sfp", "tar",
 };
 
 #ifdef TARGET_REGNAMES
@@ -1251,8 +1251,8 @@ static const char alt_reg_names[][8] =
     "lr",  "ctr",   "ca",   "ap",
   /* cr0..cr7 */
   "%cr0",  "%cr1", "%cr2", "%cr3", "%cr4", "%cr5", "%cr6", "%cr7",
-  /* vrsave vscr sfp */
-  "vrsave", "vscr", "sfp",
+  /* vrsave vscr sfp, tar */
+  "vrsave", "vscr", "sfp", "tar"
 };
 #endif
 
@@ -1936,9 +1936,13 @@ static int
 rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
 {
   int last_regno = regno + rs6000_hard_regno_nregs[mode][regno] - 1;
+  bool orig_complex_p = false;
 
   if (COMPLEX_MODE_P (mode))
-    mode = GET_MODE_INNER (mode);
+    {
+      mode = GET_MODE_INNER (mode);
+      orig_complex_p = true;
+    }
 
   /* Vector pair modes need even/odd VSX register pairs.  Only allow vector
      registers.  */
@@ -2019,6 +2023,26 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
 
   if (CA_REGNO_P (regno))
     return mode == Pmode || mode == SImode;
+
+  /* Restrict SPR registers to only hold an appropriate sized integer mode.  In
+     partciular, do not allow condition codes, complex values, small integers,
+     or floating point.  VRSAVE and VSCR can only hold 32-bit values.  If we
+     allow any mode other than the appropriate integer, the register allocator
+     will use the SPR registers as a temporary register.  */
+  switch (regno)
+    {
+    case VRSAVE_REGNO:
+    case VSCR_REGNO:
+      return (!orig_complex_p && mode == SImode);
+
+    case LR_REGNO:
+    case CTR_REGNO:
+    case TAR_REGNO:
+      return (!orig_complex_p && mode == Pmode);
+
+    default:
+      break;
+    }
 
   /* AltiVec only in AldyVec registers.  */
   if (ALTIVEC_REGNO_P (regno))
@@ -2392,6 +2416,7 @@ rs6000_debug_reg_global (void)
 			  "vs");
   rs6000_debug_reg_print (LR_REGNO, LR_REGNO, "lr");
   rs6000_debug_reg_print (CTR_REGNO, CTR_REGNO, "ctr");
+  rs6000_debug_reg_print (TAR_REGNO, TAR_REGNO, "tar");
   rs6000_debug_reg_print (CR0_REGNO, CR7_REGNO, "cr");
   rs6000_debug_reg_print (CA_REGNO, CA_REGNO, "ca");
   rs6000_debug_reg_print (VRSAVE_REGNO, VRSAVE_REGNO, "vrsave");
@@ -2408,6 +2433,7 @@ rs6000_debug_reg_global (void)
 	   "wa reg_class = %s\n"
 	   "we reg_class = %s\n"
 	   "wr reg_class = %s\n"
+	   "wt reg_class = %s\n"
 	   "wx reg_class = %s\n"
 	   "wA reg_class = %s\n"
 	   "\n",
@@ -2416,6 +2442,7 @@ rs6000_debug_reg_global (void)
 	   reg_class_names[rs6000_constraints[RS6000_CONSTRAINT_wa]],
 	   reg_class_names[rs6000_constraints[RS6000_CONSTRAINT_we]],
 	   reg_class_names[rs6000_constraints[RS6000_CONSTRAINT_wr]],
+	   reg_class_names[rs6000_constraints[RS6000_CONSTRAINT_wt]],
 	   reg_class_names[rs6000_constraints[RS6000_CONSTRAINT_wx]],
 	   reg_class_names[rs6000_constraints[RS6000_CONSTRAINT_wA]]);
 
@@ -2872,6 +2899,7 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 
   rs6000_regno_regclass[LR_REGNO] = LINK_REGS;
   rs6000_regno_regclass[CTR_REGNO] = CTR_REGS;
+  rs6000_regno_regclass[TAR_REGNO] = TAR_REGS;
   rs6000_regno_regclass[CA_REGNO] = NO_REGS;
   rs6000_regno_regclass[VRSAVE_REGNO] = VRSAVE_REGS;
   rs6000_regno_regclass[VSCR_REGNO] = VRSAVE_REGS;
@@ -2891,6 +2919,7 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
   reg_class_to_reg_type[(int)VSCR_REGS] = SPR_REG_TYPE;
   reg_class_to_reg_type[(int)LINK_REGS] = SPR_REG_TYPE;
   reg_class_to_reg_type[(int)CTR_REGS] = SPR_REG_TYPE;
+  reg_class_to_reg_type[(int)TAR_REGS] = SPR_REG_TYPE;
   reg_class_to_reg_type[(int)LINK_OR_CTR_REGS] = SPR_REG_TYPE;
   reg_class_to_reg_type[(int)CR_REGS] = CR_REG_TYPE;
   reg_class_to_reg_type[(int)CR0_REGS] = CR_REG_TYPE;
@@ -3079,6 +3108,10 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
   /* Support for new direct moves (ISA 3.0 + 64bit).  */
   if (TARGET_DIRECT_MOVE_128)
     rs6000_constraints[RS6000_CONSTRAINT_we] = VSX_REGS;
+
+  /* Power9 adds a TAR register that can hold the target of a jump.  */
+  if (TARGET_TAR)
+    rs6000_constraints[RS6000_CONSTRAINT_wt] = TAR_REGS;
 
   /* Set up the reload helper and direct move functions.  */
   if (TARGET_VSX || TARGET_ALTIVEC)
@@ -10285,6 +10318,9 @@ rs6000_conditional_register_usage (void)
 	for (i = FIRST_ALTIVEC_REGNO + 20; i < FIRST_ALTIVEC_REGNO + 32; ++i)
 	  fixed_regs[i] = call_used_regs[i] = 1;
     }
+
+  if (TARGET_TAR)
+    fixed_regs[TAR_REGNO] = 0;
 }
 
 
@@ -14433,10 +14469,13 @@ print_operand (FILE *file, rtx x, int code)
       if (GET_CODE (x) == UNSPEC && XINT (x, 1) == UNSPEC_PLTSEQ)
 	x = XVECEXP (x, 0, 0);
       if (!REG_P (x) || (REGNO (x) != LR_REGNO
-			 && REGNO (x) != CTR_REGNO))
+			 && REGNO (x) != CTR_REGNO
+			 && REGNO (x) != TAR_REGNO))
 	output_operand_lossage ("invalid %%T value");
       else if (REGNO (x) == LR_REGNO)
 	fputs ("lr", file);
+      else if (REGNO (x) == TAR_REGNO)
+	fputs ("tar", file);
       else
 	fputs ("ctr", file);
       return;
@@ -24267,6 +24306,8 @@ rs6000_debugger_regno (unsigned int regno, unsigned int format)
 	return 108;
       if (regno == CTR_REGNO)
 	return 109;
+      if (regno == TAR_REGNO)
+	return 111;
       if (regno == CA_REGNO)
 	return 101;  /* XER */
       /* Special handling for CR for .debug_frame: rs6000_emit_prologue has
@@ -24284,7 +24325,7 @@ rs6000_debugger_regno (unsigned int regno, unsigned int format)
 
       /* These do not make much sense.  */
       if (regno == FRAME_POINTER_REGNUM)
-	return 111;
+	return FIRST_PSEUDO_REGISTER;
       if (regno == ARG_POINTER_REGNUM)
 	return 67;
       if (regno == 64)
@@ -24307,6 +24348,8 @@ rs6000_debugger_regno (unsigned int regno, unsigned int format)
     return 65;
   if (regno == CTR_REGNO)
     return 66;
+  if (regno == TAR_REGNO)
+    return 111;
   if (regno == CA_REGNO)
     return 76;  /* XER */
   if (CR_REGNO_P (regno))
@@ -24578,6 +24621,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "recip-precision",		OPTION_MASK_RECIP_PRECISION,	false, true  },
   { "save-toc-indirect",	OPTION_MASK_SAVE_TOC_INDIRECT,	false, true  },
   { "string",			0,				false, true  },
+  { "tar",			OPTION_MASK_TAR,		false, true  },
   { "update",			OPTION_MASK_NO_UPDATE,		true , true  },
   { "vsx",			OPTION_MASK_VSX,		false, true  },
 #ifdef OPTION_MASK_64BIT
