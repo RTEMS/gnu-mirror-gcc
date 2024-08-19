@@ -51379,8 +51379,31 @@ $as_echo "#define _GLIBCXX_LONG_DOUBLE_COMPAT 1" >>confdefs.h
     case "$target" in
       powerpc*-*-linux*)
 	LONG_DOUBLE_COMPAT_FLAGS="$LONG_DOUBLE_COMPAT_FLAGS -mno-gnu-attribute"
-        # Check for IEEE128 support in libm:
-        { $as_echo "$as_me:${as_lineno-$LINENO}: checking for __frexpieee128 in -lm" >&5
+	# Eliminate little endian systems without VSX
+	cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+	  #ifndef __VSX__
+	  #error "IEEE 128-bit needs VSX"
+	  #endif
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ac_ieee128_possible=yes
+else
+  ac_ieee128_possible=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+	if test $ac_ieee128_possible = yes; then
+          # Check for IEEE128 support in libm:
+          { $as_echo "$as_me:${as_lineno-$LINENO}: checking for __frexpieee128 in -lm" >&5
 $as_echo_n "checking for __frexpieee128 in -lm... " >&6; }
 if ${ac_cv_lib_m___frexpieee128+:} false; then :
   $as_echo_n "(cached) " >&6
@@ -51425,18 +51448,18 @@ else
   ac_ldbl_ieee128_in_libc=no
 fi
 
-        if test $ac_ldbl_ieee128_in_libc = yes; then
-          # Determine which long double format is the compiler's default:
-          cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+          if test $ac_ldbl_ieee128_in_libc = yes; then
+            # Determine which long double format is the compiler's default:
+            cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
 int
 main ()
 {
 
-            #ifndef __LONG_DOUBLE_IEEE128__
-            #error compiler defaults to ibm128
-            #endif
+              #ifndef __LONG_DOUBLE_IEEE128__
+              #error compiler defaults to ibm128
+              #endif
 
   ;
   return 0;
@@ -51448,21 +51471,28 @@ else
   ac_ldbl_ieee128_default=no
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-          # Library objects should use default long double format.
-          if test "$ac_ldbl_ieee128_default" = yes; then
-            LONG_DOUBLE_128_FLAGS="-mno-gnu-attribute"
-            # Except for the ones that explicitly use these flags:
-            LONG_DOUBLE_ALT128_COMPAT_FLAGS="-mabi=ibmlongdouble -mno-gnu-attribute -Wno-psabi"
-          else
-            LONG_DOUBLE_128_FLAGS="-mno-gnu-attribute"
-            LONG_DOUBLE_ALT128_COMPAT_FLAGS="-mabi=ieeelongdouble -mno-gnu-attribute -Wno-psabi"
-          fi
+            # Library objects should use default long double format.
+            if test "$ac_ldbl_ieee128_default" = yes; then
+              LONG_DOUBLE_128_FLAGS="-mno-gnu-attribute"
+              # Except for the ones that explicitly use these flags:
+              LONG_DOUBLE_ALT128_COMPAT_FLAGS="-mabi=ibmlongdouble -mno-gnu-attribute -Wno-psabi"
+            else
+              LONG_DOUBLE_128_FLAGS="-mno-gnu-attribute"
+              LONG_DOUBLE_ALT128_COMPAT_FLAGS="-mabi=ieeelongdouble -mno-gnu-attribute -Wno-psabi"
+            fi
 
 $as_echo "#define _GLIBCXX_LONG_DOUBLE_ALT128_COMPAT 1" >>confdefs.h
 
-          port_specific_symbol_files="$port_specific_symbol_files \$(top_srcdir)/config/os/gnu-linux/ldbl-ieee128-extra.ver"
-          ac_ldbl_alt128_compat=yes
+            port_specific_symbol_files="$port_specific_symbol_files \$(top_srcdir)/config/os/gnu-linux/ldbl-ieee128-extra.ver"
+            ac_ldbl_alt128_compat=yes
+          else
+            ac_ldbl_alt128_compat=no
+          fi
+
+        # IEEE 128-bit not possible
         else
+          acl_ldbl_ieee128_in_libc=no
+          acl_ldbl_ieee128_default=no
           ac_ldbl_alt128_compat=no
         fi
 	;;
