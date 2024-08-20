@@ -240,3 +240,24 @@ FAIL: gcc.dg/guality/vla-1.c -O2 -flto -fno-use-linker-plugin -flto-partition=no
 FAIL: gcc.dg/guality/vla-1.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 17 sizeof (a) == 6
 FAIL: gcc.dg/guality/vla-1.c -O3 -g  -DPREVENT_OPTIMIZATION  line 17 sizeof (a) == 6
 FAIL: gcc.dg/guality/vla-1.c -Os  -DPREVENT_OPTIMIZATION  line 17 sizeof (a) == 6
+FAIL: gcc.dg/guality/loop-1.c -O2  -DPREVENT_OPTIMIZATION  line 20 i == 1
+FAIL: gcc.dg/guality/loop-1.c -O2 -flto -fno-use-linker-plugin -flto-partition=none  -DPREVENT_OPTIMIZATION line 20 i == 1
+FAIL: gcc.dg/guality/loop-1.c -O2 -flto -fuse-linker-plugin -fno-fat-lto-objects  -DPREVENT_OPTIMIZATION line 20 i == 1
+FAIL: gcc.dg/guality/loop-1.c -O3 -g  -DPREVENT_OPTIMIZATION  line 20 i == 1
+FAIL: gcc.target/i386/force-indirect-call-2.c scan-assembler-times (?:call|jmp)[ \\t]+\\*% 3
+FAIL: gcc.target/i386/pr101716.c scan-assembler leal[\\t ][^\\n]*eax
+FAIL: gcc.target/i386/pr101716.c scan-assembler-not movl[\\t ][^\\n]*eax
+FAIL: gcc.target/i386/pr101950-2.c scan-assembler-times \txor[ql]\t 2
+FAIL: gcc.target/i386/pr105493.c scan-tree-dump-times slp1 "  MEM <vector\\(4\\) unsigned int> \\[[^]]*\\] = " 4
+FAIL: gcc.target/i386/pr91384.c scan-assembler-not testl
+FAIL: gcc.target/i386/stack-check-17.c scan-assembler-not pop
+FAIL: libgomp.oacc-c++/../libgomp.oacc-c-c++-common/acc_prof-kernels-1.c -DACC_DEVICE_TYPE_host=1 -DACC_MEM_SHARED=1 -foffload=disable  -O2   at line 190 (test for warnings, line 185)
+FAIL: libgomp.oacc-c++/../libgomp.oacc-c-c++-common/acc_prof-kernels-1.c -DACC_DEVICE_TYPE_host=1 -DACC_MEM_SHARED=1 -foffload=disable  -O2   at line 221 (test for warnings, line 214)
+FAIL: libgomp.oacc-c++/../libgomp.oacc-c-c++-common/acc_prof-kernels-1.c -DACC_DEVICE_TYPE_host=1 -DACC_MEM_SHARED=1 -foffload=disable  -O2   at line 252 (test for warnings, line 245)
+FAIL: libgomp.oacc-c++/../libgomp.oacc-c-c++-common/acc_prof-kernels-1.c -DACC_DEVICE_TYPE_host=1 -DACC_MEM_SHARED=1 -foffload=disable  -O2  (test for excess errors)
+FAIL: libgomp.oacc-c/../libgomp.oacc-c-c++-common/acc_prof-kernels-1.c -DACC_DEVICE_TYPE_host=1 -DACC_MEM_SHARED=1 -foffload=disable  -O2   at line 190 (test for warnings, line 185)
+FAIL: libgomp.oacc-c/../libgomp.oacc-c-c++-common/acc_prof-kernels-1.c -DACC_DEVICE_TYPE_host=1 -DACC_MEM_SHARED=1 -foffload=disable  -O2   at line 221 (test for warnings, line 214)
+FAIL: libgomp.oacc-c/../libgomp.oacc-c-c++-common/acc_prof-kernels-1.c -DACC_DEVICE_TYPE_host=1 -DACC_MEM_SHARED=1 -foffload=disable  -O2   at line 252 (test for warnings, line 245)
+FAIL: libgomp.oacc-c/../libgomp.oacc-c-c++-common/acc_prof-kernels-1.c -DACC_DEVICE_TYPE_host=1 -DACC_MEM_SHARED=1 -foffload=disable  -O2  (test for excess errors)
+XPASS: gcc.dg/ira-shrinkwrap-prep-1.c scan-rtl-dump ira "Split live-range of register"
+XPASS: gcc.dg/ira-shrinkwrap-prep-2.c scan-rtl-dump ira "Split live-range of register"
