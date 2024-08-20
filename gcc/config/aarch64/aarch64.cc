@@ -26685,7 +26685,8 @@ aarch64_expand_cpymem (rtx *operands, bool is_memmove)
 	 (when !STRICT_ALIGNMENT) - this is smaller and faster.  */
       if (size > 0 && size < 16 && !STRICT_ALIGNMENT)
 	{
-	  next_mode = smallest_mode_for_size (size * BITS_PER_UNIT, MODE_INT);
+	  next_mode = smallest_mode_for_size
+	    (size * BITS_PER_UNIT, MODE_INT).require ();
 	  int n_bytes = GET_MODE_SIZE (next_mode).to_constant ();
 	  gcc_assert (n_bytes <= mode_bytes);
 	  offset -= n_bytes - size;
@@ -26860,7 +26861,7 @@ aarch64_expand_setmem (rtx *operands)
 	(when !STRICT_ALIGNMENT) - this is smaller and faster.  */
       if (n > 0 && n < copy_limit / 2 && !STRICT_ALIGNMENT)
 	{
-	  next_mode = smallest_mode_for_size (n, MODE_INT);
+	  next_mode = smallest_mode_for_size (n, MODE_INT).require ();
 	  int n_bits = GET_MODE_BITSIZE (next_mode).to_constant ();
 	  gcc_assert (n_bits <= mode_bits);
 	  dst = aarch64_move_pointer (dst, (n - n_bits) / BITS_PER_UNIT);
