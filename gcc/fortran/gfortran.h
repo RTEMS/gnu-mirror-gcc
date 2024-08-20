@@ -321,7 +321,9 @@ enum gfc_statement
   ST_OMP_ALLOCATE, ST_OMP_ALLOCATE_EXEC,
   ST_OMP_ALLOCATORS, ST_OMP_END_ALLOCATORS,
   /* Note: gfc_match_omp_nothing returns ST_NONE. */
-  ST_OMP_NOTHING, ST_NONE
+  ST_OMP_NOTHING, ST_NONE,
+  ST_OMP_UNROLL, ST_OMP_END_UNROLL,
+  ST_OMP_TILE, ST_OMP_END_TILE
 };
 
 /* Types of interfaces that we can have.  Assignment interfaces are
@@ -1577,11 +1579,13 @@ typedef struct gfc_omp_clauses
   struct gfc_expr *dist_chunk_size;
   struct gfc_expr *message;
   struct gfc_omp_assumptions *assume;
+  struct gfc_expr_list *sizes_list;
   const char *critical_name;
   enum gfc_omp_default_sharing default_sharing;
   enum gfc_omp_atomic_op atomic_op;
   enum gfc_omp_defaultmap defaultmap[OMP_DEFAULTMAP_CAT_NUM];
   int collapse, orderedc;
+  int partial;
   unsigned nowait:1, ordered:1, untied:1, mergeable:1, ancestor:1;
   unsigned inbranch:1, notinbranch:1, nogroup:1;
   unsigned sched_simd:1, sched_monotonic:1, sched_nonmonotonic:1;
@@ -1591,6 +1595,7 @@ typedef struct gfc_omp_clauses
   unsigned non_rectangular:1, order_concurrent:1;
   unsigned contains_teams_construct:1, target_first_st_is_teams:1;
   unsigned contained_in_target_construct:1, indirect:1;
+  unsigned full:1, erroneous:1;
   ENUM_BITFIELD (gfc_omp_sched_kind) sched_kind:3;
   ENUM_BITFIELD (gfc_omp_device_type) device_type:2;
   ENUM_BITFIELD (gfc_omp_memorder) memorder:3;
@@ -1888,9 +1893,8 @@ typedef struct gfc_symbol
      points to C and B's is NULL.  */
   struct gfc_common_head* common_head;
 
-  /* Make sure setup code for dummy arguments is generated in the correct
-     order.  */
-  int dummy_order;
+  /* Make sure initialization code is generated in the correct order.  */
+  int decl_order;
 
   gfc_namelist *namelist, *namelist_tail;
 
@@ -1930,6 +1934,8 @@ typedef struct gfc_symbol
   unsigned forall_index:1;
   /* Set if the symbol is used in a function result specification .  */
   unsigned fn_result_spec:1;
+  /* Set if the symbol spec. depends on an old-style function result.  */
+  unsigned fn_result_dep:1;
   /* Used to avoid multiple resolutions of a single symbol.  */
   /* = 2 if this has already been resolved as an intrinsic,
        in gfc_resolve_intrinsic,
@@ -1947,6 +1953,10 @@ typedef struct gfc_symbol
   /* Set if this should be passed by value, but is not a VALUE argument
      according to the Fortran standard.  */
   unsigned pass_as_value:1;
+  /* Set if an allocatable array variable has been allocated in the current
+     scope. Used in the suppression of uninitialized warnings in reallocation
+     on assignment.  */
+  unsigned allocated_in_scope:1;
 
   /* Reference counter, used for memory management.
 
@@ -2241,6 +2251,10 @@ typedef struct gfc_namespace
 
   /* Set when resolve_types has been called for this namespace.  */
   unsigned types_resolved:1;
+
+  /* Set if the associate_name in a select type statement is an
+     inferred type.  */
+  unsigned assoc_name_inferred:1;
 
   /* Set to 1 if code has been generated for this namespace.  */
   unsigned translated:1;
@@ -2557,6 +2571,7 @@ typedef struct gfc_expr
   gfc_typespec ts;	/* These two refer to the overall expression */
 
   int rank;		/* 0 indicates a scalar, -1 an assumed-rank array.  */
+  int corank;		/* same as rank, but for coarrays.  */
   mpz_t *shape;		/* Can be NULL if shape is unknown at compile time */
 
   /* Nonnull for functions and structure constructors, may also used to hold the
@@ -3029,6 +3044,7 @@ enum gfc_exec_op
   EXEC_OMP_TARGET_TEAMS_LOOP, EXEC_OMP_MASKED, EXEC_OMP_PARALLEL_MASKED,
   EXEC_OMP_PARALLEL_MASKED_TASKLOOP, EXEC_OMP_PARALLEL_MASKED_TASKLOOP_SIMD,
   EXEC_OMP_MASKED_TASKLOOP, EXEC_OMP_MASKED_TASKLOOP_SIMD, EXEC_OMP_SCOPE,
+  EXEC_OMP_UNROLL, EXEC_OMP_TILE,
   EXEC_OMP_ERROR, EXEC_OMP_ALLOCATE, EXEC_OMP_ALLOCATORS
 };
 
@@ -3146,6 +3162,7 @@ typedef struct
   int flag_init_logical;
   int flag_init_character;
   char flag_init_character_value;
+  int disable_omp_is_initial_device;
 
   int fpe;
   int fpe_summary;
@@ -3785,7 +3802,6 @@ bool gfc_is_class_array_function (gfc_expr *);
 bool gfc_ref_this_image (gfc_ref *ref);
 bool gfc_is_coindexed (gfc_expr *);
 bool gfc_is_coarray (gfc_expr *);
-int gfc_get_corank (gfc_expr *);
 bool gfc_has_ultimate_allocatable (gfc_expr *);
 bool gfc_has_ultimate_pointer (gfc_expr *);
 gfc_expr* gfc_find_team_co (gfc_expr *);
@@ -3954,6 +3970,9 @@ void gfc_generate_module_code (gfc_namespace *);
 /* trans-intrinsic.cc */
 bool gfc_inline_intrinsic_function_p (gfc_expr *);
 
+/* trans-openmp.cc */
+int gfc_expr_list_len (gfc_expr_list *);
+
 /* bbt.cc */
 typedef int (*compare_fn) (void *, void *);
 void gfc_insert_bbt (void *, void *, compare_fn);
@@ -4031,6 +4050,11 @@ bool gfc_may_be_finalized (gfc_typespec);
 	(sym->ts.type == BT_CLASS \
 	 && CLASS_DATA (sym) \
 	 && CLASS_DATA (sym)->attr.dimension \
+	 && !CLASS_DATA (sym)->attr.class_pointer)
+#define IS_CLASS_COARRAY_OR_ARRAY(sym) \
+	(sym->ts.type == BT_CLASS && CLASS_DATA (sym) \
+	 && (CLASS_DATA (sym)->attr.dimension \
+	     || CLASS_DATA (sym)->attr.codimension) \
 	 && !CLASS_DATA (sym)->attr.class_pointer)
 #define IS_POINTER(sym) \
 	(sym->ts.type == BT_CLASS && sym->attr.class_ok && CLASS_DATA (sym) \

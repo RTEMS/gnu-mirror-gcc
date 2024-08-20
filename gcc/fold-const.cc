@@ -177,7 +177,7 @@ minmax_from_comparison (tree_code cmp, tree exp0, tree exp1, tree exp2, tree exp
 	  /* a != MIN_RANGE<a> ? a : MIN_RANGE<a>+1 -> MAX_EXPR<MIN_RANGE<a>+1, a> */
 	  if (cmp == NE_EXPR && TREE_CODE (exp0) == SSA_NAME)
 	    {
-	      value_range r;
+	      int_range_max r;
 	      get_range_query (cfun)->range_of_expr (r, exp0);
 	      if (r.undefined_p ())
 		r.set_varying (TREE_TYPE (exp0));
@@ -199,7 +199,7 @@ minmax_from_comparison (tree_code cmp, tree exp0, tree exp1, tree exp2, tree exp
 	  /* a != MAX_RANGE<a> ? a : MAX_RANGE<a>-1 -> MIN_EXPR<MIN_RANGE<a>-1, a> */
 	  if (cmp == NE_EXPR && TREE_CODE (exp0) == SSA_NAME)
 	    {
-	      value_range r;
+	      int_range_max r;
 	      get_range_query (cfun)->range_of_expr (r, exp0);
 	      if (r.undefined_p ())
 		r.set_varying (TREE_TYPE (exp0));
@@ -2246,7 +2246,18 @@ fold_convert_const_int_from_real (enum tree_code code, tree type, const_tree arg
   if (! overflow)
     val = real_to_integer (&r, &overflow, TYPE_PRECISION (type));
 
-  t = force_fit_type (type, val, -1, overflow | TREE_OVERFLOW (arg1));
+  /* According to IEEE standard, for conversions from floating point to
+     integer. When a NaN or infinite operand cannot be represented in the
+     destination format and this cannot otherwise be indicated, the invalid
+     operation exception shall be signaled. When a numeric operand would
+     convert to an integer outside the range of the destination format, the
+     invalid operation exception shall be signaled if this situation cannot
+     otherwise be indicated.  */
+  if (!flag_trapping_math || !overflow)
+    t = force_fit_type (type, val, -1, overflow | TREE_OVERFLOW (arg1));
+  else
+    t = NULL_TREE;
+
   return t;
 }
 
@@ -4112,7 +4123,7 @@ operand_compare::hash_operand (const_tree t, inchash::hash &hstate,
 		hash_operand (TREE_OPERAND (t, 0), one, flags);
 		hash_operand (TREE_OPERAND (t, 1), two, flags);
 		hstate.add_commutative (one, two);
-		hash_operand (TREE_OPERAND (t, 2), two, flags);
+		hash_operand (TREE_OPERAND (t, 2), hstate, flags);
 		return;
 	      }
 
@@ -4992,6 +5003,9 @@ decode_field_reference (location_t loc, tree *exp_, HOST_WIDE_INT *pbitsize,
       || *pbitsize < 0
       || offset != 0
       || TREE_CODE (inner) == PLACEHOLDER_EXPR
+      /* We eventually want to build a larger reference and need to take
+	 the address of this.  */
+      || (!REFERENCE_CLASS_P (inner) && !DECL_P (inner))
       /* Reject out-of-bound accesses (PR79731).  */
       || (! AGGREGATE_TYPE_P (TREE_TYPE (inner))
 	  && compare_tree_int (TYPE_SIZE (TREE_TYPE (inner)),
@@ -8086,16 +8100,17 @@ native_encode_vector_part (const_tree expr, unsigned char *ptr, int len,
       unsigned int elts_per_byte = BITS_PER_UNIT / elt_bits;
       unsigned int first_elt = off * elts_per_byte;
       unsigned int extract_elts = extract_bytes * elts_per_byte;
+      unsigned int elt_mask = (1 << elt_bits) - 1;
       for (unsigned int i = 0; i < extract_elts; ++i)
 	{
 	  tree elt = VECTOR_CST_ELT (expr, first_elt + i);
 	  if (TREE_CODE (elt) != INTEGER_CST)
 	    return 0;
 
-	  if (ptr && wi::extract_uhwi (wi::to_wide (elt), 0, 1))
+	  if (ptr && integer_nonzerop (elt))
 	    {
 	      unsigned int bit = i * elt_bits;
-	      ptr[bit / BITS_PER_UNIT] |= 1 << (bit % BITS_PER_UNIT);
+	      ptr[bit / BITS_PER_UNIT] |= elt_mask << (bit % BITS_PER_UNIT);
 	    }
 	}
       return extract_bytes;
@@ -15241,13 +15256,18 @@ tree_call_nonnegative_warnv_p (tree type, combined_fn fn, tree arg0, tree arg1,
     CASE_CFN_FFS:
     CASE_CFN_PARITY:
     CASE_CFN_POPCOUNT:
-    CASE_CFN_CLZ:
     CASE_CFN_CLRSB:
     case CFN_BUILT_IN_BSWAP16:
     case CFN_BUILT_IN_BSWAP32:
     case CFN_BUILT_IN_BSWAP64:
     case CFN_BUILT_IN_BSWAP128:
       /* Always true.  */
+      return true;
+
+    CASE_CFN_CLZ:
+    CASE_CFN_CTZ:
+      if (arg1)
+	return RECURSE (arg1);
       return true;
 
     CASE_CFN_SQRT:
@@ -15327,8 +15347,8 @@ tree_call_nonnegative_warnv_p (tree type, combined_fn fn, tree arg0, tree arg1,
 	 non-negative if both operands are non-negative.  In the presence
 	 of qNaNs, we're non-negative if either operand is non-negative
 	 and can't be a qNaN, or if both operands are non-negative.  */
-      if (tree_expr_maybe_signaling_nan_p (arg0) ||
-	  tree_expr_maybe_signaling_nan_p (arg1))
+      if (tree_expr_maybe_signaling_nan_p (arg0)
+	  || tree_expr_maybe_signaling_nan_p (arg1))
         return RECURSE (arg0) && RECURSE (arg1);
       return RECURSE (arg0) ? (!tree_expr_maybe_nan_p (arg0)
 			       || RECURSE (arg1))
@@ -15427,8 +15447,8 @@ tree_invalid_nonnegative_warnv_p (tree t, bool *strict_overflow_p, int depth)
 
     case CALL_EXPR:
       {
-	tree arg0 = call_expr_nargs (t) > 0 ?  CALL_EXPR_ARG (t, 0) : NULL_TREE;
-	tree arg1 = call_expr_nargs (t) > 1 ?  CALL_EXPR_ARG (t, 1) : NULL_TREE;
+	tree arg0 = call_expr_nargs (t) > 0 ? CALL_EXPR_ARG (t, 0) : NULL_TREE;
+	tree arg1 = call_expr_nargs (t) > 1 ? CALL_EXPR_ARG (t, 1) : NULL_TREE;
 
 	return tree_call_nonnegative_warnv_p (TREE_TYPE (t),
 					      get_call_combined_fn (t),

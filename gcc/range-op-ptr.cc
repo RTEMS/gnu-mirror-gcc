@@ -49,76 +49,39 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-ssa-ccp.h"
 #include "range-op-mixed.h"
 
-// Return TRUE if a range-op folder TYPE either handles or can safely
-// ignore the dispatch pattern in DISPATCH.  Return FALSE for any
-// combination not handled, which will result in a hard fail up the
-// chain.
-
 bool
-range_operator::pointers_handled_p (range_op_dispatch_type ATTRIBUTE_UNUSED,
-				    unsigned dispatch ATTRIBUTE_UNUSED) const
+range_operator::fold_range (prange &, tree, const prange &, const prange &,
+			    relation_trio) const
 {
   return false;
 }
 
 bool
-range_operator::fold_range (prange &r, tree type,
-			    const prange &op1,
-			    const prange &op2,
-			    relation_trio trio) const
+range_operator::fold_range (prange &, tree, const prange &, const irange &,
+			    relation_trio) const
 {
-  relation_kind rel = trio.op1_op2 ();
-  r.set_varying (type);
-  op1_op2_relation_effect (r, type, op1, op2, rel);
-  return true;
+  return false;
 }
 
 bool
-range_operator::fold_range (prange &r, tree type,
-			    const prange &op1,
-			    const irange &op2,
-			    relation_trio trio) const
+range_operator::fold_range (irange &, tree, const prange &, const prange &,
+			    relation_trio) const
 {
-  relation_kind rel = trio.op1_op2 ();
-  r.set_varying (type);
-  op1_op2_relation_effect (r, type, op1, op2, rel);
-  return true;
+  return false;
 }
 
 bool
-range_operator::fold_range (irange &r, tree type,
-			    const prange &op1,
-			    const prange &op2,
-			    relation_trio trio) const
+range_operator::fold_range (prange &, tree, const irange &, const prange &,
+			    relation_trio) const
 {
-  relation_kind rel = trio.op1_op2 ();
-  r.set_varying (type);
-  op1_op2_relation_effect (r, type, op1, op2, rel);
-  return true;
+  return false;
 }
 
 bool
-range_operator::fold_range (prange &r, tree type,
-			    const irange &op1,
-			    const prange &op2,
-			    relation_trio trio) const
+range_operator::fold_range (irange &, tree, const prange &, const irange &,
+			    relation_trio) const
 {
-  relation_kind rel = trio.op1_op2 ();
-  r.set_varying (type);
-  op1_op2_relation_effect (r, type, op1, op2, rel);
-  return true;
-}
-
-bool
-range_operator::fold_range (irange &r, tree type,
-			    const prange &op1,
-			    const irange &op2,
-			    relation_trio trio) const
-{
-  relation_kind rel = trio.op1_op2 ();
-  r.set_varying (type);
-  op1_op2_relation_effect (r, type, op1, op2, rel);
-  return true;
+  return false;
 }
 
 bool
@@ -348,7 +311,6 @@ public:
 			  const irange &lhs,
 			  const irange &op1,
 			  relation_trio = TRIO_VARYING) const;
-  bool pointers_handled_p (range_op_dispatch_type, unsigned) const final override;
   void update_bitmask (irange &r, const irange &lh, const irange &rh) const
     { update_known_bitmask (r, POINTER_PLUS_EXPR, lh, rh); }
 } op_pointer_plus;
@@ -424,21 +386,6 @@ pointer_plus_operator::op2_range (irange &r, tree type,
   else
     return false;
   return true;
-}
-
-bool
-pointer_plus_operator::pointers_handled_p (range_op_dispatch_type type,
-					   unsigned dispatch) const
-{
-  switch (type)
-    {
-    case DISPATCH_FOLD_RANGE:
-      return dispatch == RO_PPI;
-    case DISPATCH_OP2_RANGE:
-      return dispatch == RO_IPP;
-    default:
-      return true;
-    }
 }
 
 void
@@ -637,7 +584,6 @@ class operator_pointer_diff : public range_operator
   void update_bitmask (irange &r,
 		       const prange &lh, const prange &rh) const final override
   { update_known_bitmask (r, POINTER_DIFF_EXPR, lh, rh); }
-  bool pointers_handled_p (range_op_dispatch_type, unsigned) const final override;
 } op_pointer_diff;
 
 bool
@@ -657,13 +603,6 @@ operator_pointer_diff::op1_op2_relation_effect (irange &lhs_range, tree type,
 }
 
 bool
-operator_pointer_diff::pointers_handled_p (range_op_dispatch_type,
-					   unsigned) const
-{
-  return true;
-}
-
-bool
 operator_pointer_diff::op1_op2_relation_effect (irange &lhs_range, tree type,
 						const irange &op1_range,
 						const irange &op2_range,
@@ -672,162 +611,6 @@ operator_pointer_diff::op1_op2_relation_effect (irange &lhs_range, tree type,
   return minus_op1_op2_relation_effect (lhs_range, type, op1_range, op2_range,
 					rel);
 }
-
-// ----------------------------------------------------------------------
-// Hybrid operators for the 4 operations which integer and pointers share,
-// but which have different implementations.  Simply check the type in
-// the call and choose the appropriate method.
-// Once there is a PRANGE signature, simply add the appropriate
-// prototypes in the rmixed range class, and remove these hybrid classes.
-
-class hybrid_and_operator : public operator_bitwise_and
-{
-public:
-  using range_operator::update_bitmask;
-  using range_operator::op1_range;
-  using range_operator::op2_range;
-  using range_operator::lhs_op1_relation;
-  bool op1_range (irange &r, tree type,
-		  const irange &lhs, const irange &op2,
-		  relation_trio rel = TRIO_VARYING) const final override
-    {
-      if (INTEGRAL_TYPE_P (type))
-	return operator_bitwise_and::op1_range (r, type, lhs, op2, rel);
-      else
-	return false;
-    }
-  bool op2_range (irange &r, tree type,
-		  const irange &lhs, const irange &op1,
-		  relation_trio rel = TRIO_VARYING) const final override
-    {
-      if (INTEGRAL_TYPE_P (type))
-	return operator_bitwise_and::op2_range (r, type, lhs, op1, rel);
-      else
-	return false;
-    }
-  relation_kind lhs_op1_relation (const irange &lhs,
-				  const irange &op1, const irange &op2,
-				  relation_kind rel) const final override
-    {
-      if (!lhs.undefined_p () && INTEGRAL_TYPE_P (lhs.type ()))
-	return operator_bitwise_and::lhs_op1_relation (lhs, op1, op2, rel);
-      else
-	return VREL_VARYING;
-    }
-  void update_bitmask (irange &r, const irange &lh,
-		       const irange &rh) const final override
-    {
-      if (!r.undefined_p () && INTEGRAL_TYPE_P (r.type ()))
-	operator_bitwise_and::update_bitmask (r, lh, rh);
-    }
-
-  void wi_fold (irange &r, tree type, const wide_int &lh_lb,
-		const wide_int &lh_ub, const wide_int &rh_lb,
-		const wide_int &rh_ub) const final override
-    {
-      if (INTEGRAL_TYPE_P (type))
-	return operator_bitwise_and::wi_fold (r, type, lh_lb, lh_ub,
-					      rh_lb, rh_ub);
-      else
-	return op_pointer_and.wi_fold (r, type, lh_lb, lh_ub, rh_lb, rh_ub);
-    }
-} op_hybrid_and;
-
-// Temporary class which dispatches routines to either the INT version or
-// the pointer version depending on the type.  Once PRANGE is a range
-// class, we can remove the hybrid.
-
-class hybrid_or_operator : public operator_bitwise_or
-{
-public:
-  using range_operator::update_bitmask;
-  using range_operator::op1_range;
-  using range_operator::op2_range;
-  using range_operator::lhs_op1_relation;
-  bool op1_range (irange &r, tree type,
-		  const irange &lhs, const irange &op2,
-		  relation_trio rel = TRIO_VARYING) const final override
-    {
-      if (INTEGRAL_TYPE_P (type))
-	return operator_bitwise_or::op1_range (r, type, lhs, op2, rel);
-      else
-	return op_pointer_or.op1_range (r, type, lhs, op2, rel);
-    }
-  bool op2_range (irange &r, tree type,
-		  const irange &lhs, const irange &op1,
-		  relation_trio rel = TRIO_VARYING) const final override
-    {
-      if (INTEGRAL_TYPE_P (type))
-	return operator_bitwise_or::op2_range (r, type, lhs, op1, rel);
-      else
-	return op_pointer_or.op2_range (r, type, lhs, op1, rel);
-    }
-  void update_bitmask (irange &r, const irange &lh,
-		       const irange &rh) const final override
-    {
-      if (!r.undefined_p () && INTEGRAL_TYPE_P (r.type ()))
-	operator_bitwise_or::update_bitmask (r, lh, rh);
-    }
-
-  void wi_fold (irange &r, tree type, const wide_int &lh_lb,
-		const wide_int &lh_ub, const wide_int &rh_lb,
-		const wide_int &rh_ub) const final override
-    {
-      if (INTEGRAL_TYPE_P (type))
-	return operator_bitwise_or::wi_fold (r, type, lh_lb, lh_ub,
-					      rh_lb, rh_ub);
-      else
-	return op_pointer_or.wi_fold (r, type, lh_lb, lh_ub, rh_lb, rh_ub);
-    }
-} op_hybrid_or;
-
-// Temporary class which dispatches routines to either the INT version or
-// the pointer version depending on the type.  Once PRANGE is a range
-// class, we can remove the hybrid.
-
-class hybrid_min_operator : public operator_min
-{
-  using range_operator::update_bitmask;
-public:
-  void update_bitmask (irange &r, const irange &lh,
-		       const irange &rh) const final override
-    {
-      if (!r.undefined_p () && INTEGRAL_TYPE_P (r.type ()))
-	operator_min::update_bitmask (r, lh, rh);
-    }
-
-  void wi_fold (irange &r, tree type, const wide_int &lh_lb,
-		const wide_int &lh_ub, const wide_int &rh_lb,
-		const wide_int &rh_ub) const final override
-    {
-      if (INTEGRAL_TYPE_P (type))
-	return operator_min::wi_fold (r, type, lh_lb, lh_ub, rh_lb, rh_ub);
-      else
-	return op_ptr_min_max.wi_fold (r, type, lh_lb, lh_ub, rh_lb, rh_ub);
-    }
-} op_hybrid_min;
-
-class hybrid_max_operator : public operator_max
-{
-  using range_operator::update_bitmask;
-public:
-  void update_bitmask (irange &r, const irange &lh,
-		       const irange &rh) const final override
-    {
-      if (!r.undefined_p () && INTEGRAL_TYPE_P (r.type ()))
-	operator_max::update_bitmask (r, lh, rh);
-    }
-
-  void wi_fold (irange &r, tree type, const wide_int &lh_lb,
-		const wide_int &lh_ub, const wide_int &rh_lb,
-		const wide_int &rh_ub) const final override
-    {
-      if (INTEGRAL_TYPE_P (type))
-	return operator_max::wi_fold (r, type, lh_lb, lh_ub, rh_lb, rh_ub);
-      else
-	return op_ptr_min_max.wi_fold (r, type, lh_lb, lh_ub, rh_lb, rh_ub);
-    }
-} op_hybrid_max;
 
 bool
 operator_identity::fold_range (prange &r, tree type ATTRIBUTE_UNUSED,
@@ -862,21 +645,6 @@ operator_identity::op1_range (prange &r, tree type ATTRIBUTE_UNUSED,
 }
 
 bool
-operator_identity::pointers_handled_p (range_op_dispatch_type type,
-				       unsigned dispatch) const
-{
-  switch (type)
-    {
-    case DISPATCH_FOLD_RANGE:
-    case DISPATCH_OP1_RANGE:
-    case DISPATCH_LHS_OP1_RELATION:
-      return dispatch == RO_PPP;
-    default:
-      return true;
-    }
-}
-
-bool
 operator_cst::fold_range (prange &r, tree type ATTRIBUTE_UNUSED,
 			  const prange &lh,
 			  const prange & ATTRIBUTE_UNUSED,
@@ -884,19 +652,6 @@ operator_cst::fold_range (prange &r, tree type ATTRIBUTE_UNUSED,
 {
   r = lh;
   return true;
-}
-
-bool
-operator_cst::pointers_handled_p (range_op_dispatch_type type,
-				  unsigned dispatch) const
-{
-  switch (type)
-    {
-    case DISPATCH_FOLD_RANGE:
-      return dispatch == RO_PPP;
-    default:
-      return true;
-    }
 }
 
 // Cast between pointers.
@@ -1125,26 +880,6 @@ operator_cast::lhs_op1_relation (const irange &lhs,
 }
 
 bool
-operator_cast::pointers_handled_p (range_op_dispatch_type type,
-				   unsigned dispatch) const
-{
-  switch (type)
-    {
-    case DISPATCH_FOLD_RANGE:
-    case DISPATCH_OP1_RANGE:
-      return (dispatch == RO_PPP
-	      || dispatch == RO_IPI
-	      || dispatch == RO_PIP);
-    case DISPATCH_LHS_OP1_RELATION:
-      return (dispatch == RO_PPP
-	      || dispatch == RO_PII
-	      || dispatch == RO_IPP);
-    default:
-      return true;
-    }
-}
-
-bool
 operator_min::fold_range (prange &r, tree type,
 			  const prange &op1,
 			  const prange &op2,
@@ -1164,19 +899,6 @@ operator_min::fold_range (prange &r, tree type,
 
   update_known_bitmask (r, MIN_EXPR, op1, op2);
   return true;
-}
-
-bool
-operator_min::pointers_handled_p (range_op_dispatch_type type,
-				  unsigned dispatch) const
-{
-  switch (type)
-    {
-    case DISPATCH_FOLD_RANGE:
-      return dispatch == RO_PPP;
-    default:
-      return true;
-    }
 }
 
 bool
@@ -1202,19 +924,6 @@ operator_max::fold_range (prange &r, tree type,
 }
 
 bool
-operator_max::pointers_handled_p (range_op_dispatch_type type,
-				  unsigned dispatch) const
-{
-  switch (type)
-    {
-    case DISPATCH_FOLD_RANGE:
-      return dispatch == RO_PPP;
-    default:
-      return true;
-    }
-}
-
-bool
 operator_addr_expr::op1_range (prange &r, tree type,
 			       const prange &lhs,
 			       const prange &op2,
@@ -1236,23 +945,6 @@ operator_addr_expr::op1_range (prange &r, tree type,
 }
 
 bool
-operator_addr_expr::pointers_handled_p (range_op_dispatch_type type,
-					unsigned dispatch) const
-{
-  switch (type)
-    {
-    case DISPATCH_FOLD_RANGE:
-      // NOTE: It looks like we never generate this combination.
-      gcc_unreachable ();
-      return false;
-    case DISPATCH_OP1_RANGE:
-      return dispatch == RO_PPP;
-    default:
-      return true;
-    }
-}
-
-bool
 operator_bitwise_and::fold_range (prange &r, tree type,
 				  const prange &op1,
 				  const prange &op2 ATTRIBUTE_UNUSED,
@@ -1267,30 +959,6 @@ operator_bitwise_and::fold_range (prange &r, tree type,
 
   update_known_bitmask (r, BIT_AND_EXPR, op1, op2);
   return true;
-}
-
-bool
-operator_bitwise_and::pointers_handled_p (range_op_dispatch_type type,
-					  unsigned dispatch) const
-{
-  switch (type)
-    {
-    case DISPATCH_FOLD_RANGE:
-      return dispatch == RO_PPP;
-    default:
-      return true;
-    }
-}
-
-bool
-operator_bitwise_or::pointers_handled_p (range_op_dispatch_type,
-					 unsigned) const
-{
-  // NOTE: It looks like we never generate bitwise OR with pointers.
-  // If this is indeed the case, we can move operator_bitwise_or from
-  // range-op-mixed.h to range-op.h.
-  gcc_unreachable ();
-  return false;
 }
 
 bool
@@ -1309,9 +977,9 @@ operator_equal::fold_range (irange &r, tree type,
   if (op1_const && op2_const)
     {
       if (wi::eq_p (op1.lower_bound (), op2.upper_bound()))
-	r = range_true ();
+	r = range_true (type);
       else
-	r = range_false ();
+	r = range_false (type);
     }
   else
     {
@@ -1320,14 +988,14 @@ operator_equal::fold_range (irange &r, tree type,
       prange tmp = op1;
       tmp.intersect (op2);
       if (tmp.undefined_p ())
-	r = range_false ();
+	r = range_false (type);
       // Check if a constant cannot satisfy the bitmask requirements.
       else if (op2_const && !op1.get_bitmask ().member_p (op2.lower_bound ()))
-	 r = range_false ();
+	 r = range_false (type);
       else if (op1_const && !op2.get_bitmask ().member_p (op1.lower_bound ()))
-	 r = range_false ();
+	 r = range_false (type);
       else
-	r = range_true_and_false ();
+	r = range_true_and_false (type);
     }
 
   //update_known_bitmask (r, EQ_EXPR, op1, op2);
@@ -1393,24 +1061,6 @@ operator_equal::op1_op2_relation (const irange &lhs, const prange &,
 }
 
 bool
-operator_equal::pointers_handled_p (range_op_dispatch_type type,
-				    unsigned dispatch) const
-{
-  switch (type)
-    {
-    case DISPATCH_FOLD_RANGE:
-      return dispatch == RO_IPP;
-    case DISPATCH_OP1_RANGE:
-    case DISPATCH_OP2_RANGE:
-      return dispatch == RO_PIP;
-    case DISPATCH_OP1_OP2_RELATION:
-      return dispatch == RO_IPP;
-    default:
-      return true;
-    }
-}
-
-bool
 operator_not_equal::fold_range (irange &r, tree type,
 				const prange &op1,
 				const prange &op2,
@@ -1426,9 +1076,9 @@ operator_not_equal::fold_range (irange &r, tree type,
   if (op1_const && op2_const)
     {
       if (wi::ne_p (op1.lower_bound (), op2.upper_bound()))
-	r = range_true ();
+	r = range_true (type);
       else
-	r = range_false ();
+	r = range_false (type);
     }
   else
     {
@@ -1437,14 +1087,14 @@ operator_not_equal::fold_range (irange &r, tree type,
       prange tmp = op1;
       tmp.intersect (op2);
       if (tmp.undefined_p ())
-	r = range_true ();
+	r = range_true (type);
       // Check if a constant cannot satisfy the bitmask requirements.
       else if (op2_const && !op1.get_bitmask ().member_p (op2.lower_bound ()))
-	 r = range_true ();
+	 r = range_true (type);
       else if (op1_const && !op2.get_bitmask ().member_p (op1.lower_bound ()))
-	 r = range_true ();
+	 r = range_true (type);
       else
-	r = range_true_and_false ();
+	r = range_true_and_false (type);
     }
 
   //update_known_bitmask (r, NE_EXPR, op1, op2);
@@ -1511,24 +1161,6 @@ operator_not_equal::op1_op2_relation (const irange &lhs, const prange &,
 }
 
 bool
-operator_not_equal::pointers_handled_p (range_op_dispatch_type type,
-					unsigned dispatch) const
-{
-  switch (type)
-    {
-    case DISPATCH_FOLD_RANGE:
-      return dispatch == RO_IPP;
-    case DISPATCH_OP1_RANGE:
-    case DISPATCH_OP2_RANGE:
-      return dispatch == RO_PIP;
-    case DISPATCH_OP1_OP2_RELATION:
-      return dispatch == RO_IPP;
-    default:
-      return true;
-    }
-}
-
-bool
 operator_lt::fold_range (irange &r, tree type,
 			 const prange &op1,
 			 const prange &op2,
@@ -1541,14 +1173,14 @@ operator_lt::fold_range (irange &r, tree type,
   gcc_checking_assert (sign == TYPE_SIGN (op2.type ()));
 
   if (wi::lt_p (op1.upper_bound (), op2.lower_bound (), sign))
-    r = range_true ();
+    r = range_true (type);
   else if (!wi::lt_p (op1.lower_bound (), op2.upper_bound (), sign))
-    r = range_false ();
+    r = range_false (type);
   // Use nonzero bits to determine if < 0 is false.
   else if (op2.zero_p () && !wi::neg_p (op1.get_nonzero_bits (), sign))
-    r = range_false ();
+    r = range_false (type);
   else
-    r = range_true_and_false ();
+    r = range_true_and_false (type);
 
   //update_known_bitmask (r, LT_EXPR, op1, op2);
   return true;
@@ -1622,24 +1254,6 @@ operator_lt::op1_op2_relation (const irange &lhs, const prange &,
 }
 
 bool
-operator_lt::pointers_handled_p (range_op_dispatch_type type,
-				 unsigned dispatch) const
-{
-  switch (type)
-    {
-    case DISPATCH_FOLD_RANGE:
-      return dispatch == RO_IPP;
-    case DISPATCH_OP1_RANGE:
-    case DISPATCH_OP2_RANGE:
-      return dispatch == RO_PIP;
-    case DISPATCH_OP1_OP2_RELATION:
-      return dispatch == RO_IPP;
-    default:
-      return true;
-    }
-}
-
-bool
 operator_le::fold_range (irange &r, tree type,
 			 const prange &op1,
 			 const prange &op2,
@@ -1652,11 +1266,11 @@ operator_le::fold_range (irange &r, tree type,
   gcc_checking_assert (sign == TYPE_SIGN (op2.type ()));
 
   if (wi::le_p (op1.upper_bound (), op2.lower_bound (), sign))
-    r = range_true ();
+    r = range_true (type);
   else if (!wi::le_p (op1.lower_bound (), op2.upper_bound (), sign))
-    r = range_false ();
+    r = range_false (type);
   else
-    r = range_true_and_false ();
+    r = range_true_and_false (type);
 
   //update_known_bitmask (r, LE_EXPR, op1, op2);
   return true;
@@ -1730,24 +1344,6 @@ operator_le::op1_op2_relation (const irange &lhs, const prange &,
 }
 
 bool
-operator_le::pointers_handled_p (range_op_dispatch_type type,
-				 unsigned dispatch) const
-{
-  switch (type)
-    {
-    case DISPATCH_FOLD_RANGE:
-      return dispatch == RO_IPP;
-    case DISPATCH_OP1_RANGE:
-    case DISPATCH_OP2_RANGE:
-      return dispatch == RO_PIP;
-    case DISPATCH_OP1_OP2_RELATION:
-      return dispatch == RO_IPP;
-    default:
-      return true;
-    }
-}
-
-bool
 operator_gt::fold_range (irange &r, tree type,
 			 const prange &op1, const prange &op2,
 			 relation_trio rel) const
@@ -1759,11 +1355,11 @@ operator_gt::fold_range (irange &r, tree type,
   gcc_checking_assert (sign == TYPE_SIGN (op2.type ()));
 
   if (wi::gt_p (op1.lower_bound (), op2.upper_bound (), sign))
-    r = range_true ();
+    r = range_true (type);
   else if (!wi::gt_p (op1.upper_bound (), op2.lower_bound (), sign))
-    r = range_false ();
+    r = range_false (type);
   else
-    r = range_true_and_false ();
+    r = range_true_and_false (type);
 
   //update_known_bitmask (r, GT_EXPR, op1, op2);
   return true;
@@ -1836,24 +1432,6 @@ operator_gt::op1_op2_relation (const irange &lhs, const prange &,
 }
 
 bool
-operator_gt::pointers_handled_p (range_op_dispatch_type type,
-				 unsigned dispatch) const
-{
-  switch (type)
-    {
-    case DISPATCH_FOLD_RANGE:
-      return dispatch == RO_IPP;
-    case DISPATCH_OP1_RANGE:
-    case DISPATCH_OP2_RANGE:
-      return dispatch == RO_PIP;
-    case DISPATCH_OP1_OP2_RELATION:
-      return dispatch == RO_IPP;
-    default:
-      return true;
-    }
-}
-
-bool
 operator_ge::fold_range (irange &r, tree type,
 			 const prange &op1,
 			 const prange &op2,
@@ -1866,11 +1444,11 @@ operator_ge::fold_range (irange &r, tree type,
   gcc_checking_assert (sign == TYPE_SIGN (op2.type ()));
 
   if (wi::ge_p (op1.lower_bound (), op2.upper_bound (), sign))
-    r = range_true ();
+    r = range_true (type);
   else if (!wi::ge_p (op1.upper_bound (), op2.lower_bound (), sign))
-    r = range_false ();
+    r = range_false (type);
   else
-    r = range_true_and_false ();
+    r = range_true_and_false (type);
 
   //update_known_bitmask (r, GE_EXPR, op1, op2);
   return true;
@@ -1943,24 +1521,6 @@ operator_ge::op1_op2_relation (const irange &lhs, const prange &,
   return VREL_VARYING;
 }
 
-bool
-operator_ge::pointers_handled_p (range_op_dispatch_type type,
-				 unsigned dispatch) const
-{
-  switch (type)
-    {
-    case DISPATCH_FOLD_RANGE:
-      return dispatch == RO_IPP;
-    case DISPATCH_OP1_RANGE:
-    case DISPATCH_OP2_RANGE:
-      return dispatch == RO_PIP;
-    case DISPATCH_OP1_OP2_RELATION:
-      return dispatch == RO_IPP;
-    default:
-      return true;
-    }
-}
-
 // Initialize any pointer operators to the primary table
 
 void
@@ -1968,8 +1528,4 @@ range_op_table::initialize_pointer_ops ()
 {
   set (POINTER_PLUS_EXPR, op_pointer_plus);
   set (POINTER_DIFF_EXPR, op_pointer_diff);
-  set (BIT_AND_EXPR, op_hybrid_and);
-  set (BIT_IOR_EXPR, op_hybrid_or);
-  set (MIN_EXPR, op_hybrid_min);
-  set (MAX_EXPR, op_hybrid_max);
 }

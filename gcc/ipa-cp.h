@@ -230,7 +230,7 @@ private:
 class ipcp_vr_lattice
 {
 public:
-  Value_Range m_vr;
+  value_range m_vr;
 
   inline bool bottom_p () const;
   inline bool top_p () const;
@@ -290,5 +290,13 @@ public:
 };
 
 bool values_equal_for_ipcp_p (tree x, tree y);
+
+/* Return TRUE if IPA supports ranges of TYPE.  */
+
+static inline bool
+ipa_supports_p (tree type)
+{
+  return irange::supports_p (type) || prange::supports_p (type);
+}
 
 #endif /* IPA_CP_H */

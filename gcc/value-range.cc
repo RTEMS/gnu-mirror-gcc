@@ -62,7 +62,7 @@ irange::accept (const vrange_visitor &v) const
 }
 
 void
-Value_Range::dump (FILE *out) const
+value_range::dump (FILE *out) const
 {
   if (m_vrange)
     m_vrange->dump (out);
@@ -71,7 +71,7 @@ Value_Range::dump (FILE *out) const
 }
 
 DEBUG_FUNCTION void
-debug (const Value_Range &r)
+debug (const value_range &r)
 {
   r.dump (stderr);
   fprintf (stderr, "\n");
@@ -282,23 +282,23 @@ vrange::operator== (const vrange &src) const
 void
 vrange::dump (FILE *file) const
 {
-  pretty_printer buffer;
-  pp_needs_newline (&buffer) = true;
-  buffer.buffer->stream = file;
-  vrange_printer vrange_pp (&buffer);
+  pretty_printer pp;
+  pp_needs_newline (&pp) = true;
+  pp.set_output_stream (file);
+  vrange_printer vrange_pp (&pp);
   this->accept (vrange_pp);
-  pp_flush (&buffer);
+  pp_flush (&pp);
 }
 
 void
 irange_bitmask::dump (FILE *file) const
 {
   char buf[WIDE_INT_PRINT_BUFFER_SIZE], *p;
-  pretty_printer buffer;
+  pretty_printer pp;
 
-  pp_needs_newline (&buffer) = true;
-  buffer.buffer->stream = file;
-  pp_string (&buffer, "MASK ");
+  pp_needs_newline (&pp) = true;
+  pp.set_output_stream (file);
+  pp_string (&pp, "MASK ");
   unsigned len_mask, len_val;
   if (print_hex_buf_size (m_mask, &len_mask)
       | print_hex_buf_size (m_value, &len_val))
@@ -306,11 +306,11 @@ irange_bitmask::dump (FILE *file) const
   else
     p = buf;
   print_hex (m_mask, p);
-  pp_string (&buffer, p);
-  pp_string (&buffer, " VALUE ");
+  pp_string (&pp, p);
+  pp_string (&pp, " VALUE ");
   print_hex (m_value, p);
-  pp_string (&buffer, p);
-  pp_flush (&buffer);
+  pp_string (&pp, p);
+  pp_flush (&pp);
 }
 
 namespace inchash
@@ -589,6 +589,11 @@ prange::intersect (const vrange &v)
   irange_bitmask new_bitmask = get_bitmask_from_range (m_type, m_min, m_max);
   m_bitmask.intersect (new_bitmask);
   m_bitmask.intersect (r.m_bitmask);
+  if (varying_compatible_p ())
+    {
+      set_varying (type ());
+      return true;
+    }
 
   if (flag_checking)
     verify_range ();
@@ -686,7 +691,7 @@ prange::update_bitmask (const irange_bitmask &bm)
   // If all the bits are known, this is a singleton.
   if (bm.mask () == 0)
     {
-      set (type (), m_bitmask.value (), m_bitmask.value ());
+      set (type (), bm.value (), bm.value ());
       return;
     }
 
@@ -1518,6 +1523,7 @@ irange::verify_range ()
       gcc_checking_assert (m_num_ranges == 0);
       return;
     }
+  gcc_checking_assert (supports_p (type ()));
   gcc_checking_assert (m_num_ranges <= m_max_ranges);
 
   // Legacy allowed these to represent VARYING for unknown types.
@@ -2500,20 +2506,6 @@ debug (const vrange &vr)
   debug (&vr);
 }
 
-DEBUG_FUNCTION void
-debug (const value_range *vr)
-{
-  dump_value_range (stderr, vr);
-  fprintf (stderr, "\n");
-}
-
-DEBUG_FUNCTION void
-debug (const value_range &vr)
-{
-  dump_value_range (stderr, &vr);
-  fprintf (stderr, "\n");
-}
-
 /* Return true, if VAL1 and VAL2 are equal values for VRP purposes.  */
 
 bool
@@ -2887,6 +2879,22 @@ range_tests_misc ()
   p0.invert ();
   p0.invert ();
   ASSERT_TRUE (p0 == p1);
+
+  // The intersection of:
+  //    [0, +INF] MASK 0xff..00 VALUE 0xf8
+  //    [0, +INF] MASK 0xff..00 VALUE 0x00
+  // is [0, +INF] MASK 0xff..ff VALUE 0x00, which is VARYING.
+  // Test that we normalized to VARYING.
+  unsigned prec = TYPE_PRECISION (voidp);
+  p0.set_varying (voidp);
+  wide_int mask = wi::mask (8, true, prec);
+  wide_int value = wi::uhwi (0xf8, prec);
+  irange_bitmask bm (wi::uhwi (0xf8, prec), mask);
+  p0.update_bitmask (bm);
+  p1.set_varying (voidp);
+  bm = irange_bitmask (wi::zero (prec), mask);
+  p1.update_bitmask (bm);
+  p0.intersect (p1);
 
   // [10,20] U [15, 30] => [10, 30].
   r0 = range_int (10, 20);

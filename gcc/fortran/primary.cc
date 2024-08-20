@@ -2113,13 +2113,13 @@ gfc_match_varspec (gfc_expr *primary, int equiv_flag, bool sub_flag,
 
   inferred_type = IS_INFERRED_TYPE (primary);
 
-  /* SELECT TYPE and SELECT RANK temporaries within an ASSOCIATE block, whose
-     selector has not been parsed, can generate errors with array and component
-     refs.. Use 'inferred_type' as a flag to suppress these errors.  */
+  /* SELECT TYPE temporaries within an ASSOCIATE block, whose selector has not
+     been parsed, can generate errors with array refs.. The SELECT TYPE
+     namespace is marked with 'assoc_name_inferred'. During resolution, this is
+     detected and gfc_fixup_inferred_type_refs is called.  */
   if (!inferred_type
-      && (gfc_peek_ascii_char () == '(' && !sym->attr.dimension)
-      && !sym->attr.codimension
       && sym->attr.select_type_temporary
+      && sym->ns->assoc_name_inferred
       && !sym->attr.select_rank_temporary)
     inferred_type = true;
 
@@ -2250,7 +2250,7 @@ gfc_match_varspec (gfc_expr *primary, int equiv_flag, bool sub_flag,
 	 can be found.  If this was an inquiry reference with the same name
 	 as a derived component and the associate-name type is not derived
 	 or class, this is fixed up in 'gfc_fixup_inferred_type_refs'.  */
-      if (mm == MATCH_YES && is_inquiry_ref (name, &tmp)
+      if (mm == MATCH_YES && is_inquiry_ref (name, NULL)
 	  && !(sym->ts.type == BT_UNKNOWN
 		&& gfc_find_derived_types (sym, gfc_current_ns, name)))
 	inquiry = true;
@@ -3895,9 +3895,15 @@ gfc_match_rvalue (gfc_expr **result)
 
       if (sym->ts.type == BT_CLASS && sym->attr.class_ok
 	  && CLASS_DATA (sym)->as)
-	e->rank = CLASS_DATA (sym)->as->rank;
+	{
+	  e->rank = CLASS_DATA (sym)->as->rank;
+	  e->corank = CLASS_DATA (sym)->as->corank;
+	}
       else if (sym->as != NULL)
-	e->rank = sym->as->rank;
+	{
+	  e->rank = sym->as->rank;
+	  e->corank = sym->as->corank;
+	}
 
       if (!sym->attr.function
 	  && !gfc_add_function (&sym->attr, sym->name, NULL))

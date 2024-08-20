@@ -390,18 +390,6 @@ get_intel_cpu (struct __processor_model *cpu_model,
       CHECK___builtin_cpu_is ("tremont");
       cpu_model->__cpu_type = INTEL_TREMONT;
       break;
-    case 0x57:
-      /* Knights Landing.  */
-      cpu = "knl";
-      CHECK___builtin_cpu_is ("knl");
-      cpu_model->__cpu_type = INTEL_KNL;
-      break;
-    case 0x85:
-      /* Knights Mill. */
-      cpu = "knm";
-      CHECK___builtin_cpu_is ("knm");
-      cpu_model->__cpu_type = INTEL_KNM;
-      break;
     case 0x1a:
     case 0x1e:
     case 0x1f:
@@ -679,11 +667,17 @@ get_zhaoxin_cpu (struct __processor_model *cpu_model,
 	  reset_cpu_feature (cpu_model, cpu_features2, FEATURE_F16C);
 	  cpu_model->__cpu_subtype = ZHAOXIN_FAM7H_LUJIAZUI;
 	}
-     else if (model >= 0x5b)
+     else if (model == 0x5b)
 	{
 	  cpu = "yongfeng";
 	  CHECK___builtin_cpu_is ("yongfeng");
 	  cpu_model->__cpu_subtype = ZHAOXIN_FAM7H_YONGFENG;
+	}
+     else if (model >= 0x6b)
+	{
+	  cpu = "shijidadao";
+	  CHECK___builtin_cpu_is ("shijidadao");
+	  cpu_model->__cpu_subtype = ZHAOXIN_FAM7H_SHIJIDADAO;
 	}
       break;
     default:
@@ -844,8 +838,6 @@ get_available_features (struct __processor_model *cpu_model,
 	set_feature (FEATURE_CLFLUSHOPT);
       if (ebx & bit_CLWB)
 	set_feature (FEATURE_CLWB);
-      if (ecx & bit_PREFETCHWT1)
-	set_feature (FEATURE_PREFETCHWT1);
       /* NB: bit_OSPKE indicates that OS supports PKU.  */
       if (ecx & bit_OSPKE)
 	set_feature (FEATURE_PKU);
@@ -898,10 +890,6 @@ get_available_features (struct __processor_model *cpu_model,
 	    set_feature (FEATURE_AVX512DQ);
 	  if (ebx & bit_AVX512CD)
 	    set_feature (FEATURE_AVX512CD);
-	  if (ebx & bit_AVX512PF)
-	    set_feature (FEATURE_AVX512PF);
-	  if (ebx & bit_AVX512ER)
-	    set_feature (FEATURE_AVX512ER);
 	  if (ebx & bit_AVX512IFMA)
 	    set_feature (FEATURE_AVX512IFMA);
 	  if (ecx & bit_AVX512VBMI)
@@ -914,10 +902,6 @@ get_available_features (struct __processor_model *cpu_model,
 	    set_feature (FEATURE_AVX512BITALG);
 	  if (ecx & bit_AVX512VPOPCNTDQ)
 	    set_feature (FEATURE_AVX512VPOPCNTDQ);
-	  if (edx & bit_AVX5124VNNIW)
-	    set_feature (FEATURE_AVX5124VNNIW);
-	  if (edx & bit_AVX5124FMAPS)
-	    set_feature (FEATURE_AVX5124FMAPS);
 	  if (edx & bit_AVX512VP2INTERSECT)
 	    set_feature (FEATURE_AVX512VP2INTERSECT);
 	  if (edx & bit_AVX512FP16)
@@ -1014,14 +998,17 @@ get_available_features (struct __processor_model *cpu_model,
 	}
     }
 
-  /* Get Advanced Features at level 0x24 (eax = 0x24).  */
+  /* Get Advanced Features at level 0x24 (eax = 0x24, ecx = 0).  */
   if (avx10_set && max_cpuid_level >= 0x24)
     {
-      __cpuid (0x24, eax, ebx, ecx, edx);
+      __cpuid_count (0x24, 0, eax, ebx, ecx, edx);
       version = ebx & 0xff;
       if (ebx & bit_AVX10_256)
 	switch (version)
 	  {
+	  case 2:
+	    set_feature (FEATURE_AVX10_2_256);
+	    /* Fall through.  */
 	  case 1:
 	    set_feature (FEATURE_AVX10_1_256);
 	    break;
@@ -1032,6 +1019,9 @@ get_available_features (struct __processor_model *cpu_model,
       if (ebx & bit_AVX10_512)
 	switch (version)
 	  {
+	  case 2:
+	    set_feature (FEATURE_AVX10_2_512);
+	    /* Fall through.  */
 	  case 1:
 	    set_feature (FEATURE_AVX10_1_512);
 	    break;

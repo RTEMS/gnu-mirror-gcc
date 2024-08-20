@@ -398,7 +398,9 @@ get_array_span (tree type, tree decl)
     return gfc_conv_descriptor_span_get (decl);
 
   /* Return the span for deferred character length array references.  */
-  if (type && TREE_CODE (type) == ARRAY_TYPE && TYPE_STRING_FLAG (type))
+  if (type
+      && (TREE_CODE (type) == ARRAY_TYPE || TREE_CODE (type) == INTEGER_TYPE)
+      && TYPE_STRING_FLAG (type))
     {
       if (TREE_CODE (decl) == PARM_DECL)
 	decl = build_fold_indirect_ref_loc (input_location, decl);
@@ -1402,11 +1404,12 @@ gfc_add_finalizer_call (stmtblock_t *block, gfc_expr *expr2,
          ref->next = NULL;
        }
 
-  if (expr->ts.type == BT_CLASS
-      && !expr2->rank
-      && !expr2->ref
-      && CLASS_DATA (expr2->symtree->n.sym)->as)
-    expr->rank = CLASS_DATA (expr2->symtree->n.sym)->as->rank;
+  if (expr->ts.type == BT_CLASS && (!expr2->rank || !expr2->corank)
+      && !expr2->ref && CLASS_DATA (expr2->symtree->n.sym)->as)
+    {
+      expr->rank = CLASS_DATA (expr2->symtree->n.sym)->as->rank;
+      expr->corank = CLASS_DATA (expr2->symtree->n.sym)->as->corank;
+    }
 
   stmtblock_t tmp_block;
   gfc_start_block (&tmp_block);
@@ -1838,7 +1841,8 @@ gfc_deallocate_with_status (tree pointer, tree status, tree errmsg,
 	  else
 	    caf_dereg_type = (enum gfc_coarray_deregtype) coarray_dealloc_mode;
 	}
-      else if (flag_coarray == GFC_FCOARRAY_SINGLE)
+      else if (flag_coarray == GFC_FCOARRAY_SINGLE
+	       && GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (pointer)))
 	pointer = gfc_conv_descriptor_data_get (pointer);
     }
   else if (GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (pointer)))
@@ -2656,6 +2660,8 @@ trans_code (gfc_code * code, tree cond)
 	case EXEC_OMP_TEAMS_DISTRIBUTE_PARALLEL_DO_SIMD:
 	case EXEC_OMP_TEAMS_DISTRIBUTE_SIMD:
 	case EXEC_OMP_TEAMS_LOOP:
+	case EXEC_OMP_TILE:
+	case EXEC_OMP_UNROLL:
 	case EXEC_OMP_WORKSHARE:
 	  res = gfc_trans_omp_directive (code);
 	  break;
@@ -2803,14 +2809,15 @@ gfc_start_wrapped_block (gfc_wrapped_block* block, tree code)
 /* Add a new pair of initializers/clean-up code.  */
 
 void
-gfc_add_init_cleanup (gfc_wrapped_block* block, tree init, tree cleanup)
+gfc_add_init_cleanup (gfc_wrapped_block* block, tree init, tree cleanup,
+		      bool back)
 {
   gcc_assert (block);
 
   /* The new pair of init/cleanup should be "wrapped around" the existing
      block of code, thus the initialization is added to the front and the
      cleanup to the back.  */
-  add_expr_to_chain (&block->init, init, true);
+  add_expr_to_chain (&block->init, init, !back);
   add_expr_to_chain (&block->cleanup, cleanup, false);
 }
 

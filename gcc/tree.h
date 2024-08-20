@@ -1546,6 +1546,10 @@ class auto_suppress_location_wrappers
 #define OMP_FOR_PRE_BODY(NODE)	   TREE_OPERAND (OMP_LOOPING_CHECK (NODE), 5)
 #define OMP_FOR_ORIG_DECLS(NODE)   TREE_OPERAND (OMP_LOOPING_CHECK (NODE), 6)
 
+#define OMP_LOOPXFORM_CHECK(NODE) TREE_RANGE_CHECK (NODE, OMP_TILE, OMP_UNROLL)
+#define OMP_LOOPXFORM_LOWERED(NODE) \
+  (OMP_LOOPXFORM_CHECK (NODE)->base.public_flag)
+
 #define OMP_SECTIONS_BODY(NODE)    TREE_OPERAND (OMP_SECTIONS_CHECK (NODE), 0)
 #define OMP_SECTIONS_CLAUSES(NODE) TREE_OPERAND (OMP_SECTIONS_CHECK (NODE), 1)
 
@@ -1742,6 +1746,10 @@ class auto_suppress_location_wrappers
   OMP_CLAUSE_OPERAND (OMP_CLAUSE_SUBCODE_CHECK (NODE, OMP_CLAUSE_HINT), 0)
 #define OMP_CLAUSE_FILTER_EXPR(NODE) \
   OMP_CLAUSE_OPERAND (OMP_CLAUSE_SUBCODE_CHECK (NODE, OMP_CLAUSE_FILTER), 0)
+#define OMP_CLAUSE_PARTIAL_EXPR(NODE) \
+  OMP_CLAUSE_OPERAND (OMP_CLAUSE_SUBCODE_CHECK (NODE, OMP_CLAUSE_PARTIAL), 0)
+#define OMP_CLAUSE_SIZES_LIST(NODE) \
+  OMP_CLAUSE_OPERAND (OMP_CLAUSE_SUBCODE_CHECK (NODE, OMP_CLAUSE_SIZES), 0)
 
 #define OMP_CLAUSE_GRAINSIZE_EXPR(NODE) \
   OMP_CLAUSE_OPERAND (OMP_CLAUSE_SUBCODE_CHECK (NODE, OMP_CLAUSE_GRAINSIZE),0)
@@ -5772,6 +5780,14 @@ extern special_array_member component_ref_sam_type (tree);
    cannot be determined.  */
 extern tree component_ref_size (tree, special_array_member * = NULL);
 
+/* Return true if the given node is a call to a .ACCESS_WITH_SIZE
+   function.  */
+extern bool is_access_with_size_p (const_tree);
+
+/* Get the corresponding reference from the call to a .ACCESS_WITH_SIZE,
+ * i.e. the first argument of this call.  Return NULL_TREE otherwise.  */
+extern tree get_ref_from_access_with_size (tree);
+
 extern int tree_map_base_eq (const void *, const void *);
 extern unsigned int tree_map_base_hash (const void *);
 extern bool tree_map_base_marked_p (const void *);
@@ -6913,6 +6929,8 @@ extern bool warning_suppressed_at (location_t, opt_code = all_warnings);
    at a location to disabled by default.  */
 extern bool suppress_warning_at (location_t, opt_code = all_warnings,
 				 bool = true);
+/* Overwrite warning disposition bitmap for a location with given spec.  */
+extern void put_warning_spec_at (location_t loc, unsigned);
 /* Copy warning disposition from one location to another.  */
 extern void copy_warning (location_t, location_t);
 
@@ -6925,6 +6943,13 @@ extern void suppress_warning (tree, opt_code = all_warnings, bool = true)
   ATTRIBUTE_NONNULL (1);
 /* Copy warning disposition from one expression to another.  */
 extern void copy_warning (tree, const_tree);
+
+/* Whether the tree might have a warning spec.  */
+extern bool has_warning_spec (const_tree);
+/* Retrieve warning spec bitmap for tree streaming.  */
+extern unsigned get_warning_spec (const_tree);
+/* Overwrite warning spec bitmap for a tree with given spec.  */
+extern void put_warning_spec (tree, unsigned);
 
 /* Return the zero-based number corresponding to the argument being
    deallocated if FNDECL is a deallocation function or an out-of-bounds

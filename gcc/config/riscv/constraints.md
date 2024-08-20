@@ -80,6 +80,12 @@
   (and (match_code "const_int")
        (match_test "LUI_OPERAND (ival)")))
 
+(define_constraint "MiG"
+  "const can be represented as sum of any S12 values."
+  (and (match_code "const_int")
+       (ior (match_test "IN_RANGE (ival,  2048,  4094)")
+	    (match_test "IN_RANGE (ival, -4096, -2049)"))))
+
 (define_constraint "Ds3"
   "@internal
    1, 2 or 3 immediate"
@@ -236,6 +242,15 @@
    A MEM with a valid address for th.[l|s]*ur* instructions."
   (and (match_code "mem")
        (match_test "th_memidx_legitimate_index_p (op, true)")))
+
+(define_memory_constraint "th_m_noi"
+  "@internal
+   A MEM with does not match XTheadMemIdx operands."
+  (and (match_code "mem")
+       (and (match_test "!th_memidx_legitimate_modify_p (op, true)")
+	    (and (match_test "!th_memidx_legitimate_modify_p (op, false)")
+		 (and (match_test "!th_memidx_legitimate_index_p (op, false)")
+		      (match_test "!th_memidx_legitimate_index_p (op, true)"))))))
 
 ;; CORE-V Constraints
 (define_constraint "CV_alu_pow2"

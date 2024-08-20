@@ -188,10 +188,6 @@ ASM_MISA_SPEC
 #define POINTER_SIZE (riscv_abi >= ABI_LP64 ? 64 : 32)
 #define LONG_TYPE_SIZE POINTER_SIZE
 
-#define FLOAT_TYPE_SIZE 32
-#define DOUBLE_TYPE_SIZE 64
-#define LONG_DOUBLE_TYPE_SIZE 128
-
 /* Allocation boundary (in *bits*) for storing arguments in argument list.  */
 #define PARM_BOUNDARY BITS_PER_WORD
 
@@ -433,6 +429,11 @@ ASM_MISA_SPEC
 #define RISCV_PROLOGUE_TEMP2_REGNUM (GP_TEMP_FIRST + 1)
 #define RISCV_PROLOGUE_TEMP2(MODE) gen_rtx_REG (MODE, RISCV_PROLOGUE_TEMP2_REGNUM)
 
+/* Both prologue temp registers are used in the vector probe loop for when
+   stack-clash protection is enabled, so we need to copy SP to a new register
+   and set it as CFA during the loop, we are using T3 for that.  */
+#define RISCV_STACK_CLASH_VECTOR_CFA_REGNUM (GP_TEMP_FIRST + 23)
+
 #define RISCV_CALL_ADDRESS_TEMP_REGNUM (GP_TEMP_FIRST + 1)
 #define RISCV_CALL_ADDRESS_TEMP(MODE) \
   gen_rtx_REG (MODE, RISCV_CALL_ADDRESS_TEMP_REGNUM)
@@ -625,6 +626,28 @@ enum reg_class
 #define LUI_OPERAND(VALUE)						\
   (((VALUE) | ((1UL<<31) - IMM_REACH)) == ((1UL<<31) - IMM_REACH)	\
    || ((VALUE) | ((1UL<<31) - IMM_REACH)) + IMM_REACH == 0)
+
+/* True if a VALUE (constant) can be expressed as sum of two S12 constants
+   (in range -2048 to 2047).
+   Range check logic:
+     from: min S12 + 1 (or -1 depending on what side of zero)
+       to: two times the min S12 value (to max out S12 bits).  */
+
+#define SUM_OF_TWO_S12_N(VALUE)						\
+  (((VALUE) >= (-2048 * 2)) && ((VALUE) <= (-2048 - 1)))
+
+#define SUM_OF_TWO_S12_P(VALUE)						\
+  (((VALUE) >= (2047 + 1)) && ((VALUE) <= (2047 * 2)))
+
+#define SUM_OF_TWO_S12(VALUE)						\
+  (SUM_OF_TWO_S12_N (VALUE) || SUM_OF_TWO_S12_P (VALUE))
+
+/* Variant with first value 8 byte aligned if involving stack regs.  */
+#define SUM_OF_TWO_S12_P_ALGN(VALUE)				\
+  (((VALUE) >= (2032 + 1)) && ((VALUE) <= (2032 * 2)))
+
+#define SUM_OF_TWO_S12_ALGN(VALUE)				\
+  (SUM_OF_TWO_S12_N (VALUE) || SUM_OF_TWO_S12_P_ALGN (VALUE))
 
 /* If this is a single bit mask, then we can load it with bseti.  Special
    handling of SImode 0x80000000 on RV64 is done in riscv_build_integer_1. */
@@ -912,6 +935,10 @@ extern enum riscv_cc get_riscv_cc (const rtx use);
   || (riscv_microarchitecture == sifive_p400) \
   || (riscv_microarchitecture == sifive_p600))
 
+/* True if the target supports misaligned vector loads and stores.  */
+#define TARGET_VECTOR_MISALIGN_SUPPORTED \
+   riscv_vector_unaligned_access_p
+
 #define LOGICAL_OP_NON_SHORT_CIRCUIT 0
 
 /* Control the assembler format that we output.  */
@@ -1139,6 +1166,7 @@ while (0)
 #ifndef USED_FOR_TARGET
 extern const enum reg_class riscv_regno_to_class[];
 extern bool riscv_slow_unaligned_access_p;
+extern bool riscv_vector_unaligned_access_p;
 extern bool riscv_user_wants_strict_align;
 extern unsigned riscv_stack_boundary;
 extern unsigned riscv_bytes_per_vector_chunk;
@@ -1211,8 +1239,6 @@ extern void riscv_remove_unneeded_save_restore_calls (void);
 
 #define REGMODE_NATURAL_SIZE(MODE) riscv_regmode_natural_size (MODE)
 
-#define RISCV_DWARF_VLENB (4096 + 0xc22)
-
 #define DWARF_FRAME_REGISTERS (FIRST_PSEUDO_REGISTER + 1 /* VLENB */)
 
 #define DWARF_REG_TO_UNWIND_COLUMN(REGNO) \
@@ -1236,5 +1262,30 @@ extern void riscv_remove_unneeded_save_restore_calls (void);
 
 /* Check TLS Descriptors mechanism is selected.  */
 #define TARGET_TLSDESC (riscv_tls_dialect == TLS_DESCRIPTORS)
+
+/* This value is the amount of bytes a caller is allowed to drop the stack
+   before probing has to be done for stack clash protection.  */
+#define STACK_CLASH_CALLER_GUARD 1024
+
+/* This value controls how many pages we manually unroll the loop for when
+   generating stack clash probes.  */
+#define STACK_CLASH_MAX_UNROLL_PAGES 4
+
+/* This value represents the minimum amount of bytes we expect the function's
+   outgoing arguments to be when stack-clash is enabled.  */
+#define STACK_CLASH_MIN_BYTES_OUTGOING_ARGS 8
+
+/* Allocate a minimum of STACK_CLASH_MIN_BYTES_OUTGOING_ARGS bytes for the
+   outgoing arguments if stack clash protection is enabled.  This is essential
+   as the extra arg space allows us to skip a check in alloca.  */
+#undef STACK_DYNAMIC_OFFSET
+#define STACK_DYNAMIC_OFFSET(FUNDECL)			   \
+   ((flag_stack_clash_protection			   \
+     && cfun->calls_alloca				   \
+     && known_lt (crtl->outgoing_args_size,		   \
+		  STACK_CLASH_MIN_BYTES_OUTGOING_ARGS))    \
+    ? ROUND_UP (STACK_CLASH_MIN_BYTES_OUTGOING_ARGS,       \
+		STACK_BOUNDARY / BITS_PER_UNIT)		   \
+    : (crtl->outgoing_args_size + STACK_POINTER_OFFSET))
 
 #endif /* ! GCC_RISCV_H */

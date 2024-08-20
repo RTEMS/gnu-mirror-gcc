@@ -102,23 +102,13 @@ range_op_table::range_op_table ()
   set (MINUS_EXPR, op_minus);
   set (NEGATE_EXPR, op_negate);
   set (MULT_EXPR, op_mult);
-
-  // Occur in both integer and pointer tables, but currently share
-  // integral implementation.
   set (ADDR_EXPR, op_addr);
   set (BIT_NOT_EXPR, op_bitwise_not);
   set (BIT_XOR_EXPR, op_bitwise_xor);
-
-  // These are in both integer and pointer tables, but pointer has a different
-  // implementation.
-  // If commented out, there is a hybrid version in range-op-ptr.cc which
-  // is used until there is a pointer range class.  Then we can simply
-  // uncomment the operator here and use the unified version.
-
-  // set (BIT_AND_EXPR, op_bitwise_and);
-  // set (BIT_IOR_EXPR, op_bitwise_or);
-  // set (MIN_EXPR, op_min);
-  // set (MAX_EXPR, op_max);
+  set (BIT_AND_EXPR, op_bitwise_and);
+  set (BIT_IOR_EXPR, op_bitwise_or);
+  set (MIN_EXPR, op_min);
+  set (MAX_EXPR, op_max);
 }
 
 // Instantiate a default range operator for opcodes with no entry.
@@ -207,7 +197,8 @@ range_op_handler::discriminator_fail (const vrange &r1,
   gcc_checking_assert (r1.m_discriminator < sizeof (name) - 1);
   gcc_checking_assert (r2.m_discriminator < sizeof (name) - 1);
   gcc_checking_assert (r3.m_discriminator < sizeof (name) - 1);
-  fprintf (stderr, "DISCRIMINATOR FAIL.  Dispatch ====> RO_%c%c%c <====\n",
+  fprintf (stderr,
+	   "Unsupported operand combination in dispatch: RO_%c%c%c\n",
 	   name[r1.m_discriminator],
 	   name[r2.m_discriminator],
 	   name[r3.m_discriminator]);
@@ -232,10 +223,6 @@ range_op_handler::fold_range (vrange &r, tree type,
 #if CHECKING_P
   if (!lh.undefined_p () && !rh.undefined_p ())
     gcc_assert (m_operator->operand_check_p (type, lh.type (), rh.type ()));
-  if (has_pointer_operand_p (r, lh, rh)
-      && !m_operator->pointers_handled_p (DISPATCH_FOLD_RANGE,
-					  dispatch_kind (r, lh, rh)))
-    discriminator_fail (r, lh, rh);
 #endif
   switch (dispatch_kind (r, lh, rh))
     {
@@ -298,10 +285,6 @@ range_op_handler::op1_range (vrange &r, tree type,
 #if CHECKING_P
   if (!op2.undefined_p ())
     gcc_assert (m_operator->operand_check_p (lhs.type (), type, op2.type ()));
-  if (has_pointer_operand_p (r, lhs, op2)
-      && !m_operator->pointers_handled_p (DISPATCH_OP1_RANGE,
-					  dispatch_kind (r, lhs, op2)))
-    discriminator_fail (r, lhs, op2);
 #endif
   switch (dispatch_kind (r, lhs, op2))
     {
@@ -352,10 +335,6 @@ range_op_handler::op2_range (vrange &r, tree type,
 #if CHECKING_P
   if (!op1.undefined_p ())
     gcc_assert (m_operator->operand_check_p (lhs.type (), op1.type (), type));
-  if (has_pointer_operand_p (r, lhs, op1)
-      && !m_operator->pointers_handled_p (DISPATCH_OP2_RANGE,
-					  dispatch_kind (r, lhs, op1)))
-    discriminator_fail (r, lhs, op1);
 #endif
   switch (dispatch_kind (r, lhs, op1))
     {
@@ -393,13 +372,6 @@ range_op_handler::lhs_op1_relation (const vrange &lhs,
 				    relation_kind rel) const
 {
   gcc_checking_assert (m_operator);
-#if CHECKING_P
-  if (has_pointer_operand_p (lhs, op1, op2)
-      && !m_operator->pointers_handled_p (DISPATCH_LHS_OP1_RELATION,
-					  dispatch_kind (lhs, op1, op2)))
-    discriminator_fail (lhs, op1, op2);
-#endif
-
   switch (dispatch_kind (lhs, op1, op2))
     {
       case RO_III:
@@ -440,12 +412,6 @@ range_op_handler::lhs_op2_relation (const vrange &lhs,
 				    relation_kind rel) const
 {
   gcc_checking_assert (m_operator);
-#if CHECKING_P
-  if (has_pointer_operand_p (lhs, op1, op2)
-      && !m_operator->pointers_handled_p (DISPATCH_LHS_OP2_RELATION,
-					  dispatch_kind (lhs, op1, op2)))
-    discriminator_fail (lhs, op1, op2);
-#endif
   switch (dispatch_kind (lhs, op1, op2))
     {
       case RO_III:
@@ -473,12 +439,7 @@ range_op_handler::op1_op2_relation (const vrange &lhs,
 				    const vrange &op2) const
 {
   gcc_checking_assert (m_operator);
-#if CHECKING_P
-  if (has_pointer_operand_p (lhs, op1, op2)
-      && !m_operator->pointers_handled_p (DISPATCH_OP1_OP2_RELATION,
-					  dispatch_kind (lhs, op1, op2)))
-    discriminator_fail (lhs, op1, op2);
-#endif
+
   switch (dispatch_kind (lhs, op1, op2))
     {
       case RO_III:
@@ -609,9 +570,9 @@ get_shift_range (irange &r, tree type, const irange &op)
     return false;
 
   // Build valid range and intersect it with the shift range.
-  r = value_range (op.type (),
-		   wi::shwi (0, TYPE_PRECISION (op.type ())),
-		   wi::shwi (TYPE_PRECISION (type) - 1, TYPE_PRECISION (op.type ())));
+  r.set (op.type (),
+	 wi::shwi (0, TYPE_PRECISION (op.type ())),
+	 wi::shwi (TYPE_PRECISION (type) - 1, TYPE_PRECISION (op.type ())));
   r.intersect (op);
 
   // If there are no valid ranges in the shift range, returned false.
@@ -4094,13 +4055,13 @@ operator_trunc_mod::op1_range (irange &r, tree type,
   // (a % b) >= x && x > 0 , then a >= x.
   if (wi::gt_p (lhs.lower_bound (), 0, sign))
     {
-      r = value_range (type, lhs.lower_bound (), wi::max_value (prec, sign));
+      r.set (type, lhs.lower_bound (), wi::max_value (prec, sign));
       return true;
     }
   // (a % b) <= x && x < 0 , then a <= x.
   if (wi::lt_p (lhs.upper_bound (), 0, sign))
     {
-      r = value_range (type, wi::min_value (prec, sign), lhs.upper_bound ());
+      r.set (type, wi::min_value (prec, sign), lhs.upper_bound ());
       return true;
     }
   return false;
@@ -4122,12 +4083,11 @@ operator_trunc_mod::op2_range (irange &r, tree type,
   if (wi::gt_p (lhs.lower_bound (), 0, sign))
     {
       if (sign == SIGNED)
-	r = value_range (type, wi::neg (lhs.lower_bound ()),
-			 lhs.lower_bound (), VR_ANTI_RANGE);
+	r.set (type, wi::neg (lhs.lower_bound ()),
+	       lhs.lower_bound (), VR_ANTI_RANGE);
       else if (wi::lt_p (lhs.lower_bound (), wi::max_value (prec, sign),
 			 sign))
-	r = value_range (type, lhs.lower_bound () + 1,
-			 wi::max_value (prec, sign));
+	r.set (type, lhs.lower_bound () + 1, wi::max_value (prec, sign));
       else
 	return false;
       return true;
@@ -4136,8 +4096,8 @@ operator_trunc_mod::op2_range (irange &r, tree type,
   if (wi::lt_p (lhs.upper_bound (), 0, sign))
     {
       if (wi::gt_p (lhs.upper_bound (), wi::min_value (prec, sign), sign))
-	r = value_range (type, lhs.upper_bound (),
-			 wi::neg (lhs.upper_bound ()), VR_ANTI_RANGE);
+	r.set (type, lhs.upper_bound (),
+	       wi::neg (lhs.upper_bound ()), VR_ANTI_RANGE);
       else
 	return false;
       return true;

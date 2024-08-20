@@ -547,7 +547,7 @@ access_range::dump (bool simple) const
   pretty_printer pp;
   pp_format_decoder (&pp) = default_tree_printer;
   pp_show_color (&pp) = pp_show_color (global_dc->printer);
-  pp.buffer->stream = stderr;
+  pp.set_output_stream (stderr);
   dump_to_pp (&pp, simple);
   pp_newline (&pp);
   pp_flush (&pp);
@@ -1632,7 +1632,8 @@ protected:
     if (rep_tree)
       {
 	if (TREE_CODE (rep_tree) == SSA_NAME)
-	  rep_tree = SSA_NAME_VAR (rep_tree);
+	  if (tree var = SSA_NAME_VAR (rep_tree))
+	    rep_tree = var;
 	switch (TREE_CODE (rep_tree))
 	  {
 	  default:

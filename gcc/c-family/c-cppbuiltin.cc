@@ -954,7 +954,10 @@ c_cpp_builtins (cpp_reader *pfile)
 	}
 
       if (cxx_dialect >= cxx11)
-        cpp_define (pfile, "__GXX_EXPERIMENTAL_CXX0X__");
+	{
+	  cpp_define (pfile, "__GXX_EXPERIMENTAL_CXX0X__");
+	  cpp_define (pfile, "__GXX_CONSTEXPR_ASM__");
+	}
 
       /* Binary literals have been allowed in g++ before C++11
 	 and were standardized for C++14.  */
@@ -1088,19 +1091,15 @@ c_cpp_builtins (cpp_reader *pfile)
       if (cxx_dialect > cxx23)
 	{
 	  /* Set feature test macros for C++26.  */
-	  cpp_define (pfile, "__cpp_constexpr=202306L");
+	  cpp_define (pfile, "__cpp_constexpr=202406L");
 	  cpp_define (pfile, "__cpp_static_assert=202306L");
 	  cpp_define (pfile, "__cpp_placeholder_variables=202306L");
 	  cpp_define (pfile, "__cpp_structured_bindings=202403L");
 	  cpp_define (pfile, "__cpp_deleted_function=202403L");
+	  cpp_define (pfile, "__cpp_variadic_friend=202403L");
 	}
       if (flag_concepts)
-        {
-	  if (cxx_dialect >= cxx20 || !flag_concepts_ts)
-	    cpp_define (pfile, "__cpp_concepts=202002L");
-          else
-            cpp_define (pfile, "__cpp_concepts=201507L");
-        }
+	cpp_define (pfile, "__cpp_concepts=202002L");
       if (flag_contracts)
 	{
 	  cpp_define (pfile, "__cpp_contracts=201906L");

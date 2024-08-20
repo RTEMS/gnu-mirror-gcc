@@ -178,13 +178,6 @@ class line_table_test
   ~line_table_test ();
 };
 
-/* Helper function for selftests that need a function decl.  */
-
-extern tree make_fndecl (tree return_type,
-			 const char *name,
-			 vec <tree> &param_types,
-			 bool is_variadic = false);
-
 /* Run TESTCASE multiple times, once for each case in our test matrix.  */
 
 extern void
@@ -227,7 +220,10 @@ extern void attribs_cc_tests ();
 extern void bitmap_cc_tests ();
 extern void cgraph_cc_tests ();
 extern void convert_cc_tests ();
+extern void diagnostic_color_cc_tests ();
 extern void diagnostic_format_json_cc_tests ();
+extern void diagnostic_format_sarif_cc_tests ();
+extern void diagnostic_path_cc_tests ();
 extern void diagnostic_show_locus_cc_tests ();
 extern void digraph_cc_tests ();
 extern void dumpfile_cc_tests ();
@@ -256,6 +252,7 @@ extern void read_rtl_function_cc_tests ();
 extern void rtl_tests_cc_tests ();
 extern void sbitmap_cc_tests ();
 extern void selftest_cc_tests ();
+extern void simple_diagnostic_path_cc_tests ();
 extern void simplify_rtx_cc_tests ();
 extern void spellcheck_cc_tests ();
 extern void spellcheck_tree_cc_tests ();
@@ -264,7 +261,6 @@ extern void sreal_cc_tests ();
 extern void store_merging_cc_tests ();
 extern void tree_cc_tests ();
 extern void tree_cfg_cc_tests ();
-extern void tree_diagnostic_path_cc_tests ();
 extern void tristate_cc_tests ();
 extern void typed_splay_tree_cc_tests ();
 extern void vec_cc_tests ();

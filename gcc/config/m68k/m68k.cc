@@ -198,6 +198,8 @@ static machine_mode m68k_promote_function_mode (const_tree, machine_mode,
 						int *, const_tree, int);
 static void m68k_asm_final_postscan_insn (FILE *, rtx_insn *insn, rtx [], int);
 static HARD_REG_SET m68k_zero_call_used_regs (HARD_REG_SET);
+static machine_mode m68k_c_mode_for_floating_type (enum tree_index);
+static bool m68k_use_lra_p (void);
 
 /* Initialize the GCC target structure.  */
 
@@ -306,7 +308,7 @@ static HARD_REG_SET m68k_zero_call_used_regs (HARD_REG_SET);
 #endif
 
 #undef TARGET_LRA_P
-#define TARGET_LRA_P hook_bool_void_false
+#define TARGET_LRA_P m68k_use_lra_p
 
 #undef TARGET_LEGITIMATE_ADDRESS_P
 #define TARGET_LEGITIMATE_ADDRESS_P	m68k_legitimate_address_p
@@ -364,6 +366,9 @@ static HARD_REG_SET m68k_zero_call_used_regs (HARD_REG_SET);
 
 #undef TARGET_ZERO_CALL_USED_REGS
 #define TARGET_ZERO_CALL_USED_REGS m68k_zero_call_used_regs
+
+#undef TARGET_C_MODE_FOR_FLOATING_TYPE
+#define TARGET_C_MODE_FOR_FLOATING_TYPE m68k_c_mode_for_floating_type
 
 TARGET_GNU_ATTRIBUTES (m68k_attribute_table,
 {
@@ -7210,6 +7215,26 @@ m68k_zero_call_used_regs (HARD_REG_SET need_zeroed_hardregs)
       }
 
   return need_zeroed_hardregs;
+}
+
+/* Implement TARGET_C_MODE_FOR_FLOATING_TYPE.  Return XFmode or DFmode
+   for TI_LONG_DOUBLE_TYPE which is for long double type, go with the
+   default one for the others.  */
+
+static machine_mode
+m68k_c_mode_for_floating_type (enum tree_index ti)
+{
+  if (ti == TI_LONG_DOUBLE_TYPE)
+    return LONG_DOUBLE_TYPE_MODE;
+  return default_mode_for_floating_type (ti);
+}
+
+/* Implement TARGET_LRA_P.  */
+
+static bool
+m68k_use_lra_p ()
+{
+  return m68k_lra_p;
 }
 
 #include "gt-m68k.h"

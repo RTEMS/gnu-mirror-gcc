@@ -182,10 +182,8 @@ streamer_read_hwi (class lto_input_block *ib)
 poly_uint64
 streamer_read_poly_uint64 (class lto_input_block *ib)
 {
-  poly_uint64 res;
-  for (unsigned int i = 0; i < NUM_POLY_INT_COEFFS; ++i)
-    res.coeffs[i] = streamer_read_uhwi (ib);
-  return res;
+  using coeff_type = poly_int_traits<poly_uint64>::coeff_type;
+  return poly_int_read_common<coeff_type> (streamer_read_uhwi, ib);
 }
 
 /* Read a poly_int64 from IB.  */
@@ -193,10 +191,8 @@ streamer_read_poly_uint64 (class lto_input_block *ib)
 poly_int64
 streamer_read_poly_int64 (class lto_input_block *ib)
 {
-  poly_int64 res;
-  for (unsigned int i = 0; i < NUM_POLY_INT_COEFFS; ++i)
-    res.coeffs[i] = streamer_read_hwi (ib);
-  return res;
+  using coeff_type = poly_int_traits<poly_int64>::coeff_type;
+  return poly_int_read_common<coeff_type> (streamer_read_hwi, ib);
 }
 
 /* Read gcov_type value from IB.  */
@@ -219,14 +215,14 @@ streamer_read_real_value (class lto_input_block *ib, REAL_VALUE_TYPE *r)
 
 void
 streamer_read_value_range (class lto_input_block *ib, data_in *data_in,
-			   Value_Range &vr)
+			   value_range &vr)
 {
   // Read the common fields to all vranges.
   value_range_kind kind = streamer_read_enum (ib, value_range_kind, VR_LAST);
   gcc_checking_assert (kind != VR_UNDEFINED);
   tree type = stream_read_tree (ib, data_in);
 
-  // Initialize the Value_Range to the correct type.
+  // Initialize the value_range to the correct type.
   vr.set_type (type);
 
   if (is_a <irange> (vr))

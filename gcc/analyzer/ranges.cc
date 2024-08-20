@@ -20,6 +20,7 @@ along with GCC; see the file COPYING3.  If not see
 
 #include "config.h"
 #define INCLUDE_MEMORY
+#define INCLUDE_VECTOR
 #include "system.h"
 #include "coretypes.h"
 #include "tree.h"
@@ -97,7 +98,7 @@ symbolic_byte_offset::dump (bool simple) const
   pretty_printer pp;
   pp_format_decoder (&pp) = default_tree_printer;
   pp_show_color (&pp) = pp_show_color (global_dc->printer);
-  pp.buffer->stream = stderr;
+  pp.set_output_stream (stderr);
   dump_to_pp (&pp, simple);
   pp_newline (&pp);
   pp_flush (&pp);
@@ -156,7 +157,7 @@ symbolic_byte_range::dump (bool simple, region_model_manager &mgr) const
   pretty_printer pp;
   pp_format_decoder (&pp) = default_tree_printer;
   pp_show_color (&pp) = pp_show_color (global_dc->printer);
-  pp.buffer->stream = stderr;
+  pp.set_output_stream (stderr);
   dump_to_pp (&pp, simple, mgr);
   pp_newline (&pp);
   pp_flush (&pp);

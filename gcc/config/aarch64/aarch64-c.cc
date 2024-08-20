@@ -64,7 +64,7 @@ aarch64_define_unconditional_macros (cpp_reader *pfile)
   builtin_define ("__ARM_ARCH_8A");
 
   builtin_define_with_int_value ("__ARM_ARCH_PROFILE",
-      AARCH64_ISA_V8R ? 'R' : 'A');
+      TARGET_V8R ? 'R' : 'A');
   builtin_define ("__ARM_FEATURE_CLZ");
   builtin_define ("__ARM_FEATURE_IDIV");
   builtin_define ("__ARM_FEATURE_UNALIGNED");
@@ -75,6 +75,7 @@ aarch64_define_unconditional_macros (cpp_reader *pfile)
 
   builtin_define ("__ARM_STATE_ZA");
   builtin_define ("__ARM_STATE_ZT0");
+  builtin_define ("__ARM_NEON_SVE_BRIDGE");
 
   /* Define keyword attributes like __arm_streaming as macros that expand
      to the associated [[...]] attribute.  Use __extension__ in the attribute
@@ -131,7 +132,7 @@ aarch64_update_cpp_builtins (cpp_reader *pfile)
   aarch64_def_or_undef (flag_unsafe_math_optimizations, "__ARM_FP_FAST", pfile);
 
   cpp_undef (pfile, "__ARM_ARCH");
-  builtin_define_with_int_value ("__ARM_ARCH", AARCH64_ISA_V9A ? 9 : 8);
+  builtin_define_with_int_value ("__ARM_ARCH", TARGET_V9A ? 9 : 8);
 
   builtin_define_with_int_value ("__ARM_SIZEOF_MINIMAL_ENUM",
 				 flag_short_enums ? 1 : 4);
@@ -251,9 +252,14 @@ aarch64_update_cpp_builtins (cpp_reader *pfile)
 			"__ARM_FEATURE_BF16_VECTOR_ARITHMETIC", pfile);
   aarch64_def_or_undef (TARGET_BF16_FP,
 			"__ARM_FEATURE_BF16_SCALAR_ARITHMETIC", pfile);
+  aarch64_def_or_undef (TARGET_BF16_FP,
+			"__ARM_FEATURE_BF16", pfile);
+  aarch64_def_or_undef (TARGET_SVE_BF16,
+			"__ARM_FEATURE_SVE_BF16", pfile);
+
   aarch64_def_or_undef (TARGET_LS64,
 			"__ARM_FEATURE_LS64", pfile);
-  aarch64_def_or_undef (AARCH64_ISA_RCPC, "__ARM_FEATURE_RCPC", pfile);
+  aarch64_def_or_undef (TARGET_RCPC, "__ARM_FEATURE_RCPC", pfile);
   aarch64_def_or_undef (TARGET_D128, "__ARM_FEATURE_SYSREG128", pfile);
 
   aarch64_def_or_undef (TARGET_SME, "__ARM_FEATURE_SME", pfile);

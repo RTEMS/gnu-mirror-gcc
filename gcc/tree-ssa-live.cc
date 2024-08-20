@@ -113,8 +113,10 @@ init_var_map (int size, class loop *loop, bitmap bitint)
       map->outofssa_p = bitint == NULL;
       map->bitint = bitint;
       basic_block bb;
+      map->vec_bbs.reserve_exact (n_basic_blocks_for_fn (cfun)
+				  - NUM_FIXED_BLOCKS);
       FOR_EACH_BB_FN (bb, cfun)
-	map->vec_bbs.safe_push (bb);
+	map->vec_bbs.quick_push (bb);
     }
   return map;
 }
@@ -1673,14 +1675,18 @@ virtual_operand_live::get_live_in (basic_block bb)
   edge_iterator ei;
   edge e;
   tree livein = NULL_TREE;
+  bool first = true;
   FOR_EACH_EDGE (e, ei, bb->preds)
     if (e->flags & EDGE_DFS_BACK)
       /* We can ignore backedges since if there's a def there it would
 	 have forced a PHI in the source because it also acts as use
 	 downstream.  */
       continue;
-    else if (!livein)
-      livein = get_live_out (e->src);
+    else if (first)
+      {
+	livein = get_live_out (e->src);
+	first = false;
+      }
     else if (get_live_out (e->src) != livein)
       /* When there's no virtual use downstream this indicates a point
 	 where we'd insert a PHI merging the different live virtual

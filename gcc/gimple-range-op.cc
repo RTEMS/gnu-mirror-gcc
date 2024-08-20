@@ -133,7 +133,7 @@ gimple_range_op_handler::gimple_range_op_handler (gimple *s)
 	  m_op1 = gimple_cond_lhs (m_stmt);
 	  m_op2 = gimple_cond_rhs (m_stmt);
 	  // Check that operands are supported types.  One check is enough.
-	  if (Value_Range::supports_type_p (TREE_TYPE (m_op1)))
+	  if (value_range::supports_type_p (TREE_TYPE (m_op1)))
 	    m_operator = oper.range_op ();
 	  gcc_checking_assert (m_operator);
 	  return;
@@ -153,7 +153,7 @@ gimple_range_op_handler::gimple_range_op_handler (gimple *s)
 	  if (gimple_num_ops (m_stmt) >= 3)
 	    m_op2 = gimple_assign_rhs2 (m_stmt);
 	  // Check that operands are supported types.  One check is enough.
-	  if ((m_op1 && !Value_Range::supports_type_p (TREE_TYPE (m_op1))))
+	  if ((m_op1 && !value_range::supports_type_p (TREE_TYPE (m_op1))))
 	    return;
 	  m_operator = oper.range_op ();
 	  gcc_checking_assert (m_operator);
@@ -185,7 +185,7 @@ gimple_range_op_handler::calc_op1 (vrange &r, const vrange &lhs_range)
   // Unary operations require the type of the first operand in the
   // second range position.
   tree type = TREE_TYPE (operand1 ());
-  Value_Range type_range (type);
+  value_range type_range (type);
   type_range.set_varying (type);
   return op1_range (r, type, lhs_range, type_range);
 }
@@ -218,7 +218,7 @@ gimple_range_op_handler::calc_op1 (vrange &r, const vrange &lhs_range,
 	op2_type = TREE_TYPE (operand2 ());
       else
 	op2_type = TREE_TYPE (operand1 ());
-      Value_Range trange (op2_type);
+      value_range trange (op2_type);
       trange.set_varying (op2_type);
       return op1_range (r, type, lhs_range, trange, k);
     }
@@ -243,7 +243,7 @@ gimple_range_op_handler::calc_op2 (vrange &r, const vrange &lhs_range,
   if (op1_range.undefined_p ())
     {
       tree op1_type = TREE_TYPE (operand1 ());
-      Value_Range trange (op1_type);
+      value_range trange (op1_type);
       trange.set_varying (op1_type);
       return op2_range (r, type, lhs_range, trange, k);
     }
@@ -328,19 +328,6 @@ public:
   {
     r = lhs;
     return true;
-  }
-  virtual bool pointers_handled_p (range_op_dispatch_type type,
-				   unsigned dispatch) const
-  {
-    switch (type)
-      {
-      case DISPATCH_FOLD_RANGE:
-	return dispatch == RO_PPP;
-      case DISPATCH_OP1_RANGE:
-	return dispatch == RO_PPP;
-      default:
-	return true;
-      }
   }
 } op_cfn_pass_through_arg1;
 
@@ -954,8 +941,10 @@ cfn_clz::fold_range (irange &r, tree type, const irange &lh,
   int maxi = prec - 1;
   if (m_gimple_call_internal_p)
     {
-      // Only handle the single common value.
-      if (rh.lower_bound () == prec)
+      // Handle only the two common values.
+      if (rh.lower_bound () == -1)
+	mini = -1;
+      else if (rh.lower_bound () == prec)
 	maxi = prec;
       else
 	// Magic value to give up, unless we can prove arg is non-zero.
@@ -966,7 +955,7 @@ cfn_clz::fold_range (irange &r, tree type, const irange &lh,
   if (wi::gt_p (lh.lower_bound (), 0, TYPE_SIGN (lh.type ())))
     {
       maxi = prec - 1 - wi::floor_log2 (lh.lower_bound ());
-      if (mini == -2)
+      if (mini < 0)
 	mini = 0;
     }
   else if (!range_includes_zero_p (lh))
@@ -982,11 +971,11 @@ cfn_clz::fold_range (irange &r, tree type, const irange &lh,
   if (max == 0)
     {
       // If CLZ_DEFINED_VALUE_AT_ZERO is 2 with VALUE of prec,
-      // return [prec, prec], otherwise ignore the range.
-      if (maxi == prec)
-	mini = prec;
+      // return [prec, prec] or [-1, -1], otherwise ignore the range.
+      if (maxi == prec || mini == -1)
+	mini = maxi;
     }
-  else
+  else if (mini >= 0)
     mini = newmini;
 
   if (mini == -2)
@@ -1120,7 +1109,7 @@ class cfn_strlen : public range_operator
 {
 public:
   using range_operator::fold_range;
-  virtual bool fold_range (irange &r, tree type, const irange &,
+  virtual bool fold_range (irange &r, tree type, const prange &,
 			   const irange &, relation_trio) const
   {
     wide_int max = irange_val_max (ptrdiff_type_node);
@@ -1131,17 +1120,6 @@ public:
     // FIXME: Use max_object_size() - 1 here.
     r.set (type, wi::zero (TYPE_PRECISION (type)), max - 2);
     return true;
-  }
-  virtual bool pointers_handled_p (range_op_dispatch_type type,
-				   unsigned dispatch) const
-  {
-    switch (type)
-      {
-      case DISPATCH_FOLD_RANGE:
-	return dispatch == RO_IPI;
-      default:
-	return true;
-      }
   }
 } op_cfn_strlen;
 
@@ -1175,6 +1153,174 @@ private:
   bool m_is_pos;
 } op_cfn_goacc_dim_size (false), op_cfn_goacc_dim_pos (true);
 
+// Implement range operator for CFN_BUILT_IN_ISINF
+class cfn_isinf : public range_operator
+{
+public:
+  using range_operator::fold_range;
+  using range_operator::op1_range;
+  virtual bool fold_range (irange &r, tree type, const frange &op1,
+			   const irange &, relation_trio) const override
+  {
+    if (op1.undefined_p ())
+      return false;
+
+    if (op1.known_isinf ())
+      {
+	wide_int one = wi::one (TYPE_PRECISION (type));
+	r.set (type, one, one);
+	return true;
+      }
+
+    if (op1.known_isnan ()
+	|| (!real_isinf (&op1.lower_bound ())
+	    && !real_isinf (&op1.upper_bound ())))
+      {
+	r.set_zero (type);
+	return true;
+      }
+
+    r.set_varying (type);
+    return true;
+  }
+  virtual bool op1_range (frange &r, tree type, const irange &lhs,
+			  const frange &, relation_trio) const override
+  {
+    if (lhs.undefined_p ())
+      return false;
+
+    if (lhs.zero_p ())
+      {
+	nan_state nan (true);
+	r.set (type, real_min_representable (type),
+	       real_max_representable (type), nan);
+	return true;
+      }
+
+    if (!range_includes_zero_p (lhs))
+      {
+	// The range is [-INF,-INF][+INF,+INF], but it can't be represented.
+	// Set range to [-INF,+INF]
+	r.set_varying (type);
+	r.clear_nan ();
+	return true;
+      }
+
+    r.set_varying (type);
+    return true;
+  }
+} op_cfn_isinf;
+
+//Implement range operator for CFN_BUILT_IN_ISFINITE
+class cfn_isfinite : public range_operator
+{
+public:
+  using range_operator::fold_range;
+  using range_operator::op1_range;
+  virtual bool fold_range (irange &r, tree type, const frange &op1,
+			   const irange &, relation_trio) const override
+  {
+    if (op1.undefined_p ())
+      return false;
+
+    if (op1.known_isfinite ())
+      {
+	wide_int one = wi::one (TYPE_PRECISION (type));
+	r.set (type, one, one);
+	return true;
+      }
+
+    if (op1.known_isnan ()
+	|| op1.known_isinf ())
+      {
+	r.set_zero (type);
+	return true;
+      }
+
+    r.set_varying (type);
+    return true;
+  }
+  virtual bool op1_range (frange &r, tree type, const irange &lhs,
+			  const frange &, relation_trio) const override
+  {
+    if (lhs.undefined_p ())
+      return false;
+
+    if (lhs.zero_p ())
+      {
+	// The range is [-INF,-INF][+INF,+INF] NAN, but it can't be represented.
+	// Set range to varying
+	r.set_varying (type);
+	return true;
+      }
+
+    if (!range_includes_zero_p (lhs))
+      {
+	nan_state nan (false);
+	r.set (type, real_min_representable (type),
+	       real_max_representable (type), nan);
+	return true;
+      }
+
+    r.set_varying (type);
+    return true;
+  }
+} op_cfn_isfinite;
+
+//Implement range operator for CFN_BUILT_IN_ISNORMAL
+class cfn_isnormal :  public range_operator
+{
+public:
+  using range_operator::fold_range;
+  using range_operator::op1_range;
+  virtual bool fold_range (irange &r, tree type, const frange &op1,
+			   const irange &, relation_trio) const override
+  {
+    if (op1.undefined_p ())
+      return false;
+
+    if (op1.known_isnormal ())
+      {
+	wide_int one = wi::one (TYPE_PRECISION (type));
+	r.set (type, one, one);
+	return true;
+      }
+
+    if (op1.known_isnan ()
+	|| op1.known_isinf ()
+	|| op1.known_isdenormal_or_zero ())
+      {
+	r.set_zero (type);
+	return true;
+      }
+
+    r.set_varying (type);
+    return true;
+  }
+  virtual bool op1_range (frange &r, tree type, const irange &lhs,
+			  const frange &, relation_trio) const override
+  {
+    if (lhs.undefined_p ())
+      return false;
+
+    if (lhs.zero_p ())
+      {
+	r.set_varying (type);
+	return true;
+      }
+
+    if (!range_includes_zero_p (lhs))
+      {
+	nan_state nan (false);
+	r.set (type, real_min_representable (type),
+	       real_max_representable (type), nan);
+	return true;
+      }
+
+    r.set_varying (type);
+    return true;
+  }
+} op_cfn_isnormal;
 
 // Implement range operator for CFN_BUILT_IN_
 class cfn_parity : public range_operator
@@ -1250,7 +1396,7 @@ gimple_range_op_handler::maybe_builtin_call ()
   tree type = gimple_range_type (call);
   if (!type)
     return;
-  if (!Value_Range::supports_type_p (type))
+  if (!value_range::supports_type_p (type))
     return;
 
   switch (func)
@@ -1266,6 +1412,21 @@ gimple_range_op_handler::maybe_builtin_call ()
     CASE_FLT_FN (CFN_BUILT_IN_SIGNBIT):
       m_op1 = gimple_call_arg (call, 0);
       m_operator = &op_cfn_signbit;
+      break;
+
+    CASE_FLT_FN (BUILT_IN_ISINF):
+      m_op1 = gimple_call_arg (call, 0);
+      m_operator = &op_cfn_isinf;
+      break;
+
+    case CFN_BUILT_IN_ISFINITE:
+      m_op1 = gimple_call_arg (call, 0);
+      m_operator = &op_cfn_isfinite;
+      break;
+
+    case CFN_BUILT_IN_ISNORMAL:
+      m_op1 = gimple_call_arg (call, 0);
+      m_operator = &op_cfn_isnormal;
       break;
 
     CASE_CFN_COPYSIGN_ALL:

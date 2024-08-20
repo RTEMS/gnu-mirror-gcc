@@ -310,6 +310,8 @@ merge_and_complain (vec<cl_decoded_option> &decoded_options,
 
 	  /* Fallthru.  */
 	case OPT_fdiagnostics_show_caret:
+	case OPT_fdiagnostics_show_event_links:
+	case OPT_fdiagnostics_show_highlight_colors:
 	case OPT_fdiagnostics_show_labels:
 	case OPT_fdiagnostics_show_line_numbers:
 	case OPT_fdiagnostics_show_option:
@@ -726,6 +728,8 @@ append_compiler_options (obstack *argv_obstack, vec<cl_decoded_option> opts)
       switch (option->opt_index)
 	{
 	case OPT_fdiagnostics_show_caret:
+	case OPT_fdiagnostics_show_event_links:
+	case OPT_fdiagnostics_show_highlight_colors:
 	case OPT_fdiagnostics_show_labels:
 	case OPT_fdiagnostics_show_line_numbers:
 	case OPT_fdiagnostics_show_option:
@@ -785,6 +789,8 @@ append_diag_options (obstack *argv_obstack, vec<cl_decoded_option> opts)
 	case OPT_fdiagnostics_color_:
 	case OPT_fdiagnostics_format_:
 	case OPT_fdiagnostics_show_caret:
+	case OPT_fdiagnostics_show_event_links:
+	case OPT_fdiagnostics_show_highlight_colors:
 	case OPT_fdiagnostics_show_labels:
 	case OPT_fdiagnostics_show_line_numbers:
 	case OPT_fdiagnostics_show_option:
@@ -1358,11 +1364,11 @@ init_num_threads (void)
 void
 print_lto_docs_link ()
 {
-  bool print_url = global_dc->printer->url_format != URL_FORMAT_NONE;
+  bool print_url = global_dc->printer->supports_urls_p ();
   const char *url = global_dc->make_option_url (OPT_flto);
 
   pretty_printer pp;
-  pp.url_format = URL_FORMAT_DEFAULT;
+  pp.set_url_format (URL_FORMAT_DEFAULT);
   pp_string (&pp, "see the ");
   if (print_url)
     pp_begin_url (&pp, url);
@@ -1588,6 +1594,10 @@ run_gcc (unsigned argc, char *argv[])
 
 	case OPT_fdiagnostics_color_:
 	  diagnostic_color_init (global_dc, option->value);
+	  break;
+
+	case OPT_fdiagnostics_show_highlight_colors:
+	  global_dc->set_show_highlight_colors (option->value);
 	  break;
 
 	default:
