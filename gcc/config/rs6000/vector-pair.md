@@ -38,7 +38,9 @@
    UNSPEC_VPAIR_NEG
    UNSPEC_VPAIR_PLUS
    UNSPEC_VPAIR_SMAX
-   UNSPEC_VPAIR_SMIN])
+   UNSPEC_VPAIR_SMIN
+   UNSPEC_VPAIR_ZERO
+   UNSPEC_VPAIR_SPLAT])
 
 ;; Vector pair element ID that defines the scaler element within the vector pair.
 (define_c_enum "vpair_element"
@@ -98,6 +100,104 @@
 ;; Map the scalar element ID into the appropriate insn type for divide.
 (define_int_attr vpair_divtype [(VPAIR_ELEMENT_FLOAT  "vecfdiv")
 				(VPAIR_ELEMENT_DOUBLE "vecdiv")])
+
+;; Mode iterator for the vector modes that we provide splat operations for.
+(define_mode_iterator VPAIR_SPLAT_VMODE [V4SF V2DF])
+
+;; Map element mode to 128-bit vector mode for splat operations
+(define_mode_attr VPAIR_SPLAT_ELEMENT_TO_VMODE [(SF "V4SF")
+						(DF "V2DF")])
+
+;; Map either element mode or vector mode into the name for the splat insn.
+(define_mode_attr vpair_splat_name [(SF   "v8sf")
+				    (DF   "v4df")
+				    (V4SF "v8sf")
+				    (V2DF "v4df")])
+
+;; Initialize a vector pair to 0
+(define_insn_and_split "vpair_zero"
+  [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
+	(unspec:OO [(const_int 0)] UNSPEC_VPAIR_ZERO))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 1) (match_dup 3))
+   (set (match_dup 2) (match_dup 3))]
+{
+  rtx op0 = operands[0];
+
+  operands[1] = simplify_gen_subreg (V2DFmode, op0, OOmode, 0);
+  operands[2] = simplify_gen_subreg (V2DFmode, op0, OOmode, 16);
+  operands[3] = CONST0_RTX (V2DFmode);
+}
+  [(set_attr "length" "8")
+   (set_attr "type" "vecperm")])
+
+;; Create a vector pair with a value splat'ed (duplicated) to all of the
+;; elements.
+(define_expand "vpair_splat_<vpair_splat_name>"
+  [(use (match_operand:OO 0 "vsx_register_operand"))
+   (use (match_operand:SFDF 1 "input_operand"))]
+  "TARGET_MMA"
+{
+  rtx op0 = operands[0];
+  rtx op1 = operands[1];
+  machine_mode element_mode = <MODE>mode;
+
+  if (op1 == CONST0_RTX (element_mode))
+    {
+      emit_insn (gen_vpair_zero (op0));
+      DONE;
+    }
+
+  machine_mode vector_mode = <VPAIR_SPLAT_ELEMENT_TO_VMODE>mode;
+  rtx vec = gen_reg_rtx (vector_mode);
+  unsigned num_elements = GET_MODE_NUNITS (vector_mode);
+  rtvec elements = rtvec_alloc (num_elements);
+  for (size_t i = 0; i < num_elements; i++)
+    RTVEC_ELT (elements, i) = copy_rtx (op1);
+
+  rs6000_expand_vector_init (vec, gen_rtx_PARALLEL (vector_mode, elements));
+  emit_insn (gen_vpair_splat_<vpair_splat_name>_internal (op0, vec));
+  DONE;
+})
+
+;; Inner splat support.  Operand1 is the vector splat created above.  Allow
+;; operand 1 to overlap with the output registers to eliminate one move
+;; instruction.
+(define_insn_and_split "vpair_splat_<vpair_splat_name>_internal"
+  [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
+	(unspec:OO
+	 [(match_operand:VPAIR_SPLAT_VMODE 1 "vsx_register_operand" "0,wa")]
+	 UNSPEC_VPAIR_SPLAT))]
+  "TARGET_MMA"
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  rtx op0 = operands[0];
+  rtx op0_a = simplify_gen_subreg (<MODE>mode, op0, OOmode, 0);
+  rtx op0_b = simplify_gen_subreg (<MODE>mode, op0, OOmode, 16);
+  rtx op1 = operands[1];
+  unsigned op1_regno = reg_or_subregno (op1);
+
+  /* Check if the input is one of the output registers.  */
+  if (op1_regno == reg_or_subregno (op0_a))
+    emit_move_insn (op0_b, op1);
+
+  else if (op1_regno == reg_or_subregno (op0_b))
+    emit_move_insn (op0_a, op1);
+
+  else
+    {
+      emit_move_insn (op0_a, op1);
+      emit_move_insn (op0_b, op1);
+    }
+
+  DONE;
+}
+  [(set_attr "length" "*,8")
+   (set_attr "type" "vecmove")])
 
 ;; Vector pair unary operations.  The last argument in the UNSPEC is a
 ;; CONST_INT which identifies what the scalar element is.
