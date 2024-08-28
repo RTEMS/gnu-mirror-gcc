@@ -17,14 +17,15 @@
 # unused_functions.py gcc/c  gcc/c-family/ gcc/*-c.o | grep -v "'gt_"
 # unused_functions.py gcc/cp gcc/c-family/ gcc/*-c.o | grep -v "'gt_"
 
-import sys, os
+import sys
+import os
 from tempfile import mkdtemp
 from subprocess import Popen, PIPE
 
 def usage():
     sys.stderr.write("usage: %s [-v] [dirs | files] [-- <readelf options>]\n"
                         % sys.argv[0])
-    sys.stderr.write("\t-v\tVerbose output\n");
+    sys.stderr.write("\t-v\tVerbose output\n")
     sys.exit(1)
 
 (odir, sym_args, tmpd, verbose) = (set(), "", None, False)

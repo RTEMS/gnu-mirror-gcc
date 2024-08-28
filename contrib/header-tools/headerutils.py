@@ -1,10 +1,8 @@
 #! /usr/bin/python3
 import os.path
 import sys
-import shlex
 import re
 import subprocess
-import shutil
 import pickle
 
 import multiprocessing 
@@ -31,7 +29,7 @@ def find_pound_define (line):
       print ("What? more than 1 match in #define??")
       print (inc)
       sys.exit(5)
-    return inc[0];
+    return inc[0]
   return ""
 
 def is_pound_if (line):
@@ -95,7 +93,7 @@ def process_include_info (filen, do_macros, keep_src):
   if not os.path.exists (filen):
     return empty_iinfo
 
-  sfile = open (filen, "r");
+  sfile = open (filen, "r")
   data = sfile.readlines()
   sfile.close()
 
@@ -132,7 +130,7 @@ def process_include_info (filen, do_macros, keep_src):
       d = find_pound_define (line)
       if d:
         if d not in macout:
-          macout.append (d);
+          macout.append (d)
           continue
 
       d = find_pound_if (line)
@@ -146,7 +144,7 @@ def process_include_info (filen, do_macros, keep_src):
         else:
           for mac in d:
             if mac != "defined" and mac not in macin:
-              macin.append (mac);
+              macin.append (mac)
 
   if not keep_src:
     data = list()
@@ -299,7 +297,7 @@ def find_unique_include_list (filen):
 # (filen, macin, macout, incl)
 
 def create_macro_in_out (filen):
-  sfile = open (filen, "r");
+  sfile = open (filen, "r")
   data = sfile.readlines()
   sfile.close()
 
@@ -311,14 +309,14 @@ def create_macro_in_out (filen):
     d = find_pound_define (line)
     if d != "":
       if d not in macout:
-        macout.append (d);
+        macout.append (d)
       continue
 
     d = find_pound_if (line)
     if len(d) != 0:
       for mac in d:
         if mac != "defined" and mac not in macin:
-          macin.append (mac);
+          macin.append (mac)
       continue
 
     nm = find_pound_include (line, True, True)
@@ -474,7 +472,7 @@ def get_make_rc (rc, output):
     h = re.findall ("warning: inline function.*used but never defined", output)
     if len(h) != 0:
       rc = 1
-  return rc;
+  return rc
 
 def get_make_output (build_dir, make_opt):
   devnull = open('/dev/null', 'w')
@@ -485,7 +483,7 @@ def get_make_output (build_dir, make_opt):
   else:
     command = make + make_opt
   process = subprocess.Popen(command, stdout=devnull, stderr=subprocess.PIPE, shell=True)
-  output = process.communicate();
+  output = process.communicate()
   rc = get_make_rc (process.returncode, output[1])
   return (rc , output[1])
 
@@ -509,7 +507,7 @@ def spawn_makes (command_list):
     if (ret[0] != 0):
       # Just record the first one.
       if rc[0] == 0:
-        rc = ret;
+        rc = ret
   return rc
 
 def get_make_output_parallel (targ_list, make_opt, at_a_time):

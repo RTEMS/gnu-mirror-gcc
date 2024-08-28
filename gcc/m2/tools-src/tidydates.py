@@ -92,7 +92,7 @@ def handle_copyright(outfile, lines, n, leader1, leader2):
             else:
                 seen_date = False
             if seen_date:
-                if not (e in years):
+                if e not in years:
                     c += len(e) + len(punctuation)
                     outfile.write(' ')
                     outfile.write(e)

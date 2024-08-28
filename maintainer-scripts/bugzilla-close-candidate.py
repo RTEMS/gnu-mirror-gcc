@@ -21,7 +21,6 @@ https://gcc.gnu.org/bugzilla/buglist.cgi?bug_id=87486
 """
 
 import argparse
-import json
 
 import requests
 
@@ -92,7 +91,7 @@ def search():
                 continue
 
             branches = sorted(list(get_branches_by_comments(comments)),
-                              key=lambda b: 999 if b is 'master' else int(b))
+                              key=lambda b: 999 if b == 'master' else int(b))
             if branches:
                 branches_str = ','.join(branches)
                 print('%-30s%-30s%-40s%-40s%-60s' % ('https://gcc.gnu.org/PR%d' % id, branches_str, fail, work, b['summary']), flush=True)

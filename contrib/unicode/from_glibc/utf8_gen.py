@@ -28,7 +28,6 @@ It will output UTF-8 file
 '''
 
 import argparse
-import sys
 import re
 import unicode_utils
 
@@ -147,10 +146,10 @@ def process_charmap(flines, outfile):
         #
         # 3400;<CJK Ideograph Extension A, First>;Lo;0;L;;;;;N;;;;;
         # 4DB5;<CJK Ideograph Extension A, Last>;Lo;0;L;;;;;N;;;;;
-        if fields[1].endswith(', First>') and not 'Surrogate,' in fields[1]:
+        if fields[1].endswith(', First>') and 'Surrogate,' not in fields[1]:
             fields_start = fields
             continue
-        if fields[1].endswith(', Last>') and not 'Surrogate,' in fields[1]:
+        if fields[1].endswith(', Last>') and 'Surrogate,' not in fields[1]:
             process_range(fields_start[0], fields[0],
                           outfile, fields[1][:-7]+'>')
             fields_start = []
@@ -227,7 +226,7 @@ def process_width(outfile, ulines, elines, plines):
     width_dict = {}
     for line in elines:
         fields = line.split(";")
-        if not '..' in fields[0]:
+        if '..' not in fields[0]:
             code_points = (fields[0], fields[0])
         else:
             code_points = fields[0].split("..")
@@ -244,7 +243,7 @@ def process_width(outfile, ulines, elines, plines):
         # Characters with the property “Prepended_Concatenation_Mark”
         # should have the width 1:
         fields = line.split(";")
-        if not '..' in fields[0]:
+        if '..' not in fields[0]:
             code_points = (fields[0], fields[0])
         else:
             code_points = fields[0].split("..")

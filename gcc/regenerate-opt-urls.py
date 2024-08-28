@@ -35,10 +35,8 @@ To run unit tests:
 """
 
 import argparse
-import json
 import os
 from pathlib import Path
-from pprint import pprint
 import sys
 import re
 import unittest

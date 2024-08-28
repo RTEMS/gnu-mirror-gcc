@@ -348,7 +348,7 @@ class GitCommit:
         if self.info.lines and not self.revert_commit:
             self.subject_prs = {m.group('pr') for m in subject_pr2_regex.finditer(info.lines[0])}
             for m in subject_pr_regex.finditer(info.lines[0]):
-                if not m.group('component') in bug_components:
+                if m.group('component') not in bug_components:
                     self.errors.append(Error('invalid PR component in subject', info.lines[0]))
                 self.subject_prs.add(m.group('pr'))
 
@@ -506,7 +506,7 @@ class GitCommit:
                     if not component:
                         self.errors.append(Error('missing PR component', line))
                         continue
-                    elif not component[:-1] in bug_components:
+                    elif component[:-1] not in bug_components:
                         self.errors.append(Error('invalid PR component', line))
                         continue
                     else:

@@ -446,7 +446,7 @@ def visit_dir(startDir, ext, func):
             if (len(fname) > len(ext)) and (fname[-len(ext):] == ext):
                 fullpath = os.path.join(dirName, fname)
                 output_name = fullpath
-                if not (fullpath in seen_files):
+                if fullpath not in seen_files:
                     seen_files += [fullpath]
                     func(fullpath)
             # Remove the first entry in the list of sub-directories

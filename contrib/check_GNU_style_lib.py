@@ -26,7 +26,6 @@
 # like this:
 # $ pip3 install unidiff termcolor
 
-import sys
 import re
 import unittest
 

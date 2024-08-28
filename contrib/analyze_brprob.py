@@ -64,8 +64,6 @@
 #  "opcode values nonequal (on trees)" heuristics has good hirate, but poor
 #  coverage.
 
-import sys
-import os
 import re
 import argparse
 
@@ -227,7 +225,7 @@ class Profile:
         self.niter_vector = []
 
     def add(self, name, prediction, count, hits):
-        if not name in self.heuristics:
+        if name not in self.heuristics:
             self.heuristics[name] = Summary(name)
 
         s = self.heuristics[name]
