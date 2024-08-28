@@ -1,3 +1,115 @@
+2024-08-09  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* testsuite/libgomp.c++/static-aggr-constructor-destructor-1.C:
+	Fix effective-target keyword.
+	* testsuite/libgomp.c++/static-aggr-constructor-destructor-2.C:
+	Likewise.
+	* testsuite/libgomp.c-c++-common/target-is-initial-host-2.c:
+	Likewise.
+	* testsuite/libgomp.c-c++-common/target-is-initial-host.c:
+	Likewise.
+	* testsuite/libgomp.fortran/target-is-initial-host-2.f90:
+	Likewise.
+	* testsuite/libgomp.fortran/target-is-initial-host.f: Likewise.
+	* testsuite/libgomp.fortran/target-is-initial-host.f90: Likewise.
+
+2024-08-08  Tobias Burnus  <tburnus@baylibre.com>
+
+	* libgomp.texi (OpenMP Technical Report 13): Renamed from
+	'OpenMP Technical Report 12'; updated for TR13 changes.
+
+2024-08-08  Tobias Burnus  <tburnus@baylibre.com>
+
+	* libgomp.texi (omp_is_initial_device): Mention
+	-fno-builtin-omp_is_initial_device and folding by default.
+
+2024-08-08  Tobias Burnus  <tburnus@baylibre.com>
+
+	* testsuite/libgomp.c++/static-aggr-constructor-destructor-1.C: Split
+	scan-tree-dump into with and without target offload_target_any.
+	* testsuite/libgomp.c++/static-aggr-constructor-destructor-2.C:
+	Likewise.
+
+2024-08-07  Julian Brown  <julian@codesourcery.com>
+	    Tobias Burnus  <tobias@baylibre.com>
+
+	* testsuite/libgomp.c++/static-aggr-constructor-destructor-1.C: New test.
+	* testsuite/libgomp.c++/static-aggr-constructor-destructor-2.C: New test.
+	* testsuite/libgomp.c++/static-aggr-constructor-destructor-3.C: New test.
+	* testsuite/libgomp.c-c++-common/target-is-initial-host.c: New test.
+	* testsuite/libgomp.c-c++-common/target-is-initial-host-2.c: New test.
+	* testsuite/libgomp.fortran/target-is-initial-host.f: New test.
+	* testsuite/libgomp.fortran/target-is-initial-host.f90: New test.
+	* testsuite/libgomp.fortran/target-is-initial-host-2.f90: New test.
+
+2024-08-07  Tobias Burnus  <tburnus@baylibre.com>
+
+	* testsuite/libgomp.c-c++-common/target-link-2.c: Reset variable
+	value to handle multi-device tests.
+
+2024-08-06  Tobias Burnus  <tburnus@baylibre.com>
+
+	* target.c (gomp_load_image_to_device): Extend fatal-error message;
+	simplify a condition.
+
+2024-08-05  Tobias Burnus  <tburnus@baylibre.com>
+
+	* libgomp.texi (OpenMP Runtime Library Routines): Add TR13 routines
+	to @menu (commented out).
+
+2024-08-01  Tobias Burnus  <tburnus@baylibre.com>
+	    Richard Biener  <rguenther@suse.de
+
+	PR middle-end/115637
+	* testsuite/libgomp.fortran/declare-target-link.f90: Uncomment
+	now working code.
+
+2024-07-31  Sam James  <sam@gentoo.org>
+
+	* testsuite/libgomp.c++/pr24455.C: Fix dg-require-effective-target directive order.
+	* testsuite/libgomp.c/pr24455.c: Likewise.
+
+2024-07-31  Sam James  <sam@gentoo.org>
+
+	* testsuite/libgomp.c++/declare-target-indirect-1.C: Fix 'dg-run' typo.
+
+2024-07-29  Tobias Burnus  <tburnus@baylibre.com>
+
+	* libgomp.texi (OpenMP Runtime Library Routines): Add missing
+	title to some commented still undocumented items.
+	(Device Information Routines): Update.
+
+2024-07-29  Tobias Burnus  <tburnus@baylibre.com>
+
+	PR fortran/115559
+	* testsuite/libgomp.fortran/declare-target-link.f90: New test.
+
+2024-07-29  Tobias Burnus  <tburnus@baylibre.com>
+
+	PR middle-end/116107
+	* target.c (gomp_map_vars_internal): Honor array mapping offsets
+	with declare-target 'link' variables.
+	* testsuite/libgomp.c-c++-common/target-link-2.c: New test.
+
+2024-07-19  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* config/gcn/target.c (GOMP_teams4): Document.
+	* config/nvptx/target.c (GOMP_teams4): Likewise.
+	* target.c (GOMP_teams4): Likewise.
+
+2024-07-19  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* config/gcn/libgomp-gcn.h (GOMP_TEAM_NUM): Inject.
+	* config/gcn/target.c (GOMP_teams4): Handle.
+	* config/gcn/team.c (gomp_gcn_enter_kernel): Initialize.
+	* config/gcn/teams.c (omp_get_team_num): Adjust.
+
+2024-07-19  Paul Thomas  <pault@gcc.gnu.org>
+
+	* testsuite/libgomp.oacc-fortran/privatized-ref-2.f90: Cut
+	dg-note about 'a' and remove bogus warnings about its array
+	descriptor components being used uninitialized.
+
 2024-07-01  Andrew Stubbs  <ams@baylibre.com>
 	    Thomas Schwinge  <thomas@codesourcery.com>
 

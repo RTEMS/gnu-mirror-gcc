@@ -604,7 +604,7 @@ C ObjC C++ ObjC++ Joined RejectNegative UInteger Var(warn_dangling_pointer) Warn
 Warn for uses of pointers to auto variables whose lifetime has ended.
 
 Wdangling-reference
-C++ ObjC++ Var(warn_dangling_reference) Warning LangEnabledBy(C++ ObjC++, Wall)
+C++ ObjC++ Var(warn_dangling_reference) Warning LangEnabledBy(C++ ObjC++, Wextra)
 Warn when a reference is bound to a temporary whose lifetime has ended.
 
 Wdate-time
@@ -1420,6 +1420,10 @@ Wtautological-compare
 C ObjC C++ ObjC++ Var(warn_tautological_compare) Warning LangEnabledBy(C ObjC C++ ObjC++,Wall)
 Warn if a comparison always evaluates to true or false.
 
+Wtemplate-body
+C++ ObjC++ Var(warn_template_body) Warning Init(1)
+Diagnose errors when parsing a template.
+
 Wtemplate-id-cdtor
 C++ ObjC++ Var(warn_template_id_cdtor) Warning
 Warn about simple-template-id in a constructor or destructor.
@@ -1463,6 +1467,10 @@ Warn about unrecognized pragmas.
 Wunsuffixed-float-constants
 C ObjC Var(warn_unsuffixed_float_constants) Warning
 Warn about unsuffixed float constants.
+
+Wunterminated-string-initialization
+C ObjC Var(warn_unterminated_string_initialization) Warning LangEnabledBy(C ObjC,Wextra || Wc++-compat)
+Warn about character arrays initialized as unterminated character sequences with a string literal.
 
 Wunused
 C ObjC C++ ObjC++ LangEnabledBy(C ObjC C++ ObjC++,Wall)
@@ -1721,8 +1729,8 @@ C++ ObjC++ Var(flag_concepts)
 Enable support for C++ concepts.
 
 fconcepts-ts
-C++ ObjC++ Var(flag_concepts_ts) Init(0)
-Enable certain features present in the Concepts TS.
+C++ ObjC++ WarnRemoved
+Removed in GCC 15.  This switch has no effect.
 
 fconcepts-diagnostics-depth=
 C++ ObjC++ Joined RejectNegative UInteger Var(concepts_diagnostics_max_depth) Init(1)

@@ -1,3 +1,493 @@
+2024-08-23  Paul Thomas  <pault@gcc.gnu.org>
+
+	Revert:
+	2024-08-06  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/102689
+	* trans-array.cc (get_array_ref_dim_for_loop_dim): Use the arg1
+	class container carried in ss->info as the seed for a lhs in
+	class valued transformational intrinsic calls that are not the
+	rhs of an assignment. Otherwise, the lhs variable expression is
+	taken from the loop chain. For this latter case, the _vptr and
+	_len fields are set.
+	(gfc_trans_create_temp_array): Use either the lhs expression
+	seeds to build a class variable that will take the returned
+	descriptor as its _data field. In the case that the arg1 expr.
+	is used, a class typespec must be built with the correct rank
+	and the _vptr and _len fields set. The element size is provided
+	for the temporary allocation and to set the descriptor span.
+	(gfc_array_init_size): When an intrinsic type scalar expr3 is
+	used in allocation of a class array, use its element size in
+	the descriptor dtype.
+	* trans-expr.cc (gfc_conv_class_to_class): Class valued
+	transformational intrinsics return the pointer to the array
+	descriptor as the _data field of a class temporary. Extract
+	directly and return the address of the class temporary.
+	(gfc_conv_procedure_call): store the expression for the first
+	argument of a class valued transformational intrinsic function
+	in the ss info class_container field. Later, use its type  as
+	the element type in the call to gfc_trans_create_temp_array.
+	(fcncall_realloc_result): Add a dtype argument and use it in
+	the descriptor, when available.
+	(gfc_trans_arrayfunc_assign): For class lhs, build a dtype with
+	the lhs rank and the rhs element size and use it in the call to
+	fcncall_realloc_result.
+
+2024-08-23  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	* invoke.texi (Code Gen Options): Add a missing word.
+
+2024-08-23  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	PR fortran/86468
+	* trans-stmt.cc (trans_associate_var): Remove superfluous
+	view_convert.
+
+2024-08-21  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	PR fortran/86468
+	* trans-intrinsic.cc (conv_intrinsic_move_alloc): Correct
+	comment.
+	* trans-types.cc (gfc_sym_type): Pass coarray rank, not	false.
+	(gfc_get_derived_type): Only propagate	codimension for coarrays
+	and pointers to array components in derived typed coarrays.
+
+2024-08-21  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	PR fortran/77518
+	* trans-intrinsic.cc (gfc_conv_intrinsic_sizeof): Use
+	class_container of se when set.
+
+2024-08-20  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	PR fortran/84246
+	* resolve.cc (caf_possible_reallocate): Detect arrays that may
+	be reallocated by caf_send.
+	(resolve_ordinary_assign): More reliably detect assignments
+	where a rewrite to caf_send is needed.
+	* trans-expr.cc (gfc_trans_assignment_1): Remove rewrite to
+	caf_send, because this is done by resolve now.
+	* trans-intrinsic.cc (conv_caf_send): Prevent unneeded temporary
+	arrays.
+
+2024-08-19  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	PR fortran/46371
+	PR fortran/56496
+	* expr.cc (gfc_is_coindexed): Detect is coindexed also when
+	rewritten to caf_get.
+	* trans-stmt.cc (trans_associate_var): Always accept a
+	descriptor for coarrays.
+
+2024-08-19  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	PR fortran/84244
+	* trans-types.cc (gfc_get_derived_type): When a caf_sub_token is
+	generated for a component, link it to the component it is
+	generated for (the previous one).
+
+2024-08-16  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/114146
+	* intrinsic.texi: Fix documentation of arguments of RANDOM_INIT,
+	which is conforming to the F2018 standard.
+
+2024-08-15  Jakub Jelinek  <jakub@redhat.com>
+
+	PR bootstrap/116387
+	* resolve.cc (resolve_operator): Use %L rather than %%L in format
+	string.
+
+2024-08-15  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	PR fortran/110033
+	* class.cc (gfc_is_class_scalar_expr): Coarray refs that ref
+	only self, aka this image, are regarded as scalar, too.
+	* resolve.cc (resolve_assoc_var): Ignore this image coarray refs
+	and do not build a new class type.
+	* trans-expr.cc (gfc_get_caf_token_offset): Get the caf token
+	from the descriptor for associated variables.
+	(gfc_conv_variable): Same.
+	(gfc_trans_pointer_assignment): Assign token to temporary
+	associate variable, too.
+	(gfc_trans_scalar_assign): Add flag that assign is for associate
+	and use it to assign the token.
+	(is_assoc_assign): Detect that expressions are for associate
+	assign.
+	(gfc_trans_assignment_1): Treat associate assigns like pointer
+	assignments where possible.
+	* trans-stmt.cc (trans_associate_var): Set same_class only for
+	class-targets.
+	* trans.h (gfc_trans_scalar_assign): Add flag to
+	trans_scalar_assign for marking associate assignments.
+
+2024-08-15  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	* arith.cc (reduce_unary): Use expr.corank.
+	(reduce_binary_ac): Same.
+	(reduce_binary_ca): Same.
+	(reduce_binary_aa): Same.
+	* array.cc (gfc_match_array_ref): Same.
+	* check.cc (dim_corank_check): Same.
+	(gfc_check_move_alloc): Same.
+	(gfc_check_image_index): Same.
+	* class.cc (gfc_add_class_array_ref): Same.
+	(finalize_component): Same.
+	* data.cc (gfc_assign_data_value): Same.
+	* decl.cc (match_clist_expr): Same.
+	(add_init_expr_to_sym): Same.
+	* expr.cc (simplify_intrinsic_op): Same.
+	(simplify_parameter_variable): Same.
+	(gfc_check_assign_symbol): Same.
+	(gfc_get_variable_expr): Same.
+	(gfc_add_full_array_ref): Same.
+	(gfc_lval_expr_from_sym): Same.
+	(gfc_get_corank): Removed.
+	* frontend-passes.cc (callback_reduction): Use expr.corank.
+	(create_var): Same.
+	(combine_array_constructor): Same.
+	(optimize_minmaxloc): Same.
+	* gfortran.h (gfc_get_corank): Add corank to gfc_expr.
+	* intrinsic.cc (gfc_get_intrinsic_function_symbol): Use
+	expr.corank.
+	(gfc_convert_type_warn): Same.
+	(gfc_convert_chartype): Same.
+	* iresolve.cc (resolve_bound): Same.
+	(gfc_resolve_cshift): Same.
+	(gfc_resolve_eoshift): Same.
+	(gfc_resolve_logical): Same.
+	(gfc_resolve_matmul): Same.
+	* match.cc (copy_ts_from_selector_to_associate): Same.
+	* matchexp.cc (gfc_get_parentheses): Same.
+	* parse.cc (parse_associate): Same.
+	* primary.cc (gfc_match_rvalue): Same.
+	* resolve.cc (resolve_structure_cons): Same.
+	(resolve_actual_arglist): Same.
+	(resolve_elemental_actual): Same.
+	(resolve_generic_f0): Same.
+	(resolve_unknown_f): Same.
+	(resolve_operator): Same.
+	(gfc_expression_rank): Same and set dimen_type for coarray to
+	default.
+	(gfc_op_rank_conformable): Use expr.corank.
+	(add_caf_get_intrinsic): Same.
+	(resolve_variable): Same.
+	(gfc_fixup_inferred_type_refs): Same.
+	(check_host_association): Same.
+	(resolve_compcall): Same.
+	(resolve_expr_ppc): Same.
+	(resolve_assoc_var): Same.
+	(fixup_array_ref): Same.
+	(resolve_select_type): Same.
+	(add_comp_ref): Same.
+	(get_temp_from_expr): Same.
+	(resolve_fl_var_and_proc): Same.
+	(resolve_symbol): Same.
+	* symbol.cc (gfc_is_associate_pointer): Same.
+	* trans-array.cc (walk_coarray): Same.
+	(gfc_conv_expr_descriptor): Same.
+	(gfc_walk_array_ref): Same.
+	* trans-array.h (gfc_walk_array_ref): Same.
+	* trans-expr.cc (gfc_get_ultimate_alloc_ptr_comps_caf_token):
+	Same.
+	* trans-intrinsic.cc (trans_this_image): Same.
+	(trans_image_index): Same.
+	(conv_intrinsic_cobound): Same.
+	(gfc_walk_intrinsic_function): Same.
+	(conv_intrinsic_move_alloc): Same.
+	* trans-stmt.cc (gfc_trans_lock_unlock): Same.
+	(trans_associate_var): Same and adapt to slightly different
+	behaviour of expr.corank and gfc_get_corank.
+	(gfc_trans_allocate): Same.
+	* trans.cc (gfc_add_finalizer_call): Same.
+
+2024-08-14  Harald Anlauf  <anlauf@gmx.de>
+
+	* simplify.cc (gfc_simplify_sizeof): Clear used gmp variable.
+	* target-memory.cc (gfc_target_expr_size): Likewise.
+
+2024-08-14  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	PR fortran/102973
+	* match.cc (gfc_match_associate): Reset proc_ptr parsing flag on
+	error.
+
+2024-08-14  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	PR fortran/116292
+	* trans-intrinsic.cc (conv_intrinsic_move_alloc): Get the vtab
+	only for derived types and classes and adjust _len for class
+	types.
+
+2024-08-13  Harald Anlauf  <anlauf@gmx.de>
+	    Steven G. Kargl  <kargl@gcc.gnu.org>
+
+	PR fortran/114308
+	* array.cc (resolve_array_list): Reject array constructor value if
+	its declared type is abstract (F2018:C7114).
+
+2024-08-12  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	PR fortran/85510
+	* resolve.cc (resolve_variable): Mark the variable as host
+	associated only, when it is not in an associate block.
+	* trans-decl.cc (generate_coarray_init): Remove incorrect unused
+	flag on parameter.
+
+2024-08-11  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/116221
+	* intrinsic.cc (gfc_get_intrinsic_sub_symbol): Initialize variable.
+	* symbol.cc (gfc_get_ha_symbol): Likewise.
+
+2024-08-07  Julian Brown  <julian@codesourcery.com>
+	    Tobias Burnus  <tobias@baylibre.com>
+
+	* gfortran.h (gfc_option_t): Add disable_omp_is_initial_device.
+	* lang.opt (fbuiltin-): Add.
+	* options.cc (gfc_handle_option): Handle
+	-fno-builtin-omp_is_initial_device.
+	* f95-lang.cc (gfc_init_builtin_functions): Handle
+	DEF_GOMP_BUILTIN_COMPILER.
+	* trans-decl.cc (gfc_get_extern_function_decl): Add code to use
+	DEF_GOMP_BUILTIN_COMPILER for 'omp_is_initial_device'.
+
+2024-08-06  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+
+	PR fortran/109105
+	* resolve.cc (CHECK_INTERFACES): New helper macro.
+	(resolve_operator): Replace use of snprintf with
+	gfc_error.
+
+2024-08-06  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/102689
+	* trans-array.cc (get_array_ref_dim_for_loop_dim): Use the arg1
+	class container carried in ss->info as the seed for a lhs in
+	class valued transformational intrinsic calls that are not the
+	rhs of an assignment. Otherwise, the lhs variable expression is
+	taken from the loop chain. For this latter case, the _vptr and
+	_len fields are set.
+	(gfc_trans_create_temp_array): Use either the lhs expression
+	seeds to build a class variable that will take the returned
+	descriptor as its _data field. In the case that the arg1 expr.
+	is used, a class typespec must be built with the correct rank
+	and the _vptr and _len fields set. The element size is provided
+	for the temporary allocation and to set the descriptor span.
+	(gfc_array_init_size): When an intrinsic type scalar expr3 is
+	used in allocation of a class array, use its element size in
+	the descriptor dtype.
+	* trans-expr.cc (gfc_conv_class_to_class): Class valued
+	transformational intrinsics return the pointer to the array
+	descriptor as the _data field of a class temporary. Extract
+	directly and return the address of the class temporary.
+	(gfc_conv_procedure_call): store the expression for the first
+	argument of a class valued transformational intrinsic function
+	in the ss info class_container field. Later, use its type  as
+	the element type in the call to gfc_trans_create_temp_array.
+	(fcncall_realloc_result): Add a dtype argument and use it in
+	the descriptor, when available.
+	(gfc_trans_arrayfunc_assign): For class lhs, build a dtype with
+	the lhs rank and the rhs element size and use it in the call to
+	fcncall_realloc_result.
+
+2024-08-03  Steve Kargl  <kargls@comcast.net>
+
+	PR fortran/104626
+	* symbol.cc (gfc_add_save): Add checks for SAVE attribute
+	conflicts and duplicate SAVE attribute.
+
+2024-08-02  Mikael Morin  <mikael@gcc.gnu.org>
+
+	* trans-intrinsic.cc (maybe_absent_optional_variable): New function.
+	(gfc_conv_intrinsic_minmaxloc): Remove BACK from scalarization and
+	evaluate it before.  Add a check that BACK is not null if the
+	expression is an optional dummy.  Save the resulting expression to a
+	variable.  Use the variable in the generated inline code.
+
+2024-08-01  Jakub Jelinek  <jakub@redhat.com>
+
+	* trans-types.cc (gfc_get_array_descr_info): Don't test if
+	!integer_zerop (dtype_off), use fold_build_pointer_plus
+	unconditionally.
+
+2024-07-29  Tobias Burnus  <tburnus@baylibre.com>
+
+	PR fortran/115559
+	* trans-common.cc (build_common_decl): Add 'omp declare target' and
+	'omp declare target link' variables to offload_vars.
+	* trans-decl.cc (add_attributes_to_decl): Likewise; update args and
+	call decl_attributes.
+	(get_proc_pointer_decl, gfc_get_extern_function_decl,
+	build_function_decl): Update calls.
+	(gfc_get_symbol_decl): Likewise; move after 'DECL_STATIC (t)=1'
+	to avoid errors with symtab_node::get_create.
+
+2024-07-22  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	PR fortran/88624
+	* trans-expr.cc (gfc_conv_procedure_call): Treat
+	pointers/references (e.g. from parameters) correctly by derefing
+	them.
+
+2024-07-21  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/59104
+	* gfortran.h : Add decl_order to gfc_symbol.
+	* symbol.cc : Add static next_decl_order..
+	(gfc_set_sym_referenced): Set symbol decl_order.
+	* trans-decl.cc : Include dependency.h.
+	(decl_order): Replace symbol declared_at.lb->location with
+	decl_order.
+
+2024-07-19  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/103115
+	* trans-array.cc (gfc_trans_array_constructor_value): If the first
+	element of an array constructor is deferred-length character and
+	therefore does not have an element size known at compile time, do
+	not try to collect subsequent constant elements into a constructor
+	for optimization.
+
+2024-07-18  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	PR fortran/78466
+	PR fortran/80774
+	* array.cc (gfc_compare_array_spec): Take cotype into account.
+	* class.cc (gfc_build_class_symbol): Coarrays are also arrays.
+	* gfortran.h (IS_CLASS_COARRAY_OR_ARRAY): New macro to detect
+	regular and coarray class arrays.
+	* interface.cc (compare_components): Take codimension into
+	account.
+	* resolve.cc (resolve_symbol): Improve error message.
+	* simplify.cc (simplify_bound_dim): Remove duplicate.
+	* trans-array.cc (gfc_trans_array_cobounds): Coarrays are also
+	arrays.
+	(gfc_trans_array_bounds): Same.
+	(gfc_trans_dummy_array_bias): Same.
+	(get_coarray_as): Get the as having a non-zero codim.
+	(is_explicit_coarray): Detect explicit coarrays.
+	(gfc_conv_expr_descriptor): Create a new descriptor for explicit
+	coarrays.
+	* trans-decl.cc (gfc_build_qualified_array): Coarrays are also
+	arrays.
+	(gfc_build_dummy_array_decl): Same.
+	(gfc_get_symbol_decl): Same.
+	(gfc_trans_deferred_vars): Same.
+	* trans-expr.cc (class_scalar_coarray_to_class): Get the
+	descriptor from the correct location.
+	(gfc_conv_variable): Pick up the descriptor when needed.
+	* trans-types.cc (gfc_is_nodesc_array): Coarrays are also
+	arrays.
+	(gfc_get_nodesc_array_type): Indentation fix only.
+	(cobounds_match_decl): Match a tree's bounds to the expr's
+	bounds and return true, when they match.
+	(gfc_get_derived_type): Create a new type tree/descriptor, when
+	the cobounds of the existing declaration and expr to not
+	match.  This happends for class arrays in parameter list, when
+	there are different cobound declarations.
+
+2024-07-18  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/108889
+	* gfortran.h: Add bit field 'allocated_in_scope' to gfc_symbol.
+	* trans-array.cc (gfc_array_allocate): Set 'allocated_in_scope'
+	after allocation if not a component reference.
+	(gfc_alloc_allocatable_for_assignment): If 'allocated_in_scope'
+	not set, not a component ref and not allocated, set the array
+	bounds and offset to give zero length in all dimensions. Then
+	set allocated_in_scope.
+
+2024-07-18  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	PR fortran/82904
+	* trans-types.cc (gfc_sym_type): Use type `char*` for saved
+	deferred length char arrays.
+	* trans.cc (get_array_span): Get `.span` also for `char*` typed
+	arrays, i.e. for those that have INTEGER_TYPE instead of
+	ARRAY_TYPE.
+
+2024-07-17  Kewen Lin  <linkw@linux.ibm.com>
+
+	PR target/112993
+	* trans-types.cc (get_real_kind_from_node): Consider the case where
+	more than one modes have the same precision.
+
+2024-07-16  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/84868
+	* simplify.cc (gfc_simplify_len_trim): If the argument is an
+	element of a parameter array, simplify all the elements and
+	build a new parameter array to hold the result, after checking
+	that it doesn't already exist.
+	* trans-expr.cc (gfc_get_interface_mapping_array) if a string
+	length is available, use it for the typespec.
+	(gfc_add_interface_mapping): Supply the se string length.
+
+2024-07-16  Prathamesh Kulkarni  <prathameshk@nvidia.com>
+
+	* trans-expr.cc (gfc_trans_zero_assign): Handle allocatable arrays.
+
+2024-07-13  Mikael Morin  <mikael@gcc.gnu.org>
+
+	* trans-intrinsic.cc (gfc_conv_intrinsic_minmaxloc): Add the
+	preliminary code generated for MASK to the preliminary code of
+	MINLOC/MAXLOC.
+
+2024-07-12  Mikael Morin  <morin-mikael@orange.fr>
+
+	* trans-intrinsic.cc (gfc_conv_intrinsic_minmaxloc): Create a new
+	scalar scalarization chain element if BACK is present.  Add it to
+	the loop.  Set the scalarization chain before evaluating the
+	argument.
+
+2024-07-11  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	* trans-array.cc (gfc_conv_array_parameter): Init variable to
+	NULL_TREE to fix bootstrap.
+
+2024-07-11  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	PR fortran/96992
+	* trans-array.cc (gfc_trans_array_bounds): Set a starting
+	stride, when descriptor expects a variable for the stride.
+	(gfc_trans_dummy_array_bias): Allow storage association for
+	dummy class arrays, when they are not elemental.
+	(gfc_conv_array_parameter): Add more general class support
+	and packing for classes, too.
+	* trans-array.h (gfc_conv_array_parameter): Add lbound shift
+	for class arrays.
+	* trans-decl.cc (gfc_build_builtin_function_decls): Add decls
+	for internal_un-/pack_class.
+	* trans-expr.cc (gfc_reset_vptr): Allow supplying a type-tree
+	to generate the vtab from.
+	(gfc_class_set_vptr): Allow supplying a class-tree to take the
+	vptr from.
+	(class_array_data_assign): Rename to gfc_class_array_data_assign
+	and make usable from other compile units.
+	(gfc_class_array_data_assign): Renamed from class_array_data_
+	assign.
+	(gfc_conv_derived_to_class): Remove assert to
+	allow converting derived to class type arrays with assumed
+	rank.  Reduce code base and use gfc_conv_array_parameter also
+	for classes.
+	(gfc_conv_class_to_class): Use gfc_class_data_assign.
+	(gfc_conv_procedure_call): Adapt to new signature of
+	gfc_conv_derived_to_class.
+	* trans-io.cc (transfer_expr): Same.
+	* trans-stmt.cc (trans_associate_var): Same.
+	* trans.h (gfc_conv_derived_to_class): Signature changed.
+	(gfc_class_array_data_assign): Made public.
+	(gfor_fndecl_in_pack_class): Added declaration.
+	(gfor_fndecl_in_unpack_class): Same.
+
+2024-07-08  Mikael Morin  <mikael@gcc.gnu.org>
+
+	* trans-array.cc (gfc_trans_preloop_setup): Use a separate variable
+	for iteration.  Use directly the value of variable I if it is known.
+	Move the definition of the variable to the branch where the
+	remaining uses are.
+
 2024-07-03  Harald Anlauf  <anlauf@gmx.de>
 
 	PR fortran/115700

@@ -4349,9 +4349,14 @@ vectorizable_simd_clone_call (vec_info *vinfo, stmt_vec_info stmt_info,
 	    case SIMD_CLONE_ARG_TYPE_MASK:
 	      if (loop_vinfo
 		  && LOOP_VINFO_CAN_USE_PARTIAL_VECTORS_P (loop_vinfo))
-		vect_record_loop_mask (loop_vinfo,
-				       &LOOP_VINFO_MASKS (loop_vinfo),
-				       ncopies, vectype, op);
+		{
+		  unsigned nmasks
+		    = exact_div (ncopies * bestn->simdclone->simdlen,
+				 TYPE_VECTOR_SUBPARTS (vectype)).to_constant ();
+		  vect_record_loop_mask (loop_vinfo,
+					 &LOOP_VINFO_MASKS (loop_vinfo),
+					 nmasks, vectype, op);
+		}
 
 	      break;
 	    }
@@ -4748,7 +4753,12 @@ vectorizable_simd_clone_call (vec_info *vinfo, stmt_vec_info stmt_info,
 		      SIMD_CLONE_ARG_TYPE_MASK);
 
 	  tree masktype = bestn->simdclone->args[mask_i].vector_type;
-	  callee_nelements = TYPE_VECTOR_SUBPARTS (masktype);
+	  if (SCALAR_INT_MODE_P (bestn->simdclone->mask_mode))
+	    /* Guess the number of lanes represented by masktype.  */
+	    callee_nelements = exact_div (bestn->simdclone->simdlen,
+					  bestn->simdclone->nargs - nargs);
+	  else
+	    callee_nelements = TYPE_VECTOR_SUBPARTS (masktype);
 	  o = vector_unroll_factor (nunits, callee_nelements);
 	  for (m = j * o; m < (j + 1) * o; m++)
 	    {
@@ -13286,6 +13296,8 @@ vect_analyze_stmt (vec_info *vinfo,
 				      NULL, NULL, node, cost_vec)
 	  || vectorizable_load (vinfo, stmt_info, NULL, NULL, node, cost_vec)
 	  || vectorizable_store (vinfo, stmt_info, NULL, NULL, node, cost_vec)
+	  || vectorizable_lane_reducing (as_a <loop_vec_info> (vinfo),
+					 stmt_info, node, cost_vec)
 	  || vectorizable_reduction (as_a <loop_vec_info> (vinfo), stmt_info,
 				     node, node_instance, cost_vec)
 	  || vectorizable_induction (as_a <loop_vec_info> (vinfo), stmt_info,
@@ -14167,7 +14179,6 @@ supportable_widening_operation (vec_info *vinfo,
 	 are properly set up for the caller.  If we fail, we'll continue with
 	 a VEC_WIDEN_MULT_LO/HI_EXPR check.  */
       if (vect_loop
-	  && STMT_VINFO_RELEVANT (stmt_info) == vect_used_by_reduction
 	  && !nested_in_vect_loop_p (vect_loop, stmt_info)
 	  && supportable_widening_operation (vinfo, VEC_WIDEN_MULT_EVEN_EXPR,
 					     stmt_info, vectype_out,
@@ -14180,10 +14191,9 @@ supportable_widening_operation (vec_info *vinfo,
              same operation.  One such an example is s += a * b, where elements
              in a and b cannot be reordered.  Here we check if the vector defined
              by STMT is only directly used in the reduction statement.  */
-	  tree lhs = gimple_assign_lhs (stmt_info->stmt);
+	  tree lhs = gimple_assign_lhs (vect_orig_stmt (stmt_info)->stmt);
 	  stmt_vec_info use_stmt_info = loop_info->lookup_single_use (lhs);
-	  if (use_stmt_info
-	      && STMT_VINFO_DEF_TYPE (use_stmt_info) == vect_reduction_def)
+	  if (use_stmt_info && STMT_VINFO_REDUC_DEF (use_stmt_info))
 	    return true;
         }
       c1 = VEC_WIDEN_MULT_LO_EXPR;
@@ -14891,7 +14901,7 @@ vect_get_vector_types_for_stmt (vec_info *vinfo, stmt_vec_info stmt_info,
 	 vector size per vectorization).  */
       scalar_type = vect_get_smallest_scalar_type (stmt_info,
 						   TREE_TYPE (vectype));
-      if (scalar_type != TREE_TYPE (vectype))
+      if (!types_compatible_p (scalar_type, TREE_TYPE (vectype)))
 	{
 	  if (dump_enabled_p ())
 	    dump_printf_loc (MSG_NOTE, vect_location,

@@ -679,12 +679,12 @@ saved_diagnostic::saved_diagnostic (const state_machine *sm,
   m_stmt (ploc.m_stmt),
   /* stmt_finder could be on-stack; we want our own copy that can
      outlive that.  */
-  m_stmt_finder (ploc.m_finder ? ploc.m_finder->clone () : NULL),
+  m_stmt_finder (ploc.m_finder ? ploc.m_finder->clone () : nullptr),
   m_loc (ploc.m_loc),
   m_var (var), m_sval (sval), m_state (state),
-  m_d (std::move (d)), m_trailing_eedge (NULL),
+  m_d (std::move (d)), m_trailing_eedge (nullptr),
   m_idx (idx),
-  m_best_epath (NULL), m_problem (NULL),
+  m_best_epath (nullptr), m_problem (nullptr),
   m_notes ()
 {
   /* We must have an enode in order to be able to look for paths
@@ -746,17 +746,17 @@ saved_diagnostic::to_json () const
   json::object *sd_obj = new json::object ();
 
   if (m_sm)
-    sd_obj->set ("sm", new json::string (m_sm->get_name ()));
-  sd_obj->set ("enode", new json::integer_number (m_enode->m_index));
-  sd_obj->set ("snode", new json::integer_number (m_snode->m_index));
+    sd_obj->set_string ("sm", m_sm->get_name ());
+  sd_obj->set_integer ("enode", m_enode->m_index);
+  sd_obj->set_integer ("snode", m_snode->m_index);
   if (m_sval)
     sd_obj->set ("sval", m_sval->to_json ());
   if (m_state)
     sd_obj->set ("state", m_state->to_json ());
   if (m_best_epath)
-    sd_obj->set ("path_length", new json::integer_number (get_epath_length ()));
-  sd_obj->set ("pending_diagnostic", new json::string (m_d->get_kind ()));
-  sd_obj->set ("idx", new json::integer_number (m_idx));
+    sd_obj->set_integer ("path_length", get_epath_length ());
+  sd_obj->set_string ("pending_diagnostic", m_d->get_kind ());
+  sd_obj->set_integer ("idx", m_idx);
 
   /* We're not yet JSONifying the following fields:
      const gimple *m_stmt;
@@ -1038,7 +1038,7 @@ saved_diagnostic::maybe_add_sarif_properties (sarif_object &result_obj) const
   if (m_state)
     props.set (PROPERTY_PREFIX "state", m_state->to_json ());
   if (m_best_epath)
-  props.set (PROPERTY_PREFIX "idx", new json::integer_number (m_idx));
+  props.set_integer (PROPERTY_PREFIX "idx", m_idx);
 #undef PROPERTY_PREFIX
 
   /* Potentially add pending_diagnostic-specific properties.  */
@@ -1800,10 +1800,10 @@ public:
 					stmt,
 					stack_depth,
 					sm,
-					NULL,
+					nullptr,
 					src_sm_val,
 					dst_sm_val,
-					NULL,
+					nullptr,
 					dst_state,
 					src_node));
     return false;
@@ -1993,9 +1993,9 @@ struct null_assignment_sm_context : public sm_context
 					m_sm,
 					var_new_sval,
 					from, to,
-					NULL,
+					nullptr,
 					*m_new_state,
-					NULL));
+					nullptr));
   }
 
   void set_next_state (const gimple *stmt,
@@ -2019,9 +2019,9 @@ struct null_assignment_sm_context : public sm_context
 					m_sm,
 					sval,
 					from, to,
-					NULL,
+					nullptr,
 					*m_new_state,
-					NULL));
+					nullptr));
   }
 
   void warn (const supernode *, const gimple *,

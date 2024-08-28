@@ -19,7 +19,7 @@
 
 ;; Return 1 for anything except PARALLEL.
 (define_predicate "any_operand"
-  (match_code "const_int,const_double,const_wide_int,const,symbol_ref,label_ref,subreg,reg,mem"))
+  (match_code "const_int,const_double,const_wide_int,const_vector,const,symbol_ref,label_ref,subreg,reg,mem"))
 
 ;; Return 1 for any PARALLEL.
 (define_predicate "any_parallel_operand"
@@ -796,7 +796,7 @@
       elt += (BYTES_BIG_ENDIAN ? -1 : 1) * (sz - isz) / isz;
     }
   else if (isz > sz)
-    inner = smallest_int_mode_for_size (sz * BITS_PER_UNIT);
+    inner = smallest_int_mode_for_size (sz * BITS_PER_UNIT).require ();
   val = const_vector_elt_as_int (op, elt);
   return EASY_VECTOR_MSB (val, inner);
 })

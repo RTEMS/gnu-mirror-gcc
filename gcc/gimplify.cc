@@ -227,6 +227,7 @@ struct gimplify_ctx
   unsigned keep_stack : 1;
   unsigned save_stack : 1;
   unsigned in_switch_expr : 1;
+  unsigned in_handler_expr : 1;
 };
 
 enum gimplify_defaultmap_kind
@@ -3759,7 +3760,22 @@ gimplify_arg (tree *arg_p, gimple_seq *pre_p, location_t call_location,
 	{
 	  tree init = TARGET_EXPR_INITIAL (*arg_p);
 	  if (init
-	      && !VOID_TYPE_P (TREE_TYPE (init)))
+	      && !VOID_TYPE_P (TREE_TYPE (init))
+	      /* Currently, due to c++/116015, it is not desirable to
+		 strip a TARGET_EXPR whose initializer is a {}.  The
+		 problem is that if we do elide it, we also have to
+		 replace all the occurrences of the slot temporary in the
+		 initializer with the temporary created for the argument.
+		 But we do not have that temporary yet so the replacement
+		 would be quite awkward and it might be needed to resort
+		 back to a PLACEHOLDER_EXPR.  Note that stripping the
+		 TARGET_EXPR wouldn't help anyway, as gimplify_expr would
+		 just allocate a temporary to store the CONSTRUCTOR into.
+		 (FIXME PR116375.)
+
+		 See convert_for_arg_passing for the C++ code that marks
+		 the TARGET_EXPR as eliding or not.  */
+	      && TREE_CODE (init) != CONSTRUCTOR)
 	    *arg_p = init;
 	}
     }
@@ -5598,7 +5614,7 @@ gimplify_init_constructor (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
 
 	    DECL_INITIAL (object) = ctor;
 	    TREE_STATIC (object) = 1;
-	    if (!DECL_NAME (object))
+	    if (!DECL_NAME (object) || DECL_NAMELESS (object))
 	      DECL_NAME (object) = create_tmp_var_name ("C");
 	    walk_tree (&DECL_INITIAL (object), force_labels_r, NULL, NULL);
 
@@ -6728,18 +6744,56 @@ gimplify_variable_sized_compare (tree *expr_p)
 static enum gimplify_status
 gimplify_scalar_mode_aggregate_compare (tree *expr_p)
 {
-  location_t loc = EXPR_LOCATION (*expr_p);
+  const location_t loc = EXPR_LOCATION (*expr_p);
+  const enum tree_code code = TREE_CODE (*expr_p);
   tree op0 = TREE_OPERAND (*expr_p, 0);
   tree op1 = TREE_OPERAND (*expr_p, 1);
-
   tree type = TREE_TYPE (op0);
   tree scalar_type = lang_hooks.types.type_for_mode (TYPE_MODE (type), 1);
 
   op0 = fold_build1_loc (loc, VIEW_CONVERT_EXPR, scalar_type, op0);
   op1 = fold_build1_loc (loc, VIEW_CONVERT_EXPR, scalar_type, op1);
 
-  *expr_p
-    = fold_build2_loc (loc, TREE_CODE (*expr_p), TREE_TYPE (*expr_p), op0, op1);
+  /* We need to perform ordering comparisons in memory order like memcmp and,
+     therefore, may need to byte-swap operands for little-endian targets.  */
+  if (code != EQ_EXPR && code != NE_EXPR)
+    {
+      gcc_assert (BYTES_BIG_ENDIAN == WORDS_BIG_ENDIAN);
+      gcc_assert (TREE_CODE (scalar_type) == INTEGER_TYPE);
+      tree fndecl;
+
+      if (BYTES_BIG_ENDIAN)
+	fndecl = NULL_TREE;
+      else
+	switch (int_size_in_bytes (scalar_type))
+	  {
+	  case 1:
+	    fndecl = NULL_TREE;
+	    break;
+	  case 2:
+	    fndecl = builtin_decl_implicit (BUILT_IN_BSWAP16);
+	    break;
+	  case 4:
+	    fndecl = builtin_decl_implicit (BUILT_IN_BSWAP32);
+	    break;
+	  case 8:
+	    fndecl = builtin_decl_implicit (BUILT_IN_BSWAP64);
+	    break;
+	  case 16:
+	    fndecl = builtin_decl_implicit (BUILT_IN_BSWAP128);
+	    break;
+	  default:
+	    gcc_unreachable ();
+	  }
+
+      if (fndecl)
+	{
+	  op0 = build_call_expr_loc (loc, fndecl, 1, op0);
+	  op1 = build_call_expr_loc (loc, fndecl, 1, op1);
+	}
+    }
+
+  *expr_p = fold_build2_loc (loc, code, TREE_TYPE (*expr_p), op0, op1);
 
   return GS_OK;
 }
@@ -6941,7 +6995,8 @@ gimplify_addr_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
 	*expr_p = build_fold_addr_expr (op0);
 
       /* Make sure TREE_CONSTANT and TREE_SIDE_EFFECTS are set properly.  */
-      recompute_tree_invariant_for_addr_expr (*expr_p);
+      if (TREE_CODE (*expr_p) == ADDR_EXPR)
+	recompute_tree_invariant_for_addr_expr (*expr_p);
 
       /* If we re-built the ADDR_EXPR add a conversion to the original type
          if required.  */
@@ -18409,22 +18464,28 @@ gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
 	    input_location = UNKNOWN_LOCATION;
 	    eval = cleanup = NULL;
 	    gimplify_and_add (TREE_OPERAND (*expr_p, 0), &eval);
+	    bool save_in_handler_expr = gimplify_ctxp->in_handler_expr;
 	    if (TREE_CODE (*expr_p) == TRY_FINALLY_EXPR
 		&& TREE_CODE (TREE_OPERAND (*expr_p, 1)) == EH_ELSE_EXPR)
 	      {
 		gimple_seq n = NULL, e = NULL;
+		gimplify_ctxp->in_handler_expr = true;
 		gimplify_and_add (TREE_OPERAND (TREE_OPERAND (*expr_p, 1),
 						0), &n);
 		gimplify_and_add (TREE_OPERAND (TREE_OPERAND (*expr_p, 1),
 						1), &e);
-		if (!gimple_seq_empty_p (n) && !gimple_seq_empty_p (e))
+		if (!gimple_seq_empty_p (n) || !gimple_seq_empty_p (e))
 		  {
 		    geh_else *stmt = gimple_build_eh_else (n, e);
 		    gimple_seq_add_stmt (&cleanup, stmt);
 		  }
 	      }
 	    else
-	      gimplify_and_add (TREE_OPERAND (*expr_p, 1), &cleanup);
+	      {
+		gimplify_ctxp->in_handler_expr = true;
+		gimplify_and_add (TREE_OPERAND (*expr_p, 1), &cleanup);
+	      }
+	    gimplify_ctxp->in_handler_expr = save_in_handler_expr;
 	    /* Don't create bogus GIMPLE_TRY with empty cleanup.  */
 	    if (gimple_seq_empty_p (cleanup))
 	      {
@@ -18524,6 +18585,10 @@ gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
 	  /* When within an OMP context, notice uses of variables.  */
 	  if (gimplify_omp_ctxp)
 	    omp_notice_variable (gimplify_omp_ctxp, *expr_p, true);
+	  /* Handlers can refer to the function result; if that has been
+	     moved, we need to track it.  */
+	  if (gimplify_ctxp->in_handler_expr && gimplify_ctxp->return_temp)
+	    *expr_p = gimplify_ctxp->return_temp;
 	  ret = GS_ALL_DONE;
 	  break;
 
@@ -18825,7 +18890,7 @@ gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
 		      else
 			goto expr_2;
 		    }
-		  else if (TYPE_MODE (type) != BLKmode)
+		  else if (SCALAR_INT_MODE_P (TYPE_MODE (type)))
 		    ret = gimplify_scalar_mode_aggregate_compare (expr_p);
 		  else
 		    ret = gimplify_variable_sized_compare (expr_p);
@@ -19373,7 +19438,7 @@ gimplify_body (tree fndecl, bool do_parms)
   DECL_SAVED_TREE (fndecl) = NULL_TREE;
 
   /* If we had callee-copies statements, insert them at the beginning
-     of the function and clear DECL_VALUE_EXPR_P on the parameters.  */
+     of the function and clear DECL_HAS_VALUE_EXPR_P on the parameters.  */
   if (!gimple_seq_empty_p (parm_stmts))
     {
       tree parm;
