@@ -22,7 +22,7 @@ def test_execution_unsuccessful(sarif):
     invocation = invocations[0]
 
     # We expect the 'error' to make executionSuccessful be false
-    assert invocation['executionSuccessful'] == False
+    assert invocation['executionSuccessful'] is False
 
 def test_location_relationships(sarif):
     runs = sarif['runs']

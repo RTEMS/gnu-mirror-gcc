@@ -59,7 +59,7 @@ def test_execution_successful(sarif):
     invocation = invocations[0]
 
     # We expect a mere 'warning' to allow executionSuccessful be true
-    assert invocation['executionSuccessful'] == True
+    assert invocation['executionSuccessful'] is True
 
 def test_result(sarif):
     runs = sarif['runs']

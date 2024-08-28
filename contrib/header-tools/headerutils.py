@@ -397,7 +397,7 @@ def find_replace_include (find, replace, src):
     inc = find_pound_include (line, True, True)
     if inc == find:
       for y in replace:
-        if seen.get(y) == None:
+        if seen.get(y) is None:
           res.append("#include \""+y+"\"\n")
           seen[y] = True
           if y != find:
@@ -407,7 +407,7 @@ def find_replace_include (find, replace, src):
         anything = True
     else:
       if inc in replace:
-        if seen.get(inc) == None:
+        if seen.get(inc) is None:
           res.append (line)
           seen[inc] = True
       else:
@@ -512,10 +512,9 @@ def spawn_makes (command_list):
 
 def get_make_output_parallel (targ_list, make_opt, at_a_time):
   command = list()
-  targname = list()
   if at_a_time == 0:
     at_a_time = multiprocessing.cpu_count() * 2
-  proc_res = [0] * at_a_time
+  [0] * at_a_time
   for x in targ_list:
     if make_opt[-2:] == ".o":
       s = "cd " + x[1] + "/gcc/; make " + make_opt

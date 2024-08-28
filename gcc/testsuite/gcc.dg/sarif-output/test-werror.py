@@ -24,7 +24,7 @@ def test_execution_unsuccessful(sarif):
     assert '-Werror=unused-variable' in invocation['arguments']
 
     # We expect the 'Werror' to make executionSuccessful be false
-    assert invocation['executionSuccessful'] == False
+    assert invocation['executionSuccessful'] is False
 
 def test_result(sarif):
     runs = sarif['runs']

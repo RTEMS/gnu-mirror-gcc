@@ -111,16 +111,16 @@ class PredictDefFile:
             elif l == '':
                 p = None
 
-            if p != None:
+            if p is not None:
                 heuristic = [x for x in heuristics if x.name == p]
                 heuristic = heuristic[0] if len(heuristic) == 1 else None
 
                 m = re.match('.*HITRATE \(([^)]*)\).*', l)
-                if (m != None):
+                if (m is not None):
                     self.predictors[p] = int(m.group(1))
 
                     # modify the line
-                    if heuristic != None:
+                    if heuristic is not None:
                         new_line = (l[:m.start(1)]
                             + str(round(heuristic.get_hitrate()))
                             + l[m.end(1):])
@@ -181,14 +181,14 @@ class Summary:
     def print(self, branches_max, count_max, predict_def):
         # filter out most hot edges (if requested)
         self.edges = sorted(self.edges, reverse = True, key = lambda x: x.count)
-        if args.coverage_threshold != None:
+        if args.coverage_threshold is not None:
             threshold = args.coverage_threshold * self.count() / 100
             edges = [x for x in self.edges if x.count < threshold]
             if len(edges) != 0:
                 self.edges = edges
 
         predicted_as = None
-        if predict_def != None and self.name in predict_def.predictors:
+        if predict_def is not None and self.name in predict_def.predictors:
             predicted_as = predict_def.predictors[self.name]
 
         print('%-40s %8i %5.1f%% %11.2f%% %7.2f%% / %6.2f%% %14i %8s %5.1f%%' %
@@ -200,14 +200,14 @@ class Summary:
                 self.count(), self.count_formatted(),
                 percentage(self.count(), count_max)), end = '')
 
-        if predicted_as != None:
+        if predicted_as is not None:
             print('%12i%% %5.1f%%' % (predicted_as,
                 self.get_hitrate() - predicted_as), end = '')
         else:
             print(' ' * 20, end = '')
 
         # print details about the most important edges
-        if args.coverage_threshold == None:
+        if args.coverage_threshold is None:
             edges = [x for x in self.edges[:100] if x.count * hot_threshold > self.count()]
             if args.verbose:
                 for c in edges:
@@ -251,15 +251,20 @@ class Profile:
         count_max = self.count_max()
         branches_max = self.branches_max()
 
-        sorter = lambda x: x.branches()
+        def sorter(x):
+            return x.branches()
         if sorting == 'branch-hitrate':
-            sorter = lambda x: x.get_branch_hitrate()
+            def sorter(x):
+                return x.get_branch_hitrate()
         elif sorting == 'hitrate':
-            sorter = lambda x: x.get_hitrate()
+            def sorter(x):
+                return x.get_hitrate()
         elif sorting == 'coverage':
-            sorter = lambda x: x.count
+            def sorter(x):
+                return x.count
         elif sorting == 'name':
-            sorter = lambda x: x.name.lower()
+            def sorter(x):
+                return x.name.lower()
 
         print('%-40s %8s %6s %12s %18s %14s %8s %6s %12s %6s %s' %
             ('HEURISTICS', 'BRANCHES', '(REL)',
@@ -275,7 +280,7 @@ class Profile:
             return
 
         predict_def = None
-        if args.def_file != None:
+        if args.def_file is not None:
             predict_def = PredictDefFile(args.def_file)
             predict_def.parse_and_modify(heuristics, args.write_def_file)
 

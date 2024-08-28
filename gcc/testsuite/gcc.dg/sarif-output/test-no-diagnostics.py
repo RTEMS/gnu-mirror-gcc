@@ -21,7 +21,7 @@ def test_execution_successful(sarif):
     assert len(invocations) == 1
     invocation = invocations[0]
 
-    assert invocation['executionSuccessful'] == True
+    assert invocation['executionSuccessful'] is True
     assert invocation['toolExecutionNotifications'] == []
 
 def test_empty_results(sarif):

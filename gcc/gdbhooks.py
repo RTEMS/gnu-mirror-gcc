@@ -690,7 +690,7 @@ class BreakOnPass(gdb.Command):
 
     def invoke(self, arg, from_tty):
         sym = '(anonymous namespace)::%s::execute' % arg
-        breakpoint = gdb.Breakpoint(sym)
+        gdb.Breakpoint(sym)
 
 BreakOnPass()
 

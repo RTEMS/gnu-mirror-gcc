@@ -219,7 +219,6 @@ TARGET_SPECIFIC_PAGES = {
     'gcc/AArch64-Options.html' : 'gcc/config/aarch64/',
     'gcc/AMD-GCN-Options.html' : 'gcc/config/gcn/',
     'gcc/ARC-Options.html' : 'gcc/config/arc/',
-    'gcc/ARC-Options.html' : 'gcc/config/arc/',
     'gcc/ARM-Options.html' : 'gcc/config/arm/',
     'gcc/AVR-Options.html' : 'gcc/config/avr/',
     'gcc/Adapteva-Epiphany-Options.html' : 'gcc/config/epiphany/',
