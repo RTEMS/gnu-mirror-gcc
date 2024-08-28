@@ -40,6 +40,7 @@ compilation is specified by a string called a "spec".  */
 #include "opt-suggestions.h"
 #include "gcc.h"
 #include "diagnostic.h"
+#include "diagnostic-format.h"
 #include "flags.h"
 #include "opts.h"
 #include "filenames.h"
@@ -4350,11 +4351,16 @@ driver_handle_option (struct gcc_options *opts,
       diagnostic_urls_init (dc, value);
       break;
 
+    case OPT_fdiagnostics_show_highlight_colors:
+      dc->set_show_highlight_colors (value);
+      break;
+
     case OPT_fdiagnostics_format_:
 	{
 	  const char *basename = (opts->x_dump_base_name ? opts->x_dump_base_name
 				  : opts->x_main_input_basename);
-	  diagnostic_output_format_init (dc,
+	  gcc_assert (dc);
+	  diagnostic_output_format_init (*dc,
 					 opts->x_main_input_filename, basename,
 					 (enum diagnostics_output_format)value,
 					 opts->x_flag_diagnostics_json_formatting);

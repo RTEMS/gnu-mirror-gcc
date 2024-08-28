@@ -37,6 +37,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "diagnostic-path.h"
 #include "diagnostic-client-data-hooks.h"
 #include "diagnostic-diagram.h"
+#include "diagnostic-format.h"
+#include "diagnostic-format-text.h"
 #include "edit-context.h"
 #include "selftest.h"
 #include "selftest-diagnostic.h"
@@ -219,6 +221,7 @@ diagnostic_context::initialize (int n_opts)
   m_warn_system_headers = false;
   m_max_errors = 0;
   m_internal_error = nullptr;
+  m_adjust_diagnostic_info = nullptr;
   m_text_callbacks.m_begin_diagnostic = default_diagnostic_starter;
   m_text_callbacks.m_start_span = default_diagnostic_start_span_fn;
   m_text_callbacks.m_end_diagnostic = default_diagnostic_finalizer;
@@ -261,6 +264,7 @@ diagnostic_context::initialize (int n_opts)
   m_includes_seen = nullptr;
   m_client_data_hooks = nullptr;
   m_diagrams.m_theme = nullptr;
+  m_original_argv = nullptr;
 
   enum diagnostic_text_art_charset text_art_charset
     = DIAGNOSTICS_TEXT_ART_CHARSET_EMOJI;
@@ -345,6 +349,14 @@ initialize_input_context (diagnostic_input_charset_callback ccb,
 void
 diagnostic_context::finish ()
 {
+  /* We might be handling a fatal error.
+     Close any active diagnostic groups, which may trigger flushing
+     the output format.  */
+  while (m_diagnostic_groups.m_nesting_depth > 0)
+    end_group ();
+
+  /* Clean ups.  */
+
   delete m_output_format;
   m_output_format= nullptr;
 
@@ -385,6 +397,22 @@ diagnostic_context::finish ()
 
   delete m_urlifier;
   m_urlifier = nullptr;
+
+  freeargv (m_original_argv);
+  m_original_argv = nullptr;
+}
+
+/* Return true if sufficiently severe diagnostics have been seen that
+   we ought to exit with a non-zero exit code.  */
+
+bool
+diagnostic_context::execution_failed_p () const
+{
+  /* Equivalent to (seen_error () || werrorcount), but on
+     this context, rather than global_dc.  */
+  return (m_diagnostic_count [DK_ERROR]
+	  || m_diagnostic_count [DK_SORRY]
+	  || m_diagnostic_count [DK_WERROR]);
 }
 
 void
@@ -401,6 +429,19 @@ diagnostic_context::set_client_data_hooks (diagnostic_client_data_hooks *hooks)
   /* Ideally we'd use a std::unique_ptr here.  */
   delete m_client_data_hooks;
   m_client_data_hooks = hooks;
+}
+
+void
+diagnostic_context::set_original_argv (unique_argv original_argv)
+{
+  /* Ideally we'd use a unique_argv for m_original_argv, but
+     diagnostic_context doesn't yet have a ctor/dtor pair.  */
+
+  // Ensure any old value is freed
+  freeargv (m_original_argv);
+
+  // Take ownership of the new value
+  m_original_argv = original_argv.release ();
 }
 
 void
@@ -906,7 +947,7 @@ diagnostic_context::show_any_path (const diagnostic_info &diagnostic)
   if (!path)
     return;
 
-  print_path (path);
+  print_path (*path);
 }
 
 /* class logical_location.  */
@@ -1193,117 +1234,6 @@ get_cwe_url (int cwe)
   return xasprintf ("https://cwe.mitre.org/data/definitions/%i.html", cwe);
 }
 
-/* If DIAGNOSTIC has a CWE identifier, print it.
-
-   For example, if the diagnostic metadata associates it with CWE-119,
-   " [CWE-119]" will be printed, suitably colorized, and with a URL of a
-   description of the security issue.  */
-
-void
-diagnostic_context::print_any_cwe (const diagnostic_info &diagnostic)
-{
-  if (diagnostic.metadata == NULL)
-    return;
-
-  int cwe = diagnostic.metadata->get_cwe ();
-  if (cwe)
-    {
-      pretty_printer * const pp = this->printer;
-      char *saved_prefix = pp_take_prefix (pp);
-      pp_string (pp, " [");
-      pp_string (pp, colorize_start (pp_show_color (pp),
-				     diagnostic_kind_color[diagnostic.kind]));
-      if (pp->supports_urls_p ())
-	{
-	  char *cwe_url = get_cwe_url (cwe);
-	  pp_begin_url (pp, cwe_url);
-	  free (cwe_url);
-	}
-      pp_printf (pp, "CWE-%i", cwe);
-      pp_set_prefix (pp, saved_prefix);
-      if (pp->supports_urls_p ())
-	pp_end_url (pp);
-      pp_string (pp, colorize_stop (pp_show_color (pp)));
-      pp_character (pp, ']');
-    }
-}
-
-/* If DIAGNOSTIC has any rules associated with it, print them.
-
-   For example, if the diagnostic metadata associates it with a rule
-   named "STR34-C", then " [STR34-C]" will be printed, suitably colorized,
-   with any URL provided by the rule.  */
-
-void
-diagnostic_context::print_any_rules (const diagnostic_info &diagnostic)
-{
-  if (diagnostic.metadata == NULL)
-    return;
-
-  for (unsigned idx = 0; idx < diagnostic.metadata->get_num_rules (); idx++)
-    {
-      const diagnostic_metadata::rule &rule
-	= diagnostic.metadata->get_rule (idx);
-      if (char *desc = rule.make_description ())
-	{
-	  pretty_printer * const pp = this->printer;
-	  char *saved_prefix = pp_take_prefix (pp);
-	  pp_string (pp, " [");
-	  pp_string (pp,
-		     colorize_start (pp_show_color (pp),
-				     diagnostic_kind_color[diagnostic.kind]));
-	  char *url = NULL;
-	  if (pp->supports_urls_p ())
-	    {
-	      url = rule.make_url ();
-	      if (url)
-		pp_begin_url (pp, url);
-	    }
-	  pp_string (pp, desc);
-	  pp_set_prefix (pp, saved_prefix);
-	  if (pp->supports_urls_p ())
-	    if (url)
-	      pp_end_url (pp);
-	  free (url);
-	  pp_string (pp, colorize_stop (pp_show_color (pp)));
-	  pp_character (pp, ']');
-	  free (desc);
-	}
-    }
-}
-
-/* Print any metadata about the option used to control DIAGNOSTIC to CONTEXT's
-   printer, e.g. " [-Werror=uninitialized]".
-   Subroutine of diagnostic_context::report_diagnostic.  */
-
-void
-diagnostic_context::print_option_information (const diagnostic_info &diagnostic,
-					      diagnostic_t orig_diag_kind)
-{
-  if (char *option_text = make_option_name (diagnostic.option_index,
-					    orig_diag_kind, diagnostic.kind))
-    {
-      char *option_url = nullptr;
-      if (this->printer->supports_urls_p ())
-	option_url = make_option_url (diagnostic.option_index);
-      pretty_printer * const pp = this->printer;
-      pp_string (pp, " [");
-      pp_string (pp, colorize_start (pp_show_color (pp),
-				     diagnostic_kind_color[diagnostic.kind]));
-      if (option_url)
-	pp_begin_url (pp, option_url);
-      pp_string (pp, option_text);
-      if (option_url)
-	{
-	  pp_end_url (pp);
-	  free (option_url);
-	}
-      pp_string (pp, colorize_stop (pp_show_color (pp)));
-      pp_character (pp, ']');
-      free (option_text);
-    }
-}
-
 /* Returns whether a DIAGNOSTIC should be printed, and adjusts diagnostic->kind
    as appropriate for #pragma GCC diagnostic and -Werror=foo.  */
 
@@ -1379,12 +1309,20 @@ diagnostic_context::report_diagnostic (diagnostic_info *diagnostic)
 
   gcc_assert (m_output_format);
 
+  /* Every call to report_diagnostic should be within a
+     begin_group/end_group pair so that output formats can reliably
+     flush diagnostics with on_end_group when the topmost group is ended.  */
+  gcc_assert (m_diagnostic_groups.m_nesting_depth > 0);
+
   /* Give preference to being able to inhibit warnings, before they
      get reclassified to something else.  */
   bool was_warning = (diagnostic->kind == DK_WARNING
 		      || diagnostic->kind == DK_PEDWARN);
   if (was_warning && m_inhibit_warnings)
     return false;
+
+  if (m_adjust_diagnostic_info)
+    m_adjust_diagnostic_info (this, diagnostic);
 
   if (diagnostic->kind == DK_PEDWARN)
     {
@@ -1470,15 +1408,10 @@ diagnostic_context::report_diagnostic (diagnostic_info *diagnostic)
   m_diagnostic_groups.m_emission_count++;
 
   pp_format (this->printer, &diagnostic->message, m_urlifier);
-  m_output_format->on_begin_diagnostic (*diagnostic);
-  pp_output_formatted_text (this->printer, m_urlifier);
-  if (m_show_cwe)
-    print_any_cwe (*diagnostic);
-  if (m_show_rules)
-    print_any_rules (*diagnostic);
-  if (m_show_option_requested)
-    print_option_information (*diagnostic, orig_diag_kind);
-  m_output_format->on_end_diagnostic (*diagnostic, orig_diag_kind);
+  /* Call vfunc in the output format.  This is responsible for
+     phase 3 of formatting, and for printing the result.  */
+  m_output_format->on_report_diagnostic (*diagnostic, orig_diag_kind);
+
   switch (m_extra_output_kind)
     {
     default:
@@ -1747,60 +1680,11 @@ diagnostic_context::end_group ()
     }
 }
 
-/* class diagnostic_text_output_format : public diagnostic_output_format.  */
-
-diagnostic_text_output_format::~diagnostic_text_output_format ()
-{
-  /* Some of the errors may actually have been warnings.  */
-  if (m_context.diagnostic_count (DK_WERROR))
-    {
-      /* -Werror was given.  */
-      if (m_context.warning_as_error_requested_p ())
-	pp_verbatim (m_context.printer,
-		     _("%s: all warnings being treated as errors"),
-		     progname);
-      /* At least one -Werror= was given.  */
-      else
-	pp_verbatim (m_context.printer,
-		     _("%s: some warnings being treated as errors"),
-		     progname);
-      pp_newline_and_flush (m_context.printer);
-    }
-}
-
-void
-diagnostic_text_output_format::on_begin_diagnostic (const diagnostic_info &diagnostic)
-{
-  (*diagnostic_starter (&m_context)) (&m_context, &diagnostic);
-}
-
-void
-diagnostic_text_output_format::on_end_diagnostic (const diagnostic_info &diagnostic,
-						  diagnostic_t orig_diag_kind)
-{
-  (*diagnostic_finalizer (&m_context)) (&m_context, &diagnostic,
-					orig_diag_kind);
-}
-
-void
-diagnostic_text_output_format::on_diagram (const diagnostic_diagram &diagram)
-{
-  char *saved_prefix = pp_take_prefix (m_context.printer);
-  pp_set_prefix (m_context.printer, NULL);
-  /* Use a newline before and after and a two-space indent
-     to make the diagram stand out a little from the wall of text.  */
-  pp_newline (m_context.printer);
-  diagram.get_canvas ().print_to_pp (m_context.printer, "  ");
-  pp_newline (m_context.printer);
-  pp_set_prefix (m_context.printer, saved_prefix);
-  pp_flush (m_context.printer);
-}
-
 /* Set the output format for CONTEXT to FORMAT, using BASE_FILE_NAME for
    file-based output formats.  */
 
 void
-diagnostic_output_format_init (diagnostic_context *context,
+diagnostic_output_format_init (diagnostic_context &context,
 			       const char *main_input_filename_,
 			       const char *base_file_name,
 			       enum diagnostics_output_format format,
@@ -1827,12 +1711,14 @@ diagnostic_output_format_init (diagnostic_context *context,
 
     case DIAGNOSTICS_OUTPUT_FORMAT_SARIF_STDERR:
       diagnostic_output_format_init_sarif_stderr (context,
+						  line_table,
 						  main_input_filename_,
 						  json_formatting);
       break;
 
     case DIAGNOSTICS_OUTPUT_FORMAT_SARIF_FILE:
       diagnostic_output_format_init_sarif_file (context,
+						line_table,
 						main_input_filename_,
 						json_formatting,
 						base_file_name);

@@ -224,8 +224,7 @@ package body Exp_Attr is
    --  loop may be converted into a conditional block. See body for details.
 
    procedure Expand_Min_Max_Attribute (N : Node_Id);
-   --  Handle the expansion of attributes 'Max and 'Min, including expanding
-   --  then out if we are in Modify_Tree_For_C mode.
+   --  Handle the expansion of attributes 'Max and 'Min
 
    procedure Expand_Pred_Succ_Attribute (N : Node_Id);
    --  Handles expansion of Pred or Succ attributes for case of non-real
@@ -3689,11 +3688,34 @@ package body Exp_Attr is
 
          --  Local variables
 
-         Size : Entity_Id;
+         P_Loc : constant Source_Ptr := Sloc (Pref);
+         Size  : Entity_Id;
 
       --  Start of processing for Finalization_Size
 
       begin
+         --  If the prefix is an interface type, generate code to obtain its
+         --  address and displace it to reference the base of the object.
+
+         if Is_Interface (Ptyp) then
+            --  Generate:
+            --    Ptyp!(tag_ptr!($base_address (ptr.all'address)).all)
+
+            Rewrite (Pref,
+              Unchecked_Convert_To (Ptyp,
+                Make_Explicit_Dereference (P_Loc,
+                  Unchecked_Convert_To (RTE (RE_Tag_Ptr),
+                    Make_Function_Call (P_Loc,
+                      Name => New_Occurrence_Of
+                                (RTE (RE_Base_Address), P_Loc),
+                      Parameter_Associations =>
+                        New_List (
+                          Make_Attribute_Reference (P_Loc,
+                            Prefix => Duplicate_Subexpr (Pref),
+                            Attribute_Name => Name_Address)))))));
+            Analyze_And_Resolve (Pref, Ptyp);
+         end if;
+
          --  If the prefix is the dereference of an access value subject to
          --  pragma No_Heap_Finalization, then no header has been added.
 
@@ -5144,19 +5166,6 @@ package body Exp_Attr is
          use Old_Attr_Util.Conditional_Evaluation;
          use Old_Attr_Util.Indirect_Temps;
       begin
-         --  Generating C code we don't need to expand this attribute when
-         --  we are analyzing the internally built nested _Wrapped_Statements
-         --  procedure since it will be expanded inline (and later it will
-         --  be removed by Expand_N_Subprogram_Body). It this expansion is
-         --  performed in such case then the compiler generates unreferenced
-         --  extra temporaries.
-
-         if Modify_Tree_For_C
-           and then Chars (Current_Scope) = Name_uWrapped_Statements
-         then
-            return;
-         end if;
-
          --  'Old can only appear in the case where local contract-related
          --  wrapper has been generated with the purpose of wrapping the
          --  original declarations and statements.
@@ -5997,6 +6006,7 @@ package body Exp_Attr is
       when Attribute_Put_Image => Put_Image : declare
          use Exp_Put_Image;
          U_Type : constant Entity_Id := Underlying_Type (Entity (Pref));
+         C_Type : Entity_Id;
          Pname  : Entity_Id;
          Decl   : Node_Id;
 
@@ -6022,6 +6032,21 @@ package body Exp_Attr is
          end if;
 
          if No (Pname) then
+            if Is_String_Type (U_Type) then
+               declare
+                  R : constant Entity_Id := Root_Type (U_Type);
+
+               begin
+                  if Is_Private_Type (R) then
+                     C_Type := Component_Type (Full_View (R));
+                  else
+                     C_Type := Component_Type (R);
+                  end if;
+
+                  C_Type := Root_Type (Underlying_Type (C_Type));
+               end;
+            end if;
+
             --  If Put_Image is disabled, call the "unknown" version
 
             if not Put_Image_Enabled (U_Type) then
@@ -6037,7 +6062,17 @@ package body Exp_Attr is
                Analyze (N);
                return;
 
-            elsif Is_Standard_String_Type (U_Type) then
+            --  String type objects, including custom string types, and
+            --  excluding C arrays.
+
+            elsif Is_String_Type (U_Type)
+              and then C_Type in Standard_Character
+                               | Standard_Wide_Character
+                               | Standard_Wide_Wide_Character
+              and then (not RTU_Loaded (Interfaces_C)
+                          or else Enclosing_Lib_Unit_Entity (U_Type)
+                                    /= RTU_Entity (Interfaces_C))
+            then
                Rewrite (N, Build_String_Put_Image_Call (N));
                Analyze (N);
                return;
@@ -7546,93 +7581,84 @@ package body Exp_Attr is
             --  Start of processing for Float_Valid
 
             begin
-               --  The C back end handles Valid for floating-point types
+               Find_Fat_Info (Ptyp, Ftp, Pkg);
 
-               if Modify_Tree_For_C then
-                  Analyze_And_Resolve (Pref, Ptyp);
-                  Set_Etype (N, Standard_Boolean);
-                  Set_Analyzed (N);
+               --  If the prefix is a reverse SSO component, or is possibly
+               --  unaligned, first create a temporary copy that is in
+               --  native SSO, and properly aligned. Make it Volatile to
+               --  prevent folding in the back-end. Note that we use an
+               --  intermediate constrained string type to initialize the
+               --  temporary, as the value at hand might be invalid, and in
+               --  that case it cannot be copied using a floating point
+               --  register.
 
-               else
-                  Find_Fat_Info (Ptyp, Ftp, Pkg);
+               if In_Reverse_Storage_Order_Object (Pref)
+                 or else Is_Possibly_Unaligned_Object (Pref)
+               then
+                  declare
+                     Temp : constant Entity_Id :=
+                              Make_Temporary (Loc, 'F');
 
-                  --  If the prefix is a reverse SSO component, or is possibly
-                  --  unaligned, first create a temporary copy that is in
-                  --  native SSO, and properly aligned. Make it Volatile to
-                  --  prevent folding in the back-end. Note that we use an
-                  --  intermediate constrained string type to initialize the
-                  --  temporary, as the value at hand might be invalid, and in
-                  --  that case it cannot be copied using a floating point
-                  --  register.
+                     Fat_S : constant Entity_Id :=
+                               Get_Fat_Entity (Name_S);
+                     --  Constrained string subtype of appropriate size
 
-                  if In_Reverse_Storage_Order_Object (Pref)
-                    or else Is_Possibly_Unaligned_Object (Pref)
-                  then
-                     declare
-                        Temp : constant Entity_Id :=
-                                 Make_Temporary (Loc, 'F');
+                     Fat_P : constant Entity_Id :=
+                               Get_Fat_Entity (Name_P);
+                     --  Access to Fat_S
 
-                        Fat_S : constant Entity_Id :=
-                                  Get_Fat_Entity (Name_S);
-                        --  Constrained string subtype of appropriate size
-
-                        Fat_P : constant Entity_Id :=
-                                  Get_Fat_Entity (Name_P);
-                        --  Access to Fat_S
-
-                        Decl : constant Node_Id :=
-                                 Make_Object_Declaration (Loc,
+                     Decl : constant Node_Id :=
+                              Make_Object_Declaration (Loc,
                                    Defining_Identifier => Temp,
                                    Aliased_Present     => True,
-                                   Object_Definition   =>
-                                     New_Occurrence_Of (Ptyp, Loc));
+                                Object_Definition   =>
+                                  New_Occurrence_Of (Ptyp, Loc));
 
-                     begin
-                        Set_Aspect_Specifications (Decl, New_List (
-                          Make_Aspect_Specification (Loc,
-                            Identifier =>
-                              Make_Identifier (Loc, Name_Volatile))));
+                  begin
+                     Set_Aspect_Specifications (Decl, New_List (
+                       Make_Aspect_Specification (Loc,
+                         Identifier =>
+                           Make_Identifier (Loc, Name_Volatile))));
 
-                        Insert_Actions (N,
-                          New_List (
-                            Decl,
+                     Insert_Actions (N,
+                       New_List (
+                         Decl,
 
-                            Make_Assignment_Statement (Loc,
-                              Name =>
-                                Make_Explicit_Dereference (Loc,
-                                  Prefix =>
-                                    Unchecked_Convert_To (Fat_P,
-                                      Make_Attribute_Reference (Loc,
-                                        Prefix =>
-                                          New_Occurrence_Of (Temp, Loc),
-                                        Attribute_Name =>
-                                          Name_Unrestricted_Access))),
-                              Expression =>
-                                Unchecked_Convert_To (Fat_S,
-                                  Relocate_Node (Pref)))),
+                         Make_Assignment_Statement (Loc,
+                           Name =>
+                             Make_Explicit_Dereference (Loc,
+                               Prefix =>
+                                 Unchecked_Convert_To (Fat_P,
+                                   Make_Attribute_Reference (Loc,
+                                     Prefix =>
+                                       New_Occurrence_Of (Temp, Loc),
+                                     Attribute_Name =>
+                                       Name_Unrestricted_Access))),
+                           Expression =>
+                             Unchecked_Convert_To (Fat_S,
+                               Relocate_Node (Pref)))),
 
-                          Suppress => All_Checks);
+                       Suppress => All_Checks);
 
-                        Rewrite (Pref, New_Occurrence_Of (Temp, Loc));
-                     end;
-                  end if;
-
-                  --  We now have an object of the proper endianness and
-                  --  alignment, and can construct a Valid attribute.
-
-                  --  We make sure the prefix of this valid attribute is
-                  --  marked as not coming from source, to avoid losing
-                  --  warnings from 'Valid looking like a possible update.
-
-                  Set_Comes_From_Source (Pref, False);
-
-                  Expand_Fpt_Attribute
-                    (N, Pkg, Name_Valid,
-                     New_List (
-                       Make_Attribute_Reference (Loc,
-                         Prefix         => Unchecked_Convert_To (Ftp, Pref),
-                         Attribute_Name => Name_Unrestricted_Access)));
+                     Rewrite (Pref, New_Occurrence_Of (Temp, Loc));
+                  end;
                end if;
+
+               --  We now have an object of the proper endianness and
+               --  alignment, and can construct a Valid attribute.
+
+               --  We make sure the prefix of this valid attribute is
+               --  marked as not coming from source, to avoid losing
+               --  warnings from 'Valid looking like a possible update.
+
+               Set_Comes_From_Source (Pref, False);
+
+               Expand_Fpt_Attribute
+                 (N, Pkg, Name_Valid,
+                  New_List (
+                    Make_Attribute_Reference (Loc,
+                      Prefix         => Unchecked_Convert_To (Ftp, Pref),
+                      Attribute_Name => Name_Unrestricted_Access)));
 
                --  One more task, we still need a range check. Required
                --  only if we have a constraint, since the Valid routine
@@ -9336,8 +9362,7 @@ package body Exp_Attr is
 
       function Is_GCC_Target return Boolean is
       begin
-         return not CodePeer_Mode
-           and then not Modify_Tree_For_C;
+         return not CodePeer_Mode;
       end Is_GCC_Target;
 
    --  Start of processing for Is_Inline_Floating_Point_Attribute

@@ -44,6 +44,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "decl.h"
 #include "c-family/c-type-mismatch.h"
 #include "tristate.h"
+#include "tree-pretty-print-markup.h"
 
 /* The various kinds of conversion.  */
 
@@ -4760,7 +4761,8 @@ implicit_conversion_error (location_t loc, tree type, tree expr)
   else
     {
       range_label_for_type_mismatch label (TREE_TYPE (expr), type);
-      gcc_rich_location rich_loc (loc, &label);
+      gcc_rich_location rich_loc (loc, &label,
+				  highlight_colors::percent_h);
       error_at (&rich_loc, "could not convert %qE from %qH to %qI",
 		expr, TREE_TYPE (expr), type);
     }
@@ -5446,6 +5448,19 @@ build_op_call (tree obj, vec<tree, va_gc> **args, tsubst_flags_t complain)
   return result;
 }
 
+/* Subroutine for preparing format strings suitable for the error
+   function.  It concatenates a prefix (controlled by MATCH), ERRMSG,
+   and SUFFIX.  */
+
+static const char *
+concat_op_error_string (bool match, const char *errmsg, const char *suffix)
+{
+  return concat (match
+		 ? G_("ambiguous overload for ")
+		 : G_("no match for "),
+		 errmsg, suffix, nullptr);
+}
+
 /* Called by op_error to prepare format strings suitable for the error
    function.  It concatenates a prefix (controlled by MATCH), ERRMSG,
    and a suffix (controlled by NTYPES).  */
@@ -5453,19 +5468,24 @@ build_op_call (tree obj, vec<tree, va_gc> **args, tsubst_flags_t complain)
 static const char *
 op_error_string (const char *errmsg, int ntypes, bool match)
 {
-  const char *msg;
-
-  const char *msgp = concat (match ? G_("ambiguous overload for ")
-			           : G_("no match for "), errmsg, NULL);
-
+  const char *suffix;
   if (ntypes == 3)
-    msg = concat (msgp, G_(" (operand types are %qT, %qT, and %qT)"), NULL);
+    suffix = G_(" (operand types are %qT, %qT, and %qT)");
   else if (ntypes == 2)
-    msg = concat (msgp, G_(" (operand types are %qT and %qT)"), NULL);
+    suffix = G_(" (operand types are %qT and %qT)");
   else
-    msg = concat (msgp, G_(" (operand type is %qT)"), NULL);
+    suffix = G_(" (operand type is %qT)");
+  return concat_op_error_string (match, errmsg, suffix);
+}
 
-  return msg;
+/* Similar to op_error_string, but a special-case for binary ops that
+   use %e for the args, rather than %qT.  */
+
+static const char *
+binop_error_string (const char *errmsg, bool match)
+{
+  return concat_op_error_string (match, errmsg,
+				 G_(" (operand types are %e and %e)"));
 }
 
 static void
@@ -5536,9 +5556,13 @@ op_error (const op_location_t &loc,
 	if (flag_diagnostics_show_caret)
 	  {
 	    binary_op_rich_location richloc (loc, arg1, arg2, true);
+	    pp_markup::element_quoted_type element_0
+	      (TREE_TYPE (arg1), highlight_colors::lhs);
+	    pp_markup::element_quoted_type element_1
+	      (TREE_TYPE (arg2), highlight_colors::rhs);
 	    error_at (&richloc,
-		      op_error_string (G_("%<operator%s%>"), 2, match),
-		      opname, TREE_TYPE (arg1), TREE_TYPE (arg2));
+		      binop_error_string (G_("%<operator%s%>"), match),
+		      opname, &element_0, &element_1);
 	  }
 	else
 	  error_at (loc, op_error_string (G_("%<operator%s%> in %<%E %s %E%>"),
@@ -7827,6 +7851,9 @@ usual_deallocation_fn_p (tree fn)
    SIZE is the size of the memory block to be deleted.
    GLOBAL_P is true if the delete-expression should not consider
    class-specific delete operators.
+   CORO_P is true if the allocation is for a coroutine, where the two argument
+   usual deallocation should be chosen in preference to the single argument
+   version in a class context.
    PLACEMENT is the corresponding placement new call, or NULL_TREE.
 
    If this call to "operator delete" is being generated as part to
@@ -7835,10 +7862,10 @@ usual_deallocation_fn_p (tree fn)
    we call a deallocation function), then ALLOC_FN is the allocation
    function.  */
 
-tree
-build_op_delete_call (enum tree_code code, tree addr, tree size,
-		      bool global_p, tree placement,
-		      tree alloc_fn, tsubst_flags_t complain)
+static tree
+build_op_delete_call_1 (enum tree_code code, tree addr, tree size,
+			bool global_p, bool coro_p, tree placement,
+			tree alloc_fn, tsubst_flags_t complain)
 {
   tree fn = NULL_TREE;
   tree fns, fnname, type, t;
@@ -8017,7 +8044,7 @@ build_op_delete_call (enum tree_code code, tree addr, tree size,
 	    /* -- If the deallocation functions have class scope, the one
 	       without a parameter of type std::size_t is selected.  */
 	    bool want_size;
-	    if (DECL_CLASS_SCOPE_P (fn))
+	    if (DECL_CLASS_SCOPE_P (fn) && !coro_p)
 	      want_size = false;
 
 	    /* -- If the type is complete and if, for the second alternative
@@ -8153,6 +8180,27 @@ build_op_delete_call (enum tree_code code, tree addr, tree size,
     error ("no suitable %<operator %s%> for %qT",
 	   OVL_OP_INFO (false, code)->name, type);
   return error_mark_node;
+}
+
+/* Arguments as per build_op_delete_call_1 ().  */
+
+tree
+build_op_delete_call (enum tree_code code, tree addr, tree size, bool global_p,
+		      tree placement, tree alloc_fn, tsubst_flags_t complain)
+{
+  return build_op_delete_call_1 (code, addr, size, global_p, /*coro_p*/false,
+				 placement, alloc_fn, complain);
+}
+
+/* Arguments as per build_op_delete_call_1 ().  */
+
+tree
+build_coroutine_op_delete_call (enum tree_code code, tree addr, tree size,
+				bool global_p, tree placement, tree alloc_fn,
+				tsubst_flags_t complain)
+{
+  return build_op_delete_call_1 (code, addr, size, global_p, /*coro_p*/true,
+				 placement, alloc_fn, complain);
 }
 
 /* Issue diagnostics about a disallowed access of DECL, using DIAG_DECL
@@ -8370,11 +8418,16 @@ get_fndecl_argument_location (tree fndecl, int argnum)
    wrong).  */
 
 void
-maybe_inform_about_fndecl_for_bogus_argument_init (tree fn, int argnum)
+maybe_inform_about_fndecl_for_bogus_argument_init (tree fn, int argnum,
+						   const char *highlight_color)
 {
   if (fn)
-    inform (get_fndecl_argument_location (fn, argnum),
-	    "  initializing argument %P of %qD", argnum, fn);
+    {
+      gcc_rich_location richloc (get_fndecl_argument_location (fn, argnum));
+      richloc.set_highlight_color (highlight_color);
+      inform (&richloc,
+	      "  initializing argument %P of %qD", argnum, fn);
+    }
 }
 
 /* Maybe warn about C++20 Conversions to arrays of unknown bound.  C is
@@ -8523,7 +8576,7 @@ convert_like_internal (conversion *convs, tree expr, tree fn, int argnum,
       if (!complained && expr != error_mark_node)
 	{
 	  range_label_for_type_mismatch label (TREE_TYPE (expr), totype);
-	  gcc_rich_location richloc (loc, &label);
+	  gcc_rich_location richloc (loc, &label, highlight_colors::percent_h);
 	  complained = permerror (&richloc,
 				  "invalid conversion from %qH to %qI",
 				  TREE_TYPE (expr), totype);
@@ -8535,7 +8588,8 @@ convert_like_internal (conversion *convs, tree expr, tree fn, int argnum,
       else
 	expr = cp_convert (totype, expr, complain);
       if (complained == 1)
-	maybe_inform_about_fndecl_for_bogus_argument_init (fn, argnum);
+	maybe_inform_about_fndecl_for_bogus_argument_init
+	  (fn, argnum, highlight_colors::percent_i);
       return expr;
     }
 
@@ -9438,8 +9492,11 @@ convert_for_arg_passing (tree type, tree val, tsubst_flags_t complain)
   if (complain & tf_warning)
     warn_for_address_of_packed_member (type, val);
 
-  /* gimplify_arg elides TARGET_EXPRs that initialize a function argument.  */
-  if (SIMPLE_TARGET_EXPR_P (val))
+  /* gimplify_arg elides TARGET_EXPRs that initialize a function argument,
+     unless the initializer is a CONSTRUCTOR.  In that case, we fail to
+     elide the copy anyway.  See that function for more information.  */
+  if (SIMPLE_TARGET_EXPR_P (val)
+      && TREE_CODE (TARGET_EXPR_INITIAL (val)) != CONSTRUCTOR)
     set_target_expr_eliding (val);
 
   return val;
@@ -10335,6 +10392,7 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
 	  a = decay_conversion (a, complain);
 	}
       else if (DECL_CONSTRUCTOR_P (fn)
+	       && vec_safe_length (args) == 1
 	       && same_type_ignoring_top_level_qualifiers_p (DECL_CONTEXT (fn),
 							     TREE_TYPE (a)))
 	{
@@ -10380,7 +10438,8 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
 	}
 
       warned_p = check_function_arguments (input_location, fn, TREE_TYPE (fn),
-					   nargs, fargs, NULL);
+					   nargs, fargs, NULL,
+					   cp_comp_parm_types);
     }
 
   if (DECL_INHERITED_CTOR (fn))
@@ -11460,12 +11519,14 @@ complain_about_bad_argument (location_t arg_loc,
       arg_loc = input_location;
       label = NULL;
     }
-  gcc_rich_location richloc (arg_loc, label);
+  gcc_rich_location richloc (arg_loc, label, highlight_colors::percent_h);
   error_at (&richloc,
 	    "cannot convert %qH to %qI",
 	    from_type, to_type);
-  maybe_inform_about_fndecl_for_bogus_argument_init (fndecl,
-						     parmnum);
+  maybe_inform_about_fndecl_for_bogus_argument_init
+    (fndecl,
+     parmnum,
+     highlight_colors::percent_i);
 }
 
 /* Subroutine of build_new_method_call_1, for where there are no viable
@@ -11822,7 +11883,7 @@ build_new_method_call (tree instance, tree fns, vec<tree, va_gc> **args,
 			 fn);
 	    }
 
-	  if (TREE_CODE (TREE_TYPE (fn)) == METHOD_TYPE
+	  if (DECL_OBJECT_MEMBER_FUNCTION_P (fn)
 	      && !DECL_CONSTRUCTOR_P (fn)
 	      && is_dummy_object (instance))
 	    {
@@ -13228,10 +13289,35 @@ joust (struct z_candidate *cand1, struct z_candidate *cand2, bool warn,
   else if (cand2->rewritten ())
     return 1;
 
-  /* F1 is generated from a deduction-guide (13.3.1.8) and F2 is not */
   if (deduction_guide_p (cand1->fn))
     {
       gcc_assert (deduction_guide_p (cand2->fn));
+
+      /* F1 and F2 are generated from class template argument deduction for a
+	 class D, and F2 is generated from inheriting constructors from a base
+	 class of D while F1 is not, and for each explicit function argument,
+	 the corresponding parameters of F1 and F2 are either both ellipses or
+	 have the same type.  */
+      bool inherited1 = inherited_guide_p (cand1->fn);
+      bool inherited2 = inherited_guide_p (cand2->fn);
+      if (int diff = inherited2 - inherited1)
+	{
+	  for (i = 0; i < len; ++i)
+	    {
+	      conversion *t1 = cand1->convs[i + off1];
+	      conversion *t2 = cand2->convs[i + off2];
+	      /* ??? It seems the ellipses part of this tiebreaker isn't
+		 needed since a mismatch should have broken the tie earlier
+		 during ICS comparison.  */
+	      gcc_checking_assert (t1->ellipsis_p == t2->ellipsis_p);
+	      if (!same_type_p (t1->type, t2->type))
+		break;
+	    }
+	  if (i == len)
+	    return diff;
+	}
+
+      /* F1 is generated from a deduction-guide (13.3.1.8) and F2 is not */
       /* We distinguish between candidates from an explicit deduction guide and
 	 candidates built from a constructor based on DECL_ARTIFICIAL.  */
       int art1 = DECL_ARTIFICIAL (cand1->fn);
@@ -14257,8 +14343,18 @@ do_warn_dangling_reference (tree expr, bool arg_p)
 	    /* Recurse to see if the argument is a temporary.  It could also
 	       be another call taking a temporary and returning it and
 	       initializing this reference parameter.  */
-	    if (do_warn_dangling_reference (arg, /*arg_p=*/true))
-	      return expr;
+	    if ((arg = do_warn_dangling_reference (arg, /*arg_p=*/true)))
+	      {
+		/* If we know the temporary could not bind to the return type,
+		   don't warn.  This is for scalars only because for classes
+		   we can't be sure we are not returning its sub-object.  */
+		if (SCALAR_TYPE_P (TREE_TYPE (arg))
+		    && TYPE_REF_P (rettype)
+		    && !reference_related_p (TREE_TYPE (arg),
+					     TREE_TYPE (rettype)))
+		  continue;
+		return expr;
+	      }
 	  /* Don't warn about member functions like:
 	      std::any a(...);
 	      S& s = a.emplace<S>({0}, 0);

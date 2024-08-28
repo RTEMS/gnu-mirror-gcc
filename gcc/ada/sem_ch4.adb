@@ -278,6 +278,7 @@ package body Sem_Ch4 is
            (N /= Original_Node (N)
              and then Is_Effectively_Visible_Operator
                         (N => Original_Node (N), Typ => Typ))
+         or else Checking_Potentially_Static_Expression
          or else not Comes_From_Source (N));
    --  Return True iff either Is_Visible_Operator returns True or if
    --  there is a reason it is ok for Is_Visible_Operator to return False.
@@ -1994,6 +1995,7 @@ package body Sem_Ch4 is
               (Root_Type (LT) = Standard_String
                  or else Scope (LT) /= Standard_Standard)
               and then Etype (R) = Any_String
+              and then not Is_Component_Left_Opnd (N)
             then
                Add_One_Interp (N, Op_Id, LT);
 
@@ -2001,6 +2003,7 @@ package body Sem_Ch4 is
               (Root_Type (RT) = Standard_String
                  or else Scope (RT) /= Standard_Standard)
               and then Etype (L) = Any_String
+              and then not Is_Component_Right_Opnd (N)
             then
                Add_One_Interp (N, Op_Id, RT);
 
@@ -4709,13 +4712,6 @@ package body Sem_Ch4 is
       begin
          if Warn_On_Suspicious_Contract
            and then not Is_Internal_Name (Chars (Loop_Id))
-
-           --  Generating C, this check causes spurious warnings on inlined
-           --  postconditions; we can safely disable it because this check
-           --  was previously performed when analyzing the internally built
-           --  postconditions procedure.
-
-           and then not (Modify_Tree_For_C and In_Inlined_Body)
          then
             if not Referenced (Loop_Id, Cond) then
                Error_Msg_N ("?.t?unused variable &", Loop_Id);

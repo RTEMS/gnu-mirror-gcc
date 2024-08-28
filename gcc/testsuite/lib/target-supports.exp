@@ -1922,6 +1922,17 @@ proc check_effective_target_riscv_zabha { } {
     }]
 }
 
+# Return 1 if the target arch supports the atomic CAS extension, 0 otherwise.
+# Cache the result.
+
+proc check_effective_target_riscv_zacas { } {
+    return [check_no_compiler_messages riscv_ext_zacas assembly {
+       #ifndef __riscv_zacas
+       #error "Not __riscv_zacas"
+       #endif
+    }]
+}
+
 # Return 1 if the target arch supports the double precision floating point
 # extension, 0 otherwise.  Cache the result.
 
@@ -2140,7 +2151,7 @@ proc check_effective_target_riscv_v_misalign_ok { } {
 proc riscv_get_arch { } {
     set gcc_march ""
     # ??? do we neeed to add more extensions to the list below?
-    foreach ext { i m a f d q c v zicsr zifencei zfh zba zbb zbc zbs zvbb zvfh ztso zaamo zalrsc zabha } {
+    foreach ext { i m a f d q c b v zicsr zifencei zfh zba zbb zbc zbs zvbb zvfh ztso zaamo zalrsc zabha zacas } {
 	if { [check_no_compiler_messages  riscv_ext_$ext assembly [string map [list DEF __riscv_$ext] {
 		#ifndef DEF
 		#error "Not DEF"
@@ -2308,6 +2319,9 @@ proc remove_options_for_riscv_zaamo { flags } {
     # If zabha is set then zaamo will be implied. We need to remove zabha
     # as well.
     set modified_flags [remove_options_for_riscv_z_ext zabha $modified_flags]
+    # If zacas is set then zaamo will be implied. We need to remove zacas
+    # as well.
+    set modified_flags [remove_options_for_riscv_z_ext zacas $modified_flags]
     # If 'a' is set then zaamo will be implied. We need to downgrade instances
     # of 'a' to 'zalrsc'
     set no_a_flags [remove_options_for_riscv_a_only $modified_flags]
@@ -2341,6 +2355,15 @@ proc add_options_for_riscv_zabha { flags } {
 proc remove_options_for_riscv_zabha { flags } {
     set modified_flags [remove_options_for_riscv_zaamo $flags]
     return [remove_options_for_riscv_z_ext zabha $modified_flags]
+}
+
+proc add_options_for_riscv_zacas { flags } {
+    return [add_options_for_riscv_z_ext zacas $flags]
+}
+
+proc remove_options_for_riscv_zacas { flags } {
+    set modified_flags [remove_options_for_riscv_zaamo $flags]
+    return [remove_options_for_riscv_z_ext zacas $modified_flags]
 }
 
 proc add_options_for_riscv_zfh { flags } {
@@ -2825,30 +2848,6 @@ proc check_ppc_cpu_supports_hw_available { } {
     }]
 }
 
-# Return 1 if the target supports executing 750CL paired-single instructions, 0
-# otherwise.  Cache the result.
-
-proc check_750cl_hw_available { } {
-    return [check_cached_effective_target 750cl_hw_available {
-	# If this is not the right target then we can skip the test.
-	if { ![istarget powerpc-*paired*] } {
-	    expr 0
-	} else {
-	    check_runtime_nocache 750cl_hw_available {
-		 int main()
-		 {
-		 #ifdef __MACH__
-		   asm volatile ("ps_mul v0,v0,v0");
-		 #else
-		   asm volatile ("ps_mul 0,0,0");
-		 #endif
-		   return 0;
-		 }
-	    } "-mpaired"
-	}
-    }]
-}
-
 # Return 1 if the target supports executing power8 vector instructions, 0
 # otherwise.  Cache the result.
 
@@ -2864,11 +2863,9 @@ proc check_p8vector_hw_available { } {
 	    check_runtime_nocache p8vector_hw_available {
 		int main()
 		{
-		#ifdef __MACH__
-		  asm volatile ("xxlorc vs0,vs0,vs0");
-		#else
-		  asm volatile ("xxlorc 0,0,0");
-		#endif
+		  vector long long v1 = {0x1, 0x2};
+		  vector long long v2;
+		  asm ("xxlorc %0,%1,%1" : "=wa" (v2) : "wa" (v1));
 		  return 0;
 		}
 	    } $options
@@ -3165,11 +3162,9 @@ proc check_vsx_hw_available { } {
 	    check_runtime_nocache vsx_hw_available {
 		int main()
 		{
-		#ifdef __MACH__
-		  asm volatile ("xxlor vs0,vs0,vs0");
-		#else
-		  asm volatile ("xxlor 0,0,0");
-		#endif
+		  vector int v1 = {0, 0, 0, 0};
+		  vector int v2;
+		  asm ("xxlor %0,%1,%1" : "=wa" (v2) : "wa" (v1));
 		  return 0;
 		}
 	    } $options
@@ -3198,11 +3193,9 @@ proc check_vmx_hw_available { } {
 	    check_runtime_nocache vmx_hw_available {
 		int main()
 		{
-		#ifdef __MACH__
-		  asm volatile ("vor v0,v0,v0");
-		#else
-		  asm volatile ("vor 0,0,0");
-		#endif
+		  vector int v1 = {0, 0, 0, 0};
+		  vector int v2;
+		  asm ("vor %0,%1,%1" : "=v" (v2) : "v" (v1));
 		  return 0;
 		}
 	    } $options
@@ -4239,6 +4232,11 @@ proc check_effective_target_vect_int { } {
 	 || ([istarget loongarch*-*-*]
 	     && [check_effective_target_loongarch_sx])
 	}}]
+}
+
+# Return 1 if the target supports vector integer division, 0 otherwise.
+proc check_effective_target_vect_int_div { } {
+    return [check_effective_target_aarch64_sve]
 }
 
 # Return 1 if the target supports vectorization of early breaks,
@@ -7452,7 +7450,7 @@ proc check_effective_target_powerpc_elfv2 { } {
 # Return 1 if this is a PowerPC target supporting -mrop-protect
 
 proc check_effective_target_rop_ok { } {
-    return [check_effective_target_power10_ok] && [check_effective_target_powerpc_elfv2]
+    return [check_effective_target_has_arch_pwr8] && [check_effective_target_powerpc_elfv2]
 }
 
 # The VxWorks SPARC simulator accepts only EM_SPARC executables and
@@ -8312,7 +8310,7 @@ proc check_effective_target_vect_pack_trunc { } {
 
 proc check_effective_target_vect_unpack { } {
     return [check_cached_effective_target_indexed vect_unpack {
-      expr { ([istarget powerpc*-*-*] && ![istarget powerpc-*paired*])
+      expr { [istarget powerpc*-*-*]
 	     || [istarget i?86-*-*] || [istarget x86_64-*-*]
 	     || [istarget ia64-*-*]
 	     || [istarget aarch64*-*-*]
@@ -10621,6 +10619,42 @@ proc check_effective_target_apxf { } {
     } "-mapxf" ]
 }
 
+# Return 1 if avx10.2 instructions can be compiled.
+proc check_effective_target_avx10_2 { } {
+    return [check_no_compiler_messages avx10.2 object {
+	typedef int __v8si __attribute__ ((__vector_size__ (32)));
+	typedef char __mmask8;
+
+	__v8si
+	_mm256_mask_vpdpbssd_epi32 (__v8si __A, __mmask8 __U,
+				    __v8si __B, __v8si __C)
+	{
+	  return (__v8si) __builtin_ia32_vpdpbssd_v8si_mask ((__v8si)__A,
+							     (__v8si)__B,
+							     (__v8si)__C,
+							     (__mmask8)__U);
+	}
+    } "-mavx10.2" ]
+}
+
+# Return 1 if avx10.2-512 instructions can be compiled.
+proc check_effective_target_avx10_2_512 { } {
+    return [check_no_compiler_messages avx10.2-512 object {
+	typedef int __v16si __attribute__ ((__vector_size__ (64)));
+	typedef short __mmask16;
+
+	__v16si
+	_mm512_vpdpbssd_epi32 (__v16si __A, __mmask16 __U,
+			       __v16si __B, __v16si __C)
+	{
+	  return (__v16si) __builtin_ia32_vpdpbssd_v16si_mask ((__v16si)__A,
+							       (__v16si)__B,
+							       (__v16si)__C,
+							       (__mmask16)__U);
+	}
+    } "-mavx10.2-512" ]
+}
+
 # Return 1 if sse instructions can be compiled.
 proc check_effective_target_sse { } {
     return [check_no_compiler_messages sse object {
@@ -11685,14 +11719,7 @@ proc check_vect_support_and_set_flags { } {
     global dg-do-what-default
     global EFFECTIVE_TARGETS
 
-    if  [istarget powerpc-*paired*]  {
-	lappend DEFAULT_VECTCFLAGS "-mpaired"
-	if [check_750cl_hw_available] {
-	    set dg-do-what-default run
-	} else {
-	    set dg-do-what-default compile
-	}
-    } elseif [istarget powerpc*-*-*] {
+    if [istarget powerpc*-*-*] {
 	# Skip targets not supporting -maltivec.
 	if ![is-effective-target powerpc_altivec_ok] {
 	    return 0
@@ -12718,7 +12745,7 @@ proc check_effective_target_supports_stack_clash_protection { } {
     if { [istarget x86_64-*-*] || [istarget i?86-*-*]
 	  || [istarget powerpc*-*-*] || [istarget rs6000*-*-*]
 	  || [istarget aarch64*-**] || [istarget s390*-*-*]
-	  || [istarget loongarch64*-**] } {
+	  || [istarget loongarch64*-**] || [istarget riscv64*-**] } {
 	return 1
     }
   return 0
@@ -12741,6 +12768,18 @@ proc check_effective_target_tail_call { } {
     return [check_no_messages_and_pattern tail_call ",SIBCALL" rtl-expand {
 	__attribute__((__noipa__)) void foo (void) { }
 	__attribute__((__noipa__)) void bar (void) { foo(); }
+    } {-O2 -fdump-rtl-expand-all}] ;# The "SIBCALL" note requires a detailed dump.
+}
+
+# Return 1 if the target can perform tail-call optimizations for structures
+# checking with C++ because the C++ compiler has less tail call ability
+# due to PR115606 on some targets
+proc check_effective_target_struct_tail_call { } {
+    return [check_no_messages_and_pattern tail_call ",SIBCALL" rtl-expand {
+	// C++
+	struct foo { int a, b; };
+	__attribute__((__noipa__)) struct foo foo (void) { return {}; }
+	__attribute__((__noipa__)) struct foo bar (void) { return foo(); }
     } {-O2 -fdump-rtl-expand-all}] ;# The "SIBCALL" note requires a detailed dump.
 }
 
@@ -12775,6 +12814,10 @@ proc check_effective_target_caller_implicit_probes { } {
   # consider the aarch64 as having a caller implicit probe at
   # *(sp + 1k).
   if { [istarget aarch64*-*-*] } {
+	return 1;
+  }
+
+  if { [istarget riscv64*-*-*] } {
 	return 1;
   }
 

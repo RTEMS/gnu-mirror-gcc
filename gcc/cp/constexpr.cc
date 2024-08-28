@@ -2797,10 +2797,6 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
 			  value_cat lval,
 			  bool *non_constant_p, bool *overflow_p)
 {
-  /* Handle concept checks separately.  */
-  if (concept_check_p (t))
-    return evaluate_concept_check (t);
-
   location_t loc = cp_expr_loc_or_input_loc (t);
   tree fun = get_function_named_in_call (t);
   constexpr_call new_call
@@ -3123,10 +3119,16 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
 	 At this point it has already been evaluated in the call
 	 to cxx_bind_parameters_in_call.  */
       new_obj = TREE_VEC_ELT (new_call.bindings, 0);
-      new_obj = cxx_fold_indirect_ref (ctx, loc, DECL_CONTEXT (fun), new_obj);
-
-      if (ctx->call && ctx->call->fundef
-	  && DECL_CONSTRUCTOR_P (ctx->call->fundef->decl))
+      bool empty_base = false;
+      new_obj = cxx_fold_indirect_ref (ctx, loc, DECL_CONTEXT (fun), new_obj,
+				       &empty_base);
+      /* If we're initializing an empty class, don't set constness, because
+	 cxx_fold_indirect_ref will return the wrong object to set constness
+	 of.  */
+      if (empty_base)
+	new_obj = NULL_TREE;
+      else if (ctx->call && ctx->call->fundef
+	       && DECL_CONSTRUCTOR_P (ctx->call->fundef->decl))
 	{
 	  tree cur_obj = TREE_VEC_ELT (ctx->call->bindings, 0);
 	  STRIP_NOPS (cur_obj);
@@ -3968,10 +3970,13 @@ cxx_eval_conditional_expression (const constexpr_ctx *ctx, tree t,
   if (TREE_CODE (t) == IF_STMT && !val)
     val = void_node;
 
-  /* P2564: a subexpression of a manifestly constant-evaluated expression
-     or conversion is an immediate function context.  */
+  /* P2564: If we aren't in immediate function context (including a manifestly
+     constant-evaluated expression), check any uses of immediate functions in
+     the arm we're discarding.  But don't do this inside a call; we already
+     checked when parsing the function.  */
   if (ctx->manifestly_const_eval != mce_true
       && !in_immediate_context ()
+      && !ctx->call
       && cp_fold_immediate (&TREE_OPERAND (t, zero_p ? 1 : 2),
 			    ctx->manifestly_const_eval))
     {
@@ -7808,6 +7813,14 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
 				      non_constant_p, overflow_p);
       break;
 
+    case EH_ELSE_EXPR:
+      /* Evaluate any cleanup that applies to non-EH exits.  */
+      cxx_eval_constant_expression (ctx, TREE_OPERAND (t, 0), vc_discard,
+				    non_constant_p, overflow_p);
+
+      /* We do not have constexpr exceptions yet, so skip the EH path.  */
+      break;
+
     case CLEANUP_STMT:
       r = cxx_eval_constant_expression (ctx, CLEANUP_BODY (t), lval,
 					non_constant_p, overflow_p,
@@ -8157,10 +8170,13 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
 		    || DECL_NAME (decl) == heap_vec_uninit_identifier))
 	      /* OK */;
 	    /* P2738 (C++26): a conversion from a prvalue P of type "pointer to
-	       cv void" to a pointer-to-object type T unless P points to an
-	       object whose type is similar to T.  */
+	       cv void" to a pointer-to-object type T unless P is a null
+	       pointer value or points to an object whose type is similar to
+	       T.  */
 	    else if (cxx_dialect > cxx23)
 	      {
+		if (integer_zerop (sop))
+		  return build_int_cst (type, 0);
 		r = cxx_fold_indirect_ref (ctx, loc, TREE_TYPE (type), sop);
 		if (r)
 		  {
@@ -8169,26 +8185,16 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
 		  }
 		if (!ctx->quiet)
 		  {
-		    if (TREE_CODE (sop) == ADDR_EXPR)
-		      {
-			auto_diagnostic_group d;
-			error_at (loc, "cast from %qT is not allowed in a "
-				  "constant expression because "
-				  "pointed-to type %qT is not similar to %qT",
-				  TREE_TYPE (op), TREE_TYPE (TREE_TYPE (sop)),
-				  TREE_TYPE (type));
-			tree obj = build_fold_indirect_ref (sop);
-			inform (DECL_SOURCE_LOCATION (obj),
-				"pointed-to object declared here");
-		      }
-		    else
-		      {
-			gcc_assert (integer_zerop (sop));
-			error_at (loc, "cast from %qT is not allowed in a "
-				  "constant expression because "
-				  "%qE does not point to an object",
-				  TREE_TYPE (op), oldop);
-		      }
+		    gcc_assert (TREE_CODE (sop) == ADDR_EXPR);
+		    auto_diagnostic_group d;
+		    error_at (loc, "cast from %qT is not allowed in a "
+			      "constant expression because "
+			      "pointed-to type %qT is not similar to %qT",
+			      TREE_TYPE (op), TREE_TYPE (TREE_TYPE (sop)),
+			      TREE_TYPE (type));
+		    tree obj = build_fold_indirect_ref (sop);
+		    inform (DECL_SOURCE_LOCATION (obj),
+			    "pointed-to object declared here");
 		  }
 		*non_constant_p = true;
 		return t;
@@ -8498,19 +8504,7 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
       {
         /* We can evaluate template-id that refers to a concept only if
 	   the template arguments are non-dependent.  */
-	tree id = unpack_concept_check (t);
-	tree tmpl = TREE_OPERAND (id, 0);
-	if (!concept_definition_p (tmpl))
-	  internal_error ("unexpected template-id %qE", t);
-
-	if (function_concept_p (tmpl))
-	  {
-	    if (!ctx->quiet)
-	      error_at (cp_expr_loc_or_input_loc (t),
-			"function concept must be called");
-	    r = error_mark_node;
-	    break;
-	  }
+	gcc_assert (concept_check_p (t));
 
 	if (!value_dependent_expression_p (t)
 	    && !uid_sensitive_constexpr_evaluation_p ())
@@ -8776,16 +8770,12 @@ cxx_eval_outermost_constant_expr (tree t, bool allow_non_constant,
 	       || TREE_CODE (t) == AGGR_INIT_EXPR
 	       || TREE_CODE (t) == TARGET_EXPR))
     {
-      /* For non-concept checks, determine if it is consteval.  */
-      if (!concept_check_p (t))
-	{
-	  tree x = t;
-	  if (TREE_CODE (x) == TARGET_EXPR)
-	    x = TARGET_EXPR_INITIAL (x);
-	  tree fndecl = cp_get_callee_fndecl_nofold (x);
-	  if (fndecl && DECL_IMMEDIATE_FUNCTION_P (fndecl))
-	    is_consteval = true;
-	}
+      tree x = t;
+      if (TREE_CODE (x) == TARGET_EXPR)
+	x = TARGET_EXPR_INITIAL (x);
+      tree fndecl = cp_get_callee_fndecl_nofold (x);
+      if (fndecl && DECL_IMMEDIATE_FUNCTION_P (fndecl))
+	is_consteval = true;
     }
   if (AGGREGATE_TYPE_P (type) || VECTOR_TYPE_P (type))
     {

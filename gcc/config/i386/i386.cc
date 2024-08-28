@@ -14057,7 +14057,8 @@ ix86_print_operand (FILE *file, rtx x, int code)
 
 	    if (!optimize
 	        || optimize_function_for_size_p (cfun)
-		|| !TARGET_BRANCH_PREDICTION_HINTS)
+		|| (!TARGET_BRANCH_PREDICTION_HINTS_NOT_TAKEN
+		    && !TARGET_BRANCH_PREDICTION_HINTS_TAKEN))
 	      return;
 
 	    x = find_reg_note (current_output_insn, REG_BR_PROB, 0);
@@ -14066,25 +14067,13 @@ ix86_print_operand (FILE *file, rtx x, int code)
 		int pred_val = profile_probability::from_reg_br_prob_note
 				 (XINT (x, 0)).to_reg_br_prob_base ();
 
-		if (pred_val < REG_BR_PROB_BASE * 45 / 100
-		    || pred_val > REG_BR_PROB_BASE * 55 / 100)
-		  {
-		    bool taken = pred_val > REG_BR_PROB_BASE / 2;
-		    bool cputaken
-		      = final_forward_branch_p (current_output_insn) == 0;
-
-		    /* Emit hints only in the case default branch prediction
-		       heuristics would fail.  */
-		    if (taken != cputaken)
-		      {
-			/* We use 3e (DS) prefix for taken branches and
-			   2e (CS) prefix for not taken branches.  */
-			if (taken)
-			  fputs ("ds ; ", file);
-			else
-			  fputs ("cs ; ", file);
-		      }
-		  }
+		bool taken = pred_val > REG_BR_PROB_BASE / 2;
+		/* We use 3e (DS) prefix for taken branches and
+		   2e (CS) prefix for not taken branches.  */
+		if (taken && TARGET_BRANCH_PREDICTION_HINTS_TAKEN)
+		  fputs ("ds ; ", file);
+		else if (!taken && TARGET_BRANCH_PREDICTION_HINTS_NOT_TAKEN)
+		  fputs ("cs ; ", file);
 	      }
 	    return;
 	  }
@@ -16184,6 +16173,9 @@ ix86_build_const_vector (machine_mode mode, bool vect, rtx value)
     case E_V8DFmode:
     case E_V4DFmode:
     case E_V2DFmode:
+    case E_V32BFmode:
+    case E_V16BFmode:
+    case E_V8BFmode:
       n_elt = GET_MODE_NUNITS (mode);
       v = rtvec_alloc (n_elt);
       scalar_mode = GET_MODE_INNER (mode);
@@ -16220,6 +16212,9 @@ ix86_build_signbit_mask (machine_mode mode, bool vect, bool invert)
     case E_V8HFmode:
     case E_V16HFmode:
     case E_V32HFmode:
+    case E_V32BFmode:
+    case E_V16BFmode:
+    case E_V8BFmode:
       vec_mode = mode;
       imode = HImode;
       break;
@@ -18554,9 +18549,11 @@ ix86_fold_builtin (tree fndecl, int n_args,
 	      unsigned int prec = TYPE_PRECISION (TREE_TYPE (args[0]));
 	      unsigned int start = tree_to_uhwi (args[1]);
 	      unsigned int len = (start & 0xff00) >> 8;
+	      tree lhs_type = TREE_TYPE (TREE_TYPE (fndecl));
 	      start &= 0xff;
 	      if (start >= prec || len == 0)
-		res = 0;
+		return omit_one_operand (lhs_type, build_zero_cst (lhs_type),
+					 args[0]);
 	      else if (!tree_fits_uhwi_p (args[0]))
 		break;
 	      else
@@ -18565,7 +18562,7 @@ ix86_fold_builtin (tree fndecl, int n_args,
 		len = prec;
 	      if (len < HOST_BITS_PER_WIDE_INT)
 		res &= (HOST_WIDE_INT_1U << len) - 1;
-	      return build_int_cstu (TREE_TYPE (TREE_TYPE (fndecl)), res);
+	      return build_int_cstu (lhs_type, res);
 	    }
 	  break;
 
@@ -18575,15 +18572,17 @@ ix86_fold_builtin (tree fndecl, int n_args,
 	  if (tree_fits_uhwi_p (args[1]))
 	    {
 	      unsigned int idx = tree_to_uhwi (args[1]) & 0xff;
+	      tree lhs_type = TREE_TYPE (TREE_TYPE (fndecl));
 	      if (idx >= TYPE_PRECISION (TREE_TYPE (args[0])))
 		return args[0];
 	      if (idx == 0)
-		return build_int_cst (TREE_TYPE (TREE_TYPE (fndecl)), 0);
+		return omit_one_operand (lhs_type, build_zero_cst (lhs_type),
+					 args[0]);
 	      if (!tree_fits_uhwi_p (args[0]))
 		break;
 	      unsigned HOST_WIDE_INT res = tree_to_uhwi (args[0]);
 	      res &= ~(HOST_WIDE_INT_M1U << idx);
-	      return build_int_cstu (TREE_TYPE (TREE_TYPE (fndecl)), res);
+	      return build_int_cstu (lhs_type, res);
 	    }
 	  break;
 
@@ -20217,7 +20216,7 @@ ix86_class_likely_spilled_p (reg_class_t rclass)
 }
 
 /* Return true if a set of DST by the expression SRC should be allowed.
-   This prevents complex sets of likely_spilled hard regs before reload.  */
+   This prevents complex sets of likely_spilled hard regs before split1.  */
 
 bool
 ix86_hardreg_mov_ok (rtx dst, rtx src)
@@ -20229,8 +20228,7 @@ ix86_hardreg_mov_ok (rtx dst, rtx src)
 	   ? standard_sse_constant_p (src, GET_MODE (dst))
 	   : x86_64_immediate_operand (src, GET_MODE (dst)))
       && ix86_class_likely_spilled_p (REGNO_REG_CLASS (REGNO (dst)))
-      && !reload_completed
-      && !lra_in_progress)
+      && ix86_pre_reload_split ())
     return false;
   return true;
 }
@@ -20294,6 +20292,18 @@ inline_secondary_memory_needed (machine_mode mode, reg_class_t class1,
       if (!(INTEGER_CLASS_P (class1) || INTEGER_CLASS_P (class2)))
 	return true;
 
+      /* If the target says that inter-unit moves are more expensive
+	 than moving through memory, then don't generate them.  */
+      if ((SSE_CLASS_P (class1) && !TARGET_INTER_UNIT_MOVES_FROM_VEC)
+	  || (SSE_CLASS_P (class2) && !TARGET_INTER_UNIT_MOVES_TO_VEC))
+	return true;
+
+      /* With SSE4.1, *mov{ti,di}_internal supports moves between
+	 SSE_REGS and GENERAL_REGS using pinsr{q,d} or pextr{q,d}.  */
+      if (TARGET_SSE4_1
+	  && (TARGET_64BIT ? mode == TImode : mode == DImode))
+	return false;
+
       int msize = GET_MODE_SIZE (mode);
 
       /* Between SSE and general, we have moves no larger than word size.  */
@@ -20305,12 +20315,6 @@ inline_secondary_memory_needed (machine_mode mode, reg_class_t class1,
       int minsize = GET_MODE_SIZE (TARGET_SSE2 ? HImode : SImode);
 
       if (msize < minsize)
-	return true;
-
-      /* If the target says that inter-unit moves are more expensive
-	 than moving through memory, then don't generate them.  */
-      if ((SSE_CLASS_P (class1) && !TARGET_INTER_UNIT_MOVES_FROM_VEC)
-	  || (SSE_CLASS_P (class2) && !TARGET_INTER_UNIT_MOVES_TO_VEC))
 	return true;
     }
 
@@ -23405,150 +23409,6 @@ ix86_split_stlf_stall_load ()
     }
 }
 
-/* When a hot loop can be fit into one cacheline,
-   force align the loop without considering the max skip.  */
-static void
-ix86_align_loops ()
-{
-  basic_block bb;
-
-  /* Don't do this when we don't know cache line size.  */
-  if (ix86_cost->prefetch_block == 0)
-    return;
-
-  loop_optimizer_init (AVOID_CFG_MODIFICATIONS);
-  profile_count count_threshold = cfun->cfg->count_max / param_align_threshold;
-  FOR_EACH_BB_FN (bb, cfun)
-    {
-      rtx_insn *label = BB_HEAD (bb);
-      bool has_fallthru = 0;
-      edge e;
-      edge_iterator ei;
-
-      if (!LABEL_P (label))
-	continue;
-
-      profile_count fallthru_count = profile_count::zero ();
-      profile_count branch_count = profile_count::zero ();
-
-      FOR_EACH_EDGE (e, ei, bb->preds)
-	{
-	  if (e->flags & EDGE_FALLTHRU)
-	    has_fallthru = 1, fallthru_count += e->count ();
-	  else
-	    branch_count += e->count ();
-	}
-
-      if (!fallthru_count.initialized_p () || !branch_count.initialized_p ())
-	continue;
-
-      if (bb->loop_father
-	  && bb->loop_father->latch != EXIT_BLOCK_PTR_FOR_FN (cfun)
-	  && (has_fallthru
-	      ? (!(single_succ_p (bb)
-		   && single_succ (bb) == EXIT_BLOCK_PTR_FOR_FN (cfun))
-		 && optimize_bb_for_speed_p (bb)
-		 && branch_count + fallthru_count > count_threshold
-		 && (branch_count > fallthru_count * param_align_loop_iterations))
-	      /* In case there'no fallthru for the loop.
-		 Nops inserted won't be executed.  */
-	      : (branch_count > count_threshold
-		 || (bb->count > bb->prev_bb->count * 10
-		     && (bb->prev_bb->count
-			 <= ENTRY_BLOCK_PTR_FOR_FN (cfun)->count / 2)))))
-	{
-	  rtx_insn* insn, *end_insn;
-	  HOST_WIDE_INT size = 0;
-	  bool padding_p = true;
-	  basic_block tbb = bb;
-	  unsigned cond_branch_num = 0;
-	  bool detect_tight_loop_p = false;
-
-	  for (unsigned int i = 0; i != bb->loop_father->num_nodes;
-	       i++, tbb = tbb->next_bb)
-	    {
-	      /* Only handle continuous cfg layout. */
-	      if (bb->loop_father != tbb->loop_father)
-		{
-		  padding_p = false;
-		  break;
-		}
-
-	      FOR_BB_INSNS (tbb, insn)
-		{
-		  if (!NONDEBUG_INSN_P (insn))
-		    continue;
-		  size += ix86_min_insn_size (insn);
-
-		  /* We don't know size of inline asm.
-		     Don't align loop for call.  */
-		  if (asm_noperands (PATTERN (insn)) >= 0
-		      || CALL_P (insn))
-		    {
-		      size = -1;
-		      break;
-		    }
-		}
-
-	      if (size == -1 || size > ix86_cost->prefetch_block)
-		{
-		  padding_p = false;
-		  break;
-		}
-
-	      FOR_EACH_EDGE (e, ei, tbb->succs)
-		{
-		  /* It could be part of the loop.  */
-		  if (e->dest == bb)
-		    {
-		      detect_tight_loop_p = true;
-		      break;
-		    }
-		}
-
-	      if (detect_tight_loop_p)
-		break;
-
-	      end_insn = BB_END (tbb);
-	      if (JUMP_P (end_insn))
-		{
-		  /* For decoded icache:
-		     1. Up to two branches are allowed per Way.
-		     2. A non-conditional branch is the last micro-op in a Way.
-		  */
-		  if (onlyjump_p (end_insn)
-		      && (any_uncondjump_p (end_insn)
-			  || single_succ_p (tbb)))
-		    {
-		      padding_p = false;
-		      break;
-		    }
-		  else if (++cond_branch_num >= 2)
-		    {
-		      padding_p = false;
-		      break;
-		    }
-		}
-
-	    }
-
-	  if (padding_p && detect_tight_loop_p)
-	    {
-	      emit_insn_before (gen_max_skip_align (GEN_INT (ceil_log2 (size)),
-						    GEN_INT (0)), label);
-	      /* End of function.  */
-	      if (!tbb || tbb == EXIT_BLOCK_PTR_FOR_FN (cfun))
-		break;
-	      /* Skip bb which already fits into one cacheline.  */
-	      bb = tbb;
-	    }
-	}
-    }
-
-  loop_optimizer_finalize ();
-  free_dominance_info (CDI_DOMINATORS);
-}
-
 /* Implement machine specific optimizations.  We implement padding of returns
    for K8 CPUs and pass to avoid 4 jumps in the single 16 byte window.  */
 static void
@@ -23572,8 +23432,6 @@ ix86_reorg (void)
 #ifdef ASM_OUTPUT_MAX_SKIP_ALIGN
       if (TARGET_FOUR_JUMP_LIMIT)
 	ix86_avoid_jump_mispredicts ();
-
-      ix86_align_loops ();
 #endif
     }
 }
@@ -24779,11 +24637,11 @@ ix86_get_mask_mode (machine_mode data_mode)
       if (elem_size == 4
 	  || elem_size == 8
 	  || (TARGET_AVX512BW && (elem_size == 1 || elem_size == 2)))
-	return smallest_int_mode_for_size (nunits);
+	return smallest_int_mode_for_size (nunits).require ();
     }
 
   scalar_int_mode elem_mode
-    = smallest_int_mode_for_size (elem_size * BITS_PER_UNIT);
+    = smallest_int_mode_for_size (elem_size * BITS_PER_UNIT).require ();
 
   gcc_assert (elem_size * nunits == vector_size);
 
@@ -26111,6 +25969,25 @@ ix86_have_ccmp ()
   return (bool) TARGET_APX_CCMP;
 }
 
+/* Implement TARGET_MODE_CAN_TRANSFER_BITS.  */
+static bool
+ix86_mode_can_transfer_bits (machine_mode mode)
+{
+  if (GET_MODE_CLASS (mode) == MODE_FLOAT
+      || GET_MODE_CLASS (mode) == MODE_COMPLEX_FLOAT)
+    switch (GET_MODE_INNER (mode))
+      {
+      case E_SFmode:
+      case E_DFmode:
+	/* These suffer from normalization upon load when not using SSE.  */
+	return !(ix86_fpmath & FPMATH_387);
+      default:
+	return true;
+      }
+
+  return true;
+}
+
 /* Target-specific selftests.  */
 
 #if CHECKING_P
@@ -26956,6 +26833,9 @@ ix86_libgcc_floating_mode_supported_p
 
 #undef TARGET_HAVE_CCMP
 #define TARGET_HAVE_CCMP ix86_have_ccmp
+
+#undef TARGET_MODE_CAN_TRANSFER_BITS
+#define TARGET_MODE_CAN_TRANSFER_BITS ix86_mode_can_transfer_bits
 
 static bool
 ix86_libc_has_fast_function (int fcode ATTRIBUTE_UNUSED)

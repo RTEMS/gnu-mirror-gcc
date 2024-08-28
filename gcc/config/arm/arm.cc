@@ -117,7 +117,6 @@ static bool arm_assemble_integer (rtx, unsigned int, int);
 static void arm_print_operand (FILE *, rtx, int);
 static void arm_print_operand_address (FILE *, machine_mode, rtx);
 static bool arm_print_operand_punct_valid_p (unsigned char code);
-static const char *fp_const_from_val (REAL_VALUE_TYPE *);
 static arm_cc get_arm_condition_code (rtx);
 static bool arm_fixed_condition_code_regs (unsigned int *, unsigned int *);
 static const char *output_multi_immediate (rtx *, const char *, const char *,
@@ -209,9 +208,7 @@ static int aapcs_select_return_coproc (const_tree, const_tree);
 static void arm_elf_asm_constructor (rtx, int) ATTRIBUTE_UNUSED;
 static void arm_elf_asm_destructor (rtx, int) ATTRIBUTE_UNUSED;
 #endif
-#ifndef ARM_PE
 static void arm_encode_section_info (tree, rtx, int);
-#endif
 
 static void arm_file_end (void);
 static void arm_file_start (void);
@@ -353,21 +350,7 @@ static const attribute_spec arm_gnu_attributes[] =
     NULL },
   { "naked",        0, 0, true,  false, false, false,
     arm_handle_fndecl_attribute, NULL },
-#ifdef ARM_PE
-  /* ARM/PE has three new attributes:
-     interfacearm - ?
-     dllexport - for exporting a function/variable that will live in a dll
-     dllimport - for importing a function/variable from a dll
-
-     Microsoft allows multiple declspecs in one __declspec, separating
-     them with spaces.  We do NOT support this.  Instead, use __declspec
-     multiple times.
-  */
-  { "dllimport",    0, 0, true,  false, false, false, NULL, NULL },
-  { "dllexport",    0, 0, true,  false, false, false, NULL, NULL },
-  { "interfacearm", 0, 0, true,  false, false, false,
-    arm_handle_fndecl_attribute, NULL },
-#elif TARGET_DLLIMPORT_DECL_ATTRIBUTES
+#if TARGET_DLLIMPORT_DECL_ATTRIBUTES
   { "dllimport",    0, 0, false, false, false, false, handle_dll_attribute,
     NULL },
   { "dllexport",    0, 0, false, false, false, false, handle_dll_attribute,
@@ -489,11 +472,7 @@ static const scoped_attribute_specs *const arm_attribute_table[] =
 #define TARGET_MEMORY_MOVE_COST arm_memory_move_cost
 
 #undef TARGET_ENCODE_SECTION_INFO
-#ifdef ARM_PE
-#define TARGET_ENCODE_SECTION_INFO  arm_pe_encode_section_info
-#else
 #define TARGET_ENCODE_SECTION_INFO  arm_encode_section_info
-#endif
 
 #undef  TARGET_STRIP_NAME_ENCODING
 #define TARGET_STRIP_NAME_ENCODING arm_strip_name_encoding
@@ -12822,37 +12801,12 @@ arm_cortex_m7_branch_cost (bool speed_p, bool predictable_p)
   return speed_p ? 0 : arm_default_branch_cost (speed_p, predictable_p);
 }
 
-static bool fp_consts_inited = false;
-
-static REAL_VALUE_TYPE value_fp0;
-
-static void
-init_fp_table (void)
-{
-  REAL_VALUE_TYPE r;
-
-  r = REAL_VALUE_ATOF ("0", DFmode);
-  value_fp0 = r;
-  fp_consts_inited = true;
-}
-
 /* Return TRUE if rtx X is a valid immediate FP constant.  */
 int
 arm_const_double_rtx (rtx x)
 {
-  const REAL_VALUE_TYPE *r;
-
-  if (!fp_consts_inited)
-    init_fp_table ();
-
-  r = CONST_DOUBLE_REAL_VALUE (x);
-  if (REAL_VALUE_MINUS_ZERO (*r))
-    return 0;
-
-  if (real_equal (r, &value_fp0))
-    return 1;
-
-  return 0;
+  return (GET_MODE_CLASS (GET_MODE (x)) == MODE_FLOAT
+	  && x == CONST0_RTX (GET_MODE (x)));
 }
 
 /* VFPv3 has a fairly wide range of representable immediates, formed from
@@ -19793,17 +19747,6 @@ arm_reorg (void)
 
 /* Routines to output assembly language.  */
 
-/* Return string representation of passed in real value.  */
-static const char *
-fp_const_from_val (REAL_VALUE_TYPE *r)
-{
-  if (!fp_consts_inited)
-    init_fp_table ();
-
-  gcc_assert (real_equal (r, &value_fp0));
-  return "0";
-}
-
 /* OPERANDS[0] is the entire list of insns that constitute pop,
    OPERANDS[1] is the base register, RETURN_PC is true iff return insn
    is in the list, UPDATE is true iff the list contains explicit
@@ -24160,8 +24103,8 @@ arm_print_condition (FILE *stream)
 /* Globally reserved letters: acln
    Puncutation letters currently used: @_|?().!#
    Lower case letters currently used: bcdefhimpqtvwxyz
-   Upper case letters currently used: ABCDEFGHIJKLMNOPQRSTUV
-   Letters previously used, but now deprecated/obsolete: sWXYZ.
+   Upper case letters currently used: ABCDEFGHIJKLMOPQRSTUV
+   Letters previously used, but now deprecated/obsolete: sNWXYZ.
 
    Note that the global reservation for 'c' is only for CONSTANT_ADDRESS_P.
 
@@ -24174,8 +24117,6 @@ arm_print_condition (FILE *stream)
    in these cases the instruction pattern will take care to make sure that
    an instruction containing %d will follow, thereby undoing the effects of
    doing this instruction unconditionally.
-   If CODE is 'N' then X is a floating point operand that must be negated
-   before output.
    If CODE is 'B' then output a bitwise inverted value of X (a const int).
    If X is a REG and CODE is `M', output a ldm/stm style multi-reg.
    If CODE is 'V', then the operand must be a CONST_INT representing
@@ -24224,14 +24165,6 @@ arm_print_operand (FILE *stream, rtx x, int code)
        of further digits which we don't want to be part of the operand
        number.  */
     case '#':
-      return;
-
-    case 'N':
-      {
-	REAL_VALUE_TYPE r;
-	r = real_value_negate (CONST_DOUBLE_REAL_VALUE (x));
-	fprintf (stream, "%s", fp_const_from_val (&r));
-      }
       return;
 
     /* An integer or symbol address without a preceding # sign.  */
@@ -24508,6 +24441,12 @@ arm_print_operand (FILE *stream, rtx x, int code)
 	asm_fprintf (stream, "#%d, #%d", lsb,
 		     (exact_log2 (val + (val & -val)) - lsb));
       }
+      return;
+
+    case 'N':
+      /* Former FPA support, effectively unused after GCC-4.7, but not
+	 removed until gcc-15.  */
+      output_operand_lossage ("obsolete FPA format code '%c'", code);
       return;
 
     case 's':
@@ -26862,11 +26801,7 @@ is_called_in_ARM_mode (tree func)
   if (TARGET_CALLEE_INTERWORKING && TREE_PUBLIC (func))
     return true;
 
-#ifdef ARM_PE
-  return lookup_attribute ("interfacearm", DECL_ATTRIBUTES (func)) != NULL_TREE;
-#else
   return false;
-#endif
 }
 
 /* Given the stack offsets and register mask in OFFSETS, decide how
@@ -28342,10 +28277,6 @@ thumb1_output_interwork (void)
 #define STUB_NAME ".real_start_of"
 
   fprintf (f, "\t.code\t16\n");
-#ifdef ARM_PE
-  if (arm_dllexport_name_p (name))
-    name = arm_strip_name_encoding (name);
-#endif
   asm_fprintf (f, "\t.globl %s%U%s\n", STUB_NAME, name);
   fprintf (f, "\t.thumb_func\n");
   asm_fprintf (f, "%s%U%s:\n", STUB_NAME, name);
@@ -28934,7 +28865,6 @@ arm_file_end (void)
     }
 }
 
-#ifndef ARM_PE
 /* Symbols in the text segment can be accessed without indirecting via the
    constant pool; it may take an extra binary operation, but this is still
    faster than indirecting via memory.  Don't do this when not optimizing,
@@ -28949,7 +28879,6 @@ arm_encode_section_info (tree decl, rtx rtl, int first)
 
   default_encode_section_info (decl, rtl, first);
 }
-#endif /* !ARM_PE */
 
 static void
 arm_internal_label (FILE *stream, const char *prefix, unsigned long labelno)
@@ -34403,7 +34332,7 @@ arm_expand_divmod_libfunc (rtx libfunc, machine_mode mode,
     gcc_assert (!TARGET_IDIV);
 
   scalar_int_mode libval_mode
-    = smallest_int_mode_for_size (2 * GET_MODE_BITSIZE (mode));
+    = smallest_int_mode_for_size (2 * GET_MODE_BITSIZE (mode)).require ();
 
   rtx libval = emit_library_call_value (libfunc, NULL_RTX, LCT_CONST,
 					libval_mode, op0, mode, op1, mode);

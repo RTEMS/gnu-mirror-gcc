@@ -22,7 +22,7 @@
 (define_insn "*zero_extendsidi2_bitmanip"
   [(set (match_operand:DI 0 "register_operand" "=r,r")
 	(zero_extend:DI (match_operand:SI 1 "nonimmediate_operand" "r,m")))]
-  "TARGET_64BIT && TARGET_ZBA"
+  "TARGET_64BIT && TARGET_ZBA && !TARGET_XTHEADMEMIDX"
   "@
    zext.w\t%0,%1
    lwu\t%0,%1"
@@ -549,23 +549,33 @@
 
 ;; Optimize the common case of a SImode min/max against a constant
 ;; that is safe both for sign- and zero-extension.
-(define_insn_and_split "*minmax"
-  [(set (match_operand:DI 0 "register_operand" "=r")
+(define_split
+  [(set (match_operand:DI 0 "register_operand")
 	(sign_extend:DI
 	  (subreg:SI
-	    (bitmanip_minmax:DI (zero_extend:DI (match_operand:SI 1 "register_operand" "r"))
-						(match_operand:DI 2 "immediate_operand" "i"))
-	   0)))
-   (clobber (match_scratch:DI 3 "=&r"))
-   (clobber (match_scratch:DI 4 "=&r"))]
+	    (bitmanip_minmax:DI (zero_extend:DI
+				  (match_operand:SI 1 "register_operand"))
+				(match_operand:DI 2 "immediate_operand")) 0)))
+   (clobber (match_operand:DI 3 "register_operand"))
+   (clobber (match_operand:DI 4 "register_operand"))]
   "TARGET_64BIT && TARGET_ZBB && sext_hwi (INTVAL (operands[2]), 32) >= 0"
-  "#"
-  "&& reload_completed"
-  [(set (match_dup 3) (sign_extend:DI (match_dup 1)))
-   (set (match_dup 4) (match_dup 2))
-   (set (match_dup 0) (<minmax_optab>:DI (match_dup 3) (match_dup 4)))]
-  ""
-  [(set_attr "type" "bitmanip")])
+  [(set (match_dup 0) (<uminmax_optab>:DI (match_dup 4) (match_dup 3)))]
+  "
+{
+  /* Load the constant into a register.  */
+  emit_move_insn (operands[3], operands[2]);
+
+  /* If operands[1] is a sign extended SUBREG, then we can use it
+     directly.  Otherwise extend it into another temporary.  */
+  if (SUBREG_P (operands[1])
+      && SUBREG_PROMOTED_VAR_P (operands[1])
+      && SUBREG_PROMOTED_SIGNED_P (operands[1]))
+    operands[4] = SUBREG_REG (operands[1]);
+  else
+    emit_move_insn (operands[4], gen_rtx_SIGN_EXTEND (DImode, operands[1]));
+
+  /* The minmax is actually emitted from the split pattern.  */
+}")
 
 ;; ZBS extension.
 
@@ -633,7 +643,10 @@
     (set (match_dup 3) (and:DI (not:DI (match_dup 1)) (match_dup 3)))
     (set (match_dup 0) (zero_extend:DI
 			 (ashift:SI (const_int 1) (match_dup 4))))]
-  { operands[4] = gen_lowpart (QImode, operands[3]); }
+{
+  operands[4] = gen_lowpart (QImode, operands[3]);
+  operands[2] = GEN_INT (INTVAL (operands[2]) & 0x1f);
+}
   [(set_attr "type" "bitmanip")])
 
 (define_insn_and_split ""
@@ -652,7 +665,7 @@
    (set (match_dup 0) (zero_extend:DI (ashift:SI
 				     (const_int 1)
 				     (subreg:QI (match_dup 0) 0))))]
-  { }
+  { operands[2] = GEN_INT (INTVAL (operands[2]) & 0x1f); }
   [(set_attr "type" "bitmanip")])
 
 ;; Similarly two patterns for IOR/XOR generating bset/binv to
@@ -675,9 +688,12 @@
   "#"
   "&& reload_completed"
    [(set (match_dup 4) (match_dup 2))
-    (set (match_dup 4) (and:DI (not:DI (match_dup 4)) (match_dup 1)))
+    (set (match_dup 4) (and:DI (not:DI (match_dup 1)) (match_dup 4)))
     (set (match_dup 0) (any_or:DI (ashift:DI (const_int 1) (match_dup 5)) (match_dup 3)))]
-  { operands[5] = gen_lowpart (QImode, operands[4]); }
+{
+  operands[5] = gen_lowpart (QImode, operands[4]);
+  operands[2] = GEN_INT (INTVAL (operands[2]) & 0x1f);
+}
   [(set_attr "type" "bitmanip")])
 
 (define_insn_and_split ""
@@ -698,7 +714,7 @@
   "&& reload_completed"
    [(set (match_dup 4) (and:DI (match_dup 1) (match_dup 2)))
     (set (match_dup 0) (any_or:DI (ashift:DI (const_int 1) (subreg:QI (match_dup 4) 0)) (match_dup 3)))]
-  { }
+  { operands[2] = GEN_INT (INTVAL (operands[2]) & 0x1f); }
   [(set_attr "type" "bitmanip")])
 
 ;; Similarly two patterns for AND generating bclr to
@@ -724,7 +740,10 @@
    [(set (match_dup 4) (match_dup 2))
     (set (match_dup 4) (and:DI (not:DI (match_dup 1)) (match_dup 4)))
     (set (match_dup 0) (and:DI (rotate:DI (const_int -2) (match_dup 5)) (match_dup 3)))]
-  { operands[5] = gen_lowpart (QImode, operands[4]); }
+{
+  operands[5] = gen_lowpart (QImode, operands[4]);
+  operands[2] = GEN_INT (INTVAL (operands[2]) & 0x1f);
+}
   [(set_attr "type" "bitmanip")])
 
 
@@ -747,7 +766,10 @@
   "&& reload_completed"
    [(set (match_dup 4) (and:DI (match_dup 1) (match_dup 2)))
     (set (match_dup 0) (and:DI (rotate:DI (const_int -2) (match_dup 5)) (match_dup 3)))]
-  { operands[5] = gen_lowpart (QImode, operands[4]); }
+{
+  operands[5] = gen_lowpart (QImode, operands[4]);
+  operands[2] = GEN_INT (INTVAL (operands[2]) & 0x1f);
+}
   [(set_attr "type" "bitmanip")])
 
 (define_insn "*bset<mode>_1_mask"
@@ -1056,7 +1078,7 @@
    && TARGET_ZBA
    && !paradoxical_subreg_p (operands[1])
    /* Only profitable if synthesis takes more than one insn.  */
-   && riscv_const_insns (operands[2]) != 1
+   && riscv_const_insns (operands[2], false) != 1
    /* We need the upper half to be zero.  */
    && (INTVAL (operands[2]) & HOST_WIDE_INT_C (0xffffffff00000000)) == 0
    /* And the the adjusted constant must either be something we can

@@ -318,10 +318,6 @@ package Exp_Util is
    --  type Typ at runtime. Flag Partial_Invariant should be set when building
    --  the invariant procedure for a private type.
 
-   procedure Build_Procedure_Form (N : Node_Id);
-   --  Create a procedure declaration which emulates the behavior of a function
-   --  that returns an array type, for C-compatible generation.
-
    function Build_Runtime_Call (Loc : Source_Ptr; RE : RE_Id) return Node_Id;
    --  Build an N_Procedure_Call_Statement calling the given runtime entity.
    --  The call has no parameters. The first argument provides the location
@@ -772,6 +768,15 @@ package Exp_Util is
    --    type Ann is access all Typ;
    --    Rnn : constant Ann := Func (...)'reference;
    --    Rnn.all
+
+   function Is_Conversion_Or_Reference_To_Formal (N : Node_Id) return Boolean;
+   --  Return True if N is a type conversion, or a dereference thereof, or a
+   --  reference to a formal parameter.
+
+   function Is_Expanded_Class_Wide_Interface_Object_Decl
+      (N : Node_Id) return Boolean;
+   --  Determine if N is the expanded code for a class-wide interface type
+   --  object declaration.
 
    function Is_Finalizable_Transient
      (Decl : Node_Id;
@@ -1259,6 +1264,11 @@ package Exp_Util is
    --  the Thunk_Entity of the last member on the thunk chain.
 
    --  WARNING: There is a matching C declaration of this subprogram in fe.h
+
+   function Try_Inline_Always (Subp : Entity_Id) return Boolean;
+   --  Determines if the backend should try hard to inline Subp. This is
+   --  similar to Subp having a pragma Inline_Always, but doesn't cause an
+   --  error if Subp can't actually be inlined.
 
    function Type_May_Have_Bit_Aligned_Components
      (Typ : Entity_Id) return Boolean;

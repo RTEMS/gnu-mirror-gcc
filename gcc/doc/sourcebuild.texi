@@ -2530,6 +2530,9 @@ Test target architecture has support for the zaamo extension.
 @item riscv_zabha
 Test target architecture has support for the zabha extension.
 
+@item riscv_zacas
+Test target architecture has support for the zacas extension.
+
 @item riscv_zalrsc
 Test target architecture has support for the zalrsc extension.
 
@@ -2580,6 +2583,15 @@ Target supports the execution of @code{avx10.1} instructions.
 
 @item avx10.1-512
 Target supports the execution of @code{avx10.1-512} instructions.
+
+@item avx10.2
+Target supports the execution of @code{avx10.2} instructions.
+
+@item avx10.2-256
+Target supports the execution of @code{avx10.2} instructions.
+
+@item avx10.2-512
+Target supports the execution of @code{avx10.2-512} instructions.
 
 @item avx2
 Target supports compiling @code{avx2} instructions.
@@ -3298,6 +3310,9 @@ Add the zaamo extension to the -march string on RISC-V targets.
 @item riscv_zabha
 Add the zabha extension to the -march string on RISC-V targets.
 
+@item riscv_zacas
+Add the zacas extension to the -march string on RISC-V targets.
+
 @item riscv_zalrsc
 Add the zalrsc extension to the -march string on RISC-V targets.
 
@@ -3343,6 +3358,10 @@ extension is present downgrade it to zalrsc.
 
 @item riscv_zabha
 Remove the zabha extension and implied zaamo extension from the -march string
+on RISC-V.
+
+@item riscv_zacas
+Remove the zacas extension and implied zaamo extension from the -march string
 on RISC-V.
 
 @item riscv_zalrsc
@@ -3511,7 +3530,7 @@ assembly output.
 Passes if @var{symbol} is not defined as a hidden symbol in the test's
 assembly output.
 
-@item check-function-bodies @var{prefix} @var{terminator} [@var{options} [@{ target/xfail @var{selector} @}]]
+@item check-function-bodies @var{prefix} @var{terminator} [@var{options} [@{ target/xfail @var{selector} @} [@var{matched}]]]
 Looks through the source file for comments that give the expected assembly
 output for selected functions.  Each line of expected output starts with the
 prefix string @var{prefix} and the expected output for a function as a whole
@@ -3538,8 +3557,11 @@ Depending on the configuration (see
 @code{configure_check-function-bodies} in
 @file{gcc/testsuite/lib/scanasm.exp}), the test may discard from the
 compiler's assembly output directives such as @code{.cfi_startproc},
-local label definitions such as @code{.LFB0}, and more.
-It then matches the result against the expected
+local label definitions such as @code{.LFB0}, and more.  This behavior
+can be overridden using the optional @var{matched} argument, which
+specifies a regexp for lines that should not be discarded in this way.
+
+The test then matches the result against the expected
 output for a function as a single regular expression.  This means that
 later lines can use backslashes to refer back to @samp{(@dots{})}
 captures on earlier lines.  For example:

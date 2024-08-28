@@ -6494,6 +6494,25 @@ binary_scale_code_p (enum rtx_code code)
           || code == ROTATERT);
 }
 
+/* Return true if X appears to be a valid base or index term.  */
+static bool
+valid_base_or_index_term_p (rtx x)
+{
+  if (GET_CODE (x) == SCRATCH)
+    return true;
+  /* Handle what appear to be eliminated forms of a register.  If we reach
+     here, the elimination occurs outside of the outermost PLUS tree,
+     and so the elimination offset cannot be treated as a displacement
+     of the main address.  Instead, we need to treat the whole PLUS as
+     the base or index term.  The address can only be made legitimate by
+     reloading the PLUS.  */
+  if (GET_CODE (x) == PLUS && CONST_SCALAR_INT_P (XEXP (x, 1)))
+    x = XEXP (x, 0);
+  if (GET_CODE (x) == SUBREG)
+    x = SUBREG_REG (x);
+  return REG_P (x) || MEM_P (x);
+}
+
 /* If *INNER can be interpreted as a base, return a pointer to the inner term
    (see address_info).  Return null otherwise.  */
 
@@ -6502,10 +6521,7 @@ get_base_term (rtx *inner)
 {
   if (GET_CODE (*inner) == LO_SUM)
     inner = strip_address_mutations (&XEXP (*inner, 0));
-  if (REG_P (*inner)
-      || MEM_P (*inner)
-      || GET_CODE (*inner) == SUBREG
-      || GET_CODE (*inner) == SCRATCH)
+  if (valid_base_or_index_term_p (*inner))
     return inner;
   return 0;
 }
@@ -6519,10 +6535,7 @@ get_index_term (rtx *inner)
   /* At present, only constant scales are allowed.  */
   if (binary_scale_code_p (GET_CODE (*inner)) && CONSTANT_P (XEXP (*inner, 1)))
     inner = strip_address_mutations (&XEXP (*inner, 0));
-  if (REG_P (*inner)
-      || MEM_P (*inner)
-      || GET_CODE (*inner) == SUBREG
-      || GET_CODE (*inner) == SCRATCH)
+  if (valid_base_or_index_term_p (*inner))
     return inner;
   return 0;
 }
@@ -6724,20 +6737,36 @@ decompose_normal_address (struct address_info *info)
     }
   else if (out == 2)
     {
+      auto address_mode = targetm.addr_space.address_mode (info->as);
+      rtx inner_op0 = *inner_ops[0];
+      rtx inner_op1 = *inner_ops[1];
+      int base;
+      /* If one inner operand has the expected mode for a base and the other
+	 doesn't, assume that the other one is the index.  This is useful
+	 for addresses such as:
+
+	   (plus (zero_extend X) Y)
+
+	 zero_extend is not in itself enough to assume an index, since bases
+	 can be zero-extended on POINTERS_EXTEND_UNSIGNED targets.  But if
+	 Y has address mode and X doesn't, there should be little doubt that
+	 Y is the base.  */
+      if (GET_MODE (inner_op0) == address_mode
+	  && GET_MODE (inner_op1) != address_mode)
+	base = 0;
+      else if (GET_MODE (inner_op1) == address_mode
+	       && GET_MODE (inner_op0) != address_mode)
+	base = 1;
       /* In the event of a tie, assume the base comes first.  */
-      if (baseness (*inner_ops[0], info->mode, info->as, PLUS,
-		    GET_CODE (*ops[1]))
-	  >= baseness (*inner_ops[1], info->mode, info->as, PLUS,
-		       GET_CODE (*ops[0])))
-	{
-	  set_address_base (info, ops[0], inner_ops[0]);
-	  set_address_index (info, ops[1], inner_ops[1]);
-	}
+      else if (baseness (inner_op0, info->mode, info->as, PLUS,
+			 GET_CODE (*ops[1]))
+	       >= baseness (inner_op1, info->mode, info->as, PLUS,
+			    GET_CODE (*ops[0])))
+	base = 0;
       else
-	{
-	  set_address_base (info, ops[1], inner_ops[1]);
-	  set_address_index (info, ops[0], inner_ops[0]);
-	}
+	base = 1;
+      set_address_base (info, ops[base], inner_ops[base]);
+      set_address_index (info, ops[1 - base], inner_ops[1 - base]);
     }
   else
     gcc_assert (out == 0);

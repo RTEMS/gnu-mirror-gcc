@@ -8908,9 +8908,11 @@ get_file_function_name (const char *type)
      will be local to this file and the name is only necessary for
      debugging purposes. 
      We also assign sub_I and sub_D sufixes to constructors called from
-     the global static constructors.  These are always local.  */
+     the global static constructors.  These are always local.
+     OpenMP "declare target" offloaded constructors/destructors use "off_I" and
+     "off_D" for the same purpose.  */
   else if (((type[0] == 'I' || type[0] == 'D') && targetm.have_ctors_dtors)
-	   || (startswith (type, "sub_")
+	   || ((startswith (type, "sub_") || startswith (type, "off_"))
 	       && (type[4] == 'I' || type[4] == 'D')))
     {
       const char *file = main_input_filename;
@@ -9633,15 +9635,6 @@ build_common_tree_nodes (bool signed_char)
       if (!targetm.floatn_mode (n, extended).exists (&mode))
 	continue;
       int precision = GET_MODE_PRECISION (mode);
-      /* Work around the rs6000 KFmode having precision 113 not
-	 128.  */
-      const struct real_format *fmt = REAL_MODE_FORMAT (mode);
-      gcc_assert (fmt->b == 2 && fmt->emin + fmt->emax == 3);
-      int min_precision = fmt->p + ceil_log2 (fmt->emax - fmt->emin);
-      if (!extended)
-	gcc_assert (min_precision == n);
-      if (precision < min_precision)
-	precision = min_precision;
       FLOATN_NX_TYPE_NODE (i) = make_node (REAL_TYPE);
       TYPE_PRECISION (FLOATN_NX_TYPE_NODE (i)) = precision;
       layout_type (FLOATN_NX_TYPE_NODE (i));
