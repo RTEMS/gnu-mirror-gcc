@@ -25428,7 +25428,7 @@ report_architecture_mismatch (void)
     rs6000_isa_flags |= (ISA_2_5_MASKS_SERVER & ~ignore_masks);
   else if (TARGET_CMPB)
     rs6000_isa_flags |= (ISA_2_5_MASKS_EMBEDDED & ~ignore_masks);
-  else if (TARGET_FPRND)
+  else if (TARGET_POWER5X)
     rs6000_isa_flags |= (ISA_2_4_MASKS & ~ignore_masks);
   else if (TARGET_POPCNTB)
     rs6000_isa_flags |= (ISA_2_2_MASKS & ~ignore_masks);
