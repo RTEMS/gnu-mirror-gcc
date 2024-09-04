@@ -1,6 +1,214 @@
+==================== Branch work177-libs, patch #503 ====================
+
+Do not add -mvsx when testing the float128 support.
+
+Currently, we add -mvsx when building the float128 support in libgcc.  This
+allows us to build the float128 support on a big endian system where the
+default cpu is power4.  While the libgcc support can be built, given there is
+no glibc support for float128 available.
+
+However, adding -mvsx and building the libgcc float128 support causes problems
+if you set the default cpu to something like a 7540, which does not have VSX
+support.  The assembler complains that when the code does a ".machine 7450", you
+cannot use VSX instructions.
+
+After patching libgcc to not build the float128 support unless the host can
+support float128 normally, this patch changes the GCC tests so that it will only
+do the IEEE 128-bit tests if the default compiler enables the VSX instruction
+set by default.  Otherwise all of the float128 tests will fail because the
+libgcc support is not available.
+
+In addition to not doing the float128 tests when the compiler does not natively
+support float128, this patch also removes adding -mvsx, -mfloat128, and
+-mfloat128-hardware enable the support if the compiler did not natively enable
+it.
+
+I built little endian compilers and there were no regressions.
+
+I built big endian compilers with the --with-cpu=power5 configure option, and I
+verified that none of the float128 support functions are built.
+
+I also built big endian compilers on a power9 with the --with-cpu=native
+configure option, and I verified that the float128 support functions were
+built, since the default compiler used the VSX instruction set.
+
+I verified that on both sets of big endian builds, that all of the float128
+tests were skipped, since there is no support for float128 in glibc and the GCC
+compiler does not enable float128 on those systems.
+
+Can I check these patches into the trunk assuming the original bugzilla author
+says they fix the problem?
+
+2024-09-04 Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	PR target/115800
+	PR target/113652
+	* gcc.target/powerpc/abs128-1.c: Remove adding -mvsx, -mfloat128, and
+	-mfloat128-hardware options to float128 test.  Add explicit checks for
+	the float128 support, rather than just using VSX as a stand in, or
+	assuming we can silently enable VSX if the default is power4.  For
+	pr99708.c, also use the correct spelling to disable the float128 tests.
+	* gcc.target/powerpc/bfp/scalar-insert-exp-16.c: Likewise.
+	* gcc.target/powerpc/copysign128-1.c: Likewise.
+	* gcc.target/powerpc/divkc3-1.c: Likewise.
+	* gcc.target/powerpc/float128-3.c: Likewise.
+	* gcc.target/powerpc/float128-5.c: Likewise.
+	* gcc.target/powerpc/float128-complex-2.: Likewise.
+	* gcc.target/powerpc/float128-math.: Likewise.
+	* gcc.target/powerpc/inf128-1.: Likewise.
+	* gcc.target/powerpc/mulkc3-1.c: Likewise.
+	* gcc.target/powerpc/nan128-1.c: Likewise.
+	* gcc.target/powerpc/p9-lxvx-stxvx-3.: Likewise.
+	* gcc.target/powerpc/pr104253.: Likewise.
+	* gcc.target/powerpc/pr70669.c: Likewise.
+	* gcc.target/powerpc/pr79004.c: Likewise.
+	* gcc.target/powerpc/pr79038-1.c: Likewise.
+	* gcc.target/powerpc/pr81959.c: Likewise.
+	* gcc.target/powerpc/pr85657-1.: Likewise.
+	* gcc.target/powerpc/pr85657-2.c: Likewise.
+	* gcc.target/powerpc/pr99708.: Likewise.
+	* gcc.target/powerpc/signbit-1.c: Likewise.
+	* gcc.target/powerpc/signbit-2.c: Likewise.
+	* lib/target-supports.exp (check_ppc_float128_sw_available): Likewise.
+	(check_ppc_float128_hw_available): Likewise.
+	(check_effective_target_ppc_ieee128_ok): Likewise.
+	(add_options_for___float128): Likewise.
+	(check_effective_target___float128): Likewise.
+	(check_effective_target_base_quadfloat_support): Likewise.
+	(check_effective_target_powerpc_float128_sw_ok): Likewise.
+	(check_effective_target_powerpc_float128_hw_ok): Likewise.
+
+==================== Branch work177-libs, patch #502 ====================
+
+Do not add -mvsx when building libgcc float128 support.
+
+Currently, we add -mvsx when building the float128 support in libgcc.  This
+allows us to build the float128 support on a big endian system where the
+default cpu is power4.  While the libgcc support can be built, given there is
+no glibc support for float128 available.
+
+In the past, we would add -mvsx when building the float128 support in libgcc.
+This allowed us to build the float128 support on a big endian system where the
+default cpu is power4.  While the libgcc support can be built, given there is no
+glibc support for float128 available.
+
+However, adding -mvsx and building the libgcc float128 support causes problems
+if you set the default cpu to something like a 7540, which does not have VSX
+support.  The assembler complains that when the code does a ".machine 7450", you
+cannot use VSX instructions.
+
+With these patches, the float128 libgcc support is only built if the default
+compiler has VSX support.  If somebody wanted to enable the glibc support for
+big endian, they would need to set the base cpu to power8 to enable building the
+libgcc float128 libraries.
+
+I built little endian compilers and there were no regressions.
+
+I built big endian compilers with the --with-cpu=power5 configure option, and I
+verified that none of the float128 support functions are built.
+
+I also built big endian compilers on a power9 with the --with-cpu=native
+configure option, and I verified that the float128 support functions were
+built, since the default compiler used the VSX instruction set.
+
+I verified that on both sets of big endian builds, that all of the float128
+tests were skipped, since there is no support for float128 in glibc and the GCC
+compiler does not enable float128 on those systems.
+
+Can I check these patches into the trunk assuming the original bugzilla author
+says they fix the problem?
+
+2024-09-04 Michael Meissner  <meissner@linux.ibm.com>
+
+libgcc/
+
+	PR target/115800
+	PR target/113652
+	* config.host (powerpc*-*-linux*): Do not add t-float128-hw or
+	t-float128-p10-hw if the default compiler does not support float128.
+	* config/rs6000/t-float128 (FP128_CFLAGS_SW): Do not add -mvsx when
+	building the basic float128 support.
+	* config/rs6000/t-float128-hw (FP128_CFLAGS_HW): Likewise.
+	* config/rs6000/t-float128-p10-hw (FP128_3_1_CFLAGS_HW): Likewise.
+	* configure.ac (powerpc*-*-linux*): Do not add -mvsx when testing
+	whether to build the float128 support.
+	* configure: Regenerate.
+
+==================== Branch work177-libs, patch #501 ====================
+
+Do not build IEEE 128-bit libstdc++ support if VSX is not available.
+
+If you build a little endian compiler and select a default CPU of power5
+(i.e. --with-cpu=power5), GCC cannot be built.  The reason is that both the
+libgfortran and libstdc++-v3 libraries assume that all little endian powerpc
+builds support IEEE 128-bit floating point.
+
+However, if the default cpu does not support the VSX instruction set, then we
+cannot build the IEEE 128-bit libraries.  This patch fixes the libstdc++-v3
+library so if the GCC compiler does not support IEEE 128-bit floating point, the
+IEEE 128-bit floating point libraries are not built.  A companion patch will fix
+the libgfortran library.
+
+I have built these patches on a little endian system, doing both normal builds,
+and making a build with a power5 default.  There was no regression in the normal
+builds.  I have also built a big endian GCC compiler and there was no regression
+there.  Can I check this patch into the trunk?
+
+2024-09-04  Michael Meissner  <meissner@linux.ibm.com>
+
+libstdc++-v3/
+
+	PR target/115800
+	* configure.ac (powerpc*-*-linux*): Don't enable IEEE 128-bit on PowerPC
+	systems without VSX.
+	* configure: Regenerate.
+	* numeric_traits.h: Don't enable IEEE 128-bit on PowerPC systems without
+	VSX.
+
+==================== Branch work177-libs, patch #500 ====================
+
+Do not build IEEE 128-bit libgfortran support if VSX is not available.
+
+If you build a little endian compiler and select a default CPU of power5
+(i.e. --with-cpu=power5), GCC cannot be built.  The reason is that both the
+libgfortran and libstdc++-v3 libraries assume that all little endian powerpc
+builds support IEEE 128-bit floating point.
+
+However, if the default cpu does not support the VSX instruction set, then we
+cannot build the IEEE 128-bit libraries.  This patch fixes the libgfortran
+library so if the GCC compiler does not support IEEE 128-bit floating point, the
+IEEE 128-bit floating point libraries are not built.  A companion patch will fix
+the libstdc++-v3 library.
+
+I have built these patches on a little endian system, doing both normal builds,
+and making a build with a power5 default.  There was no regression in the normal
+builds.  I have also built a big endian GCC compiler and there was no regression
+there.  Can I check this patch into the trunk?
+
+2024-09-04  Michael Meissner  <meissner@linux.ibm.com>
+
+libgfortran/
+
+	PR target/115800
+	* configure.ac (powerpc64le*-linux*): Check to see that the compiler
+	uses VSX before enabling IEEE 128-bit support.
+	* configure: Regenerate.
+	* kinds-override.h (GFC_REAL_17): Add check for __VSX__.
+	* libgfortran.h (POWER_IEEE128): Likewise.
+
 ==================== Branch work177-libs, baseline ====================
+
+Add ChangeLog.libs and update REVISION.
+
+2024-09-03  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* ChangeLog.libs: New file for branch.
+	* REVISION: Update.
 
 2024-09-03   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
-
