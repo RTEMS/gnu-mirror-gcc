@@ -1,6 +1,6 @@
 /* { dg-do compile { target { powerpc*-*-linux* } } } */
 /* { dg-require-effective-target ppc_float128_sw } */
-/* { dg-options "-mvsx -mfloat128 -O2 -mabi=ibmlongdouble -Wno-psabi" } */
+/* { dg-options "-mfloat128 -O2 -mabi=ibmlongdouble -Wno-psabi" } */
 
 // PR 85657 -- make sure conversions work between each of the 128-bit floating
 // point types.
