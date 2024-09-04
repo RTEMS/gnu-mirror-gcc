@@ -1,6 +1,87 @@
+==================== Branch work177-tar, patch #301 ====================
+
+Remove SPR alternatives for move insns.
+
+2024-08-19  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.md (mov<mode>_internal): Remove alternatives for
+	moving values to/from SPR registers.
+	(movcc_<mode>): Likewise.
+	(movsf_hardfloat): Likewise.
+	(movsd_hardfloat): Likewise.
+	(mov<mode>_softfloat): Likewise.
+	(mov<mode>_hardfloat64): Likewise.
+	(mov<mode>_softfloat64): Likewise.
+
+==================== Branch work177-tar, patch #300 ====================
+
+Add support for the TAR register.
+
+2024-08-19  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/constraints.md (h constraint): Add TAR register to the
+	documentation.
+	(wt constraint): New constraint.
+	* config/rs6000/rs6000-cpus.def (ISA_3_0_MASKS_SERVER): Add -mtar.
+	(POWERPC_MASKS): Likewise.
+	* config/rs6000/rs6000.cc (rs6000_reg_names): Add TAR register support.
+	(alt_reg_names): Likewise.
+	(rs6000_hard_regno_mode_ok_uncached): Restrict SPR registers to only
+	hold scalar integer modes of an appropriate size.  Add TAR register
+	support.
+	(rs6000_debug_reg_global): Print the register class that wt maps too.
+	(rs6000_init_hard_regno_mode_ok): Add TAR register support.
+	(rs6000_conditional_register_usage): Add TAR register support.
+	(print_operand): Likewise.
+	(rs6000_debugger_regno): Likewise.
+	(rs6000_opt_masks): Add support for -mtar.
+	* config/rs6000/rs6000.h (FIRST_PSEUDO_REGISTER): Add TAR register
+	support.
+	(FIXED_REGISTERS): Likewise.
+	(CALL_REALLY_USED_REGISTERS): Likewise.
+	(REG_ALLOC_ORDER): Likewise.
+	(enum reg_class): Likewise.
+	(REG_CLASS_NAMES): Likewise.
+	(REG_CLASS_CONTENTS): Likewise.
+	(enum r6000_reg_class_enum): Add support for the wt constraint.
+	* config/rs6000/rs6000.md (TAR_REGNO): New constant.
+	(call_indirect_nonlocal_sysv<mode>): Likewise.
+	(call_value_indirect_nonlocal_sysv<mode>): Likewise.
+	(call_indirect_aix<mode>): Likewise.
+	(call_value_indirect_aix<mode>): Likewise.
+	(call_indirect_elfv2<mode>): Likewise.
+	(call_indirect_pcrel<mode>): Likewise.
+	(call_value_indirect_elfv2<mode>): Likewise.
+	(call_value_indirect_pcrel<mode>): Likewise.
+	(*sibcall_indirect_nonlocal_sysv<mode>): Likewise.
+	(sibcall_value_indirect_nonlocal_sysv<mode>): Likewise.
+	(indirect_jump<mode>): Likewise.
+	(@indirect_jump<mode>_nospec): Likewise.
+	(@tablejump<mode>_insn_normal): Likewise.
+	(@tablejump<mode>_insn_nospec): Likewise.
+	* config/rs6000/rs6000.opt (-mtar): New option.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/ppc-switch-1.c: Update test for the TAR register.
+	* gcc.target/powerpc/pr51513.c: Likewise.
+	* gcc.target/powerpc/safe-indirect-jump-2.c: Likewise.
+	* gcc.target/powerpc/safe-indirect-jump-3.c: Likewise.
+	* gcc.target/powerpc/tar-register.c: New test.
+
 ==================== Branch work177-tar, baseline ====================
+
+Add ChangeLog.tar and update REVISION.
+
+2024-08-16  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* ChangeLog.tar: New file for branch.
+	* REVISION: Update.
 
 2024-09-03   Michael Meissner  <meissner@linux.ibm.com>
 
 	Clone branch
-
