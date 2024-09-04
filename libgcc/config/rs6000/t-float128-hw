@@ -23,8 +23,7 @@ fp128_ifunc_obj		= $(fp128_ifunc_static_obj) $(fp128_ifunc_shared_obj)
 fp128_sed_hw		= -hw
 
 # Build the hardware support functions with appropriate hardware support
-FP128_CFLAGS_HW		 = -Wno-type-limits -mvsx -mfloat128 \
-			   -mcpu=power9 \
+FP128_CFLAGS_HW		 = -Wno-type-limits -mfloat128 -mcpu=power9 \
 			   -mfloat128-hardware -mno-gnu-attribute \
 			   -I$(srcdir)/soft-fp \
 			   -I$(srcdir)/config/rs6000 \
