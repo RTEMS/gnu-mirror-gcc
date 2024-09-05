@@ -38,11 +38,7 @@ typedef __vector_pair vector_pair_t;
 #define VPAIR_FP_SECOND		"S"		/* Access 2nd VSX register.  */
 
 /* vector pair double operations on power10.  */
-#define vpair_f64_splat(R, A)						\
-  __asm__ ("xxpermdi %x0,%x1,%x1,0" "\n\t"				\
-           "xxpermdi %" VPAIR_FP_SECOND "0,%x1,%x1,0"			\
-           : "=" VPAIR_FP_CONSTRAINT (*R)				\
-	   : "wa" ((A)))
+#define vpair_f64_splat(R, A)	(*R) = __builtin_vpair_f64_splat (A)
 
 #define vpair_f64_neg(R,A)	(*R) = __builtin_vpair_f64_neg (*A)
 #define vpair_f64_abs(R,A)	(*R) = __builtin_vpair_f64_abs (*A)
@@ -63,12 +59,7 @@ typedef __vector_pair vector_pair_t;
 
 
 /* vector pair float operations on power10.  */
-#define vpair_f32_splat(R, A)						\
-  __asm__ ("xscvdpspn %x0,%x1" "\n\t"					\
-           "xxspltw %x0,%x0,0" "\n\t"					\
-           "xxlor %" VPAIR_FP_SECOND "0,%x0,%x0"			\
-           : "=" VPAIR_FP_CONSTRAINT (*R)				\
-	   : "wa" (((float) (A))))
+#define vpair_f32_splat(R, A)	(*R) = __builtin_vpair_f32_splat (A)
 
 #define vpair_f32_neg(R,A)	(*R) = __builtin_vpair_f32_neg (*A)
 #define vpair_f32_abs(R,A)	(*R) = __builtin_vpair_f32_abs (*A)
