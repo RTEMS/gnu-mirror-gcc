@@ -44,65 +44,17 @@ typedef __vector_pair vector_pair_t;
            : "=" VPAIR_FP_CONSTRAINT (*R)				\
 	   : "wa" ((A)))
 
-#define vpair_f64_neg(R,A)						\
-  __asm__ ("xvnegdp %x0,%x1" "\n\t"					\
-           "xvnegdp %" VPAIR_FP_SECOND "0,%" VPAIR_FP_SECOND "1"	\
-           : "=" VPAIR_FP_CONSTRAINT (*R)				\
-	   : VPAIR_FP_CONSTRAINT ((*A)))
+#define vpair_f64_neg(R,A)	(*R) = __builtin_vpair_f64_neg (*A)
+#define vpair_f64_abs(R,A)	(*R) = __builtin_vpair_f64_abs (*A)
+#define vpair_f64_nabs(R,A)	(*R) = __builtin_vpair_f64_nabs (*A)
+#define vpair_f64_sqrt(R,A)	(*R) = __builtin_vpair_f64_sqrt (*A)
 
-#define vpair_f64_abs(R,A)						\
-  __asm__ ("xvabsdp %x0,%x1" "\n\t"					\
-           "xvabsdp %" VPAIR_FP_SECOND "0,%" VPAIR_FP_SECOND "1"	\
-           : "=" VPAIR_FP_CONSTRAINT (*R)				\
-	   : VPAIR_FP_CONSTRAINT ((*A)))
-
-#define vpair_f64_nabs(R,A)						\
-  __asm__ ("xvnabsdp %x0,%x1" "\n\t"					\
-           "xvnabsdp %" VPAIR_FP_SECOND "0,%" VPAIR_FP_SECOND "1"	\
-           : "=" VPAIR_FP_CONSTRAINT (*R)				\
-	   : VPAIR_FP_CONSTRAINT ((*A)))
-
-#define vpair_f64_sqrt(R,A)						\
-  __asm__ ("xvsqrtdp %x0,%x1" "\n\t"					\
-           "xvsqrtdp %" VPAIR_FP_SECOND "0,%" VPAIR_FP_SECOND "1"	\
-           : "=" VPAIR_FP_CONSTRAINT (*R)				\
-	   : VPAIR_FP_CONSTRAINT ((*A)))
-
-#define vpair_f64_add(R,A,B)						\
-  __asm__ ("xvadddp %x0,%x1,%x2" "\n\t"					\
-           "xvadddp %" VPAIR_FP_SECOND "0,%" VPAIR_FP_SECOND "1,%" VPAIR_FP_SECOND "2" \
-           : "=" VPAIR_FP_CONSTRAINT (*R)				\
-	   : VPAIR_FP_CONSTRAINT ((*A)), VPAIR_FP_CONSTRAINT ((*B)))
-
-#define vpair_f64_div(R,A,B)						\
-  __asm__ ("xvdivdp %x0,%x1,%x2" "\n\t"					\
-           "xvdivdp %" VPAIR_FP_SECOND "0,%" VPAIR_FP_SECOND "1,%" VPAIR_FP_SECOND "2" \
-           : "=" VPAIR_FP_CONSTRAINT (*R)				\
-	   : VPAIR_FP_CONSTRAINT ((*A)), VPAIR_FP_CONSTRAINT ((*B)))
-
-#define vpair_f64_max(R,A,B)						\
-  __asm__ ("xvmaxdp %x0,%x1,%x2" "\n\t"					\
-           "xvmaxdp %" VPAIR_FP_SECOND "0,%" VPAIR_FP_SECOND "1,%" VPAIR_FP_SECOND "2" \
-           : "=" VPAIR_FP_CONSTRAINT (*R)				\
-	   : VPAIR_FP_CONSTRAINT ((*A)), VPAIR_FP_CONSTRAINT ((*B)))
-
-#define vpair_f64_min(R,A,B)						\
-  __asm__ ("xvmindp %x0,%x1,%x2" "\n\t"					\
-           "xvmindp %" VPAIR_FP_SECOND "0,%" VPAIR_FP_SECOND "1,%" VPAIR_FP_SECOND "2" \
-           : "=" VPAIR_FP_CONSTRAINT (*R)				\
-	   : VPAIR_FP_CONSTRAINT ((*A)), VPAIR_FP_CONSTRAINT ((*B)))
-
-#define vpair_f64_mul(R,A,B)						\
-  __asm__ ("xvmuldp %x0,%x1,%x2" "\n\t"					\
-           "xvmuldp %" VPAIR_FP_SECOND "0,%" VPAIR_FP_SECOND "1,%" VPAIR_FP_SECOND "2" \
-           : "=" VPAIR_FP_CONSTRAINT (*R)				\
-	   : VPAIR_FP_CONSTRAINT ((*A)), VPAIR_FP_CONSTRAINT ((*B)))
-
-#define vpair_f64_sub(R,A,B)						\
-  __asm__ ("xvsubdp %x0,%x1,%x2" "\n\t"					\
-           "xvsubdp %" VPAIR_FP_SECOND "0,%" VPAIR_FP_SECOND "1,%" VPAIR_FP_SECOND "2" \
-           : "=" VPAIR_FP_CONSTRAINT (*R)				\
-	   : VPAIR_FP_CONSTRAINT ((*A)), VPAIR_FP_CONSTRAINT ((*B)))
+#define vpair_f64_add(R,A,B)	(*R) = __builtin_vpair_f64_add (*A, *B)
+#define vpair_f64_div(R,A,B)	(*R) = __builtin_vpair_f64_div (*A, *B)
+#define vpair_f64_max(R,A,B)	(*R) = __builtin_vpair_f64_max (*A, *B)
+#define vpair_f64_min(R,A,B)	(*R) = __builtin_vpair_f64_min (*A, *B)
+#define vpair_f64_mul(R,A,B)	(*R) = __builtin_vpair_f64_mul (*A, *B)
+#define vpair_f64_sub(R,A,B)	(*R) = __builtin_vpair_f64_sub (*A, *B)
 
 #define vpair_f64_fma(R,A,B,C)						\
   __asm__ ("xvmaddadp %x0,%x1,%x2" "\n\t"				\
@@ -136,65 +88,17 @@ typedef __vector_pair vector_pair_t;
            : "=" VPAIR_FP_CONSTRAINT (*R)				\
 	   : "wa" (((float) (A))))
 
-#define vpair_f32_neg(R,A)						\
-  __asm__ ("xvnegsp %x0,%x1" "\n\t"					\
-           "xvnegsp %" VPAIR_FP_SECOND "0,%" VPAIR_FP_SECOND "1"	\
-           : "=" VPAIR_FP_CONSTRAINT (*R)				\
-	   : VPAIR_FP_CONSTRAINT ((*A)))
+#define vpair_f32_neg(R,A)	(*R) = __builtin_vpair_f32_neg (*A)
+#define vpair_f32_abs(R,A)	(*R) = __builtin_vpair_f32_abs (*A)
+#define vpair_f32_nabs(R,A)	(*R) = __builtin_vpair_f32_nabs (*A)
+#define vpair_f32_sqrt(R,A)	(*R) = __builtin_vpair_f32_sqrt (*A)
 
-#define vpair_f32_abs(R,A)						\
-  __asm__ ("xvabssp %x0,%x1" "\n\t"					\
-           "xvabssp %" VPAIR_FP_SECOND "0,%" VPAIR_FP_SECOND "1"	\
-           : "=" VPAIR_FP_CONSTRAINT (*R)				\
-	   : VPAIR_FP_CONSTRAINT ((*A)))
-
-#define vpair_f32_nabs(R,A)						\
-  __asm__ ("xvnabssp %x0,%x1" "\n\t"					\
-           "xvnabssp %" VPAIR_FP_SECOND "0,%" VPAIR_FP_SECOND "1"	\
-           : "=" VPAIR_FP_CONSTRAINT (*R)				\
-	   : VPAIR_FP_CONSTRAINT ((*A)))
-
-#define vpair_f32_sqrt(R,A)						\
-  __asm__ ("xvsqrtsp %x0,%x1" "\n\t"					\
-           "xvsqrtsp %" VPAIR_FP_SECOND "0,%" VPAIR_FP_SECOND "1"	\
-           : "=" VPAIR_FP_CONSTRAINT (*R)				\
-	   : VPAIR_FP_CONSTRAINT ((*A)))
-
-#define vpair_f32_add(R,A,B)						\
-  __asm__ ("xvaddsp %x0,%x1,%x2" "\n\t"					\
-           "xvaddsp %" VPAIR_FP_SECOND "0,%" VPAIR_FP_SECOND "1,%" VPAIR_FP_SECOND "2" \
-           : "=" VPAIR_FP_CONSTRAINT (*R)				\
-	   : VPAIR_FP_CONSTRAINT ((*A)), VPAIR_FP_CONSTRAINT ((*B)))
-
-#define vpair_f32_div(R,A,B)						\
-  __asm__ ("xvdivsp %x0,%x1,%x2" "\n\t"					\
-           "xvdivsp %" VPAIR_FP_SECOND "0,%" VPAIR_FP_SECOND "1,%" VPAIR_FP_SECOND "2" \
-           : "=" VPAIR_FP_CONSTRAINT (*R)				\
-	   : VPAIR_FP_CONSTRAINT ((*A)), VPAIR_FP_CONSTRAINT ((*B)))
-
-#define vpair_f32_max(R,A,B)						\
-  __asm__ ("xvmaxsp %x0,%x1,%x2" "\n\t"					\
-           "xvmaxsp %" VPAIR_FP_SECOND "0,%" VPAIR_FP_SECOND "1,%" VPAIR_FP_SECOND "2" \
-           : "=" VPAIR_FP_CONSTRAINT (*R)				\
-	   : VPAIR_FP_CONSTRAINT ((*A)), VPAIR_FP_CONSTRAINT ((*B)))
-
-#define vpair_f32_min(R,A,B)						\
-  __asm__ ("xvminsp %x0,%x1,%x2" "\n\t"					\
-           "xvminsp %" VPAIR_FP_SECOND "0,%" VPAIR_FP_SECOND "1,%" VPAIR_FP_SECOND "2" \
-           : "=" VPAIR_FP_CONSTRAINT (*R)				\
-	   : VPAIR_FP_CONSTRAINT ((*A)), VPAIR_FP_CONSTRAINT ((*B)))
-
-#define vpair_f32_mul(R,A,B)						\
-  __asm__ ("xvmulsp %x0,%x1,%x2" "\n\t"					\
-           "xvmulsp %" VPAIR_FP_SECOND "0,%" VPAIR_FP_SECOND "1,%" VPAIR_FP_SECOND "2" \
-           : "=" VPAIR_FP_CONSTRAINT (*R)				\
-	   : VPAIR_FP_CONSTRAINT ((*A)), VPAIR_FP_CONSTRAINT ((*B)))
-
-#define vpair_f32_sub(R,A,B)						\
-  __asm__ ("xvsubsp %x0,%x1,%x2" "\n\t"					\
-           "xvsubsp %" VPAIR_FP_SECOND "0,%" VPAIR_FP_SECOND "1,%" VPAIR_FP_SECOND "2" \
-           : "=" VPAIR_FP_CONSTRAINT (*R)				\
-	   : VPAIR_FP_CONSTRAINT ((*A)), VPAIR_FP_CONSTRAINT ((*B)))
+#define vpair_f32_add(R,A,B)	(*R) = __builtin_vpair_f32_add (*A, *B)
+#define vpair_f32_div(R,A,B)	(*R) = __builtin_vpair_f32_div (*A, *B)
+#define vpair_f32_max(R,A,B)	(*R) = __builtin_vpair_f32_max (*A, *B)
+#define vpair_f32_min(R,A,B)	(*R) = __builtin_vpair_f32_min (*A, *B)
+#define vpair_f32_mul(R,A,B)	(*R) = __builtin_vpair_f32_mul (*A, *B)
+#define vpair_f32_sub(R,A,B)	(*R) = __builtin_vpair_f32_sub (*A, *B)
 
 #define vpair_f32_fma(R,A,B,C)						\
   __asm__ ("xvmaddasp %x0,%x1,%x2" "\n\t"				\
