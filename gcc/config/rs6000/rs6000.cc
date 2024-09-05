@@ -14414,6 +14414,52 @@ print_operand (FILE *file, rtx x, int code)
 	fprintf (file, HOST_WIDE_INT_PRINT_DEC, (32 - INTVAL (x)) & 31);
       return;
 
+    case 'S':
+      /* Like %L<x>, but assume the second register is a VSX register.  This
+	 works on VSX registers and memory addresses.  */
+      if (REG_P (x))
+	{
+	  int reg = REGNO (x);
+	  if (!VSX_REGNO_P (reg) || (reg & 1) != 0)
+	    output_operand_lossage ("invalid %%S value");
+	  else
+	    {
+	      int vsx_reg = (FP_REGNO_P (reg)
+			     ? reg - 32
+			     : reg - FIRST_ALTIVEC_REGNO + 32) + 1;
+
+#ifdef TARGET_REGNAMES      
+	      if (TARGET_REGNAMES)
+		fprintf (file, "%%vs%d", vsx_reg);
+	      else
+#endif
+		fprintf (file, "%d", vsx_reg);
+	    }
+	}
+
+      else if (MEM_P (x))
+	{
+	  machine_mode mode = GET_MODE (x);
+	  /* Vectors and vector pairs can't have auto increment addreses.  */
+	  if (GET_CODE (XEXP (x, 0)) == PRE_INC
+	      || GET_CODE (XEXP (x, 0)) == PRE_DEC
+	      || GET_CODE (XEXP (x, 0)) == PRE_MODIFY)
+	    output_operand_lossage ("invalid auto-increment %%S value");
+	  else
+	    output_address (mode, XEXP (adjust_address_nv (x, SImode,
+							   UNITS_PER_WORD),
+				  0));
+
+	  if (small_data_operand (x, GET_MODE (x)))
+	    fprintf (file, "@%s(%s)", SMALL_DATA_RELOC,
+		     reg_names[SMALL_DATA_REG]);
+	}
+
+      else
+	output_operand_lossage ("invalid %%S value");
+
+      return;
+
     case 't':
       /* Like 'J' but get to the OVERFLOW/UNORDERED bit.  */
       if (!REG_P (x) || !CR_REGNO_P (REGNO (x)))
