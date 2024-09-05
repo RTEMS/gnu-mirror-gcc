@@ -30,19 +30,55 @@
 #ifndef _VECTOR_PAIR_H
 #define _VECTOR_PAIR_H	1
 
-/* If we have MMA support, use power10 support.  */
-#if __MMA__
-typedef __vector_pair vector_pair_t;
+/* During testing, allow vector-pair.h to be included multiple times.  */
+#undef  vector_pair_t
+#undef  vector_pair_f64_t
+#undef  vector_pair_f32_t
 
-#define VPAIR_FP_CONSTRAINT	"wa"		/* Allow all VSX registers.  */
-#define VPAIR_FP_SECOND		"S"		/* Access 2nd VSX register.  */
+#undef  vpair_f64_abs
+#undef  vpair_f64_add
+#undef  vpair_f64_div
+#undef  vpair_f64_fma
+#undef  vpair_f64_fms
+#undef  vpair_f64_max
+#undef  vpair_f64_min
+#undef  vpair_f64_mul
+#undef  vpair_f64_nabs
+#undef  vpair_f64_neg
+#undef  vpair_f64_nfma
+#undef  vpair_f64_nfms
+#undef  vpair_f64_splat
+#undef  vpair_f64_sqrt
+#undef  vpair_f64_sub
+
+#undef  vpair_f32_abs
+#undef  vpair_f32_add
+#undef  vpair_f32_div
+#undef  vpair_f32_fma
+#undef  vpair_f32_fms
+#undef  vpair_f32_max
+#undef  vpair_f32_min
+#undef  vpair_f32_mul
+#undef  vpair_f32_nabs
+#undef  vpair_f32_neg
+#undef  vpair_f32_nfma
+#undef  vpair_f32_nfms
+#undef  vpair_f32_splat
+#undef  vpair_f32_sqrt
+#undef  vpair_f32_sub
+
+/* Do we have MMA support and the vector pair built-in function?  */
+#if __MMA__ && __VPAIR__ && !__NO_VPAIR_BUILTIN__
+#define vector_pair_t		__vector_pair
+#define vector_pair_d64_t	__vector_pair
+#define vector_pair_d32_t	__vector_pair
 
 /* vector pair double operations on power10.  */
 #define vpair_f64_splat(R, A)	(*R) = __builtin_vpair_f64_splat (A)
 
-#define vpair_f64_neg(R,A)	(*R) = __builtin_vpair_f64_neg (*A)
 #define vpair_f64_abs(R,A)	(*R) = __builtin_vpair_f64_abs (*A)
 #define vpair_f64_nabs(R,A)	(*R) = __builtin_vpair_f64_nabs (*A)
+#define vpair_f64_neg(R,A)	(*R) = __builtin_vpair_f64_neg (*A)
 #define vpair_f64_sqrt(R,A)	(*R) = __builtin_vpair_f64_sqrt (*A)
 
 #define vpair_f64_add(R,A,B)	(*R) = __builtin_vpair_f64_add (*A, *B)
@@ -57,13 +93,12 @@ typedef __vector_pair vector_pair_t;
 #define vpair_f64_nfma(R,A,B,C)	(*R) = __builtin_vpair_f64_nfma (*A, *B, *C)
 #define vpair_f64_nfms(R,A,B,C)	(*R) = __builtin_vpair_f64_nfms (*A, *B, *C)
 
-
 /* vector pair float operations on power10.  */
 #define vpair_f32_splat(R, A)	(*R) = __builtin_vpair_f32_splat (A)
 
-#define vpair_f32_neg(R,A)	(*R) = __builtin_vpair_f32_neg (*A)
 #define vpair_f32_abs(R,A)	(*R) = __builtin_vpair_f32_abs (*A)
 #define vpair_f32_nabs(R,A)	(*R) = __builtin_vpair_f32_nabs (*A)
+#define vpair_f32_neg(R,A)	(*R) = __builtin_vpair_f32_neg (*A)
 #define vpair_f32_sqrt(R,A)	(*R) = __builtin_vpair_f32_sqrt (*A)
 
 #define vpair_f32_add(R,A,B)	(*R) = __builtin_vpair_f32_add (*A, *B)
@@ -79,211 +114,486 @@ typedef __vector_pair vector_pair_t;
 #define vpair_f32_nfms(R,A,B,C)	(*R) = __builtin_vpair_f32_nfma (*A, *B, *C)
 
 
+/* Do we have the __vector_pair type available, but we don't have the built-in
+   functions?  */
+
+#elif __MMA__ && !__NO_VPAIR_ASM__
+#define vector_pair_t		__vector_pair
+#define vector_pair_d64_t	__vector_pair
+#define vector_pair_d32_t	__vector_pair
+
+#undef  __VPAIR_FP_UNARY_ASM
+#define __VPAIR_FP_UNARY_ASM(OPCODE, R, A)				\
+  __asm__ (OPCODE " %x0,%x1\n\t" OPCODE " %x0+1,%x1+1"			\
+           : "=wa" (*(__vector_pair *)(R))				\
+           : "wa" (*(__vector_pair *)(A)));
+
+#undef  __VPAIR_FP_BINARY_ASM
+#define __VPAIR_FP_BINARY_ASM(OPCODE, R, A, B)				\
+  __asm__ (OPCODE " %x0,%x1,%x2\n\t" OPCODE " %x0+1,%x1+1,%x2+1"	\
+           : "=wa" (*(__vector_pair *)(R))				\
+           : "wa" (*(__vector_pair *)(A)),				\
+             "wa" (*(__vector_pair *)(B)));
+
+    /* Note the 'a' version of the FMA instruction must be used.  */
+#undef  __VPAIR_FP_FMA_ASM
+#define __VPAIR_FP_FMA_ASM(OPCODE, R, A, B, C)				\
+  __asm__ (OPCODE " %x0,%x1,%x2\n\t" OPCODE " %x0+1,%x1+1,%x2+1"	\
+           : "=wa" (*(__vector_pair *)(R))				\
+           : "wa" (*(__vector_pair *)(A)),				\
+             "wa" (*(__vector_pair *)(B)),				\
+             "0"  (*(__vector_pair *)(C)));
+
+#define vpair_f64_splat(R, A)						\
+  __asm__ ("xxlor %x0+1,%x1,%x1"					\
+	   : "=wa" (*(__vector_pair *)(R))				\
+	   : "0" (__builtin_vec_splats ((double) (A))))
+
+#define vpair_f64_abs(R,A)	__VPAIR_FP_UNARY_ASM ("xvabsdp",  R, A)
+#define vpair_f64_nabs(R,A)	__VPAIR_FP_UNARY_ASM ("xvnabsdp", R, A)
+#define vpair_f64_neg(R,A)	__VPAIR_FP_UNARY_ASM ("xvnegdp",  R, A)
+#define vpair_f64_sqrt(R,A)	__VPAIR_FP_UNARY_ASM ("xvsqrtdp", R, A)
+
+#define vpair_f64_add(R,A,B)	__VPAIR_FP_BINARY_ASM ("xvadddp", R, A, B)
+#define vpair_f64_div(R,A,B)	__VPAIR_FP_BINARY_ASM ("xvdivdp", R, A, B)
+#define vpair_f64_max(R,A,B)	__VPAIR_FP_BINARY_ASM ("xvmaxdp", R, A, B)
+#define vpair_f64_min(R,A,B)	__VPAIR_FP_BINARY_ASM ("xvmindp", R, A, B)
+#define vpair_f64_mul(R,A,B)	__VPAIR_FP_BINARY_ASM ("xvmuldp", R, A, B)
+#define vpair_f64_sub(R,A,B)	__VPAIR_FP_BINARY_ASM ("xvsubdp", R, A, B)
+
+#define vpair_f64_fma(R,A,B,C)	__VPAIR_FP_FMA_ASM ("xvmaddadp",  R, A, B, C)
+#define vpair_f64_fms(R,A,B,C)	__VPAIR_FP_FMA_ASM ("xvmsubadp",  R, A, B, C)
+#define vpair_f64_nfma(R,A,B,C)	__VPAIR_FP_FMA_ASM ("xvnmaddadp", R, A, B, C)
+#define vpair_f64_nfms(R,A,B,C)	__VPAIR_FP_FMA_ASM ("xvnmsubadp", R, A, B, C)
+
+#define vpair_f32_splat(R, A)						\
+  __asm__ ("xxlor %x0+1,%x1,%x1"					\
+	   : "=wa" (*(__vector_pair *)(R))				\
+	   : "0" (__builtin_vec_splats ((float) (A))))
+
+#define vpair_f32_abs(R,A)	__VPAIR_FP_UNARY_ASM ("xvabssp",  R, A)
+#define vpair_f32_nabs(R,A)	__VPAIR_FP_UNARY_ASM ("xvnabssp", R, A)
+#define vpair_f32_neg(R,A)	__VPAIR_FP_UNARY_ASM ("xvnegsp",  R, A)
+#define vpair_f32_sqrt(R,A)	__VPAIR_FP_UNARY_ASM ("xvsqrtsp", R, A)
+
+#define vpair_f32_add(R,A,B)	__VPAIR_FP_BINARY_ASM ("xvaddsp", R, A, B)
+#define vpair_f32_div(R,A,B)	__VPAIR_FP_BINARY_ASM ("xvdivsp", R, A, B)
+#define vpair_f32_max(R,A,B)	__VPAIR_FP_BINARY_ASM ("xvmaxsp", R, A, B)
+#define vpair_f32_min(R,A,B)	__VPAIR_FP_BINARY_ASM ("xvminsp", R, A, B)
+#define vpair_f32_mul(R,A,B)	__VPAIR_FP_BINARY_ASM ("xvmulsp", R, A, B)
+#define vpair_f32_sub(R,A,B)	__VPAIR_FP_BINARY_ASM ("xvsubsp", R, A, B)
+
+#define vpair_f32_fma(R,A,B,C)	__VPAIR_FP_FMA_ASM ("xvmaddasp",  R, A, B, C)
+#define vpair_f32_fms(R,A,B,C)	__VPAIR_FP_FMA_ASM ("xvmsubasp",  R, A, B, C)
+#define vpair_f32_nfma(R,A,B,C)	__VPAIR_FP_FMA_ASM ("xvnmaddasp", R, A, B, C)
+#define vpair_f32_nfms(R,A,B,C)	__VPAIR_FP_FMA_ASM ("xvnmsubasp", R, A, B, C)
+
+
 #else	/* !__MMA__.  */
-typedef union {
+
+#ifndef __VECTOR_PAIR_UNION__
+#define __VECTOR_PAIR_UNION__	1
+
+union vpair_union {
   /* Double vector pairs.  */
-  double __attribute__((__vector_size__(32))) __vpair_vp_f64;
-  vector double __vpair_vec_f64[2];
-  double __vpair_scalar_f64[4];
+  vector double __vdbl[2];
 
   /* Float vector pairs.  */
-  float  __attribute__((__vector_size__(32))) __vpair_vp_f32;
-  vector float  __vpair_vec_f32[2];
-  float __vpair_scalar_f32[8];
+  vector float  __vflt[2];
 
-} vector_pair_t;
+};
+#endif	/* __VECTOR_PAIR_UNION__.  */
 
-#define VPAIR_FP_CONSTRAINT	"d"		/* Only use FPR registers.  */
-#define VPAIR_FP_SECOND		"L"		/* Access 2nd FPR register.  */
+#define vector_pair_t		union vpair_union
+#define vector_pair_d64_t	union vpair_union
+#define vector_pair_d32_t	union vpair_union
 
 /* vector pair double operations on power8/power9.  */
-#define vpair_f64_splat(R,A)						\
-  ((R)->__vpair_vec_f64[0] = (R)->__vpair_vec_f64[1]			\
-   = __builtin_vec_splats ((double) (A)))
+#define vpair_f64_splat(R, A)						\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      __vr->__vdbl[0] = __vr->__vdbl[1]					\
+	= __builtin_vec_splats ((double)(A));				\
+    }									\
+  while (0)
 
-#define vpair_f64_neg(R,A)						\
-  ((R)->__vpair_vp_f64 = - (A)->__vpair_vp_f64)
+#define vpair_f64_abs(R, A)						\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      union vpair_union *__va = (union vpair_union *)(A);		\
+      __vr->__vdbl[0] = __builtin_vsx_xvabsdp (__va->__vdbl[0]);	\
+      __vr->__vdbl[1] = __builtin_vsx_xvabsdp (__va->__vdbl[1]);	\
+    }									\
+  while (0)
 
-#define vpair_f64_abs(R,A)						\
-  (((R)->__vpair_vec_f64[0]						\
-    = __builtin_vsx_xvabsdp ((A)->__vpair_vec_f64[0])),			\
-   ((R)->__vpair_vec_f64[1]						\
-    = __builtin_vsx_xvabsdp ((A)->__vpair_vec_f64[1])))
+#define vpair_f64_nabs(R, A)						\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      union vpair_union *__va = (union vpair_union *)(A);		\
+      __vr->__vdbl[0] = __builtin_vsx_xvnabsdp (__va->__vdbl[0]);	\
+      __vr->__vdbl[1] = __builtin_vsx_xvnabsdp (__va->__vdbl[1]);	\
+    }									\
+  while (0)
 
-#define vpair_f64_nabs(R,A)						\
-  (((R)->__vpair_vec_f64[0]						\
-    = __builtin_vsx_xvnabsdp ((A)->__vpair_vec_f64[0])),		\
-   ((R)->__vpair_vec_f64[1]						\
-    = __builtin_vsx_xvnabsdp ((A)->__vpair_vec_f64[1])))
+#define vpair_f64_neg(R, A)						\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      union vpair_union *__va = (union vpair_union *)(A);		\
+      __vr->__vdbl[0] = - __va->__vdbl[0];				\
+      __vr->__vdbl[1] = - __va->__vdbl[1];				\
+    }									\
+  while (0)
 
-#define vpair_f64_sqrt(R,A)						\
-  (((R)->__vpair_vec_f64[0]						\
-    = __builtin_vsx_xvsqrtdp ((A)->__vpair_vec_f64[0])),		\
-   ((R)->__vpair_vec_f64[1]						\
-    = __builtin_vsx_xvsqrtdp ((A)->__vpair_vec_f64[1])))
+#define vpair_f64_sqrt(R, A)						\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      union vpair_union *__va = (union vpair_union *)(A);		\
+      __vr->__vdbl[0] = __builtin_vsx_xvsqrtdp (__va->__vdbl[0]);	\
+      __vr->__vdbl[1] = __builtin_vsx_xvsqrtdp (__va->__vdbl[1]);	\
+    }									\
+  while (0)
 
-#define vpair_f64_add(R,A,B)						\
-  ((R)->__vpair_vp_f64 = (A)->__vpair_vp_f64 + (B)->__vpair_vp_f64)
+#define vpair_f64_add(R, A, B)						\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      union vpair_union *__va = (union vpair_union *)(A);		\
+      union vpair_union *__vb = (union vpair_union *)(B);		\
+      __vr->__vdbl[0] = __va->__vdbl[0] + __vb->__vdbl[0];		\
+      __vr->__vdbl[1] = __va->__vdbl[1] + __vb->__vdbl[1];		\
+    }									\
+  while (0)
 
-#define vpair_f64_div(R,A,B)						\
-  ((R)->__vpair_vp_f64 = (A)->__vpair_vp_f64 / (B)->__vpair_vp_f64)
+#define vpair_f64_div(R, A, B)						\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      union vpair_union *__va = (union vpair_union *)(A);		\
+      union vpair_union *__vb = (union vpair_union *)(B);		\
+      __vr->__vdbl[0] = __va->__vdbl[0] / __vb->__vdbl[0];		\
+      __vr->__vdbl[1] = __va->__vdbl[1] / __vb->__vdbl[1];		\
+    }									\
+  while (0)
 
-#define vpair_f64_max(R,A,B)						\
-  (((R)->__vpair_vec_f64[0]						\
-    = __builtin_vsx_xvmaxdp ((A)->__vpair_vec_f64[0],			\
-			     (B)->__vpair_vec_f64[0])),			\
-  (((R)->__vpair_vec_f64[1]						\
-    = __builtin_vsx_xvmaxdp ((A)->__vpair_vec_f64[1],			\
-			     (B)->__vpair_vec_f64[1]))))
+#define vpair_f64_max(R, A, B)						\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      union vpair_union *__va = (union vpair_union *)(A);		\
+      union vpair_union *__vb = (union vpair_union *)(B);		\
+      __vr->__vdbl[0]							\
+	= __builtin_vsx_xvmaxdp (__va->__vdbl[0], __vb->__vdbl[0]);	\
+      __vr->__vdbl[1]							\
+	= __builtin_vsx_xvmaxdp (__va->__vdbl[1], __vb->__vdbl[1]);	\
+    }									\
+  while (0)
 
-#define vpair_f64_min(R,A,B)						\
-  (((R)->__vpair_vec_f64[0]						\
-    = __builtin_vsx_xvmindp ((A)->__vpair_vec_f64[0],			\
-			     (B)->__vpair_vec_f64[0])),			\
-  (((R)->__vpair_vec_f64[1]						\
-    = __builtin_vsx_xvmindp ((A)->__vpair_vec_f64[1],			\
-			     (B)->__vpair_vec_f64[1]))))
+#define vpair_f64_min(R, A, B)						\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      union vpair_union *__va = (union vpair_union *)(A);		\
+      union vpair_union *__vb = (union vpair_union *)(B);		\
+      __vr->__vdbl[0]							\
+	= __builtin_vsx_xvmindp (__va->__vdbl[0], __vb->__vdbl[0]);	\
+      __vr->__vdbl[1]							\
+	= __builtin_vsx_xvmindp (__va->__vdbl[1], __vb->__vdbl[1]);	\
+    }									\
+  while (0)
 
-#define vpair_f64_mul(R,A,B)						\
-  ((R)->__vpair_vp_f64 = (A)->__vpair_vp_f64 * (B)->__vpair_vp_f64)
+#define vpair_f64_mul(R, A, B)						\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      union vpair_union *__va = (union vpair_union *)(A);		\
+      union vpair_union *__vb = (union vpair_union *)(B);		\
+      __vr->__vdbl[0] = __va->__vdbl[0] * __vb->__vdbl[0];		\
+      __vr->__vdbl[1] = __va->__vdbl[1] * __vb->__vdbl[1];		\
+    }									\
+  while (0)
 
-#define vpair_f64_sub(R,A,B)						\
-  ((R)->__vpair_vp_f64 = (A)->__vpair_vp_f64 - (B)->__vpair_vp_f64)
+#define vpair_f64_sub(R, A, B)						\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      union vpair_union *__va = (union vpair_union *)(A);		\
+      union vpair_union *__vb = (union vpair_union *)(B);		\
+      __vr->__vdbl[0] = __va->__vdbl[0] - __vb->__vdbl[0];		\
+      __vr->__vdbl[1] = __va->__vdbl[1] - __vb->__vdbl[1];		\
+    }									\
+  while (0)
 
-#define vpair_f64_fma(R,A,B,C)						\
-  (((R)->__vpair_vec_f64[0]						\
-    = __builtin_vsx_xvmadddp ((A)->__vpair_vec_f64[0],			\
-                              (B)->__vpair_vec_f64[0],			\
-			      (C)->__vpair_vec_f64[0])),		\
-  (((R)->__vpair_vec_f64[1]						\
-    = __builtin_vsx_xvmadddp ((A)->__vpair_vec_f64[1],			\
-                              (B)->__vpair_vec_f64[1],			\
-			      (C)->__vpair_vec_f64[1]))))
+#define vpair_f64_fma(R, A, B, C)					\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      union vpair_union *__va = (union vpair_union *)(A);		\
+      union vpair_union *__vb = (union vpair_union *)(B);		\
+      union vpair_union *__vc = (union vpair_union *)(C);		\
+      __vr->__vdbl[0]							\
+	= __builtin_vsx_xvmadddp (__va->__vdbl[0],			\
+				  __vb->__vdbl[0],			\
+				  __vc->__vdbl[0]);			\
+      __vr->__vdbl[1]							\
+	= __builtin_vsx_xvmadddp (__va->__vdbl[1],			\
+				  __vb->__vdbl[1],			\
+				  __vc->__vdbl[1]);			\
+    }									\
+  while (0)
 
-#define vpair_f64_fms(R,A,B,C)						\
-  (((R)->__vpair_vec_f64[0]						\
-    = __builtin_vsx_xvmsubdp ((A)->__vpair_vec_f64[0],			\
-                              (B)->__vpair_vec_f64[0],			\
-			      (C)->__vpair_vec_f64[0])),		\
-  (((R)->__vpair_vec_f64[1]						\
-    = __builtin_vsx_xvmsubdp ((A)->__vpair_vec_f64[1],			\
-                              (B)->__vpair_vec_f64[1],			\
-			      (C)->__vpair_vec_f64[1]))))
+#define vpair_f64_fms(R, A, B, C)					\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      union vpair_union *__va = (union vpair_union *)(A);		\
+      union vpair_union *__vb = (union vpair_union *)(B);		\
+      union vpair_union *__vc = (union vpair_union *)(C);		\
+      __vr->__vdbl[0]							\
+	= __builtin_vsx_xvmsubdp (__va->__vdbl[0],			\
+				  __vb->__vdbl[0],			\
+				  __vc->__vdbl[0]);			\
+      __vr->__vdbl[1]							\
+	= __builtin_vsx_xvmsubdp (__va->__vdbl[1],			\
+				  __vb->__vdbl[1],			\
+				  __vc->__vdbl[1]);			\
+    }									\
+  while (0)
 
-#define vpair_f64_nfma(R,A,B,C)						\
-  (((R)->__vpair_vec_f64[0]						\
-    = __builtin_vsx_xvnmadddp ((A)->__vpair_vec_f64[0],			\
-			       (B)->__vpair_vec_f64[0],			\
-			       (C)->__vpair_vec_f64[0])),		\
-  (((R)->__vpair_vec_f64[1]						\
-    = __builtin_vsx_xvnmadddp ((A)->__vpair_vec_f64[1],			\
-			       (B)->__vpair_vec_f64[1],			\
-			       (C)->__vpair_vec_f64[1]))))
+#define vpair_f64_nfma(R, A, B, C)					\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      union vpair_union *__va = (union vpair_union *)(A);		\
+      union vpair_union *__vb = (union vpair_union *)(B);		\
+      union vpair_union *__vc = (union vpair_union *)(C);		\
+      __vr->__vdbl[0]							\
+	= __builtin_vsx_xvnmadddp (__va->__vdbl[0],			\
+				   __vb->__vdbl[0],			\
+				   __vc->__vdbl[0]);			\
+      __vr->__vdbl[1]							\
+	= __builtin_vsx_xvnmadddp (__va->__vdbl[1],			\
+				   __vb->__vdbl[1],			\
+				   __vc->__vdbl[1]);			\
+    }									\
+  while (0)
 
-#define vpair_f64_nfms(R,A,B,C)						\
-  (((R)->__vpair_vec_f64[0]						\
-    = __builtin_vsx_xvnmsubdp ((A)->__vpair_vec_f64[0],			\
-			       (B)->__vpair_vec_f64[0],			\
-			       (C)->__vpair_vec_f64[0])),		\
-  (((R)->__vpair_vec_f64[1]						\
-    = __builtin_vsx_xvnmsubdp ((A)->__vpair_vec_f64[1],			\
-			       (B)->__vpair_vec_f64[1],			\
-			       (C)->__vpair_vec_f64[1]))))
+#define vpair_f64_nfms(R, A, B, C)					\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      union vpair_union *__va = (union vpair_union *)(A);		\
+      union vpair_union *__vb = (union vpair_union *)(B);		\
+      union vpair_union *__vc = (union vpair_union *)(C);		\
+      __vr->__vdbl[0]							\
+	= __builtin_vsx_xvnmsubdp (__va->__vdbl[0],			\
+				   __vb->__vdbl[0],			\
+				   __vc->__vdbl[0]);			\
+      __vr->__vdbl[1]							\
+	= __builtin_vsx_xvnmsubdp (__va->__vdbl[1],			\
+				   __vb->__vdbl[1],			\
+				   __vc->__vdbl[1]);			\
+    }									\
+  while (0)
 
 
 /* vector pair float operations on power8/power9.  */
-#define vpair_f32_splat(R,A)						\
-  ((R)->__vpair_vec_f32[0] = (R)->__vpair_vec_f32[1]			\
-   = __builtin_vec_splats ((float) (A)))
 
-#define vpair_f32_neg(R,A)						\
-  ((R)->__vpair_vp_f64 = - (A)->__vpair_vp_f64)
+/* vector pair float operations on power8/power9.  */
+#define vpair_f32_splat(R, A)						\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      __vr->__vflt[0] = __vr->__vflt[1]					\
+	= __builtin_vec_splats ((float)(A));				\
+    }									\
+  while (0)
 
-#define vpair_f32_abs(R,A)						\
-  (((R)->__vpair_vec_f32[0]						\
-    = __builtin_vsx_xvnabssp ((A)->__vpair_vec_f32[0])),		\
-   ((R)->__vpair_vec_f32[1]						\
-    = __builtin_vsx_xvnabssp ((A)->__vpair_vec_f32[1])))
+#define vpair_f32_abs(R, A)						\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      union vpair_union *__va = (union vpair_union *)(A);		\
+      __vr->__vflt[0] = __builtin_vsx_xvabssp (__va->__vflt[0]);	\
+      __vr->__vflt[1] = __builtin_vsx_xvabssp (__va->__vflt[1]);	\
+    }									\
+  while (0)
 
-#define vpair_f32_nabs(R,A)						\
-  (((R)->__vpair_vec_f32[0]						\
-    = __builtin_vsx_xvnabssp ((A)->__vpair_vec_f32[0])),		\
-   ((R)->__vpair_vec_f32[1]						\
-    = __builtin_vsx_xvnabssp ((A)->__vpair_vec_f32[1])))
+#define vpair_f32_nabs(R, A)						\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      union vpair_union *__va = (union vpair_union *)(A);		\
+      __vr->__vflt[0] = __builtin_vsx_xvnabssp (__va->__vflt[0]);	\
+      __vr->__vflt[1] = __builtin_vsx_xvnabssp (__va->__vflt[1]);	\
+    }									\
+  while (0)
 
-#define vpair_f32_sqrt(R,A)						\
-  (((R)->__vpair_vec_f32[0]						\
-    = __builtin_vsx_xvsqrtsp ((A)->__vpair_vec_f32[0])),		\
-   ((R)->__vpair_vec_f32[1]						\
-    = __builtin_vsx_xvsqrtsp ((A)->__vpair_vec_f32[1])))
+#define vpair_f32_neg(R, A)						\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      union vpair_union *__va = (union vpair_union *)(A);		\
+      __vr->__vflt[0] = - __va->__vflt[0];				\
+      __vr->__vflt[1] = - __va->__vflt[1];				\
+    }									\
+  while (0)
 
-#define vpair_f32_add(R,A,B)						\
-  ((R)->__vpair_vp_f32 = (A)->__vpair_vp_f32 + (B)->__vpair_vp_f32)
+#define vpair_f32_sqrt(R, A)						\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      union vpair_union *__va = (union vpair_union *)(A);		\
+      __vr->__vflt[0] = __builtin_vsx_xvsqrtsp (__va->__vflt[0]);	\
+      __vr->__vflt[1] = __builtin_vsx_xvsqrtsp (__va->__vflt[1]);	\
+    }									\
+  while (0)
 
-#define vpair_f32_div(R,A,B)						\
-  ((R)->__vpair_vp_f32 = (A)->__vpair_vp_f32 / (B)->__vpair_vp_f32)
+#define vpair_f32_add(R, A, B)						\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      union vpair_union *__va = (union vpair_union *)(A);		\
+      union vpair_union *__vb = (union vpair_union *)(B);		\
+      __vr->__vflt[0] = __va->__vflt[0] + __vb->__vflt[0];		\
+      __vr->__vflt[1] = __va->__vflt[1] + __vb->__vflt[1];		\
+    }									\
+  while (0)
 
-#define vpair_f32_max(R,A,B)						\
-  (((R)->__vpair_vec_f32[0]						\
-    = __builtin_vsx_xvmaxsp ((A)->__vpair_vec_f32[0],			\
-			     (B)->__vpair_vec_f32[0])),			\
-  (((R)->__vpair_vec_f32[1]						\
-    = __builtin_vsx_xvmaxsp ((A)->__vpair_vec_f32[1],			\
-			     (B)->__vpair_vec_f32[1]))))
+#define vpair_f32_div(R, A, B)						\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      union vpair_union *__va = (union vpair_union *)(A);		\
+      union vpair_union *__vb = (union vpair_union *)(B);		\
+      __vr->__vflt[0] = __va->__vflt[0] / __vb->__vflt[0];		\
+      __vr->__vflt[1] = __va->__vflt[1] / __vb->__vflt[1];		\
+    }									\
+  while (0)
 
-#define vpair_f32_min(R,A,B)						\
-  (((R)->__vpair_vec_f32[0]						\
-    = __builtin_vsx_xvminsp ((A)->__vpair_vec_f32[0],			\
-			     (B)->__vpair_vec_f32[0])),			\
-  (((R)->__vpair_vec_f32[1]						\
-    = __builtin_vsx_xvminsp ((A)->__vpair_vec_f32[1],			\
-			     (B)->__vpair_vec_f32[1]))))
+#define vpair_f32_max(R, A, B)						\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      union vpair_union *__va = (union vpair_union *)(A);		\
+      union vpair_union *__vb = (union vpair_union *)(B);		\
+      __vr->__vflt[0]							\
+	= __builtin_vsx_xvmaxsp (__va->__vflt[0], __vb->__vflt[0]);	\
+      __vr->__vflt[1]							\
+	= __builtin_vsx_xvmaxsp (__va->__vflt[1], __vb->__vflt[1]);	\
+    }									\
+  while (0)
 
-#define vpair_f32_mul(R,A,B)						\
-  ((R)->__vpair_vp_f32 = (A)->__vpair_vp_f32 * (B)->__vpair_vp_f32)
+#define vpair_f32_min(R, A, B)						\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      union vpair_union *__va = (union vpair_union *)(A);		\
+      union vpair_union *__vb = (union vpair_union *)(B);		\
+      __vr->__vflt[0]							\
+	= __builtin_vsx_xvminsp (__va->__vflt[0], __vb->__vflt[0]);	\
+      __vr->__vflt[1]							\
+	= __builtin_vsx_xvminsp (__va->__vflt[1], __vb->__vflt[1]);	\
+    }									\
+  while (0)
 
-#define vpair_f32_sub(R,A,B)						\
-  ((R)->__vpair_vp_f32 = (A)->__vpair_vp_f32 - (B)->__vpair_vp_f32)
+#define vpair_f32_mul(R, A, B)						\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      union vpair_union *__va = (union vpair_union *)(A);		\
+      union vpair_union *__vb = (union vpair_union *)(B);		\
+      __vr->__vflt[0] = __va->__vflt[0] * __vb->__vflt[0];		\
+      __vr->__vflt[1] = __va->__vflt[1] * __vb->__vflt[1];		\
+    }									\
+  while (0)
 
-#define vpair_f32_fma(R,A,B,C)						\
-  (((R)->__vpair_vec_f32[0]						\
-    = __builtin_vsx_xvmaddsp ((A)->__vpair_vec_f32[0],			\
-                              (B)->__vpair_vec_f32[0],			\
-			      (C)->__vpair_vec_f32[0])),		\
-  (((R)->__vpair_vec_f32[1]						\
-    = __builtin_vsx_xvmaddsp ((A)->__vpair_vec_f32[1],			\
-                              (B)->__vpair_vec_f32[1],			\
-			      (C)->__vpair_vec_f32[1]))))
+#define vpair_f32_sub(R, A, B)						\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      union vpair_union *__va = (union vpair_union *)(A);		\
+      union vpair_union *__vb = (union vpair_union *)(B);		\
+      __vr->__vflt[0] = __va->__vflt[0] - __vb->__vflt[0];		\
+      __vr->__vflt[1] = __va->__vflt[1] - __vb->__vflt[1];		\
+    }									\
+  while (0)
 
-#define vpair_f32_fms(R,A,B,C)						\
-  (((R)->__vpair_vec_f32[0]						\
-    = __builtin_vsx_xvmsubsp ((A)->__vpair_vec_f32[0],			\
-                              (B)->__vpair_vec_f32[0],			\
-			      (C)->__vpair_vec_f32[0])),		\
-  (((R)->__vpair_vec_f32[1]						\
-    = __builtin_vsx_xvmsubsp ((A)->__vpair_vec_f32[1],			\
-                              (B)->__vpair_vec_f32[1],			\
-			      (C)->__vpair_vec_f32[1]))))
+#define vpair_f32_fma(R, A, B, C)					\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      union vpair_union *__va = (union vpair_union *)(A);		\
+      union vpair_union *__vb = (union vpair_union *)(B);		\
+      union vpair_union *__vc = (union vpair_union *)(C);		\
+      __vr->__vflt[0]							\
+	= __builtin_vsx_xvmaddsp (__va->__vflt[0],			\
+				  __vb->__vflt[0],			\
+				  __vc->__vflt[0]);			\
+      __vr->__vflt[1]							\
+	= __builtin_vsx_xvmaddsp (__va->__vflt[1],			\
+				  __vb->__vflt[1],			\
+				  __vc->__vflt[1]);			\
+    }									\
+  while (0)
 
-#define vpair_f32_nfma(R,A,B,C)						\
-  (((R)->__vpair_vec_f32[0]						\
-    = __builtin_vsx_xvnmaddsp ((A)->__vpair_vec_f32[0],			\
-			       (B)->__vpair_vec_f32[0],			\
-			       (C)->__vpair_vec_f32[0])),		\
-  (((R)->__vpair_vec_f32[1]						\
-    = __builtin_vsx_xvnmaddsp ((A)->__vpair_vec_f32[1],			\
-			       (B)->__vpair_vec_f32[1],			\
-			       (C)->__vpair_vec_f32[1]))))
+#define vpair_f32_fms(R, A, B, C)					\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      union vpair_union *__va = (union vpair_union *)(A);		\
+      union vpair_union *__vb = (union vpair_union *)(B);		\
+      union vpair_union *__vc = (union vpair_union *)(C);		\
+      __vr->__vflt[0]							\
+	= __builtin_vsx_xvmsubsp (__va->__vflt[0],			\
+				  __vb->__vflt[0],			\
+				  __vc->__vflt[0]);			\
+      __vr->__vflt[1]							\
+	= __builtin_vsx_xvmsubsp (__va->__vflt[1],			\
+				  __vb->__vflt[1],			\
+				  __vc->__vflt[1]);			\
+    }									\
+  while (0)
 
-#define vpair_f32_nfms(R,A,B,C)						\
-  (((R)->__vpair_vec_f32[0]						\
-    = __builtin_vsx_xvnmsubsp ((A)->__vpair_vec_f32[0],			\
-			       (B)->__vpair_vec_f32[0],			\
-			       (C)->__vpair_vec_f32[0])),		\
-  (((R)->__vpair_vec_f32[1]						\
-    = __builtin_vsx_xvnmsubsp ((A)->__vpair_vec_f32[1],			\
-			       (B)->__vpair_vec_f32[1],			\
-			       (C)->__vpair_vec_f32[1]))))
+#define vpair_f32_nfma(R, A, B, C)					\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      union vpair_union *__va = (union vpair_union *)(A);		\
+      union vpair_union *__vb = (union vpair_union *)(B);		\
+      union vpair_union *__vc = (union vpair_union *)(C);		\
+      __vr->__vflt[0]							\
+	= __builtin_vsx_xvnmaddsp (__va->__vflt[0],			\
+				   __vb->__vflt[0],			\
+				   __vc->__vflt[0]);			\
+      __vr->__vflt[1]							\
+	= __builtin_vsx_xvnmaddsp (__va->__vflt[1],			\
+				   __vb->__vflt[1],			\
+				   __vc->__vflt[1]);			\
+    }									\
+  while (0)
+
+#define vpair_f32_nfms(R, A, B, C)					\
+  do									\
+    {									\
+      union vpair_union *__vr = (union vpair_union *)(R);		\
+      union vpair_union *__va = (union vpair_union *)(A);		\
+      union vpair_union *__vb = (union vpair_union *)(B);		\
+      union vpair_union *__vc = (union vpair_union *)(C);		\
+      __vr->__vflt[0]							\
+	= __builtin_vsx_xvnmsubsp (__va->__vflt[0],			\
+				   __vb->__vflt[0],			\
+				   __vc->__vflt[0]);			\
+      __vr->__vflt[1]							\
+	= __builtin_vsx_xvnmsubsp (__va->__vflt[1],			\
+				   __vb->__vflt[1],			\
+				   __vc->__vflt[1]);			\
+    }									\
+  while (0)
 
 #endif	/* __MMA__.  */
 
