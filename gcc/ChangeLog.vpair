@@ -1,3 +1,40 @@
+==================== Branch work177-vpair, patch #405 ====================
+
+Rewrite vector-pair.h
+
+2024-09-04  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Signal that
+	we have the vector pair built-in functions.
+	* config/rs6000/vector-pair.h: Rewrite.
+
+==================== Branch work177-vpair, patch #404 ====================
+
+Add vector pair optimizations.
+
+2024-09-04  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-pair.md (vpair_add_neg_<vpair_modename>3): New
+	combiner insn to convert vector plus/neg into a minus operation.
+	(vpair_fma_<vpair_modename>_merge): Optimize multiply, add/subtract, and
+	negation into fma operations if the user specifies to create fmas.
+	(vpair_fma_<vpair_modename>_merge): Likewise.
+	(vpair_fma_<vpair_modename>_merge2): Likewise.
+	(vpair_nfma_<vpair_modename>_merge): Likewise.
+	(vpair_nfms_<vpair_modename>_merge): Likewise.
+	(vpair_nfms_<vpair_modename>_merge2): Likewise.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-pair-7.c: New test.
+	* gcc.target/powerpc/vector-pair-8.c: Likewise.
+	* gcc.target/powerpc/vector-pair-9.c: Likewise.
+	* gcc.target/powerpc/vector-pair-10.c: Likewise.
+	* gcc.target/powerpc/vector-pair-11.c: Likewise.
+	* gcc.target/powerpc/vector-pair-12xs.c: Likewise.
+
 ==================== Branch work177-vpair, patch #403 ====================
 
 Add vector pair init and splat.
