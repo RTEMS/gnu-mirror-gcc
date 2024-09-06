@@ -67,11 +67,23 @@
 #undef  vpair_f32_sqrt
 #undef  vpair_f32_sub
 
+#if !__VPAIR_BUILTIN__ && !__VPAIR_ASM__ && !__VPAIR_NOP10__
+#if __MMA__ && __VPAIR__
+#define __VPAIR_BUILTIN__	1
+
+#elif __MMA__
+#define __VPAIR_ASM__		1
+
+#else
+#define __VPAIR_NOP10__		1
+#endif
+#endif
+
 /* Do we have MMA support and the vector pair built-in function?  */
-#if __MMA__ && __VPAIR__ && !__NO_VPAIR_BUILTIN__
+#if __VPAIR_BUILTIN__
 #define vector_pair_t		__vector_pair
-#define vector_pair_d64_t	__vector_pair
-#define vector_pair_d32_t	__vector_pair
+#define vector_pair_f64_t	__vector_pair
+#define vector_pair_f32_t	__vector_pair
 
 /* vector pair double operations on power10.  */
 #define vpair_f64_splat(R, A)	(*R) = __builtin_vpair_f64_splat (A)
@@ -117,10 +129,10 @@
 /* Do we have the __vector_pair type available, but we don't have the built-in
    functions?  */
 
-#elif __MMA__ && !__NO_VPAIR_ASM__
+#elif __VPAIR_ASM__
 #define vector_pair_t		__vector_pair
-#define vector_pair_d64_t	__vector_pair
-#define vector_pair_d32_t	__vector_pair
+#define vector_pair_f64_t	__vector_pair
+#define vector_pair_f32_t	__vector_pair
 
 #undef  __VPAIR_FP_UNARY_ASM
 #define __VPAIR_FP_UNARY_ASM(OPCODE, R, A)				\
@@ -189,7 +201,7 @@
 #define vpair_f32_nfms(R,A,B,C)	__VPAIR_FP_FMA_ASM ("xvnmsubasp", R, A, B, C)
 
 
-#else	/* !__MMA__.  */
+#else	/* !__VPAIR_BUILTIN__ && !__VPAIR_ASM__.  */
 
 #ifndef __VECTOR_PAIR_UNION__
 #define __VECTOR_PAIR_UNION__	1
@@ -205,8 +217,8 @@ union vpair_union {
 #endif	/* __VECTOR_PAIR_UNION__.  */
 
 #define vector_pair_t		union vpair_union
-#define vector_pair_d64_t	union vpair_union
-#define vector_pair_d32_t	union vpair_union
+#define vector_pair_f64_t	union vpair_union
+#define vector_pair_f32_t	union vpair_union
 
 /* vector pair double operations on power8/power9.  */
 #define vpair_f64_splat(R, A)						\
@@ -595,6 +607,6 @@ union vpair_union {
     }									\
   while (0)
 
-#endif	/* __MMA__.  */
+#endif	/* !__VPAIR_BUILTIN__ && !__VPAIR_ASM__.  */
 
 #endif	/* _VECTOR_PAIR_H.  */
