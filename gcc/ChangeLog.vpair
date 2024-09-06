@@ -1,3 +1,11 @@
+==================== Branch work177-vpair, patch #406 ====================
+
+Tweak vector-pair.h.
+
+2024-09-04  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/vector-pair.h: Add fixes.
+
 ==================== Branch work177-vpair, patch #405 ====================
 
 Rewrite vector-pair.h
