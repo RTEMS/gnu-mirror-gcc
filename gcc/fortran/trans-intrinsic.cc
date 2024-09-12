@@ -5746,7 +5746,7 @@ gfc_conv_intrinsic_minmaxloc (gfc_se * se, gfc_expr * expr, enum tree_code op)
 
   gcc_assert (reduction_dimensions == ploop->dimen);
 
-  if (nonempty == NULL && maskss == NULL)
+  if (nonempty == NULL && !(maskexpr && maskexpr->rank > 0))
     {
       nonempty = logical_true_node;
 
@@ -5816,7 +5816,7 @@ gfc_conv_intrinsic_minmaxloc (gfc_se * se, gfc_expr * expr, enum tree_code op)
   gfc_start_scalarized_body (ploop, &body);
 
   /* If we have a mask, only check this element if the mask is set.  */
-  if (maskss)
+  if (maskexpr && maskexpr->rank > 0)
     {
       gcc_assert (!nested_loop);
       gfc_init_se (&maskse, NULL);
@@ -5921,7 +5921,7 @@ gfc_conv_intrinsic_minmaxloc (gfc_se * se, gfc_expr * expr, enum tree_code op)
     }
   gfc_add_expr_to_block (&block, ifbody);
 
-  if (maskss)
+  if (maskexpr && maskexpr->rank > 0)
     {
       /* We enclose the above in if (mask) {...}.  If the mask is an
 	 optional argument, generate IF (.NOT. PRESENT(MASK)
@@ -5972,7 +5972,7 @@ gfc_conv_intrinsic_minmaxloc (gfc_se * se, gfc_expr * expr, enum tree_code op)
       gfc_add_expr_to_block (outer_block, build1_v (LABEL_EXPR, lab1));
 
       /* If we have a mask, only check this element if the mask is set.  */
-      if (maskss)
+      if (maskexpr && maskexpr->rank > 0)
 	{
 	  gfc_init_se (&maskse, NULL);
 	  gfc_copy_loopinfo_to_se (&maskse, &loop);
@@ -6038,7 +6038,7 @@ gfc_conv_intrinsic_minmaxloc (gfc_se * se, gfc_expr * expr, enum tree_code op)
 
       gfc_add_expr_to_block (&block, tmp);
 
-      if (maskss)
+      if (maskexpr && maskexpr->rank > 0)
 	{
 	  /* We enclose the above in if (mask) {...}.  If the mask is
 	 an optional argument, generate IF (.NOT. PRESENT(MASK)
@@ -6063,7 +6063,7 @@ gfc_conv_intrinsic_minmaxloc (gfc_se * se, gfc_expr * expr, enum tree_code op)
     gfc_add_expr_to_block (&loop.pre, build1_v (LABEL_EXPR, lab2));
 
   /* For a scalar mask, enclose the loop in an if statement.  */
-  if (maskexpr && maskss == NULL)
+  if (maskexpr && maskexpr->rank == 0)
     {
       tree ifmask;
 
