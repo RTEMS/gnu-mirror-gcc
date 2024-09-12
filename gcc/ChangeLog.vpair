@@ -2,6 +2,15 @@
 
 Tweak vector-pair.h.
 
+2024-09-12  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/vector-pair.h: If __VPAIR_ASM__ or __VPAIR_NOP10__ are
+	defined, don't enable using vector pair built-in functions.
+
+==================== Branch work177-vpair, patch #406 ====================
+
+Tweak vector-pair.h.
+
 2024-09-04  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config/rs6000/vector-pair.h: Add fixes.
