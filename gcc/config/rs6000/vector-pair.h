@@ -80,7 +80,7 @@
 #endif
 
 /* Do we have MMA support and the vector pair built-in function?  */
-#if __VPAIR_BUILTIN__
+#if __VPAIR_BUILTIN__ && !__VPAIR_ASM__ && !__VPAIR_NOP10__
 #define vector_pair_t		__vector_pair
 #define vector_pair_f64_t	__vector_pair
 #define vector_pair_f32_t	__vector_pair
