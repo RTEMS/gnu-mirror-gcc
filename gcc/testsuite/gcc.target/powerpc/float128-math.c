@@ -1,6 +1,6 @@
 /* { dg-require-effective-target ppc_float128_sw } */
 /* { dg-require-effective-target vsx_hw } */
-/* { dg-options "-mvsx -O2 -mfloat128 -mlong-double-128 -mabi=ieeelongdouble -Wno-psabi" } */
+/* { dg-options "-O2 -mfloat128 -mlong-double-128 -mabi=ieeelongdouble -Wno-psabi" } */
 
 /* Test whether we convert __builtin_<math>l to __builtin_<math>f128 if the
    default long double type is IEEE 128-bit.  We leave off the \M in matching

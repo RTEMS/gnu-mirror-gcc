@@ -1,7 +1,7 @@
 /* { dg-do run } */
 /* { dg-skip-if "" { powerpc*-*-darwin* powerpc-ibm-aix* } } */
-/* { require-effective-target ppc_float128_sw } */
-/* { dg-options "-O2 -mvsx -mfloat128" } */
+/* { dg-require-effective-target ppc_float128_sw } */
+/* { dg-options "-O2" } */
 
 /*
  * PR target/99708
