@@ -13,8 +13,7 @@ fp128_3_1_hw_shared_obj	= $(addsuffix _s$(objext),$(fp128_3_1_hw_funcs))
 fp128_3_1_hw_obj	= $(fp128_3_1_hw_static_obj) $(fp128_3_1_hw_shared_obj)
 
 # Build the hardware support functions with appropriate hardware support
-FP128_3_1_CFLAGS_HW	 = -Wno-type-limits -mvsx -mfloat128 \
-			   -mcpu=power10 \
+FP128_3_1_CFLAGS_HW	 = -Wno-type-limits -mfloat128 -mcpu=power10 \
 			   -mfloat128-hardware -mno-gnu-attribute \
 			   -I$(srcdir)/soft-fp \
 			   -I$(srcdir)/config/rs6000 \

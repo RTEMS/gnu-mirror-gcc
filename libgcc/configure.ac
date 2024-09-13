@@ -407,9 +407,15 @@ case ${host} in
 # check if we have VSX (ISA 2.06) support to build the software libraries, and
 # whether the assembler can handle xsaddqp for hardware support.  Also check if
 # a new glibc is being used so that __builtin_cpu_supports can be used.
+#
+# with the VSX instruction set.  This allowed the big endian GCC on server
+# platforms to build the float128 support.  However, is causes problems when
+# other default cpu targets are used such as the 7450.  Now
+# libgcc_cv_powerpc_float128 will fail if the default cpu cannot build the
+# float128 support.
 powerpc*-*-linux*)
   saved_CFLAGS="$CFLAGS"
-  CFLAGS="$CFLAGS -mabi=altivec -mvsx -mfloat128"
+  CFLAGS="$CFLAGS -mfloat128"
   AC_CACHE_CHECK([for PowerPC ISA 2.06 to build __float128 libraries],
 		 [libgcc_cv_powerpc_float128],
 		 [AC_COMPILE_IFELSE(
