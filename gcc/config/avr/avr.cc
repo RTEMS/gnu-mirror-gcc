@@ -3388,19 +3388,22 @@ avr_use_by_pieces_infrastructure_p (unsigned HOST_WIDE_INT size,
 /* Choose mode for jump insn:
    1 - relative jump in range -63 <= x <= 62 ;
    2 - relative jump in range -2046 <= x <= 2045 ;
-   3 - absolute jump (only for ATmega[16]03).  */
+   3 - absolute jump (only when we have JMP / CALL).
+
+   When jumping backwards, assume the jump offset is EXTRA words
+   bigger than inferred from insn addresses.  */
 
 int
-avr_jump_mode (rtx x, rtx_insn *insn)
+avr_jump_mode (rtx x, rtx_insn *insn, int extra)
 {
   int dest_addr = INSN_ADDRESSES (INSN_UID (GET_CODE (x) == LABEL_REF
                                             ? XEXP (x, 0) : x));
   int cur_addr = INSN_ADDRESSES (INSN_UID (insn));
   int jump_distance = cur_addr - dest_addr;
 
-  if (IN_RANGE (jump_distance, -63, 62))
+  if (IN_RANGE (jump_distance, -63, 62 - extra))
     return 1;
-  else if (IN_RANGE (jump_distance, -2046, 2045))
+  else if (IN_RANGE (jump_distance, -2046, 2045 - extra))
     return 2;
   else if (AVR_HAVE_JMP_CALL)
     return 3;
@@ -4093,7 +4096,13 @@ avr_out_xload (rtx_insn *insn ATTRIBUTE_UNUSED, rtx *op, int *plen)
   xop[2] = lpm_addr_reg_rtx;
   xop[3] = AVR_HAVE_LPMX ? op[0] : lpm_reg_rtx;
 
-  avr_asm_len (AVR_HAVE_LPMX ? "lpm %3,%a2" : "lpm", xop, plen, -1);
+  if (plen)
+    *plen = 0;
+
+  if (reg_overlap_mentioned_p (xop[3], lpm_addr_reg_rtx))
+    avr_asm_len ("sbrs %1,7", xop, plen, 1);
+
+  avr_asm_len (AVR_HAVE_LPMX ? "lpm %3,%a2" : "lpm", xop, plen, 1);
 
   avr_asm_len ("sbrc %1,7" CR_TAB
                "ld %3,%a2", xop, plen, 2);
@@ -4239,13 +4248,30 @@ avr_out_movqi_r_mr_reg_disp_tiny (rtx_insn *insn, rtx op[], int *plen)
   rtx dest = op[0];
   rtx src = op[1];
   rtx x = XEXP (src, 0);
+  rtx base = XEXP (x, 0);
 
-  avr_asm_len (TINY_ADIW (%I1, %J1, %o1) CR_TAB
-               "ld %0,%b1" , op, plen, -3);
+  if (plen)
+    *plen = 0;
 
-  if (!reg_overlap_mentioned_p (dest, XEXP (x, 0))
-      && !reg_unused_after (insn, XEXP (x, 0)))
-    avr_asm_len (TINY_SBIW (%I1, %J1, %o1), op, plen, 2);
+  if (!reg_overlap_mentioned_p (dest, base))
+    {
+      avr_asm_len (TINY_ADIW (%I1, %J1, %o1) CR_TAB
+		   "ld %0,%b1", op, plen, 3);
+      if (!reg_unused_after (insn, base))
+	avr_asm_len (TINY_SBIW (%I1, %J1, %o1), op, plen, 2);
+    }
+  else
+    {
+      // PR98762: The base register overlaps dest and is only partly clobbered.
+      rtx base2 = all_regs_rtx[1 ^ REGNO (dest)];
+
+      if (!reg_unused_after (insn, base2))
+	avr_asm_len ("mov __tmp_reg__,%0" , &base2, plen, 1);
+      avr_asm_len (TINY_ADIW (%I1, %J1, %o1) CR_TAB
+		   "ld %0,%b1", op, plen, 3);
+      if (!reg_unused_after (insn, base2))
+	avr_asm_len ("mov %0,__tmp_reg__" , &base2, plen, 1);
+    }
 
   return "";
 }

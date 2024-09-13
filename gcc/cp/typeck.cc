@@ -393,6 +393,9 @@ cp_compare_floating_point_conversion_ranks (tree t1, tree t2)
      has higher rank.  */
   if (cnt > 1 && mv2 == long_double_type_node)
     return -2;
+  /* And similarly if t2 is float, t2 has lower rank.  */
+  if (cnt > 1 && mv2 == float_type_node)
+    return 2;
   /* Otherwise, they have equal rank, but extended types
      (other than std::bfloat16_t) have higher subrank.
      std::bfloat16_t shouldn't have equal rank to any standard
@@ -4175,10 +4178,23 @@ get_member_function_from_ptrfunc (tree *instance_ptrptr, tree function,
       if (!nonvirtual && is_dummy_object (instance_ptr))
 	nonvirtual = true;
 
-      if (TREE_SIDE_EFFECTS (instance_ptr))
-	instance_ptr = instance_save_expr = save_expr (instance_ptr);
+      /* Use save_expr even when instance_ptr doesn't have side-effects,
+	 unless it is a simple decl (save_expr won't do anything on
+	 constants), so that we don't ubsan instrument the expression
+	 multiple times.  See PR116449.  */
+      if (TREE_SIDE_EFFECTS (instance_ptr)
+	  || (!nonvirtual && !DECL_P (instance_ptr)))
+	{
+	  instance_save_expr = save_expr (instance_ptr);
+	  if (instance_save_expr == instance_ptr)
+	    instance_save_expr = NULL_TREE;
+	  else
+	    instance_ptr = instance_save_expr;
+	}
 
-      if (TREE_SIDE_EFFECTS (function))
+      /* See above comment.  */
+      if (TREE_SIDE_EFFECTS (function)
+	  || (!nonvirtual && !DECL_P (function)))
 	function = save_expr (function);
 
       /* Start by extracting all the information from the PMF itself.  */

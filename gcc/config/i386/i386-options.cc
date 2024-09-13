@@ -1868,6 +1868,54 @@ ix86_recompute_optlev_based_flags (struct gcc_options *opts,
 	    opts->x_flag_pcc_struct_return = DEFAULT_PCC_STRUCT_RETURN;
 	}
     }
+
+  /* Keep nonleaf frame pointers.  */
+  if (opts->x_flag_omit_frame_pointer)
+    opts->x_target_flags &= ~MASK_OMIT_LEAF_FRAME_POINTER;
+  else if (TARGET_OMIT_LEAF_FRAME_POINTER_P (opts->x_target_flags))
+    opts->x_flag_omit_frame_pointer = 1;
+}
+
+/* Implement part of TARGET_OVERRIDE_OPTIONS_AFTER_CHANGE hook.  */
+
+static void
+ix86_override_options_after_change_1 (struct gcc_options *opts,
+				      struct gcc_options *opts_set)
+{
+#define OPTS_SET_P(OPTION) opts_set->x_ ## OPTION
+#define OPTS(OPTION) opts->x_ ## OPTION
+
+  /* Disable unrolling small loops when there's explicit
+     -f{,no}unroll-loop.  */
+  if ((OPTS_SET_P (flag_unroll_loops))
+     || (OPTS_SET_P (flag_unroll_all_loops)
+	 && OPTS (flag_unroll_all_loops)))
+    {
+      if (!OPTS_SET_P (ix86_unroll_only_small_loops))
+	OPTS (ix86_unroll_only_small_loops) = 0;
+      /* Re-enable -frename-registers and -fweb if funroll-loops
+	 enabled.  */
+      if (!OPTS_SET_P (flag_web))
+	OPTS (flag_web) = OPTS (flag_unroll_loops);
+      if (!OPTS_SET_P (flag_rename_registers))
+	OPTS (flag_rename_registers) = OPTS (flag_unroll_loops);
+      /* -fcunroll-grow-size default follws -f[no]-unroll-loops.  */
+      if (!OPTS_SET_P (flag_cunroll_grow_size))
+	OPTS (flag_cunroll_grow_size)
+	  = (OPTS (flag_unroll_loops)
+	     || OPTS (flag_peel_loops)
+	     || OPTS (optimize) >= 3);
+    }
+  else
+    {
+      if (!OPTS_SET_P (flag_cunroll_grow_size))
+	OPTS (flag_cunroll_grow_size)
+	  = (OPTS (flag_peel_loops)
+	     || OPTS (optimize) >= 3);
+    }
+
+#undef OPTS
+#undef OPTS_SET_P
 }
 
 /* Implement TARGET_OVERRIDE_OPTIONS_AFTER_CHANGE hook.  */
@@ -1875,32 +1923,11 @@ ix86_recompute_optlev_based_flags (struct gcc_options *opts,
 void
 ix86_override_options_after_change (void)
 {
-  /* Disable unrolling small loops when there's explicit
-     -f{,no}unroll-loop.  */
-  if ((OPTION_SET_P (flag_unroll_loops))
-     || (OPTION_SET_P (flag_unroll_all_loops)
-	 && flag_unroll_all_loops))
-    {
-      if (!OPTION_SET_P (ix86_unroll_only_small_loops))
-	ix86_unroll_only_small_loops = 0;
-      /* Re-enable -frename-registers and -fweb if funroll-loops
-	 enabled.  */
-      if (!OPTION_SET_P (flag_web))
-	flag_web = flag_unroll_loops;
-      if (!OPTION_SET_P (flag_rename_registers))
-	flag_rename_registers = flag_unroll_loops;
-      /* -fcunroll-grow-size default follws -f[no]-unroll-loops.  */
-      if (!OPTION_SET_P (flag_cunroll_grow_size))
-	flag_cunroll_grow_size = flag_unroll_loops
-				 || flag_peel_loops
-				 || optimize >= 3;
-    }
-  else
-    {
-      if (!OPTION_SET_P (flag_cunroll_grow_size))
-	flag_cunroll_grow_size = flag_peel_loops || optimize >= 3;
-    }
+  ix86_default_align (&global_options);
 
+  ix86_recompute_optlev_based_flags (&global_options, &global_options_set);
+
+  ix86_override_options_after_change_1 (&global_options, &global_options_set);
 }
 
 /* Clear stack slot assignments remembered from previous functions.
@@ -2417,7 +2444,7 @@ ix86_option_override_internal (bool main_args_p,
 
   ix86_recompute_optlev_based_flags (opts, opts_set);
 
-  ix86_override_options_after_change ();
+  ix86_override_options_after_change_1 (opts, opts_set);
 
   ix86_tune_cost = processor_cost_table[ix86_tune];
   /* TODO: ix86_cost should be chosen at instruction or function granuality
@@ -2487,12 +2514,6 @@ ix86_option_override_internal (bool main_args_p,
       if (!(opts_set->x_target_flags & MASK_NO_RED_ZONE))
         opts->x_target_flags |= MASK_NO_RED_ZONE;
     }
-
-  /* Keep nonleaf frame pointers.  */
-  if (opts->x_flag_omit_frame_pointer)
-    opts->x_target_flags &= ~MASK_OMIT_LEAF_FRAME_POINTER;
-  else if (TARGET_OMIT_LEAF_FRAME_POINTER_P (opts->x_target_flags))
-    opts->x_flag_omit_frame_pointer = 1;
 
   /* If we're doing fast math, we don't care about comparison order
      wrt NaNs.  This lets us use a shorter comparison sequence.  */
@@ -2819,6 +2840,9 @@ ix86_option_override_internal (bool main_args_p,
 	    {
 	      if (TARGET_AVX512F_P (opts->x_ix86_isa_flags))
 		opts->x_ix86_move_max = PVW_AVX512;
+	      /* Align with vectorizer to avoid potential STLF issue.  */
+	      else if (TARGET_AVX_P (opts->x_ix86_isa_flags))
+		opts->x_ix86_move_max = PVW_AVX256;
 	      else
 		opts->x_ix86_move_max = PVW_AVX128;
 	    }
@@ -2840,6 +2864,9 @@ ix86_option_override_internal (bool main_args_p,
 	    {
 	      if (TARGET_AVX512F_P (opts->x_ix86_isa_flags))
 		opts->x_ix86_store_max = PVW_AVX512;
+	      /* Align with vectorizer to avoid potential STLF issue.  */
+	      else if (TARGET_AVX_P (opts->x_ix86_isa_flags))
+		opts->x_ix86_store_max = PVW_AVX256;
 	      else
 		opts->x_ix86_store_max = PVW_AVX128;
 	    }
