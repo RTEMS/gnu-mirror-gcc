@@ -1,3 +1,20 @@
+==================== Branch work178-bugs, patch #202 ====================
+
+PR 89213: Address review comments.
+
+2024-09-17  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/89213
+	* config/rs6000/altivec.md (altivec_<mode>_shift_const): Remove extra
+	()'s.
+
+gcc/testsuite/
+
+	PR target/89213
+	* gcc.target/powerpc/pr89213.c: Allow running test on 32-bit.
+
 ==================== Branch work178-bugs, patch #201 ====================
 
 PR 99293: Optimize splat of a V2DF/V2DI extract with constant element
