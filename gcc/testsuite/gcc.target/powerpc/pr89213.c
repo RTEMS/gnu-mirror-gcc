@@ -1,4 +1,4 @@
-/* { dg-do compile { target { lp64 } } } */
+/* { dg-do compile } */
 /* { dg-require-effective-target powerpc_vsx } */
 /* { dg-options "-mcpu=power9 -O2" } */
 

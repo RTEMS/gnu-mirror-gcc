@@ -2208,9 +2208,9 @@
   if (GET_CODE (operands[3]) == SCRATCH)
     operands[3] = gen_reg_rtx (<MODE>mode);
 
-  operands[4] = ((GET_CODE (operands[2]) == CONST_VECTOR)
-		 ? CONST_VECTOR_ELT (operands[2], 0)
-		 : XEXP (operands[2], 0));
+  operands[4] = GET_CODE (operands[2]) == CONST_VECTOR
+		? CONST_VECTOR_ELT (operands[2], 0)
+		: XEXP (operands[2], 0);
 })
 
 (define_insn "*altivec_<mode>_shift_const"
