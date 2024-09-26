@@ -42,12 +42,35 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-ssa.h"
 #include "attribs.h"
 #include "asan.h"
+#include "bitmap.h"
 
 #ifndef LOGICAL_OP_NON_SHORT_CIRCUIT
 #define LOGICAL_OP_NON_SHORT_CIRCUIT \
   (BRANCH_COST (optimize_function_for_speed_p (cfun), \
                 false) >= 2)
 #endif
+
+/* Return TRUE iff COND is NULL, or the condition in it is constant.  */
+
+static bool
+constant_condition_p (gcond *cond)
+{
+  if (!cond)
+    return true;
+
+  return (CONSTANT_CLASS_P (gimple_cond_lhs (cond))
+	  && CONSTANT_CLASS_P (gimple_cond_rhs (cond)));
+}
+
+/* Return FALSE iff the condition in the COND stmt that ends COND_BB is not
+   constant.  */
+
+static bool
+constant_condition_p (basic_block cond_bb)
+{
+  gcond *cond = safe_dyn_cast <gcond *> (*gsi_last_bb (cond_bb));
+  return constant_condition_p (cond);
+}
 
 /* This pass combines COND_EXPRs to simplify control flow.  It
    currently recognizes bit tests and comparisons in chains that
@@ -110,6 +133,37 @@ recognize_if_then_else (basic_block cond_bb,
   return true;
 }
 
+/* Same as recognize_if_then_else, but check that the condition is not
+   constant.  It is not useful to combine constant conditions.  */
+
+static bool
+recognize_if_then_else_nc (basic_block cond_bb,
+			   basic_block *then_bb, basic_block *else_bb)
+{
+  return recognize_if_then_else (cond_bb, then_bb, else_bb)
+    && !constant_condition_p (cond_bb);
+}
+
+/* Same as recognize_if_then_else, but don't associate the blocks with then and
+   else, check both possibilities.  */
+
+static bool
+recognize_if_succs (basic_block cond_bb,
+		    basic_block succ1, basic_block succ2)
+{
+  basic_block t, e;
+
+  if (EDGE_COUNT (cond_bb->succs) != 2)
+    return false;
+
+  /* Find both succs.  */
+  t = EDGE_SUCC (cond_bb, 0)->dest;
+  e = EDGE_SUCC (cond_bb, 1)->dest;
+
+  return ((t == succ1 && e == succ2)
+	  || (t == succ2 && e == succ1));
+}
+
 /* Verify if the basic block BB does not have side-effects.  Return
    true in this case, else false.  */
 
@@ -129,7 +183,7 @@ bb_no_side_effects_p (basic_block bb)
       enum tree_code rhs_code;
       if (gimple_has_side_effects (stmt)
 	  || gimple_could_trap_p (stmt)
-	  || gimple_vuse (stmt)
+	  /* || gimple_vuse (stmt) */
 	  /* We need to rewrite stmts with undefined overflow to use
 	     unsigned arithmetic but cannot do so for signed division.  */
 	  || ((ass = dyn_cast <gassign *> (stmt))
@@ -356,14 +410,28 @@ recognize_bits_test (gcond *cond, tree *name, tree *bits, bool inv)
 }
 
 
-/* Update profile after code in outer_cond_bb was adjusted so
-   outer_cond_bb has no condition.  */
+/* Update profile after code in either outer_cond_bb or inner_cond_bb was
+   adjusted so that it has no condition.  */
 
 static void
 update_profile_after_ifcombine (basic_block inner_cond_bb,
 			        basic_block outer_cond_bb)
 {
-  edge outer_to_inner = find_edge (outer_cond_bb, inner_cond_bb);
+  /* In the following we assume that inner_cond_bb has single predecessor.  */
+  gcc_assert (single_pred_p (inner_cond_bb));
+
+  basic_block outer_to_inner_bb = inner_cond_bb;
+  profile_probability prob = profile_probability::always ();
+  for (;;)
+    {
+      basic_block parent = single_pred (outer_to_inner_bb);
+      prob *= find_edge (parent, outer_to_inner_bb)->probability;
+      if (parent == outer_cond_bb)
+	break;
+      outer_to_inner_bb = parent;
+    }
+
+  edge outer_to_inner = find_edge (outer_cond_bb, outer_to_inner_bb);
   edge outer2 = (EDGE_SUCC (outer_cond_bb, 0) == outer_to_inner
 		 ? EDGE_SUCC (outer_cond_bb, 1)
 		 : EDGE_SUCC (outer_cond_bb, 0));
@@ -374,40 +442,294 @@ update_profile_after_ifcombine (basic_block inner_cond_bb,
     std::swap (inner_taken, inner_not_taken);
   gcc_assert (inner_taken->dest == outer2->dest);
 
-  /* In the following we assume that inner_cond_bb has single predecessor.  */
-  gcc_assert (single_pred_p (inner_cond_bb));
+  if (outer_to_inner_bb == inner_cond_bb
+      && constant_condition_p (outer_cond_bb))
+    {
+      /* Path outer_cond_bb->(outer2) needs to be merged into path
+	 outer_cond_bb->(outer_to_inner)->inner_cond_bb->(inner_taken)
+	 and probability of inner_not_taken updated.  */
 
-  /* Path outer_cond_bb->(outer2) needs to be merged into path
-     outer_cond_bb->(outer_to_inner)->inner_cond_bb->(inner_taken)
-     and probability of inner_not_taken updated.  */
+      inner_cond_bb->count = outer_cond_bb->count;
 
-  inner_cond_bb->count = outer_cond_bb->count;
+      /* Handle special case where inner_taken probability is always. In this
+	 case we know that the overall outcome will be always as well, but
+	 combining probabilities will be conservative because it does not know
+	 that outer2->probability is inverse of
+	 outer_to_inner->probability.  */
+      if (inner_taken->probability == profile_probability::always ())
+	;
+      else
+	inner_taken->probability = outer2->probability
+	  + outer_to_inner->probability * inner_taken->probability;
+      inner_not_taken->probability = profile_probability::always ()
+	- inner_taken->probability;
 
-  /* Handle special case where inner_taken probability is always. In this case
-     we know that the overall outcome will be always as well, but combining
-     probabilities will be conservative because it does not know that
-     outer2->probability is inverse of outer_to_inner->probability.  */
-  if (inner_taken->probability == profile_probability::always ())
-    ;
+      outer_to_inner->probability = profile_probability::always ();
+      outer2->probability = profile_probability::never ();
+    }
+  else if (constant_condition_p (inner_cond_bb))
+    {
+      /* Path inner_cond_bb->(inner_taken) needs to be merged into path
+	 outer_cond_bb->(outer2).  We've accumulated the probabilities from
+	 outer_cond_bb->(outer)->...->inner_cond_bb in prob, so we have to
+	 adjust that by inner_taken, and make inner unconditional.  */
+
+      prob *= inner_taken->probability;
+      outer2->probability += prob;
+      outer_to_inner->probability = profile_probability::always ()
+	- outer2->probability;
+
+      inner_taken->probability = profile_probability::never ();
+      inner_not_taken->probability = profile_probability::always ();
+    }
   else
-    inner_taken->probability = outer2->probability + outer_to_inner->probability
-			       * inner_taken->probability;
-  inner_not_taken->probability = profile_probability::always ()
-				 - inner_taken->probability;
+    {
+      /* We've moved part of the inner cond to outer, but we don't know the
+	 probabilities for each part, so estimate the effects by moving half of
+	 the odds of inner_taken to outer.  */
 
-  outer_to_inner->probability = profile_probability::always ();
-  outer2->probability = profile_probability::never ();
+      inner_taken->probability *= profile_probability::even ();
+      inner_not_taken->probability = profile_probability::always ()
+	- inner_taken->probability;
+
+      prob *= inner_taken->probability;
+      outer2->probability += prob;
+      outer_to_inner->probability = profile_probability::always ()
+	- outer2->probability;
+    }
+}
+
+/* Set NAME's bit in USED if OUTER dominates it.  */
+
+static void
+ifcombine_mark_ssa_name (bitmap used, tree name, basic_block outer)
+{
+  if (SSA_NAME_IS_DEFAULT_DEF (name))
+    return;
+
+  gimple *def = SSA_NAME_DEF_STMT (name);
+  basic_block bb = gimple_bb (def);
+  if (!dominated_by_p (CDI_DOMINATORS, bb, outer))
+    return;
+
+  bitmap_set_bit (used, SSA_NAME_VERSION (name));
+}
+
+/* Data structure passed to ifcombine_mark_ssa_name.  */
+struct ifcombine_mark_ssa_name_t
+{
+  /* SSA_NAMEs that have been referenced.  */
+  bitmap used;
+  /* Dominating block of DEFs that might need moving.  */
+  basic_block outer;
+};
+
+/* Mark in DATA->used any SSA_NAMEs used in *t.  */
+
+static tree
+ifcombine_mark_ssa_name_walk (tree *t, int *, void *data_)
+{
+  ifcombine_mark_ssa_name_t *data = (ifcombine_mark_ssa_name_t *)data_;
+
+  if (*t && TREE_CODE (*t) == SSA_NAME)
+    ifcombine_mark_ssa_name (data->used, *t, data->outer);
+
+  return NULL;
+}
+
+/* Replace the conditions in INNER_COND and OUTER_COND with COND and COND2.
+   COND and COND2 are computed for insertion at INNER_COND, with OUTER_COND
+   replaced with a constant, but if there are intervening blocks, it's best to
+   adjust COND for insertion at OUTER_COND, placing COND2 at INNER_COND.  */
+
+static tree
+ifcombine_replace_cond (gcond *inner_cond, bool inner_inv,
+			gcond *outer_cond, bool outer_inv,
+			tree cond, bool must_canon,
+			tree cond2)
+{
+  tree ret = cond;
+  if (cond2)
+    ret = fold_build2 (TRUTH_AND_EXPR, TREE_TYPE (ret), ret, cond2);
+
+  /* Split cond into cond2 if they're contiguous.  ??? We might be able to
+     handle ORIF as well, inverting both conditions, but it's not clear that
+     this would be enough, and it never comes up.  */
+  if (!cond2
+      && TREE_CODE (cond) == TRUTH_ANDIF_EXPR
+      && single_pred (gimple_bb (inner_cond)) == gimple_bb (outer_cond))
+    {
+      cond2 = TREE_OPERAND (cond, 1);
+      cond = TREE_OPERAND (cond, 0);
+    }
+
+  bool outer_p = cond2 || (single_pred (gimple_bb (inner_cond))
+			   != gimple_bb (outer_cond));
+  bool result_inv = outer_p ? outer_inv : inner_inv;
+
+  if (result_inv)
+    cond = fold_build1 (TRUTH_NOT_EXPR, TREE_TYPE (cond), cond);
+
+  if (tree tcanon = canonicalize_cond_expr_cond (cond))
+    cond = tcanon;
+  else if (must_canon)
+    return NULL_TREE;
+
+  if (outer_p)
+    {
+      {
+	auto_bitmap used;
+	basic_block outer_bb = gimple_bb (outer_cond);
+
+	/* Mark SSA DEFs that are referenced by cond and may thus need to be
+	   moved to outer.  */
+	{
+	  ifcombine_mark_ssa_name_t data = { used, outer_bb };
+	  walk_tree (&cond, ifcombine_mark_ssa_name_walk, &data, NULL);
+	}
+
+	if (!bitmap_empty_p (used))
+	  {
+	    /* Iterate up from inner_cond, moving DEFs identified as used by
+	       cond, and marking USEs in the DEFs for moving as well.  */
+	    gimple_stmt_iterator gsins = gsi_for_stmt (outer_cond);
+	    for (basic_block bb = gimple_bb (inner_cond);
+		 bb != outer_bb; bb = single_pred (bb))
+	      {
+		for (gimple_stmt_iterator gsitr = gsi_last_bb (bb);
+		     !gsi_end_p (gsitr); gsi_prev (&gsitr))
+		  {
+		    gimple *stmt = gsi_stmt (gsitr);
+		    bool move = false;
+		    tree t;
+		    ssa_op_iter it;
+
+		    FOR_EACH_SSA_TREE_OPERAND (t, stmt, it, SSA_OP_DEF)
+		      if (bitmap_bit_p (used, SSA_NAME_VERSION (t)))
+			{
+			  move = true;
+			  break;
+			}
+
+		    if (!move)
+		      continue;
+
+		    /* Mark uses in STMT before moving it.  */
+		    FOR_EACH_SSA_TREE_OPERAND (t, stmt, it, SSA_OP_USE)
+		      ifcombine_mark_ssa_name (used, t, outer_bb);
+
+		    gsi_move_before (&gsitr, &gsins, GSI_NEW_STMT);
+		  }
+
+		/* Surprisingly, there may be PHI nodes in single-predecessor
+		   bocks, as in pr50682.C.  Fortunately, since they can't
+		   involve back edges, there won't be references to parallel
+		   nodes that we'd have to pay special attention to to keep
+		   them parallel.  We can't move the PHI nodes, but we can turn
+		   them into assignments.  */
+		for (gphi_iterator gsi = gsi_start_phis (bb);
+		     !gsi_end_p (gsi);)
+		  {
+		    gphi *phi = gsi.phi ();
+
+		    gcc_assert (gimple_phi_num_args (phi) == 1);
+		    tree def = gimple_phi_result (phi);
+
+		    if (!bitmap_bit_p (used, SSA_NAME_VERSION (def)))
+		      {
+			gsi_next (&gsi);
+			continue;
+		      }
+
+		    /* Mark uses in STMT before moving it.  */
+		    use_operand_p use_p;
+		    ssa_op_iter it;
+		    FOR_EACH_PHI_ARG (use_p, phi, it, SSA_OP_USE)
+		      ifcombine_mark_ssa_name (used, USE_FROM_PTR (use_p),
+					       outer_bb);
+
+		    tree use = gimple_phi_arg_def (phi, 0);
+		    location_t loc = gimple_phi_arg_location (phi, 0);
+
+		    remove_phi_node (&gsi, false);
+
+		    gassign *a = gimple_build_assign (def, use);
+		    gimple_set_location (a, loc);
+		    gsi_insert_before (&gsins, a, GSI_NEW_STMT);
+		  }
+	      }
+	  }
+      }
+
+      if (!is_gimple_condexpr_for_cond (cond))
+	{
+	  gimple_stmt_iterator gsi = gsi_for_stmt (outer_cond);
+	  cond = force_gimple_operand_gsi_1 (&gsi, cond,
+					     is_gimple_condexpr_for_cond,
+					     NULL, true, GSI_SAME_STMT);
+	}
+
+      /* Leave CFG optimization to cfg_cleanup.  */
+      gimple_cond_set_condition_from_tree (outer_cond, cond);
+      update_stmt (outer_cond);
+
+      if (cond2)
+	{
+	  if (inner_inv)
+	    cond2 = fold_build1 (TRUTH_NOT_EXPR, TREE_TYPE (cond2), cond2);
+
+	  if (tree tcanon = canonicalize_cond_expr_cond (cond2))
+	    cond2 = tcanon;
+	  if (!is_gimple_condexpr_for_cond (cond2))
+	    {
+	      gimple_stmt_iterator gsi = gsi_for_stmt (inner_cond);
+	      cond2 = force_gimple_operand_gsi_1 (&gsi, cond2,
+						  is_gimple_condexpr_for_cond,
+						  NULL, true, GSI_SAME_STMT);
+	    }
+	  gimple_cond_set_condition_from_tree (inner_cond, cond2);
+	}
+      else
+	gimple_cond_set_condition_from_tree (inner_cond,
+					     inner_inv
+					     ? boolean_false_node
+					     : boolean_true_node);
+      update_stmt (inner_cond);
+    }
+  else
+    {
+      if (!is_gimple_condexpr_for_cond (cond))
+	{
+	  gimple_stmt_iterator gsi = gsi_for_stmt (inner_cond);
+	  cond = force_gimple_operand_gsi_1 (&gsi, cond,
+					     is_gimple_condexpr_for_cond,
+					     NULL, true, GSI_SAME_STMT);
+	}
+      gimple_cond_set_condition_from_tree (inner_cond, cond);
+      update_stmt (inner_cond);
+
+      /* Leave CFG optimization to cfg_cleanup.  */
+      gimple_cond_set_condition_from_tree (outer_cond,
+					   outer_inv
+					   ? boolean_false_node
+					   : boolean_true_node);
+      update_stmt (outer_cond);
+    }
+
+  update_profile_after_ifcombine (gimple_bb (inner_cond),
+				  gimple_bb (outer_cond));
+
+  return ret;
 }
 
 /* If-convert on a and pattern with a common else block.  The inner
    if is specified by its INNER_COND_BB, the outer by OUTER_COND_BB.
-   inner_inv, outer_inv and result_inv indicate whether the conditions
-   are inverted.
+   inner_inv, outer_inv indicate whether the conditions are inverted.
    Returns true if the edges to the common else basic-block were merged.  */
 
 static bool
 ifcombine_ifandif (basic_block inner_cond_bb, bool inner_inv,
-		   basic_block outer_cond_bb, bool outer_inv, bool result_inv)
+		   basic_block outer_cond_bb, bool outer_inv)
 {
   gimple_stmt_iterator gsi;
   tree name1, name2, bit1, bit2, bits1, bits2;
@@ -446,26 +768,13 @@ ifcombine_ifandif (basic_block inner_cond_bb, bool inner_inv,
       t2 = fold_build2 (BIT_AND_EXPR, TREE_TYPE (name1), name1, t);
       t2 = force_gimple_operand_gsi (&gsi, t2, true, NULL_TREE,
 				     true, GSI_SAME_STMT);
-      t = fold_build2 (result_inv ? NE_EXPR : EQ_EXPR,
-		       boolean_type_node, t2, t);
-      t = canonicalize_cond_expr_cond (t);
-      if (!t)
+
+      t = fold_build2 (EQ_EXPR, boolean_type_node, t2, t);
+
+      if (!ifcombine_replace_cond (inner_cond, inner_inv,
+				   outer_cond, outer_inv,
+				   t, true, NULL_TREE))
 	return false;
-      if (!is_gimple_condexpr_for_cond (t))
-	{
-	  gsi = gsi_for_stmt (inner_cond);
-	  t = force_gimple_operand_gsi_1 (&gsi, t, is_gimple_condexpr_for_cond,
-					  NULL, true, GSI_SAME_STMT);
-	}
-      gimple_cond_set_condition_from_tree (inner_cond, t);
-      update_stmt (inner_cond);
-
-      /* Leave CFG optimization to cfg_cleanup.  */
-      gimple_cond_set_condition_from_tree (outer_cond,
-	outer_inv ? boolean_false_node : boolean_true_node);
-      update_stmt (outer_cond);
-
-      update_profile_after_ifcombine (inner_cond_bb, outer_cond_bb);
 
       if (dump_file)
 	{
@@ -485,9 +794,8 @@ ifcombine_ifandif (basic_block inner_cond_bb, bool inner_inv,
      In that case remove the outer test and change the inner one to
      test for name & (bits1 | bits2) != 0.  */
   else if (recognize_bits_test (inner_cond, &name1, &bits1, !inner_inv)
-      && recognize_bits_test (outer_cond, &name2, &bits2, !outer_inv))
+	   && recognize_bits_test (outer_cond, &name2, &bits2, !outer_inv))
     {
-      gimple_stmt_iterator gsi;
       tree t;
 
       if ((TREE_CODE (name1) == SSA_NAME
@@ -530,33 +838,14 @@ ifcombine_ifandif (basic_block inner_cond_bb, bool inner_inv,
 	  bits1 = fold_convert (TREE_TYPE (bits2), bits1);
 	}
 
-      /* Do it.  */
-      gsi = gsi_for_stmt (inner_cond);
       t = fold_build2 (BIT_IOR_EXPR, TREE_TYPE (name1), bits1, bits2);
-      t = force_gimple_operand_gsi (&gsi, t, true, NULL_TREE,
-				    true, GSI_SAME_STMT);
       t = fold_build2 (BIT_AND_EXPR, TREE_TYPE (name1), name1, t);
-      t = force_gimple_operand_gsi (&gsi, t, true, NULL_TREE,
-				    true, GSI_SAME_STMT);
-      t = fold_build2 (result_inv ? NE_EXPR : EQ_EXPR, boolean_type_node, t,
+      t = fold_build2 (EQ_EXPR, boolean_type_node, t,
 		       build_int_cst (TREE_TYPE (t), 0));
-      t = canonicalize_cond_expr_cond (t);
-      if (!t)
+      if (!ifcombine_replace_cond (inner_cond, inner_inv,
+				   outer_cond, outer_inv,
+				   t, false, NULL_TREE))
 	return false;
-      if (!is_gimple_condexpr_for_cond (t))
-	{
-	  gsi = gsi_for_stmt (inner_cond);
-	  t = force_gimple_operand_gsi_1 (&gsi, t, is_gimple_condexpr_for_cond,
-					  NULL, true, GSI_SAME_STMT);
-	}
-      gimple_cond_set_condition_from_tree (inner_cond, t);
-      update_stmt (inner_cond);
-
-      /* Leave CFG optimization to cfg_cleanup.  */
-      gimple_cond_set_condition_from_tree (outer_cond,
-	outer_inv ? boolean_false_node : boolean_true_node);
-      update_stmt (outer_cond);
-      update_profile_after_ifcombine (inner_cond_bb, outer_cond_bb);
 
       if (dump_file)
 	{
@@ -576,7 +865,7 @@ ifcombine_ifandif (basic_block inner_cond_bb, bool inner_inv,
   else if (TREE_CODE_CLASS (gimple_cond_code (inner_cond)) == tcc_comparison
 	   && TREE_CODE_CLASS (gimple_cond_code (outer_cond)) == tcc_comparison)
     {
-      tree t;
+      tree t, ts = NULL_TREE;
       enum tree_code inner_cond_code = gimple_cond_code (inner_cond);
       enum tree_code outer_cond_code = gimple_cond_code (outer_cond);
 
@@ -599,10 +888,20 @@ ifcombine_ifandif (basic_block inner_cond_bb, bool inner_inv,
 					    outer_cond_code,
 					    gimple_cond_lhs (outer_cond),
 					    gimple_cond_rhs (outer_cond),
-					    gimple_bb (outer_cond))))
+					    gimple_bb (outer_cond)))
+	  && !(t = (fold_truth_andor_maybe_separate
+		    (UNKNOWN_LOCATION, TRUTH_ANDIF_EXPR,
+		     boolean_type_node,
+		     outer_cond_code,
+		     gimple_cond_lhs (outer_cond),
+		     gimple_cond_rhs (outer_cond),
+		     inner_cond_code,
+		     gimple_cond_lhs (inner_cond),
+		     gimple_cond_rhs (inner_cond),
+		     &ts))))
 	{
+	  {
 	  tree t1, t2;
-	  gimple_stmt_iterator gsi;
 	  bool logical_op_non_short_circuit = LOGICAL_OP_NON_SHORT_CIRCUIT;
 	  if (param_logical_op_non_short_circuit != -1)
 	    logical_op_non_short_circuit
@@ -624,34 +923,13 @@ ifcombine_ifandif (basic_block inner_cond_bb, bool inner_inv,
 				gimple_cond_rhs (outer_cond));
 	  t = fold_build2_loc (gimple_location (inner_cond), 
 			       TRUTH_AND_EXPR, boolean_type_node, t1, t2);
-	  if (result_inv)
-	    {
-	      t = fold_build1 (TRUTH_NOT_EXPR, TREE_TYPE (t), t);
-	      result_inv = false;
-	    }
-	  gsi = gsi_for_stmt (inner_cond);
-	  t = force_gimple_operand_gsi_1 (&gsi, t, is_gimple_condexpr_for_cond,
-					  NULL, true, GSI_SAME_STMT);
+	  }
         }
-      if (result_inv)
-	t = fold_build1 (TRUTH_NOT_EXPR, TREE_TYPE (t), t);
-      t = canonicalize_cond_expr_cond (t);
-      if (!t)
-	return false;
-      if (!is_gimple_condexpr_for_cond (t))
-	{
-	  gsi = gsi_for_stmt (inner_cond);
-	  t = force_gimple_operand_gsi_1 (&gsi, t, is_gimple_condexpr_for_cond,
-					  NULL, true, GSI_SAME_STMT);
-	}
-      gimple_cond_set_condition_from_tree (inner_cond, t);
-      update_stmt (inner_cond);
 
-      /* Leave CFG optimization to cfg_cleanup.  */
-      gimple_cond_set_condition_from_tree (outer_cond,
-	outer_inv ? boolean_false_node : boolean_true_node);
-      update_stmt (outer_cond);
-      update_profile_after_ifcombine (inner_cond_bb, outer_cond_bb);
+      if (!(t = ifcombine_replace_cond (inner_cond, inner_inv,
+					outer_cond, outer_inv,
+					t, false, ts)))
+	return false;
 
       if (dump_file)
 	{
@@ -669,19 +947,21 @@ ifcombine_ifandif (basic_block inner_cond_bb, bool inner_inv,
 /* Helper function for tree_ssa_ifcombine_bb.  Recognize a CFG pattern and
    dispatch to the appropriate if-conversion helper for a particular
    set of INNER_COND_BB, OUTER_COND_BB, THEN_BB and ELSE_BB.
-   PHI_PRED_BB should be one of INNER_COND_BB, THEN_BB or ELSE_BB.  */
+   PHI_PRED_BB should be one of INNER_COND_BB, THEN_BB or ELSE_BB.
+   OUTER_SUCC_BB is the successor of OUTER_COND_BB on the path towards
+   INNER_COND_BB.  */
 
 static bool
 tree_ssa_ifcombine_bb_1 (basic_block inner_cond_bb, basic_block outer_cond_bb,
 			 basic_block then_bb, basic_block else_bb,
-			 basic_block phi_pred_bb)
+			 basic_block phi_pred_bb, basic_block outer_succ_bb)
 {
   /* The && form is characterized by a common else_bb with
      the two edges leading to it mergable.  The latter is
      guaranteed by matching PHI arguments in the else_bb and
      the inner cond_bb having no side-effects.  */
   if (phi_pred_bb != else_bb
-      && recognize_if_then_else (outer_cond_bb, &inner_cond_bb, &else_bb)
+      && recognize_if_then_else_nc (outer_cond_bb, &outer_succ_bb, &else_bb)
       && same_phi_args_p (outer_cond_bb, phi_pred_bb, else_bb))
     {
       /* We have
@@ -693,13 +973,12 @@ tree_ssa_ifcombine_bb_1 (basic_block inner_cond_bb, basic_block outer_cond_bb,
 	   <else_bb>
 	     ...
        */
-      return ifcombine_ifandif (inner_cond_bb, false, outer_cond_bb, false,
-				false);
+      return ifcombine_ifandif (inner_cond_bb, false, outer_cond_bb, false);
     }
 
   /* And a version where the outer condition is negated.  */
   if (phi_pred_bb != else_bb
-      && recognize_if_then_else (outer_cond_bb, &else_bb, &inner_cond_bb)
+      && recognize_if_then_else_nc (outer_cond_bb, &else_bb, &outer_succ_bb)
       && same_phi_args_p (outer_cond_bb, phi_pred_bb, else_bb))
     {
       /* We have
@@ -711,8 +990,7 @@ tree_ssa_ifcombine_bb_1 (basic_block inner_cond_bb, basic_block outer_cond_bb,
 	   <else_bb>
 	     ...
        */
-      return ifcombine_ifandif (inner_cond_bb, false, outer_cond_bb, true,
-				false);
+      return ifcombine_ifandif (inner_cond_bb, false, outer_cond_bb, true);
     }
 
   /* The || form is characterized by a common then_bb with the
@@ -720,7 +998,7 @@ tree_ssa_ifcombine_bb_1 (basic_block inner_cond_bb, basic_block outer_cond_bb,
      by matching PHI arguments in the then_bb and the inner cond_bb
      having no side-effects.  */
   if (phi_pred_bb != then_bb
-      && recognize_if_then_else (outer_cond_bb, &then_bb, &inner_cond_bb)
+      && recognize_if_then_else_nc (outer_cond_bb, &then_bb, &outer_succ_bb)
       && same_phi_args_p (outer_cond_bb, phi_pred_bb, then_bb))
     {
       /* We have
@@ -731,13 +1009,12 @@ tree_ssa_ifcombine_bb_1 (basic_block inner_cond_bb, basic_block outer_cond_bb,
 	   <then_bb>
 	     ...
        */
-      return ifcombine_ifandif (inner_cond_bb, true, outer_cond_bb, true,
-				true);
+      return ifcombine_ifandif (inner_cond_bb, true, outer_cond_bb, true);
     }
 
   /* And a version where the outer condition is negated.  */
   if (phi_pred_bb != then_bb
-      && recognize_if_then_else (outer_cond_bb, &inner_cond_bb, &then_bb)
+      && recognize_if_then_else_nc (outer_cond_bb, &outer_succ_bb, &then_bb)
       && same_phi_args_p (outer_cond_bb, phi_pred_bb, then_bb))
     {
       /* We have
@@ -748,8 +1025,7 @@ tree_ssa_ifcombine_bb_1 (basic_block inner_cond_bb, basic_block outer_cond_bb,
 	   <then_bb>
 	     ...
        */
-      return ifcombine_ifandif (inner_cond_bb, true, outer_cond_bb, false,
-				true);
+      return ifcombine_ifandif (inner_cond_bb, true, outer_cond_bb, false);
     }
 
   return false;
@@ -759,13 +1035,13 @@ tree_ssa_ifcombine_bb_1 (basic_block inner_cond_bb, basic_block outer_cond_bb,
    if-conversion helper.  We start with BB as the innermost
    worker basic-block.  Returns true if a transformation was done.  */
 
-static bool
+static basic_block
 tree_ssa_ifcombine_bb (basic_block inner_cond_bb)
 {
   basic_block then_bb = NULL, else_bb = NULL;
 
-  if (!recognize_if_then_else (inner_cond_bb, &then_bb, &else_bb))
-    return false;
+  if (!recognize_if_then_else_nc (inner_cond_bb, &then_bb, &else_bb))
+    return NULL;
 
   /* Recognize && and || of two conditions with a common
      then/else block which entry edges we can merge.  That is:
@@ -775,14 +1051,41 @@ tree_ssa_ifcombine_bb (basic_block inner_cond_bb)
        if (a && b)
 	 ;
      This requires a single predecessor of the inner cond_bb.  */
-  if (single_pred_p (inner_cond_bb)
-      && bb_no_side_effects_p (inner_cond_bb))
+  for (basic_block bb = inner_cond_bb, outer_cond_bb, exit_bb = NULL;
+       single_pred_p (bb) && bb_no_side_effects_p (bb)
+	 && (!exit_bb || same_phi_args_p (bb, inner_cond_bb, exit_bb));
+       bb = outer_cond_bb)
     {
-      basic_block outer_cond_bb = single_pred (inner_cond_bb);
+      outer_cond_bb = single_pred (bb);
+
+      /* Skip blocks without conditions.  */
+      if (single_succ_p (outer_cond_bb))
+	continue;
+
+      /* When considering noncontiguous conditions, make sure that all
+	 non-final conditions lead to the same successor of the final
+	 condition, when not taking the path to inner_bb, so that we can
+	 combine C into A, both in A && (B && C), and in A || (B || C), but
+	 neither in A && (B || C), nor A || (B && C).  Say, if C goes to
+	 THEN_BB or ELSE_BB, then B must go to either of these, say X, besides
+	 C (whether C is then or else), and A must go to X and B (whether then
+	 or else).
+
+	 We test for this, while allowing intervening nonconditional blocks, by
+	 first taking note of which of the successors of the inner conditional
+	 block is the exit path taken by the first considered outer conditional
+	 block.
+
+	 Having ve identified and saved the exit block in exit_bb at the end of
+	 the loop, here we test that subsequent conditional blocks under
+	 consideration also use the exit block as a successor, besides the
+	 block that leads to inner_cond_bb.  */
+      if (exit_bb && !recognize_if_succs (outer_cond_bb, bb, exit_bb))
+	break;
 
       if (tree_ssa_ifcombine_bb_1 (inner_cond_bb, outer_cond_bb,
-				   then_bb, else_bb, inner_cond_bb))
-	return true;
+				   then_bb, else_bb, inner_cond_bb, bb))
+	return outer_cond_bb;
 
       if (forwarder_block_to (else_bb, then_bb))
 	{
@@ -793,8 +1096,8 @@ tree_ssa_ifcombine_bb (basic_block inner_cond_bb)
 	     For same_phi_args_p we look at equality of arguments between
 	     edge from outer_cond_bb and the forwarder block.  */
 	  if (tree_ssa_ifcombine_bb_1 (inner_cond_bb, outer_cond_bb, else_bb,
-				       then_bb, else_bb))
-	    return true;
+				       then_bb, else_bb, bb))
+	    return outer_cond_bb;
 	}
       else if (forwarder_block_to (then_bb, else_bb))
 	{
@@ -805,12 +1108,25 @@ tree_ssa_ifcombine_bb (basic_block inner_cond_bb)
 	     For same_phi_args_p we look at equality of arguments between
 	     edge from outer_cond_bb and the forwarder block.  */
 	  if (tree_ssa_ifcombine_bb_1 (inner_cond_bb, outer_cond_bb, else_bb,
-				       then_bb, then_bb))
-	    return true;
+				       then_bb, then_bb, bb))
+	    return outer_cond_bb;
+	}
+
+      /* Record the exit path taken by the outer condition.  In the loop
+	 condition test, we'll check whether INNER_COND_BB and the current
+	 OUTER_COND_BB (then BB) share the same PHI args at EXIT_BB.  */
+      if (!exit_bb)
+	{
+	  if (recognize_if_succs (outer_cond_bb, then_bb, bb))
+	    exit_bb = then_bb;
+	  else if (recognize_if_succs (outer_cond_bb, bb, else_bb))
+	    exit_bb = else_bb;
+	  else
+	    break;
 	}
     }
 
-  return false;
+  return NULL;
 }
 
 /* Main entry for the tree if-conversion pass.  */
@@ -866,7 +1182,7 @@ pass_tree_ifcombine::execute (function *fun)
       basic_block bb = bbs[i];
 
       if (safe_is_a <gcond *> (*gsi_last_bb (bb)))
-	if (tree_ssa_ifcombine_bb (bb))
+	if (basic_block outer_bb = tree_ssa_ifcombine_bb (bb))
 	  {
 	    /* Clear range info from all stmts in BB which is now executed
 	       conditional on a always true/false condition.  */
@@ -885,6 +1201,12 @@ pass_tree_ifcombine::execute (function *fun)
 		  rewrite_to_defined_overflow (&gsi);
 	      }
 	    cfg_changed |= true;
+	    /* Go back to outer_bb, in case it could be further optimized, but
+	       only at -O2+, since it could get quadratic.  */
+	    do
+	      i++;
+	    while (optimize >= 2 && bbs[i] != outer_bb);
+	    continue;
 	  }
     }
 

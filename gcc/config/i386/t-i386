@@ -79,3 +79,5 @@ s-i386-bt: $(srcdir)/config/i386/i386-builtin-types.awk \
 	$(AWK) -f $^ > tmp-bt.inc
 	$(SHELL) $(srcdir)/../move-if-change tmp-bt.inc i386-builtin-types.inc
 	$(STAMP) $@
+
+insn-attrtab.o-warn = -Wno-error

@@ -95,6 +95,10 @@ $(srcdir)/config/rs6000/rs6000-tables.opt: $(srcdir)/config/rs6000/genopt.sh \
 	$(SHELL) $(srcdir)/config/rs6000/genopt.sh $(srcdir)/config/rs6000 > \
 		$(srcdir)/config/rs6000/rs6000-tables.opt
 
+# FRAME_GROWS_DOWNWARD tests flag_sanitize in a way that rules out a
+# test in toplev.c.
+toplev.o-warn = -Wno-error
+
 # The rs6000 backend doesn't cause warnings in these files.
 insn-conditions.o-warn =
 
