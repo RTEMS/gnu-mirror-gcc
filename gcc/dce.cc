@@ -40,6 +40,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "dbgcnt.h"
 #include "rtl-iter.h"
 
+using namespace rtl_ssa;
+
 
 /* -------------------------------------------------------------------------
    Core mark/delete routines
@@ -1297,6 +1299,15 @@ public:
 
 } // namespace
 
+
+bool is_inherently_live(insn_info *insn) {
+
+}
+
+static void rti_ssa_dce_() {
+  
+}
+
 static void
 rtl_ssa_dce_init ()
 {
@@ -1323,6 +1334,52 @@ rtl_ssa_dce ()
 {
     rtl_ssa_dce_init ();
 
+    insn_info *next;
+    sbitmap marked;
+    auto_vec<insn_info *> worklist;
+    for (insn_info *insn = crtl->ssa->first_insn (); insn; insn = next)
+    {
+      next = insn->next_any_insn ();
+      auto *rtl = insn->rtl();
+      /*
+      I would like to mark visited instruction with something like plf (Pass local flags) as in gimple
+
+      This file contains some useful functions: e.g. marked_insn_p, mark_insn
+      mark_insn does much more than I want now...
+      It does quite a useful job. If rtl_insn is a call and it is obsolete, it will find call arguments.
+      */
+     // insn.defs() // UD chain - this is what I want - reach the ancestors\
+     // insn.uses() // DU chain
+      if (is_inherently_live(insn)) {
+        if (dump_file)
+	          fprintf (dump_file, "  Adding insn %d to worklist\n", INSN_UID (insn));
+        worklist.safe_push (insn);
+        bitmap_set_bit(marked, INSN_UID (insn)); 
+      }
+
+      //if (insn->can_be_optimized () || insn->is_debug_insn ())
+	    // if (fwprop_insn (insn, fwprop_addr_p))
+	    // worklist.safe_push (insn);
+    }
+
+    while (!worklist.is_empty())
+    {
+      insn_info *insn = worklist.pop();
+      def_array defs = insn->defs(); // array - because of phi?
+      for (size_t i = 0; i < defs.size(); i++)
+      {
+
+        insn_info* parent_insn = defs[i]->insn();
+
+        if (!bitmap_bit_p(INSN_UID (parent_insn))) {
+          if (dump_file)
+	          fprintf (dump_file, "  Adding insn %d to worklist\n", INSN_UID (parent_insn));
+          worklist.safe_push(parent_insn);
+          bitmap_set_bit(marked, INSN_UID (parent_insn)); 
+        }
+      }
+    }
+    
     rtl_ssa_dce_done ();
     return 0;
 }
