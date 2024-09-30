@@ -1,4 +1,14 @@
-==================== Branch work179-vpair, patch #300 ====================
+==================== Branch work179-vpair, patch #306 ====================
+
+Delete __vpair_ptr_t.
+
+2024-09-30  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-pair.h: Delete __vpair_ptr_t.
+
+==================== Branch work179-vpair, patch #305 ====================
 
 Rewrite vector-pair.h.
 
@@ -8,7 +18,7 @@ gcc/
 
 	* config/rs6000/vector-pair.h: Rewrite.
 
-==================== Branch work179-vpair, patch #300 ====================
+==================== Branch work179-vpair, patch #304 ====================
 
 Add vector pair optimizations.
 
@@ -35,7 +45,7 @@ gcc/testsuite/
 	* gcc.target/powerpc/vector-pair-11.c: Likewise.
 	* gcc.target/powerpc/vector-pair-12xs.c: Likewise.
 
-==================== Branch work179-vpair, patch #300 ====================
+==================== Branch work179-vpair, patch #303 ====================
 
 Add vector pair init and splat.
 
@@ -62,7 +72,7 @@ gcc/testsuite/
 	* gcc.target/powerpc/vector-pair-5.c: New test.
 	* gcc.target/powerpc/vector-pair-6.c: Likewise.
 
-==================== Branch work179-vpair, patch #300 ====================
+==================== Branch work179-vpair, patch #302 ====================
 
 Add support for vector pair fma operations.
 
@@ -98,7 +108,7 @@ gcc/testsuite/
 	* gcc.target/powerpc/vector-pair-3.c: New test.
 	* gcc.target/powerpc/vector-pair-4.c: Likewise.
 
-==================== Branch work179-vpair, patch #300 ====================
+==================== Branch work179-vpair, patch #301 ====================
 
 Add support for vector pair unary and binary operations.
 
