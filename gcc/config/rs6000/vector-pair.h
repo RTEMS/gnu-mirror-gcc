@@ -48,8 +48,7 @@ union __vpair_union {
 typedef union __vpair_union	vector_pair_t;
 typedef union __vpair_union	vector_pair_f64_t;
 typedef union __vpair_union	vector_pair_f32_t;
-typedef union __vpair_union	*__vpair_ptr_t;
-#endif	/* __VPAIR_UNION__.  */
+#endif /* __VPAIR_UNION__.  */
 
 #if !__VPAIR_BUILTIN__ && !__VPAIR_ASM__ && !__VPAIR_NOP10__
 #if __MMA__ && __VPAIR__
@@ -440,24 +439,24 @@ vpair_f32_nfms (vector_ptr_f32_t *__r,
 #undef  __VPAIR_FP_UNARY_ASM
 #define __VPAIR_FP_UNARY_ASM(OPCODE, R, A)				\
   __asm__ (OPCODE " %x0,%x1\n\t" OPCODE " %x0+1,%x1+1"			\
-           : "=wa" (((__vpair_ptr_t)(R))->__vpair)			\
-           : "wa" (((__vpair_ptr_t)(A))->__vpair));
+           : "=wa" (((R))->__vpair)					\
+           : "wa" (((A))->__vpair));
 
 #undef  __VPAIR_FP_BINARY_ASM
 #define __VPAIR_FP_BINARY_ASM(OPCODE, R, A, B)				\
   __asm__ (OPCODE " %x0,%x1,%x2\n\t" OPCODE " %x0+1,%x1+1,%x2+1"	\
-           : "=wa" (((__vpair_ptr_t)(R))->__vpair)			\
-           : "wa" (((__vpair_ptr_t)(A))->__vpair),			\
-             "wa" (((__vpair_ptr_t)(B))->__vpair));
+           : "=wa" (((R))->__vpair)					\
+           : "wa" (((A))->__vpair),					\
+             "wa" (((B))->__vpair));
 
     /* Note the 'a' version of the FMA instruction must be used.  */
 #undef  __VPAIR_FP_FMA_ASM
 #define __VPAIR_FP_FMA_ASM(OPCODE, R, A, B, C)				\
   __asm__ (OPCODE " %x0,%x1,%x2\n\t" OPCODE " %x0+1,%x1+1,%x2+1"	\
-           : "=wa" (((__vpair_ptr_t)(R))->__vpair)			\
-           : "wa" (((__vpair_ptr_t)(A))->__vpair),			\
-             "wa" (((__vpair_ptr_t)(B))->__vpair),			\
-             "0"  (((__vpair_ptr_t)(C))->__vpair));
+           : "=wa" (((R))->__vpair)					\
+           : "wa" (((A))->__vpair),					\
+             "wa" (((B))->__vpair),					\
+             "0"  (((C))->__vpair));
 
 /* vector pair double operations on power10/power11.  */
 static inline void
