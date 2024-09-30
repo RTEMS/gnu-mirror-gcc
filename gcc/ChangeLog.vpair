@@ -1,3 +1,14 @@
+==================== Branch work179-vpair, patch #307 ====================
+
+Remove re-inclusion support; Fix various typos; Spacing.
+
+2024-09-30  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/vector-pair.h: Remove re-inclusion support; Fix various
+	typos; Spacing.
+
 ==================== Branch work179-vpair, patch #306 ====================
 
 Delete __vpair_ptr_t.
