@@ -61,6 +61,10 @@
 (define_int_attr vpair_modename [(VPAIR_ELEMENT_FLOAT  "v8sf")
 				 (VPAIR_ELEMENT_DOUBLE "v4df")])
 
+;; Suffix for the appropriate vector instruction
+(define_int_attr vpair_spdp [(VPAIR_ELEMENT_FLOAT  "sp")
+			     (VPAIR_ELEMENT_DOUBLE "dp")])
+
 ;; Unary/binary arithmetic iterator on vector pairs.
 (define_int_iterator VPAIR_FP_UNARY  [UNSPEC_VPAIR_ABS
 				      UNSPEC_VPAIR_NEG
@@ -84,6 +88,18 @@
 				(UNSPEC_VPAIR_SMAX   "smax")
 				(UNSPEC_VPAIR_SMIN   "smin")
 				(UNSPEC_VPAIR_SQRT   "sqrt")])
+
+;; Map the vpair operator unspec number to the instruction
+(define_int_attr vpair_insn [(UNSPEC_VPAIR_ABS    "xvabs")
+			     (UNSPEC_VPAIR_DIV    "xvdiv")
+			     (UNSPEC_VPAIR_FMA    "xvmadd")
+			     (UNSPEC_VPAIR_MINUS  "xvsub")
+			     (UNSPEC_VPAIR_MULT   "xvmul")
+			     (UNSPEC_VPAIR_NEG    "xvneg")
+			     (UNSPEC_VPAIR_PLUS   "xvadd")
+			     (UNSPEC_VPAIR_SMAX   "xvmax")
+			     (UNSPEC_VPAIR_SMIN   "xvmin")
+			     (UNSPEC_VPAIR_SQRT   "xvsqrt")])
 
 ;; Map the vpair operator unspec number to the RTL operator.
 (define_int_attr VPAIR_OP [(UNSPEC_VPAIR_ABS    "ABS")
@@ -205,26 +221,19 @@
 
 ;; Vector pair unary operations.  The last argument in the UNSPEC is a
 ;; CONST_INT which identifies what the scalar element is.
-(define_insn_and_split "vpair_<vpair_stdname>_<vpair_modename>2"
+(define_insn "vpair_<vpair_stdname>_<vpair_modename>2"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
 	(unspec:OO
 	 [(match_operand:OO 1 "vsx_register_operand" "wa")
 	  (const_int VPAIR_FP_ELEMENT)]
 	 VPAIR_FP_UNARY))]
   "TARGET_MMA"
-  "#"
-  "&& reload_completed"
-  [(const_int 0)]
-{
-  vpair_split_unary (operands, <VPAIR_VMODE>mode, <VPAIR_OP>,
-		     VPAIR_SPLIT_NORMAL);
-  DONE;
-}
+  "<vpair_insn><vpair_spdp> %x0,%x1\;<vpair_insn><vpair_spdp> %S0,%S1"
   [(set_attr "length" "8")
    (set_attr "type" "<vpair_type>")])
 
 ;; Optimize vector pair (neg (abs)).
-(define_insn_and_split "vpair_nabs_<vpair_modename>2"
+(define_insn "vpair_nabs_<vpair_modename>2"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
 	(unspec:OO
 	 [(unspec:OO
@@ -234,19 +243,13 @@
 	  (const_int VPAIR_FP_ELEMENT)]
 	 UNSPEC_VPAIR_NEG))]
   "TARGET_MMA"
-  "#"
-  "&& reload_completed"
-  [(const_int 0)]
-{
-  vpair_split_unary (operands, <VPAIR_VMODE>mode, ABS, VPAIR_SPLIT_NEGATE);
-  DONE;
-}
+  "xvnabs<vpair_spdp> %x0,%x1\;xvnabs<vpair_spdp> %S0,%S1"
   [(set_attr "length" "8")
    (set_attr "type" "<vpair_type>")])
 
 ;; Vector pair binary operations.  The last argument in the UNSPEC is a
 ;; CONST_INT which identifies what the scalar element is.
-(define_insn_and_split "vpair_<vpair_stdname>_<vpair_modename>3"
+(define_insn "vpair_<vpair_stdname>_<vpair_modename>3"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa")
 	(unspec:OO
 	 [(match_operand:OO 1 "vsx_register_operand" "wa")
@@ -254,13 +257,7 @@
 	  (const_int VPAIR_FP_ELEMENT)]
 	 VPAIR_FP_BINARY))]
   "TARGET_MMA"
-  "#"
-  "&& reload_completed"
-  [(const_int 0)]
-{
-  vpair_split_binary (operands, <VPAIR_VMODE>mode, <VPAIR_OP>);
-  DONE;
-}
+  "<vpair_insn><vpair_spdp> %x0,%x1,%x2\;<vpair_insn><vpair_spdp> %S0,%S1,%S2"
   [(set_attr "length" "8")
    (set (attr "type") (if_then_else (match_test "<VPAIR_OP> == DIV")
 				    (const_string "<vpair_divtype>")
@@ -293,7 +290,7 @@
 
 ;; Vector pair fused-multiply (FMA) operations.  The last argument in the
 ;; UNSPEC is a CONST_INT which identifies what the scalar element is.
-(define_insn_and_split "vpair_fma_<vpair_modename>4"
+(define_insn "vpair_fma_<vpair_modename>4"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
 	(unspec:OO
 	 [(match_operand:OO 1 "vsx_register_operand" "%wa,wa")
@@ -302,18 +299,14 @@
 	  (const_int VPAIR_FP_ELEMENT)]
 	 UNSPEC_VPAIR_FMA))]
   "TARGET_MMA"
-  "#"
-  "&& reload_completed"
-  [(const_int 0)]
-{
-  vpair_split_fma (operands, <VPAIR_VMODE>mode, VPAIR_SPLIT_FMA);
-  DONE;
-}
+  "@
+   xvmadda<vpair_spdp> %x0,%x1,%x2\;xvmadda<vpair_spdp> %S0,%S1,%S2
+   xvmaddm<vpair_spdp> %x0,%x1,%x3\;xvmaddm<vpair_spdp> %S0,%S1,%S3"
   [(set_attr "length" "8")
    (set_attr "type" "<vpair_type>")])
 
 ;; Vector pair fused multiply-subtract
-(define_insn_and_split "vpair_fms_<vpair_modename>4"
+(define_insn "vpair_fms_<vpair_modename>4"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
 	(unspec:OO
 	 [(match_operand:OO 1 "vsx_register_operand" "%wa,wa")
@@ -325,18 +318,14 @@
 	  (const_int VPAIR_FP_ELEMENT)]
 	 UNSPEC_VPAIR_FMA))]
   "TARGET_MMA"
-  "#"
-  "&& reload_completed"
-  [(const_int 0)]
-{
-  vpair_split_fma (operands, <VPAIR_VMODE>mode, VPAIR_SPLIT_FMS);
-  DONE;
-}
+  "@
+   xvmsuba<vpair_spdp> %x0,%x1,%x2\;xvmsuba<vpair_spdp> %S0,%S1,%S2
+   xvmsubm<vpair_spdp> %x0,%x1,%x3\;xvmsubm<vpair_spdp> %S0,%S1,%S3"
   [(set_attr "length" "8")
    (set_attr "type" "<vpair_type>")])
 
 ;; Vector pair negate fused multiply-add
-(define_insn_and_split "vpair_nfma_<vpair_modename>4"
+(define_insn "vpair_nfma_<vpair_modename>4"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
 	(unspec:OO
 	 [(unspec:OO
@@ -348,18 +337,14 @@
 	  (const_int VPAIR_FP_ELEMENT)]
 	 UNSPEC_VPAIR_NEG))]
   "TARGET_MMA"
-  "#"
-  "&& reload_completed"
-  [(const_int 0)]
-{
-  vpair_split_fma (operands, <VPAIR_VMODE>mode, VPAIR_SPLIT_NFMA);
-  DONE;
-}
+  "@
+   xvnmadda<vpair_spdp> %x0,%x1,%x2\;xvnmadda<vpair_spdp> %S0,%S1,%S2
+   xvnmaddm<vpair_spdp> %x0,%x1,%x3\;xvnmaddm<vpair_spdp> %S0,%S1,%S3"
   [(set_attr "length" "8")
    (set_attr "type" "<vpair_type>")])
 
 ;; Vector pair fused multiply-subtract
-(define_insn_and_split "vpair_nfms_<vpair_modename>4"
+(define_insn "vpair_nfms_<vpair_modename>4"
   [(set (match_operand:OO 0 "vsx_register_operand" "=wa,wa")
 	(unspec:OO
 	 [(unspec:OO
@@ -374,13 +359,9 @@
 	  (const_int VPAIR_FP_ELEMENT)]
 	 UNSPEC_VPAIR_NEG))]
   "TARGET_MMA"
-  "#"
-  "&& reload_completed"
-  [(const_int 0)]
-{
-  vpair_split_fma (operands, <VPAIR_VMODE>mode, VPAIR_SPLIT_NFMS);
-  DONE;
-}
+  "@
+   xvnmsuba<vpair_spdp> %x0,%x1,%x2\;xvnmsuba<vpair_spdp> %S0,%S1,%S2
+   xvnmsubm<vpair_spdp> %x0,%x1,%x3\;xvnmsubm<vpair_spdp> %S0,%S1,%S3"
   [(set_attr "length" "8")
    (set_attr "type" "<vpair_type>")])
 
