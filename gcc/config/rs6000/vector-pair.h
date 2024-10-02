@@ -42,7 +42,6 @@ union __vpair_union {
   vector unsigned char	__vp_uc[2];
 };
 
-typedef union __vpair_union	vector_pair_t;
 typedef union __vpair_union	vector_pair_f64_t;
 typedef union __vpair_union	vector_pair_f32_t;
 
@@ -58,564 +57,228 @@ typedef union __vpair_union	vector_pair_f32_t;
 #endif
 #endif
 
-
-/* ISA 3.1 (power10/power11) support with explicit vector pair type and
-   built-in functions for the vector pair operations.  */
+#undef  __VPAIR_SPLAT
+#undef  __VPAIR_UNARY
+#undef  __VPAIR_BINARY
+#undef  __VPAIR_FMA
 
-#if __VPAIR_BUILTIN__ && __MMA__
+#undef  __VPAIR_F64_UNARY
+#undef  __VPAIR_F64_BINARY
+#undef  __VPAIR_F64_FMA
 
-/* vector pair double operations on power10/power11 with vector pair built-in
-   functions.  */
-static inline void
-vpair_f64_splat (vector_pair_f64_t *__r,
-		 double             __x)
-{
-  __r->__vpair = __builtin_vpair_f64_splat (__x);
-}
+#undef  __VPAIR_F32_UNARY
+#undef  __VPAIR_F32_BINARY
+#undef  __VPAIR_F32_FMA
 
-static inline void
-vpair_f64_abs (vector_pair_f64_t       *__r,
-	       const vector_pair_f64_t *__a)
-{
-  __r->__vpair = __builtin_vpair_f64_abs (__a->__vpair);
-}
+/* Operations using a built-in vector pair function.  */
+#if __MMA__ && __VPAIR_BUILTIN__
 
-static inline void
-vpair_f64_nabs (vector_pair_f64_t       *__r,
-		const vector_pair_f64_t *__a)
-{
-  __r->__vpair = __builtin_vpair_f64_nabs (__a->__vpair);
-}
+#define __VPAIR_SPLAT(R, X, VP_FUNC, VEC)				\
+  (R)->__vpair = VP_FUNC ((X))
 
-static inline void
-vpair_f64_neg (vector_pair_f64_t       *__r,
-	       const vector_pair_f64_t *__a)
-{
-  __r->__vpair = __builtin_vpair_f64_neg (__a->__vpair);
-}
+#define __VPAIR_UNARY(R, A, VP_FUNC, OPCODE, VEC, VEC_FUNC)		\
+  (R)->__vpair = VP_FUNC ((A)->__vpair)
 
-static inline void
-vpair_f64_sqrt (vector_pair_f64_t       *__r,
-		const vector_pair_f64_t *__a)
-{
-  __r->__vpair = __builtin_vpair_f64_sqrt (__a->__vpair);
-}
+#define __VPAIR_BINARY(R, A, B, VP_FUNC, OPCODE, VEC, VEC_FUNC)		\
+  (R)->__vpair = VP_FUNC ((A)->__vpair, (B)->__vpair)
 
-static inline void
-vpair_f64_add (vector_pair_f64_t       *__r,
-	       const vector_pair_f64_t *__a,
-	       const vector_pair_f64_t *__b)
-{
-  __r->__vpair = __builtin_vpair_f64_add (__a->__vpair, __b->__vpair);
-}
+#define __VPAIR_FMA(R, A, B, C, VP_FUNC, OPCODE, VEC, VEC_FUNC)		\
+  (R)->__vpair = VP_FUNC ((A)->__vpair, (B)->__vpair, (C)->__vpair)
 
-static inline void
-vpair_f64_max (vector_pair_f64_t       *__r,
-	       const vector_pair_f64_t *__a,
-	       const vector_pair_f64_t *__b)
-{
-  __r->__vpair = __builtin_vpair_f64_max (__a->__vpair, __b->__vpair);
-}
+/* Operations using a vector pair and __asm__operations.  */
+#elif __MMA__ && !__VPAIR_NOP10__
 
-static inline void
-vpair_f64_min (vector_pair_f64_t       *__r,
-	       const vector_pair_f64_t *__a,
-	       const vector_pair_f64_t *__b)
-{
-  __r->__vpair = __builtin_vpair_f64_min (__a->__vpair, __b->__vpair);
-}
+#define __VPAIR_SPLAT(R, X, VP_FUNC, VEC)				\
+  __asm__ ("xxlor %x0+1,%x0,%x0"					\
+	   : "=wa" ((R)->__vpair)					\
+	   : "0" (__builtin_vec_splats ((X))))
 
-static inline void
-vpair_f64_mul (vector_pair_f64_t       *__r,
-	       const vector_pair_f64_t *__a,
-	       const vector_pair_f64_t *__b)
-{
-  __r->__vpair = __builtin_vpair_f64_mul (__a->__vpair, __b->__vpair);
-}
-
-static inline void
-vpair_f64_sub (vector_pair_f64_t       *__r,
-	       const vector_pair_f64_t *__a,
-	       const vector_pair_f64_t *__b)
-{
-  __r->__vpair = __builtin_vpair_f64_sub (__a->__vpair, __b->__vpair);
-}
-
-static inline void
-vpair_f64_fma (vector_pair_f64_t       *__r,
-	       const vector_pair_f64_t *__a,
-	       const vector_pair_f64_t *__b,
-	       const vector_pair_f64_t *__c)
-{
-  __r->__vpair = __builtin_vpair_f64_fma (__a->__vpair,
-					  __b->__vpair,
-					  __c->__vpair);
-}
-
-static inline void
-vpair_f64_fms (vector_pair_f64_t       *__r,
-	       const vector_pair_f64_t *__a,
-	       const vector_pair_f64_t *__b,
-	       const vector_pair_f64_t *__c)
-{
-  __r->__vpair = __builtin_vpair_f64_fms (__a->__vpair,
-					  __b->__vpair,
-					  __c->__vpair);
-}
-
-static inline void
-vpair_f64_nfma (vector_pair_f64_t       *__r,
-		const vector_pair_f64_t *__a,
-		const vector_pair_f64_t *__b,
-		const vector_pair_f64_t *__c)
-{
-  __r->__vpair = __builtin_vpair_f64_nfma (__a->__vpair,
-					   __b->__vpair,
-					   __c->__vpair);
-}
-
-static inline void
-vpair_f64_nfms (vector_pair_f64_t       *__r,
-		const vector_pair_f64_t *__a,
-		const vector_pair_f64_t *__b,
-		const vector_pair_f64_t *__c)
-{
-  __r->__vpair = __builtin_vpair_f64_nfms (__a->__vpair,
-					   __b->__vpair,
-					   __c->__vpair);
-}
-
-/* vector pair float operations on power10/power11 with vector pair built-in
-   functions.  */
-
-static inline void
-vpair_f32_splat (vector_pair_f32_t *__r,
-		 float              __x)
-{
-  __r->__vpair = __builtin_vpair_f32_splat (__x);
-}
-
-static inline void
-vpair_f32_abs (vector_pair_f32_t       *__r,
-	       const vector_pair_f32_t *__a)
-{
-  __r->__vpair = __builtin_vpair_f32_abs (__a->__vpair);
-}
-
-static inline void
-vpair_f32_nabs (vector_pair_f32_t       *__r,
-		const vector_pair_f32_t *__a)
-{
-  __r->__vpair = __builtin_vpair_f32_nabs (__a->__vpair);
-}
-
-static inline void
-vpair_f32_neg (vector_pair_f32_t       *__r,
-	       const vector_pair_f32_t *__a)
-{
-  __r->__vpair = __builtin_vpair_f32_neg (__a->__vpair);
-}
-
-static inline void
-vpair_f32_sqrt (vector_pair_f32_t       *__r,
-		const vector_pair_f32_t *__a)
-{
-  __r->__vpair = __builtin_vpair_f32_sqrt (__a->__vpair);
-}
-
-static inline void
-vpair_f32_add (vector_pair_f32_t       *__r,
-	       const vector_pair_f32_t *__a,
-	       const vector_pair_f32_t *__b)
-{
-  __r->__vpair = __builtin_vpair_f32_add (__a->__vpair, __b->__vpair);
-}
-
-static inline void
-vpair_f32_max (vector_pair_f32_t       *__r,
-	       const vector_pair_f32_t *__a,
-	       const vector_pair_f32_t *__b)
-{
-  __r->__vpair = __builtin_vpair_f32_max (__a->__vpair, __b->__vpair);
-}
-
-static inline void
-vpair_f32_min (vector_pair_f32_t       *__r,
-	       const vector_pair_f32_t *__a,
-	       const vector_pair_f32_t *__b)
-{
-  __r->__vpair = __builtin_vpair_f32_min (__a->__vpair, __b->__vpair);
-}
-
-static inline void
-vpair_f32_mul (vector_pair_f32_t       *__r,
-	       const vector_pair_f32_t *__a,
-	       const vector_pair_f32_t *__b)
-{
-  __r->__vpair = __builtin_vpair_f32_mul (__a->__vpair, __b->__vpair);
-}
-
-static inline void
-vpair_f32_sub (vector_pair_f32_t       *__r,
-	       const vector_pair_f32_t *__a,
-	       const vector_pair_f32_t *__b)
-{
-  __r->__vpair = __builtin_vpair_f32_sub (__a->__vpair, __b->__vpair);
-}
-
-static inline void
-vpair_f32_fma (vector_pair_f32_t       *__r,
-	       const vector_pair_f32_t *__a,
-	       const vector_pair_f32_t *__b,
-	       const vector_pair_f32_t *__c)
-{
-  __r->__vpair = __builtin_vpair_f32_fma (__a->__vpair,
-					  __b->__vpair,
-					  __c->__vpair);
-}
-
-static inline void
-vpair_f32_fms (vector_pair_f32_t       *__r,
-	       const vector_pair_f32_t *__a,
-	       const vector_pair_f32_t *__b,
-	       const vector_pair_f32_t *__c)
-{
-  __r->__vpair = __builtin_vpair_f32_fms (__a->__vpair,
-					  __b->__vpair,
-					  __c->__vpair);
-}
-
-static inline void
-vpair_f32_nfma (vector_pair_f32_t       *__r,
-		const vector_pair_f32_t *__a,
-		const vector_pair_f32_t *__b,
-		const vector_pair_f32_t *__c)
-{
-  __r->__vpair = __builtin_vpair_f32_nfma (__a->__vpair,
-					   __b->__vpair,
-					   __c->__vpair);
-}
-
-static inline void
-vpair_f32_nfms (vector_pair_f32_t       *__r,
-		const vector_pair_f32_t *__a,
-		const vector_pair_f32_t *__b,
-		const vector_pair_f32_t *__c)
-{
-  __r->__vpair = __builtin_vpair_f32_nfms (__a->__vpair,
-					   __b->__vpair,
-					   __c->__vpair);
-}
-
-
-/* ISA 3.1 (power10/power11) support with explicit vector pair type, using
-   __asm__ to do the vector pair operations.  */
-
-#elif __VPAIR_ASM__ && __MMA__
-
-#undef  __VPAIR_FP_UNARY_ASM
-#define __VPAIR_FP_UNARY_ASM(OPCODE, R, A)				\
+#define __VPAIR_UNARY(R, A, VP_FUNC, OPCODE, VEC, VEC_FUNC)		\
   __asm__ (OPCODE " %x0,%x1\n\t" OPCODE " %x0+1,%x1+1"			\
-           : "=wa" (((R))->__vpair)					\
-           : "wa" (((A))->__vpair));
+           : "=wa" ((R)->__vpair)					\
+           : "wa" ((A)->__vpair))
 
-#undef  __VPAIR_FP_BINARY_ASM
-#define __VPAIR_FP_BINARY_ASM(OPCODE, R, A, B)				\
+#define __VPAIR_BINARY(R, A, B, VP_FUNC, OPCODE, VEC, VEC_FUNC)		\
+  __asm__ (OPCODE " %x0,%x1\n\t" OPCODE " %x0+1,%x1+1"			\
+           : "=wa" ((R)->__vpair)					\
+	   : "wa" ((A)->__vpair), "wa" ((B)->__vpair))
+
+/* Note the 'a' form of the fma instructions must be used.  */
+#define __VPAIR_FMA(R, A, B, C, VP_FUNC, OPCODE, VEC, VEC_FUNC)		\
   __asm__ (OPCODE " %x0,%x1,%x2\n\t" OPCODE " %x0+1,%x1+1,%x2+1"	\
-           : "=wa" (((R))->__vpair)					\
-           : "wa" (((A))->__vpair),					\
-             "wa" (((B))->__vpair));
+           : "=wa" ((R)->__vpair)					\
+	   : "wa" ((A)->__vpair), "wa" ((B)->__vpair), "0" ((C)->__vpair))
 
-    /* Note the 'a' version of the FMA instruction must be used.  */
-#undef  __VPAIR_FP_FMA_ASM
-#define __VPAIR_FP_FMA_ASM(OPCODE, R, A, B, C)				\
-  __asm__ (OPCODE " %x0,%x1,%x2\n\t" OPCODE " %x0+1,%x1+1,%x2+1"	\
-           : "=wa" (((R))->__vpair)					\
-           : "wa" (((A))->__vpair),					\
-             "wa" (((B))->__vpair),					\
-             "0"  (((C))->__vpair));
+#else	/* vpair support on power8/power9.  */
 
-/* vector pair double operations on power10/power11 using asm.  */
+/* Pair of vector operations using a built-in function.  */
+
+#define __VPAIR_SPLAT(R, X, VP_FUNC, VEC)				\
+  (R)->VEC[0] = (R)->VEC[1] = __builtin_vec_splats ((X))
+
+#define __VPAIR_UNARY(R, A, VP_FUNC, OPCODE, VEC, VEC_FUNC)		\
+  do									\
+    {									\
+      (R)->VEC[0] = VEC_FUNC ((A)->VEC[0]);				\
+      (R)->VEC[1] = VEC_FUNC ((A)->VEC[1]);				\
+    }									\
+  while (0)
+
+#define __VPAIR_BINARY(R, A, B, VP_FUNC, OPCODE, VEC, VEC_FUNC)		\
+  do									\
+    {									\
+      (R)->VEC[0] = VEC_FUNC ((A)->VEC[0], (B)->VEC[0]);		\
+      (R)->VEC[1] = VEC_FUNC ((A)->VEC[1], (B)->VEC[1]);		\
+    }									\
+  while (0)
+
+#define __VPAIR_FMA(R, A, B, C, VP_FUNC, OPCODE, VEC, VEC_FUNC)		\
+  do									\
+    {									\
+      (R)->VEC[0] = VEC_FUNC ((A)->VEC[0], (B)->VEC[0], (C)->VEC[0]);	\
+      (R)->VEC[1] = VEC_FUNC ((A)->VEC[1], (B)->VEC[1], (C)->VEC[1]);	\
+    }									\
+  while (0)
+
+#endif
+
+/* 64-bit version of the macros.  */
+#define __VPAIR_F64_UNARY(R, A, VP_FUNC, OPCODE, VEC_FUNC)		\
+  __VPAIR_UNARY(R, A, VP_FUNC, OPCODE, __vp_f64, VEC_FUNC)
+
+#define __VPAIR_F64_BINARY(R, A, B, VP_FUNC, OPCODE, VEC_FUNC)		\
+  __VPAIR_BINARY(R, A, B, VP_FUNC, OPCODE, __vp_f64, VEC_FUNC)
+
+#define __VPAIR_F64_FMA(R, A, B, C, VP_FUNC, OPCODE, VEC_FUNC)		\
+  __VPAIR_FMA(R, A, B, C, VP_FUNC, OPCODE, __vp_f64, VEC_FUNC)
+
+
+/* 32-bit version of the macros.  */
+#define __VPAIR_F32_UNARY(R, A, VP_FUNC, OPCODE, VEC_FUNC)		\
+  __VPAIR_UNARY(R, A, VP_FUNC, OPCODE, __vp_f32, VEC_FUNC)
+
+#define __VPAIR_F32_BINARY(R, A, B, VP_FUNC, OPCODE, VEC_FUNC)		\
+  __VPAIR_BINARY(R, A, B, VP_FUNC, OPCODE, __vp_f32, VEC_FUNC)
+
+#define __VPAIR_F32_FMA(R, A, B, C, VP_FUNC, OPCODE, VEC_FUNC)		\
+  __VPAIR_FMA(R, A, B, C, VP_FUNC, OPCODE, __vp_f32, VEC_FUNC)
+
+
+/* Splat functions.  */
+
+/* 64-bit splat to vector pair.  */
+
 static inline void
-vpair_f64_splat (vector_pair_f64_t *__r,
-		 double             __x)
+vpair_f64_splat (vector_pair_f64_t *__r, double __x)
 {
-  __asm__ ("xxlor %x0+1,%x1,%x1"
-	   : "=wa" (__r->__vpair)
-	   : "0" (__builtin_vec_splats (__x)));
+  __VPAIR_SPLAT (__r, __x, __builtin_vpair_f64_splat, __vp_f64);
 }
+
+/* 32-bit splat to vector pair.  */
+
+static inline void
+vpair_f32_splat (vector_pair_f32_t *__r, float __x)
+{
+  __VPAIR_SPLAT (__r, __x, __builtin_vpair_f32_splat, __vp_f32);
+}
+
+
+/* 64-bit unary functions.  */
 
 static inline void
 vpair_f64_abs (vector_pair_f64_t       *__r,
 	       const vector_pair_f64_t *__a)
 {
-  __VPAIR_FP_UNARY_ASM ("xvabsdp", __r, __a);
+  __VPAIR_F64_UNARY (__r, __a,
+		     __builtin_vpair_f64_abs,
+		     "xvabsdp",
+		     __builtin_vec_abs);
 }
 
 static inline void
 vpair_f64_nabs (vector_pair_f64_t       *__r,
 		const vector_pair_f64_t *__a)
 {
-  __VPAIR_FP_UNARY_ASM ("xvnabsdp", __r, __a);
+  __VPAIR_F64_UNARY (__r, __a,
+		     __builtin_vpair_f64_nabs,
+		     "xvnabsdp",
+		     __builtin_vec_nabs);
 }
 
 static inline void
 vpair_f64_neg (vector_pair_f64_t       *__r,
 	       const vector_pair_f64_t *__a)
 {
-  __VPAIR_FP_UNARY_ASM ("xvnegdp", __r, __a);
+  __VPAIR_F64_UNARY (__r, __a,
+		     __builtin_vpair_f64_neg,
+		     "xvnegdp",
+		     __builtin_vec_neg);
 }
 
 static inline void
 vpair_f64_sqrt (vector_pair_f64_t       *__r,
 		const vector_pair_f64_t *__a)
 {
-  __VPAIR_FP_UNARY_ASM ("xvsqrtdp", __r, __a);
+  __VPAIR_F64_UNARY (__r, __a,
+		     __builtin_vpair_f64_sqrt,
+		     "xvsqrtdp",
+		     __builtin_vec_sqrt);
 }
 
-static inline void
-vpair_f64_add (vector_pair_f64_t       *__r,
-	       const vector_pair_f64_t *__a,
-	       const vector_pair_f64_t *__b)
-{
-  __VPAIR_FP_BINARY_ASM ("xvadddp", __r, __a, __b);
-}
-
-static inline void
-vpair_f64_max (vector_pair_f64_t       *__r,
-	       const vector_pair_f64_t *__a,
-	       const vector_pair_f64_t *__b)
-{
-  __VPAIR_FP_BINARY_ASM ("xvmaxdp", __r, __a, __b);
-}
-
-static inline void
-vpair_f64_min (vector_pair_f64_t       *__r,
-	       const vector_pair_f64_t *__a,
-	       const vector_pair_f64_t *__b)
-{
-  __VPAIR_FP_BINARY_ASM ("xvmindp", __r, __a, __b);
-}
-
-static inline void
-vpair_f64_mul (vector_pair_f64_t       *__r,
-	       const vector_pair_f64_t *__a,
-	       const vector_pair_f64_t *__b)
-{
-  __VPAIR_FP_BINARY_ASM ("xvmuldp", __r, __a, __b);
-}
-
-static inline void
-vpair_f64_sub (vector_pair_f64_t       *__r,
-	       const vector_pair_f64_t *__a,
-	       const vector_pair_f64_t *__b)
-{
-  __VPAIR_FP_BINARY_ASM ("xvsubdp", __r, __a, __b);
-}
-
-static inline void
-vpair_f64_fma (vector_pair_f64_t       *__r,
-	       const vector_pair_f64_t *__a,
-	       const vector_pair_f64_t *__b,
-	       const vector_pair_f64_t *__c)
-{
-  __VPAIR_FP_FMA_ASM ("xvmaddadp", __r, __a, __b, __c);
-}
-
-static inline void
-vpair_f64_fms (vector_pair_f64_t       *__r,
-	       const vector_pair_f64_t *__a,
-	       const vector_pair_f64_t *__b,
-	       const vector_pair_f64_t *__c)
-{
-  __VPAIR_FP_FMA_ASM ("xvmsubadp", __r, __a, __b, __c);
-}
-
-static inline void
-vpair_f64_nfma (vector_pair_f64_t       *__r,
-		const vector_pair_f64_t *__a,
-		const vector_pair_f64_t *__b,
-		const vector_pair_f64_t *__c)
-{
-  __VPAIR_FP_FMA_ASM ("xvnmaddadp", __r, __a, __b, __c);
-}
-
-static inline void
-vpair_f64_nfms (vector_pair_f64_t       *__r,
-		const vector_pair_f64_t *__a,
-		const vector_pair_f64_t *__b,
-		const vector_pair_f64_t *__c)
-{
-  __VPAIR_FP_FMA_ASM ("xvnmsubadp", __r, __a, __b, __c);
-}
-
-/* vector pair float operations on power10/power11 using asm.  */
-static inline void
-vpair_f32_splat (vector_pair_f32_t *__r,
-		 float              __x)
-{
-  __asm__ ("xxlor %x0+1,%x1,%x1"
-	   : "=wa" (__r->__vpair)
-	   : "0" (__builtin_vec_splats (__x)));
-}
+/* 32-bit unary functions.  */
 
 static inline void
 vpair_f32_abs (vector_pair_f32_t       *__r,
 	       const vector_pair_f32_t *__a)
 {
-  __VPAIR_FP_UNARY_ASM ("xvabssp", __r, __a);
+  __VPAIR_F32_UNARY (__r, __a,
+		     __builtin_vpair_f32_abs,
+		     "xvabssp",
+		     __builtin_vec_abs);
 }
 
 static inline void
 vpair_f32_nabs (vector_pair_f32_t       *__r,
 		const vector_pair_f32_t *__a)
 {
-  __VPAIR_FP_UNARY_ASM ("xvnabssp", __r, __a);
+  __VPAIR_F32_UNARY (__r, __a,
+		     __builtin_vpair_f32_nabs,
+		     "xvnabssp",
+		     __builtin_vec_nabs);
 }
 
 static inline void
 vpair_f32_neg (vector_pair_f32_t       *__r,
 	       const vector_pair_f32_t *__a)
 {
-  __VPAIR_FP_UNARY_ASM ("xvnegsp", __r, __a);
+  __VPAIR_F32_UNARY (__r, __a,
+		     __builtin_vpair_f32_neg,
+		     "xvnegsp",
+		     __builtin_vec_neg);
 }
 
 static inline void
 vpair_f32_sqrt (vector_pair_f32_t       *__r,
 		const vector_pair_f32_t *__a)
 {
-  __VPAIR_FP_UNARY_ASM ("xvsqrtsp", __r, __a);
+  __VPAIR_F32_UNARY (__r, __a,
+		     __builtin_vpair_f32_sqrt,
+		     "xvsqrtsp",
+		     __builtin_vec_sqrt);
 }
-
-static inline void
-vpair_f32_add (vector_pair_f32_t       *__r,
-	       const vector_pair_f32_t *__a,
-	       const vector_pair_f32_t *__b)
-{
-  __VPAIR_FP_BINARY_ASM ("xvaddsp", __r, __a, __b);
-}
-
-static inline void
-vpair_f32_max (vector_pair_f32_t       *__r,
-	       const vector_pair_f32_t *__a,
-	       const vector_pair_f32_t *__b)
-{
-  __VPAIR_FP_BINARY_ASM ("xvmaxsp", __r, __a, __b);
-}
-
-static inline void
-vpair_f32_min (vector_pair_f32_t       *__r,
-	       const vector_pair_f32_t *__a,
-	       const vector_pair_f32_t *__b)
-{
-  __VPAIR_FP_BINARY_ASM ("xvminsp", __r, __a, __b);
-}
-
-static inline void
-vpair_f32_mul (vector_pair_f32_t       *__r,
-	       const vector_pair_f32_t *__a,
-	       const vector_pair_f32_t *__b)
-{
-  __VPAIR_FP_BINARY_ASM ("xvmulsp", __r, __a, __b);
-}
-
-static inline void
-vpair_f32_sub (vector_pair_f32_t       *__r,
-	       const vector_pair_f32_t *__a,
-	       const vector_pair_f32_t *__b)
-{
-  __VPAIR_FP_BINARY_ASM ("xvsubsp", __r, __a, __b);
-}
-
-static inline void
-vpair_f32_fma (vector_pair_f32_t       *__r,
-	       const vector_pair_f32_t *__a,
-	       const vector_pair_f32_t *__b,
-	       const vector_pair_f32_t *__c)
-{
-  __VPAIR_FP_FMA_ASM ("xvmaddasp", __r, __a, __b, __c);
-}
-
-static inline void
-vpair_f32_fms (vector_pair_f32_t       *__r,
-	       const vector_pair_f32_t *__a,
-	       const vector_pair_f32_t *__b,
-	       const vector_pair_f32_t *__c)
-{
-  __VPAIR_FP_FMA_ASM ("xvmsubasp", __r, __a, __b, __c);
-}
-
-static inline void
-vpair_f32_nfma (vector_pair_f32_t       *__r,
-		const vector_pair_f32_t *__a,
-		const vector_pair_f32_t *__b,
-		const vector_pair_f32_t *__c)
-{
-  __VPAIR_FP_FMA_ASM ("xvnmaddasp", __r, __a, __b, __c);
-}
-
-static inline void
-vpair_f32_nfms (vector_pair_f32_t       *__r,
-		const vector_pair_f32_t *__a,
-		const vector_pair_f32_t *__b,
-		const vector_pair_f32_t *__c)
-{
-  __VPAIR_FP_FMA_ASM ("xvnmsubasp", __r, __a, __b, __c);
-}
-
-/* vector pair float operations on power10/power11.  */
 
 
-#else	/* ISA 2.8/3.0 support for machines without vector pair support.  */
-
-/* Simulated vector pair double operations on power8/power9.  */
-
-static inline void
-vpair_f64_splat (vector_pair_f64_t *__r,
-		 double             __x)
-{
-  __r->__vp_f64[0] = __r->__vp_f64[1] = __builtin_vec_splats (__x);
-}
-
-static inline void
-vpair_f64_abs (vector_pair_f64_t       *__r,
-	       const vector_pair_f64_t *__a)
-{
-  __r->__vp_f64[0] = __builtin_vsx_xvabsdp (__a->__vp_f64[0]);
-  __r->__vp_f64[1] = __builtin_vsx_xvabsdp (__a->__vp_f64[1]);
-}
-
-static inline void
-vpair_f64_nabs (vector_pair_f64_t       *__r,
-		const vector_pair_f64_t *__a)
-{
-  __r->__vp_f64[0] = __builtin_vsx_xvnabsdp (__a->__vp_f64[0]);
-  __r->__vp_f64[1] = __builtin_vsx_xvnabsdp (__a->__vp_f64[1]);
-}
-
-static inline void
-vpair_f64_neg (vector_pair_f64_t       *__r,
-	       const vector_pair_f64_t *__a)
-{
-  __r->__vp_f64[0] = - __a->__vp_f64[0];
-  __r->__vp_f64[1] = - __a->__vp_f64[1];
-}
-
-static inline void
-vpair_f64_sqrt (vector_pair_f64_t       *__r,
-		const vector_pair_f64_t *__a)
-{
-  __r->__vp_f64[0] = __builtin_vsx_xvsqrtdp (__a->__vp_f64[0]);
-  __r->__vp_f64[1] = __builtin_vsx_xvsqrtdp (__a->__vp_f64[1]);
-}
+/* 64-bit binary functions.  */
 
 static inline void
 vpair_f64_add (vector_pair_f64_t       *__r,
 	       const vector_pair_f64_t *__a,
 	       const vector_pair_f64_t *__b)
 {
-  __r->__vp_f64[0] = __a->__vp_f64[0] + __b->__vp_f64[0];
-  __r->__vp_f64[1] = __a->__vp_f64[1] + __b->__vp_f64[1];
+  __VPAIR_F64_BINARY (__r, __a, __b,
+		      __builtin_vpair_f64_add,
+		      "xvadddp",
+		      __builtin_vec_add);
 }
 
 static inline void
@@ -623,8 +286,10 @@ vpair_f64_div (vector_pair_f64_t       *__r,
 	       const vector_pair_f64_t *__a,
 	       const vector_pair_f64_t *__b)
 {
-  __r->__vp_f64[0] = __a->__vp_f64[0] / __b->__vp_f64[0];
-  __r->__vp_f64[1] = __a->__vp_f64[1] / __b->__vp_f64[1];
+  __VPAIR_F64_BINARY (__r, __a, __b,
+		      __builtin_vpair_f64_div,
+		      "xvdivdp",
+		      __builtin_vec_div);
 }
 
 static inline void
@@ -632,11 +297,10 @@ vpair_f64_max (vector_pair_f64_t       *__r,
 	       const vector_pair_f64_t *__a,
 	       const vector_pair_f64_t *__b)
 {
-  __r->__vp_f64[0] = __builtin_vsx_xvmaxdp (__a->__vp_f64[0],
-					    __b->__vp_f64[0]);
-
-  __r->__vp_f64[1] = __builtin_vsx_xvmaxdp (__a->__vp_f64[1],
-					    __b->__vp_f64[1]);
+  __VPAIR_F64_BINARY (__r, __a, __b,
+		      __builtin_vpair_f64_max,
+		      "xvmaxdp",
+		      __builtin_vec_max);
 }
 
 static inline void
@@ -644,11 +308,10 @@ vpair_f64_min (vector_pair_f64_t       *__r,
 	       const vector_pair_f64_t *__a,
 	       const vector_pair_f64_t *__b)
 {
-  __r->__vp_f64[0] = __builtin_vsx_xvmindp (__a->__vp_f64[0],
-					    __b->__vp_f64[0]);
-
-  __r->__vp_f64[1] = __builtin_vsx_xvmindp (__a->__vp_f64[1],
-					    __b->__vp_f64[1]);
+  __VPAIR_F64_BINARY (__r, __a, __b,
+		      __builtin_vpair_f64_min,
+		      "xvmindp",
+		      __builtin_vec_min);
 }
 
 static inline void
@@ -656,8 +319,10 @@ vpair_f64_mul (vector_pair_f64_t       *__r,
 	       const vector_pair_f64_t *__a,
 	       const vector_pair_f64_t *__b)
 {
-  __r->__vp_f64[0] = __a->__vp_f64[0] * __b->__vp_f64[0];
-  __r->__vp_f64[1] = __a->__vp_f64[1] * __b->__vp_f64[1];
+  __VPAIR_F64_BINARY (__r, __a, __b,
+		      __builtin_vpair_f64_mul,
+		      "xvmuldp",
+		      __builtin_vec_mul);
 }
 
 static inline void
@@ -665,9 +330,81 @@ vpair_f64_sub (vector_pair_f64_t       *__r,
 	       const vector_pair_f64_t *__a,
 	       const vector_pair_f64_t *__b)
 {
-  __r->__vp_f64[0] = __a->__vp_f64[0] - __b->__vp_f64[0];
-  __r->__vp_f64[1] = __a->__vp_f64[1] - __b->__vp_f64[1];
+  __VPAIR_F64_BINARY (__r, __a, __b,
+		      __builtin_vpair_f64_sub,
+		      "xvsubdp",
+		      __builtin_vec_sub);
 }
+
+/* 32-bit binary functions.  */
+
+static inline void
+vpair_f32_add (vector_pair_f32_t       *__r,
+	       const vector_pair_f32_t *__a,
+	       const vector_pair_f32_t *__b)
+{
+  __VPAIR_F32_BINARY (__r, __a, __b,
+		      __builtin_vpair_f32_add,
+		      "xvaddsp",
+		      __builtin_vec_add);
+}
+
+static inline void
+vpair_f32_div (vector_pair_f32_t       *__r,
+	       const vector_pair_f32_t *__a,
+	       const vector_pair_f32_t *__b)
+{
+  __VPAIR_F32_BINARY (__r, __a, __b,
+		      __builtin_vpair_f32_div,
+		      "xvdivsp",
+		      __builtin_vec_div);
+}
+
+static inline void
+vpair_f32_max (vector_pair_f32_t       *__r,
+	       const vector_pair_f32_t *__a,
+	       const vector_pair_f32_t *__b)
+{
+  __VPAIR_F32_BINARY (__r, __a, __b,
+		      __builtin_vpair_f32_max,
+		      "xvmaxsp",
+		      __builtin_vec_max);
+}
+
+static inline void
+vpair_f32_min (vector_pair_f32_t       *__r,
+	       const vector_pair_f32_t *__a,
+	       const vector_pair_f32_t *__b)
+{
+  __VPAIR_F32_BINARY (__r, __a, __b,
+		      __builtin_vpair_f32_min,
+		      "xvminsp",
+		      __builtin_vec_min);
+}
+
+static inline void
+vpair_f32_mul (vector_pair_f32_t       *__r,
+	       const vector_pair_f32_t *__a,
+	       const vector_pair_f32_t *__b)
+{
+  __VPAIR_F32_BINARY (__r, __a, __b,
+		      __builtin_vpair_f32_mul,
+		      "xvmulsp",
+		      __builtin_vec_mul);
+}
+
+static inline void
+vpair_f32_sub (vector_pair_f32_t       *__r,
+	       const vector_pair_f32_t *__a,
+	       const vector_pair_f32_t *__b)
+{
+  __VPAIR_F32_BINARY (__r, __a, __b,
+		      __builtin_vpair_f32_sub,
+		      "xvsubsp",
+		      __builtin_vec_sub);
+}
+
+/* 64-bit fma operations.  */
 
 static inline void
 vpair_f64_fma (vector_pair_f64_t       *__r,
@@ -675,13 +412,10 @@ vpair_f64_fma (vector_pair_f64_t       *__r,
 	       const vector_pair_f64_t *__b,
 	       const vector_pair_f64_t *__c)
 {
-  __r->__vp_f64[0] = __builtin_vsx_xvmadddp (__a->__vp_f64[0],
-					     __b->__vp_f64[0],
-					     __c->__vp_f64[0]);
-
-  __r->__vp_f64[1] = __builtin_vsx_xvmadddp (__a->__vp_f64[1],
-					     __b->__vp_f64[1],
-					     __c->__vp_f64[1]);
+  __VPAIR_F64_FMA (__r, __a, __b, __c,
+		   __builtin_vpair_f64_fma,
+		   "xvmaddadp",
+		   __builtin_vsx_xvmadddp);
 }
 
 static inline void
@@ -690,13 +424,10 @@ vpair_f64_fms (vector_pair_f64_t       *__r,
 	       const vector_pair_f64_t *__b,
 	       const vector_pair_f64_t *__c)
 {
-  __r->__vp_f64[0] = __builtin_vsx_xvmsubdp (__a->__vp_f64[0],
-					     __b->__vp_f64[0],
-					     __c->__vp_f64[0]);
-
-  __r->__vp_f64[1] = __builtin_vsx_xvmsubdp (__a->__vp_f64[1],
-					     __b->__vp_f64[1],
-					     __c->__vp_f64[1]);
+  __VPAIR_F64_FMA (__r, __a, __b, __c,
+		   __builtin_vpair_f64_fms,
+		   "xvmsubadp",
+		   __builtin_vsx_xvmsubdp);
 }
 
 static inline void
@@ -705,13 +436,10 @@ vpair_f64_nfma (vector_pair_f64_t       *__r,
 		const vector_pair_f64_t *__b,
 		const vector_pair_f64_t *__c)
 {
-  __r->__vp_f64[0] = __builtin_vsx_xvnmadddp (__a->__vp_f64[0],
-					     __b->__vp_f64[0],
-					     __c->__vp_f64[0]);
-
-  __r->__vp_f64[1] = __builtin_vsx_xvnmadddp (__a->__vp_f64[1],
-					      __b->__vp_f64[1],
-					      __c->__vp_f64[1]);
+  __VPAIR_F64_FMA (__r, __a, __b, __c,
+		   __builtin_vpair_f64_nfma,
+		   "xvnmaddadp",
+		   __builtin_vsx_xvnmadddp);
 }
 
 static inline void
@@ -720,115 +448,12 @@ vpair_f64_nfms (vector_pair_f64_t       *__r,
 		const vector_pair_f64_t *__b,
 		const vector_pair_f64_t *__c)
 {
-  __r->__vp_f64[0] = __builtin_vsx_xvnmsubdp (__a->__vp_f64[0],
-					      __b->__vp_f64[0],
-					      __c->__vp_f64[0]);
-
-  __r->__vp_f64[1] = __builtin_vsx_xvnmsubdp (__a->__vp_f64[1],
-					      __b->__vp_f64[1],
-					      __c->__vp_f64[1]);
+  __VPAIR_F64_FMA (__r, __a, __b, __c,
+		   __builtin_vpair_f64_nfms,
+		   "xvnmsubadp",
+		   __builtin_vsx_xvnmsubdp);
 }
-
-/* Simulated vector pair float operations on power10/power11.  */
-
-static inline void
-vpair_f32_splat (vector_pair_f32_t *__r,
-		 float              __x)
-{
-  __r->__vp_f32[0] = __r->__vp_f32[1] = __builtin_vec_splats (__x);
-}
-
-static inline void
-vpair_f32_abs (vector_pair_f32_t       *__r,
-	       const vector_pair_f32_t *__a)
-{
-  __r->__vp_f32[0] = __builtin_vsx_xvabssp (__a->__vp_f32[0]);
-  __r->__vp_f32[1] = __builtin_vsx_xvabssp (__a->__vp_f32[1]);
-}
-
-static inline void
-vpair_f32_nabs (vector_pair_f32_t       *__r,
-		const vector_pair_f32_t *__a)
-{
-  __r->__vp_f32[0] = __builtin_vsx_xvnabssp (__a->__vp_f32[0]);
-  __r->__vp_f32[1] = __builtin_vsx_xvnabssp (__a->__vp_f32[1]);
-}
-
-static inline void
-vpair_f32_neg (vector_pair_f32_t       *__r,
-	       const vector_pair_f32_t *__a)
-{
-  __r->__vp_f32[0] = - __a->__vp_f32[0];
-  __r->__vp_f32[1] = - __a->__vp_f32[1];
-}
-
-static inline void
-vpair_f32_sqrt (vector_pair_f32_t       *__r,
-		const vector_pair_f32_t *__a)
-{
-  __r->__vp_f32[0] = __builtin_vsx_xvsqrtsp (__a->__vp_f32[0]);
-  __r->__vp_f32[1] = __builtin_vsx_xvsqrtsp (__a->__vp_f32[1]);
-}
-
-static inline void
-vpair_f32_add (vector_pair_f32_t       *__r,
-	       const vector_pair_f32_t *__a,
-	       const vector_pair_f32_t *__b)
-{
-  __r->__vp_f32[0] = __a->__vp_f32[0] + __b->__vp_f32[0];
-  __r->__vp_f32[1] = __a->__vp_f32[1] + __b->__vp_f32[1];
-}
-
-static inline void
-vpair_f32_div (vector_pair_f32_t       *__r,
-	       const vector_pair_f32_t *__a,
-	       const vector_pair_f32_t *__b)
-{
-  __r->__vp_f32[0] = __a->__vp_f32[0] / __b->__vp_f32[0];
-  __r->__vp_f32[1] = __a->__vp_f32[1] / __b->__vp_f32[1];
-}
-
-static inline void
-vpair_f32_max (vector_pair_f32_t       *__r,
-	       const vector_pair_f32_t *__a,
-	       const vector_pair_f32_t *__b)
-{
-  __r->__vp_f32[0] = __builtin_vsx_xvmaxsp (__a->__vp_f32[0],
-					    __b->__vp_f32[0]);
-
-  __r->__vp_f32[1] = __builtin_vsx_xvmaxsp (__a->__vp_f32[1],
-					    __b->__vp_f32[1]);
-}
-
-static inline void
-vpair_f32_min (vector_pair_f32_t       *__r,
-	       const vector_pair_f32_t *__a,
-	       const vector_pair_f32_t *__b)
-{
-  __r->__vp_f32[0] = __builtin_vsx_xvminsp (__a->__vp_f32[0],
-					    __b->__vp_f32[0]);
-
-  __r->__vp_f32[1] = __builtin_vsx_xvminsp (__a->__vp_f32[1],
-					    __b->__vp_f32[1]);
-}
-
-static inline void
-vpair_f32_mul (vector_pair_f32_t       *__r,
-	       const vector_pair_f32_t *__a,
-	       const vector_pair_f32_t *__b)
-{
-  __r->__vp_f32[0] = __a->__vp_f32[0] * __b->__vp_f32[0];
-  __r->__vp_f32[1] = __a->__vp_f32[1] * __b->__vp_f32[1];
-}
-
-static inline void
-vpair_f32_sub (vector_pair_f32_t       *__r,
-	       const vector_pair_f32_t *__a,
-	       const vector_pair_f32_t *__b)
-{
-  __r->__vp_f32[0] = __a->__vp_f32[0] - __b->__vp_f32[0];
-  __r->__vp_f32[1] = __a->__vp_f32[1] - __b->__vp_f32[1];
-}
+/* 32-bit fma operations.  */
 
 static inline void
 vpair_f32_fma (vector_pair_f32_t       *__r,
@@ -836,13 +461,10 @@ vpair_f32_fma (vector_pair_f32_t       *__r,
 	       const vector_pair_f32_t *__b,
 	       const vector_pair_f32_t *__c)
 {
-  __r->__vp_f32[0] = __builtin_vsx_xvmaddsp (__a->__vp_f32[0],
-					     __b->__vp_f32[0],
-					     __c->__vp_f32[0]);
-
-  __r->__vp_f32[1] = __builtin_vsx_xvmaddsp (__a->__vp_f32[1],
-					     __b->__vp_f32[1],
-					     __c->__vp_f32[1]);
+  __VPAIR_F32_FMA (__r, __a, __b, __c,
+		   __builtin_vpair_f32_fma,
+		   "xvmaddasp",
+		   __builtin_vsx_xvmaddsp);
 }
 
 static inline void
@@ -851,13 +473,10 @@ vpair_f32_fms (vector_pair_f32_t       *__r,
 	       const vector_pair_f32_t *__b,
 	       const vector_pair_f32_t *__c)
 {
-  __r->__vp_f32[0] = __builtin_vsx_xvmsubsp (__a->__vp_f32[0],
-					     __b->__vp_f32[0],
-					     __c->__vp_f32[0]);
-
-  __r->__vp_f32[1] = __builtin_vsx_xvmsubsp (__a->__vp_f32[1],
-					     __b->__vp_f32[1],
-					     __c->__vp_f32[1]);
+  __VPAIR_F32_FMA (__r, __a, __b, __c,
+		   __builtin_vpair_f32_fms,
+		   "xvmsubasp",
+		   __builtin_vsx_xvmsubsp);
 }
 
 static inline void
@@ -866,13 +485,10 @@ vpair_f32_nfma (vector_pair_f32_t       *__r,
 		const vector_pair_f32_t *__b,
 		const vector_pair_f32_t *__c)
 {
-  __r->__vp_f32[0] = __builtin_vsx_xvnmaddsp (__a->__vp_f32[0],
-					     __b->__vp_f32[0],
-					     __c->__vp_f32[0]);
-
-  __r->__vp_f32[1] = __builtin_vsx_xvnmaddsp (__a->__vp_f32[1],
-					      __b->__vp_f32[1],
-					      __c->__vp_f32[1]);
+  __VPAIR_F32_FMA (__r, __a, __b, __c,
+		   __builtin_vpair_f32_nfma,
+		   "xvnmaddasp",
+		   __builtin_vsx_xvnmaddsp);
 }
 
 static inline void
@@ -881,13 +497,9 @@ vpair_f32_nfms (vector_pair_f32_t       *__r,
 		const vector_pair_f32_t *__b,
 		const vector_pair_f32_t *__c)
 {
-  __r->__vp_f32[0] = __builtin_vsx_xvnmsubsp (__a->__vp_f32[0],
-					      __b->__vp_f32[0],
-					      __c->__vp_f32[0]);
-
-  __r->__vp_f32[1] = __builtin_vsx_xvnmsubsp (__a->__vp_f32[1],
-					      __b->__vp_f32[1],
-					      __c->__vp_f32[1]);
+  __VPAIR_F32_FMA (__r, __a, __b, __c,
+		   __builtin_vpair_f32_nfms,
+		   "xvnmsubasp",
+		   __builtin_vsx_xvnmsubsp);
 }
-#endif	/* Vector pair support for power8/power9 systems.  */
 #endif	/* _VECTOR_PAIR_H.  */
