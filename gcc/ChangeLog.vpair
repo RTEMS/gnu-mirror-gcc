@@ -1,3 +1,18 @@
+==================== Branch work179-vpair, patch #309 ====================
+
+Rewrite vector-pair.h to use macros.
+
+2024-10-01  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Define
+	__VPAIR__ if MMA is available.
+	* config/rs6000/vector-pair.h: Rewrite to only have one function
+	definition, and to use macros to to switch between the 3
+	implementations.  Delete vector_pair_t.
+
+==================== Branch work179-vpair, patch #308 was reverted ====================
+
+
 ==================== Branch work179-vpair, patch #307 ====================
 
 Remove re-inclusion support; Fix various typos; Spacing.
