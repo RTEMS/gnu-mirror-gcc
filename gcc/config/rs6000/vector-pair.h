@@ -88,10 +88,51 @@ typedef union __vpair_union	vector_pair_f32_t;
 /* Operations using a vector pair and __asm__operations.  */
 #elif __MMA__ && !__VPAIR_NOP10__
 
+/* When using __asm__, we need to access the second register.  Due to the way
+   VSX registers were formed by combining the traditional floating point
+   registers and Altivec registers, we can't use the output modifier %L<n> to
+   refer to the second register if the VSX register was a traditional Altivec
+   register.  If the value is in VSX registers 34 & 35, %x0 would give 34, but
+   %L0 would give 1, since 'Altivec' registers start at 0.
+
+   If we are using GAS under Linux, we can use %x0+1 to access the second
+   register and use the full VSX register set.
+
+   If this include file is used on non-Linux systems, or with a non-GCC
+   compiler, limit the registers used to the traditional FPR registers so that
+   we can use %L0.  */
+
+#if __VPAIR__USE_FPR__ || !__GNUC__ || (!__linux__ && !__ELF__)
+
+/* Use %0 and %L0 on traditional FPR registers.  */
+#define __VPAIR_SPLAT(R, X, VP_FUNC, VEC)				\
+  __asm__ ("xxlor %L0,%0,%0"						\
+           : "=d" ((R)->__vpair)					\
+           : "0" (__builtin_vec_splats ((X))))
+
+#define __VPAIR_UNARY(R, A, VP_FUNC, OPCODE, VEC, VEC_FUNC)		\
+  __asm__ (OPCODE " %0,%1\n\t" OPCODE " %L0,%L1"			\
+           : "=d" ((R)->__vpair)					\
+           : "d" ((A)->__vpair))
+
+#define __VPAIR_BINARY(R, A, B, VP_FUNC, OPCODE, VEC, VEC_FUNC)		\
+  __asm__ (OPCODE " %0,%1\n\t" OPCODE " %L0,%L1"			\
+           : "=d" ((R)->__vpair)					\
+           : "d" ((A)->__vpair), "d" ((B)->__vpair))
+
+/* Note the 'a' form of the fma instructions must be used.  */
+#define __VPAIR_FMA(R, A, B, C, VP_FUNC, OPCODE, VEC, VEC_FUNC)		\
+  __asm__ (OPCODE " %0,%1,%2\n\t" OPCODE " %L0,%L1,%L2"			\
+           : "=d" ((R)->__vpair)					\
+           : "d" ((A)->__vpair), "d" ((B)->__vpair), "0" ((C)->__vpair))
+
+#else
+
+/* Use %x0 and %x0+1 on VSX reigsters.  */
 #define __VPAIR_SPLAT(R, X, VP_FUNC, VEC)				\
   __asm__ ("xxlor %x0+1,%x0,%x0"					\
-	   : "=wa" ((R)->__vpair)					\
-	   : "0" (__builtin_vec_splats ((X))))
+           : "=wa" ((R)->__vpair)					\
+           : "0" (__builtin_vec_splats ((X))))
 
 #define __VPAIR_UNARY(R, A, VP_FUNC, OPCODE, VEC, VEC_FUNC)		\
   __asm__ (OPCODE " %x0,%x1\n\t" OPCODE " %x0+1,%x1+1"			\
@@ -101,13 +142,14 @@ typedef union __vpair_union	vector_pair_f32_t;
 #define __VPAIR_BINARY(R, A, B, VP_FUNC, OPCODE, VEC, VEC_FUNC)		\
   __asm__ (OPCODE " %x0,%x1\n\t" OPCODE " %x0+1,%x1+1"			\
            : "=wa" ((R)->__vpair)					\
-	   : "wa" ((A)->__vpair), "wa" ((B)->__vpair))
+           : "wa" ((A)->__vpair), "wa" ((B)->__vpair))
 
 /* Note the 'a' form of the fma instructions must be used.  */
 #define __VPAIR_FMA(R, A, B, C, VP_FUNC, OPCODE, VEC, VEC_FUNC)		\
   __asm__ (OPCODE " %x0,%x1,%x2\n\t" OPCODE " %x0+1,%x1+1,%x2+1"	\
            : "=wa" ((R)->__vpair)					\
-	   : "wa" ((A)->__vpair), "wa" ((B)->__vpair), "0" ((C)->__vpair))
+           : "wa" ((A)->__vpair), "wa" ((B)->__vpair), "0" ((C)->__vpair))
+#endif	/* Select whether to use %0/%L0 or %x0/%x0+1.  */
 
 #else	/* vpair support on power8/power9.  */
 
