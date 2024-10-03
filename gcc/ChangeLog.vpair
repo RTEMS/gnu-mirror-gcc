@@ -1,3 +1,29 @@
+==================== Branch work179-vpair, patch #311 ====================
+
+Add vector-pair.h runtime tests.
+
+2024-10-03  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite
+
+	* gcc.target/powerpc/vpair-3-not-p10.c: New test.
+	* gcc.target/powerpc/vpair-3-p10.c: Likewise.
+	* gcc.target/powerpc/vpair-3.h: New test include.
+	* gcc.target/powerpc/vpair-4-not-p10.c: New test.
+	* gcc.target/powerpc/vpair-4-p10.c: Likewise.
+	* gcc.target/powerpc/vpair-4.h: New test include.
+
+==================== Branch work179-vpair, patch #310 ====================
+
+Add vector-pair.h tests.
+
+2024-10-02  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite
+
+	* gcc.target/powerpc/vpair-1.c: New test.
+	* gcc.target/powerpc/vpair-2.c: Likewise.
+
 ==================== Branch work179-vpair, patch #309 ====================
 
 Rewrite vector-pair.h to use macros.
