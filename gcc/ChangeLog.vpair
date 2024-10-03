@@ -1,5 +1,17 @@
 ==================== Branch work179-vpair, patch #311 ====================
 
+Add support for restricting asm to fpr registers.
+
+2024-10-03  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/vector-pair.h (__VPAIR_SPLAT): Add support for
+	restricting asm usage to traditional FPR registers.
+	(__VPAIR_UNARY): Likewise.
+	(__VPAIR_BINARY): Likewise.
+	(__VPAIR_RMA): Likewise.
+
+==================== Branch work179-vpair, patch #311 ====================
+
 Add vector-pair.h runtime tests.
 
 2024-10-03  Michael Meissner  <meissner@linux.ibm.com>
