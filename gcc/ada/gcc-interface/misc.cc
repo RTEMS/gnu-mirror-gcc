@@ -28,6 +28,8 @@
 #include "coretypes.h"
 #include "target.h"
 #include "tree.h"
+#include "memmodel.h"
+#include "tm_p.h"
 #include "diagnostic.h"
 #include "opts.h"
 #include "alias.h"
@@ -305,14 +307,14 @@ internal_error_function (diagnostic_context *context, const char *msgid,
   emergency_dump_function ();
 
   /* Reset the pretty-printer.  */
-  pp_clear_output_area (context->printer);
+  pp_clear_output_area (context->m_printer);
 
   /* Format the message into the pretty-printer.  */
   text_info tinfo (msgid, ap, errno);
-  pp_format_verbatim (context->printer, &tinfo);
+  pp_format_verbatim (context->m_printer, &tinfo);
 
   /* Extract a (writable) pointer to the formatted text.  */
-  buffer = xstrdup (pp_formatted_text (context->printer));
+  buffer = xstrdup (pp_formatted_text (context->m_printer));
 
   /* Go up to the first newline.  */
   for (p = buffer; *p; p++)
@@ -1127,6 +1129,26 @@ must_pass_by_ref (tree gnu_type)
 	  || TYPE_IS_BY_REFERENCE_P (gnu_type)
 	  || (TYPE_SIZE_UNIT (gnu_type)
 	      && TREE_CODE (TYPE_SIZE_UNIT (gnu_type)) != INTEGER_CST));
+}
+
+/* Return the default alignment of a FIELD of TYPE declared in a record or
+   union type as specified by the ABI of the target architecture.  */
+
+unsigned int
+default_field_alignment (tree ARG_UNUSED (field), tree type)
+{
+  /* This is modeled on layout_decl.  */
+  unsigned int align = TYPE_ALIGN (type);
+
+#ifdef BIGGEST_FIELD_ALIGNMENT
+  align = MIN (align, (unsigned int) BIGGEST_FIELD_ALIGNMENT);
+#endif
+
+#ifdef ADJUST_FIELD_ALIGN
+  align = ADJUST_FIELD_ALIGN (field, type, align);
+#endif
+
+  return align;
 }
 
 /* This function is called by the front-end to enumerate all the supported

@@ -3287,7 +3287,7 @@ package body Freeze is
                     ("aspect % applied to task type &", Typ);
                   Error_Msg_N
                     ("\replace task components with access-to-task-type "
-                     & "components??", Typ);
+                     & "components", Typ);
                end if;
 
             else
@@ -7617,16 +7617,16 @@ package body Freeze is
 
                if Ada_Version >= Ada_2005 then
                   Error_Msg_N
-                    ("\would be legal if Storage_Size of 0 given??", E);
+                    ("\would be legal if Storage_Size of 0 given", E);
 
                elsif No_Pool_Assigned (E) then
                   Error_Msg_N
-                    ("\would be legal in Ada 2005??", E);
+                    ("\would be legal in Ada 2005", E);
 
                else
                   Error_Msg_N
                     ("\would be legal in Ada 2005 if "
-                     & "Storage_Size of 0 given??", E);
+                     & "Storage_Size of 0 given", E);
                end if;
             end if;
          end if;
@@ -11100,7 +11100,7 @@ package body Freeze is
                   then
                      Error_Msg_NE
                        ("\packed array component& " &
-                        "will be initialized to zero??",
+                        "will be initialized to zero?o?",
                         Nam, Comp);
                      exit;
                   else
@@ -11112,7 +11112,7 @@ package body Freeze is
 
          Error_Msg_N
            ("\use pragma Import for & to " &
-            "suppress initialization (RM B.1(24))??",
+            "suppress initialization (RM B.1(24))?o?",
             Nam);
       end if;
    end Warn_Overlay;

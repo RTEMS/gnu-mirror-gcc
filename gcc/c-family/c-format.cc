@@ -5578,14 +5578,14 @@ test_type_mismatch_range_labels ()
   richloc.add_range (param, SHOW_RANGE_WITHOUT_CARET, &param_label);
 
   test_diagnostic_context dc;
-  diagnostic_show_locus (&dc, &richloc, DK_ERROR);
+  diagnostic_show_locus (&dc, &richloc, DK_ERROR, dc.m_printer);
   if (c_dialect_cxx ())
     /* "char*", without a space.  */
     ASSERT_STREQ ("   printf (\"msg: %i\\n\", msg);\n"
 		  "                 ~^     ~~~\n"
 		  "                  |     |\n"
 		  "                  char* int\n",
-		  pp_formatted_text (dc.printer));
+		  pp_formatted_text (dc.m_printer));
   else
     /* "char *", with a space.  */
     ASSERT_STREQ ("   printf (\"msg: %i\\n\", msg);\n"
@@ -5593,7 +5593,7 @@ test_type_mismatch_range_labels ()
 		  "                  |     |\n"
 		  "                  |     int\n"
 		  "                  char *\n",
-		  pp_formatted_text (dc.printer));
+		  pp_formatted_text (dc.m_printer));
 }
 
 /* Run all of the selftests within this file.  */

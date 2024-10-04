@@ -22,6 +22,7 @@
 #define IN_TARGET_CODE 1
 
 #include "config.h"
+#define INCLUDE_MEMORY
 #include "system.h"
 #include "coretypes.h"
 #include "backend.h"
@@ -17329,9 +17330,9 @@ static char *
 rs6000_offload_options (void)
 {
   if (TARGET_64BIT)
-    return xstrdup ("-foffload-abi=lp64");
+    return xstrdup ("-foffload-abi=lp64 -foffload-abi-host-opts=-m64");
   else
-    return xstrdup ("-foffload-abi=ilp32");
+    return xstrdup ("-foffload-abi=ilp32 -foffload-abi-host-opts=-m32");
 }
 
 

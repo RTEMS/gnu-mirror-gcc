@@ -317,7 +317,8 @@ expand_widen_pattern_expr (const_sepops ops, rtx op0, rtx op1, rtx wide_op,
     widen_pattern_optab
       = optab_for_tree_code (ops->code, TREE_TYPE (oprnd0), optab_default);
   if (ops->code == WIDEN_MULT_PLUS_EXPR
-      || ops->code == WIDEN_MULT_MINUS_EXPR)
+      || ops->code == WIDEN_MULT_MINUS_EXPR
+      || ops->code == DOT_PROD_EXPR)
     icode = find_widening_optab_handler (widen_pattern_optab,
 					 TYPE_MODE (TREE_TYPE (ops->op2)),
 					 tmode0);
@@ -2551,8 +2552,10 @@ expand_twoval_binop_libfunc (optab binoptab, rtx op0, rtx op1,
 
   /* The value returned by the library function will have twice as
      many bits as the nominal MODE.  */
-  libval_mode
-    = smallest_int_mode_for_size (2 * GET_MODE_BITSIZE (mode)).require ();
+  auto return_size = 2 * GET_MODE_BITSIZE (mode);
+  if (!smallest_int_mode_for_size (return_size).exists (&libval_mode))
+    return false;
+
   start_sequence ();
   libval = emit_library_call_value (libfunc, NULL_RTX, LCT_CONST,
 				    libval_mode,

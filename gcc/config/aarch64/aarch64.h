@@ -96,6 +96,8 @@
 
 #define LONG_LONG_TYPE_SIZE	64
 
+#define WIDEST_HARDWARE_FP_SIZE	64
+
 /* This value is the amount of bytes a caller is allowed to drop the stack
    before probing has to be done for stack clash protection.  */
 #define STACK_CLASH_CALLER_GUARD 1024
@@ -155,6 +157,16 @@
 #define PTRDIFF_TYPE	"long int"
 
 #define PCC_BITFIELD_TYPE_MATTERS	1
+
+/* Use the same RTL truth representation for vector elements as we do
+   for scalars.  This maintains the property that a comparison like
+   eq:V4SI is a composition of 4 individual eq:SIs, just like plus:V4SI
+   is a composition of 4 individual plus:SIs.
+
+   This means that Advanced SIMD comparisons are represented in RTL as
+   (neg (op ...)).  */
+
+#define VECTOR_STORE_FLAG_VALUE(MODE) CONST1_RTX (GET_MODE_INNER (MODE))
 
 #ifndef USED_FOR_TARGET
 
@@ -456,6 +468,10 @@ constexpr auto AARCH64_FL_DEFAULT_ISA_MODE ATTRIBUTE_UNUSED
 /*  Armv9.4-A Guarded Control Stack extension system registers are
     enabled through +gcs.  */
 #define TARGET_GCS AARCH64_HAVE_ISA (GCS)
+
+/* Floating Point Absolute Maximum/Minimum extension instructions are
+   enabled through +faminmax.  */
+#define TARGET_FAMINMAX AARCH64_HAVE_ISA (FAMINMAX)
 
 /* Prefer different predicate registers for the output of a predicated
    operation over re-using an existing input predicate.  */
@@ -1446,6 +1462,11 @@ extern const char *aarch64_rewrite_mcpu (int argc, const char **argv);
   { "asm_cpu_spec",		ASM_CPU_SPEC }
 
 #define ASM_OUTPUT_POOL_EPILOGUE  aarch64_asm_output_pool_epilogue
+
+/* This type is the user-visible __mfp8, and a pointer to that type.  We
+   need it in many places in the backend.  Defined in aarch64-builtins.cc.  */
+extern GTY(()) tree aarch64_mfp8_type_node;
+extern GTY(()) tree aarch64_mfp8_ptr_type_node;
 
 /* This type is the user-visible __fp16, and a pointer to that type.  We
    need it in many places in the backend.  Defined in aarch64-builtins.cc.  */

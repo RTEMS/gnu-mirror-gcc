@@ -169,6 +169,34 @@ vec_sat_u_add_imm##IMM##_##T##_fmt_2 (T *out, T *in, unsigned limit) \
 #define DEF_VEC_SAT_U_ADD_IMM_FMT_2_WRAP(T, IMM) \
   DEF_VEC_SAT_U_ADD_IMM_FMT_2(T, IMM)
 
+#define DEF_VEC_SAT_U_ADD_IMM_FMT_3(T, IMM)                          \
+T __attribute__((noinline))                                          \
+vec_sat_u_add_imm##IMM##_##T##_fmt_3 (T *out, T *in, unsigned limit) \
+{                                                                    \
+  unsigned i;                                                        \
+  T ret;                                                             \
+  for (i = 0; i < limit; i++)                                        \
+    {                                                                \
+      out[i] = __builtin_add_overflow (in[i], IMM, &ret) ? -1 : ret; \
+    }                                                                \
+}
+#define DEF_VEC_SAT_U_ADD_IMM_FMT_3_WRAP(T, IMM) \
+  DEF_VEC_SAT_U_ADD_IMM_FMT_3(T, IMM)
+
+#define DEF_VEC_SAT_U_ADD_IMM_FMT_4(T, IMM)                               \
+T __attribute__((noinline))                                               \
+vec_sat_u_add_imm##IMM##_##T##_fmt_4 (T *out, T *in, unsigned limit)      \
+{                                                                         \
+  unsigned i;                                                             \
+  T ret;                                                                  \
+  for (i = 0; i < limit; i++)                                             \
+    {                                                                     \
+      out[i] = __builtin_add_overflow (in[i], IMM, &ret) == 0 ? ret : -1; \
+    }                                                                     \
+}
+#define DEF_VEC_SAT_U_ADD_IMM_FMT_4_WRAP(T, IMM) \
+  DEF_VEC_SAT_U_ADD_IMM_FMT_4(T, IMM)
+
 #define RUN_VEC_SAT_U_ADD_IMM_FMT_1(T, out, op_1, expect, IMM, N) \
   vec_sat_u_add_imm##IMM##_##T##_fmt_1(out, op_1, N);             \
   VALIDATE_RESULT (out, expect, N)
@@ -180,6 +208,89 @@ vec_sat_u_add_imm##IMM##_##T##_fmt_2 (T *out, T *in, unsigned limit) \
   VALIDATE_RESULT (out, expect, N)
 #define RUN_VEC_SAT_U_ADD_IMM_FMT_2_WRAP(T, out, op_1, expect, IMM, N) \
   RUN_VEC_SAT_U_ADD_IMM_FMT_2(T, out, op_1, expect, IMM, N)
+
+#define RUN_VEC_SAT_U_ADD_IMM_FMT_3(T, out, op_1, expect, IMM, N) \
+  vec_sat_u_add_imm##IMM##_##T##_fmt_3(out, op_1, N);             \
+  VALIDATE_RESULT (out, expect, N)
+#define RUN_VEC_SAT_U_ADD_IMM_FMT_3_WRAP(T, out, op_1, expect, IMM, N) \
+  RUN_VEC_SAT_U_ADD_IMM_FMT_3(T, out, op_1, expect, IMM, N)
+
+#define RUN_VEC_SAT_U_ADD_IMM_FMT_4(T, out, op_1, expect, IMM, N) \
+  vec_sat_u_add_imm##IMM##_##T##_fmt_4(out, op_1, N);             \
+  VALIDATE_RESULT (out, expect, N)
+#define RUN_VEC_SAT_U_ADD_IMM_FMT_4_WRAP(T, out, op_1, expect, IMM, N) \
+  RUN_VEC_SAT_U_ADD_IMM_FMT_4(T, out, op_1, expect, IMM, N)
+
+#define DEF_VEC_SAT_S_ADD_FMT_1(T, UT, MIN, MAX)                     \
+void __attribute__((noinline))                                       \
+vec_sat_s_add_##T##_fmt_1 (T *out, T *op_1, T *op_2, unsigned limit) \
+{                                                                    \
+  unsigned i;                                                        \
+  for (i = 0; i < limit; i++)                                        \
+    {                                                                \
+      T x = op_1[i];                                                 \
+      T y = op_2[i];                                                 \
+      T sum = (UT)x + (UT)y;                                         \
+      out[i] = (x ^ y) < 0                                           \
+        ? sum                                                        \
+        : (sum ^ x) >= 0                                             \
+          ? sum                                                      \
+          : x < 0 ? MIN : MAX;                                       \
+    }                                                                \
+}
+#define DEF_VEC_SAT_S_ADD_FMT_1_WRAP(T, UT, MIN, MAX) \
+  DEF_VEC_SAT_S_ADD_FMT_1(T, UT, MIN, MAX)
+
+#define DEF_VEC_SAT_S_ADD_FMT_2(T, UT, MIN, MAX)                     \
+void __attribute__((noinline))                                       \
+vec_sat_s_add_##T##_fmt_2 (T *out, T *op_1, T *op_2, unsigned limit) \
+{                                                                    \
+  unsigned i;                                                        \
+  for (i = 0; i < limit; i++)                                        \
+    {                                                                \
+      T x = op_1[i];                                                 \
+      T y = op_2[i];                                                 \
+      T sum = (UT)x + (UT)y;                                         \
+      if ((x ^ y) < 0 || (sum ^ x) >= 0)                             \
+        out[i] = sum;                                                \
+      else                                                           \
+        out[i] = x < 0 ? MIN : MAX;                                  \
+    }                                                                \
+}
+#define DEF_VEC_SAT_S_ADD_FMT_2_WRAP(T, UT, MIN, MAX) \
+  DEF_VEC_SAT_S_ADD_FMT_2(T, UT, MIN, MAX)
+
+#define DEF_VEC_SAT_S_ADD_FMT_3(T, UT, MIN, MAX)                     \
+void __attribute__((noinline))                                       \
+vec_sat_s_add_##T##_fmt_3 (T *out, T *op_1, T *op_2, unsigned limit) \
+{                                                                    \
+  unsigned i;                                                        \
+  for (i = 0; i < limit; i++)                                        \
+    {                                                                \
+      T x = op_1[i];                                                 \
+      T y = op_2[i];                                                 \
+      T sum;                                                         \
+      bool overflow = __builtin_add_overflow (x, y, &sum);           \
+      out[i] = overflow ? x < 0 ? MIN : MAX : sum;                   \
+    }                                                                \
+}
+#define DEF_VEC_SAT_S_ADD_FMT_3_WRAP(T, UT, MIN, MAX) \
+  DEF_VEC_SAT_S_ADD_FMT_3(T, UT, MIN, MAX)
+
+#define RUN_VEC_SAT_S_ADD_FMT_1(T, out, op_1, op_2, N) \
+  vec_sat_s_add_##T##_fmt_1(out, op_1, op_2, N)
+#define RUN_VEC_SAT_S_ADD_FMT_1_WRAP(T, out, op_1, op_2, N) \
+  RUN_VEC_SAT_S_ADD_FMT_1(T, out, op_1, op_2, N)
+
+#define RUN_VEC_SAT_S_ADD_FMT_2(T, out, op_1, op_2, N) \
+  vec_sat_s_add_##T##_fmt_2(out, op_1, op_2, N)
+#define RUN_VEC_SAT_S_ADD_FMT_2_WRAP(T, out, op_1, op_2, N) \
+  RUN_VEC_SAT_S_ADD_FMT_2(T, out, op_1, op_2, N)
+
+#define RUN_VEC_SAT_S_ADD_FMT_3(T, out, op_1, op_2, N) \
+  vec_sat_s_add_##T##_fmt_3(out, op_1, op_2, N)
+#define RUN_VEC_SAT_S_ADD_FMT_3_WRAP(T, out, op_1, op_2, N) \
+  RUN_VEC_SAT_S_ADD_FMT_3(T, out, op_1, op_2, N)
 
 /******************************************************************************/
 /* Saturation Sub (Unsigned and Signed)                                       */

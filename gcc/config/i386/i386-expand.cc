@@ -2916,6 +2916,11 @@ ix86_expand_fp_compare (enum rtx_code code, rtx op0, rtx op1)
   switch (ix86_fp_comparison_strategy (code))
     {
     case IX86_FPCMP_COMI:
+      tmp = gen_rtx_COMPARE (CCFPmode, op0, op1);
+      if (TARGET_AVX10_2_256 && (code == EQ || code == NE))
+	tmp = gen_rtx_UNSPEC (CCFPmode, gen_rtvec (1, tmp), UNSPEC_OPTCOMX);
+      if (unordered_compare)
+	tmp = gen_rtx_UNSPEC (CCFPmode, gen_rtvec (1, tmp), UNSPEC_NOTRAP);
       cmp_mode = CCFPmode;
       emit_insn (gen_rtx_SET (gen_rtx_REG (CCFPmode, FLAGS_REG), tmp));
       break;
@@ -4030,6 +4035,8 @@ ix86_use_mask_cmp_p (machine_mode mode, machine_mode cmp_mode,
   else if (vector_size == 64)
     return true;
   else if (GET_MODE_INNER (cmp_mode) == HFmode)
+    return true;
+  else if (GET_MODE_INNER (cmp_mode) == BFmode)
     return true;
 
   /* When op_true is NULL, op_false must be NULL, or vice versa.  */
@@ -12741,7 +12748,7 @@ ix86_expand_round_builtin (const struct builtin_description *d,
 	      /* Skip erasing embedded rounding for below expanders who
 		 generates multiple insns.  In ix86_erase_embedded_rounding
 		 the pattern will be transformed to a single set, and emit_insn
-		 appends the set insead of insert it to chain.  So the insns
+		 appends the set instead of insert it to chain.  So the insns
 		 emitted inside define_expander would be ignored.  */
 	      switch (icode)
 		{

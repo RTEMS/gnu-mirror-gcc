@@ -1487,6 +1487,10 @@ Enum(diagnostics_output_format) String(sarif-stderr) Value(DIAGNOSTICS_OUTPUT_FO
 EnumValue
 Enum(diagnostics_output_format) String(sarif-file) Value(DIAGNOSTICS_OUTPUT_FORMAT_SARIF_FILE)
 
+EnumValue
+Enum(diagnostics_output_format) String(sarif-file-2.2-prerelease) Value(DIAGNOSTICS_OUTPUT_FORMAT_SARIF_FILE_2_2_PRERELEASE)
+; undocumented
+
 fdiagnostics-parseable-fixits
 Common Var(flag_diagnostics_parseable_fixits)
 Print fix-it hints in machine-readable form.
@@ -2360,6 +2364,10 @@ Enum(offload_abi) String(ilp32) Value(OFFLOAD_ABI_ILP32)
 
 EnumValue
 Enum(offload_abi) String(lp64) Value(OFFLOAD_ABI_LP64)
+
+foffload-abi-host-opts=
+Common Joined MissingArgError(option missing after %qs)
+-foffload-abi-host-opts=<options>	Specify host ABI options.
 
 fomit-frame-pointer
 Common Var(flag_omit_frame_pointer) Optimization

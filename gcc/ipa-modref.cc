@@ -1997,7 +1997,7 @@ struct escape_point
   /* Value escapes to this call.  */
   gcall *call;
   /* Argument it escapes to.  */
-  int arg;
+  unsigned int arg;
   /* Flags already known about the argument (this can save us from recording
      escape points if local analysis did good job already).  */
   eaf_flags_t min_flags;
@@ -2047,7 +2047,8 @@ public:
   bool merge_deref (const modref_lattice &with, bool ignore_stores);
   bool merge_direct_load ();
   bool merge_direct_store ();
-  bool add_escape_point (gcall *call, int arg, int min_flags, bool diret);
+  bool add_escape_point (gcall *call, unsigned int arg,
+			 eaf_flags_t min_flags, bool direct);
   void dump (FILE *out, int indent = 0) const;
 };
 
@@ -2101,8 +2102,8 @@ modref_lattice::dump (FILE *out, int indent) const
    point exists.  */
 
 bool
-modref_lattice::add_escape_point (gcall *call, int arg, int min_flags,
-				  bool direct)
+modref_lattice::add_escape_point (gcall *call, unsigned arg,
+				  eaf_flags_t min_flags, bool direct)
 {
   escape_point *ep;
   unsigned int i;
@@ -2610,8 +2611,9 @@ modref_eaf_analysis::analyze_ssa_name (tree name, bool deferred)
 		 is used arbitrarily.  */
 	      if (memory_access_to (gimple_assign_rhs1 (assign), name))
 		m_lattice[index].merge (deref_flags (0, false));
+
 	      /* Handle *name = *exp.  */
-	      else if (memory_access_to (gimple_assign_lhs (assign), name))
+	      if (memory_access_to (gimple_assign_lhs (assign), name))
 		m_lattice[index].merge_direct_store ();
 	    }
 	  /* Handle lhs = *name.  */
@@ -2975,7 +2977,7 @@ analyze_parms (modref_summary *summary, modref_summary_lto *summary_lto,
 		summary->arg_flags.safe_grow_cleared (count, true);
 	      summary->arg_flags[parm_index] = EAF_UNUSED;
 	    }
-	  else if (summary_lto)
+	  if (summary_lto)
 	    {
 	      if (parm_index >= summary_lto->arg_flags.length ())
 		summary_lto->arg_flags.safe_grow_cleared (count, true);
@@ -3034,7 +3036,7 @@ analyze_parms (modref_summary *summary, modref_summary_lto *summary_lto,
 		summary->arg_flags.safe_grow_cleared (count, true);
 	      summary->arg_flags[parm_index] = flags;
 	    }
-	  else if (summary_lto)
+	  if (summary_lto)
 	    {
 	      if (parm_index >= summary_lto->arg_flags.length ())
 		summary_lto->arg_flags.safe_grow_cleared (count, true);
@@ -4414,12 +4416,12 @@ update_escape_summary_1 (cgraph_edge *e,
 	continue;
       FOR_EACH_VEC_ELT (map[ee->parm_index], j, em)
 	{
-	  int min_flags = ee->min_flags;
+	  eaf_flags_t min_flags = ee->min_flags;
 	  if (ee->direct && !em->direct)
 	    min_flags = deref_flags (min_flags, ignore_stores);
 	  struct escape_entry entry = {em->parm_index, ee->arg,
 				       min_flags,
-				       ee->direct & em->direct};
+				       ee->direct && em->direct};
 	  sum->esc.safe_push (entry);
 	}
     }

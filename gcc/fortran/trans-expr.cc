@@ -2044,7 +2044,6 @@ void
 gfc_advance_se_ss_chain (gfc_se * se)
 {
   gfc_se *p;
-  gfc_ss *ss;
 
   gcc_assert (se != NULL && se->ss != NULL && se->ss != gfc_ss_terminator);
 
@@ -2056,15 +2055,7 @@ gfc_advance_se_ss_chain (gfc_se * se)
       gcc_assert (p->parent == NULL || p->parent->ss == p->ss
 		  || p->parent->ss->nested_ss == p->ss);
 
-      /* If we were in a nested loop, the next scalarized expression can be
-	 on the parent ss' next pointer.  Thus we should not take the next
-	 pointer blindly, but rather go up one nest level as long as next
-	 is the end of chain.  */
-      ss = p->ss;
-      while (ss->next == gfc_ss_terminator && ss->parent != NULL)
-	ss = ss->parent;
-
-      p->ss = ss->next;
+      p->ss = p->ss->next;
 
       p = p->parent;
     }
@@ -3982,9 +3973,9 @@ gfc_conv_expr_op (gfc_se * se, gfc_expr * expr)
 
     case INTRINSIC_DIVIDE:
       /* If expr is a real or complex expr, use an RDIV_EXPR. If op1 is
-         an integer, we must round towards zero, so we use a
+	 an integer or unsigned, we must round towards zero, so we use a
          TRUNC_DIV_EXPR.  */
-      if (expr->ts.type == BT_INTEGER)
+      if (expr->ts.type == BT_INTEGER || expr->ts.type == BT_UNSIGNED)
 	code = TRUNC_DIV_EXPR;
       else
 	code = RDIV_EXPR;
@@ -5835,6 +5826,10 @@ gfc_conv_gfc_desc_to_cfi_desc (gfc_se *parmse, gfc_expr *e, gfc_symbol *fsym)
 	    }
 	  else
 	    gcc_unreachable ();
+
+	case BT_UNSIGNED:
+	  gfc_internal_error ("Unsigned not yet implemented");
+
 	case BT_PROCEDURE:
 	case BT_HOLLERITH:
 	case BT_UNION:
@@ -6443,11 +6438,15 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
     {
       bool finalized = false;
       tree derived_array = NULL_TREE;
+      symbol_attribute *attr;
 
       e = arg->expr;
       fsym = formal ? formal->sym : NULL;
       parm_kind = MISSING;
 
+      attr = fsym ? &(fsym->ts.type == BT_CLASS ? CLASS_DATA (fsym)->attr
+						: fsym->attr)
+		  : nullptr;
       /* If the procedure requires an explicit interface, the actual
 	 argument is passed according to the corresponding formal
 	 argument.  If the corresponding formal argument is a POINTER,
@@ -6463,7 +6462,9 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
       if (comp)
 	nodesc_arg = nodesc_arg || !comp->attr.always_explicit;
       else
-	nodesc_arg = nodesc_arg || !sym->attr.always_explicit;
+	nodesc_arg
+	  = nodesc_arg
+	    || !(sym->attr.always_explicit || (attr && attr->codimension));
 
       /* Class array expressions are sometimes coming completely unadorned
 	 with either arrayspec or _data component.  Correct that here.
@@ -9650,7 +9651,7 @@ gfc_trans_structure_assign (tree dest, gfc_expr * expr, bool init, bool coarray)
 
       /* Register the component with the caf-lib before it is initialized.
 	 Register only allocatable components, that are not coarray'ed
-	 components (%comp[*]).  Only register when the constructor is not the
+	 components (%comp[*]).  Only register when the constructor is the
 	 null-expression.  */
       if (coarray && !cm->attr.codimension
 	  && (cm->attr.allocatable || cm->attr.pointer)
@@ -10364,7 +10365,13 @@ trans_caf_token_assign (gfc_se *lse, gfc_se *rse, gfc_expr *expr1,
   else if (lhs_attr.codimension)
     {
       lhs_tok = gfc_get_ultimate_alloc_ptr_comps_caf_token (lse, expr1);
-      lhs_tok = build_fold_indirect_ref (lhs_tok);
+      if (!lhs_tok)
+	{
+	  lhs_tok = gfc_get_tree_for_caf_expr (expr1);
+	  lhs_tok = GFC_TYPE_ARRAY_CAF_TOKEN (TREE_TYPE (lhs_tok));
+	}
+      else
+	lhs_tok = build_fold_indirect_ref (lhs_tok);
       tmp = build2_loc (input_location, MODIFY_EXPR, void_type_node,
 			lhs_tok, null_pointer_node);
       gfc_prepend_expr_to_block (&lse->post, tmp);

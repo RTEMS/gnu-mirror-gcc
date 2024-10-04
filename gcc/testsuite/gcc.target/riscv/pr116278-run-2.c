@@ -1,7 +1,7 @@
-/* { dg-do run { target { riscv_v } } } */
+/* { dg-do compile } */
 /* { dg-options "-O2 -fdump-rtl-expand-details" } */
 
-#include <stdint-gcc.h>
+#include <stdint.h>
 
 int16_t b[1];
 int16_t *d = b;
