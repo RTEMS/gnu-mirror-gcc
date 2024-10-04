@@ -66,6 +66,16 @@ C ObjC C++ ObjC++ Separate Alias(d)
 -dump=
 C ObjC C++ ObjC++ Joined Alias(d)
 
+-embed-dir=
+C ObjC C++ ObjC++ Joined MissingArgError(missing filename after %qs)
+--embed-dir=<dir>	Add <dir> to the #embed path.
+
+-embed-directory
+C ObjC C++ ObjC++ Separate Alias(-embed-dir=) MissingArgError(missing path after %qs)
+
+-embed-directory=
+C ObjC C++ ObjC++ Joined Alias(-embed-dir=) MissingArgError(missing path after %qs)
+
 -imacros
 C ObjC C++ ObjC++ Separate Alias(imacros) MissingArgError(missing filename after %qs)
 
@@ -487,19 +497,19 @@ C++ ObjC++ Var(warn_cxx11_extensions) Warning Init(1)
 Warn about C++11 constructs in code compiled with an older standard.
 
 Wc++14-extensions
-C++ ObjC++ Var(warn_cxx14_extensions) Warning Init(1)
+C++ ObjC++ Var(warn_cxx14_extensions) Warning Init(1) CppReason(CPP_W_CXX14_EXTENSIONS)
 Warn about C++14 constructs in code compiled with an older standard.
 
 Wc++17-extensions
-C++ ObjC++ Var(warn_cxx17_extensions) Warning Init(1)
+C++ ObjC++ Var(warn_cxx17_extensions) Warning Init(1) CppReason(CPP_W_CXX17_EXTENSIONS)
 Warn about C++17 constructs in code compiled with an older standard.
 
 Wc++20-extensions
-C++ ObjC++ Var(warn_cxx20_extensions) Warning Init(1)
+C++ ObjC++ Var(warn_cxx20_extensions) Warning Init(1) CppReason(CPP_W_CXX20_EXTENSIONS)
 Warn about C++20 constructs in code compiled with an older standard.
 
 Wc++23-extensions
-C++ ObjC++ Var(warn_cxx23_extensions) Warning Init(1)
+C++ ObjC++ Var(warn_cxx23_extensions) Warning Init(1) CppReason(CPP_W_CXX23_EXTENSIONS)
 Warn about C++23 constructs in code compiled with an older standard.
 
 Wc++26-extensions
@@ -619,6 +629,10 @@ Wdeclaration-missing-parameter-type
 C ObjC Var(warn_declaration_missing_parameter) Warning Init(1)
 Warn for missing parameter types in function declarations.
 
+Wdefaulted-function-deleted
+C++ ObjC++ Var(warn_defaulted_fn_deleted) Init(1) Warning
+Warn when an explicitly defaulted function is deleted.
+
 Wdelete-incomplete
 C++ ObjC++ Var(warn_delete_incomplete) Init(1) Warning
 Warn when deleting a pointer to incomplete type.
@@ -649,6 +663,10 @@ Wdeprecated-enum-float-conversion
 C++ ObjC++ Var(warn_deprecated_enum_float_conv) Warning
 Warn about deprecated arithmetic conversions on operands where one is of enumeration
 type and the other is of a floating-point type.
+
+Wdeprecated-literal-operator
+C++ ObjC++ Var(warn_deprecated_literal_operator) Warning
+Warn about deprecated space between "" and suffix in a user-defined literal operator.
 
 Wdesignated-init
 C ObjC Var(warn_designated_init) Init(1) Warning
@@ -813,6 +831,10 @@ Warn when __builtin_frame_address or __builtin_return_address is used unsafely.
 Wglobal-module
 C++ ObjC++ Var(warn_global_module) Warning Init(1)
 Warn about the global module fragment not containing only preprocessing directives.
+
+Wheader-guard
+C ObjC C++ ObjC++ CPP(warn_header_guard) CppReason(CPP_W_HEADER_GUARD) Var(cpp_warn_header_guard) Init(0) Warning LangEnabledBy(C ObjC C++ ObjC++,Wall)
+Warn when #ifndef of a header guard is followed by #define of a different macro with the header guard macro not defined at the end of header.
 
 Wif-not-aligned
 C ObjC C++ ObjC++ Var(warn_if_not_aligned) Init(1) Warning
@@ -2194,6 +2216,10 @@ Do not pretty-print template specializations as the template signature followed 
 fprintf-return-value
 C ObjC C++ ObjC++ LTO Optimization Var(flag_printf_return_value) Init(1)
 Treat known sprintf return values as constants.
+
+frange-for-ext-temps
+C++ ObjC++ Var(flag_range_for_ext_temps)
+Enable lifetime extension of range based for temporaries.
 
 freplace-objc-classes
 ObjC ObjC++ LTO Var(flag_replace_objc_classes)

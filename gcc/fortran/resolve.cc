@@ -4208,6 +4208,13 @@ resolve_operator (gfc_expr *e)
 		     gfc_op2string (e->value.op.op));
 	  return false;
 	}
+      if (flag_unsigned && pedantic && e->ts.type == BT_UNSIGNED
+	  && e->value.op.op == INTRINSIC_UMINUS)
+	{
+	  gfc_error ("Negation of unsigned expression at %L not permitted ",
+		     &e->value.op.op1->where);
+	  return false;
+	}
       break;
     }
 
@@ -4256,11 +4263,36 @@ resolve_operator (gfc_expr *e)
 		 gfc_op2string (e->value.op.op), &e->where, gfc_typename (e));
       return false;
 
+    case INTRINSIC_POWER:
+
+      if (flag_unsigned)
+	{
+	  if (op1->ts.type == BT_UNSIGNED || op2->ts.type == BT_UNSIGNED)
+	    {
+	      CHECK_INTERFACES
+	      gfc_error ("Exponentiation not valid at %L for %s and %s",
+			 &e->where, gfc_typename (op1), gfc_typename (op2));
+	      return false;
+	    }
+	}
+      gcc_fallthrough ();
+
     case INTRINSIC_PLUS:
     case INTRINSIC_MINUS:
     case INTRINSIC_TIMES:
     case INTRINSIC_DIVIDE:
-    case INTRINSIC_POWER:
+
+      /* UNSIGNED cannot appear in a mixed expression without explicit
+	     conversion.  */
+      if (flag_unsigned &&  gfc_invalid_unsigned_ops (op1, op2))
+	{
+	  CHECK_INTERFACES
+	  gfc_error ("Operands of binary numeric operator %<%s%> at %L are "
+		     "%s/%s", gfc_op2string (e->value.op.op), &e->where,
+		     gfc_typename (op1), gfc_typename (op2));
+	  return false;
+	}
+
       if (gfc_numeric_ts (&op1->ts) && gfc_numeric_ts (&op2->ts))
 	{
 	  /* Do not perform conversions if operands are not conformable as
@@ -4460,6 +4492,15 @@ resolve_operator (gfc_expr *e)
 	      CHECK_INTERFACES
 	      gfc_error ("Inconsistent ranks for operator at %L and %L",
 			 &op1->where, &op2->where);
+	      return false;
+	    }
+
+	  if (flag_unsigned  && gfc_invalid_unsigned_ops (op1, op2))
+	    {
+	      CHECK_INTERFACES
+	      gfc_error ("Inconsistent types for operator at %L and %L: "
+			 "%s and %s", &op1->where, &op2->where,
+			 gfc_typename (op1), gfc_typename (op2));
 	      return false;
 	    }
 
@@ -9205,7 +9246,9 @@ resolve_select (gfc_code *code, bool select_type)
   type = case_expr->ts.type;
 
   /* F08:C830.  */
-  if (type != BT_LOGICAL && type != BT_INTEGER && type != BT_CHARACTER)
+  if (type != BT_LOGICAL && type != BT_INTEGER && type != BT_CHARACTER
+      && (!flag_unsigned || (flag_unsigned && type != BT_UNSIGNED)))
+
     {
       gfc_error ("Argument of SELECT statement at %L cannot be %s",
 		 &case_expr->where, gfc_typename (case_expr));
@@ -11692,6 +11735,13 @@ resolve_ordinary_assign (gfc_code *code, gfc_namespace *ns)
       return false;
     }
 
+  if (flag_unsigned && gfc_invalid_unsigned_ops (lhs, rhs))
+    {
+      gfc_error ("Cannot assign %s to %s at %L", gfc_typename (rhs),
+		   gfc_typename (lhs), &rhs->where);
+      return false;
+    }
+
   /* Handle the case of a BOZ literal on the RHS.  */
   if (rhs->ts.type == BT_BOZ)
     {
@@ -13237,6 +13287,7 @@ start:
 	case EXEC_OMP_DO:
 	case EXEC_OMP_DO_SIMD:
 	case EXEC_OMP_ERROR:
+	case EXEC_OMP_INTEROP:
 	case EXEC_OMP_LOOP:
 	case EXEC_OMP_MASTER:
 	case EXEC_OMP_MASTER_TASKLOOP:
@@ -17262,6 +17313,9 @@ resolve_symbol (gfc_symbol *sym)
 	/* Mark the result symbol to be referenced, when it has allocatable
 	   components.  */
 	sym->result->attr.referenced = 1;
+      else if (a->function && !a->pointer && !a->allocatable && sym->result)
+	/* Default initialization for function results.  */
+	apply_default_init (sym->result);
     }
 
   if (sym->ts.type == BT_CLASS && sym->ns == gfc_current_ns

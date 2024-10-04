@@ -2132,6 +2132,13 @@ gfc_match_type_spec (gfc_typespec *ts)
       goto kind_selector;
     }
 
+  if (flag_unsigned && gfc_match ("unsigned") == MATCH_YES)
+    {
+      ts->type = BT_UNSIGNED;
+      ts->kind = gfc_default_integer_kind;
+      goto kind_selector;
+    }
+
   if (gfc_match ("double precision") == MATCH_YES)
     {
       ts->type = BT_REAL;
@@ -5540,10 +5547,11 @@ gfc_free_namelist (gfc_namelist *name)
 void
 gfc_free_omp_namelist (gfc_omp_namelist *name, bool free_ns,
 		       bool free_align_allocator,
-		       bool free_mem_traits_space)
+		       bool free_mem_traits_space, bool free_init)
 {
   gfc_omp_namelist *n;
   gfc_expr *last_allocator = NULL;
+  char *last_init_attr = NULL;
 
   for (; name; name = n)
     {
@@ -5552,6 +5560,7 @@ gfc_free_omp_namelist (gfc_omp_namelist *name, bool free_ns,
 	gfc_free_expr (name->u.align);
       else if (free_mem_traits_space)
 	{ }  /* name->u.memspace_sym: shall not call gfc_free_symbol here. */
+
       if (free_ns)
 	gfc_free_namespace (name->u2.ns);
       else if (free_align_allocator)
@@ -5564,6 +5573,15 @@ gfc_free_omp_namelist (gfc_omp_namelist *name, bool free_ns,
 	}
       else if (free_mem_traits_space)
 	{ }  /* name->u2.traits_sym: shall not call gfc_free_symbol here. */
+      else if (free_init)
+	{
+	  if (name->u.init.attr != last_init_attr)
+	    {
+	      last_init_attr = name->u.init.attr;
+	      free (name->u.init.attr);
+	      free (name->u2.init_interop_fr);
+	    }
+	}
       else if (name->u2.udr)
 	{
 	  if (name->u2.udr->combiner)
@@ -5603,9 +5621,11 @@ gfc_match_namelist (void)
 	  return MATCH_ERROR;
 	}
 
+      /* A use associated name shall not be used as a namelist group name
+	 (e.g. F2003:C581).  It is only supported as a legacy extension.  */
       if (group_name->attr.flavor == FL_NAMELIST
 	  && group_name->attr.use_assoc
-	  && !gfc_notify_std (GFC_STD_GNU, "Namelist group name %qs "
+	  && !gfc_notify_std (GFC_STD_LEGACY, "Namelist group name %qs "
 			      "at %C already is USE associated and can"
 			      "not be respecified.", group_name->name))
 	return MATCH_ERROR;
@@ -6194,7 +6214,9 @@ match_case_selector (gfc_case **cp)
 	goto cleanup;
 
       if (c->high->ts.type != BT_LOGICAL && c->high->ts.type != BT_INTEGER
-	  && c->high->ts.type != BT_CHARACTER)
+	  && c->high->ts.type != BT_CHARACTER
+	  && (!flag_unsigned
+	      || (flag_unsigned && c->high->ts.type != BT_UNSIGNED)))
 	{
 	  gfc_error ("Expression in CASE selector at %L cannot be %s",
 		     &c->high->where, gfc_typename (&c->high->ts));
@@ -6210,7 +6232,9 @@ match_case_selector (gfc_case **cp)
 	goto need_expr;
 
       if (c->low->ts.type != BT_LOGICAL && c->low->ts.type != BT_INTEGER
-	  && c->low->ts.type != BT_CHARACTER)
+	  && c->low->ts.type != BT_CHARACTER
+	  && (!flag_unsigned
+	      || (flag_unsigned && c->low->ts.type != BT_UNSIGNED)))
 	{
 	  gfc_error ("Expression in CASE selector at %L cannot be %s",
 		     &c->low->where, gfc_typename (&c->low->ts));
@@ -6229,7 +6253,9 @@ match_case_selector (gfc_case **cp)
 	  if (m == MATCH_YES
 	      && c->high->ts.type != BT_LOGICAL
 	      && c->high->ts.type != BT_INTEGER
-	      && c->high->ts.type != BT_CHARACTER)
+	      && c->high->ts.type != BT_CHARACTER
+	      && (!flag_unsigned
+		  || (flag_unsigned && c->high->ts.type != BT_UNSIGNED)))
 	    {
 	      gfc_error ("Expression in CASE selector at %L cannot be %s",
 			 &c->high->where, gfc_typename (c->high));

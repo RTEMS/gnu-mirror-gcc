@@ -1662,7 +1662,7 @@ avr-*-*)
 	tmake_file="${tmake_file} avr/t-avr avr/t-multilib"
 	use_gcc_stdint=wrap
 	extra_gcc_objs="driver-avr.o avr-devices.o"
-	extra_objs="avr-devices.o avr-log.o"
+	extra_objs="avr-devices.o avr-log.o avr-passes.o"
 	;;
 bfin*-elf*)
 	tm_file="${tm_file} elfos.h newlib-stdint.h bfin/elf.h"
@@ -4618,7 +4618,7 @@ case "${target}" in
 		for which in arch tune; do
 			eval "val=\$with_$which"
 			case ${val} in
-			"" | fiji | gfx900 | gfx906 | gfx908 | gfx90a | gfx90c | gfx1030 | gfx1036 | gfx1100 | gfx1103)
+			"" | gfx900 | gfx906 | gfx908 | gfx90a | gfx90c | gfx1030 | gfx1036 | gfx1100 | gfx1103)
 				# OK
 				;;
 			*)

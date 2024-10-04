@@ -6833,7 +6833,7 @@ package body Checks is
    ----------------------
 
    function Expr_Known_Valid (Expr : Node_Id) return Boolean is
-      Typ : constant Entity_Id := Etype (Expr);
+      Typ : constant Entity_Id := Validated_View (Etype (Expr));
 
    begin
       --  Non-scalar types are always considered valid, since they never give
@@ -9712,10 +9712,6 @@ package body Checks is
          Set_Do_Range_Check (N, False);
 
          case Nkind (N) is
-            when N_And_Then =>
-               Traverse (Left_Opnd (N));
-               return Skip;
-
             when N_Attribute_Reference =>
                Set_Do_Overflow_Check (N, False);
 
@@ -9723,34 +9719,28 @@ package body Checks is
                Set_Do_Overflow_Check (N, False);
 
                case Nkind (N) is
-                  when N_Op_Divide =>
+                  when N_Op_Divide
+                     | N_Op_Mod
+                     | N_Op_Rem
+                  =>
                      Set_Do_Division_Check (N, False);
 
-                  when N_Op_And =>
-                     Set_Do_Length_Check (N, False);
-
-                  when N_Op_Mod =>
-                     Set_Do_Division_Check (N, False);
-
-                  when N_Op_Or =>
-                     Set_Do_Length_Check (N, False);
-
-                  when N_Op_Rem =>
-                     Set_Do_Division_Check (N, False);
-
-                  when N_Op_Xor =>
+                  when N_Op_And
+                     | N_Op_Or
+                     | N_Op_Xor
+                  =>
                      Set_Do_Length_Check (N, False);
 
                   when others =>
                      null;
                end case;
 
-            when N_Or_Else =>
-               Traverse (Left_Opnd (N));
-               return Skip;
-
             when N_Selected_Component =>
                Set_Do_Discriminant_Check (N, False);
+
+            when N_Short_Circuit =>
+               Traverse (Left_Opnd (N));
+               return Skip;
 
             when N_Type_Conversion =>
                Set_Do_Length_Check   (N, False);
@@ -9861,7 +9851,15 @@ package body Checks is
          if Ekind (Scope (E)) = E_Record_Type
            and then Has_Discriminants (Scope (E))
          then
-            N := Build_Discriminal_Subtype_Of_Component (E);
+            --  If the expression is a selected component, in other words,
+            --  has a prefix, then build an actual subtype from the prefix.
+            --  Otherwise, build an actual subtype from the discriminal.
+
+            if Nkind (Expr) = N_Selected_Component then
+               N := Build_Actual_Subtype_Of_Component (E, Expr);
+            else
+               N := Build_Discriminal_Subtype_Of_Component (E);
+            end if;
 
             if Present (N) then
                Insert_Action (Expr, N);

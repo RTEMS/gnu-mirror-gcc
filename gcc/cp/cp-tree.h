@@ -5723,7 +5723,8 @@ enum base_access_flags {
   ba_unique = 1 << 0,  /* Must be a unique base.  */
   ba_check_bit = 1 << 1,   /* Check access.  */
   ba_check = ba_unique | ba_check_bit,
-  ba_ignore_scope = 1 << 2 /* Ignore access allowed by local scope.  */
+  ba_ignore_scope = 1 << 2, /* Ignore access allowed by local scope.  */
+  ba_require_virtual = 1 << 3 /* Require a virtual base.  */
 };
 
 /* This type is used for parameters and variables which hold
@@ -6929,7 +6930,8 @@ extern bool type_build_ctor_call		(tree);
 extern bool type_build_dtor_call		(tree);
 extern void explain_non_literal_class		(tree);
 extern void inherit_targ_abi_tags		(tree);
-extern void defaulted_late_check		(tree);
+extern void maybe_delete_defaulted_fn		(tree, tree);
+extern void defaulted_late_check		(tree, tristate = tristate::unknown ());
 extern bool defaultable_fn_check		(tree);
 extern void check_abi_tags			(tree);
 extern tree missing_abi_tags			(tree);
@@ -6992,6 +6994,7 @@ extern bool member_like_constrained_friend_p	(tree);
 extern bool fns_correspond			(tree, tree);
 extern int decls_match				(tree, tree, bool = true);
 extern bool maybe_version_functions		(tree, tree, bool);
+extern bool validate_constexpr_redeclaration	(tree, tree);
 extern bool merge_default_template_args		(tree, tree, bool);
 extern tree duplicate_decls			(tree, tree,
 						 bool hiding = false,
@@ -7024,7 +7027,7 @@ extern void omp_declare_variant_finalize	(tree, tree);
 struct cp_decomp { tree decl; unsigned int count; };
 extern void cp_finish_decl			(tree, tree, bool, tree, int, cp_decomp * = nullptr);
 extern tree lookup_decomp_type			(tree);
-extern void cp_finish_decomp			(tree, cp_decomp *);
+extern bool cp_finish_decomp			(tree, cp_decomp *, bool = false);
 extern int cp_complete_array_type		(tree *, tree, bool);
 extern int cp_complete_array_type_or_error	(tree *, tree, bool, tsubst_flags_t);
 extern tree build_ptrmemfunc_type		(tree);
@@ -7185,7 +7188,9 @@ extern const char *class_key_or_enum_as_string	(tree);
 extern void maybe_warn_variadic_templates       (void);
 extern void maybe_warn_cpp0x			(cpp0x_warn_str str,
 						 location_t = input_location);
-extern bool pedwarn_cxx98                       (location_t, int, const char *, ...) ATTRIBUTE_GCC_DIAG(3,4);
+extern bool pedwarn_cxx98                       (location_t,
+						 diagnostic_option_id option_id,
+						 const char *, ...) ATTRIBUTE_GCC_DIAG(3,4);
 extern location_t location_of                   (tree);
 extern void qualified_name_lookup_error		(tree, tree, tree,
 						 location_t);
@@ -7470,7 +7475,8 @@ extern bool maybe_clone_body			(tree);
 extern tree cp_convert_range_for (tree, tree, tree, cp_decomp *, bool,
 				  tree, bool);
 extern void cp_convert_omp_range_for (tree &, tree &, tree &,
-				      tree &, tree &, tree &, tree &, tree &);
+				      tree &, tree &, tree &, tree &, tree &,
+				      bool);
 extern void cp_finish_omp_range_for (tree, tree);
 extern bool cp_maybe_parse_omp_decl (tree, tree);
 extern bool parsing_nsdmi (void);
@@ -7805,6 +7811,7 @@ extern tree begin_for_stmt			(tree, tree);
 extern void finish_init_stmt			(tree);
 extern void finish_for_cond		(tree, tree, bool, tree, bool);
 extern void finish_for_expr			(tree, tree);
+extern void find_range_for_decls		(tree[3]);
 extern void finish_for_stmt			(tree);
 extern tree begin_range_for_stmt		(tree, tree);
 extern void finish_range_for_decl		(tree, tree, tree);
@@ -8167,7 +8174,7 @@ extern void cxx_print_xnode			(FILE *, tree, int);
 extern void cxx_print_decl			(FILE *, tree, int);
 extern void cxx_print_type			(FILE *, tree, int);
 extern void cxx_print_identifier		(FILE *, tree, int);
-extern void cxx_print_error_function		(diagnostic_context *,
+extern void cxx_print_error_function		(diagnostic_text_output_format &,
 						 const char *,
 						 const diagnostic_info *);
 
@@ -8776,7 +8783,7 @@ extern tree coro_get_actor_function		(tree);
 extern tree coro_get_destroy_function		(tree);
 extern tree coro_get_ramp_function		(tree);
 
-extern tree* co_await_get_resume_call		(tree await_expr);
+extern tree co_await_get_resume_call		(tree await_expr);
 
 
 /* contracts.cc */

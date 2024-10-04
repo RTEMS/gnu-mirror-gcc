@@ -56,6 +56,8 @@
   UNSPEC_FLT_QUIET
   UNSPEC_FLE_QUIET
   UNSPEC_COPYSIGN
+  UNSPEC_FMV_X_W
+  UNSPEC_FMVH_X_D
   UNSPEC_RINT
   UNSPEC_ROUND
   UNSPEC_FLOOR
@@ -2327,17 +2329,16 @@
 
 (define_insn "@tlsdesc<mode>"
   [(set (reg:P A0_REGNUM)
-	    (unspec:P
-			[(match_operand:P 0 "symbolic_operand" "")
-			 (match_operand:P 1 "const_int_operand")]
-			UNSPEC_TLSDESC))
+	(unspec:P
+	    [(match_operand:P 0 "symbolic_operand" "")]
+	    UNSPEC_TLSDESC))
    (clobber (reg:P T0_REGNUM))]
   "TARGET_TLSDESC"
   {
-    return ".LT%1: auipc\ta0,%%tlsdesc_hi(%0)\;"
-           "<load>\tt0,%%tlsdesc_load_lo(.LT%1)(a0)\;"
-           "addi\ta0,a0,%%tlsdesc_add_lo(.LT%1)\;"
-           "jalr\tt0,t0,%%tlsdesc_call(.LT%1)";
+    return ".LT%=: auipc\ta0,%%tlsdesc_hi(%0)\;"
+           "<load>\tt0,%%tlsdesc_load_lo(.LT%=)(a0)\;"
+           "addi\ta0,a0,%%tlsdesc_add_lo(.LT%=)\;"
+           "jalr\tt0,t0,%%tlsdesc_call(.LT%=)";
   }
   [(set_attr "type" "multi")
    (set_attr "length" "16")
@@ -2627,8 +2628,9 @@
 
 (define_insn "movsidf2_low_rv32"
   [(set (match_operand:SI      0 "register_operand" "=  r")
-	(truncate:SI
-	    (match_operand:DF 1 "register_operand"  "zmvf")))]
+	(unspec:SI
+	    [(match_operand:DF 1 "register_operand" "zmvf")]
+	UNSPEC_FMV_X_W))]
   "TARGET_HARD_FLOAT && !TARGET_64BIT && TARGET_ZFA"
   "fmv.x.w\t%0,%1"
   [(set_attr "move_type" "fmove")
@@ -2637,11 +2639,10 @@
 
 
 (define_insn "movsidf2_high_rv32"
-  [(set (match_operand:SI      0 "register_operand"    "=  r")
-	(truncate:SI
-            (lshiftrt:DF
-                (match_operand:DF 1 "register_operand" "zmvf")
-                (const_int 32))))]
+  [(set (match_operand:SI      0 "register_operand" "=  r")
+	(unspec:SI
+	    [(match_operand:DF 1 "register_operand" "zmvf")]
+	UNSPEC_FMVH_X_D))]
   "TARGET_HARD_FLOAT && !TARGET_64BIT && TARGET_ZFA"
   "fmvh.x.d\t%0,%1"
   [(set_attr "move_type" "fmove")
@@ -2925,7 +2926,9 @@
 ;; for IOR/XOR.  It probably doesn't matter for AND.
 ;;
 ;; We also don't want to do this if the immediate already fits in a simm12
-;; field.
+;; field, or is a single bit operand, or when we might be able to generate
+;; a shift-add sequence via the splitter in bitmanip.md
+;; in bitmanip.md for masks that are a run of consecutive ones.
 (define_insn_and_split "<optab>_shift_reverse<X:mode>"
   [(set (match_operand:X 0 "register_operand" "=r")
     (any_bitwise:X (ashift:X (match_operand:X 1 "register_operand" "r")
@@ -2934,9 +2937,9 @@
   "(!SMALL_OPERAND (INTVAL (operands[3]))
     && SMALL_OPERAND (INTVAL (operands[3]) >> INTVAL (operands[2]))
     && popcount_hwi (INTVAL (operands[3])) > 1
-    && (!TARGET_64BIT
-	|| (exact_log2 ((INTVAL (operands[3]) >> INTVAL (operands[2])) + 1)
-	     == -1))
+    && (!(TARGET_64BIT && TARGET_ZBA)
+	|| !consecutive_bits_operand (operands[3], VOIDmode)
+	|| !imm123_operand (operands[2], VOIDmode))
     && (INTVAL (operands[3]) & ((1ULL << INTVAL (operands[2])) - 1)) == 0)"
   "#"
   "&& 1"
@@ -4358,11 +4361,22 @@
 
 (define_expand "usadd<mode>3"
   [(match_operand:ANYI 0 "register_operand")
+   (match_operand:ANYI 1 "reg_or_int_operand")
+   (match_operand:ANYI 2 "reg_or_int_operand")]
+  ""
+  {
+    riscv_expand_usadd (operands[0], operands[1], operands[2]);
+    DONE;
+  }
+)
+
+(define_expand "ssadd<mode>3"
+  [(match_operand:ANYI 0 "register_operand")
    (match_operand:ANYI 1 "register_operand")
    (match_operand:ANYI 2 "register_operand")]
   ""
   {
-    riscv_expand_usadd (operands[0], operands[1], operands[2]);
+    riscv_expand_ssadd (operands[0], operands[1], operands[2]);
     DONE;
   }
 )
@@ -4374,6 +4388,17 @@
   ""
   {
     riscv_expand_ussub (operands[0], operands[1], operands[2]);
+    DONE;
+  }
+)
+
+(define_expand "sssub<mode>3"
+  [(match_operand:ANYI 0 "register_operand")
+   (match_operand:ANYI 1 "register_operand")
+   (match_operand:ANYI 2 "register_operand")]
+  ""
+  {
+    riscv_expand_sssub (operands[0], operands[1], operands[2]);
     DONE;
   }
 )

@@ -23,6 +23,7 @@
 #define IN_TARGET_CODE 1
 
 #include "config.h"
+#define INCLUDE_MEMORY
 #define INCLUDE_STRING
 #include "system.h"
 #include "coretypes.h"
@@ -8006,10 +8007,11 @@ arm_function_ok_for_sibcall (tree decl, tree exp)
       && DECL_WEAK (decl))
     return false;
 
-  /* We cannot tailcall an indirect call by descriptor if all the call-clobbered
-     general registers are live (r0-r3 and ip).  This can happen when:
-      - IP contains the static chain, or
-      - IP is needed for validating the PAC signature.  */
+  /* Indirect tailcalls need a call-clobbered register to hold the function
+     address.  But we only have r0-r3 and ip in that class.  If r0-r3 all hold
+     function arguments, then we can only use IP.  But IP may be needed in the
+     epilogue (for PAC validation), or for passing the static chain.  We have
+     to disable the tail call if nothing is available.  */
   if (!decl
       && ((CALL_EXPR_BY_DESCRIPTOR (exp) && !flag_trampolines)
 	  || arm_current_function_pac_enabled_p()))
@@ -8021,18 +8023,33 @@ arm_function_ok_for_sibcall (tree decl, tree exp)
       arm_init_cumulative_args (&cum, fntype, NULL_RTX, NULL_TREE);
       cum_v = pack_cumulative_args (&cum);
 
-      for (tree t = TYPE_ARG_TYPES (fntype); t; t = TREE_CHAIN (t))
+      tree arg;
+      call_expr_arg_iterator iter;
+      unsigned used_regs = 0;
+
+      /* Layout each actual argument in turn.  If it is allocated to
+	 core regs, note which regs have been allocated.  */
+      FOR_EACH_CALL_EXPR_ARG (arg, iter, exp)
 	{
-	  tree type = TREE_VALUE (t);
-	  if (!VOID_TYPE_P (type))
+	  tree type = TREE_TYPE (arg);
+	  function_arg_info arg_info (type, /*named=*/true);
+	  rtx reg = arm_function_arg (cum_v, arg_info);
+	  if (reg && REG_P (reg)
+	      && REGNO (reg) <= LAST_ARG_REGNUM)
 	    {
-	      function_arg_info arg (type, /*named=*/true);
-	      arm_function_arg_advance (cum_v, arg);
+	      /* Avoid any chance of UB here.  We don't care if TYPE
+		 is very large since it will use up all the argument regs.  */
+	      unsigned nregs = MIN (ARM_NUM_REGS2 (GET_MODE (reg), type),
+				    LAST_ARG_REGNUM + 1);
+	      used_regs |= ((1 << nregs) - 1) << REGNO (reg);
 	    }
+	  arm_function_arg_advance (cum_v, arg_info);
 	}
 
-      function_arg_info arg (integer_type_node, /*named=*/true);
-      if (!arm_function_arg (cum_v, arg))
+      /* We've used all the argument regs, and we know IP is live during the
+	 epilogue for some reason, so we can't tailcall.  */
+      if ((used_regs & ((1 << (LAST_ARG_REGNUM + 1)) - 1))
+	  == ((1 << (LAST_ARG_REGNUM + 1)) - 1))
 	return false;
     }
 
@@ -35214,6 +35231,32 @@ arm_mve_dlstp_check_inc_counter (loop *loop, rtx_insn* vctp_insn,
   return vctp_insn;
 }
 
+/* Helper function to 'arm_mve_dlstp_check_dec_counter' to make sure DEC_INSN
+   is of the expected form:
+   (set (reg a) (plus (reg a) (const_int)))
+   where (reg a) is the same as CONDCOUNT.
+   Return a rtx with the set if it is in the right format or NULL_RTX
+   otherwise.  */
+
+static rtx
+check_dec_insn (rtx_insn *dec_insn, rtx condcount)
+{
+  if (!NONDEBUG_INSN_P (dec_insn))
+    return NULL_RTX;
+  rtx dec_set = single_set (dec_insn);
+  if (!dec_set
+      || !REG_P (SET_DEST (dec_set))
+      || GET_CODE (SET_SRC (dec_set)) != PLUS
+      || !REG_P (XEXP (SET_SRC (dec_set), 0))
+      || !CONST_INT_P (XEXP (SET_SRC (dec_set), 1))
+      || REGNO (SET_DEST (dec_set))
+	  != REGNO (XEXP (SET_SRC (dec_set), 0))
+      || REGNO (SET_DEST (dec_set)) != REGNO (condcount))
+    return NULL_RTX;
+
+  return dec_set;
+}
+
 /* Helper function to `arm_mve_loop_valid_for_dlstp`.  In the case of a
    counter that is decrementing, ensure that it is decrementing by the
    right amount in each iteration and that the target condition is what
@@ -35230,30 +35273,19 @@ arm_mve_dlstp_check_dec_counter (loop *loop, rtx_insn* vctp_insn,
      loop latch.  Here we simply need to verify that this counter is the same
      reg that is also used in the vctp_insn and that it is not otherwise
      modified.  */
-  rtx_insn *dec_insn = BB_END (loop->latch);
+  rtx dec_set = check_dec_insn (BB_END (loop->latch), condcount);
   /* If not in the loop latch, try to find the decrement in the loop header.  */
-  if (!NONDEBUG_INSN_P (dec_insn))
+  if (dec_set == NULL_RTX)
   {
     df_ref temp = df_bb_regno_only_def_find (loop->header, REGNO (condcount));
     /* If we haven't been able to find the decrement, bail out.  */
     if (!temp)
       return NULL;
-    dec_insn = DF_REF_INSN (temp);
+    dec_set = check_dec_insn (DF_REF_INSN (temp), condcount);
+
+    if (dec_set == NULL_RTX)
+      return NULL;
   }
-
-  rtx dec_set = single_set (dec_insn);
-
-  /* Next, ensure that it is a PLUS of the form:
-     (set (reg a) (plus (reg a) (const_int)))
-     where (reg a) is the same as condcount.  */
-  if (!dec_set
-      || !REG_P (SET_DEST (dec_set))
-      || !REG_P (XEXP (SET_SRC (dec_set), 0))
-      || !CONST_INT_P (XEXP (SET_SRC (dec_set), 1))
-      || REGNO (SET_DEST (dec_set))
-	  != REGNO (XEXP (SET_SRC (dec_set), 0))
-      || REGNO (SET_DEST (dec_set)) != REGNO (condcount))
-    return NULL;
 
   decrementnum = INTVAL (XEXP (SET_SRC (dec_set), 1));
 

@@ -2874,6 +2874,12 @@ supplement_binding (cxx_binding *binding, tree decl)
 		 "%<-std=c++2c%> or %<-std=gnu++2c%>");
       binding->value = name_lookup::ambiguous (decl, binding->value);
     }
+  else if (binding->scope->kind != sk_class
+	   && TREE_CODE (decl) == USING_DECL
+	   && decls_match (target_bval, target_decl))
+    /* Since P1787 (DR 36) it is OK to redeclare entities via using-decl,
+       except in class scopes.  */
+    ok = false;
   else
     {
       if (!error_operand_p (bval))
@@ -2893,6 +2899,7 @@ supplement_binding (cxx_binding *binding, tree decl)
 void
 diagnose_name_conflict (tree decl, tree bval)
 {
+  auto_diagnostic_group d;
   if (TREE_CODE (decl) == TREE_CODE (bval)
       && TREE_CODE (decl) != NAMESPACE_DECL
       && !DECL_DECLARES_FUNCTION_P (decl)
@@ -3004,6 +3011,8 @@ update_binding (cp_binding_level *level, cxx_binding *binding, tree *slot,
 
   if (old == error_mark_node)
     old = NULL_TREE;
+
+  tree old_bval = old;
   old = strip_using_decl (old);
 
   if (DECL_IMPLICIT_TYPEDEF_P (decl))
@@ -3020,7 +3029,7 @@ update_binding (cp_binding_level *level, cxx_binding *binding, tree *slot,
 	  gcc_checking_assert (!to_type);
 	  hide_type = hiding;
 	  to_type = decl;
-	  to_val = old;
+	  to_val = old_bval;
 	}
       else
 	hide_value = hiding;
@@ -3033,7 +3042,7 @@ update_binding (cp_binding_level *level, cxx_binding *binding, tree *slot,
       /* OLD is an implicit typedef.  Move it to to_type.  */
       gcc_checking_assert (!to_type);
 
-      to_type = old;
+      to_type = old_bval;
       hide_type = hide_value;
       old = NULL_TREE;
       hide_value = false;
@@ -3092,7 +3101,7 @@ update_binding (cp_binding_level *level, cxx_binding *binding, tree *slot,
 	{
 	  if (same_type_p (TREE_TYPE (old), TREE_TYPE (decl)))
 	    /* Two type decls to the same type.  Do nothing.  */
-	    return old;
+	    return old_bval;
 	  else
 	    goto conflict;
 	}
@@ -3105,7 +3114,7 @@ update_binding (cp_binding_level *level, cxx_binding *binding, tree *slot,
 
 	  /* The new one must be an alias at this point.  */
 	  gcc_assert (DECL_NAMESPACE_ALIAS (decl));
-	  return old;
+	  return old_bval;
 	}
       else if (TREE_CODE (old) == VAR_DECL)
 	{
@@ -3120,7 +3129,7 @@ update_binding (cp_binding_level *level, cxx_binding *binding, tree *slot,
       else
 	{
 	conflict:
-	  diagnose_name_conflict (decl, old);
+	  diagnose_name_conflict (decl, old_bval);
 	  to_val = NULL_TREE;
 	}
     }
@@ -3636,6 +3645,8 @@ push_local_extern_decl_alias (tree decl)
 	  if (decls_match (decl, *iter, /*record_versions*/false))
 	    {
 	      alias = *iter;
+	      if (!validate_constexpr_redeclaration (alias, decl))
+		return;
 	      break;
 	    }
 
@@ -3722,17 +3733,10 @@ maybe_record_mergeable_decl (tree *slot, tree name, tree decl)
   if (TREE_CODE (*slot) != BINDING_VECTOR)
     return;
 
-  if (!TREE_PUBLIC (CP_DECL_CONTEXT (decl)))
-    /* Member of internal namespace.  */
+  if (decl_linkage (decl) == lk_internal)
     return;
 
   tree not_tmpl = STRIP_TEMPLATE (decl);
-  if ((TREE_CODE (not_tmpl) == FUNCTION_DECL
-       || VAR_P (not_tmpl))
-      && DECL_THIS_STATIC (not_tmpl))
-    /* Internal linkage.  */
-    return;
-
   bool is_attached = (DECL_LANG_SPECIFIC (not_tmpl)
 		      && DECL_MODULE_ATTACH_P (not_tmpl));
   tree *gslot = get_fixed_binding_slot
@@ -5210,38 +5214,47 @@ pushdecl_outermost_localscope (tree x)
 static bool
 check_can_export_using_decl (tree binding)
 {
-  tree decl = STRIP_TEMPLATE (binding);
+  /* Declarations in header units are always OK.  */
+  if (header_module_p ())
+    return true;
 
-  /* Linkage is determined by the owner of an enumerator.  */
-  if (TREE_CODE (decl) == CONST_DECL)
-    decl = TYPE_NAME (DECL_CONTEXT (decl));
-
-  /* If the using decl is exported, the things it refers
-     to must also be exported (or not have module attachment).  */
-  if (!DECL_MODULE_EXPORT_P (decl)
-      && (DECL_LANG_SPECIFIC (decl)
-	  && DECL_MODULE_ATTACH_P (decl)))
+  /* We want the linkage of the underlying entity, so strip typedefs.
+     If the underlying entity is a builtin type then we're OK.  */
+  tree entity = binding;
+  if (TREE_CODE (entity) == TYPE_DECL)
     {
-      bool internal_p = !TREE_PUBLIC (decl);
+      entity = TYPE_MAIN_DECL (TREE_TYPE (entity));
+      if (!entity)
+	return true;
+    }
 
-      /* A template in an anonymous namespace doesn't constrain TREE_PUBLIC
-	 until it's instantiated, so double-check its context.  */
-      if (!internal_p && TREE_CODE (binding) == TEMPLATE_DECL)
-	internal_p = decl_internal_context_p (decl);
+  linkage_kind linkage = decl_linkage (entity);
+  tree not_tmpl = STRIP_TEMPLATE (entity);
 
+  /* Attachment is determined by the owner of an enumerator.  */
+  if (TREE_CODE (not_tmpl) == CONST_DECL)
+    not_tmpl = TYPE_NAME (DECL_CONTEXT (not_tmpl));
+
+  /* If the using decl is exported, the things it refers to must
+     have external linkage.  decl_linkage returns lk_external for
+     module linkage so also check for attachment.  */
+  if (linkage != lk_external
+      || (DECL_LANG_SPECIFIC (not_tmpl)
+	  && DECL_MODULE_ATTACH_P (not_tmpl)
+	  && !DECL_MODULE_EXPORT_P (not_tmpl)))
+    {
       auto_diagnostic_group d;
       error ("exporting %q#D that does not have external linkage",
 	     binding);
-      if (TREE_CODE (decl) == TYPE_DECL && !DECL_IMPLICIT_TYPEDEF_P (decl))
-	/* An un-exported explicit type alias has no linkage.  */
-	inform (DECL_SOURCE_LOCATION (binding),
-		"%q#D declared here with no linkage", binding);
-      else if (internal_p)
-	inform (DECL_SOURCE_LOCATION (binding),
-		"%q#D declared here with internal linkage", binding);
+      if (linkage == lk_none)
+	inform (DECL_SOURCE_LOCATION (entity),
+		"%q#D declared here with no linkage", entity);
+      else if (linkage == lk_internal)
+	inform (DECL_SOURCE_LOCATION (entity),
+		"%q#D declared here with internal linkage", entity);
       else
-	inform (DECL_SOURCE_LOCATION (binding),
-		"%q#D declared here with module linkage", binding);
+	inform (DECL_SOURCE_LOCATION (entity),
+		"%q#D declared here with module linkage", entity);
       return false;
     }
 
@@ -5370,8 +5383,7 @@ do_nonmember_using_decl (name_lookup &lookup, bool fn_scope_p,
   else if (value
 	   /* Ignore anticipated builtins.  */
 	   && !anticipated_builtin_p (value)
-	   && (fn_scope_p
-	       || !decls_match (lookup.value, strip_using_decl (value))))
+	   && !decls_match (lookup.value, strip_using_decl (value)))
     {
       diagnose_name_conflict (lookup.value, value);
       failed = true;
@@ -6213,6 +6225,7 @@ lookup_using_decl (tree scope, name_lookup &lookup)
 	   /* We can (independently) have ambiguous implicit typedefs.  */
 	   || (lookup.type && TREE_CODE (lookup.type) == TREE_LIST))
     {
+      auto_diagnostic_group d;
       error ("reference to %qD is ambiguous", lookup.name);
       print_candidates (TREE_CODE (lookup.value) == TREE_LIST
 			? lookup.value : lookup.type);
@@ -6344,6 +6357,7 @@ set_decl_namespace (tree decl, tree scope, bool friendp)
   if (TREE_CODE (old) == TREE_LIST)
     {
     ambiguous:
+      auto_diagnostic_group d;
       DECL_CONTEXT (decl) = FROB_CONTEXT (scope);
       error ("reference to %qD is ambiguous", decl);
       print_candidates (old);
@@ -6443,6 +6457,7 @@ set_decl_namespace (tree decl, tree scope, bool friendp)
     {
       if (hidden_p)
 	{
+	  auto_diagnostic_group d;
 	  pedwarn (DECL_SOURCE_LOCATION (decl), 0,
 		   "%qD has not been declared within %qD", decl, scope);
 	  inform (DECL_SOURCE_LOCATION (found),
@@ -6604,6 +6619,7 @@ do_namespace_alias (tree alias, tree name_space)
   DECL_NAMESPACE_ALIAS (alias) = name_space;
   DECL_EXTERNAL (alias) = 1;
   DECL_CONTEXT (alias) = FROB_CONTEXT (current_scope ());
+  TREE_PUBLIC (alias) = TREE_PUBLIC (DECL_CONTEXT (alias));
   set_originating_module (alias);
 
   pushdecl (alias);
@@ -6640,9 +6656,6 @@ push_using_decl_bindings (name_lookup *lookup, tree name, tree value)
       type = binding->type;
     }
 
-  /* DR 36 questions why using-decls at function scope may not be
-     duplicates.  Disallow it, as C++11 claimed and PR 20420
-     implemented.  */
   if (lookup)
     do_nonmember_using_decl (*lookup, true, true, &value, &type);
 
@@ -7415,10 +7428,9 @@ tree lookup_qualified_name (tree t, const char *p, LOOK_want w, bool c)
 static bool
 qualified_namespace_lookup (tree scope, name_lookup *lookup)
 {
-  timevar_start (TV_NAME_LOOKUP);
+  auto_cond_timevar tv (TV_NAME_LOOKUP);
   query_oracle (lookup->name);
   bool found = lookup->search_qualified (ORIGINAL_NAMESPACE (scope));
-  timevar_stop (TV_NAME_LOOKUP);
   return found;
 }
 
@@ -8775,6 +8787,7 @@ struct local_state_t
 {
   int cp_unevaluated_operand;
   int c_inhibit_evaluation_warnings;
+  int cp_noexcept_operand_;
 
   static local_state_t
   save_and_clear ()
@@ -8784,6 +8797,8 @@ struct local_state_t
     ::cp_unevaluated_operand = 0;
     s.c_inhibit_evaluation_warnings = ::c_inhibit_evaluation_warnings;
     ::c_inhibit_evaluation_warnings = 0;
+    s.cp_noexcept_operand_ = ::cp_noexcept_operand;
+    ::cp_noexcept_operand = 0;
     return s;
   }
 
@@ -8792,6 +8807,7 @@ struct local_state_t
   {
     ::cp_unevaluated_operand = this->cp_unevaluated_operand;
     ::c_inhibit_evaluation_warnings = this->c_inhibit_evaluation_warnings;
+    ::cp_noexcept_operand = this->cp_noexcept_operand_;
   }
 };
 
@@ -8927,6 +8943,7 @@ finish_using_directive (tree target, tree attribs)
 	if (current_binding_level->kind == sk_namespace
 	    && is_attribute_p ("strong", name))
 	  {
+	    auto_diagnostic_group d;
 	    if (warning (0, "%<strong%> using directive no longer supported")
 		&& CP_DECL_CONTEXT (target) == current_namespace)
 	      inform (DECL_SOURCE_LOCATION (target),
@@ -9246,6 +9263,7 @@ push_namespace (tree name, bool make_inline)
 
       if (make_inline && !DECL_NAMESPACE_INLINE_P (ns))
 	{
+	  auto_diagnostic_group d;
 	  error_at (input_location,
 		    "inline namespace must be specified at initial definition");
 	  inform (DECL_SOURCE_LOCATION (ns), "%qD defined here", ns);
@@ -9296,6 +9314,7 @@ add_imported_namespace (tree ctx, tree name, location_t loc, unsigned import,
     }
   else if (DECL_NAMESPACE_INLINE_P (decl) != inline_p)
     {
+      auto_diagnostic_group d;
       error_at (loc, "%s namespace %qD conflicts with reachable definition",
 		inline_p ? "inline" : "non-inline", decl);
       inform (DECL_SOURCE_LOCATION (decl), "reachable %s definition here",

@@ -20,6 +20,7 @@ along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
 #define INCLUDE_ALGORITHM
+#define INCLUDE_MEMORY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -1850,10 +1851,17 @@ vect_analyze_loop_form (class loop *loop, vect_loop_form_info *info)
 				   " too many incoming edges.\n");
 
   /* We assume that the latch is empty.  */
-  if (!empty_block_p (loop->latch)
-      || !gimple_seq_empty_p (phi_nodes (loop->latch)))
-    return opt_result::failure_at (vect_location,
-				   "not vectorized: latch block not empty.\n");
+  basic_block latch = loop->latch;
+  do
+    {
+      if (!empty_block_p (latch)
+	  || !gimple_seq_empty_p (phi_nodes (latch)))
+	return opt_result::failure_at (vect_location,
+				       "not vectorized: latch block not "
+				       "empty.\n");
+      latch = single_pred (latch);
+    }
+  while (single_succ_p (latch));
 
   /* Make sure there is no abnormal exit.  */
   auto_vec<edge> exits = get_loop_exit_edges (loop);
@@ -2717,7 +2725,7 @@ vect_determine_partial_vectors_and_peeling (loop_vec_info loop_vinfo)
 static opt_result
 vect_analyze_loop_2 (loop_vec_info loop_vinfo, bool &fatal,
 		     unsigned *suggested_unroll_factor,
-		     bool& slp_done_for_suggested_uf)
+		     unsigned& slp_done_for_suggested_uf)
 {
   opt_result ok = opt_result::success ();
   int res;
@@ -2786,11 +2794,11 @@ vect_analyze_loop_2 (loop_vec_info loop_vinfo, bool &fatal,
   /* If the slp decision is false when suggested unroll factor is worked
      out, and we are applying suggested unroll factor, we can simply skip
      all slp related analyses this time.  */
-  bool slp = !applying_suggested_uf || slp_done_for_suggested_uf;
+  unsigned slp = !applying_suggested_uf ? 2 : slp_done_for_suggested_uf;
 
   /* Classify all cross-iteration scalar data-flow cycles.
      Cross-iteration cycles caused by virtual phis are analyzed separately.  */
-  vect_analyze_scalar_cycles (loop_vinfo, slp);
+  vect_analyze_scalar_cycles (loop_vinfo, slp == 2);
 
   vect_pattern_recog (loop_vinfo);
 
@@ -2853,18 +2861,23 @@ vect_analyze_loop_2 (loop_vec_info loop_vinfo, bool &fatal,
   vect_compute_single_scalar_iteration_cost (loop_vinfo);
 
   poly_uint64 saved_vectorization_factor = LOOP_VINFO_VECT_FACTOR (loop_vinfo);
+  bool saved_can_use_partial_vectors_p
+    = LOOP_VINFO_CAN_USE_PARTIAL_VECTORS_P (loop_vinfo);
+
+  /* This is the point where we can re-start analysis with SLP forced off.  */
+start_over:
 
   if (slp)
     {
       /* Check the SLP opportunities in the loop, analyze and build
 	 SLP trees.  */
-      ok = vect_analyze_slp (loop_vinfo, LOOP_VINFO_N_STMTS (loop_vinfo));
+      ok = vect_analyze_slp (loop_vinfo, LOOP_VINFO_N_STMTS (loop_vinfo),
+			     slp == 1);
       if (!ok)
 	return ok;
 
       /* If there are any SLP instances mark them as pure_slp.  */
-      slp = vect_make_slp_decision (loop_vinfo);
-      if (slp)
+      if (vect_make_slp_decision (loop_vinfo))
 	{
 	  /* Find stmts that need to be both vectorized and SLPed.  */
 	  vect_detect_hybrid_slp (loop_vinfo);
@@ -2880,15 +2893,15 @@ vect_analyze_loop_2 (loop_vec_info loop_vinfo, bool &fatal,
 	}
     }
 
-  bool saved_can_use_partial_vectors_p
-    = LOOP_VINFO_CAN_USE_PARTIAL_VECTORS_P (loop_vinfo);
-
   /* We don't expect to have to roll back to anything other than an empty
      set of rgroups.  */
   gcc_assert (LOOP_VINFO_MASKS (loop_vinfo).is_empty ());
 
-  /* This is the point where we can re-start analysis with SLP forced off.  */
-start_over:
+  /* When we arrive here with SLP disabled and we are supposed
+     to use SLP for everything fail vectorization.  */
+  if (!slp && param_vect_force_slp)
+    return opt_result::failure_at (vect_location,
+				   "may need non-SLP handling\n");
 
   /* Apply the suggested unrolling factor, this was determined by the backend
      during finish_cost the first time we ran the analyzis for this
@@ -2946,91 +2959,13 @@ start_over:
 
   if (slp)
     {
-      /* Analyze operations in the SLP instances.  Note this may
-	 remove unsupported SLP instances which makes the above
-	 SLP kind detection invalid.  */
-      unsigned old_size = LOOP_VINFO_SLP_INSTANCES (loop_vinfo).length ();
-      vect_slp_analyze_operations (loop_vinfo);
-      if (LOOP_VINFO_SLP_INSTANCES (loop_vinfo).length () != old_size)
+      /* Analyze operations in the SLP instances.  We can't simply
+	 remove unsupported SLP instances as this makes the above
+	 SLP kind detection invalid and might also affect the VF.  */
+      if (! vect_slp_analyze_operations (loop_vinfo))
 	{
 	  ok = opt_result::failure_at (vect_location,
 				       "unsupported SLP instances\n");
-	  goto again;
-	}
-
-      /* Check whether any load in ALL SLP instances is possibly permuted.  */
-      slp_tree load_node, slp_root;
-      unsigned i, x;
-      slp_instance instance;
-      bool can_use_lanes = true;
-      FOR_EACH_VEC_ELT (LOOP_VINFO_SLP_INSTANCES (loop_vinfo), x, instance)
-	{
-	  slp_root = SLP_INSTANCE_TREE (instance);
-	  int group_size = SLP_TREE_LANES (slp_root);
-	  tree vectype = SLP_TREE_VECTYPE (slp_root);
-	  bool loads_permuted = false;
-	  FOR_EACH_VEC_ELT (SLP_INSTANCE_LOADS (instance), i, load_node)
-	    {
-	      if (!SLP_TREE_LOAD_PERMUTATION (load_node).exists ())
-		continue;
-	      unsigned j;
-	      stmt_vec_info load_info;
-	      FOR_EACH_VEC_ELT (SLP_TREE_SCALAR_STMTS (load_node), j, load_info)
-		if (SLP_TREE_LOAD_PERMUTATION (load_node)[j] != j)
-		  {
-		    loads_permuted = true;
-		    break;
-		  }
-	    }
-
-	  /* If the loads and stores can be handled with load/store-lane
-	     instructions record it and move on to the next instance.  */
-	  if (loads_permuted
-	      && SLP_INSTANCE_KIND (instance) == slp_inst_kind_store
-	      && vect_store_lanes_supported (vectype, group_size, false)
-		   != IFN_LAST)
-	    {
-	      FOR_EACH_VEC_ELT (SLP_INSTANCE_LOADS (instance), i, load_node)
-		if (STMT_VINFO_GROUPED_ACCESS
-		      (SLP_TREE_REPRESENTATIVE (load_node)))
-		  {
-		    stmt_vec_info stmt_vinfo = DR_GROUP_FIRST_ELEMENT
-			(SLP_TREE_REPRESENTATIVE (load_node));
-		    /* Use SLP for strided accesses (or if we can't
-		       load-lanes).  */
-		    if (STMT_VINFO_STRIDED_P (stmt_vinfo)
-			|| vect_load_lanes_supported
-			     (STMT_VINFO_VECTYPE (stmt_vinfo),
-			      DR_GROUP_SIZE (stmt_vinfo), false) == IFN_LAST)
-		      break;
-		  }
-
-	      can_use_lanes
-		= can_use_lanes && i == SLP_INSTANCE_LOADS (instance).length ();
-
-	      if (can_use_lanes && dump_enabled_p ())
-		dump_printf_loc (MSG_NOTE, vect_location,
-				 "SLP instance %p can use load/store-lanes\n",
-				 (void *) instance);
-	    }
-	  else
-	    {
-	      can_use_lanes = false;
-	      break;
-	    }
-	}
-
-      /* If all SLP instances can use load/store-lanes abort SLP and try again
-	 with SLP disabled.  */
-      if (can_use_lanes)
-	{
-	  ok = opt_result::failure_at (vect_location,
-				       "Built SLP cancelled: can use "
-				       "load/store-lanes\n");
-	  if (dump_enabled_p ())
-	    dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
-			     "Built SLP cancelled: all SLP instances support "
-			     "load/store-lanes\n");
 	  goto again;
 	}
     }
@@ -3155,10 +3090,23 @@ start_over:
       if (direct_internal_fn_supported_p (IFN_SELECT_VL, iv_type,
 					  OPTIMIZE_FOR_SPEED)
 	  && LOOP_VINFO_LENS (loop_vinfo).length () == 1
-	  && LOOP_VINFO_LENS (loop_vinfo)[0].factor == 1 && !slp
+	  && LOOP_VINFO_LENS (loop_vinfo)[0].factor == 1
 	  && (!LOOP_VINFO_NITERS_KNOWN_P (loop_vinfo)
 	      || !LOOP_VINFO_VECT_FACTOR (loop_vinfo).is_constant ()))
 	LOOP_VINFO_USING_SELECT_VL_P (loop_vinfo) = true;
+
+      /* If any of the SLP instances cover more than a single lane
+	 we cannot use .SELECT_VL at the moment, even if the number
+	 of lanes is uniform throughout the SLP graph.  */
+      if (LOOP_VINFO_USING_SELECT_VL_P (loop_vinfo))
+	for (slp_instance inst : LOOP_VINFO_SLP_INSTANCES (loop_vinfo))
+	  if (SLP_TREE_LANES (SLP_INSTANCE_TREE (inst)) != 1
+	      && !(SLP_INSTANCE_KIND (inst) == slp_inst_kind_store
+		   && SLP_INSTANCE_TREE (inst)->ldst_lanes))
+	    {
+	      LOOP_VINFO_USING_SELECT_VL_P (loop_vinfo) = false;
+	      break;
+	    }
     }
 
   /* Decide whether this loop_vinfo should use partial vectors or peeling,
@@ -3276,15 +3224,14 @@ again:
   /* Ensure that "ok" is false (with an opt_problem if dumping is enabled).  */
   gcc_assert (!ok);
 
-  /* Try again with SLP forced off but if we didn't do any SLP there is
+  /* Try again with SLP degraded but if we didn't do any SLP there is
      no point in re-trying.  */
   if (!slp)
     return ok;
 
-  /* If the slp decision is true when suggested unroll factor is worked
-     out, and we are applying suggested unroll factor, we don't need to
-     re-try any more.  */
-  if (applying_suggested_uf && slp_done_for_suggested_uf)
+  /* If we are applying suggested unroll factor, we don't need to
+     re-try any more as we want to keep the SLP mode fixed.  */
+  if (applying_suggested_uf)
     return ok;
 
   /* If there are reduction chains re-trying will fail anyway.  */
@@ -3329,11 +3276,18 @@ again:
     }
 
   if (dump_enabled_p ())
-    dump_printf_loc (MSG_NOTE, vect_location,
-		     "re-trying with SLP disabled\n");
+    {
+      if (slp)
+	dump_printf_loc (MSG_NOTE, vect_location,
+			 "re-trying with single-lane SLP\n");
+      else
+	dump_printf_loc (MSG_NOTE, vect_location,
+			 "re-trying with SLP disabled\n");
+    }
 
-  /* Roll back state appropriately.  No SLP this time.  */
-  slp = false;
+  /* Roll back state appropriately.  Degrade SLP this time.  From multi-
+     to single-lane to disabled.  */
+  --slp;
   /* Restore vectorization factor as it were without SLP.  */
   LOOP_VINFO_VECT_FACTOR (loop_vinfo) = saved_vectorization_factor;
   /* Free the SLP instances.  */
@@ -3478,7 +3432,7 @@ vect_analyze_loop_1 (class loop *loop, vec_info_shared *shared,
   machine_mode vector_mode = vector_modes[mode_i];
   loop_vinfo->vector_mode = vector_mode;
   unsigned int suggested_unroll_factor = 1;
-  bool slp_done_for_suggested_uf = false;
+  unsigned slp_done_for_suggested_uf = 0;
 
   /* Run the main analysis.  */
   opt_result res = vect_analyze_loop_2 (loop_vinfo, fatal,
@@ -4400,7 +4354,8 @@ vect_is_simple_reduction (loop_vec_info loop_info, stmt_vec_info phi_info,
 	  && is_a <gphi *> (phi_use_stmt)
 	  && flow_bb_inside_loop_p (loop->inner, gimple_bb (phi_use_stmt))
 	  && (op1 == PHI_ARG_DEF_FROM_EDGE (phi_use_stmt,
-					    loop_latch_edge (loop->inner))))
+					    loop_latch_edge (loop->inner)))
+	  && lcphis.length () == 1)
         {
           if (dump_enabled_p ())
             report_vect_op (MSG_NOTE, def_stmt,
@@ -5289,6 +5244,7 @@ vect_is_emulated_mixed_dot_prod (stmt_vec_info stmt_info)
 
   gcc_assert (STMT_VINFO_REDUC_VECTYPE_IN (stmt_info));
   return !directly_supported_p (DOT_PROD_EXPR,
+				STMT_VINFO_VECTYPE (stmt_info),
 				STMT_VINFO_REDUC_VECTYPE_IN (stmt_info),
 				optab_vector_mixed_sign);
 }
@@ -10322,12 +10278,11 @@ vectorizable_induction (loop_vec_info loop_vinfo,
   tree vec_def;
   edge pe = loop_preheader_edge (loop);
   basic_block new_bb;
-  tree new_vec, vec_init, vec_step, t;
+  tree new_vec, vec_init = NULL_TREE, vec_step, t;
   tree new_name;
   gimple *new_stmt;
   gphi *induction_phi;
   tree induc_def, vec_dest;
-  tree init_expr, step_expr;
   poly_uint64 vf = LOOP_VINFO_VECT_FACTOR (loop_vinfo);
   unsigned i;
   tree expr;
@@ -10413,7 +10368,7 @@ vectorizable_induction (loop_vec_info loop_vinfo,
     iv_loop = loop;
   gcc_assert (iv_loop == (gimple_bb (phi))->loop_father);
 
-  if (slp_node && !nunits.is_constant ())
+  if (slp_node && (!nunits.is_constant () && SLP_TREE_LANES (slp_node) != 1))
     {
       /* The current SLP code creates the step value element-by-element.  */
       if (dump_enabled_p ())
@@ -10431,7 +10386,7 @@ vectorizable_induction (loop_vec_info loop_vinfo,
       return false;
     }
 
-  step_expr = STMT_VINFO_LOOP_PHI_EVOLUTION_PART (stmt_info);
+  tree step_expr = STMT_VINFO_LOOP_PHI_EVOLUTION_PART (stmt_info);
   gcc_assert (step_expr != NULL_TREE);
   if (INTEGRAL_TYPE_P (TREE_TYPE (step_expr))
       && !type_has_mode_precision_p (TREE_TYPE (step_expr)))
@@ -10519,9 +10474,6 @@ vectorizable_induction (loop_vec_info loop_vinfo,
        [i2 + 2*S2, i0 + 3*S0, i1 + 3*S1, i2 + 3*S2].  */
   if (slp_node)
     {
-      /* Enforced above.  */
-      unsigned int const_nunits = nunits.to_constant ();
-
       /* The initial values are vectorized, but any lanes > group_size
 	 need adjustment.  */
       slp_tree init_node
@@ -10543,11 +10495,12 @@ vectorizable_induction (loop_vec_info loop_vinfo,
 
       /* Now generate the IVs.  */
       unsigned nvects = SLP_TREE_NUMBER_OF_VEC_STMTS (slp_node);
-      gcc_assert ((const_nunits * nvects) % group_size == 0);
+      gcc_assert (multiple_p (nunits * nvects, group_size));
       unsigned nivs;
+      unsigned HOST_WIDE_INT const_nunits;
       if (nested_in_vect_loop)
 	nivs = nvects;
-      else
+      else if (nunits.is_constant (&const_nunits))
 	{
 	  /* Compute the number of distinct IVs we need.  First reduce
 	     group_size if it is a multiple of const_nunits so we get
@@ -10558,21 +10511,43 @@ vectorizable_induction (loop_vec_info loop_vinfo,
 	  nivs = least_common_multiple (group_sizep,
 					const_nunits) / const_nunits;
 	}
+      else
+	{
+	  gcc_assert (SLP_TREE_LANES (slp_node) == 1);
+	  nivs = 1;
+	}
+      gimple_seq init_stmts = NULL;
       tree stept = TREE_TYPE (step_vectype);
       tree lupdate_mul = NULL_TREE;
       if (!nested_in_vect_loop)
 	{
-	  /* The number of iterations covered in one vector iteration.  */
-	  unsigned lup_mul = (nvects * const_nunits) / group_size;
-	  lupdate_mul
-	    = build_vector_from_val (step_vectype,
-				     SCALAR_FLOAT_TYPE_P (stept)
-				     ? build_real_from_wide (stept, lup_mul,
-							     UNSIGNED)
-				     : build_int_cstu (stept, lup_mul));
+	  if (nunits.is_constant (&const_nunits))
+	    {
+	      /* The number of iterations covered in one vector iteration.  */
+	      unsigned lup_mul = (nvects * const_nunits) / group_size;
+	      lupdate_mul
+		= build_vector_from_val (step_vectype,
+					 SCALAR_FLOAT_TYPE_P (stept)
+					 ? build_real_from_wide (stept, lup_mul,
+								 UNSIGNED)
+					 : build_int_cstu (stept, lup_mul));
+	    }
+	  else
+	    {
+	      if (SCALAR_FLOAT_TYPE_P (stept))
+		{
+		  tree tem = build_int_cst (integer_type_node, vf);
+		  lupdate_mul = gimple_build (&init_stmts, FLOAT_EXPR,
+					      stept, tem);
+		}
+	      else
+		lupdate_mul = build_int_cst (stept, vf);
+	      lupdate_mul = gimple_build_vector_from_val (&init_stmts,
+							  step_vectype,
+							  lupdate_mul);
+	    }
 	}
       tree peel_mul = NULL_TREE;
-      gimple_seq init_stmts = NULL;
       if (LOOP_VINFO_MASK_SKIP_NITERS (loop_vinfo))
 	{
 	  if (SCALAR_FLOAT_TYPE_P (stept))
@@ -10584,44 +10559,105 @@ vectorizable_induction (loop_vec_info loop_vinfo,
 	  peel_mul = gimple_build_vector_from_val (&init_stmts,
 						   step_vectype, peel_mul);
 	}
+      tree step_mul = NULL_TREE;
       unsigned ivn;
       auto_vec<tree> vec_steps;
       for (ivn = 0; ivn < nivs; ++ivn)
 	{
-	  tree_vector_builder step_elts (step_vectype, const_nunits, 1);
-	  tree_vector_builder init_elts (vectype, const_nunits, 1);
-	  tree_vector_builder mul_elts (step_vectype, const_nunits, 1);
-	  for (unsigned eltn = 0; eltn < const_nunits; ++eltn)
+	  gimple_seq stmts = NULL;
+	  bool invariant = true;
+	  if (nunits.is_constant (&const_nunits))
 	    {
-	      /* The scalar steps of the IVs.  */
-	      tree elt = steps[(ivn*const_nunits + eltn) % group_size];
-	      elt = gimple_convert (&init_stmts, TREE_TYPE (step_vectype), elt);
-	      step_elts.quick_push (elt);
-	      if (!init_node)
+	      tree_vector_builder step_elts (step_vectype, const_nunits, 1);
+	      tree_vector_builder init_elts (vectype, const_nunits, 1);
+	      tree_vector_builder mul_elts (step_vectype, const_nunits, 1);
+	      for (unsigned eltn = 0; eltn < const_nunits; ++eltn)
 		{
-		  /* The scalar inits of the IVs if not vectorized.  */
-		  elt = inits[(ivn*const_nunits + eltn) % group_size];
-		  if (!useless_type_conversion_p (TREE_TYPE (vectype),
-						  TREE_TYPE (elt)))
-		    elt = gimple_build (&init_stmts, VIEW_CONVERT_EXPR,
-					TREE_TYPE (vectype), elt);
-		  init_elts.quick_push (elt);
+		  /* The scalar steps of the IVs.  */
+		  tree elt = steps[(ivn*const_nunits + eltn) % group_size];
+		  elt = gimple_convert (&init_stmts,
+					TREE_TYPE (step_vectype), elt);
+		  step_elts.quick_push (elt);
+		  if (!init_node)
+		    {
+		      /* The scalar inits of the IVs if not vectorized.  */
+		      elt = inits[(ivn*const_nunits + eltn) % group_size];
+		      if (!useless_type_conversion_p (TREE_TYPE (vectype),
+						      TREE_TYPE (elt)))
+			elt = gimple_build (&init_stmts, VIEW_CONVERT_EXPR,
+					    TREE_TYPE (vectype), elt);
+		      init_elts.quick_push (elt);
+		    }
+		  /* The number of steps to add to the initial values.  */
+		  unsigned mul_elt = (ivn*const_nunits + eltn) / group_size;
+		  mul_elts.quick_push (SCALAR_FLOAT_TYPE_P (stept)
+				       ? build_real_from_wide (stept, mul_elt,
+							       UNSIGNED)
+				       : build_int_cstu (stept, mul_elt));
 		}
-	      /* The number of steps to add to the initial values.  */
-	      unsigned mul_elt = (ivn*const_nunits + eltn) / group_size;
-	      mul_elts.quick_push (SCALAR_FLOAT_TYPE_P (stept)
-				   ? build_real_from_wide (stept,
-							   mul_elt, UNSIGNED)
-				   : build_int_cstu (stept, mul_elt));
+	      vec_step = gimple_build_vector (&init_stmts, &step_elts);
+	      step_mul = gimple_build_vector (&init_stmts, &mul_elts);
+	      if (!init_node)
+		vec_init = gimple_build_vector (&init_stmts, &init_elts);
 	    }
-	  vec_step = gimple_build_vector (&init_stmts, &step_elts);
+	  else
+	    {
+	      if (init_node)
+		;
+	      else if (INTEGRAL_TYPE_P (TREE_TYPE (steps[0])))
+		{
+		  new_name = gimple_convert (&init_stmts, stept, inits[0]);
+		  /* Build the initial value directly as a VEC_SERIES_EXPR.  */
+		  vec_init = gimple_build (&init_stmts, VEC_SERIES_EXPR,
+					   step_vectype, new_name, steps[0]);
+		  if (!useless_type_conversion_p (vectype, step_vectype))
+		    vec_init = gimple_build (&init_stmts, VIEW_CONVERT_EXPR,
+					     vectype, vec_init);
+		}
+	      else
+		{
+		  /* Build:
+		       [base, base, base, ...]
+		       + (vectype) [0, 1, 2, ...] * [step, step, step, ...].  */
+		  gcc_assert (SCALAR_FLOAT_TYPE_P (TREE_TYPE (steps[0])));
+		  gcc_assert (flag_associative_math);
+		  tree index = build_index_vector (step_vectype, 0, 1);
+		  new_name = gimple_convert (&init_stmts, TREE_TYPE (steps[0]),
+					     inits[0]);
+		  tree base_vec = gimple_build_vector_from_val (&init_stmts,
+								step_vectype,
+								new_name);
+		  tree step_vec = gimple_build_vector_from_val (&init_stmts,
+								step_vectype,
+								steps[0]);
+		  vec_init = gimple_build (&init_stmts, FLOAT_EXPR,
+					   step_vectype, index);
+		  vec_init = gimple_build (&init_stmts, MULT_EXPR,
+					   step_vectype, vec_init, step_vec);
+		  vec_init = gimple_build (&init_stmts, PLUS_EXPR,
+					   step_vectype, vec_init, base_vec);
+		  if (!useless_type_conversion_p (vectype, step_vectype))
+		    vec_init = gimple_build (&init_stmts, VIEW_CONVERT_EXPR,
+					     vectype, vec_init);
+		}
+	      /* iv_loop is nested in the loop to be vectorized. Generate:
+		 vec_step = [S, S, S, S]  */
+	      t = unshare_expr (steps[0]);
+	      gcc_assert (CONSTANT_CLASS_P (t)
+			  || TREE_CODE (t) == SSA_NAME);
+	      vec_step = gimple_build_vector_from_val (&init_stmts,
+						       step_vectype, t);
+	    }
 	  vec_steps.safe_push (vec_step);
-	  tree step_mul = gimple_build_vector (&init_stmts, &mul_elts);
 	  if (peel_mul)
-	    step_mul = gimple_build (&init_stmts, PLUS_EXPR, step_vectype,
-				     step_mul, peel_mul);
-	  if (!init_node)
-	    vec_init = gimple_build_vector (&init_stmts, &init_elts);
+	    {
+	      if (!step_mul)
+		step_mul = peel_mul;
+	      else
+		step_mul = gimple_build (&init_stmts,
+					 MINUS_EXPR, step_vectype,
+					 step_mul, peel_mul);
+	    }
 
 	  /* Create the induction-phi that defines the induction-operand.  */
 	  vec_dest = vect_get_new_vect_var (vectype, vect_simple_var,
@@ -10632,9 +10668,38 @@ vectorizable_induction (loop_vec_info loop_vinfo,
 	  /* Create the iv update inside the loop  */
 	  tree up = vec_step;
 	  if (lupdate_mul)
-	    up = gimple_build (&init_stmts, MULT_EXPR, step_vectype,
-			       vec_step, lupdate_mul);
-	  gimple_seq stmts = NULL;
+	    {
+	      if (LOOP_VINFO_USING_SELECT_VL_P (loop_vinfo))
+		{
+		  /* When we're using loop_len produced by SELEC_VL, the
+		     non-final iterations are not always processing VF
+		     elements.  So vectorize induction variable instead of
+
+		       _21 = vect_vec_iv_.6_22 + { VF, ... };
+
+		     We should generate:
+
+		       _35 = .SELECT_VL (ivtmp_33, VF);
+		       vect_cst__22 = [vec_duplicate_expr] _35;
+		       _21 = vect_vec_iv_.6_22 + vect_cst__22;  */
+		  vec_loop_lens *lens = &LOOP_VINFO_LENS (loop_vinfo);
+		  tree len = vect_get_loop_len (loop_vinfo, NULL, lens, 1,
+						vectype, 0, 0);
+		  if (SCALAR_FLOAT_TYPE_P (stept))
+		    expr = gimple_build (&stmts, FLOAT_EXPR, stept, len);
+		  else
+		    expr = gimple_convert (&stmts, stept, len);
+		  lupdate_mul = gimple_build_vector_from_val (&stmts,
+							      step_vectype,
+							      expr);
+		  up = gimple_build (&stmts, MULT_EXPR,
+				     step_vectype, vec_step, lupdate_mul);
+		}
+	      else
+		up = gimple_build (&init_stmts,
+				   MULT_EXPR, step_vectype,
+				   vec_step, lupdate_mul);
+	    }
 	  vec_def = gimple_convert (&stmts, step_vectype, induc_def);
 	  vec_def = gimple_build (&stmts,
 				  PLUS_EXPR, step_vectype, vec_def, up);
@@ -10646,8 +10711,10 @@ vectorizable_induction (loop_vec_info loop_vinfo,
 	  if (init_node)
 	    vec_init = vect_get_slp_vect_def (init_node, ivn);
 	  if (!nested_in_vect_loop
+	      && step_mul
 	      && !integer_zerop (step_mul))
 	    {
+	      gcc_assert (invariant);
 	      vec_def = gimple_convert (&init_stmts, step_vectype, vec_init);
 	      up = gimple_build (&init_stmts, MULT_EXPR, step_vectype,
 				 vec_step, step_mul);
@@ -10664,8 +10731,11 @@ vectorizable_induction (loop_vec_info loop_vinfo,
       if (!nested_in_vect_loop)
 	{
 	  /* Fill up to the number of vectors we need for the whole group.  */
-	  nivs = least_common_multiple (group_size,
-					const_nunits) / const_nunits;
+	  if (nunits.is_constant (&const_nunits))
+	    nivs = least_common_multiple (group_size,
+					  const_nunits) / const_nunits;
+	  else
+	    nivs = 1;
 	  vec_steps.reserve (nivs-ivn);
 	  for (; ivn < nivs; ++ivn)
 	    {
@@ -10678,14 +10748,31 @@ vectorizable_induction (loop_vec_info loop_vinfo,
 	 stmts by adding VF' * stride to the IVs generated above.  */
       if (ivn < nvects)
 	{
-	  unsigned vfp
-	    = least_common_multiple (group_size, const_nunits) / group_size;
-	  tree lupdate_mul
-	    = build_vector_from_val (step_vectype,
-				     SCALAR_FLOAT_TYPE_P (stept)
-				     ? build_real_from_wide (stept,
-							     vfp, UNSIGNED)
-				     : build_int_cstu (stept, vfp));
+	  if (nunits.is_constant (&const_nunits))
+	    {
+	      unsigned vfp = (least_common_multiple (group_size, const_nunits)
+			      / group_size);
+	      lupdate_mul
+		= build_vector_from_val (step_vectype,
+					 SCALAR_FLOAT_TYPE_P (stept)
+					 ? build_real_from_wide (stept,
+								 vfp, UNSIGNED)
+					 : build_int_cstu (stept, vfp));
+	    }
+	  else
+	    {
+	      if (SCALAR_FLOAT_TYPE_P (stept))
+		{
+		  tree tem = build_int_cst (integer_type_node, nunits);
+		  lupdate_mul = gimple_build (&init_stmts, FLOAT_EXPR,
+					      stept, tem);
+		}
+	      else
+		lupdate_mul = build_int_cst (stept, nunits);
+	      lupdate_mul = gimple_build_vector_from_val (&init_stmts,
+							  step_vectype,
+							  lupdate_mul);
+	    }
 	  for (; ivn < nvects; ++ivn)
 	    {
 	      gimple *iv
@@ -10717,7 +10804,7 @@ vectorizable_induction (loop_vec_info loop_vinfo,
       return true;
     }
 
-  init_expr = vect_phi_initial_value (phi);
+  tree init_expr = vect_phi_initial_value (phi);
 
   gimple_seq stmts = NULL;
   if (!nested_in_vect_loop)
@@ -11036,7 +11123,8 @@ vectorizable_live_operation_1 (loop_vec_info loop_vinfo,
 
 	 where VEC_LHS is the vectorized live-out result and MASK is
 	 the loop mask for the final iteration.  */
-      gcc_assert (ncopies == 1 && !slp_node);
+      gcc_assert (ncopies == 1
+		  && (!slp_node || SLP_TREE_LANES (slp_node) == 1));
       gimple_seq tem = NULL;
       gimple_stmt_iterator gsi = gsi_last (tem);
       tree len = vect_get_loop_len (loop_vinfo, &gsi,
@@ -11070,7 +11158,7 @@ vectorizable_live_operation_1 (loop_vec_info loop_vinfo,
 
 	 where VEC_LHS is the vectorized live-out result and MASK is
 	 the loop mask for the final iteration.  */
-      gcc_assert (!slp_node);
+      gcc_assert (!slp_node || SLP_TREE_LANES (slp_node) == 1);
       tree scalar_type = TREE_TYPE (STMT_VINFO_VECTYPE (stmt_info));
       gimple_seq tem = NULL;
       gimple_stmt_iterator gsi = gsi_last (tem);
@@ -11222,7 +11310,7 @@ vectorizable_live_operation (vec_info *vinfo, stmt_vec_info stmt_info,
       /* No transformation required.  */
       if (loop_vinfo && LOOP_VINFO_CAN_USE_PARTIAL_VECTORS_P (loop_vinfo))
 	{
-	  if (slp_node)
+	  if (slp_node && SLP_TREE_LANES (slp_node) != 1)
 	    {
 	      if (dump_enabled_p ())
 		dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
@@ -11231,7 +11319,8 @@ vectorizable_live_operation (vec_info *vinfo, stmt_vec_info stmt_info,
 				 "the loop.\n");
 	      LOOP_VINFO_CAN_USE_PARTIAL_VECTORS_P (loop_vinfo) = false;
 	    }
-	  else if (ncopies > 1)
+	  else if (ncopies > 1
+		   || (slp_node && SLP_TREE_NUMBER_OF_VEC_STMTS (slp_node) > 1))
 	    {
 	      if (dump_enabled_p ())
 		dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
@@ -11241,7 +11330,8 @@ vectorizable_live_operation (vec_info *vinfo, stmt_vec_info stmt_info,
 	    }
 	  else
 	    {
-	      gcc_assert (ncopies == 1 && !slp_node);
+	      gcc_assert (ncopies == 1
+			  && (!slp_node || SLP_TREE_LANES (slp_node) == 1));
 	      if (direct_internal_fn_supported_p (IFN_EXTRACT_LAST, vectype,
 						  OPTIMIZE_FOR_SPEED))
 		vect_record_loop_mask (loop_vinfo,
@@ -11288,8 +11378,9 @@ vectorizable_live_operation (vec_info *vinfo, stmt_vec_info stmt_info,
   if (slp_node)
     {
       gcc_assert (!loop_vinfo
-		  || (!LOOP_VINFO_FULLY_MASKED_P (loop_vinfo)
-		      && !LOOP_VINFO_FULLY_WITH_LENGTH_P (loop_vinfo)));
+		  || ((!LOOP_VINFO_FULLY_MASKED_P (loop_vinfo)
+		       && !LOOP_VINFO_FULLY_WITH_LENGTH_P (loop_vinfo))
+		      || SLP_TREE_LANES (slp_node) == 1));
 
       /* Get the correct slp vectorized stmt.  */
       vec_lhs = SLP_TREE_VEC_DEFS (slp_node)[vec_entry];
@@ -12404,6 +12495,18 @@ vect_transform_loop (loop_vec_info loop_vinfo, gimple *loop_vectorized_call)
       vect_schedule_slp (loop_vinfo, LOOP_VINFO_SLP_INSTANCES (loop_vinfo));
     }
 
+  /* Generate the loop invariant statements.  */
+  if (!gimple_seq_empty_p (LOOP_VINFO_INV_PATTERN_DEF_SEQ (loop_vinfo)))
+    {
+      if (dump_enabled_p ())
+	dump_printf_loc (MSG_NOTE, vect_location,
+			 "------>generating loop invariant statements\n");
+      gimple_stmt_iterator gsi;
+      gsi = gsi_after_labels (loop_preheader_edge (loop)->src);
+      gsi_insert_seq_before (&gsi, LOOP_VINFO_INV_PATTERN_DEF_SEQ (loop_vinfo),
+			     GSI_CONTINUE_LINKING);
+    }
+
   /* FORNOW: the vectorizer supports only loops which body consist
      of one basic block (header + empty latch). When the vectorizer will
      support more involved loop forms, the order by which the BBs are
@@ -12875,6 +12978,7 @@ optimize_mask_stores (class loop *loop)
 		  if (has_zero_uses (lhs))
 		    {
 		      gsi_remove (&gsi_from, true);
+		      release_defs (stmt1);
 		      continue;
 		    }
 		}

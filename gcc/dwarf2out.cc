@@ -516,12 +516,11 @@ switch_to_frame_table_section (int for_eh, bool back)
 /* Describe for the GTY machinery what parts of dw_cfi_oprnd1 are used.  */
 
 enum dw_cfi_oprnd_type
-dw_cfi_oprnd1_desc (enum dwarf_call_frame_info cfi)
+dw_cfi_oprnd1_desc (dwarf_call_frame_info cfi)
 {
   switch (cfi)
     {
     case DW_CFA_nop:
-    case DW_CFA_GNU_window_save:
     case DW_CFA_remember_state:
     case DW_CFA_restore_state:
       return dw_cfi_oprnd_unused;
@@ -557,14 +556,20 @@ dw_cfi_oprnd1_desc (enum dwarf_call_frame_info cfi)
       return dw_cfi_oprnd_loc;
 
     default:
-      gcc_unreachable ();
+      {
+	dw_cfi_oprnd_type oprnd_type;
+	if (targetm.dw_cfi_oprnd1_desc (cfi, oprnd_type))
+	  return oprnd_type;
+	else
+	  gcc_unreachable ();
+      }
     }
 }
 
 /* Describe for the GTY machinery what parts of dw_cfi_oprnd2 are used.  */
 
 enum dw_cfi_oprnd_type
-dw_cfi_oprnd2_desc (enum dwarf_call_frame_info cfi)
+dw_cfi_oprnd2_desc (dwarf_call_frame_info cfi)
 {
   switch (cfi)
     {
@@ -5450,8 +5455,8 @@ get_AT (dw_die_ref die, enum dwarf_attribute attr_kind)
 
 /* Returns the parent of the declaration of DIE.  */
 
-static dw_die_ref
-get_die_parent (dw_die_ref die)
+dw_die_ref
+dw_get_die_parent (dw_die_ref die)
 {
   dw_die_ref t;
 
@@ -7783,7 +7788,7 @@ generate_type_signature (dw_die_ref die, comdat_type_node *type_node)
 
   name = get_AT_string (die, DW_AT_name);
   decl = get_AT_ref (die, DW_AT_specification);
-  parent = get_die_parent (die);
+  parent = dw_get_die_parent (die);
 
   /* First, compute a signature for just the type name (and its surrounding
      context, if any.  This is stored in the type unit DIE for link-time
@@ -14019,6 +14024,7 @@ modified_type_die (tree type, int cv_quals, bool reverse,
 	       || (cv_quals == TYPE_UNQUALIFIED)))
 	  || (TREE_CODE (name) == TYPE_DECL
 	      && DECL_NAME (name)
+	      && !DECL_NAMELESS (name)
 	      && (TREE_TYPE (name) == qualified_type
 		  || (lang_hooks.types.get_debug_type
 		      && (lang_hooks.types.get_debug_type (TREE_TYPE (name))

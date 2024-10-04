@@ -37,8 +37,7 @@ typedef struct dw_wide_int *dw_wide_int_ptr;
    Information instructions.  The register number, offset
    and address fields are provided as possible operands;
    their use is selected by the opcode field.  */
-
-enum dw_cfi_oprnd_type {
+enum dw_cfi_oprnd_type: int {
   dw_cfi_oprnd_unused,
   dw_cfi_oprnd_reg_num,
   dw_cfi_oprnd_offset,
@@ -405,12 +404,10 @@ extern void output_cfi (dw_cfi_ref, dw_fde_ref, int);
 extern GTY(()) cfi_vec cie_cfi_vec;
 
 /* Interface from dwarf2*.c to the rest of the compiler.  */
-extern enum dw_cfi_oprnd_type dw_cfi_oprnd1_desc
-  (enum dwarf_call_frame_info cfi);
-extern enum dw_cfi_oprnd_type dw_cfi_oprnd2_desc
-  (enum dwarf_call_frame_info cfi);
+extern enum dw_cfi_oprnd_type dw_cfi_oprnd1_desc (dwarf_call_frame_info cfi);
+extern enum dw_cfi_oprnd_type dw_cfi_oprnd2_desc (dwarf_call_frame_info cfi);
 
-extern void output_cfi_directive (FILE *f, struct dw_cfi_node *cfi);
+extern void output_cfi_directive (FILE *f, dw_cfi_ref cfi);
 
 extern void dwarf2out_emit_cfi (dw_cfi_ref cfi);
 
@@ -522,6 +519,7 @@ extern dw_die_ref lookup_type_die (tree);
 
 extern dw_die_ref dw_get_die_child (dw_die_ref);
 extern dw_die_ref dw_get_die_sib (dw_die_ref);
+extern dw_die_ref dw_get_die_parent (dw_die_ref);
 extern enum dwarf_tag dw_get_die_tag (dw_die_ref);
 
 /* Data about a single source file.  */

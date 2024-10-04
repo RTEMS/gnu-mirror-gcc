@@ -134,7 +134,9 @@ extern bool
 riscv_zcmp_valid_stack_adj_bytes_p (HOST_WIDE_INT, int);
 extern void riscv_legitimize_poly_move (machine_mode, rtx, rtx, rtx);
 extern void riscv_expand_usadd (rtx, rtx, rtx);
+extern void riscv_expand_ssadd (rtx, rtx, rtx);
 extern void riscv_expand_ussub (rtx, rtx, rtx);
+extern void riscv_expand_sssub (rtx, rtx, rtx);
 extern void riscv_expand_ustrunc (rtx, rtx);
 
 #ifdef RTX_CODE
@@ -644,6 +646,7 @@ void expand_vec_lround (rtx, rtx, machine_mode, machine_mode, machine_mode);
 void expand_vec_lceil (rtx, rtx, machine_mode, machine_mode);
 void expand_vec_lfloor (rtx, rtx, machine_mode, machine_mode);
 void expand_vec_usadd (rtx, rtx, rtx, machine_mode);
+void expand_vec_ssadd (rtx, rtx, rtx, machine_mode);
 void expand_vec_ussub (rtx, rtx, rtx, machine_mode);
 void expand_vec_double_ustrunc (rtx, rtx, machine_mode);
 void expand_vec_quad_ustrunc (rtx, rtx, machine_mode, machine_mode);
