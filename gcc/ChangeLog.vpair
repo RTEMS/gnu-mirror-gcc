@@ -1,6 +1,36 @@
+==================== Branch work180-vpair, patch #300 ====================
+
+Initial vector-pair.h support
+
+2024-10-06  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config.gcc (powerpc*-*-*): Add vector-pair.h to extra headers.
+	* config/rs6000/vector-pair.h: New file.
+	* doc/extend.texi (PowerPC Vector Pair Support): Document the vector
+	pair support functions.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vpair-1.c: New test or include file.
+	* gcc.target/powerpc/vpair-2.c: Likewise.
+	* gcc.target/powerpc/vpair-3-not-p10.c: Likewise.
+	* gcc.target/powerpc/vpair-3-p10.c: Likewise.
+	* gcc.target/powerpc/vpair-3.h: Likewise.
+	* gcc.target/powerpc/vpair-4-not-p10.c: Likewise.
+	* gcc.target/powerpc/vpair-4-p10.c: Likewise.
+	* gcc.target/powerpc/vpair-4.h: Likewise.
+
 ==================== Branch work180-vpair, baseline ====================
 
-2024-10-05   Michael Meissner  <meissner@linux.ibm.com>
+Add ChangeLog.vpair and update REVISION.
+
+2024-10-05  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* ChangeLog.vpair: New file for branch.
+	* REVISION: Update.
 
 	Clone branch
-
