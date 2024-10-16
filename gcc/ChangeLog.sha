@@ -6,14 +6,16 @@ Initial support for adding xxeval fusion support.
 
 gcc/
 
-	* config/rs6000/fusion.md (fuse_vandc_xor_noxxeval): Rename from
-	fuse_vandc_xor, and restrict the case to non-xxeval support.
-	(fuse_vandc_vxor_xxeval): New insn.
-	(fuse_vxor_vxor_noxxeval): Rename from fuse_vxor_xor, and restrict the
-	case to non-xxeval support.
-	(fuse_vxor_vxor_xxeval): New insn.
+	* config/rs6000/fusion.md: Regenerate.
+	* config/rs6000/genfusion.pl (gen_logical_addsubf): Add support to
+	generate vector/vector logical fusion if XXEVAL supports the fusion.
+	* config/rs6000/predicates.md (vector_fusion_operand): New predicate.
 	* config/rs6000/rs6000.cc (rs6000_opt_vars): Add -mxxeval.
+	* config/rs6000/rs6000.md (isa attribute): Add xxeval.
+	(enabled attribute): Add support for -mxxeval.
 	* config/rs6000/rs6000.opt (-mxxeval): New switch.
+
+==================== Branch work181-sha, patch #400 was reverted ====================
 
 ==================== Branch work181-sha, baseline ====================
 
