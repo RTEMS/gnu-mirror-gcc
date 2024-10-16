@@ -1,4 +1,30 @@
+==================== Branch work181-sha, patch #400 ====================
+
+Initial support for adding xxeval fusion support.
+
+2024-10-16  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/fusion.md (fuse_vandc_xor_noxxeval): Rename from
+	fuse_vandc_xor, and restrict the case to non-xxeval support.
+	(fuse_vandc_vxor_xxeval): New insn.
+	(fuse_vxor_vxor_noxxeval): Rename from fuse_vxor_xor, and restrict the
+	case to non-xxeval support.
+	(fuse_vxor_vxor_xxeval): New insn.
+	* config/rs6000/rs6000.cc (rs6000_opt_vars): Add -mxxeval.
+	* config/rs6000/rs6000.opt (-mxxeval): New switch.
+
 ==================== Branch work181-sha, baseline ====================
+
+Add ChangeLog.sha and update REVISION.
+
+2024-10-14  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* ChangeLog.sha: New file for branch.
+	* REVISION: Update.
 
 2024-10-14   Michael Meissner  <meissner@linux.ibm.com>
 
