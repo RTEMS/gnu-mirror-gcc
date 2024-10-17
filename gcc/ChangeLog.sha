@@ -1,3 +1,14 @@
+==================== Branch work181-sha, patch #403 ====================
+
+Rename sha3 tests.
+
+2024-10-17  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/p10-vector-fused-1.c: Renamed from xxeval-1.c.
+	* gcc.target/powerpc/p10-vector-fused-2.c: Renamed from xxeval-2.c.
+
 ==================== Branch work181-sha, patch #402 ====================
 
 Add sha3 tests; Fix bugs.
