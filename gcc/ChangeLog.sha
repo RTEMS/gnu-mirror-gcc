@@ -1,4 +1,21 @@
-==================== Branch work181-sha, patch #400 ====================
+==================== Branch work181-sha, patch #402 ====================
+
+Add sha3 tests; Fix bugs.
+
+2024-10-17  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/fusion.md: Regenerate.
+	* config/rs6000/genfusion.pl (gen_logical_addsubf): Remove two incorrect
+	xxeval fusion patterns.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/xxeval-1.c: New test
+	* gcc.target/powerpc/xxeval-2.c: Likewise.
+
+==================== Branch work181-sha, patch #401 ====================
 
 Initial support for adding xxeval fusion support.
 
