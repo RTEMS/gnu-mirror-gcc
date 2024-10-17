@@ -217,7 +217,6 @@ sub gen_logical_addsubf
     my %xxeval_fusions = (
       "vand_vand"   =>   1,
       "vandc_vand"  =>   2,
-      "vorc_vandc"  =>   4,
       "vxor_vand"   =>   6,
       "vor_vand"    =>   7,
       "vnor_vand"   =>   8,
@@ -249,7 +248,6 @@ sub gen_logical_addsubf
       "vorc_vor"    => 191,
       "vandc_vnor"  => 208,
       "vandc_veqv"  => 210,
-      "vandc_vorc"  => 223,
       "vand_vnor"   => 224,
       "vnand_vxor"  => 225,
       "vnand_vor"   => 239,
