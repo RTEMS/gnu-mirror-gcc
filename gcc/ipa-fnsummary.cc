@@ -3080,7 +3080,7 @@ analyze_function_body (struct cgraph_node *node, bool early)
 	      es->call_stmt_time = this_time;
 	      es->loop_depth = bb_loop_depth (bb);
 	      edge_set_predicate (edge, &bb_predicate);
-	      if (edge->speculative)
+	      if (edge->speculative || edge->callback)
 		{
 		  cgraph_edge *indirect
 			= edge->speculative_call_indirect_edge ();
@@ -3489,6 +3489,13 @@ compute_fn_summary (struct cgraph_node *node, bool early)
       for (e = node->indirect_calls; e; e = e->next_callee)
        if (e->speculative)
 	 break;
+
+      if (!e)
+	{
+	  for (e = node->callees; e; e = e->next_callee)
+	    if (e->callback)
+	      break;
+	}
       gcc_assert (e || size_info->size == size_info->self_size);
     }
 }

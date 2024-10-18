@@ -1769,6 +1769,10 @@ public:
      target2.  */
   cgraph_edge *next_speculative_call_target ()
   {
+    if (callback)
+      {
+	return NULL;
+      }
     cgraph_edge *e = this;
     gcc_checking_assert (speculative && callee);
 
@@ -1783,15 +1787,29 @@ public:
      indirect call edge in the speculative call sequence.  */
   cgraph_edge *speculative_call_indirect_edge ()
   {
-    gcc_checking_assert (speculative);
+    gcc_checking_assert (speculative || callback);
     if (!callee)
       return this;
-    for (cgraph_edge *e2 = caller->indirect_calls;
-	 true; e2 = e2->next_callee)
+    
+    cgraph_edge * e2 = NULL;
+    for (e2 = caller->indirect_calls;
+	 e2; e2 = e2->next_callee)
       if (e2->speculative
 	  && call_stmt == e2->call_stmt
 	  && lto_stmt_uid == e2->lto_stmt_uid)
 	return e2;
+
+    if (!e2 && callback)
+      {
+	for (e2 = caller->callees; e2; e2 = e2->next_callee)
+	  {
+	    if (e2->has_callback && call_stmt == e2->call_stmt)
+	      {
+		return e2;
+	      }
+	  }
+      }
+          gcc_unreachable();
   }
 
   /* When called on any edge in speculative call and when given any target
