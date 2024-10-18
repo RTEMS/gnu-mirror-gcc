@@ -1735,6 +1735,9 @@ public:
   cgraph_edge *make_speculative (cgraph_node *n2, profile_count direct_count,
 				 unsigned int speculative_id = 0);
 
+  /* TODO DOCS */
+  cgraph_edge *make_callback (cgraph_node *n2);
+
   /* Speculative call consists of an indirect edge and one or more
      direct edge+ref pairs.  Speculative will expand to the following sequence:
 
@@ -1951,6 +1954,10 @@ public:
      Optimizers may later redirect direct call to clone, so 1) and 3)
      do not need to necessarily agree with destination.  */
   unsigned int speculative : 1;
+  /* TODO DOCS */
+  unsigned int callback : 1;
+  /* TODO DOCS */
+  unsigned int has_callback : 1;
   /* Set to true when caller is a constructor or destructor of polymorphic
      type.  */
   unsigned in_polymorphic_cdtor : 1;

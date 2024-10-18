@@ -452,6 +452,12 @@ can_inline_edge_p (struct cgraph_edge *e, bool report,
     }
   if (!inlinable && report)
     report_inline_failed_reason (e);
+
+  if(e->callback) {
+    printf("skipping inline - tried to inline: %d\n", inlinable);
+    inlinable = false;
+  }
+
   return inlinable;
 }
 
