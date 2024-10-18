@@ -1,5 +1,17 @@
 ==================== Branch work181-sha, patch #403 ====================
 
+Move xxeval case before alternative that needs a temporary register.
+
+2024-10-18  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/genfusion.pl (gen_logical_addsubf): Move xxeval case
+	before alternative that needs a temporary register.
+	* config/rs6000/fusion.md: Regenerate.
+
+==================== Branch work181-sha, patch #403 ====================
+
 Rename sha3 tests.
 
 2024-10-17  Michael Meissner  <meissner@linux.ibm.com>
