@@ -885,7 +885,7 @@ symbol_table::create_edge (cgraph_node *caller, cgraph_node *callee,
 	 construction of call stmt hashtable.  */
       cgraph_edge *e;
       gcc_checking_assert (!(e = caller->get_edge (call_stmt))
-			   || e->speculative);
+			   || e->speculative || e->has_callback);
 
       gcc_assert (is_gimple_call (call_stmt));
     }
@@ -912,6 +912,8 @@ symbol_table::create_edge (cgraph_node *caller, cgraph_node *callee,
   edge->indirect_info = NULL;
   edge->indirect_inlining_edge = 0;
   edge->speculative = false;
+  edge->has_callback = false;
+  edge->callback = false;
   edge->indirect_unknown_callee = indir_unknown_callee;
   if (call_stmt && caller->call_site_hash)
     cgraph_add_edge_to_call_site_hash (edge);
@@ -1133,6 +1135,28 @@ cgraph_edge::make_speculative (cgraph_node *n2, profile_count direct_count,
   ref->lto_stmt_uid = lto_stmt_uid;
   ref->speculative_id = speculative_id;
   ref->speculative = speculative;
+  n2->mark_address_taken ();
+  return e2;
+}
+
+cgraph_edge *
+cgraph_edge::make_callback (cgraph_node *n2)
+{
+  cgraph_node *n = caller;
+  cgraph_edge *e2;
+
+  if (dump_file)
+    fprintf (dump_file, "Indirect call -> callback call %s => %s\n",
+	     n->dump_name (), n2->dump_name ());
+  has_callback = true;
+  e2 = n->create_edge (n2, call_stmt, count);
+  initialize_inline_failed (e2);
+  e2->callback = true;
+  if (TREE_NOTHROW (n2->decl))
+    e2->can_throw_external = false;
+  else
+    e2->can_throw_external = can_throw_external;
+  e2->lto_stmt_uid = lto_stmt_uid;
   n2->mark_address_taken ();
   return e2;
 }

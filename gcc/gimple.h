@@ -22,8 +22,11 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_GIMPLE_H
 #define GCC_GIMPLE_H
 
+#include "stringpool.h"
+#include "attribs.h"
 #include "tree-ssa-alias.h"
 #include "gimple-expr.h"
+#include "tree.h"
 
 typedef gimple *gimple_seq_node;
 
@@ -5814,9 +5817,16 @@ inline void
 gimple_omp_parallel_set_child_fn (gomp_parallel *omp_parallel_stmt,
 				  tree child_fn)
 {
+  if (child_fn != NULL_TREE
+      && !lookup_attribute ("callback", DECL_ATTRIBUTES (child_fn)))
+    {
+      tree attrs = tree_cons (get_identifier ("callback"), NULL,
+			      DECL_ATTRIBUTES (child_fn));
+      decl_attributes (&child_fn, attrs, 0);
+    }
+
   omp_parallel_stmt->child_fn = child_fn;
 }
-
 
 /* Return the artificial argument used to send variables and values
    from the parent to the children threads in OMP_PARALLEL_STMT.  */

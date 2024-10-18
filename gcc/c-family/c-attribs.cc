@@ -642,7 +642,8 @@ const struct attribute_spec c_common_gnu_attributes[] =
   { "flag_enum",	      0, 0, false, true, false, false,
 			      handle_flag_enum_attribute, NULL },
   { "null_terminated_string_arg", 1, 1, false, true, true, false,
-			      handle_null_terminated_string_arg_attribute, NULL}
+			      handle_null_terminated_string_arg_attribute, NULL},
+  { "callback", 0, 0, true, false, false, false, NULL, NULL}
 };
 
 const struct scoped_attribute_specs c_common_gnu_attribute_table =

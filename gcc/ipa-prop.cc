@@ -59,6 +59,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "attr-fnspec.h"
 #include "gimple-range.h"
 #include "value-range-storage.h"
+#include "attribs.h"
+#include "ipa-ref.h"
+#include "is-a.h"
 
 /* Function summary where the parameter infos are actually stored. */
 ipa_node_params_t *ipa_node_params_sum = NULL;
@@ -3193,6 +3196,27 @@ ipa_analyze_node (struct cgraph_node *node)
   fbi.bb_infos.safe_grow_cleared (last_basic_block_for_fn (cfun), true);
   fbi.param_count = ipa_get_param_count (info);
   fbi.aa_walk_budget = opt_for_fn (node->decl, param_ipa_max_aa_steps);
+
+  if (lookup_attribute ("callback", DECL_ATTRIBUTES (node->decl)))
+    {
+      printf ("callback ahoj %s\n", node->name ());
+      gcc_checking_assert (node->referred_to_p ());
+
+      ipa_ref *ref = NULL;
+      for (int i = 0; node->iterate_referring (i, ref); i++)
+	{
+	    if (ref->use == IPA_REF_ADDR) {
+	      gcc_checking_assert(dyn_cast<gcall*>(ref->stmt));
+	      gcall * call_stmt = dyn_cast<gcall *>(ref->stmt);
+	      cgraph_node * reffering_node = dyn_cast<cgraph_node *>(ref->referring);
+	      gcc_checking_assert(call_stmt);
+	      gcc_checking_assert(reffering_node);
+        cgraph_edge * e = reffering_node->get_edge(ref->stmt);
+        e->make_callback(node);
+        ipa_analyze_node(e->caller);
+	    }
+	}
+    }
 
   for (struct cgraph_edge *cs = node->callees; cs; cs = cs->next_callee)
     {
