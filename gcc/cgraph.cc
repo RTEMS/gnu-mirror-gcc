@@ -1515,9 +1515,7 @@ cgraph_edge::redirect_call_stmt_to_callee (cgraph_edge *e,
 	}
     }
 
-
-  if (e->indirect_unknown_callee
-      || decl == e->callee->decl)
+  if (e->indirect_unknown_callee || decl == e->callee->decl || e->callback)
     return e->call_stmt;
 
   if (decl && ipa_saved_clone_sources)
@@ -3683,6 +3681,7 @@ cgraph_node::verify_node (void)
       if (gimple_has_body_p (e->caller->decl)
 	  && !e->caller->inlined_to
 	  && !e->speculative
+	  && !e->callback
 	  /* Optimized out calls are redirected to __builtin_unreachable.  */
 	  && (e->count.nonzero_p ()
 	      || ! e->callee->decl
@@ -3930,7 +3929,7 @@ cgraph_node::verify_node (void)
 
       for (e = callees; e; e = e->next_callee)
 	{
-	  if (!e->aux && !e->speculative)
+	  if (!e->aux && !e->speculative && !e->callback)
 	    {
 	      error ("edge %s->%s has no corresponding call_stmt",
 		     identifier_to_locale (e->caller->name ()),
