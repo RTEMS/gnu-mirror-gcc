@@ -1872,16 +1872,16 @@
 ;; vector vand -> vand
 (define_insn "*fuse_vand_vand"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (and:VM (and:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v")
-                          (match_operand:VM 1 "vector_fusion_operand" "%v,v,v,wa,v"))
-                 (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v")))
+        (and:VM (and:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v")
+                          (match_operand:VM 1 "vector_fusion_operand" "%wa,v,v,v,v"))
+                 (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v")))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vand %3,%1,%0\;vand %3,%3,%2
-   vand %3,%1,%0\;vand %3,%3,%2
-   vand %3,%1,%0\;vand %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,1
+   vand %3,%1,%0\;vand %3,%3,%2
+   vand %3,%1,%0\;vand %3,%3,%2
+   vand %3,%1,%0\;vand %3,%3,%2
    vand %4,%1,%0\;vand %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -1893,16 +1893,16 @@
 ;; vector vandc -> vand
 (define_insn "*fuse_vandc_vand"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (and:VM (and:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v"))
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v"))
-                 (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v")))
+        (and:VM (and:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v"))
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v"))
+                 (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v")))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vandc %3,%1,%0\;vand %3,%3,%2
-   vandc %3,%1,%0\;vand %3,%3,%2
-   vandc %3,%1,%0\;vand %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,2
+   vandc %3,%1,%0\;vand %3,%3,%2
+   vandc %3,%1,%0\;vand %3,%3,%2
+   vandc %3,%1,%0\;vand %3,%3,%2
    vandc %4,%1,%0\;vand %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -1914,16 +1914,16 @@
 ;; vector veqv -> vand
 (define_insn "*fuse_veqv_vand"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (and:VM (not:VM (xor:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v")
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v")))
-                 (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v")))
+        (and:VM (not:VM (xor:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v")
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v")))
+                 (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v")))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   veqv %3,%1,%0\;vand %3,%3,%2
-   veqv %3,%1,%0\;vand %3,%3,%2
-   veqv %3,%1,%0\;vand %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,9
+   veqv %3,%1,%0\;vand %3,%3,%2
+   veqv %3,%1,%0\;vand %3,%3,%2
+   veqv %3,%1,%0\;vand %3,%3,%2
    veqv %4,%1,%0\;vand %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -1935,16 +1935,16 @@
 ;; vector vnand -> vand
 (define_insn "*fuse_vnand_vand"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (and:VM (ior:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v"))
-                          (not:VM (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v")))
-                 (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v")))
+        (and:VM (ior:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v"))
+                          (not:VM (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v")))
+                 (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v")))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vnand %3,%1,%0\;vand %3,%3,%2
-   vnand %3,%1,%0\;vand %3,%3,%2
-   vnand %3,%1,%0\;vand %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,14
+   vnand %3,%1,%0\;vand %3,%3,%2
+   vnand %3,%1,%0\;vand %3,%3,%2
+   vnand %3,%1,%0\;vand %3,%3,%2
    vnand %4,%1,%0\;vand %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -1956,16 +1956,16 @@
 ;; vector vnor -> vand
 (define_insn "*fuse_vnor_vand"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (and:VM (and:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v"))
-                          (not:VM (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v")))
-                 (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v")))
+        (and:VM (and:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v"))
+                          (not:VM (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v")))
+                 (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v")))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vnor %3,%1,%0\;vand %3,%3,%2
-   vnor %3,%1,%0\;vand %3,%3,%2
-   vnor %3,%1,%0\;vand %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,8
+   vnor %3,%1,%0\;vand %3,%3,%2
+   vnor %3,%1,%0\;vand %3,%3,%2
+   vnor %3,%1,%0\;vand %3,%3,%2
    vnor %4,%1,%0\;vand %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -1977,16 +1977,16 @@
 ;; vector vor -> vand
 (define_insn "*fuse_vor_vand"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (and:VM (ior:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v")
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v"))
-                 (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v")))
+        (and:VM (ior:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v")
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v"))
+                 (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v")))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vor %3,%1,%0\;vand %3,%3,%2
-   vor %3,%1,%0\;vand %3,%3,%2
-   vor %3,%1,%0\;vand %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,7
+   vor %3,%1,%0\;vand %3,%3,%2
+   vor %3,%1,%0\;vand %3,%3,%2
+   vor %3,%1,%0\;vand %3,%3,%2
    vor %4,%1,%0\;vand %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -1998,16 +1998,16 @@
 ;; vector vorc -> vand
 (define_insn "*fuse_vorc_vand"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (and:VM (ior:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v"))
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v"))
-                 (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v")))
+        (and:VM (ior:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v"))
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v"))
+                 (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v")))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vorc %3,%1,%0\;vand %3,%3,%2
-   vorc %3,%1,%0\;vand %3,%3,%2
-   vorc %3,%1,%0\;vand %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,11
+   vorc %3,%1,%0\;vand %3,%3,%2
+   vorc %3,%1,%0\;vand %3,%3,%2
+   vorc %3,%1,%0\;vand %3,%3,%2
    vorc %4,%1,%0\;vand %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2019,16 +2019,16 @@
 ;; vector vxor -> vand
 (define_insn "*fuse_vxor_vand"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (and:VM (xor:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v")
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v"))
-                 (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v")))
+        (and:VM (xor:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v")
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v"))
+                 (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v")))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vxor %3,%1,%0\;vand %3,%3,%2
-   vxor %3,%1,%0\;vand %3,%3,%2
-   vxor %3,%1,%0\;vand %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,6
+   vxor %3,%1,%0\;vand %3,%3,%2
+   vxor %3,%1,%0\;vand %3,%3,%2
+   vxor %3,%1,%0\;vand %3,%3,%2
    vxor %4,%1,%0\;vand %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2058,16 +2058,16 @@
 ;; vector vandc -> vandc
 (define_insn "*fuse_vandc_vandc"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (and:VM (and:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v"))
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v"))
-                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v"))))
+        (and:VM (and:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v"))
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v"))
+                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v"))))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vandc %3,%1,%0\;vandc %3,%3,%2
-   vandc %3,%1,%0\;vandc %3,%3,%2
-   vandc %3,%1,%0\;vandc %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,13
+   vandc %3,%1,%0\;vandc %3,%3,%2
+   vandc %3,%1,%0\;vandc %3,%3,%2
+   vandc %3,%1,%0\;vandc %3,%3,%2
    vandc %4,%1,%0\;vandc %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2205,16 +2205,16 @@
 ;; vector vandc -> veqv
 (define_insn "*fuse_vandc_veqv"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (not:VM (xor:VM (and:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v"))
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v"))
-                 (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v"))))
+        (not:VM (xor:VM (and:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v"))
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v"))
+                 (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v"))))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vandc %3,%1,%0\;veqv %3,%3,%2
-   vandc %3,%1,%0\;veqv %3,%3,%2
-   vandc %3,%1,%0\;veqv %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,210
+   vandc %3,%1,%0\;veqv %3,%3,%2
+   vandc %3,%1,%0\;veqv %3,%3,%2
+   vandc %3,%1,%0\;veqv %3,%3,%2
    vandc %4,%1,%0\;veqv %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2298,16 +2298,16 @@
 ;; vector vorc -> veqv
 (define_insn "*fuse_vorc_veqv"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (not:VM (xor:VM (ior:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v"))
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v"))
-                 (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v"))))
+        (not:VM (xor:VM (ior:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v"))
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v"))
+                 (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v"))))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vorc %3,%1,%0\;veqv %3,%3,%2
-   vorc %3,%1,%0\;veqv %3,%3,%2
-   vorc %3,%1,%0\;veqv %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,75
+   vorc %3,%1,%0\;veqv %3,%3,%2
+   vorc %3,%1,%0\;veqv %3,%3,%2
+   vorc %3,%1,%0\;veqv %3,%3,%2
    vorc %4,%1,%0\;veqv %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2337,16 +2337,16 @@
 ;; vector vand -> vnand
 (define_insn "*fuse_vand_vnand"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (ior:VM (not:VM (and:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v")
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v")))
-                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v"))))
+        (ior:VM (not:VM (and:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v")
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v")))
+                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v"))))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vand %3,%1,%0\;vnand %3,%3,%2
-   vand %3,%1,%0\;vnand %3,%3,%2
-   vand %3,%1,%0\;vnand %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,254
+   vand %3,%1,%0\;vnand %3,%3,%2
+   vand %3,%1,%0\;vnand %3,%3,%2
+   vand %3,%1,%0\;vnand %3,%3,%2
    vand %4,%1,%0\;vnand %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2358,16 +2358,16 @@
 ;; vector vandc -> vnand
 (define_insn "*fuse_vandc_vnand"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (ior:VM (not:VM (and:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v"))
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v")))
-                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v"))))
+        (ior:VM (not:VM (and:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v"))
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v")))
+                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v"))))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vandc %3,%1,%0\;vnand %3,%3,%2
-   vandc %3,%1,%0\;vnand %3,%3,%2
-   vandc %3,%1,%0\;vnand %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,253
+   vandc %3,%1,%0\;vnand %3,%3,%2
+   vandc %3,%1,%0\;vnand %3,%3,%2
+   vandc %3,%1,%0\;vnand %3,%3,%2
    vandc %4,%1,%0\;vnand %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2379,16 +2379,16 @@
 ;; vector veqv -> vnand
 (define_insn "*fuse_veqv_vnand"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (ior:VM (not:VM (not:VM (xor:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v")
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v"))))
-                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v"))))
+        (ior:VM (not:VM (not:VM (xor:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v")
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v"))))
+                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v"))))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   veqv %3,%1,%0\;vnand %3,%3,%2
-   veqv %3,%1,%0\;vnand %3,%3,%2
-   veqv %3,%1,%0\;vnand %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,246
+   veqv %3,%1,%0\;vnand %3,%3,%2
+   veqv %3,%1,%0\;vnand %3,%3,%2
+   veqv %3,%1,%0\;vnand %3,%3,%2
    veqv %4,%1,%0\;vnand %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2400,16 +2400,16 @@
 ;; vector vnand -> vnand
 (define_insn "*fuse_vnand_vnand"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (ior:VM (not:VM (ior:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v"))
-                          (not:VM (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v"))))
-                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v"))))
+        (ior:VM (not:VM (ior:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v"))
+                          (not:VM (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v"))))
+                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v"))))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vnand %3,%1,%0\;vnand %3,%3,%2
-   vnand %3,%1,%0\;vnand %3,%3,%2
-   vnand %3,%1,%0\;vnand %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,241
+   vnand %3,%1,%0\;vnand %3,%3,%2
+   vnand %3,%1,%0\;vnand %3,%3,%2
+   vnand %3,%1,%0\;vnand %3,%3,%2
    vnand %4,%1,%0\;vnand %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2421,16 +2421,16 @@
 ;; vector vnor -> vnand
 (define_insn "*fuse_vnor_vnand"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (ior:VM (not:VM (and:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v"))
-                          (not:VM (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v"))))
-                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v"))))
+        (ior:VM (not:VM (and:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v"))
+                          (not:VM (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v"))))
+                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v"))))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vnor %3,%1,%0\;vnand %3,%3,%2
-   vnor %3,%1,%0\;vnand %3,%3,%2
-   vnor %3,%1,%0\;vnand %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,247
+   vnor %3,%1,%0\;vnand %3,%3,%2
+   vnor %3,%1,%0\;vnand %3,%3,%2
+   vnor %3,%1,%0\;vnand %3,%3,%2
    vnor %4,%1,%0\;vnand %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2442,16 +2442,16 @@
 ;; vector vor -> vnand
 (define_insn "*fuse_vor_vnand"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (ior:VM (not:VM (ior:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v")
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v")))
-                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v"))))
+        (ior:VM (not:VM (ior:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v")
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v")))
+                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v"))))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vor %3,%1,%0\;vnand %3,%3,%2
-   vor %3,%1,%0\;vnand %3,%3,%2
-   vor %3,%1,%0\;vnand %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,248
+   vor %3,%1,%0\;vnand %3,%3,%2
+   vor %3,%1,%0\;vnand %3,%3,%2
+   vor %3,%1,%0\;vnand %3,%3,%2
    vor %4,%1,%0\;vnand %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2463,16 +2463,16 @@
 ;; vector vorc -> vnand
 (define_insn "*fuse_vorc_vnand"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (ior:VM (not:VM (ior:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v"))
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v")))
-                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v"))))
+        (ior:VM (not:VM (ior:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v"))
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v")))
+                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v"))))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vorc %3,%1,%0\;vnand %3,%3,%2
-   vorc %3,%1,%0\;vnand %3,%3,%2
-   vorc %3,%1,%0\;vnand %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,244
+   vorc %3,%1,%0\;vnand %3,%3,%2
+   vorc %3,%1,%0\;vnand %3,%3,%2
+   vorc %3,%1,%0\;vnand %3,%3,%2
    vorc %4,%1,%0\;vnand %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2484,16 +2484,16 @@
 ;; vector vxor -> vnand
 (define_insn "*fuse_vxor_vnand"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (ior:VM (not:VM (xor:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v")
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v")))
-                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v"))))
+        (ior:VM (not:VM (xor:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v")
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v")))
+                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v"))))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vxor %3,%1,%0\;vnand %3,%3,%2
-   vxor %3,%1,%0\;vnand %3,%3,%2
-   vxor %3,%1,%0\;vnand %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,249
+   vxor %3,%1,%0\;vnand %3,%3,%2
+   vxor %3,%1,%0\;vnand %3,%3,%2
+   vxor %3,%1,%0\;vnand %3,%3,%2
    vxor %4,%1,%0\;vnand %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2505,16 +2505,16 @@
 ;; vector vand -> vnor
 (define_insn "*fuse_vand_vnor"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (and:VM (not:VM (and:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v")
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v")))
-                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v"))))
+        (and:VM (not:VM (and:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v")
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v")))
+                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v"))))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vand %3,%1,%0\;vnor %3,%3,%2
-   vand %3,%1,%0\;vnor %3,%3,%2
-   vand %3,%1,%0\;vnor %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,224
+   vand %3,%1,%0\;vnor %3,%3,%2
+   vand %3,%1,%0\;vnor %3,%3,%2
+   vand %3,%1,%0\;vnor %3,%3,%2
    vand %4,%1,%0\;vnor %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2526,16 +2526,16 @@
 ;; vector vandc -> vnor
 (define_insn "*fuse_vandc_vnor"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (and:VM (not:VM (and:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v"))
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v")))
-                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v"))))
+        (and:VM (not:VM (and:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v"))
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v")))
+                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v"))))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vandc %3,%1,%0\;vnor %3,%3,%2
-   vandc %3,%1,%0\;vnor %3,%3,%2
-   vandc %3,%1,%0\;vnor %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,208
+   vandc %3,%1,%0\;vnor %3,%3,%2
+   vandc %3,%1,%0\;vnor %3,%3,%2
+   vandc %3,%1,%0\;vnor %3,%3,%2
    vandc %4,%1,%0\;vnor %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2547,16 +2547,16 @@
 ;; vector veqv -> vnor
 (define_insn "*fuse_veqv_vnor"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (and:VM (not:VM (not:VM (xor:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v")
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v"))))
-                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v"))))
+        (and:VM (not:VM (not:VM (xor:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v")
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v"))))
+                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v"))))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   veqv %3,%1,%0\;vnor %3,%3,%2
-   veqv %3,%1,%0\;vnor %3,%3,%2
-   veqv %3,%1,%0\;vnor %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,96
+   veqv %3,%1,%0\;vnor %3,%3,%2
+   veqv %3,%1,%0\;vnor %3,%3,%2
+   veqv %3,%1,%0\;vnor %3,%3,%2
    veqv %4,%1,%0\;vnor %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2568,16 +2568,16 @@
 ;; vector vnand -> vnor
 (define_insn "*fuse_vnand_vnor"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (and:VM (not:VM (ior:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v"))
-                          (not:VM (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v"))))
-                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v"))))
+        (and:VM (not:VM (ior:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v"))
+                          (not:VM (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v"))))
+                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v"))))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vnand %3,%1,%0\;vnor %3,%3,%2
-   vnand %3,%1,%0\;vnor %3,%3,%2
-   vnand %3,%1,%0\;vnor %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,16
+   vnand %3,%1,%0\;vnor %3,%3,%2
+   vnand %3,%1,%0\;vnor %3,%3,%2
+   vnand %3,%1,%0\;vnor %3,%3,%2
    vnand %4,%1,%0\;vnor %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2589,16 +2589,16 @@
 ;; vector vnor -> vnor
 (define_insn "*fuse_vnor_vnor"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (and:VM (not:VM (and:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v"))
-                          (not:VM (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v"))))
-                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v"))))
+        (and:VM (not:VM (and:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v"))
+                          (not:VM (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v"))))
+                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v"))))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vnor %3,%1,%0\;vnor %3,%3,%2
-   vnor %3,%1,%0\;vnor %3,%3,%2
-   vnor %3,%1,%0\;vnor %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,112
+   vnor %3,%1,%0\;vnor %3,%3,%2
+   vnor %3,%1,%0\;vnor %3,%3,%2
+   vnor %3,%1,%0\;vnor %3,%3,%2
    vnor %4,%1,%0\;vnor %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2610,16 +2610,16 @@
 ;; vector vor -> vnor
 (define_insn "*fuse_vor_vnor"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (and:VM (not:VM (ior:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v")
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v")))
-                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v"))))
+        (and:VM (not:VM (ior:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v")
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v")))
+                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v"))))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vor %3,%1,%0\;vnor %3,%3,%2
-   vor %3,%1,%0\;vnor %3,%3,%2
-   vor %3,%1,%0\;vnor %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,128
+   vor %3,%1,%0\;vnor %3,%3,%2
+   vor %3,%1,%0\;vnor %3,%3,%2
+   vor %3,%1,%0\;vnor %3,%3,%2
    vor %4,%1,%0\;vnor %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2631,16 +2631,16 @@
 ;; vector vorc -> vnor
 (define_insn "*fuse_vorc_vnor"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (and:VM (not:VM (ior:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v"))
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v")))
-                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v"))))
+        (and:VM (not:VM (ior:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v"))
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v")))
+                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v"))))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vorc %3,%1,%0\;vnor %3,%3,%2
-   vorc %3,%1,%0\;vnor %3,%3,%2
-   vorc %3,%1,%0\;vnor %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,64
+   vorc %3,%1,%0\;vnor %3,%3,%2
+   vorc %3,%1,%0\;vnor %3,%3,%2
+   vorc %3,%1,%0\;vnor %3,%3,%2
    vorc %4,%1,%0\;vnor %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2652,16 +2652,16 @@
 ;; vector vxor -> vnor
 (define_insn "*fuse_vxor_vnor"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (and:VM (not:VM (xor:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v")
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v")))
-                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v"))))
+        (and:VM (not:VM (xor:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v")
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v")))
+                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v"))))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vxor %3,%1,%0\;vnor %3,%3,%2
-   vxor %3,%1,%0\;vnor %3,%3,%2
-   vxor %3,%1,%0\;vnor %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,144
+   vxor %3,%1,%0\;vnor %3,%3,%2
+   vxor %3,%1,%0\;vnor %3,%3,%2
+   vxor %3,%1,%0\;vnor %3,%3,%2
    vxor %4,%1,%0\;vnor %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2673,16 +2673,16 @@
 ;; vector vand -> vor
 (define_insn "*fuse_vand_vor"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (ior:VM (and:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v")
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v"))
-                 (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v")))
+        (ior:VM (and:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v")
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v"))
+                 (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v")))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vand %3,%1,%0\;vor %3,%3,%2
-   vand %3,%1,%0\;vor %3,%3,%2
-   vand %3,%1,%0\;vor %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,31
+   vand %3,%1,%0\;vor %3,%3,%2
+   vand %3,%1,%0\;vor %3,%3,%2
+   vand %3,%1,%0\;vor %3,%3,%2
    vand %4,%1,%0\;vor %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2694,16 +2694,16 @@
 ;; vector vandc -> vor
 (define_insn "*fuse_vandc_vor"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (ior:VM (and:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v"))
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v"))
-                 (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v")))
+        (ior:VM (and:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v"))
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v"))
+                 (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v")))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vandc %3,%1,%0\;vor %3,%3,%2
-   vandc %3,%1,%0\;vor %3,%3,%2
-   vandc %3,%1,%0\;vor %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,47
+   vandc %3,%1,%0\;vor %3,%3,%2
+   vandc %3,%1,%0\;vor %3,%3,%2
+   vandc %3,%1,%0\;vor %3,%3,%2
    vandc %4,%1,%0\;vor %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2715,16 +2715,16 @@
 ;; vector veqv -> vor
 (define_insn "*fuse_veqv_vor"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (ior:VM (not:VM (xor:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v")
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v")))
-                 (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v")))
+        (ior:VM (not:VM (xor:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v")
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v")))
+                 (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v")))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   veqv %3,%1,%0\;vor %3,%3,%2
-   veqv %3,%1,%0\;vor %3,%3,%2
-   veqv %3,%1,%0\;vor %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,159
+   veqv %3,%1,%0\;vor %3,%3,%2
+   veqv %3,%1,%0\;vor %3,%3,%2
+   veqv %3,%1,%0\;vor %3,%3,%2
    veqv %4,%1,%0\;vor %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2736,16 +2736,16 @@
 ;; vector vnand -> vor
 (define_insn "*fuse_vnand_vor"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (ior:VM (ior:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v"))
-                          (not:VM (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v")))
-                 (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v")))
+        (ior:VM (ior:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v"))
+                          (not:VM (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v")))
+                 (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v")))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vnand %3,%1,%0\;vor %3,%3,%2
-   vnand %3,%1,%0\;vor %3,%3,%2
-   vnand %3,%1,%0\;vor %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,239
+   vnand %3,%1,%0\;vor %3,%3,%2
+   vnand %3,%1,%0\;vor %3,%3,%2
+   vnand %3,%1,%0\;vor %3,%3,%2
    vnand %4,%1,%0\;vor %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2757,16 +2757,16 @@
 ;; vector vnor -> vor
 (define_insn "*fuse_vnor_vor"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (ior:VM (and:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v"))
-                          (not:VM (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v")))
-                 (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v")))
+        (ior:VM (and:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v"))
+                          (not:VM (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v")))
+                 (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v")))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vnor %3,%1,%0\;vor %3,%3,%2
-   vnor %3,%1,%0\;vor %3,%3,%2
-   vnor %3,%1,%0\;vor %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,143
+   vnor %3,%1,%0\;vor %3,%3,%2
+   vnor %3,%1,%0\;vor %3,%3,%2
+   vnor %3,%1,%0\;vor %3,%3,%2
    vnor %4,%1,%0\;vor %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2778,16 +2778,16 @@
 ;; vector vor -> vor
 (define_insn "*fuse_vor_vor"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (ior:VM (ior:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v")
-                          (match_operand:VM 1 "vector_fusion_operand" "%v,v,v,wa,v"))
-                 (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v")))
+        (ior:VM (ior:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v")
+                          (match_operand:VM 1 "vector_fusion_operand" "%wa,v,v,v,v"))
+                 (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v")))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vor %3,%1,%0\;vor %3,%3,%2
-   vor %3,%1,%0\;vor %3,%3,%2
-   vor %3,%1,%0\;vor %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,127
+   vor %3,%1,%0\;vor %3,%3,%2
+   vor %3,%1,%0\;vor %3,%3,%2
+   vor %3,%1,%0\;vor %3,%3,%2
    vor %4,%1,%0\;vor %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2799,16 +2799,16 @@
 ;; vector vorc -> vor
 (define_insn "*fuse_vorc_vor"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (ior:VM (ior:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v"))
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v"))
-                 (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v")))
+        (ior:VM (ior:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v"))
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v"))
+                 (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v")))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vorc %3,%1,%0\;vor %3,%3,%2
-   vorc %3,%1,%0\;vor %3,%3,%2
-   vorc %3,%1,%0\;vor %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,191
+   vorc %3,%1,%0\;vor %3,%3,%2
+   vorc %3,%1,%0\;vor %3,%3,%2
+   vorc %3,%1,%0\;vor %3,%3,%2
    vorc %4,%1,%0\;vor %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2820,16 +2820,16 @@
 ;; vector vxor -> vor
 (define_insn "*fuse_vxor_vor"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (ior:VM (xor:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v")
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v"))
-                 (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v")))
+        (ior:VM (xor:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v")
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v"))
+                 (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v")))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vxor %3,%1,%0\;vor %3,%3,%2
-   vxor %3,%1,%0\;vor %3,%3,%2
-   vxor %3,%1,%0\;vor %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,111
+   vxor %3,%1,%0\;vor %3,%3,%2
+   vxor %3,%1,%0\;vor %3,%3,%2
+   vxor %3,%1,%0\;vor %3,%3,%2
    vxor %4,%1,%0\;vor %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2949,16 +2949,16 @@
 ;; vector vorc -> vorc
 (define_insn "*fuse_vorc_vorc"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (ior:VM (ior:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v"))
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v"))
-                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v"))))
+        (ior:VM (ior:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v"))
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v"))
+                 (not:VM (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v"))))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vorc %3,%1,%0\;vorc %3,%3,%2
-   vorc %3,%1,%0\;vorc %3,%3,%2
-   vorc %3,%1,%0\;vorc %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,79
+   vorc %3,%1,%0\;vorc %3,%3,%2
+   vorc %3,%1,%0\;vorc %3,%3,%2
+   vorc %3,%1,%0\;vorc %3,%3,%2
    vorc %4,%1,%0\;vorc %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -2988,16 +2988,16 @@
 ;; vector vand -> vxor
 (define_insn "*fuse_vand_vxor"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (xor:VM (and:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v")
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v"))
-                 (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v")))
+        (xor:VM (and:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v")
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v"))
+                 (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v")))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vand %3,%1,%0\;vxor %3,%3,%2
-   vand %3,%1,%0\;vxor %3,%3,%2
-   vand %3,%1,%0\;vxor %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,30
+   vand %3,%1,%0\;vxor %3,%3,%2
+   vand %3,%1,%0\;vxor %3,%3,%2
+   vand %3,%1,%0\;vxor %3,%3,%2
    vand %4,%1,%0\;vxor %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -3009,16 +3009,16 @@
 ;; vector vandc -> vxor
 (define_insn "*fuse_vandc_vxor"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (xor:VM (and:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v"))
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v"))
-                 (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v")))
+        (xor:VM (and:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v"))
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v"))
+                 (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v")))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vandc %3,%1,%0\;vxor %3,%3,%2
-   vandc %3,%1,%0\;vxor %3,%3,%2
-   vandc %3,%1,%0\;vxor %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,45
+   vandc %3,%1,%0\;vxor %3,%3,%2
+   vandc %3,%1,%0\;vxor %3,%3,%2
+   vandc %3,%1,%0\;vxor %3,%3,%2
    vandc %4,%1,%0\;vxor %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -3030,16 +3030,16 @@
 ;; vector veqv -> vxor
 (define_insn "*fuse_veqv_vxor"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (xor:VM (not:VM (xor:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v")
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v")))
-                 (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v")))
+        (xor:VM (not:VM (xor:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v")
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v")))
+                 (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v")))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   veqv %3,%1,%0\;vxor %3,%3,%2
-   veqv %3,%1,%0\;vxor %3,%3,%2
-   veqv %3,%1,%0\;vxor %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,150
+   veqv %3,%1,%0\;vxor %3,%3,%2
+   veqv %3,%1,%0\;vxor %3,%3,%2
+   veqv %3,%1,%0\;vxor %3,%3,%2
    veqv %4,%1,%0\;vxor %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -3051,16 +3051,16 @@
 ;; vector vnand -> vxor
 (define_insn "*fuse_vnand_vxor"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (xor:VM (ior:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v"))
-                          (not:VM (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v")))
-                 (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v")))
+        (xor:VM (ior:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v"))
+                          (not:VM (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v")))
+                 (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v")))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vnand %3,%1,%0\;vxor %3,%3,%2
-   vnand %3,%1,%0\;vxor %3,%3,%2
-   vnand %3,%1,%0\;vxor %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,225
+   vnand %3,%1,%0\;vxor %3,%3,%2
+   vnand %3,%1,%0\;vxor %3,%3,%2
+   vnand %3,%1,%0\;vxor %3,%3,%2
    vnand %4,%1,%0\;vxor %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -3072,16 +3072,16 @@
 ;; vector vnor -> vxor
 (define_insn "*fuse_vnor_vxor"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (xor:VM (and:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v"))
-                          (not:VM (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v")))
-                 (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v")))
+        (xor:VM (and:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v"))
+                          (not:VM (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v")))
+                 (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v")))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vnor %3,%1,%0\;vxor %3,%3,%2
-   vnor %3,%1,%0\;vxor %3,%3,%2
-   vnor %3,%1,%0\;vxor %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,135
+   vnor %3,%1,%0\;vxor %3,%3,%2
+   vnor %3,%1,%0\;vxor %3,%3,%2
+   vnor %3,%1,%0\;vxor %3,%3,%2
    vnor %4,%1,%0\;vxor %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -3093,16 +3093,16 @@
 ;; vector vor -> vxor
 (define_insn "*fuse_vor_vxor"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (xor:VM (ior:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v")
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v"))
-                 (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v")))
+        (xor:VM (ior:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v")
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v"))
+                 (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v")))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vor %3,%1,%0\;vxor %3,%3,%2
-   vor %3,%1,%0\;vxor %3,%3,%2
-   vor %3,%1,%0\;vxor %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,120
+   vor %3,%1,%0\;vxor %3,%3,%2
+   vor %3,%1,%0\;vxor %3,%3,%2
+   vor %3,%1,%0\;vxor %3,%3,%2
    vor %4,%1,%0\;vxor %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -3114,16 +3114,16 @@
 ;; vector vorc -> vxor
 (define_insn "*fuse_vorc_vxor"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (xor:VM (ior:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v"))
-                          (match_operand:VM 1 "vector_fusion_operand" "v,v,v,wa,v"))
-                 (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v")))
+        (xor:VM (ior:VM (not:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v"))
+                          (match_operand:VM 1 "vector_fusion_operand" "wa,v,v,v,v"))
+                 (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v")))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vorc %3,%1,%0\;vxor %3,%3,%2
-   vorc %3,%1,%0\;vxor %3,%3,%2
-   vorc %3,%1,%0\;vxor %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,180
+   vorc %3,%1,%0\;vxor %3,%3,%2
+   vorc %3,%1,%0\;vxor %3,%3,%2
+   vorc %3,%1,%0\;vxor %3,%3,%2
    vorc %4,%1,%0\;vxor %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
@@ -3135,16 +3135,16 @@
 ;; vector vxor -> vxor
 (define_insn "*fuse_vxor_vxor"
   [(set (match_operand:VM 3 "vector_fusion_operand" "=&0,&1,&v,wa,v")
-        (xor:VM (xor:VM (match_operand:VM 0 "vector_fusion_operand" "v,v,v,wa,v")
-                          (match_operand:VM 1 "vector_fusion_operand" "%v,v,v,wa,v"))
-                 (match_operand:VM 2 "vector_fusion_operand" "v,v,v,wa,v")))
+        (xor:VM (xor:VM (match_operand:VM 0 "vector_fusion_operand" "wa,v,v,v,v")
+                          (match_operand:VM 1 "vector_fusion_operand" "%wa,v,v,v,v"))
+                 (match_operand:VM 2 "vector_fusion_operand" "wa,v,v,v,v")))
    (clobber (match_scratch:VM 4 "=X,X,X,X,&v"))]
   "(TARGET_P10_FUSION)"
   "@
-   vxor %3,%1,%0\;vxor %3,%3,%2
-   vxor %3,%1,%0\;vxor %3,%3,%2
-   vxor %3,%1,%0\;vxor %3,%3,%2
    xxeval %x3,%x2,%x1,%x0,105
+   vxor %3,%1,%0\;vxor %3,%3,%2
+   vxor %3,%1,%0\;vxor %3,%3,%2
+   vxor %3,%1,%0\;vxor %3,%3,%2
    vxor %4,%1,%0\;vxor %3,%4,%2"
   [(set_attr "type" "fused_vector")
    (set_attr "cost" "6")
