@@ -1239,6 +1239,7 @@ namespace
 
 bool is_inherently_live(insn_info *insn)
 {
+  return insn->num_uses() > 0;
 }
 
 static void
@@ -1263,6 +1264,17 @@ rtl_ssa_dce_done()
 }
 
 static void
+rtl_ssa_dce_mark_live(insn_info *info, auto_vec<insn_info *> worklist, sbitmap marked) {
+  int info_uid = info->uid();
+  bitmap_set_bit(marked, info_uid);
+  if (dump_file) {
+    fprintf(dump_file, "  Adding insn %d to worklist\n", info_uid);
+  }
+
+  worklist.safe_push(info);
+}
+
+static void
 rtl_ssa_dce_mark(sbitmap marked)
 {
   insn_info *next;
@@ -1279,12 +1291,19 @@ rtl_ssa_dce_mark(sbitmap marked)
     */
     // insn.defs() // UD chain - this is what I want - reach the ancestors\
      // insn.uses() // DU chain
+
+    /*
+    * For marking phi nodes, which don't have uid (insn->rtl() is null) by definition, use a dictionary and store their addresses
+    * Is seems, that insn->uid() is uniq enough
+    */
+
     if (is_inherently_live(insn))
     {
       if (dump_file)
-        fprintf(dump_file, "  Adding insn %d to worklist\n", INSN_UID(insn->rtl()));
+        fprintf(dump_file, "  Adding insn %d to worklist\n", insn->uid());
+      rtl_ssa_dce_mark_live(insn, marked);
       worklist.safe_push(insn);
-      bitmap_set_bit(marked, INSN_UID(insn->rtl()));
+      bitmap_set_bit(marked, insn->uid());
     }
 
     // if (insn->can_be_optimized () || insn->is_debug_insn ())
@@ -1301,12 +1320,13 @@ rtl_ssa_dce_mark(sbitmap marked)
 
       insn_info *parent_insn = defs[i]->insn();
 
-      if (!bitmap_bit_p(marked, INSN_UID(parent_insn->rtl())))
+      int parent_insn_uid = parent_insn->uid();
+      if (!bitmap_bit_p(marked, parent_insn_uid))
       {
         if (dump_file)
-          fprintf(dump_file, "  Adding insn %d to worklist\n", INSN_UID(parent_insn->rtl()));
+          fprintf(dump_file, "  Adding insn %d to worklist\n", parent_insn_uid);
         worklist.safe_push(parent_insn);
-        bitmap_set_bit(marked, INSN_UID(parent_insn->rtl()));
+        bitmap_set_bit(marked, parent_insn_uid);
       }
     }
   }
@@ -1318,10 +1338,16 @@ rtl_ssa_dce_sweep(sbitmap marked)
   insn_info *next;
   for (insn_info *insn = crtl->ssa->first_insn(); insn; insn = next)
   {
-      if (!bitmap_bit_p(marked, INSN_UID(insn->rtl()))) {
-        insn->rtl()->set_deleted();
-        // delete
-      }
+    if (!bitmap_bit_p(marked, insn->uid())) {
+      // rtx_insn* rtl = insn->rtl();
+      // How to delete phis?
+      // if (rtl != nullptr) {
+      //   delete_insn(rtl);
+      // }
+      // insn_change::delete_insn(insn);
+      crtl->ssa->possibly_queue_changes(insn_change::delete_insn(insn))
+      // insn->rtl()->set_deleted();
+    }
   }
 }
 
