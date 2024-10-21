@@ -280,7 +280,7 @@ sub gen_logical_addsubf
 	  push (@outer_ops, ( "rsubf" ));
       }
       $c4 = "${constraint},${constraint},${constraint},${constraint}";
-      $c5 = "wa,${constraint},${constraint},${constraint},${constraint}";
+      $c5 = "${constraint},${constraint},${constraint},wa,${constraint}";
     OUTER: foreach $outer ( @outer_ops ) {
 	$outer_name = "${vchr}${outer}";
 	$is_subf = ( $outer eq "subf" );
@@ -399,10 +399,10 @@ EOF
    (clobber (match_scratch:${mode} 4 "=X,X,X,X,&${constraint}"))]
   "(TARGET_P10_FUSION)"
   "@
+   ${inner_op} %3,%1,%0\\;${outer_op} %3,${outer_32}
+   ${inner_op} %3,%1,%0\\;${outer_op} %3,${outer_32}
+   ${inner_op} %3,%1,%0\\;${outer_op} %3,${outer_32}
    xxeval %x3,%x2,%x1,%x0,${xxeval}
-   ${inner_op} %3,%1,%0\\;${outer_op} %3,${outer_32}
-   ${inner_op} %3,%1,%0\\;${outer_op} %3,${outer_32}
-   ${inner_op} %3,%1,%0\\;${outer_op} %3,${outer_32}
    ${inner_op} %4,%1,%0\\;${outer_op} %3,${outer_42}"
   [(set_attr "type" "$fuse_type")
    (set_attr "cost" "6")
