@@ -2114,6 +2114,10 @@ cgraph_edge::dump_edge_flags (FILE *f)
 {
   if (speculative)
     fprintf (f, "(speculative) ");
+  if (callback)
+    fprintf (f, "(callback) ");
+  if (has_callback)
+    fprintf (f, "(has_callback) ");
   if (!inline_failed)
     fprintf (f, "(inlined) ");
   if (call_stmt_cannot_inline_p)

@@ -371,6 +371,11 @@ can_inline_edge_p (struct cgraph_edge *e, bool report,
 {
   gcc_checking_assert (e->inline_failed);
 
+  if(e->callback) {
+    printf("skipping inline - callback\n");
+    return false;
+  }
+
   if (cgraph_inline_failed_type (e->inline_failed) == CIF_FINAL_ERROR)
     {
       if (report)
@@ -452,11 +457,6 @@ can_inline_edge_p (struct cgraph_edge *e, bool report,
     }
   if (!inlinable && report)
     report_inline_failed_reason (e);
-
-  if(e->callback) {
-    printf("skipping inline - tried to inline: %d\n", inlinable);
-    inlinable = false;
-  }
 
   return inlinable;
 }
