@@ -1,4 +1,16 @@
-==================== Branch work181-sha, patch #403 ====================
+==================== Branch work181-sha, patch #405 ====================
+
+Move xxeval case to be first.
+
+2024-10-21  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/genfusion.pl (gen_logical_addsubf): Move xxeval case
+	to be first.
+	* config/rs6000/fusion.md: Regenerate.
+
+==================== Branch work181-sha, patch #404 ====================
 
 Move xxeval case before alternative that needs a temporary register.
 
