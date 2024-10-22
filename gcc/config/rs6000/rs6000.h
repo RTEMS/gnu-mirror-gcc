@@ -448,13 +448,11 @@ extern int rs6000_vector_align[];
    Enable 32-bit fcfid's on any of the switches for newer ISA machines.  */
 #define TARGET_FCFID	(TARGET_POWERPC64				\
 			 || TARGET_PPC_GPOPT	/* 970/power4 */	\
-			 || TARGET_POPCNTB	/* ISA 2.02 */		\
-			 || TARGET_CMPB		/* ISA 2.05 */		\
-			 || TARGET_POPCNTD)	/* ISA 2.06 */
+			 || TARGET_POWER5)	/* ISA 2.02 and above */ \
 
 #define TARGET_FCTIDZ	TARGET_FCFID
 #define TARGET_STFIWX	TARGET_PPC_GFXOPT
-#define TARGET_LFIWAX	TARGET_CMPB
+#define TARGET_LFIWAX	TARGET_POWER6
 #define TARGET_LFIWZX	TARGET_POPCNTD
 #define TARGET_FCFIDS	TARGET_POPCNTD
 #define TARGET_FCFIDU	TARGET_POPCNTD
