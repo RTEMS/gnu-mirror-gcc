@@ -1,46 +1,5 @@
-==================== Branch work182-dmf, patch #113 ====================
-
-RFC2677-Add xvrlw support.
-
-2024-10-14  Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/altivec.md (xvrlw): New insn.
-	* config/rs6000/rs6000.h (TARGET_XVRLW): New macro.
-
-gcc/testsuite/
-
-	* gcc.target/powerpc/vector-rotate-left.c: New test.
-
-==================== Branch work182-dmf, patch #112 ====================
-
-RFC2686-Add paddis support.
-
-2024-10-14  Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/constraints.md (eU): New constraint.
-	(eV): Likewise.
-	* config/rs6000/predicates.md (paddis_operand): New predicate.
-	(paddis_paddi_operand): Likewise.
-	(add_operand): Add paddis support.
-	* config/rs6000/rs6000.cc (num_insns_constant_gpr): Add paddis support.
-	(num_insns_constant_multi): Likewise.
-	(print_operand): Add %B<n> for paddis support.
-	* config/rs6000/rs6000.h (TARGET_PADDIS): New macro.
-	(SIGNED_INTEGER_32BIT_P): Likewise.
-	* config/rs6000/rs6000.md (isa attribute): Add paddis support.
-	(enabled attribute); Likewise.
-	(add<mode>3): Likewise.
-	(adddi3 splitter): New splitter for paddis.
-	(movdi_internal64): Add paddis support.
-	(movdi splitter): New splitter for paddis.
-
-gcc/testsuite/
-
-	* gcc.target/powerpc/prefixed-addis.c: New test.
+==================== Branch work182-dmf, patch #113 was reverted ====================
+==================== Branch work182-dmf, patch #112 was reverted ====================
 
 ==================== Branch work182-dmf, patch #111 ====================
 
