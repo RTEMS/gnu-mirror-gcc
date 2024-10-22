@@ -547,9 +547,7 @@ extern int rs6000_vector_align[];
 
 #define TARGET_EXTRA_BUILTINS	(TARGET_POWERPC64			 \
 				 || TARGET_PPC_GPOPT /* 970/power4 */	 \
-				 || TARGET_POPCNTB   /* ISA 2.02 */	 \
-				 || TARGET_CMPB      /* ISA 2.05 */	 \
-				 || TARGET_POPCNTD   /* ISA 2.06 */	 \
+				 || TARGET_POWER5    /* ISA 2.02 & above */ \
 				 || TARGET_ALTIVEC			 \
 				 || TARGET_VSX				 \
 				 || TARGET_HARD_FLOAT)
@@ -563,9 +561,9 @@ extern int rs6000_vector_align[];
 #define TARGET_FRES	(TARGET_HARD_FLOAT && TARGET_PPC_GFXOPT)
 
 #define TARGET_FRE	(TARGET_HARD_FLOAT \
-			 && (TARGET_POPCNTB || VECTOR_UNIT_VSX_P (DFmode)))
+			 && (TARGET_POWER5 || VECTOR_UNIT_VSX_P (DFmode)))
 
-#define TARGET_FRSQRTES	(TARGET_HARD_FLOAT && TARGET_POPCNTB \
+#define TARGET_FRSQRTES	(TARGET_HARD_FLOAT && TARGET_POWER5 \
 			 && TARGET_PPC_GFXOPT)
 
 #define TARGET_FRSQRTE	(TARGET_HARD_FLOAT \
