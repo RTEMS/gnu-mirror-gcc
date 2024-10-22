@@ -1,4 +1,39 @@
+==================== Branch work182-sha, patch #400 ====================
+
+Initial support for adding xxeval fusion support.
+
+2024-10-16  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/117251
+	* config/rs6000/fusion.md: Regenerate.
+	* config/rs6000/genfusion.pl (gen_logical_addsubf): Add support to
+	generate vector/vector logical fusion if XXEVAL supports the fusion.
+	* config/rs6000/predicates.md (vector_fusion_operand): New predicate.
+	* config/rs6000/rs6000.cc (rs6000_opt_vars): Add -mxxeval.
+	* config/rs6000/rs6000.md (isa attribute): Add xxeval.
+	(enabled attribute): Add support for -mxxeval.
+	* config/rs6000/rs6000.opt (-mxxeval): New switch.
+
+gcc/testsuite/
+
+	PR target/117251
+	* gcc.target/powerpc/p10-vector-fused-1.c: New test.
+	* gcc.target/powerpc/p10-vector-fused-2.c: Likewise.
+	* gcc.target/powerpc/xxeval-1.c: Likewise.
+	* gcc.target/powerpc/xxeval-2.c: Likewise.
+
 ==================== Branch work182-sha, baseline ====================
+
+Add ChangeLog.sha and update REVISION.
+
+2024-10-22  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* ChangeLog.sha: New file for branch.
+	* REVISION: Update.
 
 2024-10-22   Michael Meissner  <meissner@linux.ibm.com>
 
