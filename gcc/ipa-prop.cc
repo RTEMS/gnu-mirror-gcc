@@ -3211,10 +3211,16 @@ ipa_analyze_node (struct cgraph_node *node)
 	      cgraph_node * reffering_node = dyn_cast<cgraph_node *>(ref->referring);
 	      gcc_checking_assert(call_stmt);
 	      gcc_checking_assert(reffering_node);
-        cgraph_edge * e = reffering_node->get_edge(ref->stmt);
-        e->make_callback(node);
-        ipa_analyze_node(e->caller);
-	    }
+	      cgraph_edge *e = reffering_node->get_edge (ref->stmt);
+	      e->make_callback (node);
+	      ipa_node_params *caller_info
+		= ipa_node_params_sum->get_create (e->caller);
+	      if (caller_info->analysis_done)
+		{
+		  caller_info->analysis_done = 0;
+		  ipa_analyze_node (e->caller);
+		}
+	      }
 	}
     }
 
