@@ -1243,15 +1243,24 @@ bool is_inherently_live(insn_info *insn)
 }
 
 static void
-rtl_ssa_dce_init()
+rtl_ssa_dce_init(sbitmap &marked_rtx)
 {
   calculate_dominance_info(CDI_DOMINATORS);
   crtl->ssa = new rtl_ssa::function_info(cfun);
+
+  marked_rtx = sbitmap_alloc(get_max_uid() + 1);
+  bitmap_clear(marked_rtx);
+  if (dump_file)
+    fprintf(dump_file, "Allocated `marked_rtx` with size: %d\n", get_max_uid() + 1);
 }
 
 static void
-rtl_ssa_dce_done()
+rtl_ssa_dce_done(sbitmap marked_rtx)
 {
+  sbitmap_free(marked_rtx);
+  if (dump_file)
+    fprintf(dump_file, "Freed `marked_rtx`\n");
+
   free_dominance_info(CDI_DOMINATORS);
   if (crtl->ssa->perform_pending_updates())
     cleanup_cfg(0);
@@ -1264,23 +1273,33 @@ rtl_ssa_dce_done()
 }
 
 static void
-rtl_ssa_dce_mark_live(insn_info *info, auto_vec<insn_info *> worklist, sbitmap marked) {
+rtl_ssa_dce_mark_live(insn_info *info, vec<insn_info *> &worklist, sbitmap marked_rtx)
+{
   int info_uid = info->uid();
-  bitmap_set_bit(marked, info_uid);
-  if (dump_file) {
+  if (dump_file)
+  {
     fprintf(dump_file, "  Adding insn %d to worklist\n", info_uid);
   }
+  if (info_uid < 0)
+  {
+      return;
+  }
+  bitmap_set_bit(marked_rtx, info_uid);
 
   worklist.safe_push(info);
 }
 
 static void
-rtl_ssa_dce_mark(sbitmap marked)
+rtl_ssa_dce_mark(sbitmap marked_rtx)
 {
   insn_info *next;
   auto_vec<insn_info *> worklist;
   for (insn_info *insn = crtl->ssa->first_insn(); insn; insn = next)
   {
+    if (dump_file)
+    {
+      fprintf(dump_file, "Insn: %d\n", insn->uid());
+    }
     next = insn->next_any_insn();
     /*
     I would like to mark visited instruction with something like plf (Pass local flags) as in gimple
@@ -1288,22 +1307,18 @@ rtl_ssa_dce_mark(sbitmap marked)
     This file contains some useful functions: e.g. marked_insn_p, mark_insn
     mark_insn does much more than I want now...
     It does quite a useful job. If rtl_insn is a call and it is obsolete, it will find call arguments.
-    */
-    // insn.defs() // UD chain - this is what I want - reach the ancestors\
-     // insn.uses() // DU chain
 
-    /*
+    insn.defs() // UD chain - this is what I want - reach the ancestors\
+    insn.uses() // DU chain
+
+
     * For marking phi nodes, which don't have uid (insn->rtl() is null) by definition, use a dictionary and store their addresses
     * Is seems, that insn->uid() is uniq enough
     */
 
     if (is_inherently_live(insn))
     {
-      if (dump_file)
-        fprintf(dump_file, "  Adding insn %d to worklist\n", insn->uid());
-      rtl_ssa_dce_mark_live(insn, marked);
-      worklist.safe_push(insn);
-      bitmap_set_bit(marked, insn->uid());
+      rtl_ssa_dce_mark_live(insn, worklist, marked_rtx);
     }
 
     // if (insn->can_be_optimized () || insn->is_debug_insn ())
@@ -1311,56 +1326,88 @@ rtl_ssa_dce_mark(sbitmap marked)
     //  worklist.safe_push (insn);
   }
 
+  if (dump_file)
+    fprintf(dump_file, "Finished inherently live, marking parents\n");
   while (!worklist.is_empty())
   {
+    if (dump_file)
+      fprintf(dump_file, "Brruuh; ");
     insn_info *insn = worklist.pop();
     def_array defs = insn->defs(); // array - because of phi?
+    if (dump_file)
+      fprintf(dump_file, "Looking at: %d, defs: %d\n", insn->uid(), defs.size());
     for (size_t i = 0; i < defs.size(); i++)
     {
-
       insn_info *parent_insn = defs[i]->insn();
-
       int parent_insn_uid = parent_insn->uid();
-      if (!bitmap_bit_p(marked, parent_insn_uid))
+      if (parent_insn_uid < 0)
+      {
+        continue;
+      }
+      if (dump_file)
+        fprintf(dump_file, "Trying to add: %d\n", parent_insn_uid);
+      if (!bitmap_bit_p(marked_rtx, parent_insn_uid))
       {
         if (dump_file)
-          fprintf(dump_file, "  Adding insn %d to worklist\n", parent_insn_uid);
+          fprintf(dump_file, "  Adding insn %d to worklist - mark\n", parent_insn_uid);
         worklist.safe_push(parent_insn);
-        bitmap_set_bit(marked, parent_insn_uid);
+        if (parent_insn_uid >= 0)
+          bitmap_set_bit(marked_rtx, parent_insn_uid);
       }
     }
   }
 }
 
 static void
-rtl_ssa_dce_sweep(sbitmap marked)
+rtl_ssa_dce_sweep(sbitmap marked_rtx)
 {
   insn_info *next;
+  auto_vec<insn_change const*> to_delete;
   for (insn_info *insn = crtl->ssa->first_insn(); insn; insn = next)
   {
-    if (!bitmap_bit_p(marked, insn->uid())) {
+    if (dump_file)
+    {
+      fprintf(dump_file, "Insn: %d\n", insn->uid());
+    }
+    next = insn->next_any_insn();
+    if (dump_file)
+    {
+      fprintf(dump_file, "  Sweeping insn %d\n", insn->uid());
+    }
+    if (insn->uid() < 0)
+      continue;
+    if (!bitmap_bit_p(marked_rtx, insn->uid()))
+    {
       // rtx_insn* rtl = insn->rtl();
       // How to delete phis?
       // if (rtl != nullptr) {
       //   delete_insn(rtl);
       // }
-      // insn_change::delete_insn(insn);
-      crtl->ssa->possibly_queue_changes(insn_change::delete_insn(insn))
+      if (insn->rtl())
+      {
+        auto change = insn_change::delete_insn(insn);
+        // crtl->ssa->possibly_queue_changes(change);
+        to_delete.safe_push(change);
+        // crtl->ssa->change_insn(change);
+      }
       // insn->rtl()->set_deleted();
     }
   }
+  // array_slice<insn_change&> d(to_delete);
+
+  // crtl->ssa->change_insns();
 }
 
 static unsigned int
 rtl_ssa_dce()
 {
-  rtl_ssa_dce_init();
+  // I can do something like invert phi uid and shift it
+  sbitmap marked_rtx;
+  rtl_ssa_dce_init(marked_rtx);
+  rtl_ssa_dce_mark(marked_rtx);
+  rtl_ssa_dce_sweep(marked_rtx);
 
-  sbitmap marked;
-  rtl_ssa_dce_mark(marked);
-  rtl_ssa_dce_sweep(marked);
-
-  rtl_ssa_dce_done();
+  rtl_ssa_dce_done(marked_rtx);
   return 0;
 }
 
