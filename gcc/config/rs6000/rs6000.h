@@ -101,6 +101,7 @@
    you make changes here, make them also there.  */
 #define ASM_CPU_SPEC \
 "%{mcpu=native: %(asm_cpu_native); \
+  mcpu=future: -mfuture; \
   mcpu=power11: -mpower11; \
   mcpu=power10: -mpower10; \
   mcpu=power9: -mpower9; \
@@ -531,6 +532,7 @@ extern int rs6000_vector_align[];
 #define TARGET_POWER9		((rs6000_arch_flags & ARCH_MASK_POWER9)  != 0)
 #define TARGET_POWER10		((rs6000_arch_flags & ARCH_MASK_POWER10) != 0)
 #define TARGET_POWER11		((rs6000_arch_flags & ARCH_MASK_POWER11) != 0)
+#define TARGET_FUTURE		((rs6000_arch_flags & ARCH_MASK_FUTURE)  != 0)
 
 /* In the past we represented power8, power10 as an ISA bit and used internal
    switches the user was not supposed to use for -mpower8-internal and
