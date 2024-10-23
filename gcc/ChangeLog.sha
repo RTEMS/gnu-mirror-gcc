@@ -1,3 +1,29 @@
+==================== Branch work182-sha, patch #402 ====================
+
+Add missing test.
+
+2024-10-16  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/vector-rotate-left.c: New test.
+
+==================== Branch work182-sha, patch #401 ====================
+
+Add potential p-future XVRLD and XVRLDI instructions.
+
+2024-10-16  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/altivec.md (altivec_vrl<VI_char>): Add support for a
+	possible XVRLD instruction in the future.
+	(altivec_vrl<VI_char>_immediate): New insns.
+	* config/rs6000/predicates.md (vector_shift_immediate): New predicate.
+	* config/rs6000/rs6000.h (TARGET_XVRLW): New macro.
+	* config/rs6000/rs6000.md (isa attribute): Add xvrlw.
+	(enabled attribute): Add support for xvrlw.
+
 ==================== Branch work182-sha, patch #400 ====================
 
 Initial support for adding xxeval fusion support.
