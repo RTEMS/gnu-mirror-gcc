@@ -728,6 +728,32 @@
   return num_insns == 1;
 })
 
+;; Return 1 if the operand is a CONST_VECTOR whose elements are all the
+;; same and the elements can be an immediate shift or rotate factor
+(define_predicate "vector_shift_immediate"
+  (match_code "const_vector,vec_duplicate,const_int")
+{
+  int value = 256;
+  int num_insns = -1;
+
+  if (zero_constant (op, mode) || all_ones_constant (op, mode))
+    return true;
+
+  if (!xxspltib_constant_p (op, mode, &num_insns, &value))
+    return false;
+
+  switch (mode)
+    {
+    case V16QImode: return IN_RANGE (value, 0, 7);
+    case V8HImode:  return IN_RANGE (value, 0, 15);
+    case V4SImode:  return IN_RANGE (value, 0, 31);
+    case V2DImode:  return IN_RANGE (value, 0, 63);
+    default:        break;
+    }
+
+  return false;
+})
+  
 ;; Return 1 if the operand is a CONST_VECTOR and can be loaded into a
 ;; vector register without using memory.
 (define_predicate "easy_vector_constant"
