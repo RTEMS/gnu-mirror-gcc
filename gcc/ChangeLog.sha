@@ -1,4 +1,4 @@
-==================== Branch work182-sha, patch #411 was reverted ====================
+==================== Branch work182-sha, patch #411 ====================
 
 Add potential p-future XVRLD and XVRLDI instructions.
 
@@ -18,7 +18,7 @@ gcc/testsuite/
 
 	* gcc.target/powerpc/vector-rotate-left.c: New test.
 
-==================== Branch work182-sha, patch #410 was reverted ====================
+==================== Branch work182-sha, patch #410 ====================
 
 PR target/117251: Add PowerPC XXEVAL support to speed up SHA3 calculations
 
