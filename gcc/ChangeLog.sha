@@ -116,7 +116,7 @@ XXEVAL                           630        0       0       0      0         0
 Load vector rotate constants      96       96      96      96     96        96
 
 
-These patches to add XXEVAL support add the following fusion patterns:
+These add the following fusion patterns:
 
 	xxland  => xxland	xxlandc => xxland	xxlxor  => xxland
 	xxlor   => xxland	xxlnor  => xxland	xxleqv  => xxland
