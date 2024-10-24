@@ -74,21 +74,21 @@ this patch that were lost with GCC 14 and the current trunk:
                               ------    -----   -----   -----   -----    -----
 Benchmark time in seconds       5.53     6.15    6.26    5.57    5.61     9.56
 
-Fuse VANDC -> VXOR               209     600      600     600     600       600
-Fuse VXOR -> VXOR                  0     240      240     120     120       120
-XXEVAL to fuse ANDC -> XOR       391       0        0       0       0         0
-XXEVAL to fuse XOR -> XOR        240       0        0       0       0         0
+Fuse VANDC -> VXOR               209     600      600     600     600      600
+Fuse VXOR -> VXOR                  0     240      240     120     120      120
+XXEVAL to fuse ANDC -> XOR       391       0        0       0       0        0
+XXEVAL to fuse XOR -> XOR        240       0        0       0       0        0
 
-Spill vector to stack             78     364      364     172     184       110
-Load spilled vector from stack   431     962      962     713     723       166
-Vector moves                      10     100      100      70      72     3,055
+Spill vector to stack             78     364      364     172     184      110
+Load spilled vector from stack   431     962      962     713     723      166
+Vector moves                      10     100      100      70      72    3,055
 
-Vector rotate right              696     696      696     696     696       696
-XXLANDC or VANDC                 209     600      600     600     600       600
-XXLXOR or VXOR                   953   1,824    1,824   1,824   1,824     1,825
-XXEVAL                           631       0        0       0       0         0
+Vector rotate right              696     696      696     696     696      696
+XXLANDC or VANDC                 209     600      600     600     600      600
+XXLXOR or VXOR                   953   1,824    1,824   1,824   1,824    1,825
+XXEVAL                           631       0        0       0       0        0
 
-Load vector rotate constants      24      24       24      24      24        24
+Load vector rotate constants      24      24       24      24      24       24
 
 
 Here are the results for adding support for XXEVAL for the singlebuff.c
