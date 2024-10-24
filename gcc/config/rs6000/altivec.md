@@ -1983,12 +1983,39 @@
 }
   [(set_attr "type" "vecperm")])
 
+;; -mcpu=future adds a vector rotate left word variant.  There is no vector
+;; byte/half-word/double-word/quad-word rotate left.  This insn occurs before
+;; altivec_vrl<VI_char> and will match for -mcpu=future, while other cpus will
+;; match the generic insn.
+;; However for testing, allow other xvrl variants.  In particular, XVRLD for
+;; the sha3 tests for multibuf/singlebuf.
 (define_insn "altivec_vrl<VI_char>"
-  [(set (match_operand:VI2 0 "register_operand" "=v")
-        (rotate:VI2 (match_operand:VI2 1 "register_operand" "v")
-		    (match_operand:VI2 2 "register_operand" "v")))]
+  [(set (match_operand:VI2 0 "register_operand" "=v,wa")
+        (rotate:VI2 (match_operand:VI2 1 "register_operand" "v,wa")
+		    (match_operand:VI2 2 "register_operand" "v,wa")))]
   "<VI_unit>"
-  "vrl<VI_char> %0,%1,%2"
+  "@
+   vrl<VI_char> %0,%1,%2
+   xvrl<VI_char> %x0,%x1,%x2"
+  [(set_attr "type" "vecsimple")
+   (set_attr "isa" "*,xvrlw")])
+
+(define_insn "*altivec_vrl<VI_char>_immediate"
+  [(set (match_operand:VI2 0 "register_operand" "=wa,wa,wa,wa")
+	(rotate:VI2 (match_operand:VI2 1 "register_operand" "wa,wa,wa,wa")
+		    (match_operand:VI2 2 "vector_shift_immediate" "j,wM,wE,wS")))]
+  "TARGET_XVRLW && <VI_unit>"
+{
+  rtx op2 = operands[2];
+  int value = 256;
+  int num_insns = -1;
+
+  if (!xxspltib_constant_p (op2, <MODE>mode, &num_insns, &value))
+    gcc_unreachable ();
+
+  operands[3] = GEN_INT (value & 0xff);
+  return "xvrl<VI_char>i %x0,%x1,%3";
+}
   [(set_attr "type" "vecsimple")])
 
 (define_insn "altivec_vrlq"
