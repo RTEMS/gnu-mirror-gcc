@@ -1,3 +1,43 @@
+2024-10-14  Steve Baird  <baird@adacore.com>
+
+	PR ada/114593
+	* sem_res.adb (Valid_Conversion): Test In_Instance instead of
+	In_Instance_Body.
+
+2024-10-08  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* exp_aggr.ads (Is_Two_Pass_Aggregate): New function declaration.
+	* exp_aggr.adb (Is_Two_Pass_Aggregate): New function body.
+	(Expand_Array_Aggregate): Call Is_Two_Pass_Aggregate to detect the
+	aggregates that need the 2-pass expansion.
+	* exp_ch3.adb (Expand_Freeze_Array_Type): In the anonymous array
+	case, build the initialization procedure if the initial value in
+	the object declaration is a 2-pass aggregate.
+
+2024-10-08  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR ada/115535
+	* exp_put_image.adb (Build_Elementary_Put_Image_Call): Use the size
+	of the underlying type to find the support type.
+
+2024-10-08  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR ada/114640
+	* exp_util.adb (Find_Hook_Context): For a node present within a
+	conditional expression, do not return an N_Elsif_Part node.
+
+2024-10-08  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR ada/114636
+	* sem_ch12.adb (Check_Formal_Package_Instance): For a defaulted
+	formal discrete type, skip the generated implicit base type.
+
+2024-10-04  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR ada/116430
+	* exp_ch7.adb (Build_Finalizer.Create_Finalizer): For the insertion
+	point of the finalizer, deal with package bodies that are subunits.
+
 2024-08-01  Release Manager
 
 	* GCC 14.2.0 released.

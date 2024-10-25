@@ -1,3 +1,356 @@
+2024-10-22  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-10-05  Patrick Palka  <ppalka@redhat.com>
+
+	* include/bits/ranges_base.h (__distance_fn::operator()):
+	Adjust iterator/sentinel overloads as per LWG 3664.
+	* testsuite/24_iterators/range_operations/distance.cc:
+	Test LWG 3664 example.
+
+2024-10-22  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-10-04  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/ranges (single_view::empty): Define as per LWG 4035.
+	(iota_view::empty): Define as per LWG 4001.
+	(lazy_split_view::_OuterIter::value_type): Remove default
+	constructor and make other constructor private as per LWG 4013.
+	(common_view::begin): Disable non-const overload for simple
+	views as per LWG 4012.
+	(common_view::end): Likewise.
+	(adjacent_view::base): Define as per LWG 3848.
+	(adjacent_transform_view::base): Likewise.
+	(chunk_view::_InnerIter::iter_move): Define as per LWG 3851.
+	(chunk_view::_InnerIter::itep_swap): Likewise.
+	(slide_view::base): Define as per LWG 3848.
+	(repeat_view): Adjust deduction guide as per LWG 4053.
+	(_Repeat::operator()): Adjust single-parameter overload as per
+	LWG 4054.
+	* testsuite/std/ranges/adaptors/adjacent/1.cc: Verify existence
+	of base member function.
+	* testsuite/std/ranges/adaptors/adjacent_transform/1.cc: Likewise.
+	* testsuite/std/ranges/adaptors/chunk/1.cc: Test LWG 3851 example.
+	* testsuite/std/ranges/adaptors/slide/1.cc: Verify existence of
+	base member function.
+	* testsuite/std/ranges/iota/iota_view.cc: Test LWG 4001 example.
+	* testsuite/std/ranges/repeat/1.cc: Test LWG 4053/4054 examples.
+
+2024-10-22  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-08-22  Patrick Palka  <ppalka@redhat.com>
+
+	* testsuite/25_algorithms/contains/1.cc: Verify value of
+	__cpp_lib_ranges_contains.
+	* testsuite/25_algorithms/find_last/1.cc: Verify value of
+	__cpp_lib_ranges_find_last.
+	* testsuite/25_algorithms/iota/1.cc: Verify value of
+	__cpp_lib_ranges_iota.
+
+2024-10-22  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-08-22  Patrick Palka  <ppalka@redhat.com>
+
+	* include/bits/iterator_concepts.h (indirectly_unary_invocable):
+	Relax as per P2997R1.
+	(indirectly_regular_unary_invocable): Likewise.
+	(indirect_unary_predicate): Likewise.
+	(indirect_binary_predicate): Likewise.
+	(indirect_equivalence_relation): Likewise.
+	(indirect_strict_weak_order): Likewise.
+	* include/bits/version.def (ranges): Update value for C++26.
+	* include/bits/version.h: Regenerate.
+	* testsuite/24_iterators/indirect_callable/p2997r1.cc: New test.
+	* testsuite/std/ranges/version_c++23.cc: Remove.
+	* testsuite/std/ranges/headers/ranges/synopsis.cc: Refine the
+	__cpp_lib_ranges checks.
+
+2024-10-22  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-08-22  Patrick Palka  <ppalka@redhat.com>
+
+	* include/bits/iterator_concepts.h (__detail::__indirect_value):
+	Define.
+	(__indirect_value_t): Define as per P2609R3.
+	(iter_common_reference_t): Adjust as per P2609R3.
+	(indirectly_unary_invocable): Likewise.
+	(indirectly_regular_unary_invocable): Likewise.
+	(indirect_unary_predicate): Likewise.
+	(indirect_binary_predicate): Likewise.
+	(indirect_equivalence_relation): Likewise.
+	(indirect_strict_weak_order): Likewise.
+	(__detail::__projected::__type): Define member aliases
+	__projected_Iter and __projected_Proj providing the
+	template arguments of the current specialization.
+	* include/bits/version.def (ranges): Update value.
+	* include/bits/version.h: Regenerate.
+	* testsuite/24_iterators/indirect_callable/p2609r3.cc: New test.
+	* testsuite/std/ranges/version_c++23.cc: Update expected value
+	of __cpp_lib_ranges macro.
+
+2024-10-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-10-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	* python/libstdcxx/v6/printers.py (strip_fundts_namespace): New.
+	(StdExpAnyPrinter, StdExpOptionalPrinter): Use it.
+
+2024-10-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-06-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/90276
+	* testsuite/25_algorithms/pstl/alg_modifying_operations/rotate_copy.cc:
+	Increase timeout for debug mode.
+	* testsuite/25_algorithms/pstl/alg_modifying_operations/transform_binary.cc:
+	Likewise.
+	* testsuite/25_algorithms/pstl/alg_nonmodifying/mismatch.cc:
+	Likewise.
+	* testsuite/25_algorithms/pstl/alg_sorting/lexicographical_compare.cc:
+	Likewise.
+	* testsuite/25_algorithms/pstl/alg_sorting/minmax_element.cc:
+	Likewise.
+	* testsuite/25_algorithms/pstl/alg_sorting/set_symmetric_difference.cc:
+	Likewise.
+
+2024-10-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-10-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/ranges (transform_view:_Iterator): Use const F&
+	to determine value_type and iterator_category of
+	_Iterator<true>, as per LWG 3564.
+	* testsuite/std/ranges/adaptors/transform.cc: Check value_type
+	and iterator_category.
+
+2024-10-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-10-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/117085
+	* include/bits/chrono_io.h (__formatter_chrono::_M_c): Add L
+	option to format string.
+	* testsuite/std/time/format.cc: Move to...
+	* testsuite/std/time/format/format.cc: ...here.
+	* testsuite/std/time/format/pr117085.cc: New test.
+
+2024-10-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-10-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/chrono_io.h (__formatter_chrono::_M_c): Add
+	[[unlikely]] attribute to condition for missing %c format in
+	locale. Use %T instead of %H:%M:%S in fallback.
+
+2024-10-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-10-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/117135
+	* config/locale/generic/time_members.cc
+	(__timepunct<wchar_t>::_M_initialize_timepunc): Set
+	_M_date_time_format for C locale. Set %Ex formats to the same
+	values as the %x formats.
+
+2024-10-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-10-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/117094
+	* include/bits/ranges_algobase.h (__fill_fn): Use std::move for
+	iterator that might not be copyable.
+	* testsuite/25_algorithms/fill/constrained.cc: Check
+	non-copyable iterator with sized sentinel.
+
+2024-10-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-08-23  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR c++/116369
+	* include/debug/safe_base.h (_Safe_sequence_base::_M_iterators):
+	Add mutable specifier.
+	(_Safe_sequence_base::_M_const_iterators): Likewise.
+
+2024-10-03  Kim Gräsman  <kim.grasman@gmail.com>
+
+	Backported from master:
+	2024-08-28  Kim Gräsman  <kim.grasman@gmail.com>
+
+	* include/bits/cpp_type_traits.h: Improve doxygen file docs.
+
+2024-10-03  Kim Gräsman  <kim.grasman@gmail.com>
+
+	Backported from master:
+	2024-08-28  Kim Gräsman  <kim.grasman@gmail.com>
+
+	* config/cpu/aarch64/opt/ext/opt_random.h: Improve doxygen file
+	docs.
+	* config/cpu/i486/opt/ext/opt_random.h: Likewise.
+
+2024-10-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-08-28  Jonathan Wakely  <jwakely@redhat.com>
+
+	* configure.ac: Fix check for O_NONBLOCK.
+	* config.h.in: Regenerate.
+	* configure: Regenerate.
+
+2024-10-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-09-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/116857
+	* libsupc++/guard.cc (__cxa_guard_acquire): Remove
+	_GLIBCXX_NOTHROW to match declaration in <cxxabi.h>.
+
+2024-10-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-06-27  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/37475
+	* config/locale/gnu/codecvt_members.cc (Guard): New RAII type.
+	(do_out, do_in): Return partial if the destination is empty but
+	the source is not. Use Guard to restore locale on scope exit.
+	Return immediately on any conversion error.
+	(do_encoding, do_max_length, do_length): Use Guard.
+	* testsuite/22_locale/codecvt/in/char/37475.cc: New test.
+	* testsuite/22_locale/codecvt/in/wchar_t/37475.cc: New test.
+	* testsuite/22_locale/codecvt/out/char/37475.cc: New test.
+	* testsuite/22_locale/codecvt/out/wchar_t/37475.cc: New test.
+
+2024-10-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-10-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	* config/locale/dragonfly/time_members.cc
+	(__timepunct<char>::_M_initialize_timepunc)
+	(__timepunct<wchar_t>::_M_initialize_timepunc): Set
+	_M_date_time_format for C locale. Set %Ex formats to the same
+	values as the %x formats.
+	* config/locale/generic/time_members.cc: Likewise.
+	* config/locale/gnu/time_members.cc: Likewise.
+	* testsuite/22_locale/time_get/get/char/5.cc: New test.
+	* testsuite/22_locale/time_get/get/wchar_t/5.cc: New test.
+
+2024-10-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-09-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/cow_string.h (__resize_for_overwrite): Add
+	inline keyword to function with always_inline attribute.
+
+2024-10-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-06-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/90276
+	* testsuite/25_algorithms/pstl/alg_sorting/partial_sort.cc
+	[_GLIBCXX_DEBUG]: Add xfail-run-if for debug mode.
+	* testsuite/25_algorithms/pstl/alg_nonmodifying/nth_element.cc
+	[_GLIBCXX_DEBUG]: Reduce size of test data.
+	* testsuite/25_algorithms/pstl/alg_sorting/includes.cc:
+	Likewise.
+	* testsuite/25_algorithms/pstl/alg_sorting/set_util.h:
+	Likewise.
+
+2024-10-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-09-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/format (__format::__is_formattable_integer): New
+	variable template and specializations.
+	(template<integral, __char> struct formatter): Replace
+	constraints on first arg with __is_formattable_integer.
+	* testsuite/std/format/formatter/requirements.cc: Check that
+	std::formatter specializations for char8_t and const int are
+	disabled.
+
+2024-10-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-09-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/116755
+	* include/bits/chrono_io.h (formatter<duration<R,P>>::format):
+	Cast negative integral durations to unsigned rep.
+	* testsuite/20_util/duration/io.cc: Test the most negative
+	integer durations.
+
+2024-09-23  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-09-20  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/116529
+	* include/bits/unique_ptr.h (unique_ptr(auto_ptr<U>&&)):
+	Use pointer instead of T*.
+	* testsuite/20_util/unique_ptr/creation/116529.cc: New test.
+
+2024-09-23  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-09-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/116754
+	* include/bits/ranges_algobase.h (__copy_or_move): Fix order of
+	arguments to __memcpyable.
+
+2024-09-23  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-09-20  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/116777
+	* doc/xml/manual/using.xml: Document features that are not
+	supported for the gcc4-compatible ABI.
+	* doc/html/manual/using_dual_abi.html: Regenerate.
+
+2024-09-23  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-08-23  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/108619
+	* include/bits/alloc_traits.h (__allocator_traits_base): Add
+	variable templates for detecting whether the allocator has a
+	construct member, or if placement new can be used instead.
+	(allocator_traits::__construct_helper): Remove.
+	(allocator_traits::__has_construct): Remove.
+	(allocator_traits::construct): Use 'if constexpr' instead of
+	dispatching to overloads constrained with enable_if.
+	(allocator_traits<allocator<T>>::construct): Use _Construct if
+	construct_at is not supported. Use
+	__is_nothrow_new_constructible for noexcept-specifier.
+	(allocator_traits<allocator<void>>::construct): Use
+	__is_nothrow_new_constructible for noexcept-specifier.
+	* include/bits/new_allocator.h (construct): Likewise.
+	* include/ext/malloc_allocator.h (construct): Likewise.
+	* include/std/type_traits (__is_nothrow_new_constructible): New
+	variable template.
+	* testsuite/20_util/allocator/89510.cc: Adjust expected results.
+	* testsuite/ext/malloc_allocator/89510.cc: Likewise.
+	* testsuite/ext/new_allocator/89510.cc: Likewise.
+	* testsuite/20_util/allocator_traits/members/108619.cc: New test.
+
 2024-09-11  Jonathan Wakely  <jwakely@redhat.com>
 
 	Backported from master:

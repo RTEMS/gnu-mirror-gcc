@@ -14415,6 +14415,10 @@ avr_out_sbxx_branch (rtx_insn *insn, rtx operands[])
   bool long_jump = get_attr_length (insn) >= 4;
   bool reverse = long_jump || jump_over_one_insn_p (insn, operands[3]);
 
+  // PR116953: jump_over_one_insn_p may call extract on the next insn,
+  // clobbering recog_data.operand.  Thus, restore recog_data.
+  extract_constrain_insn_cached (insn);
+
   if (comp == GE)
     comp = EQ;
   else if (comp == LT)

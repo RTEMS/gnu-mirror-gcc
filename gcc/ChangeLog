@@ -1,3 +1,632 @@
+2024-10-23  liuhongt  <hongtao.liu@intel.com>
+
+	Backported from master:
+	2024-10-23  liuhongt  <hongtao.liu@intel.com>
+
+	PR target/117240
+	* config/i386/i386-builtin.def: Add avx/avx512f to vaes
+	ymm/zmm builtins.
+
+2024-10-23  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-10-15  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/116891
+	* match.pd ((negate (fmas@3 @0 @1 @2)) -> (IFN_FNMS @0 @1 @2)):
+	Only enable for !HONOR_SIGN_DEPENDENT_ROUNDING.
+	((negate (IFN_FMS@3 @0 @1 @2)) -> (IFN_FNMA @0 @1 @2)): Likewise.
+	((negate (IFN_FNMA@3 @0 @1 @2)) -> (IFN_FMS @0 @1 @2)): Likewise.
+
+2024-10-23  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-10-14  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/116891
+	* match.pd ((negate (IFN_FNMS@3 @0 @1 @2)) -> (IFN_FMA @0 @1 @2)):
+	Only enable for !HONOR_SIGN_DEPENDENT_ROUNDING.
+
+2024-10-21  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-10-12  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/117104
+	* match.pd ((cmp:c (minmax:c @0 @1) @0) -> (out @0 @1)): Properly
+	guard the vector case.
+
+2024-10-21  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-10-07  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/116982
+	* tree-vectorizer.h (vect_analyze_loop): Pass in .LOOP_VECTORIZED
+	call.
+	(vect_analyze_loop_form): Likewise.
+	* tree-vect-loop.cc (vect_analyze_loop_form): Reject loops where we
+	cannot determine a IV exit for the scalar loop.
+	(vect_analyze_loop): Adjust.
+	* tree-vectorizer.cc (try_vectorize_loop_1): Likewise.
+	* tree-parloops.cc (gather_scalar_reductions): Likewise.
+
+2024-10-21  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-10-15  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/116907
+	* tree-ssa-live.cc (clear_unused_block_pointer_in_block): New
+	helper.
+	(clear_unused_block_pointer): Call it.
+
+2024-10-21  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-10-13  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/116481
+	* pointer-query.cc (build_printable_array_type):
+	Build an array types with function or method element type
+	manually to avoid bogus diagnostic.
+
+2024-10-21  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-10-14  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/116290
+	* tree-loop-distribution.cc (determine_reduction_stmt_1): PHIs
+	have no debug variants.  Start with first non-debug real stmt.
+	* tree-ssa-loop-ivopts.cc (find_givs_in_bb): Do not analyze
+	debug stmts.
+
+2024-10-21  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-05-17  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/115110
+	* tree-ssa-alias.cc (view_converted_memref_p): Fix.
+
+2024-10-21  Jeevitha  <jeevitha@linux.ibm.com>
+
+	Backported from master:
+	2024-10-21  Jeevitha  <jeevitha@linux.ibm.com>
+
+	* config/rs6000/amo.h (enum _AMO_LD): Correct the function code for
+	_AMO_LD_DEC_BOUNDED.
+
+2024-10-21  liuhongt  <hongtao.liu@intel.com>
+
+	Backported from master:
+	2024-10-21  liuhongt  <hongtao.liu@intel.com>
+
+	PR target/117159
+	* config/i386/sse.md
+	(*<avx512>_cmp<V48H_AVX512VL:mode>3_zero_extend<SWI248x:mode>):
+	Change from define_insn_and_split to define_insn.
+	(*<avx512>_cmp<VI12_AVX512VL:mode>3_zero_extend<SWI248x:mode>):
+	Ditto.
+	(*<avx512>_ucmp<VI12_AVX512VL:mode>3_zero_extend<SWI248x:mode>):
+	Ditto.
+	(*<avx512>_ucmp<VI48_AVX512VL:mode>3_zero_extend<SWI248x:mode>):
+	Ditto.
+	(*<avx512>_cmp<V48H_AVX512VL:mode>3_zero_extend<SWI248x:mode>_2):
+	Split to the zero_extend pattern.
+	(*<avx512>_cmp<VI12_AVX512VL:mode>3_zero_extend<SWI248x:mode>_2):
+	Ditto.
+	(*<avx512>_ucmp<VI12_AVX512VL:mode>3_zero_extend<SWI248x:mode>_2):
+	Ditto.
+	(*<avx512>_ucmp<VI48_AVX512VL:mode>3_zero_extend<SWI248x:mode>_2):
+	Ditto.
+
+2024-10-18  Martin Jambor  <mjambor@suse.cz>
+
+	Backported from master:
+	2024-09-06  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/115815
+	* cgraph.cc (cgraph_node_cannot_be_local_p_1): Also check
+	DECL_STATIC_CONSTRUCTOR and DECL_STATIC_DESTRUCTOR.
+	* ipa-visibility.cc (non_local_p): Likewise.
+	(cgraph_node::local_p): Delete extraneous line of tabs.
+
+2024-10-18  Li Xu  <xuli1@eswincomputing.com>
+
+	Backported from master:
+	2024-10-10  Li Xu  <xuli1@eswincomputing.com>
+
+	PR target/116883
+	* config/riscv/riscv-c.cc (riscv_pragma_intrinsic_flags_pollute): Choose zvl4096b
+	to initialize null type.
+
+2024-10-17  Marek Polacek  <polacek@redhat.com>
+
+	Backported from master:
+	2024-09-17  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/116534
+	* fold-const.cc (operand_compare::operand_equal_p): If either
+	field's DECL_FIELD_OFFSET is null, compare the fields with ==.
+
+2024-10-16  Uros Bizjak  <ubizjak@gmail.com>
+
+	Backported from master:
+	2024-10-15  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/117116
+	* config/i386/i386-expand.cc (expand_vector_set): Force "val"
+	into a register before VEC_MERGE/VEC_DUPLICATE RTX is generated
+	if it doesn't satisfy nonimmediate_operand predicate.
+
+2024-10-15  Victor Do Nascimento  <victor.donascimento@arm.com>
+
+	* tree-if-conv.cc (predicate_statements): Fix handling of
+	predicated function calls.
+
+2024-10-15  Jan Hubicka  <hubicka@ucw.cz>
+
+	Backported from master:
+	2024-07-22  Jan Hubicka  <hubicka@ucw.cz>
+
+	PR ipa/109985
+	* ipa-modref.cc (modref_summary::useful_p): Fix handling of ECF_NOVOPS.
+	(modref_access_analysis::process_fnspec): Likevise.
+	(modref_access_analysis::analyze_call): Likevise.
+	(propagate_unknown_call): Likevise.
+	(modref_propagate_in_scc): Likevise.
+	(modref_propagate_flags_in_scc): Likewise.
+	(ipa_merge_modref_summary_after_inlining): Likewise.
+
+2024-10-14  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2024-08-21  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR testsuite/116238
+	* config/aarch64/aarch64.cc (aarch64_hard_regno_caller_save_mode):
+	Only return SImode if we can convert to and from it.
+
+2024-10-14  liuhongt  <hongtao.liu@intel.com>
+
+	Backported from master:
+	2024-10-10  liuhongt  <hongtao.liu@intel.com>
+
+	* config/i386/i386.cc (ix86_vector_costs::ix86_vector_costs):
+	Add new member m_num_avx256_vec_perm.
+	(ix86_vector_costs::add_stmt_cost): Record 256-bit vec_perm.
+	(ix86_vector_costs::finish_cost): Prevent vectorization for
+	TAREGT_AVX256_AVOID_VEC_PERM when there's 256-bit vec_perm
+	instruction.
+	* config/i386/i386.h (TARGET_AVX256_AVOID_VEC_PERM): New
+	Macro.
+	* config/i386/x86-tune.def (X86_TUNE_AVX256_SPLIT_REGS): Add
+	m_CORE_ATOM.
+	(X86_TUNE_AVX256_AVOID_VEC_PERM): New tune.
+
+2024-10-14  liuhongt  <hongtao.liu@intel.com>
+
+	Backported from master:
+	2024-10-10  liuhongt  <hongtao.liu@intel.com>
+
+	* config/i386/i386-expand.cc (ix86_expand_sse_movcc): Guard
+	instruction blendv generation under new tune.
+	* config/i386/i386.h (TARGET_SSE_MOVCC_USE_BLENDV): New Macro.
+	* config/i386/x86-tune.def (X86_TUNE_SSE_MOVCC_USE_BLENDV):
+	New tune.
+
+2024-10-13  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-10-09  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/117041
+	* tree-vect-stmts.cc (get_group_load_store_type): Only
+	check DR_GROUP_NEXT_ELEMENT for STMT_VINFO_GROUPED_ACCESS.
+
+2024-10-13  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-10-11  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/117086
+	* match.pd ((op (vec_cond ...) ..) -> (vec_cond ...)): Add
+	missing checks for VECTOR_TYPE_P (type).
+
+2024-10-13  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-10-07  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/116990
+	* tree-vect-loop.cc (vect_analyze_loop_form): Check the current
+	loop body for control flow.
+
+2024-10-13  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-09-30  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/116879
+	* tree-vect-loop.cc (vect_analyze_loop_form): Scan all
+	blocks that form the latch.
+
+2024-10-13  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-09-30  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/116850
+	* gimple-ssa-isolate-paths.cc (bb_split_points): New global.
+	(insert_trap): Delay BB splitting if post-doms are computed.
+	(find_explicit_erroneous_behavior): Process delayed BB
+	splitting after releasing post dominators.
+	(gimple_ssa_isolate_erroneous_paths): Do not free post-dom
+	info here.
+
+2024-10-13  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-09-19  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/116768
+	* tree-data-ref.cc (build_classic_dist_vector_1): Revert
+	PR101009 change.
+	* tree-chrec.cc (eq_evolutions_p): Make sure (sizetype)1
+	and (int)1 compare equal.
+
+2024-10-13  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-08-07  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/116166
+	* tree-ssa-threadedge.h (jump_threader::thread_around_empty_blocks):
+	Add limit parameter.
+	(jump_threader::thread_through_normal_block): Likewise.
+	* tree-ssa-threadedge.cc (jump_threader::thread_around_empty_blocks):
+	Honor and decrement limit parameter.
+	(jump_threader::thread_through_normal_block): Likewise.
+	(jump_threader::thread_across_edge): Initialize limit from
+	param_max_jump_thread_paths and pass it down to workers.
+
+2024-10-13  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-10-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/116921
+	* config/i386/i386-expand.cc (ix86_expand_int_compare): Add a SUBREG
+	to V8HImode from V8HFmode or V8BFmode before generating a ptest.
+
+2024-10-13  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-10-01  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/116899
+	* gimple-range-cache.cc (ranger_cache::ranger_cache): Set m_workback
+	to vNULL instead of creating it, growing and then truncating.
+	(ranger_cache::fill_block_cache): Use safe_push rather than quick_push
+	on m_workback.
+	(ranger_cache::range_from_dom): Likewise.
+
+2024-10-13  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-10-01  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/116898
+	* gimple-range-cache.cc (ranger_cache::block_range): If a SSA_NAME
+	with NULL def_bb isn't SSA_NAME_IS_DEFAULT_DEF, return false instead
+	of failing assertion.  Formatting fix.
+
+2024-10-13  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-09-29  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/116627
+	* cselib.cc (remove_useless_values): Discard useless locs
+	even from preserved cselib_vals in cselib_preserved_hash_table
+	hash table.
+
+2024-10-13  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-09-20  Uros Bizjak  <ubizjak@gmail.com>
+		    Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/116738
+	* config/i386/subst.md (mask_scalar_operand_arg34,
+	mask_scalar_expand_op3, round_saeonly_scalar_mask_arg3): New
+	subst attributes.
+	* config/i386/sse.md
+	(<sse>_vm<code><mode>3<mask_scalar_name><round_saeonly_scalar_name>):
+	Change from define_insn to define_expand, rename the old define_insn
+	to ...
+	(*<sse>_vm<code><mode>3<mask_scalar_name><round_saeonly_scalar_name>):
+	... this.
+	(<sse>_ieee_vm<ieee_maxmin><mode>3<mask_scalar_name><round_saeonly_scalar_name>):
+	New define_insn.
+
+2024-10-08  Jan Beulich  <jbeulich@suse.com>
+
+	* config/i386/sse.md (vaesdec_<mode>, vaesdeclast_<mode>,
+	vaesenc_<mode>, vaesenclast_<mode>): Replace which_alternative
+	check by TARGET_AES one.
+
+2024-10-05  John David Anglin  <danglin@gcc.gnu.org>
+
+	* config/pa/pa.md: Fix indirect_got constraint.
+
+2024-10-04  H.J. Lu  <hjl.tools@gmail.com>
+
+	Backported from master:
+	2024-10-04  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR target/116962
+	* config/i386/i386.cc (ix86_stack_protect_runtime_enabled_p): New
+	function.
+	(TARGET_STACK_PROTECT_RUNTIME_ENABLED_P): New.
+
+2024-10-04  Georg-Johann Lay  <avr@gjlay.de>
+
+	Backported from master:
+	2024-10-04  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR target/116953
+	* config/avr/avr.cc (avr_out_sbxx_branch): Work on a copy of
+	the operands rather than on operands itself, which is just
+	recog_data.operand and may be clobbered by jump_over_one_insn_p.
+
+2024-10-02  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-09-18  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/116585
+	* tree-data-ref.cc (split_constant_offset_1): When either
+	operand is subject to abnormal coalescing do no further
+	processing.
+
+2024-09-29  Uros Bizjak  <ubizjak@gmail.com>
+
+	Backported from master:
+	2024-09-27  Uros Bizjak  <ubizjak@gmail.com>
+
+	* config/i386/i386.h: Add PTA_BDVER1, PTA_BDVER2, PTA_BDVER3,
+	PTA_BDVER4, PTA_BTVER1 and PTA_BTVER2.
+	* common/config/i386/i386-common.cc (processor_alias_table)
+	<"bdver1">: Use PTA_BDVER1.
+	<"bdver2">: Use PTA_BDVER2.
+	<"bdver3">: Use PTA_BDVER3.
+	<"bdver4">: Use PTA_BDVER4.
+	<"btver1">: Use PTA_BTVER1.  Use M_CPU_TYPE (AMD_BTVER1).
+	<"btver2">: Use PTA_BTVER2.
+	<"shanghai>: Use M_CPU_SUBTYPE (AMDFAM10H_SHANGHAI).
+	<"istanbul>: Use M_CPU_SUBTYPE (AMDFAM10H_ISTANBUL).
+
+2024-09-28  Jan Hubicka  <jh@suse.cz>
+
+	Backported from master:
+	2024-09-03  Jan Hubicka  <jh@suse.cz>
+
+	* config/i386/i386.cc (ix86_reassociation_width): Update for Znver5.
+	* config/i386/x86-tune-costs.h (znver5_costs): Update reassociation
+	widths.
+
+2024-09-28  Jan Hubicka  <jh@suse.cz>
+
+	Backported from master:
+	2024-09-03  Jan Hubicka  <jh@suse.cz>
+
+	* config/i386/x86-tune-sched.cc (ix86_fuse_mov_alu_p): Fix
+	typo.
+
+2024-09-28  Jan Hubicka  <jh@suse.cz>
+
+	Backported from master:
+	2024-09-03  Jan Hubicka  <jh@suse.cz>
+
+	* config/i386/i386.h (TARGET_FUSE_MOV_AND_ALU): New tune.
+	* config/i386/x86-tune-sched.cc (ix86_issue_rate): Updat for znver5.
+	(ix86_adjust_cost): Add TODO about znver5 memory latency.
+	(ix86_fuse_mov_alu_p): New.
+	(ix86_macro_fusion_pair_p): Use it.
+	* config/i386/x86-tune.def (X86_TUNE_FUSE_ALU_AND_BRANCH): Add ZNVER5.
+	(X86_TUNE_FUSE_MOV_AND_ALU): New tune;
+
+2024-09-28  Jan Hubicka  <jh@suse.cz>
+
+	Backported from master:
+	2024-09-03  Jan Hubicka  <jh@suse.cz>
+
+	* config/i386/x86-tune.def (X86_TUNE_USE_GATHER_2PARTS): Disable for
+	ZNVER5.
+	(X86_TUNE_USE_SCATTER_2PARTS): Disable for ZNVER5.
+	(X86_TUNE_USE_GATHER_4PARTS): Disable for ZNVER5.
+	(X86_TUNE_USE_SCATTER_4PARTS): Disable for ZNVER5.
+	(X86_TUNE_USE_GATHER_8PARTS): Disable for ZNVER5.
+	(X86_TUNE_USE_SCATTER_8PARTS): Disable for ZNVER5.
+
+2024-09-28  Jan Hubicka  <jh@suse.cz>
+
+	Backported from master:
+	2024-09-03  Jan Hubicka  <jh@suse.cz>
+
+	* config/i386/x86-tune.def (X86_TUNE_AVOID_128FMA_CHAINS): Enable for
+	znver5.
+	(X86_TUNE_AVOID_256FMA_CHAINS): Likewise.
+	(X86_TUNE_AVOID_512FMA_CHAINS): Likewise.
+
+2024-09-28  H.J. Lu  <hjl.tools@gmail.com>
+
+	Backported from master:
+	2024-09-25  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR target/116839
+	* config/i386/i386.cc (ix86_rewrite_tls_address_1): Make it
+	static.  Return if TLS address is thread register plus an integer
+	register.
+
+2024-09-26  Stefan Schulze Frielinghaus  <stefansf@gcc.gnu.org>
+
+	Backported from master:
+	2024-09-13  Stefan Schulze Frielinghaus  <stefansf@gcc.gnu.org>
+
+	PR target/115860
+	* config/s390/s390.cc (print_operand): Remove operand specifier
+	%V.
+	* config/s390/s390.md (UNSPEC_TF_TO_FPRX2): New.
+	* config/s390/vector.md (*tf_to_fprx2_0): Remove.
+	(*tf_to_fprx2_1): Remove.
+	(tf_to_fprx2): New.
+
+2024-09-26  Stefan Schulze Frielinghaus  <stefansf@gcc.gnu.org>
+
+	Backported from master:
+	2024-09-13  Stefan Schulze Frielinghaus  <stefansf@gcc.gnu.org>
+
+	* config/s390/s390.cc (s390_mem_constraint): Check displacement
+	for AQ and AR constraints.
+
+2024-09-23  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backported from master:
+	2024-09-20  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config/darwin.h (AS_NEEDS_DASH_FOR_PIPED_INPUT): New.
+
+2024-09-23  Iain Sandoe  <iain@sandoe.co.uk>
+
+	Backported from master:
+	2024-08-07  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR target/116237
+	* config/darwin.h (SUBTARGET_DRIVER_SELF_SPECS): Add a spec for
+	weak_framework.
+	* config/darwin.opt: Handle weak_framework driver option.
+
+2024-09-22  John David Anglin  <danglin@gcc.gnu.org>
+
+	* config/pa/pa.h (GENERAL_REGNO_P): Define.
+	* config/pa/pa.md: Add SImode and SFmode peephole2
+	patterns to generate loads and stores with long
+	displacements.
+
+2024-09-20  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* ipa-modref.cc (modref_eaf_analysis::analyze_ssa_name): Always
+	process both the load and the store of a memory copy operation.
+
+2024-09-20  Stefan Schulze Frielinghaus  <stefansf@gcc.gnu.org>
+
+	Backported from master:
+	2024-09-12  Stefan Schulze Frielinghaus  <stefansf@gcc.gnu.org>
+
+	* config/s390/s390-protos.h (s390_gen_lowpart_subreg): Remove.
+	* config/s390/s390.cc (s390_gen_lowpart_subreg): Remove.
+	(s390_expand_insv): Use adjust_address() and emit a
+	strict_low_part only in case of a natural subreg.
+	* config/s390/s390.md: Use gen_lowpart() instead of
+	s390_gen_lowpart_subreg().
+
+2024-09-19  Haochen Jiang  <haochen.jiang@intel.com>
+
+	* doc/invoke.texi: Add corei7, corei7-avx, core-avx-i,
+	core-avx2, atom, slm, gracemont and emerarldrapids. Reorder
+	the -march documentation by splitting them into date-to-now
+	products, P-core, E-core and Xeon Phi. Refine the product names in
+	documentation.
+
+2024-09-18  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-08-27  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/116460
+	* tree-ssa-forwprop.cc (pass_forwprop::execute): First do
+	simple_dce_from_worklist and then remove stmts in to_remove.
+	Track defs to be removed in to_remove_defs.
+
+2024-09-18  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-07-04  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/115426
+	* gimplify.cc (gimplify_asm_expr): Handle "rm" output
+	constraint gimplified to a register (operation).
+
+2024-09-18  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-09-06  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/116610
+	* tree-vect-loop.cc (vectorizable_induction): Use MINUS_EXPR
+	to apply a mask peeling adjustment.
+
+2024-09-18  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	Backported from master:
+	2024-08-22  Andrew Pinski  <quic_apinski@quicinc.com>
+		    Richard Biener   <rguenther@suse.de>
+
+	PR middle-end/116454
+	* fold-const.cc (fold_binary_loc): Fix `a * +-1i`
+	by wrapping arg0 with save_expr when it is not COMPLEX_EXPR.
+
+2024-09-18  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-08-21  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/116380
+	* tree-loop-distribution.cc (copy_loop_before): Handle
+	out-of-loop defs appropriately.
+
+2024-09-18  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-08-20  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/116274
+	* tree-vect-slp.cc (vect_bb_slp_scalar_cost): Cost scalar loads
+	and stores as simple scalar stmts when they access a non-global,
+	not address-taken variable that doesn't have BLKmode assigned.
+
+2024-09-18  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-08-07  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/116258
+	* tree-vect-generic.cc (expand_vector_operations_1): Do not
+	lower PAREN_EXPR.
+
+2024-09-18  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-07-18  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/115641
+	* fold-const.cc (decode_field_reference): If the inner
+	reference isn't something we can take the address of, fail.
+
+2024-09-15  H.J. Lu  <hjl.tools@gmail.com>
+
+	Backported from master:
+	2024-09-08  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR target/116621
+	* config/i386/i386.cc (ix86_gimplify_va_arg): Don't use temp for
+	a PARALLEL BLKmode container of an EXPR_LIST expression in a
+	TImode register.
+
 2024-09-09  Haochen Jiang  <haochen.jiang@intel.com>
 
 	PR target/116617
