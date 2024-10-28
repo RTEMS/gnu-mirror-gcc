@@ -372,7 +372,7 @@ can_inline_edge_p (struct cgraph_edge *e, bool report,
   gcc_checking_assert (e->inline_failed);
 
   if(e->callback) {
-    printf("skipping inline - callback\n");
+    fprintf(stderr, "skipping inline - callback\n");
     return false;
   }
 

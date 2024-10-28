@@ -2318,6 +2318,17 @@ ipa_set_jfunc_vr (ipa_jump_func *jf, const ipa_vr &vr)
    information in the jump_functions array in the ipa_edge_args corresponding
    to this callsite.  */
 
+static void calc_callback_args_idx(cgraph_edge * e) {
+  gcc_checking_assert(e->callback);
+  ipa_edge_args *args = ipa_edge_args_sum->get_create (e);
+  int argn = 1;
+  vec_safe_grow_cleared (args->callback_args, argn, true);
+  (*args->callback_args)[0] = {1, true};
+  for (int i = 1; i < argn; i++) {
+    (*args->callback_args)[i] = {i, false};
+  }
+}
+
 static void
 ipa_compute_jump_functions_for_edge (struct ipa_func_body_info *fbi,
 				     struct cgraph_edge *cs)
@@ -2326,6 +2337,9 @@ ipa_compute_jump_functions_for_edge (struct ipa_func_body_info *fbi,
   ipa_edge_args *args = ipa_edge_args_sum->get_create (cs);
   gcall *call = cs->call_stmt;
   int n, arg_num = gimple_call_num_args (call);
+  if (cs->callback) {
+    arg_num = args->callback_args->length();
+  }
   bool useful_context = false;
 
   if (arg_num == 0 || args->jump_functions)
@@ -2339,10 +2353,21 @@ ipa_compute_jump_functions_for_edge (struct ipa_func_body_info *fbi,
   if (ipa_func_spec_opts_forbid_analysis_p (cs->caller))
     return;
 
-  for (n = 0; n < arg_num; n++)
+  int n_ = 0;
+  bool recurse = false;
+  cgraph_edge * callback_edge = NULL;
+  for (n = 0; n < arg_num && n_ < arg_num; n_++, n++)
     {
+      if (cs->callback)
+	{
+	  n_ = (*args->callback_args)[n].idx;
+	}
+      else
+	{
+	  n_ = n;
+	}
       struct ipa_jump_func *jfunc = ipa_get_ith_jump_func (args, n);
-      tree arg = gimple_call_arg (call, n);
+      tree arg = gimple_call_arg (call, n_);
       tree param_type = ipa_get_callee_param_type (cs, n);
       if (flag_devirtualize && POINTER_TYPE_P (TREE_TYPE (arg)))
 	{
@@ -2419,10 +2444,24 @@ ipa_compute_jump_functions_for_edge (struct ipa_func_body_info *fbi,
 	}
 
       if (is_gimple_ip_invariant (arg)
-	  || (VAR_P (arg)
-	      && is_global_var (arg)
-	      && TREE_READONLY (arg)))
-	ipa_set_jf_constant (jfunc, arg, cs);
+	  || (VAR_P (arg) && is_global_var (arg) && TREE_READONLY (arg)))
+	{
+	  ipa_set_jf_constant (jfunc, arg, cs);
+	  if (TREE_CODE (arg) == ADDR_EXPR)
+	    {
+	      tree pointee = TREE_OPERAND (arg, 0);
+	      if (TREE_CODE (pointee) == FUNCTION_DECL
+		  && lookup_attribute ("callback", DECL_ATTRIBUTES (pointee))
+		  && !cs->callback)
+		{
+		  cgraph_node *kernel_node = cgraph_node::get_create (pointee);
+		  gcc_checking_assert (!recurse && !callback_edge);
+		  callback_edge = cs->make_callback (kernel_node);
+		  calc_callback_args_idx (callback_edge);
+		  recurse = true;
+		}
+	    }
+	}
       else if (!is_gimple_reg_type (TREE_TYPE (arg))
 	       && TREE_CODE (arg) == PARM_DECL)
 	{
@@ -2463,6 +2502,14 @@ ipa_compute_jump_functions_for_edge (struct ipa_func_body_info *fbi,
 	    }
 	}
 
+      if (cs->callback && (*args->callback_args)[n].is_data_arg)
+	{
+	  ipa_set_jf_simple_pass_through (jfunc, 0, true);
+	}
+      if (cs->has_callback && n == 1)
+	{
+	  ipa_set_jf_simple_pass_through (jfunc, 1, true);
+	}
       /* If ARG is pointer, we cannot use its type to determine the type of aggregate
 	 passed (because type conversions are ignored in gimple).  Usually we can
 	 safely get type from function declaration, but in case of K&R prototypes or
@@ -2480,6 +2527,10 @@ ipa_compute_jump_functions_for_edge (struct ipa_func_body_info *fbi,
 	      || POINTER_TYPE_P (param_type)))
 	determine_known_aggregate_parts (fbi, call, arg, param_type, jfunc);
     }
+
+  if (recurse) {
+    ipa_compute_jump_functions_for_edge (fbi, callback_edge);
+  }
   if (!useful_context)
     vec_free (args->polymorphic_call_contexts);
 }
@@ -3196,33 +3247,6 @@ ipa_analyze_node (struct cgraph_node *node)
   fbi.bb_infos.safe_grow_cleared (last_basic_block_for_fn (cfun), true);
   fbi.param_count = ipa_get_param_count (info);
   fbi.aa_walk_budget = opt_for_fn (node->decl, param_ipa_max_aa_steps);
-
-  if (lookup_attribute ("callback", DECL_ATTRIBUTES (node->decl)))
-    {
-      printf ("callback ahoj %s\n", node->name ());
-      gcc_checking_assert (node->referred_to_p ());
-
-      ipa_ref *ref = NULL;
-      for (int i = 0; node->iterate_referring (i, ref); i++)
-	{
-	    if (ref->use == IPA_REF_ADDR) {
-	      gcc_checking_assert(dyn_cast<gcall*>(ref->stmt));
-	      gcall * call_stmt = dyn_cast<gcall *>(ref->stmt);
-	      cgraph_node * reffering_node = dyn_cast<cgraph_node *>(ref->referring);
-	      gcc_checking_assert(call_stmt);
-	      gcc_checking_assert(reffering_node);
-	      cgraph_edge *e = reffering_node->get_edge (ref->stmt);
-	      e->make_callback (node);
-	      ipa_node_params *caller_info
-		= ipa_node_params_sum->get_create (e->caller);
-	      if (caller_info->analysis_done)
-		{
-		  caller_info->analysis_done = 0;
-		  ipa_analyze_node (e->caller);
-		}
-	      }
-	}
-    }
 
   for (struct cgraph_edge *cs = node->callees; cs; cs = cs->next_callee)
     {
