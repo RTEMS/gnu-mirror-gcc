@@ -1,3 +1,12 @@
+==================== Branch work182-vpair, patch #302 ====================
+
+Update vector-pair documentation.
+
+2024-11-02  Michael Meissner  <meissner@linux.ibm.com>
+
+	* doc/extend.texi (PowerPC Vector Pair Support): Add
+	vpair_f{32,64}_swap_odd_even.  Remove sub-nodes.
+
 ==================== Branch work182-vpair, patch #301 ====================
 
 Add vector pair swap even and odd.
