@@ -24753,9 +24753,6 @@ that will operate on units of 4 64-bit floating point values, and
 @code{vector_pair_f32_t} for operating on units of 8 32-bit floating
 point values.
 
-@node PowerPC Vector Pair Support for 64-bit floating point
-@subsection PowerPC Vector Pair Support for 64-bit floating point.
-
 The following functions are provided for operating on vector pairs
 that consist of 4 64-bit floating point values:
 
@@ -24790,9 +24787,6 @@ void vpair_f64_nfms (vector_pair_f64_t *, vector_pair_f64_t *,
                      vector_pair_f64_t *, vector_pair_f64_t *);
 @end smallexample
 
-@node PowerPC Vector Pair Support for 32-bit floating point
-@subsection PowerPC Vector Pair Support for 32-bit floating point.
-
 The following functions are provided for operating on vector pairs
 that consist of 8 32-bit floating point values:
 
@@ -24825,6 +24819,14 @@ void vpair_f32_nfma (vector_pair_f32_t *, vector_pair_f32_t *,
                      vector_pair_f32_t *, vector_pair_f32_t *);
 void vpair_f32_nfms (vector_pair_f32_t *, vector_pair_f32_t *,
                      vector_pair_f32_t *, vector_pair_f32_t *);
+@end smallexample
+
+The following functions are provided for operating on vector pairs
+that swap the even and odd elements.
+
+@smallexample
+void vpair_f32_swap_odd_even (vector_pair_f32_t *, vector_pair_f32_t *);
+void vpair_f64_swap_odd_even (vector_pair_f64_t *, vector_pair_f64_t *);
 @end smallexample
 
 @node PRU Built-in Functions
