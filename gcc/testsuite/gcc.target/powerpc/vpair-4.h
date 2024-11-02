@@ -219,6 +219,19 @@ vpair_nfms (float *r, float *a, float *b, float *c, size_t num)
     vpair_f32_nfms (vr + i, va + i, vb + i, vc + i);
 }
 
+void
+vpair_swap (float *r, float *a, float *b, float *c, size_t num)
+{
+  vector_pair_f32_t *vr = (vector_pair_f32_t *)r;
+  vector_pair_f32_t *va = (vector_pair_f32_t *)a;
+
+  size_t i;
+  size_t num2 = num / (sizeof (vector_pair_f32_t) / sizeof (float));
+
+  for (i = 0; i < num2; i++)
+    vpair_f32_swap_odd_even (vr + i, va + i);
+}
+
 
 /* scalar tests.  */
 
@@ -347,6 +360,18 @@ scalar_nfms (float *r, float *a, float *b, float *c, size_t num)
   for (i = 0; i < num; i++)
     r[i] = - __builtin_fma (a[i], b[i], -c[i]);
 }
+
+void
+scalar_swap (float *r, float *a, float *b, float *c, size_t num)
+{
+  size_t i;
+
+  for (i = 0; i < num; i += 2)
+    {
+      r[i] = a[i+1];
+      r[i+1] = a[i];
+    }
+}
 
 
 /* Check results.  */
@@ -397,6 +422,7 @@ struct
   { vpair_fms,  scalar_fms,     "fms"  }, 
   { vpair_nfma, scalar_nfma,    "nfma" }, 
   { vpair_nfms, scalar_nfms,    "nfms" }, 
+  { vpair_swap, scalar_swap,    "swap" }, 
 };
 
 /* Run tests.  */
