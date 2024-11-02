@@ -124,8 +124,17 @@ test_nfms (vector_pair_f32_t *dest,
   vpair_f32_nfms (dest, x, y, z);
 }
 
-/* { dg-final { scan-assembler-times {\mlxvp\M}       26 } } */
-/* { dg-final { scan-assembler-times {\mstxvp\M}      13 } } */
+void
+test_swap (vector_pair_f32_t *dest,
+	   vector_pair_f32_t *x)
+{
+  /* 1 lxvp, 2 xxpermdi, 1 stxvp.  */
+  vpair_f32_swap_odd_even (dest, x);
+}
+
+/* { dg-final { scan-assembler-times {\mlxvp\M}       27 } } */
+/* { dg-final { scan-assembler-times {\mstxvp\M}      14 } } */
+/* { dg-final { scan-assembler-times {\mvrld\M}        2 } } */
 /* { dg-final { scan-assembler-times {\mxvabssp\M}     2 } } */
 /* { dg-final { scan-assembler-times {\mxvaddsp\M}     2 } } */
 /* { dg-final { scan-assembler-times {\mxvmadd.sp\M}   2 } } */

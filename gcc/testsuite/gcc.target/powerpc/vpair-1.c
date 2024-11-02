@@ -124,8 +124,16 @@ test_nfms (vector_pair_f64_t *dest,
   vpair_f64_nfms (dest, x, y, z);
 }
 
-/* { dg-final { scan-assembler-times {\mlxvp\M}       26 } } */
-/* { dg-final { scan-assembler-times {\mstxvp\M}      13 } } */
+void
+test_swap (vector_pair_f64_t *dest,
+	   vector_pair_f64_t *x)
+{
+  /* 1 lxvp, 2 xxpermdi, 1 stxvp.  */
+  vpair_f64_swap_odd_even (dest, x);
+}
+
+/* { dg-final { scan-assembler-times {\mlxvp\M}       27 } } */
+/* { dg-final { scan-assembler-times {\mstxvp\M}      14 } } */
 /* { dg-final { scan-assembler-times {\mxvabsdp\M}     2 } } */
 /* { dg-final { scan-assembler-times {\mxvadddp\M}     2 } } */
 /* { dg-final { scan-assembler-times {\mxvmadd.dp\M}   2 } } */
@@ -139,3 +147,4 @@ test_nfms (vector_pair_f64_t *dest,
 /* { dg-final { scan-assembler-times {\mxvnmsub.dp\M}  2 } } */
 /* { dg-final { scan-assembler-times {\mxvsqrtdp\M}    2 } } */
 /* { dg-final { scan-assembler-times {\mxvsubdp\M}     2 } } */
+/* { dg-final { scan-assembler-times {\mxxpermdi\M}    2 } } */

@@ -516,4 +516,58 @@ vpair_f32_nfms (vector_pair_f32_t       *__r,
 		   "xvnmsubasp",
 		   __builtin_vsx_xvnmsubsp);
 }
+
+
+/* Swap even/odd operations.  */
+
+static inline void
+vpair_f32_swap_odd_even (vector_pair_f32_t       *__r,
+			 const vector_pair_f32_t *__a)
+{
+  vector unsigned long long __rotate = { 32, 32 };
+
+#if __MMA__ && !__VPAIR_NOP10__
+  /* Power10 vector pair support.  */
+  __asm__ ("vrld %0,%1,%2\n\tvrld %L0,%L1,%2"
+	   : "=v" (__r->__vpair)
+	   : "v"  (__a->__vpair), "v" (__rotate));
+
+#else
+  /* vector pair not available.  */
+  vector unsigned long long *__r_ll = (vector unsigned long long *)__r;
+  vector unsigned long long *__a_ll = (vector unsigned long long *)__a;
+  __r_ll[0] = __builtin_vec_vrld (__a_ll[0], __rotate);
+  __r_ll[1] = __builtin_vec_vrld (__a_ll[1], __rotate);
+#endif	/* power10/not power10.  */
+}
+
+
+static inline void
+vpair_f64_swap_odd_even (vector_pair_f64_t       *__r,
+			 const vector_pair_f64_t *__a)
+{
+#if __MMA__ && !__VPAIR_NOP10__
+#if __VPAIR__USE_FPR__ || !__GNUC__ || (!__linux__ && !__ELF__)
+
+  /* Use vector pair and use %0 and %L0 on traditional FPR registers.  */
+  __asm__ ("xxpermdi %0,%1,%1,2\n\txxpermdi %L0,%L1,%L1,2"
+	   : "=d" (__r->__vpair)
+	   : "d"  (__a->__vpair));
+
+#else
+  /* Use vector pair and use %x0 and %x0+ on all VSX registers.  */
+  __asm__ ("xxpermdi %x0,%x1,%x1,2\n\txxpermdi %x0+1,%x1+1,%x1+1,2"
+	   : "=wa" (__r->__vpair)
+	   : "wa"  (__a->__vpair));
+#endif
+
+#else
+  /* vector pair not available.  */
+  __r->__vp_f64[0]
+    = __builtin_vsx_xxpermdi_2df (__a->__vp_f64[0], __a->__vp_f64[0], 2);
+  __r->__vp_f64[1]
+    = __builtin_vsx_xxpermdi_2df (__a->__vp_f64[1], __a->__vp_f64[1], 2);
+#endif
+}
+
 #endif	/* _VECTOR_PAIR_H.  */
