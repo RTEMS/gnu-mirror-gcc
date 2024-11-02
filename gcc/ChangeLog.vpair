@@ -1,34 +1,5 @@
 ==================== Branch work182-vpair, patch #302 ====================
 
-Update vector-pair documentation.
-
-2024-11-02  Michael Meissner  <meissner@linux.ibm.com>
-
-	* doc/extend.texi (PowerPC Vector Pair Support): Add
-	vpair_f{32,64}_swap_odd_even.  Remove sub-nodes.
-
-==================== Branch work182-vpair, patch #301 ====================
-
-Add vector pair swap even and odd.
-
-This patch adds 2 additional functions:
-
-	vpair_f32_swap_odd_even
-	vpair_f64_swap_odd_even
-
-This swaps the odd and even elements in a vector pair.  The intention is for
-libraries that are doing complex multiply to be able to swap the real and
-imaginary elements to do the multiply operation.
-
-2024-11-01  Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/vector-pair.h (vpair_f32_swap_odd_even): New function.
-	(vpair_f64_swap_odd_even): Likewise.
-
-==================== Branch work182-vpair, patch #300 ====================
-
 Vector pair support.
 
 This patch adds a new include file (vector-pair.h) that adds support so that
@@ -418,7 +389,7 @@ With an explicit #pragma GCC unroll 2, the code generated would be:
 		bdnz .L93
 
 
-2024-11-01  Michael Meissner  <meissner@linux.ibm.com>
+2024-11-02  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -437,6 +408,10 @@ gcc/testsuite/
 	* gcc.target/powerpc/vpair-4-not-p10.c: Likewise.
 	* gcc.target/powerpc/vpair-4-p10.c: Likewise.
 	* gcc.target/powerpc/vpair-4.h: Likewise.
+
+==================== Branch work182-vpair, patch #302 was reverted ====================
+==================== Branch work182-vpair, patch #301 was reverted ====================
+==================== Branch work182-vpair, patch #300 was reverted ====================
 
 ==================== Branch work182-vpair, baseline ====================
 
