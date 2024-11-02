@@ -16213,6 +16213,7 @@ instructions, but allow the compiler to schedule those calls.
 * PowerPC Hardware Transactional Memory Built-in Functions::
 * PowerPC Atomic Memory Operation Functions::
 * PowerPC Matrix-Multiply Assist Built-in Functions::
+* PowerPC Vector Pair Support::
 * PRU Built-in Functions::
 * RISC-V Built-in Functions::
 * RISC-V Vector Intrinsics::
@@ -24727,6 +24728,105 @@ vec_t __builtin_vsx_xvcvbf16spn (vec_t);
 
 __vector_pair __builtin_vsx_lxvp (size_t, __vector_pair *);
 void __builtin_vsx_stxvp (__vector_pair, size_t, __vector_pair *);
+@end smallexample
+
+@node PowerPC Vector Pair Support
+@subsection PowerPC Vector Pair Support
+ISA 3.1 (power10) added instructions to load and store pairs of
+vectors with a single instruction.
+
+GCC now provides an include file (@file{vector-pair.h}) on PowerPC
+systems that allows users to write code that can write 32-bit and
+64-bit floating point code that processes data in 256-bit chunks
+rather than 128-bit chunks.
+
+If the code is compiled on an ISA 3.1 system with MMA enabled, the
+vector pair functions will use the @code{__vector_pair} type to have
+values in adjacent vectors and do the operation as a pair of
+operations.
+
+If the code is compiled on a VSX system, but not one with MMA enabled, the vector
+pair functions will use 2 separate vectors to do the operation.
+
+Two types are provided: @code{vector_pair_f64_t} is for vector pairs
+that will operate on units of 4 64-bit floating point values, and
+@code{vector_pair_f32_t} for operating on units of 8 32-bit floating
+point values.
+
+The following functions are provided for operating on vector pairs
+that consist of 4 64-bit floating point values:
+
+@smallexample
+void vpair_f64_splat (vector_pair_f64_t *, double);
+
+void vpair_f64_abs (vector_pair_f64_t *, vector_pair_f64_t *);
+void vpair_f64_nabs (vector_pair_f64_t *, vector_pair_f64_t *);
+void vpair_f64_neg (vector_pair_f64_t *, vector_pair_f64_t *);
+void vpair_f64_sqrt (vector_pair_f64_t *, vector_pair_f64_t *);
+
+void vpair_f64_add (vector_pair_f64_t *, vector_pair_f64_t *,
+                    vector_pair_f64_t *);
+void vpair_f64_div (vector_pair_f64_t *, vector_pair_f64_t *,
+                    vector_pair_f64_t *);
+void vpair_f64_max (vector_pair_f64_t *, vector_pair_f64_t *,
+                    vector_pair_f64_t *);
+void vpair_f64_min (vector_pair_f64_t *, vector_pair_f64_t *,
+                    vector_pair_f64_t *);
+void vpair_f64_mul (vector_pair_f64_t *, vector_pair_f64_t *,
+                    vector_pair_f64_t *);
+void vpair_f64_sub (vector_pair_f64_t *, vector_pair_f64_t *,
+                    vector_pair_f64_t *);
+
+void vpair_f64_fma (vector_pair_f64_t *, vector_pair_f64_t *,
+                    vector_pair_f64_t *, vector_pair_f64_t *);
+void vpair_f64_fms (vector_pair_f64_t *, vector_pair_f64_t *,
+                    vector_pair_f64_t *, vector_pair_f64_t *);
+void vpair_f64_nfma (vector_pair_f64_t *, vector_pair_f64_t *,
+                     vector_pair_f64_t *, vector_pair_f64_t *);
+void vpair_f64_nfms (vector_pair_f64_t *, vector_pair_f64_t *,
+                     vector_pair_f64_t *, vector_pair_f64_t *);
+@end smallexample
+
+The following functions are provided for operating on vector pairs
+that consist of 8 32-bit floating point values:
+
+@smallexample
+void vpair_f32_splat (vector_pair_f32_t *, float);
+
+void vpair_f32_abs (vector_pair_f32_t *, vector_pair_f32_t *);
+void vpair_f32_nabs (vector_pair_f32_t *, vector_pair_f32_t *);
+void vpair_f32_neg (vector_pair_f32_t *, vector_pair_f32_t *);
+void vpair_f32_sqrt (vector_pair_f32_t *, vector_pair_f32_t *);
+
+void vpair_f32_add (vector_pair_f32_t *, vector_pair_f32_t *,
+                    vector_pair_f32_t *);
+void vpair_f32_div (vector_pair_f32_t *, vector_pair_f32_t *,
+                    vector_pair_f32_t *);
+void vpair_f32_max (vector_pair_f32_t *, vector_pair_f32_t *,
+                    vector_pair_f32_t *);
+void vpair_f32_min (vector_pair_f32_t *, vector_pair_f32_t *,
+                    vector_pair_f32_t *);
+void vpair_f32_mul (vector_pair_f32_t *, vector_pair_f32_t *,
+                    vector_pair_f32_t *);
+void vpair_f32_sub (vector_pair_f32_t *, vector_pair_f32_t *,
+                    vector_pair_f32_t *);
+
+void vpair_f32_fma (vector_pair_f32_t *, vector_pair_f32_t *,
+                    vector_pair_f32_t *, vector_pair_f32_t *);
+void vpair_f32_fms (vector_pair_f32_t *, vector_pair_f32_t *,
+                    vector_pair_f32_t *, vector_pair_f32_t *);
+void vpair_f32_nfma (vector_pair_f32_t *, vector_pair_f32_t *,
+                     vector_pair_f32_t *, vector_pair_f32_t *);
+void vpair_f32_nfms (vector_pair_f32_t *, vector_pair_f32_t *,
+                     vector_pair_f32_t *, vector_pair_f32_t *);
+@end smallexample
+
+The following functions are provided for operating on vector pairs
+that swap the even and odd elements.
+
+@smallexample
+void vpair_f32_swap_odd_even (vector_pair_f32_t *, vector_pair_f32_t *);
+void vpair_f64_swap_odd_even (vector_pair_f64_t *, vector_pair_f64_t *);
 @end smallexample
 
 @node PRU Built-in Functions
