@@ -3014,6 +3014,7 @@ cgraph_edge::cannot_lead_to_return_p (void)
 bool
 cgraph_edge::maybe_hot_p (void)
 {
+  if (callback) return true;
   if (!maybe_hot_count_p (NULL, count.ipa ()))
     return false;
   if (caller->frequency == NODE_FREQUENCY_UNLIKELY_EXECUTED
@@ -3887,7 +3888,7 @@ cgraph_node::verify_node (void)
 			    }
 			  if (!e->indirect_unknown_callee)
 			    {
-			      if (e->verify_corresponds_to_fndecl (decl))
+			      if (!e->callback && e->verify_corresponds_to_fndecl (decl))
 				{
 				  error ("edge points to wrong declaration:");
 				  debug_tree (e->callee->decl);
@@ -3929,7 +3930,7 @@ cgraph_node::verify_node (void)
 
       for (e = callees; e; e = e->next_callee)
 	{
-	  if (!e->aux && !e->speculative && !e->callback)
+	  if (!e->aux && !e->speculative && !e->callback && !e->has_callback)
 	    {
 	      error ("edge %s->%s has no corresponding call_stmt",
 		     identifier_to_locale (e->caller->name ()),

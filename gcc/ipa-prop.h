@@ -1062,6 +1062,10 @@ ipa_get_ith_jump_func (class ipa_edge_args *args, int i)
   return &(*args->jump_functions)[i];
 }
 
+void
+ipa_copy_ith_jump_func (class cgraph_edge *src, unsigned src_idx,
+			class cgraph_edge *dst, unsigned dst_idx);
+
 /* Returns a pointer to the polymorphic call context for the ith argument.
    NULL if contexts are not computed.  */
 inline class ipa_polymorphic_call_context *
