@@ -29564,6 +29564,68 @@ rs6000_opaque_type_invalid_use_p (gimple *stmt)
   return false;
 }
 
+bool
+sf_logical_op_p (rtx operands[])
+{
+  if (!TARGET_POWERPC64 || !TARGET_DIRECT_MOVE)
+    {
+      fprintf (stderr, "!TARGET_POWERPC64 || !TARGET_DIRECT_MOVE\n");
+      return false;
+    }
+
+   /* The REG_P (xxx) tests prevents SUBREG's, which allows us to use REGNO
+      to compare registers, when the mode is different.  */
+  if (!REG_P (operands[SFBOOL_MFVSR_D]) && REG_P (operands[SFBOOL_BOOL_D]))
+    {
+      fprintf (stderr, "REG_P (operands[SFBOOL_MFVSR_D]) && REG_P (operands[SFBOOL_BOOL_D]))\n");
+      return false;
+    }
+
+  if (!REG_P (operands[SFBOOL_BOOL_A1]) && REG_P (operands[SFBOOL_SHL_D]))
+    {
+      fprintf (stderr, "!REG_P (operands[SFBOOL_BOOL_A1]) && REG_P (operands[SFBOOL_SHL_D])\n");
+      return false;
+    }
+
+  if (!REG_P (operands[SFBOOL_SHL_A])   && REG_P (operands[SFBOOL_MTVSR_D]))
+    {
+      fprintf (stderr, "!REG_P (operands[SFBOOL_SHL_A])   && REG_P (operands[SFBOOL_MTVSR_D])\n");
+      return false;
+    }
+
+  if (!REG_P (operands[SFBOOL_BOOL_A2])
+       && !CONST_INT_P (operands[SFBOOL_BOOL_A2]))
+    {
+      fprintf (stderr, "!REG_P (operands[SFBOOL_BOOL_A2]) && !CONST_INT_P (operands[SFBOOL_BOOL_A2])\n");
+      return false;
+    }
+
+  if (!REGNO (operands[SFBOOL_BOOL_D]) == REGNO (operands[SFBOOL_MFVSR_D])
+       && !peep2_reg_dead_p (2, operands[SFBOOL_MFVSR_D]))
+    {
+      fprintf (stderr, "!REGNO (operands[SFBOOL_BOOL_D]) == REGNO (operands[SFBOOL_MFVSR_D]) && !peep2_reg_dead_p (2, operands[SFBOOL_MFVSR_D])\n");
+      return false;
+    }
+
+  if (((REGNO (operands[SFBOOL_MFVSR_D]) == REGNO (operands[SFBOOL_BOOL_A1])
+	|| (REG_P (operands[SFBOOL_BOOL_A2])
+	    && REGNO (operands[SFBOOL_MFVSR_D]) == REGNO (operands[SFBOOL_BOOL_A2])))
+       && REGNO (operands[SFBOOL_BOOL_D]) == REGNO (operands[SFBOOL_SHL_A])
+       && (REGNO (operands[SFBOOL_SHL_D]) == REGNO (operands[SFBOOL_BOOL_D])
+	   || peep2_reg_dead_p (3, operands[SFBOOL_BOOL_D]))
+       && peep2_reg_dead_p (4, operands[SFBOOL_SHL_D])))
+    {
+      fprintf (stderr, "last test passed\n");
+      return true;
+    }
+  else
+    {
+      fprintf (stderr, "last test failed\n");
+      return false;
+    }
+}
+    
+
 struct gcc_target targetm = TARGET_INITIALIZER;
 
 #include "gt-rs6000.h"

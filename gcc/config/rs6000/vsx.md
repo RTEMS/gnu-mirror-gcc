@@ -6338,24 +6338,7 @@
    (set (match_operand:SF SFBOOL_MTVSR_D "vsx_register_operand")
 	(unspec:SF [(match_dup SFBOOL_SHL_D)] UNSPEC_P8V_MTVSRD))]
 
-  "TARGET_POWERPC64 && TARGET_DIRECT_MOVE
-   /* The REG_P (xxx) tests prevents SUBREG's, which allows us to use REGNO
-      to compare registers, when the mode is different.  */
-   && REG_P (operands[SFBOOL_MFVSR_D]) && REG_P (operands[SFBOOL_BOOL_D])
-   && REG_P (operands[SFBOOL_BOOL_A1]) && REG_P (operands[SFBOOL_SHL_D])
-   && REG_P (operands[SFBOOL_SHL_A])   && REG_P (operands[SFBOOL_MTVSR_D])
-   && (REG_P (operands[SFBOOL_BOOL_A2])
-       || CONST_INT_P (operands[SFBOOL_BOOL_A2]))
-   && (REGNO (operands[SFBOOL_BOOL_D]) == REGNO (operands[SFBOOL_MFVSR_D])
-       || peep2_reg_dead_p (2, operands[SFBOOL_MFVSR_D]))
-   && (REGNO (operands[SFBOOL_MFVSR_D]) == REGNO (operands[SFBOOL_BOOL_A1])
-       || (REG_P (operands[SFBOOL_BOOL_A2])
-	   && REGNO (operands[SFBOOL_MFVSR_D])
-		== REGNO (operands[SFBOOL_BOOL_A2])))
-   && REGNO (operands[SFBOOL_BOOL_D]) == REGNO (operands[SFBOOL_SHL_A])
-   && (REGNO (operands[SFBOOL_SHL_D]) == REGNO (operands[SFBOOL_BOOL_D])
-       || peep2_reg_dead_p (3, operands[SFBOOL_BOOL_D]))
-   && peep2_reg_dead_p (4, operands[SFBOOL_SHL_D])"
+  "sf_logical_op_p (operands)"
   [(set (match_dup SFBOOL_TMP_GPR)
 	(ashift:DI (match_dup SFBOOL_BOOL_A_DI)
 		   (const_int 32)))
