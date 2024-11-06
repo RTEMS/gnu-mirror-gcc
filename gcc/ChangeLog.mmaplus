@@ -1,3 +1,16 @@
+==================== Branch mmaplus, patch #22 ====================
+
+Set default name to power8 if no --with-cpu.
+
+2024-11-06  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/default64.h (TARGET_CPU_DEFAULT): Set default cpu name.
+
+==================== Branch mmaplus, patch #21 was reverted ====================
+==================== Branch mmaplus, patch #21 was reverted ====================
+
 ==================== Branch mmaplus, patch #19 ====================
 
 RFC2655-Add saturating subtract built-ins.
