@@ -2526,4 +2526,3 @@ enum {
 #undef ARCH_EXPAND
 #endif	/* GCC_HWINT_H.  */
 
-extern bool sf_logical_op_p (rtx operands[]);
