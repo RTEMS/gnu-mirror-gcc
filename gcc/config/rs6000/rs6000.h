@@ -2525,4 +2525,3 @@ enum {
 
 #undef ARCH_EXPAND
 #endif	/* GCC_HWINT_H.  */
-
