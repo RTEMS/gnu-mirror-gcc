@@ -1,3 +1,17 @@
+==================== Branch work182-test, patch #501 ====================
+
+Add power9 and power10 float to logical optimizations.
+
+2024-11-08  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/117487
+	* config/rs6000/rs6000.cc (sf_logical_op_p): Delete.
+	* config/rs6000/vsx.md (SFmode logical peephoole): Update comments in
+	the original code that supports power8.  Add a new define_peephole2 to
+	do the optimization on power9/power10.
+
 ==================== Branch work182-test, patch #500 ====================
 
 Add debugging for PR 71977-1.c regression.
