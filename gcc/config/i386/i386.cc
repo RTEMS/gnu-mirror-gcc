@@ -26670,6 +26670,135 @@ ix86_run_selftests (void)
 
 } // namespace selftest
 
+/* Generate assembly to calculate CRC using pclmulqdq instruction.
+   OPERANDS[1] is input CRC,
+   OPERANDS[2] is data (message),
+   OPERANDS[3] is the polynomial without the leading 1.  */
+
+void
+ix86_expand_crc_using_pclmul (rtx *operands)
+{
+/* Check and keep arguments.  */
+  gcc_assert (!CONST_INT_P (operands[0]));
+  gcc_assert (CONST_INT_P (operands[3]));
+  rtx crc = operands[1];
+  rtx data = operands[2];
+  unsigned HOST_WIDE_INT crc_size = GET_MODE_BITSIZE (GET_MODE (operands[0]));
+  gcc_assert (crc_size <= 32);
+  unsigned HOST_WIDE_INT data_size = GET_MODE_BITSIZE (GET_MODE (data));
+  unsigned HOST_WIDE_INT DImode_size = GET_MODE_BITSIZE (DImode);
+
+  /* Calculate the quotient.  */
+  unsigned HOST_WIDE_INT
+      q = gf2n_poly_long_div_quotient (UINTVAL (operands[3]), crc_size);
+
+  if (crc_size > data_size)
+    crc = expand_shift (RSHIFT_EXPR, DImode, crc, crc_size - data_size,
+			NULL_RTX, 1);
+
+  /* Keep the quotient in V2DImode.  */
+  rtx q_v2di = gen_reg_rtx (V2DImode);
+  rtx quotient = gen_reg_rtx (DImode);
+  convert_move (quotient, gen_int_mode (q, DImode), 0);
+  emit_insn (gen_vec_concatv2di (q_v2di, quotient, const0_rtx));
+
+  /* crc ^ data and keep in V2DImode.  */
+  rtx cd_xor = expand_binop (DImode, xor_optab, crc, data, NULL_RTX, 1,
+			     OPTAB_WIDEN);
+  rtx res = gen_reg_rtx (V2DImode);
+  emit_insn (gen_vec_concatv2di (res, cd_xor, const0_rtx));
+  /* Perform carry-less multiplication.  */
+  emit_insn (gen_pclmulqdq (res, res, q_v2di, gen_int_mode (0, DImode)));
+
+  res = expand_shift (RSHIFT_EXPR, V2DImode, res, crc_size, NULL_RTX, 0);
+
+  /* Keep the polynomial in V2DImode.  */
+  rtx polynomial = gen_reg_rtx (DImode);
+  convert_move (polynomial, operands[3], 0);
+  rtx p_v2di = gen_reg_rtx (V2DImode);
+  emit_insn (gen_vec_concatv2di (p_v2di, polynomial, const0_rtx));
+
+  /* Perform carry-less multiplication and get low part.  */
+  emit_insn (gen_pclmulqdq (res, res, p_v2di, gen_int_mode (0, DImode)));
+  rtx crc_part = gen_reg_rtx (DImode);
+  emit_insn (gen_vec_extractv2didi (crc_part, res, const0_rtx));
+
+  if (crc_size > data_size)
+    {
+      rtx shift = expand_shift (LSHIFT_EXPR, DImode, operands[1], data_size,
+				NULL_RTX, 1);
+      crc_part = expand_binop (DImode, xor_optab, crc_part, shift, NULL_RTX, 1,
+			       OPTAB_DIRECT);
+    }
+  /* Zero upper bits beyond crc_size.  */
+  res = expand_shift (RSHIFT_EXPR, DImode, crc_part, DImode_size - crc_size,
+		      NULL_RTX, 1);
+  res = expand_shift (LSHIFT_EXPR, DImode, crc_part, DImode_size - crc_size,
+		      NULL_RTX, 0);
+  emit_move_insn (operands[0], gen_lowpart (GET_MODE (operands[0]), crc_part));
+}
+
+/* Generate assembly to calculate reversed CRC using pclmulqdq instruction.
+   OPERANDS[1] is input CRC,
+   OPERANDS[2] is data (message),
+   OPERANDS[3] is the polynomial without the leading 1.  */
+
+void
+ix86_expand_reversed_crc_using_pclmul (rtx *operands)
+{
+  /* Check and keep arguments.  */
+  gcc_assert (!CONST_INT_P (operands[0]));
+  gcc_assert (CONST_INT_P (operands[3]));
+  rtx crc = operands[1];
+  rtx data = operands[2];
+  unsigned HOST_WIDE_INT crc_size = GET_MODE_BITSIZE (GET_MODE (operands[0]));
+  gcc_assert (crc_size <= 32);
+  unsigned HOST_WIDE_INT data_size = GET_MODE_BITSIZE (GET_MODE (data));
+
+  /* Calculate the quotient.  */
+  unsigned HOST_WIDE_INT
+      q = gf2n_poly_long_div_quotient (UINTVAL (operands[3]), crc_size);
+
+  /* Reflect the calculated quotient.  */
+  q = reflect_hwi (q, crc_size + 1);
+  rtx q_v2di = gen_reg_rtx (V2DImode);
+  rtx quotient = gen_reg_rtx (DImode);
+  convert_move (quotient, gen_int_mode (q, DImode), 0);
+  emit_insn (gen_vec_concatv2di (q_v2di, quotient, const0_rtx));
+
+  /* crc ^ data and keep in V2DImode.  */
+  rtx cd_xor = expand_binop (DImode, xor_optab, crc, data, NULL_RTX, 1,
+			     OPTAB_WIDEN);
+
+  /* Perform carry-less multiplication.  */
+  rtx res = gen_reg_rtx (V2DImode);
+  emit_insn (gen_vec_concatv2di (res, cd_xor, const0_rtx));
+  emit_insn (gen_pclmulqdq (res, res, q_v2di, gen_int_mode (0, DImode)));
+
+  res = expand_shift (LSHIFT_EXPR, V2DImode, res, 64 - data_size, NULL_RTX, 0);
+
+  /* Reflect the polynomial and keep in V2DImode.  */
+  unsigned HOST_WIDE_INT reflected_op3 = reflect_hwi (UINTVAL (operands[3]),
+						       crc_size);
+  rtx ref_polynomial = gen_reg_rtx (DImode);
+  convert_move (ref_polynomial, gen_int_mode (reflected_op3 << 1, DImode), 0);
+  rtx p_v2di = gen_reg_rtx (V2DImode);
+  emit_insn (gen_vec_concatv2di (p_v2di, ref_polynomial, const0_rtx));
+
+  /* Perform carry-less multiplication and get high part.  */
+  emit_insn (gen_pclmulqdq (res, res, p_v2di, gen_int_mode (0, DImode)));
+  rtx res_high = gen_reg_rtx (DImode);
+  emit_insn (gen_vec_extractv2didi (res_high, res, const1_rtx));
+
+  if (crc_size > data_size)
+    {
+      rtx shift = expand_shift (RSHIFT_EXPR, DImode, crc, data_size,
+				NULL_RTX, 1);
+      res_high = expand_binop (DImode, xor_optab, res_high, shift, NULL_RTX, 1,
+			       OPTAB_DIRECT);
+    }
+  emit_move_insn (operands[0], gen_lowpart (GET_MODE (operands[0]), res_high));
+}
 #endif /* CHECKING_P */
 
 static const scoped_attribute_specs *const ix86_attribute_table[] =

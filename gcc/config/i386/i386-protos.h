@@ -307,6 +307,8 @@ extern bool ix86_expand_vector_init_duplicate (bool, machine_mode, rtx,
 extern bool ix86_expand_vector_init_one_nonzero (bool, machine_mode, rtx,
 						 rtx, int);
 extern bool ix86_extract_perm_from_pool_constant (int*, rtx);
+extern void ix86_expand_crc_using_pclmul (rtx *);
+extern void ix86_expand_reversed_crc_using_pclmul (rtx *);
 
 /* In i386-c.cc  */
 extern void ix86_target_macros (void);
