@@ -188,9 +188,11 @@ mhard-float
 Target RejectNegative InverseMask(SOFT_FLOAT, HARD_FLOAT) Var(rs6000_isa_flags)
 Use hardware floating point.
 
+;; Originally, we used -mpopcntd to indicate ISA 2.6.  Keep the switch name,
+;; but change the target macro.
 mpopcntd
-Target Mask(POPCNTD) Var(rs6000_isa_flags)
-Use PowerPC V2.06 popcntd instruction.
+Target Mask(POWER7) Var(rs6000_isa_flags)
+Use ISA 2.6 (Power7) instructions.
 
 mfriz
 Target Var(TARGET_FRIZ) Init(-1) Save
