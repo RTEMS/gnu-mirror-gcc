@@ -258,8 +258,8 @@ struct clone_map {
 
 static const struct clone_map rs6000_clone_map[CLONE_MAX] = {
   { 0,				"" },		/* Default options.  */
-  { OPTION_MASK_POWER6,		"arch_2_05" },	/* ISA 2.05 (power6).  */
-  { OPTION_MASK_POWER7,		"arch_2_06" },	/* ISA 2.06 (power7).  */
+  { OPTION_MASK_CMPB,		"arch_2_05" },	/* ISA 2.05 (power6).  */
+  { OPTION_MASK_POPCNTD,	"arch_2_06" },	/* ISA 2.06 (power7).  */
   { OPTION_MASK_P8_VECTOR,	"arch_2_07" },	/* ISA 2.07 (power8).  */
   { OPTION_MASK_P9_VECTOR,	"arch_3_00" },	/* ISA 3.0 (power9).  */
   { OPTION_MASK_POWER10,	"arch_3_1" },	/* ISA 3.1 (power10).  */
@@ -1922,7 +1922,7 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
 	  if(GET_MODE_SIZE (mode) == UNITS_PER_FP_WORD)
 	    return 1;
 
-	  if (TARGET_POWER7 && mode == SImode)
+	  if (TARGET_POPCNTD && mode == SImode)
 	    return 1;
 
 	  if (TARGET_P9_VECTOR && (mode == QImode || mode == HImode))
@@ -3886,7 +3886,7 @@ rs6000_option_override_internal (bool global_init_p)
 
   /* For the newer switches (vsx, dfp, etc.) set some of the older options,
      unless the user explicitly used the -mno-<option> to disable the code.  */
-  if (TARGET_P9_VECTOR || TARGET_POWER9 || TARGET_P9_MISC)
+  if (TARGET_P9_VECTOR || TARGET_MODULO || TARGET_P9_MISC)
     rs6000_isa_flags |= (ISA_3_0_MASKS_SERVER & ~ignore_masks);
   else if (TARGET_P9_MINMAX)
     {
@@ -3916,15 +3916,15 @@ rs6000_option_override_internal (bool global_init_p)
     rs6000_isa_flags |= (ISA_2_7_MASKS_SERVER & ~ignore_masks);
   else if (TARGET_VSX)
     rs6000_isa_flags |= (ISA_2_6_MASKS_SERVER & ~ignore_masks);
-  else if (TARGET_POWER7)
+  else if (TARGET_POPCNTD)
     rs6000_isa_flags |= (ISA_2_6_MASKS_EMBEDDED & ~ignore_masks);
   else if (TARGET_DFP)
     rs6000_isa_flags |= (ISA_2_5_MASKS_SERVER & ~ignore_masks);
-  else if (TARGET_POWER6)
+  else if (TARGET_CMPB)
     rs6000_isa_flags |= (ISA_2_5_MASKS_EMBEDDED & ~ignore_masks);
-  else if (TARGET_POWER5X)
+  else if (TARGET_FPRND)
     rs6000_isa_flags |= (ISA_2_4_MASKS & ~ignore_masks);
-  else if (TARGET_POWER5)
+  else if (TARGET_POPCNTB)
     rs6000_isa_flags |= (ISA_2_2_MASKS & ~ignore_masks);
   else if (TARGET_ALTIVEC)
     rs6000_isa_flags |= (OPTION_MASK_PPC_GFXOPT & ~ignore_masks);
@@ -3949,12 +3949,12 @@ rs6000_option_override_internal (bool global_init_p)
       rs6000_isa_flags &= ~OPTION_MASK_CRYPTO;
     }
 
-  if (!TARGET_POWER5X && TARGET_VSX)
+  if (!TARGET_FPRND && TARGET_VSX)
     {
-      if (rs6000_isa_flags_explicit & OPTION_MASK_POWER5X)
+      if (rs6000_isa_flags_explicit & OPTION_MASK_FPRND)
 	/* TARGET_VSX = 1 implies Power 7 and newer */
 	error ("%qs requires %qs", "-mvsx", "-mfprnd");
-      rs6000_isa_flags &= ~OPTION_MASK_POWER5X;
+      rs6000_isa_flags &= ~OPTION_MASK_FPRND;
     }
 
   /* Assert !TARGET_VSX if !TARGET_ALTIVEC and make some adjustments
@@ -4129,7 +4129,7 @@ rs6000_option_override_internal (bool global_init_p)
   else if (TARGET_LONG_DOUBLE_128)
     {
       if (global_options.x_rs6000_ieeequad
-	  && (!TARGET_POWER7 || !TARGET_VSX))
+	  && (!TARGET_POPCNTD || !TARGET_VSX))
 	error ("%qs requires full ISA 2.06 support", "-mabi=ieeelongdouble");
 
       if (rs6000_ieeequad != TARGET_IEEEQUAD_DEFAULT)
@@ -4796,7 +4796,7 @@ rs6000_option_override_internal (bool global_init_p)
      DERAT mispredict penalty.  However the LVE and STVE altivec instructions
      need indexed accesses and the type used is the scalar type of the element
      being loaded or stored.  */
-    TARGET_AVOID_XFORM = (rs6000_tune == PROCESSOR_POWER6 && TARGET_POWER6
+    TARGET_AVOID_XFORM = (rs6000_tune == PROCESSOR_POWER6 && TARGET_CMPB
 			  && !TARGET_ALTIVEC);
 
   /* Set the -mrecip options.  */
@@ -22416,7 +22416,7 @@ rs6000_rtx_costs (rtx x, machine_mode mode, int outer_code,
 	    *total = rs6000_cost->divsi;
 	}
       /* Add in shift and subtract for MOD unless we have a mod instruction. */
-      if ((!TARGET_POWER9
+      if ((!TARGET_MODULO
 	   || (RS6000_DISABLE_SCALAR_MODULO && SCALAR_INT_MODE_P (mode)))
 	 && (code == MOD || code == UMOD))
 	*total += COSTS_N_INSNS (2);
@@ -22431,11 +22431,11 @@ rs6000_rtx_costs (rtx x, machine_mode mode, int outer_code,
       return false;
 
     case POPCOUNT:
-      *total = COSTS_N_INSNS (TARGET_POWER7 ? 1 : 6);
+      *total = COSTS_N_INSNS (TARGET_POPCNTD ? 1 : 6);
       return false;
 
     case PARITY:
-      *total = COSTS_N_INSNS (TARGET_POWER6 ? 2 : 6);
+      *total = COSTS_N_INSNS (TARGET_CMPB ? 2 : 6);
       return false;
 
     case NOT:
@@ -23208,8 +23208,8 @@ rs6000_emit_swsqrt (rtx dst, rtx src, bool recip)
   return;
 }
 
-/* Emit popcount intrinsic on TARGET_POWER5 and TARGET_POWER7 targets.  DST is
-   the target, and SRC is the argument operand.  */
+/* Emit popcount intrinsic on TARGET_POPCNTB (Power5) and TARGET_POPCNTD
+   (Power7) targets.  DST is the target, and SRC is the argument operand.  */
 
 void
 rs6000_emit_popcount (rtx dst, rtx src)
@@ -23218,7 +23218,7 @@ rs6000_emit_popcount (rtx dst, rtx src)
   rtx tmp1, tmp2;
 
   /* Use the PPC ISA 2.06 popcnt{w,d} instruction if we can.  */
-  if (TARGET_POWER7)
+  if (TARGET_POPCNTD)
     {
       if (mode == SImode)
 	emit_insn (gen_popcntdsi2 (dst, src));
@@ -23250,7 +23250,7 @@ rs6000_emit_popcount (rtx dst, rtx src)
 }
 
 
-/* Emit parity intrinsic on TARGET_POWER5 targets.  DST is the
+/* Emit parity intrinsic on TARGET_POPCNTB targets.  DST is the
    target, and SRC is the argument operand.  */
 
 void
@@ -23262,7 +23262,7 @@ rs6000_emit_parity (rtx dst, rtx src)
   tmp = gen_reg_rtx (mode);
 
   /* Use the PPC ISA 2.05 prtyw/prtyd instruction if we can.  */
-  if (TARGET_POWER6)
+  if (TARGET_CMPB)
     {
       if (mode == SImode)
 	{
@@ -24482,7 +24482,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
 								false, true  },
   { "block-ops-vector-pair",	OPTION_MASK_BLOCK_OPS_VECTOR_PAIR,
 								false, true  },
-  { "cmpb",			OPTION_MASK_POWER6,		false, true  },
+  { "cmpb",			OPTION_MASK_CMPB,		false, true  },
   { "crypto",			OPTION_MASK_CRYPTO,		false, true  },
   { "direct-move",		0,				false, true  },
   { "dlmzb",			OPTION_MASK_DLMZB,		false, true  },
@@ -24490,7 +24490,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
 								false, true  },
   { "float128",			OPTION_MASK_FLOAT128_KEYWORD,	false, true  },
   { "float128-hardware",	OPTION_MASK_FLOAT128_HW,	false, true  },
-  { "fprnd",			OPTION_MASK_POWER5X,		false, true  },
+  { "fprnd",			OPTION_MASK_FPRND,		false, true  },
   { "power10",			OPTION_MASK_POWER10,		false, true  },
   { "power11",			OPTION_MASK_POWER11,		false, false },
   { "hard-dfp",			OPTION_MASK_DFP,		false, true  },
@@ -24499,13 +24499,13 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "mfcrf",			OPTION_MASK_MFCRF,		false, true  },
   { "mfpgpr",			0,				false, true  },
   { "mma",			OPTION_MASK_MMA,		false, true  },
-  { "modulo",			OPTION_MASK_POWER9,		false, true  },
+  { "modulo",			OPTION_MASK_MODULO,		false, true  },
   { "mulhw",			OPTION_MASK_MULHW,		false, true  },
   { "multiple",			OPTION_MASK_MULTIPLE,		false, true  },
   { "pcrel",			OPTION_MASK_PCREL,		false, true  },
   { "pcrel-opt",		OPTION_MASK_PCREL_OPT,		false, true  },
-  { "popcntb",			OPTION_MASK_POWER5,		false, true  },
-  { "popcntd",			OPTION_MASK_POWER7,		false, true  },
+  { "popcntb",			OPTION_MASK_POPCNTB,		false, true  },
+  { "popcntd",			OPTION_MASK_POPCNTD,		false, true  },
   { "power8-fusion",		OPTION_MASK_P8_FUSION,		false, true  },
   { "power8-fusion-sign",	OPTION_MASK_P8_FUSION_SIGN,	false, true  },
   { "power8-vector",		OPTION_MASK_P8_VECTOR,		false, true  },
