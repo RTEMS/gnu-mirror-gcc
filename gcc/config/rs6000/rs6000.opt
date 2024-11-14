@@ -140,9 +140,11 @@ mfprnd
 Target Mask(POWER5X) Var(rs6000_isa_flags)
 Use ISA 2.2 (Power5x) instructions.
 
+;; Originally, we used -mcmpb to indicate ISA 2.5.  Keep the switch name,
+;; but change the target macro.
 mcmpb
-Target Mask(CMPB) Var(rs6000_isa_flags)
-Use PowerPC V2.05 compare bytes instruction.
+Target Mask(POWER6) Var(rs6000_isa_flags)
+Use ISA 2.5 (Power6) instructions.
 
 ;; This option existed in the past, but now is always off.
 mno-mfpgpr
