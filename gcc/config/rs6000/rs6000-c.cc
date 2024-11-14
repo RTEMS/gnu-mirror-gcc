@@ -422,11 +422,11 @@ rs6000_target_modify_macros (bool define_p, HOST_WIDE_INT flags)
     rs6000_define_or_undefine_macro (define_p, "_ARCH_PPC64");
   if ((flags & OPTION_MASK_MFCRF) != 0)
     rs6000_define_or_undefine_macro (define_p, "_ARCH_PWR4");
-  if ((flags & OPTION_MASK_POWER5) != 0)
+  if ((flags & OPTION_MASK_POPCNTB) != 0)
     rs6000_define_or_undefine_macro (define_p, "_ARCH_PWR5");
-  if ((flags & OPTION_MASK_POWER5X) != 0)
+  if ((flags & OPTION_MASK_FPRND) != 0)
     rs6000_define_or_undefine_macro (define_p, "_ARCH_PWR5X");
-  if ((flags & OPTION_MASK_POWER6) != 0)
+  if ((flags & OPTION_MASK_CMPB) != 0)
     rs6000_define_or_undefine_macro (define_p, "_ARCH_PWR6");
   if ((flags & OPTION_MASK_POPCNTD) != 0)
     rs6000_define_or_undefine_macro (define_p, "_ARCH_PWR7");
