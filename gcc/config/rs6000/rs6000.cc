@@ -3922,7 +3922,7 @@ rs6000_option_override_internal (bool global_init_p)
     rs6000_isa_flags |= (ISA_2_5_MASKS_SERVER & ~ignore_masks);
   else if (TARGET_CMPB)
     rs6000_isa_flags |= (ISA_2_5_MASKS_EMBEDDED & ~ignore_masks);
-  else if (TARGET_FPRND)
+  else if (TARGET_POWER5X)
     rs6000_isa_flags |= (ISA_2_4_MASKS & ~ignore_masks);
   else if (TARGET_POWER5)
     rs6000_isa_flags |= (ISA_2_2_MASKS & ~ignore_masks);
@@ -3949,12 +3949,12 @@ rs6000_option_override_internal (bool global_init_p)
       rs6000_isa_flags &= ~OPTION_MASK_CRYPTO;
     }
 
-  if (!TARGET_FPRND && TARGET_VSX)
+  if (!TARGET_POWER5X && TARGET_VSX)
     {
-      if (rs6000_isa_flags_explicit & OPTION_MASK_FPRND)
+      if (rs6000_isa_flags_explicit & OPTION_MASK_POWER5X)
 	/* TARGET_VSX = 1 implies Power 7 and newer */
 	error ("%qs requires %qs", "-mvsx", "-mfprnd");
-      rs6000_isa_flags &= ~OPTION_MASK_FPRND;
+      rs6000_isa_flags &= ~OPTION_MASK_POWER5X;
     }
 
   /* Assert !TARGET_VSX if !TARGET_ALTIVEC and make some adjustments
@@ -24490,7 +24490,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
 								false, true  },
   { "float128",			OPTION_MASK_FLOAT128_KEYWORD,	false, true  },
   { "float128-hardware",	OPTION_MASK_FLOAT128_HW,	false, true  },
-  { "fprnd",			OPTION_MASK_FPRND,		false, true  },
+  { "fprnd",			OPTION_MASK_POWER5X,		false, true  },
   { "power10",			OPTION_MASK_POWER10,		false, true  },
   { "power11",			OPTION_MASK_POWER11,		false, false },
   { "hard-dfp",			OPTION_MASK_DFP,		false, true  },

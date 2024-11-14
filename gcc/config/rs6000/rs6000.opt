@@ -134,9 +134,11 @@ mpopcntb
 Target Mask(POWER5) Var(rs6000_isa_flags)
 Use ISA 2.2 (Power5) instructions.
 
+;; Originally, we used -mfprnd to indicate ISA 2.4.  Keep the switch name,
+;; but change the target macro.
 mfprnd
-Target Mask(FPRND) Var(rs6000_isa_flags)
-Use PowerPC V2.02 floating point rounding instructions.
+Target Mask(POWER5X) Var(rs6000_isa_flags)
+Use ISA 2.4 (Power5x) instructions.
 
 mcmpb
 Target Mask(CMPB) Var(rs6000_isa_flags)
