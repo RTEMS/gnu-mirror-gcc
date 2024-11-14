@@ -62,7 +62,7 @@
    FLOAT128_HW here until we are ready to make -mfloat128 on by default.  */
 #define ISA_3_0_MASKS_SERVER	((ISA_2_7_MASKS_SERVER			\
 				  | OPTION_MASK_ISEL			\
-				  | OPTION_MASK_MODULO			\
+				  | OPTION_MASK_POWER9			\
 				  | OPTION_MASK_P9_MINMAX		\
 				  | OPTION_MASK_P9_MISC			\
 				  | OPTION_MASK_P9_VECTOR)		\
@@ -132,7 +132,7 @@
 				 | OPTION_MASK_ISEL			\
 				 | OPTION_MASK_MFCRF			\
 				 | OPTION_MASK_MMA			\
-				 | OPTION_MASK_MODULO			\
+				 | OPTION_MASK_POWER9			\
 				 | OPTION_MASK_MULHW			\
 				 | OPTION_MASK_NO_UPDATE		\
 				 | OPTION_MASK_POWER8			\
