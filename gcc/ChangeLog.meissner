@@ -1,4 +1,237 @@
+==================== Branch work186, patch #5 ====================
+
+Change TARGET_MODULO to TARGET_POWER9.
+
+This patch changes TARGET_MODULO to TARGET_POWER9 and OPTION_MASK_MODULO to
+OPTION_MASK_POWER9.  The -mmodulo switch is not being changed, just the name of
+the macros used to determine if the PowerPC processor supports ISA 3.0 (Power9).
+
+2024-11-14  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* gcc/config/rs6000/rs6000-builtin.cc (rs6000_builtin_is_supported):
+	Change TARGET_MODULO to TARGET_POWER9.  Change OPTION_MASK_MODULO to
+	OPTION_MASK_POWER9.
+	* gcc/config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Likewise.
+	* gcc/config/rs6000/rs6000-cpus.def (ISA_3_0_MASKS_SERVER): Likewise.
+	(POWERPC_MASKS): Likewise.
+	* gcc/config/rs6000/rs6000.cc (rs6000_option_override_internal):
+	Likewise.
+	(rs6000_opt_masks): Likewise.
+	* gcc/config/rs6000/rs6000.h (TARGET_CTZ): Likewise.
+	(TARGET_EXTSWSLI): Likewise.
+	(TARGET_MADDLD): Likewise.
+	* gcc/config/rs6000/rs6000.md (enabled attribute): Likewise.
+	(mod<mode>3): Likewise.
+	(umod<mode>3): Likewise.
+	(divide/modulo peephole2): Likewise.
+	* gcc/config/rs6000/rs6000.opt (-mmodulo): Likewise.
+
+==================== Branch work186, patch #4 ====================
+
+Change TARGET_POPCNTD to TARGET_POWER7.
+
+This patch changes TARGET_POPCNTD to TARGET_POWER7 and OPTION_MASK_POPCNTD to
+OPTION_MASK_POWER7.  The -mpopcntd switch is not being changed, just the name of
+the macros used to determine if the PowerPC processor supports ISA 2.6 (Power7).
+
+2024-11-14  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* gcc/config/rs6000/dfp.md (cmp<mode>_internal1): Change TARGET_POPCNTD
+	to TARGET_POWER7.  Change OPTION_MASK_POPCNTD to OPTION_MASK_POWER7.
+	* gcc/config/rs6000/rs6000-builtin.cc (rs6000_builtin_is_supported):
+	Likewise.
+	* gcc/config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Likewise.
+	* gcc/config/rs6000/rs6000-cpus.def (ISA_2_6_MASKS_EMBEDDED): Likewise.
+	(ISA_2_6_MASKS_SERVER): Likewise.
+	(POWERPC_MASKS): Likewise.
+	* gcc/config/rs6000/rs6000-string.cc (expand_block_compare): Likewise.
+	* gcc/config/rs6000/rs6000.cc (rs6000_opt_masks): Likewise.
+	(rs6000_hard_regno_mode_ok_uncached): Likewise.
+	(rs6000_option_override_internal): Likewise.
+	(rs6000_rtx_costs): Likewise.
+	(rs6000_opt_masks): Likewise.
+	* gcc/config/rs6000/rs6000.h (TARGET_LDBRX): Likewise.
+	(TARGET_FCFID): Likewise.
+	(TARGET_LFIWZX): Likewise.
+	(TARGET_FCFIDS): Likewise.
+	(TARGET_FCFIDU): Likewise.
+	(TARGET_FCFIDUS): Likewise.
+	(TARGET_FCTIDUZ): Likewise.
+	(TARGET_FCTIWUZ): Likewise.
+	(TARGET_FCTIDUZ): Likewise.
+	(TARGET_EXTRA_BUILTINS): Likewise.
+	(CTZ_DEFINED_VALUE_AT_ZERO): Likewise.
+	* gcc/config/rs6000/rs6000.md (enabled attribute): Likewise.
+	(ctz<mode>2): Likewise.
+	(ffs<mode>2): Likewise.
+	(popcntb<mode>2): Likewise.
+	(lrint<mode>si): Likewise.
+	(lrint<mode>si): Likewise.
+	(lrint<mode>si_di): Likewise.
+	(cmpmemsi): Likewise.
+	(bpermd_<mode>): Likewise.
+	(addg6s): Likewise.
+	(cdtbcd): Likewise.
+	(cbcdtd): Likewise.
+	(div<div_extend>_<mode>): Likewise.
+	* gcc/config/rs6000/rs6000.opt (-mpopcntd): Likewise.
+
+==================== Branch work186, patch #3 ====================
+
+Change TARGET_CMPB to TARGET_POWER6.
+
+This patch changes TARGET_CMPB to TARGET_POWER6 and OPTION_MASK_CMPB to
+OPTION_MASK_POWER6.  The -mcmpb switch is not being changed, just the name of
+the macros used to determine if the PowerPC processor supports ISA 2.5 (Power6).
+
+2024-11-14  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* gcc/config/rs6000/rs6000-builtin.cc (rs6000_builtin_is_supported):
+	Change TARGET_CMPB to TARGET_POWER6.  Change OPTION_MASK_CMPB to
+	OPTION_MASK_POWER6.
+	* gcc/config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Likewise.
+	* gcc/config/rs6000/rs6000-cpus.def (ISA_2_5_MASKS_EMBEDDED): Likewise.
+	(POWERPC_MASKS): Likewise.
+	(476 cpu definition): Likewise.
+	(476fp cpu definition): Likewise.
+	(a2 cpu definition): Likewise.
+	(power6 cpu definition): Likewise.
+	* gcc/config/rs6000/rs6000.cc (rs6000_clone_map): Likewise.
+	(rs6000_option_override_internal): Likewise.
+	(rs6000_rtx_costs): Likewise.
+	(rs6000_emit_parity): Likewise.
+	(rs6000_opt_masks): Likewise.
+	* gcc/config/rs6000/rs6000.h (TARGET_FCFID): Likewise.
+	(TARGET_LFIWAX): Likewise.
+	(TARGET_EXTRA_BUILTINS): Likewise.
+	* gcc/config/rs6000/rs6000.md (enabled attribute): Likewise.
+	(parity<mode>2_cmp): Change TARGET_CMPB to TARGET_POWER6.  Change
+	OPTION_MASK_CMPB to OPTION_MASK_POWER6.  Eliminate redundant
+	TARGET_POWER5 test.
+	(cmpb<mode>3): Change TARGET_CMPB to TARGET_POWER6.  Change
+	OPTION_MASK_CMPB to OPTION_MASK_POWER6.
+	(copysign<mode>3): Likewise.
+	(copysign<mode>3_fcpsgn): Likewise.
+	(cmpstrnsi): Likewise.
+	(cmpstrsi): Likewise.
+	* gcc/config/rs6000/rs6000.opt (-mcmpb): Likewise.
+
+==================== Branch work186, patch #2 ====================
+
+Change TARGET_FPRND to TARGET_POWER5X.
+
+This patch changes TARGET_POWER5X to TARGET_POWER5 and OPTION_MASK_POWER5X to
+OPTION_MASK_POWER5.  The -mfprnd switch is not being changed, just the name of
+the macros used to determine if the PowerPC processor supports ISA 2.4 (Power5x).
+
+2024-11-14  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* gcc/config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Change
+	TARGET_FPRND to TARGET_POWER5X.  Change OPTION_MASK_FPRND to
+	OPTION_MASK_POWER5X.
+	* gcc/config/rs6000/rs6000-cpus.def (ISA_2_4_MASKS): Likewise.
+	(POWERPC_MASKS): Likewise.
+	(464fp cpu definition): Likewise
+	(476fp cpu definition): Likewise.
+	(power5+ cpu definition): Likewise.
+	(power6 cpu definition): Likewise.
+	(power6x cpu definition): Likewise.
+	* gcc/config/rs6000/rs6000.cc (rs6000_option_override_internal):
+	Likewise.
+	(rs6000_opt_masks): Likewise.
+	* gcc/config/rs6000/rs6000.md (fmod<mode>3): Likewise.
+	(remainder<mode>3): Likewise.
+	(fctiwuz_<mode): Likewise.
+	(btrunc<mode>): Likewise.
+	("ceil<mode>2): Likewise.
+	(floor<mode>2): Likewise.
+	(round<mode>2): Likewise.
+	* gcc/config/rs6000/rs6000.opt (-mfprnd): Likewise.
+
+==================== Branch work186, patch #1 ====================
+
+Change TARGET_POPCNTB to TARGET_POWER5.
+
+This patch changes TARGET_POPCNTB to TARGET_POWER5 and OPTION_MASK_POPCNTB to
+OPTION_MASK_POWER5.  The -mpopcntb switch is not being changed, just the name of
+the macros used to determine if the PowerPC processor supports ISA 2.2 (Power5).
+
+2024-11-14  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* gcc/config/rs6000/rs6000-builtin.cc (rs6000_builtin_is_supported):
+	Change TARGET_POPCNTB to TARGET_POWER5.  Change OPTION_MASK_POPCNTB to
+	OPTION_MASK_POWER5.
+	* gcc/config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Likewise.
+	* gcc/config/rs6000/rs6000-cpus.def (ISA_2_2_MASKS): Likewise.
+	(POWERPC_MASKS): Likewise.
+	(476 cpu definition): Likewise.
+	(476fp cpu definition): Likewise.
+	(a2 cpu definition): Likewise.
+	(power5 cpu definition): Likewise.
+	(power5+ cpu definition): Likewise.
+	(power6 cpu definition): Likewise.
+	(power6x cpu definition): Likewise.
+	* gcc/config/rs6000/rs6000.cc (rs6000_option_override_internal):
+	Likewise.
+	(rs6000_emit_popcount): Update comment.
+	(rs6000_emit_parity): Likewise.
+	(rs6000_opt_masks): Change TARGET_POPCNTB to TARGET_POWER5.  Change
+	OPTION_MASK_POPCNTB to OPTION_MASK_POWER5.
+	* gcc/config/rs6000/rs6000.h (TARGET_FCFID): Likewise.
+	(TARGET_EXTRA_BUILTINS): Likewise.
+	(TARGET_FRE): Likewise.
+	(TARGET_FRSQRTES): Likewise.
+	* gcc/config/rs6000/rs6000.md (enabled attribute): Likewise.
+	(popcount<mode>2): Likewise.
+	(popcntb<mode>): Likewise.
+	(popcntd<mode>): Likewise.
+	(parity<mode>2): Likewise.
+	* gcc/config/rs6000/rs6000.md (-mpopcntb): Likewise.
+
 ==================== Branch work186, baseline ====================
+
+Add ChangeLog.meissner and REVISION.
+
+2024-11-14  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* REVISION: New file for branch.
+	* ChangeLog.meissner: New file.
+
+gcc/c-family/
+
+	* ChangeLog.meissner: New file.
+
+gcc/c/
+
+	* ChangeLog.meissner: New file.
+
+gcc/cp/
+
+	* ChangeLog.meissner: New file.
+
+gcc/fortran/
+
+	* ChangeLog.meissner: New file.
+
+gcc/testsuite/
+
+	* ChangeLog.meissner: New file.
+
+libgcc/
+
+	* ChangeLog.meissner: New file.
 
 2024-11-14   Michael Meissner  <meissner@linux.ibm.com>
 
