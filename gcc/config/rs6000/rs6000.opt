@@ -128,11 +128,9 @@ mmfcrf
 Target Mask(MFCRF) Var(rs6000_isa_flags)
 Use PowerPC V2.01 single field mfcr instruction.
 
-;; Originally, we used -mpopcntb to indicate ISA 2.2.  Keep the switch name,
-;; but change the target macro.
 mpopcntb
-Target Mask(POWER5) Var(rs6000_isa_flags)
-Use ISA 2.2 (Power5) instructions.
+Target Mask(POPCNTB) Var(rs6000_isa_flags)
+Use PowerPC V2.02 popcntb instruction.
 
 mfprnd
 Target Mask(FPRND) Var(rs6000_isa_flags)

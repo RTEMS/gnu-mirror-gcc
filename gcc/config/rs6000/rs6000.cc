@@ -3924,7 +3924,7 @@ rs6000_option_override_internal (bool global_init_p)
     rs6000_isa_flags |= (ISA_2_5_MASKS_EMBEDDED & ~ignore_masks);
   else if (TARGET_FPRND)
     rs6000_isa_flags |= (ISA_2_4_MASKS & ~ignore_masks);
-  else if (TARGET_POWER5)
+  else if (TARGET_POPCNTB)
     rs6000_isa_flags |= (ISA_2_2_MASKS & ~ignore_masks);
   else if (TARGET_ALTIVEC)
     rs6000_isa_flags |= (OPTION_MASK_PPC_GFXOPT & ~ignore_masks);
@@ -23208,8 +23208,8 @@ rs6000_emit_swsqrt (rtx dst, rtx src, bool recip)
   return;
 }
 
-/* Emit popcount intrinsic on TARGET_POWER5 and TARGET_POPCNTD (Power7)
-   targets.  DST is the target, and SRC is the argument operand.  */
+/* Emit popcount intrinsic on TARGET_POPCNTB (Power5) and TARGET_POPCNTD
+   (Power7) targets.  DST is the target, and SRC is the argument operand.  */
 
 void
 rs6000_emit_popcount (rtx dst, rtx src)
@@ -23250,7 +23250,7 @@ rs6000_emit_popcount (rtx dst, rtx src)
 }
 
 
-/* Emit parity intrinsic on TARGET_POWER5 targets.  DST is the
+/* Emit parity intrinsic on TARGET_POPCNTB targets.  DST is the
    target, and SRC is the argument operand.  */
 
 void
@@ -24504,7 +24504,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "multiple",			OPTION_MASK_MULTIPLE,		false, true  },
   { "pcrel",			OPTION_MASK_PCREL,		false, true  },
   { "pcrel-opt",		OPTION_MASK_PCREL_OPT,		false, true  },
-  { "power5",			OPTION_MASK_POWER5,		false, true  },
+  { "popcntb",			OPTION_MASK_POPCNTB,		false, true  },
   { "popcntd",			OPTION_MASK_POPCNTD,		false, true  },
   { "power8-fusion",		OPTION_MASK_P8_FUSION,		false, true  },
   { "power8-fusion-sign",	OPTION_MASK_P8_FUSION_SIGN,	false, true  },
