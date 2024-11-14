@@ -541,9 +541,11 @@ mpower9-minmax
 Target Undocumented Mask(P9_MINMAX) Var(rs6000_isa_flags)
 Use the new min/max instructions defined in ISA 3.0.
 
+;; Originally, we used -mmodulo to indicate ISA 3.0.  Keep the switch name,
+;; but change the target macro.
 mmodulo
-Target Undocumented Mask(MODULO) Var(rs6000_isa_flags)
-Generate the integer modulo instructions.
+Target Undocumented Mask(POWER9) Var(rs6000_isa_flags)
+Use ISA 3.0 (Power9) instructions.
 
 mfloat128
 Target Mask(FLOAT128_KEYWORD) Var(rs6000_isa_flags)
