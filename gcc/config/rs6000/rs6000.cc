@@ -259,7 +259,7 @@ struct clone_map {
 static const struct clone_map rs6000_clone_map[CLONE_MAX] = {
   { 0,				"" },		/* Default options.  */
   { OPTION_MASK_POWER6,		"arch_2_05" },	/* ISA 2.05 (power6).  */
-  { OPTION_MASK_POPCNTD,	"arch_2_06" },	/* ISA 2.06 (power7).  */
+  { OPTION_MASK_POWER7,		"arch_2_06" },	/* ISA 2.06 (power7).  */
   { OPTION_MASK_P8_VECTOR,	"arch_2_07" },	/* ISA 2.07 (power8).  */
   { OPTION_MASK_P9_VECTOR,	"arch_3_00" },	/* ISA 3.0 (power9).  */
   { OPTION_MASK_POWER10,	"arch_3_1" },	/* ISA 3.1 (power10).  */
@@ -1922,7 +1922,7 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
 	  if(GET_MODE_SIZE (mode) == UNITS_PER_FP_WORD)
 	    return 1;
 
-	  if (TARGET_POPCNTD && mode == SImode)
+	  if (TARGET_POWER7 && mode == SImode)
 	    return 1;
 
 	  if (TARGET_P9_VECTOR && (mode == QImode || mode == HImode))
@@ -3916,7 +3916,7 @@ rs6000_option_override_internal (bool global_init_p)
     rs6000_isa_flags |= (ISA_2_7_MASKS_SERVER & ~ignore_masks);
   else if (TARGET_VSX)
     rs6000_isa_flags |= (ISA_2_6_MASKS_SERVER & ~ignore_masks);
-  else if (TARGET_POPCNTD)
+  else if (TARGET_POWER7)
     rs6000_isa_flags |= (ISA_2_6_MASKS_EMBEDDED & ~ignore_masks);
   else if (TARGET_DFP)
     rs6000_isa_flags |= (ISA_2_5_MASKS_SERVER & ~ignore_masks);
@@ -4129,7 +4129,7 @@ rs6000_option_override_internal (bool global_init_p)
   else if (TARGET_LONG_DOUBLE_128)
     {
       if (global_options.x_rs6000_ieeequad
-	  && (!TARGET_POPCNTD || !TARGET_VSX))
+	  && (!TARGET_POWER7 || !TARGET_VSX))
 	error ("%qs requires full ISA 2.06 support", "-mabi=ieeelongdouble");
 
       if (rs6000_ieeequad != TARGET_IEEEQUAD_DEFAULT)
@@ -22431,7 +22431,7 @@ rs6000_rtx_costs (rtx x, machine_mode mode, int outer_code,
       return false;
 
     case POPCOUNT:
-      *total = COSTS_N_INSNS (TARGET_POPCNTD ? 1 : 6);
+      *total = COSTS_N_INSNS (TARGET_POWER7 ? 1 : 6);
       return false;
 
     case PARITY:
@@ -23208,8 +23208,8 @@ rs6000_emit_swsqrt (rtx dst, rtx src, bool recip)
   return;
 }
 
-/* Emit popcount intrinsic on TARGET_POWER5 and TARGET_POPCNTD (Power7)
-   targets.  DST is the target, and SRC is the argument operand.  */
+/* Emit popcount intrinsic on TARGET_POWER5 and TARGET_POWER7 targets.  DST is
+   the target, and SRC is the argument operand.  */
 
 void
 rs6000_emit_popcount (rtx dst, rtx src)
@@ -23218,7 +23218,7 @@ rs6000_emit_popcount (rtx dst, rtx src)
   rtx tmp1, tmp2;
 
   /* Use the PPC ISA 2.06 popcnt{w,d} instruction if we can.  */
-  if (TARGET_POPCNTD)
+  if (TARGET_POWER7)
     {
       if (mode == SImode)
 	emit_insn (gen_popcntdsi2 (dst, src));
@@ -24505,7 +24505,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "pcrel",			OPTION_MASK_PCREL,		false, true  },
   { "pcrel-opt",		OPTION_MASK_PCREL_OPT,		false, true  },
   { "popcntb",			OPTION_MASK_POWER5,		false, true  },
-  { "popcntd",			OPTION_MASK_POPCNTD,		false, true  },
+  { "popcntd",			OPTION_MASK_POWER7,		false, true  },
   { "power8-fusion",		OPTION_MASK_P8_FUSION,		false, true  },
   { "power8-fusion-sign",	OPTION_MASK_P8_FUSION_SIGN,	false, true  },
   { "power8-vector",		OPTION_MASK_P8_VECTOR,		false, true  },
