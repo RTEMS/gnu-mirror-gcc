@@ -4,7 +4,7 @@ Add -mcpu=future tuning support.
 
 This patch makes -mtune=future use the same tuning decision as -mtune=power11.
 
-2024-11-14  Michael Meissner  <meissner@linux.ibm.com>
+2024-11-15  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -18,7 +18,7 @@ Add support for -mcpu=future
 This patch adds the support that can be used in developing GCC support for
 future PowerPC processors.
 
-2024-11-14  Michael Meissner  <meissner@linux.ibm.com>
+2024-11-15  Michael Meissner  <meissner@linux.ibm.com>
 
 	* config.gcc (powerpc*-*-*): Add support for --with-cpu=future.
 	* config/rs6000/aix71.h (ASM_CPU_SPEC): Add support for -mcpu=future.
@@ -69,7 +69,7 @@ I updated the 2 tests that used -mvsx to raise the cpu to power7.
 
 Can I install this patch on the GCC 15 trunk?
 
-2024-11-14  Michael Meissner  <meissner@linux.ibm.com>
+2024-11-15  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -78,8 +78,6 @@ gcc/
 	default processor would not allow the option.
 	(rs6000_option_override_internal): Move some ISA checking code into
 	report_architecture_mismatch.
-
-2024-11-06  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/testsuite/
 
@@ -113,7 +111,7 @@ were no regressions.
 
 Can I install this patch on the GCC 15 trunk?
 
-2024-11-14  Michael Meissner  <meissner@linux.ibm.com>
+2024-11-15  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -220,7 +218,7 @@ This patch changes TARGET_MODULO to TARGET_POWER9.  The -mmodulo switch is not
 being changed, just the name of the macros used to determine if the PowerPC
 processor supports ISA 3.0 (Power9).
 
-2024-11-14  Michael Meissner  <meissner@linux.ibm.com>
+2024-11-15  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -246,7 +244,7 @@ This patch changes TARGET_POPCNTD to TARGET_POWER7.  The -mpopcntd switch is not
 being changed, just the name of the macros used to determine if the PowerPC
 processor supports ISA 2.6 (Power7).
 
-2024-11-14  Michael Meissner  <meissner@linux.ibm.com>
+2024-11-15  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -293,7 +291,7 @@ This patch changes TARGET_CMPB to TARGET_POWER6.  The -mcmpb switch is not being
 changed, just the name of the macros used to determine if the PowerPC processor
 supports ISA 2.5 (Power6).
 
-2024-11-14  Michael Meissner  <meissner@linux.ibm.com>
+2024-11-15  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -324,7 +322,7 @@ This patch changes TARGET_POWER5X to TARGET_POWER5.  The -mfprnd switch is not
 being changed, just the name of the macros used to determine if the PowerPC
 processor supports ISA 2.4 (Power5x).
 
-2024-11-14  Michael Meissner  <meissner@linux.ibm.com>
+2024-11-15  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -348,7 +346,7 @@ This patch changes TARGET_POPCNTB to TARGET_POWER5.  The -mpopcntb switch is not
 being changed in this patch, just the name of the macros used to determine if
 the PowerPC processor supports ISA 2.2 (Power5).
 
-2024-11-14  Michael Meissner  <meissner@linux.ibm.com>
+2024-11-15  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
