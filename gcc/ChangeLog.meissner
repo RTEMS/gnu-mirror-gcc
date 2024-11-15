@@ -84,8 +84,10 @@ gcc/testsuite/
 	* gcc.target/powerpc/ppc-target-4.c: Rewrite the test to add cpu=power7
 	when we need to add VSX support.  Add test for adding cpu=power7 no-vsx
 	to generate only Altivec instructions.
-	* gcc.target/powerpc/pr115688.c: Add cpu=power7 when requesting VSX
-	instructions.
+	* gcc.target/powerpc/pr115688.c: Add -mdejagnu-cpu=power6 when
+	requesting VSX instructions.
+	* gcc.target/powerpc/pr87496-1.c: Update optins to use
+	-mdejagnu-cpu=power6 to get the appropriate error message.
 
 ==================== Branch work186, patch #11 ====================
 
