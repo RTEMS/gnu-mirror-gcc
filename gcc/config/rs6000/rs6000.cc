@@ -1922,7 +1922,7 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
 	  if(GET_MODE_SIZE (mode) == UNITS_PER_FP_WORD)
 	    return 1;
 
-	  if (TARGET_POWER7 && mode == SImode)
+	  if (TARGET_POPCNTD && mode == SImode)
 	    return 1;
 
 	  if (TARGET_P9_VECTOR && (mode == QImode || mode == HImode))
@@ -3886,7 +3886,7 @@ rs6000_option_override_internal (bool global_init_p)
 
   /* For the newer switches (vsx, dfp, etc.) set some of the older options,
      unless the user explicitly used the -mno-<option> to disable the code.  */
-  if (TARGET_P9_VECTOR || TARGET_POWER9 || TARGET_P9_MISC)
+  if (TARGET_P9_VECTOR || TARGET_MODULO || TARGET_P9_MISC)
     rs6000_isa_flags |= (ISA_3_0_MASKS_SERVER & ~ignore_masks);
   else if (TARGET_P9_MINMAX)
     {
@@ -3916,15 +3916,15 @@ rs6000_option_override_internal (bool global_init_p)
     rs6000_isa_flags |= (ISA_2_7_MASKS_SERVER & ~ignore_masks);
   else if (TARGET_VSX)
     rs6000_isa_flags |= (ISA_2_6_MASKS_SERVER & ~ignore_masks);
-  else if (TARGET_POWER7)
+  else if (TARGET_POPCNTD)
     rs6000_isa_flags |= (ISA_2_6_MASKS_EMBEDDED & ~ignore_masks);
   else if (TARGET_DFP)
     rs6000_isa_flags |= (ISA_2_5_MASKS_SERVER & ~ignore_masks);
-  else if (TARGET_POWER6)
+  else if (TARGET_CMPB)
     rs6000_isa_flags |= (ISA_2_5_MASKS_EMBEDDED & ~ignore_masks);
-  else if (TARGET_POWER5X)
+  else if (TARGET_FPRND)
     rs6000_isa_flags |= (ISA_2_4_MASKS & ~ignore_masks);
-  else if (TARGET_POWER5)
+  else if (TARGET_POPCNTB)
     rs6000_isa_flags |= (ISA_2_2_MASKS & ~ignore_masks);
   else if (TARGET_ALTIVEC)
     rs6000_isa_flags |= (OPTION_MASK_PPC_GFXOPT & ~ignore_masks);
@@ -3949,7 +3949,7 @@ rs6000_option_override_internal (bool global_init_p)
       rs6000_isa_flags &= ~OPTION_MASK_CRYPTO;
     }
 
-  if (!TARGET_POWER5X && TARGET_VSX)
+  if (!TARGET_FPRND && TARGET_VSX)
     {
       if (rs6000_isa_flags_explicit & OPTION_MASK_FPRND)
 	/* TARGET_VSX = 1 implies Power 7 and newer */
@@ -4129,7 +4129,7 @@ rs6000_option_override_internal (bool global_init_p)
   else if (TARGET_LONG_DOUBLE_128)
     {
       if (global_options.x_rs6000_ieeequad
-	  && (!TARGET_POWER7 || !TARGET_VSX))
+	  && (!TARGET_POPCNTD || !TARGET_VSX))
 	error ("%qs requires full ISA 2.06 support", "-mabi=ieeelongdouble");
 
       if (rs6000_ieeequad != TARGET_IEEEQUAD_DEFAULT)
@@ -4796,7 +4796,7 @@ rs6000_option_override_internal (bool global_init_p)
      DERAT mispredict penalty.  However the LVE and STVE altivec instructions
      need indexed accesses and the type used is the scalar type of the element
      being loaded or stored.  */
-    TARGET_AVOID_XFORM = (rs6000_tune == PROCESSOR_POWER6 && TARGET_POWER6
+    TARGET_AVOID_XFORM = (rs6000_tune == PROCESSOR_POWER6 && TARGET_CMPB
 			  && !TARGET_ALTIVEC);
 
   /* Set the -mrecip options.  */
@@ -22416,7 +22416,7 @@ rs6000_rtx_costs (rtx x, machine_mode mode, int outer_code,
 	    *total = rs6000_cost->divsi;
 	}
       /* Add in shift and subtract for MOD unless we have a mod instruction. */
-      if ((!TARGET_POWER9
+      if ((!TARGET_MODULO
 	   || (RS6000_DISABLE_SCALAR_MODULO && SCALAR_INT_MODE_P (mode)))
 	 && (code == MOD || code == UMOD))
 	*total += COSTS_N_INSNS (2);
@@ -22431,11 +22431,11 @@ rs6000_rtx_costs (rtx x, machine_mode mode, int outer_code,
       return false;
 
     case POPCOUNT:
-      *total = COSTS_N_INSNS (TARGET_POWER7 ? 1 : 6);
+      *total = COSTS_N_INSNS (TARGET_POPCNTD ? 1 : 6);
       return false;
 
     case PARITY:
-      *total = COSTS_N_INSNS (TARGET_POWER6 ? 2 : 6);
+      *total = COSTS_N_INSNS (TARGET_CMPB ? 2 : 6);
       return false;
 
     case NOT:
@@ -23208,8 +23208,8 @@ rs6000_emit_swsqrt (rtx dst, rtx src, bool recip)
   return;
 }
 
-/* Emit popcount intrinsic on TARGET_POWER5 and TARGET_POWER7 targets.  DST is
-   the target, and SRC is the argument operand.  */
+/* Emit popcount intrinsic on TARGET_POPCNTB (Power5) and TARGET_POPCNTD
+   (Power7) targets.  DST is the target, and SRC is the argument operand.  */
 
 void
 rs6000_emit_popcount (rtx dst, rtx src)
@@ -23218,7 +23218,7 @@ rs6000_emit_popcount (rtx dst, rtx src)
   rtx tmp1, tmp2;
 
   /* Use the PPC ISA 2.06 popcnt{w,d} instruction if we can.  */
-  if (TARGET_POWER7)
+  if (TARGET_POPCNTD)
     {
       if (mode == SImode)
 	emit_insn (gen_popcntdsi2 (dst, src));
@@ -23250,7 +23250,7 @@ rs6000_emit_popcount (rtx dst, rtx src)
 }
 
 
-/* Emit parity intrinsic on TARGET_POWER5 targets.  DST is the
+/* Emit parity intrinsic on TARGET_POPCNTB targets.  DST is the
    target, and SRC is the argument operand.  */
 
 void
@@ -23262,7 +23262,7 @@ rs6000_emit_parity (rtx dst, rtx src)
   tmp = gen_reg_rtx (mode);
 
   /* Use the PPC ISA 2.05 prtyw/prtyd instruction if we can.  */
-  if (TARGET_POWER6)
+  if (TARGET_CMPB)
     {
       if (mode == SImode)
 	{
