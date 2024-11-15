@@ -1,3 +1,23 @@
+==================== Branch work186, patch #53 ====================
+
+Use vector pair load/store for memcpy with -mcpu=future
+
+In the development for the power10 processor, GCC did not enable using the load
+vector pair and store vector pair instructions when optimizing things like
+memory copy.  This patch enables using those instructions if -mcpu=future is
+used.
+
+2024-11-15  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000-cpus.def (ISA_FUTURE_MASKS_SERVER): Enable using
+	load vector pair and store vector pair instructions for memory copy
+	operations.
+	(POWERPC_MASKS): Make the bit for enabling using load vector pair and
+	store vector pair operations set and reset when the PowerPC processor is
+	changed.
+
 ==================== Branch work186, patch #52 ====================
 
 Add -mcpu=future tests.
