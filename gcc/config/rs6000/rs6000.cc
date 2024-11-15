@@ -252,17 +252,17 @@ enum {
 
 /* Map compiler ISA bits into HWCAP names.  */
 struct clone_map {
-  HOST_WIDE_INT arch_mask;	/* rs6000_arch mask */
+  HOST_WIDE_INT isa_mask;	/* rs6000_isa mask */
   const char *name;		/* name to use in __builtin_cpu_supports.  */
 };
 
 static const struct clone_map rs6000_clone_map[CLONE_MAX] = {
-  { 0,			"" },		/* Default options.  */
-  { ARCH_MASK_POWER6,	"arch_2_05" },	/* ISA 2.5 (power6).  */
-  { ARCH_MASK_POWER7,	"arch_2_06" },	/* ISA 2.6 (power7).  */
-  { ARCH_MASK_POWER8,	"arch_2_07" },	/* ISA 2.7 (power8).  */
-  { ARCH_MASK_POWER9,	"arch_3_00" },	/* ISA 3.0 (power9).  */
-  { ARCH_MASK_POWER10,	"arch_3_1" },	/* ISA 3.1 (power10).  */
+  { 0,				"" },		/* Default options.  */
+  { OPTION_MASK_CMPB,		"arch_2_05" },	/* ISA 2.05 (power6).  */
+  { OPTION_MASK_POPCNTD,	"arch_2_06" },	/* ISA 2.06 (power7).  */
+  { OPTION_MASK_P8_VECTOR,	"arch_2_07" },	/* ISA 2.07 (power8).  */
+  { OPTION_MASK_P9_VECTOR,	"arch_3_00" },	/* ISA 3.0 (power9).  */
+  { OPTION_MASK_POWER10,	"arch_3_1" },	/* ISA 3.1 (power10).  */
 };
 
 
@@ -1171,7 +1171,7 @@ enum reg_class (*rs6000_preferred_reload_class_ptr) (rtx, enum reg_class)
 const int INSN_NOT_AVAILABLE = -1;
 
 static void rs6000_print_isa_options (FILE *, int, const char *,
-				      HOST_WIDE_INT, HOST_WIDE_INT);
+				      HOST_WIDE_INT);
 static HOST_WIDE_INT rs6000_disable_incompatible_switches (void);
 
 static enum rs6000_reg_type register_to_reg_type (rtx, bool *);
@@ -1819,82 +1819,6 @@ rs6000_cpu_name_lookup (const char *name)
 }
 
 
-/* Map the processor into the arch bits that are set off of -mcpu=<xxx> instead
-   of having an internal -m<foo> option.  */
-
-static HOST_WIDE_INT
-get_arch_flags (int cpu_index)
-{
-  HOST_WIDE_INT ret = 0;
-
-  const HOST_WIDE_INT ARCH_COMBO_POWER4  = ARCH_MASK_POWER4;
-  const HOST_WIDE_INT ARCH_COMBO_POWER5  = ARCH_MASK_POWER5  | ARCH_COMBO_POWER4;
-  const HOST_WIDE_INT ARCH_COMBO_POWER5X = ARCH_MASK_POWER5X | ARCH_COMBO_POWER5;
-  const HOST_WIDE_INT ARCH_COMBO_POWER6  = ARCH_MASK_POWER6  | ARCH_COMBO_POWER5X;
-  const HOST_WIDE_INT ARCH_COMBO_POWER7  = ARCH_MASK_POWER7  | ARCH_COMBO_POWER6;
-  const HOST_WIDE_INT ARCH_COMBO_POWER8  = ARCH_MASK_POWER8  | ARCH_COMBO_POWER7;
-  const HOST_WIDE_INT ARCH_COMBO_POWER9  = ARCH_MASK_POWER9  | ARCH_COMBO_POWER8;
-  const HOST_WIDE_INT ARCH_COMBO_POWER10 = ARCH_MASK_POWER10 | ARCH_COMBO_POWER9;
-  const HOST_WIDE_INT ARCH_COMBO_POWER11 = ARCH_MASK_POWER11 | ARCH_COMBO_POWER10;
-
-  if (cpu_index >= 0)
-    switch (processor_target_table[cpu_index].processor)
-      {
-      case PROCESSOR_POWER11:
-	ret = ARCH_COMBO_POWER11;
-	break;
-
-      case PROCESSOR_POWER10:
-	ret = ARCH_COMBO_POWER10;
-	break;
-
-      case PROCESSOR_POWER9:
-	ret = ARCH_COMBO_POWER9;
-	break;
-
-      case PROCESSOR_POWER8:
-	ret = ARCH_COMBO_POWER8;
-	break;
-
-      case PROCESSOR_POWER7:
-	ret = ARCH_COMBO_POWER7;
-	break;
-
-      case PROCESSOR_PPCA2:
-      case PROCESSOR_POWER6:
-	ret = ARCH_COMBO_POWER6;
-	break;
-
-      case PROCESSOR_POWER5:
-	ret = ARCH_COMBO_POWER5;
-	if (TARGET_POWER5X)
-	  ret |= ARCH_MASK_POWER5X;
-	break;
-
-      case PROCESSOR_POWER4:
-	ret = ARCH_COMBO_POWER4;
-	break;
-
-      default:
-	/* For other processors, set the arch flags based on the ISA bits.  */
-	if (TARGET_MFCRF)
-	  ret |= ARCH_MASK_POWER4;
-
-	if (TARGET_POWER5)
-	  ret |= ARCH_MASK_POWER5;
-
-	if (TARGET_POWER5X)
-	  ret |= ARCH_MASK_POWER5X;
-
-	if (TARGET_POWER6)
-	  ret |= ARCH_MASK_POWER6;
-	break;
-      }
-
-  return ret;
-}
-
-
 /* Return number of consecutive hard regs needed starting at reg REGNO
    to hold something of mode MODE.
    This is ordinarily the length in words of a value of mode MODE
@@ -1998,7 +1922,7 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
 	  if(GET_MODE_SIZE (mode) == UNITS_PER_FP_WORD)
 	    return 1;
 
-	  if (TARGET_POWER7 && mode == SImode)
+	  if (TARGET_POPCNTD && mode == SImode)
 	    return 1;
 
 	  if (TARGET_P9_VECTOR && (mode == QImode || mode == HImode))
@@ -2475,10 +2399,9 @@ rs6000_debug_reg_global (void)
       const char *name = processor_target_table[rs6000_cpu_index].name;
       HOST_WIDE_INT flags
 	= processor_target_table[rs6000_cpu_index].target_enable;
-      HOST_WIDE_INT arch_flags = get_arch_flags (rs6000_cpu_index);
 
       sprintf (flags_buffer, "-mcpu=%s flags", name);
-      rs6000_print_isa_options (stderr, 0, flags_buffer, flags, arch_flags);
+      rs6000_print_isa_options (stderr, 0, flags_buffer, flags);
     }
   else
     fprintf (stderr, DEBUG_FMT_S, "cpu", "<none>");
@@ -2488,26 +2411,21 @@ rs6000_debug_reg_global (void)
       const char *name = processor_target_table[rs6000_tune_index].name;
       HOST_WIDE_INT flags
 	= processor_target_table[rs6000_tune_index].target_enable;
-      HOST_WIDE_INT arch_flags = get_arch_flags (rs6000_tune_index);
 
       sprintf (flags_buffer, "-mtune=%s flags", name);
-      rs6000_print_isa_options (stderr, 0, flags_buffer, flags, arch_flags);
+      rs6000_print_isa_options (stderr, 0, flags_buffer, flags);
     }
   else
     fprintf (stderr, DEBUG_FMT_S, "tune", "<none>");
 
   cl_target_option_save (&cl_opts, &global_options, &global_options_set);
   rs6000_print_isa_options (stderr, 0, "rs6000_isa_flags",
-			    rs6000_isa_flags, 0);
+			    rs6000_isa_flags);
 
   rs6000_print_isa_options (stderr, 0, "rs6000_isa_flags_explicit",
-			    rs6000_isa_flags_explicit, 0);
+			    rs6000_isa_flags_explicit);
 
-  if (rs6000_arch_flags)
-    rs6000_print_isa_options (stderr, 0, "rs6000_arch_flags", 0,
-			      rs6000_arch_flags);
-
-  rs6000_print_isa_options (stderr, 0, "TARGET_DEFAULT", TARGET_DEFAULT, 0);
+  rs6000_print_isa_options (stderr, 0, "TARGET_DEFAULT", TARGET_DEFAULT);
 
   fprintf (stderr, DEBUG_FMT_S, "--with-cpu default",
 	   OPTION_TARGET_CPU_DEFAULT ? OPTION_TARGET_CPU_DEFAULT : "<none>");
@@ -3704,7 +3622,7 @@ rs6000_option_override_internal (bool global_init_p)
 
   /* Print defaults.  */
   if ((TARGET_DEBUG_REG || TARGET_DEBUG_TARGET) && global_init_p)
-    rs6000_print_isa_options (stderr, 0, "TARGET_DEFAULT", TARGET_DEFAULT, 0);
+    rs6000_print_isa_options (stderr, 0, "TARGET_DEFAULT", TARGET_DEFAULT);
 
   /* Remember the explicit arguments.  */
   if (global_init_p)
@@ -3835,8 +3753,6 @@ rs6000_option_override_internal (bool global_init_p)
       rs6000_isa_flags |= (flags & ~rs6000_isa_flags_explicit);
     }
 
-  rs6000_arch_flags = get_arch_flags (cpu_index);
-
   /* Don't expect powerpc64 enabled on those OSes with OS_MISSING_POWERPC64,
      since they do not save and restore the high half of the GPRs correctly
      in all cases.  If the user explicitly specifies it, we won't interfere
@@ -3956,8 +3872,7 @@ rs6000_option_override_internal (bool global_init_p)
 		         & ~rs6000_isa_flags_explicit);
 
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
-    rs6000_print_isa_options (stderr, 0, "before defaults", rs6000_isa_flags,
-			      rs6000_arch_flags);
+    rs6000_print_isa_options (stderr, 0, "before defaults", rs6000_isa_flags);
 
 #ifdef XCOFF_DEBUGGING_INFO
   /* For AIX default to 64-bit DWARF.  */
@@ -3971,7 +3886,7 @@ rs6000_option_override_internal (bool global_init_p)
 
   /* For the newer switches (vsx, dfp, etc.) set some of the older options,
      unless the user explicitly used the -mno-<option> to disable the code.  */
-  if (TARGET_P9_VECTOR || TARGET_POWER9 || TARGET_P9_MISC)
+  if (TARGET_P9_VECTOR || TARGET_MODULO || TARGET_P9_MISC)
     rs6000_isa_flags |= (ISA_3_0_MASKS_SERVER & ~ignore_masks);
   else if (TARGET_P9_MINMAX)
     {
@@ -4001,15 +3916,15 @@ rs6000_option_override_internal (bool global_init_p)
     rs6000_isa_flags |= (ISA_2_7_MASKS_SERVER & ~ignore_masks);
   else if (TARGET_VSX)
     rs6000_isa_flags |= (ISA_2_6_MASKS_SERVER & ~ignore_masks);
-  else if (TARGET_POWER7)
+  else if (TARGET_POPCNTD)
     rs6000_isa_flags |= (ISA_2_6_MASKS_EMBEDDED & ~ignore_masks);
   else if (TARGET_DFP)
     rs6000_isa_flags |= (ISA_2_5_MASKS_SERVER & ~ignore_masks);
-  else if (TARGET_POWER6)
+  else if (TARGET_CMPB)
     rs6000_isa_flags |= (ISA_2_5_MASKS_EMBEDDED & ~ignore_masks);
-  else if (TARGET_POWER5X)
+  else if (TARGET_FPRND)
     rs6000_isa_flags |= (ISA_2_4_MASKS & ~ignore_masks);
-  else if (TARGET_POWER5)
+  else if (TARGET_POPCNTB)
     rs6000_isa_flags |= (ISA_2_2_MASKS & ~ignore_masks);
   else if (TARGET_ALTIVEC)
     rs6000_isa_flags |= (OPTION_MASK_PPC_GFXOPT & ~ignore_masks);
@@ -4034,12 +3949,12 @@ rs6000_option_override_internal (bool global_init_p)
       rs6000_isa_flags &= ~OPTION_MASK_CRYPTO;
     }
 
-  if (!TARGET_POWER5X && TARGET_VSX)
+  if (!TARGET_FPRND && TARGET_VSX)
     {
-      if (rs6000_isa_flags_explicit & OPTION_MASK_POWER5X)
+      if (rs6000_isa_flags_explicit & OPTION_MASK_FPRND)
 	/* TARGET_VSX = 1 implies Power 7 and newer */
 	error ("%qs requires %qs", "-mvsx", "-mfprnd");
-      rs6000_isa_flags &= ~OPTION_MASK_POWER5X;
+      rs6000_isa_flags &= ~OPTION_MASK_FPRND;
     }
 
   /* Assert !TARGET_VSX if !TARGET_ALTIVEC and make some adjustments
@@ -4214,7 +4129,7 @@ rs6000_option_override_internal (bool global_init_p)
   else if (TARGET_LONG_DOUBLE_128)
     {
       if (global_options.x_rs6000_ieeequad
-	  && (!TARGET_POWER7 || !TARGET_VSX))
+	  && (!TARGET_POPCNTD || !TARGET_VSX))
 	error ("%qs requires full ISA 2.06 support", "-mabi=ieeelongdouble");
 
       if (rs6000_ieeequad != TARGET_IEEEQUAD_DEFAULT)
@@ -4319,8 +4234,7 @@ rs6000_option_override_internal (bool global_init_p)
 
   /* Print the options after updating the defaults.  */
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
-    rs6000_print_isa_options (stderr, 0, "after defaults", rs6000_isa_flags,
-			      rs6000_arch_flags);
+    rs6000_print_isa_options (stderr, 0, "after defaults", rs6000_isa_flags);
 
   /* E500mc does "better" if we inline more aggressively.  Respect the
      user's opinion, though.  */
@@ -4427,8 +4341,7 @@ rs6000_option_override_internal (bool global_init_p)
     TARGET_NO_FP_IN_TOC = 1;
 
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
-    rs6000_print_isa_options (stderr, 0, "before subtarget", rs6000_isa_flags,
-			      rs6000_arch_flags);
+    rs6000_print_isa_options (stderr, 0, "before subtarget", rs6000_isa_flags);
 
 #ifdef SUBTARGET_OVERRIDE_OPTIONS
   SUBTARGET_OVERRIDE_OPTIONS;
@@ -4495,8 +4408,7 @@ rs6000_option_override_internal (bool global_init_p)
     rs6000_isa_flags &= ~OPTION_MASK_PCREL_OPT;
 
   if (TARGET_DEBUG_REG || TARGET_DEBUG_TARGET)
-    rs6000_print_isa_options (stderr, 0, "after subtarget", rs6000_isa_flags,
-			      rs6000_arch_flags);
+    rs6000_print_isa_options (stderr, 0, "after subtarget", rs6000_isa_flags);
 
   rs6000_always_hint = (rs6000_tune != PROCESSOR_POWER4
 			&& rs6000_tune != PROCESSOR_POWER5
@@ -4884,7 +4796,7 @@ rs6000_option_override_internal (bool global_init_p)
      DERAT mispredict penalty.  However the LVE and STVE altivec instructions
      need indexed accesses and the type used is the scalar type of the element
      being loaded or stored.  */
-    TARGET_AVOID_XFORM = (rs6000_tune == PROCESSOR_POWER6 && TARGET_POWER6
+    TARGET_AVOID_XFORM = (rs6000_tune == PROCESSOR_POWER6 && TARGET_CMPB
 			  && !TARGET_ALTIVEC);
 
   /* Set the -mrecip options.  */
@@ -5987,28 +5899,27 @@ rs6000_machine_from_flags (void)
     return "ppc64";
 #endif
 
-  HOST_WIDE_INT arch_flags = rs6000_arch_flags;
   HOST_WIDE_INT flags = rs6000_isa_flags;
 
   /* Disable the flags that should never influence the .machine selection.  */
   flags &= ~(OPTION_MASK_PPC_GFXOPT | OPTION_MASK_PPC_GPOPT | OPTION_MASK_ISEL
 	     | OPTION_MASK_ALTIVEC);
 
-  if ((arch_flags & ARCH_MASK_POWER11) != 0)
+  if ((flags & (POWER11_MASKS_SERVER & ~ISA_3_1_MASKS_SERVER)) != 0)
     return "power11";
-  if ((arch_flags & ARCH_MASK_POWER10) != 0)
+  if ((flags & (ISA_3_1_MASKS_SERVER & ~ISA_3_0_MASKS_SERVER)) != 0)
     return "power10";
-  if ((arch_flags & ARCH_MASK_POWER9) != 0)
+  if ((flags & (ISA_3_0_MASKS_SERVER & ~ISA_2_7_MASKS_SERVER)) != 0)
     return "power9";
-  if ((arch_flags & ARCH_MASK_POWER8) != 0)
+  if ((flags & (ISA_2_7_MASKS_SERVER & ~ISA_2_6_MASKS_SERVER)) != 0)
     return "power8";
-  if ((arch_flags & ARCH_MASK_POWER7) != 0)
+  if ((flags & (ISA_2_6_MASKS_SERVER & ~ISA_2_5_MASKS_SERVER)) != 0)
     return "power7";
-  if ((arch_flags & ARCH_MASK_POWER6) != 0)
+  if ((flags & (ISA_2_5_MASKS_SERVER & ~ISA_2_4_MASKS)) != 0)
     return "power6";
-  if ((arch_flags & ARCH_MASK_POWER5) != 0)
+  if ((flags & (ISA_2_4_MASKS & ~ISA_2_1_MASKS)) != 0)
     return "power5";
-  if ((arch_flags & ARCH_MASK_POWER4) != 0)
+  if ((flags & ISA_2_1_MASKS) != 0)
     return "power4";
   if ((flags & OPTION_MASK_POWERPC64) != 0)
     return "ppc64";
@@ -22505,7 +22416,7 @@ rs6000_rtx_costs (rtx x, machine_mode mode, int outer_code,
 	    *total = rs6000_cost->divsi;
 	}
       /* Add in shift and subtract for MOD unless we have a mod instruction. */
-      if ((!TARGET_POWER9
+      if ((!TARGET_MODULO
 	   || (RS6000_DISABLE_SCALAR_MODULO && SCALAR_INT_MODE_P (mode)))
 	 && (code == MOD || code == UMOD))
 	*total += COSTS_N_INSNS (2);
@@ -22520,11 +22431,11 @@ rs6000_rtx_costs (rtx x, machine_mode mode, int outer_code,
       return false;
 
     case POPCOUNT:
-      *total = COSTS_N_INSNS (TARGET_POWER7 ? 1 : 6);
+      *total = COSTS_N_INSNS (TARGET_POPCNTD ? 1 : 6);
       return false;
 
     case PARITY:
-      *total = COSTS_N_INSNS (TARGET_POWER6 ? 2 : 6);
+      *total = COSTS_N_INSNS (TARGET_CMPB ? 2 : 6);
       return false;
 
     case NOT:
@@ -23297,8 +23208,8 @@ rs6000_emit_swsqrt (rtx dst, rtx src, bool recip)
   return;
 }
 
-/* Emit popcount intrinsic on TARGET_POWER5 and TARGET_POWER7 targets.  DST is
-   the target, and SRC is the argument operand.  */
+/* Emit popcount intrinsic on TARGET_POPCNTB (Power5) and TARGET_POPCNTD
+   (Power7) targets.  DST is the target, and SRC is the argument operand.  */
 
 void
 rs6000_emit_popcount (rtx dst, rtx src)
@@ -23307,7 +23218,7 @@ rs6000_emit_popcount (rtx dst, rtx src)
   rtx tmp1, tmp2;
 
   /* Use the PPC ISA 2.06 popcnt{w,d} instruction if we can.  */
-  if (TARGET_POWER7)
+  if (TARGET_POPCNTD)
     {
       if (mode == SImode)
 	emit_insn (gen_popcntdsi2 (dst, src));
@@ -23339,7 +23250,7 @@ rs6000_emit_popcount (rtx dst, rtx src)
 }
 
 
-/* Emit parity intrinsic on TARGET_POWER5 targets.  DST is the
+/* Emit parity intrinsic on TARGET_POPCNTB targets.  DST is the
    target, and SRC is the argument operand.  */
 
 void
@@ -23351,7 +23262,7 @@ rs6000_emit_parity (rtx dst, rtx src)
   tmp = gen_reg_rtx (mode);
 
   /* Use the PPC ISA 2.05 prtyw/prtyd instruction if we can.  */
-  if (TARGET_POWER6)
+  if (TARGET_CMPB)
     {
       if (mode == SImode)
 	{
@@ -24571,7 +24482,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
 								false, true  },
   { "block-ops-vector-pair",	OPTION_MASK_BLOCK_OPS_VECTOR_PAIR,
 								false, true  },
-  { "cmpb",			OPTION_MASK_POWER6,		false, true  },
+  { "cmpb",			OPTION_MASK_CMPB,		false, true  },
   { "crypto",			OPTION_MASK_CRYPTO,		false, true  },
   { "direct-move",		0,				false, true  },
   { "dlmzb",			OPTION_MASK_DLMZB,		false, true  },
@@ -24579,7 +24490,7 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
 								false, true  },
   { "float128",			OPTION_MASK_FLOAT128_KEYWORD,	false, true  },
   { "float128-hardware",	OPTION_MASK_FLOAT128_HW,	false, true  },
-  { "fprnd",			OPTION_MASK_POWER5X,		false, true  },
+  { "fprnd",			OPTION_MASK_FPRND,		false, true  },
   { "power10",			OPTION_MASK_POWER10,		false, true  },
   { "power11",			OPTION_MASK_POWER11,		false, false },
   { "hard-dfp",			OPTION_MASK_DFP,		false, true  },
@@ -24588,13 +24499,13 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "mfcrf",			OPTION_MASK_MFCRF,		false, true  },
   { "mfpgpr",			0,				false, true  },
   { "mma",			OPTION_MASK_MMA,		false, true  },
-  { "modulo",			OPTION_MASK_POWER9,		false, true  },
+  { "modulo",			OPTION_MASK_MODULO,		false, true  },
   { "mulhw",			OPTION_MASK_MULHW,		false, true  },
   { "multiple",			OPTION_MASK_MULTIPLE,		false, true  },
   { "pcrel",			OPTION_MASK_PCREL,		false, true  },
   { "pcrel-opt",		OPTION_MASK_PCREL_OPT,		false, true  },
-  { "popcntb",			OPTION_MASK_POWER5,		false, true  },
-  { "popcntd",			OPTION_MASK_POWER7,		false, true  },
+  { "popcntb",			OPTION_MASK_POPCNTB,		false, true  },
+  { "popcntd",			OPTION_MASK_POPCNTD,		false, true  },
   { "power8-fusion",		OPTION_MASK_P8_FUSION,		false, true  },
   { "power8-fusion-sign",	OPTION_MASK_P8_FUSION_SIGN,	false, true  },
   { "power8-vector",		OPTION_MASK_P8_VECTOR,		false, true  },
@@ -24637,23 +24548,6 @@ static struct rs6000_opt_mask const rs6000_opt_masks[] =
   { "soft-float",		OPTION_MASK_SOFT_FLOAT,		false, false },
   { "string",			0,				false, false },
 };
-
-/* Similar structure for the arch bits that are set via -mcpu=<xxx> and not via
-   a separate -m<yyy> option.  */
-struct rs6000_arch_mask {
-  const char *name;			/* option name */
-  const HOST_WIDE_INT mask;		/* mask to set */
-};
-
-#undef  ARCH_EXPAND
-#define ARCH_EXPAND(PROC, NAME)	{ NAME, ARCH_MASK_ ## PROC },
-
-static struct rs6000_arch_mask const rs6000_arch_masks[] =
-{
-#include "rs6000-arch.def"
-};
-
-#undef ARCH_EXPAND
 
 /* Option variables that we want to support inside attribute((target)) and
    #pragma GCC target operations.  */
@@ -25193,7 +25087,6 @@ rs6000_function_specific_save (struct cl_target_option *ptr,
 {
   ptr->x_rs6000_isa_flags = opts->x_rs6000_isa_flags;
   ptr->x_rs6000_isa_flags_explicit = opts->x_rs6000_isa_flags_explicit;
-  ptr->x_rs6000_arch_flags = opts->x_rs6000_arch_flags;
 }
 
 /* Restore the current options */
@@ -25206,7 +25099,6 @@ rs6000_function_specific_restore (struct gcc_options *opts,
 {
   opts->x_rs6000_isa_flags = ptr->x_rs6000_isa_flags;
   opts->x_rs6000_isa_flags_explicit = ptr->x_rs6000_isa_flags_explicit;
-  opts->x_rs6000_arch_flags = ptr->x_rs6000_arch_flags;
   (void) rs6000_option_override_internal (false);
 }
 
@@ -25217,12 +25109,10 @@ rs6000_function_specific_print (FILE *file, int indent,
 				struct cl_target_option *ptr)
 {
   rs6000_print_isa_options (file, indent, "Isa options set",
-			    ptr->x_rs6000_isa_flags,
-			    ptr->x_rs6000_arch_flags);
+			    ptr->x_rs6000_isa_flags);
 
   rs6000_print_isa_options (file, indent, "Isa options explicit",
-			    ptr->x_rs6000_isa_flags_explicit,
-			    ptr->x_rs6000_arch_flags);
+			    ptr->x_rs6000_isa_flags_explicit);
 }
 
 /* Helper function to print the current isa or misc options on a line.  */
@@ -25234,18 +25124,13 @@ rs6000_print_options_internal (FILE *file,
 			       HOST_WIDE_INT flags,
 			       const char *prefix,
 			       const struct rs6000_opt_mask *opts,
-			       size_t num_elements,
-			       HOST_WIDE_INT arch_flags,
-			       const char *arch_prefix,
-			       const struct rs6000_arch_mask *arch_masks,
-			       size_t num_arch)
+			       size_t num_elements)
 {
   size_t i;
   size_t start_column = 0;
   size_t cur_column;
   size_t max_column = 120;
   size_t prefix_len = strlen (prefix);
-  size_t arch_prefix_len = strlen (arch_prefix);
   size_t comma_len = 0;
   const char *comma = "";
 
@@ -25305,29 +25190,6 @@ rs6000_print_options_internal (FILE *file,
       comma_len = strlen (", ");
     }
 
-  /* Put out the architecture flag bits that are set via -mcpu=<xxx> and that
-     don't have a -m option.  */
-  for (i = 0; i < num_arch; i++)
-    {
-      if ((arch_flags & arch_masks[i].mask) != 0)
-	{
-	  const char *name = arch_masks[i].name;
-	  size_t len = comma_len + arch_prefix_len + strlen (name);
-
-	  cur_column += len;
-	  if (cur_column > max_column)
-	    {
-	      fprintf (stderr, ", \\\n%*s", (int)start_column, "");
-	      cur_column = start_column + len;
-	      comma = "";
-	    }
-
-	  fprintf (file, "%s%s%s", comma, arch_prefix, name);
-	  comma = ", ";
-	  comma_len = strlen (", ");
-	}
-    }
-
   fputs ("\n", file);
 }
 
@@ -25335,13 +25197,11 @@ rs6000_print_options_internal (FILE *file,
 
 static void
 rs6000_print_isa_options (FILE *file, int indent, const char *string,
-			  HOST_WIDE_INT flags, HOST_WIDE_INT arch_flags)
+			  HOST_WIDE_INT flags)
 {
   rs6000_print_options_internal (file, indent, string, flags, "-m",
 				 &rs6000_opt_masks[0],
-				 ARRAY_SIZE (rs6000_opt_masks),
-				 arch_flags, "arch=", &rs6000_arch_masks[0],
-				 ARRAY_SIZE (rs6000_arch_masks));
+				 ARRAY_SIZE (rs6000_opt_masks));
 }
 
 /* If the user used -mno-vsx, we need turn off all of the implicit ISA 2.06,
@@ -25431,7 +25291,7 @@ static int
 rs6000_clone_priority (tree fndecl)
 {
   tree fn_opts = DECL_FUNCTION_SPECIFIC_TARGET (fndecl);
-  HOST_WIDE_INT arch_masks;
+  HOST_WIDE_INT isa_masks;
   int ret = CLONE_DEFAULT;
   tree attrs = lookup_attribute ("target", DECL_ATTRIBUTES (fndecl));
   const char *attrs_str = NULL;
@@ -25447,12 +25307,12 @@ rs6000_clone_priority (tree fndecl)
 	fn_opts = target_option_default_node;
 
       if (!fn_opts || !TREE_TARGET_OPTION (fn_opts))
-	arch_masks = rs6000_arch_flags;
+	isa_masks = rs6000_isa_flags;
       else
-	arch_masks = TREE_TARGET_OPTION (fn_opts)->x_rs6000_arch_flags;
+	isa_masks = TREE_TARGET_OPTION (fn_opts)->x_rs6000_isa_flags;
 
       for (ret = CLONE_MAX - 1; ret != 0; ret--)
-	if ((rs6000_clone_map[ret].arch_mask & arch_masks) != 0)
+	if ((rs6000_clone_map[ret].isa_mask & isa_masks) != 0)
 	  break;
     }
 
@@ -25932,8 +25792,6 @@ rs6000_can_inline_p (tree caller, tree callee)
   HOST_WIDE_INT callee_isa = callee_opts->x_rs6000_isa_flags;
   HOST_WIDE_INT caller_isa = caller_opts->x_rs6000_isa_flags;
   HOST_WIDE_INT explicit_isa = callee_opts->x_rs6000_isa_flags_explicit;
-  HOST_WIDE_INT callee_arch = callee_opts->x_rs6000_arch_flags;
-  HOST_WIDE_INT caller_arch = caller_opts->x_rs6000_arch_flags;
 
   cgraph_node *callee_node = cgraph_node::get (callee);
   if (ipa_fn_summaries && ipa_fn_summaries->get (callee_node) != NULL)
@@ -25957,8 +25815,7 @@ rs6000_can_inline_p (tree caller, tree callee)
      callee has explicitly enabled or disabled, then we must enforce that
      the callee's and caller's options match exactly; see PR70010.  */
   if (((caller_isa & callee_isa) == callee_isa)
-      && (caller_isa & explicit_isa) == (callee_isa & explicit_isa)
-      && (caller_arch & callee_arch) == callee_arch)
+      && (caller_isa & explicit_isa) == (callee_isa & explicit_isa))
     ret = true;
 
   if (TARGET_DEBUG_TARGET)
