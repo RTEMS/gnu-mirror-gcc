@@ -1,53 +1,4 @@
-==================== Branch work186, patch #21 ====================
-
-Add -mcpu=future tuning support.
-
-This patch makes -mtune=future use the same tuning decision as -mtune=power11.
-
-2024-11-15  Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/power10.md (all reservations): Add future as an
-	alterntive to power10 and power11.
-
-==================== Branch work186, patch #20 ====================
-
-Add support for -mcpu=future
-
-This patch adds the support that can be used in developing GCC support for
-future PowerPC processors.
-
-2024-11-15  Michael Meissner  <meissner@linux.ibm.com>
-
-	* config.gcc (powerpc*-*-*): Add support for --with-cpu=future.
-	* config/rs6000/aix71.h (ASM_CPU_SPEC): Add support for -mcpu=future.
-	* config/rs6000/aix72.h (ASM_CPU_SPEC): Likewise.
-	* config/rs6000/aix73.h (ASM_CPU_SPEC): Likewise.
-	* config/rs6000/driver-rs6000.cc (asm_names): Likewise.
-	* config/rs6000/rs6000-arch.def: Add future cpu.
-	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): If
-	-mcpu=future, define _ARCH_FUTURE.
-	* config/rs6000/rs6000-cpus.def (FUTURE_MASKS_SERVER): New macro.
-	(future cpu): Define.
-	* config/rs6000/rs6000-opts.h (enum processor_type): Add
-	PROCESSOR_FUTURE.
-	* config/rs6000/rs6000-tables.opt: Regenerate.
-	* config/rs6000/rs6000.cc (power10_cost): Update comment.
-	(get_arch_flags): Add support for future processor.
-	(rs6000_option_override_internal): Likewise.
-	(rs6000_machine_from_flags): Likewise.
-	(rs6000_reassociation_width): Likewise.
-	(rs6000_adjust_cost): Likewise.
-	(rs6000_issue_rate): Likewise.
-	(rs6000_sched_reorder): Likewise.
-	(rs6000_sched_reorder2): Likewise.
-	(rs6000_register_move_cost): Likewise.
-	* config/rs6000/rs6000.h (ASM_CPU_SPEC): Likewise.
-	(TARGET_POWER11): New macro.
-	* config/rs6000/rs6000.md (cpu attribute): Likewise.
-
-==================== Branch work186, patch #12 ====================
+==================== Branch work186, patch #35 ====================
 
 Do not allow -mvsx to boost processor to power7.
 
@@ -59,13 +10,8 @@ support, it will be an error.
 I have built both big endian and little endian bootstrap compilers and there
 were no regressions.
 
-In addition, I constructed a test case that used every archiecture define (like
-_ARCH_PWR4, etc.) and I also looked at the .machine directive generated.  I ran
-this test for all supported combinations of -mcpu, big/little endian, and 32/64
-bit support.  Every single instance generated exactly the same code with the
-patches installed compared to the compiler before installing the patches.
-
-I updated the 2 tests that used -mvsx to raise the cpu to power7.
+I updated the 2 tests that used -mvsx to raise the cpu to power7, and the test
+case that checks if -mno-vsx produces the expected warning.
 
 Can I install this patch on the GCC 15 trunk?
 
@@ -73,146 +19,20 @@ Can I install this patch on the GCC 15 trunk?
 
 gcc/
 
-	* config/rs6000/rs6000.cc (report_architecture_mismatch): New function.
-	Report an error if the user used an option such as -mvsx when the
-	default processor would not allow the option.
-	(rs6000_option_override_internal): Move some ISA checking code into
-	report_architecture_mismatch.
+	* config/rs6000/rs6000.cc (rs6000_option_override_internal): Check if
+	the user asked for VSX instructions whether the cpu was at least power7.
 
 gcc/testsuite/
 
 	* gcc.target/powerpc/ppc-target-4.c: Rewrite the test to add cpu=power7
 	when we need to add VSX support.  Add test for adding cpu=power7 no-vsx
 	to generate only Altivec instructions.
-	* gcc.target/powerpc/pr115688.c: Add -mdejagnu-cpu=power6 when
-	requesting VSX instructions.
-	* gcc.target/powerpc/pr87496-1.c: Update optins to use
+	* gcc.target/powerpc/pr115688.c: Add cpu=power7 in target __attribute__
+	when requesting VSX instructions.
+	* gcc.target/powerpc/pr87496-1.c: Update options to use
 	-mdejagnu-cpu=power6 to get the appropriate error message.
 
-==================== Branch work186, patch #11 ====================
-
-Use architecture flags for defining _ARCH_PWR macros.
-
-For the newer architectures, this patch changes GCC to define the _ARCH_PWR<n>
-macros using the new architecture flags instead of relying on isa options like
--mpower10.
-
-The -mpower8-internal, -mpower10, and -mpower11 options were removed.  The
--mpower11 option was removed completely, since it was just added in GCC 15.  The
-other two options were marked as WarnRemoved, and the various ISA bits were
-removed.
-
-TARGET_POWER8 and TARGET_POWER10 were re-defined to use the architeture bits
-instead of the ISA bits.
-
-There are other internal isa bits that aren't removed with this patch because
-the built-in function support uses those bits.
-
-I have built both big endian and little endian bootstrap compilers and there
-were no regressions.
-
-Can I install this patch on the GCC 15 trunk?
-
-2024-11-15  Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/rs6000-c.cc (rs6000_target_modify_macros) Add support to
-	use architecture flags instead of ISA flags for setting most of the
-	_ARCH_PWR* macros.
-	(rs6000_cpu_cpp_builtins): Update rs6000_target_modify_macros call.
-	* config/rs6000/rs6000-cpus.def (ISA_2_7_MASKS_SERVER): Remove
-	OPTION_MASK_POWER8.
-	(ISA_3_1_MASKS_SERVER): Remove OPTION_MASK_POWER10.
-	(POWER11_MASKS_SERVER): Remove OPTION_MASK_POWER11.
-	(POWERPC_MASKS): Remove OPTION_MASK_POWER8, OPTION_MASK_POWER10, and
-	OPTION_MASK_POWER11.
-	* config/rs6000/rs6000-protos.h (rs6000_target_modify_macros): Update
-	declaration.
-	(rs6000_target_modify_macros_ptr): Likewise.
-	* config/rs6000/rs6000.cc (rs6000_target_modify_macros_ptr): Likewise.
-	(rs6000_option_override_internal): Use architecture flags instead of ISA
-	flags.
-	(rs6000_opt_masks): Remove -mpower10 and -mpower11, which are no longer
-	in the ISA flags.
-	(rs6000_pragma_target_parse): Use architecture flags as well as ISA
-	flags.
-	* config/rs6000/rs6000.h (TpARGET_POWER5): New macro.
-	(TARGET_POWER5X): Likewise.
-	(TARGET_POWER6): Likewise.
-	(TARGET_POWER7): Likewise.
-	(TARGET_POWER8): Likewise.
-	(TARGET_POWER9): Likewise.
-	(TARGET_POWER10): Likewise.
-	(TARGET_POWER11): Likewise.
-	* config/rs6000/rs6000.opt (-mpower8-internal): Remove ISA flag bits.
-	(-mpower10): Likewise.
-	(-mpower11): Likewise.
-
-==================== Branch work186, patch #10 ====================
-
-Add rs6000 architecture masks.
-
-This patch begins the journey to move architecture bits that are not user ISA
-options from rs6000_isa_flags to a new targt variable rs6000_arch_flags.  The
-intention is to remove switches that are currently isa options, but the user
-should not be using this particular option. For example, we want users to use
--mcpu=power10 and not just -mpower10.
-
-This patch also changes the target_clones support to use an architecture mask
-instead of isa bits.
-
-This patch also switches the handling of .machine to use architecture masks if
-they exist (power4 through power11).  All of the other PowerPCs will continue to
-use the existing code for setting the .machine option.
-
-I have built both big endian and little endian bootstrap compilers and there
-were no regressions.
-
-In addition, I constructed a test case that used every archiecture define (like
-_ARCH_PWR4, etc.) and I also looked at the .machine directive generated.  I ran
-this test for all supported combinations of -mcpu, big/little endian, and 32/64
-bit support.  Every single instance generated exactly the same code with the
-patches installed compared to the compiler before installing the patches.
-
-The only difference in this patch compared to the first version posted on
-November 6th is that I the correct attribution and copyright year (i.e. that I
-created rs6000-arch.def in 2024).
-
-Can I install this patch on the GCC 15 trunk?
-
-2024-11-13  Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	* config/rs6000/default64.h (TARGET_CPU_DEFAULT): Set default cpu name.
-	* config/rs6000/rs6000-arch.def: New file.
-	* config/rs6000/rs6000.cc (struct clone_map): Switch to using
-	architecture masks instead of ISA masks.
-	(rs6000_clone_map): Likewise.
-	(rs6000_print_isa_options): Add an architecture flags argument, change
-	all callers.
-	(get_arch_flag): New function.
-	(rs6000_debug_reg_global): Update rs6000_print_isa_options calls.
-	(rs6000_option_override_internal): Likewise.
-	(rs6000_machine_from_flags): Switch to using architecture masks instead
-	of ISA masks.
-	(struct rs6000_arch_mask): New structure.
-	(rs6000_arch_masks): New table of architecutre masks and names.
-	(rs6000_function_specific_save): Save architecture flags.
-	(rs6000_function_specific_restore): Restore architecture flags.
-	(rs6000_function_specific_print): Update rs6000_print_isa_options calls.
-	(rs6000_print_options_internal): Add architecture flags options.
-	(rs6000_clone_priority): Switch to using architecture masks instead of
-	ISA masks.
-	(rs6000_can_inline_p): Don't allow inling if the callee requires a newer
-	architecture than the caller.
-	* config/rs6000/rs6000.h: Use rs6000-arch.def to create the architecture
-	masks.
-	* config/rs6000/rs6000.opt (rs6000_arch_flags): New target variable.
-	(x_rs6000_arch_flags): New save/restore field for rs6000_arch_flags.
-
-==================== Branch work186, patch #5 ====================
+==================== Branch work186, patch #34 ====================
 
 Change TARGET_MODULO to TARGET_POWER9.
 
@@ -238,7 +58,7 @@ gcc/
 	(umod<mode>3): Likewise.
 	(divide/modulo peephole2): Likewise.
 
-==================== Branch work186, patch #4 ====================
+==================== Branch work186, patch #33 ====================
 
 Change TARGET_POPCNTD to TARGET_POWER7.
 
@@ -259,7 +79,6 @@ gcc/
 	Likewise.
 	(rs6000_option_override_internal): Likewise.
 	(rs6000_rtx_costs): Likewise.
-	(rs6000_emit_popcount): Likewise.
 	* gcc/config/rs6000/rs6000.h (TARGET_LDBRX): Likewise.
 	(TARGET_FCFID): Likewise.
 	(TARGET_LFIWZX): Likewise.
@@ -273,8 +92,6 @@ gcc/
 	(TARGET_EXTRA_BUILTINS): Change TARGET_POPCNTD to TARGET_POWER7.
 	(CTZ_DEFINED_VALUE_AT_ZERO): Likewise.
 	* gcc/config/rs6000/rs6000.md (enabled attribute): Likewise.
-	(ctz<mode>2): Likewise.
-	(popcntd<mode>2): Likewise.
 	(lrint<mode>si2): Likewise.
 	(lrint<mode>si): Likewise.
 	(lrint<mode>si_di): Likewise.
@@ -285,7 +102,7 @@ gcc/
 	(cbcdtd): Likewise.
 	(div<div_extend>_<mode>): Likewise.
 
-==================== Branch work186, patch #3 ====================
+==================== Branch work186, patch #32 ====================
 
 Change TARGET_CMPB to TARGET_POWER6.
 
@@ -308,15 +125,14 @@ gcc/
 	(TARGET_POWER6): New macro.
 	(TARGET_EXTRA_BUILTINS): Change TARGET_CMPB to TARGET_POWER6.
 	* gcc/config/rs6000/rs6000.md (enabled attribute): Likewise.
-	(parity<mode>2_cmp): Change TARGET_CMPB to TARGET_POWER6.  Eliminate
-	redundant TARGET_POWER5 test.
-	(cmpb<mode>3): Change TARGET_CMPB to TARGET_POWER6.
+	(parity<mode>2_cmp): Likewise.
+	(cmpb<mode>3): Likewise.
 	(copysign<mode>3): Likewise.
 	(copysign<mode>3_fcpsgn): Likewise.
 	(cmpstrnsi): Likewise.
 	(cmpstrsi): Likewise.
 
-==================== Branch work186, patch #2 ====================
+==================== Branch work186, patch #31 ====================
 
 Change TARGET_FPRND to TARGET_POWER5X.
 
@@ -340,7 +156,7 @@ gcc/
 	(floor<mode>2): Likewise.
 	(round<mode>2): Likewise.
 
-==================== Branch work186, patch #1 ====================
+==================== Branch work186, patch #30 ====================
 
 Change TARGET_POPCNTB to TARGET_POWER5.
 
@@ -354,18 +170,25 @@ gcc/
 
 	* gcc/config/rs6000/rs6000-builtin.cc (rs6000_builtin_is_supported):
 	Change TARGET_POPCNTB to TARGET_POWER5.
-	* gcc/config/rs6000/rs6000-c.cc (rs6000_target_modify_macros): Likewise.
+	* gcc/config/rs6000/rs6000.cc (rs6000_option_override_internal):
+	Likewise.
 	* gcc/config/rs6000/rs6000.h (TARGET_FCFID): Likewise.
 	(TARGET_POWER5): New macro.
 	(TARGET_EXTRA_BUILTINS): Change TARGET_POPCNTB to TARGET_POWER5.
 	(TARGET_FRE): Likewise.
 	(TARGET_FRSQRTES): Likewise.
 	* gcc/config/rs6000/rs6000.md (enabled attribute): Likewise.
-	(popcount<mode>2): Change TARGET_POPCNTB to TARGET_POWER5.  Delete
-	redundant test for TARGET_POPCNTD.
-	(popcntb<mode>): Change TARGET_POPCNTB to TARGET_POWER5.
-	(popcntd<mode>): Likewise.
-	(parity<mode>2): Likewise.
+
+==================== Branch work186, patch #21 was reverted ====================
+==================== Branch work186, patch #20 was reverted ====================
+==================== Branch work186, patch #12 was reverted ====================
+==================== Branch work186, patch #11 was reverted ====================
+==================== Branch work186, patch #10 was reverted ====================
+==================== Branch work186, patch  #5 was reverted ====================
+==================== Branch work186, patch  #4 was reverted ====================
+==================== Branch work186, patch  #3 was reverted ====================
+==================== Branch work186, patch  #2 was reverted ====================
+==================== Branch work186, patch  #1 was reverted ====================
 
 ==================== Branch work186, baseline ====================
 
