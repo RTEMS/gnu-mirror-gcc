@@ -155,23 +155,23 @@ rs6000_builtin_is_supported (enum rs6000_gen_builtins fncode)
     case ENB_ALWAYS:
       return true;
     case ENB_P5:
-      return TARGET_POWER5;
+      return TARGET_POPCNTB;
     case ENB_P6:
-      return TARGET_POWER6;
+      return TARGET_CMPB;
     case ENB_P6_64:
-      return TARGET_POWER6 && TARGET_POWERPC64;
+      return TARGET_CMPB && TARGET_POWERPC64;
     case ENB_P7:
-      return TARGET_POWER7;
+      return TARGET_POPCNTD;
     case ENB_P7_64:
-      return TARGET_POWER7 && TARGET_POWERPC64;
+      return TARGET_POPCNTD && TARGET_POWERPC64;
     case ENB_P8:
       return TARGET_POWER8;
     case ENB_P8V:
       return TARGET_P8_VECTOR;
     case ENB_P9:
-      return TARGET_POWER9;
+      return TARGET_MODULO;
     case ENB_P9_64:
-      return TARGET_POWER9 && TARGET_POWERPC64;
+      return TARGET_MODULO && TARGET_POWERPC64;
     case ENB_P9V:
       return TARGET_P9_VECTOR;
     case ENB_P10:

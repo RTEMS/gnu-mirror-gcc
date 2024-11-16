@@ -7,8 +7,7 @@
 
 /* Verify there is no ICE under 32 bit env.  */
 
-/* cpu=power7 must be used to enable VSX.  */
-__attribute__((target("cpu=power7,vsx")))
+__attribute__((target("vsx")))
 int test (void)
 {
   return 0;

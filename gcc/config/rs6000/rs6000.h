@@ -101,7 +101,6 @@
    you make changes here, make them also there.  */
 #define ASM_CPU_SPEC \
 "%{mcpu=native: %(asm_cpu_native); \
-  mcpu=future: -mfuture; \
   mcpu=power11: -mpower11; \
   mcpu=power10: -mpower10; \
   mcpu=power9: -mpower9; \
@@ -443,30 +442,30 @@ extern int rs6000_vector_align[];
 #define TARGET_LONG_DOUBLE_128 (rs6000_long_double_type_size > 64)
 #define TARGET_IEEEQUAD rs6000_ieeequad
 #define TARGET_ALTIVEC_ABI rs6000_altivec_abi
-#define TARGET_LDBRX (TARGET_POWER7 || rs6000_cpu == PROCESSOR_CELL)
+#define TARGET_LDBRX (TARGET_POPCNTD || rs6000_cpu == PROCESSOR_CELL)
 
 /* ISA 2.01 allowed FCFID to be done in 32-bit, previously it was 64-bit only.
    Enable 32-bit fcfid's on any of the switches for newer ISA machines.  */
 #define TARGET_FCFID	(TARGET_POWERPC64				\
 			 || TARGET_PPC_GPOPT	/* 970/power4 */	\
-			 || TARGET_POWER5	/* ISA 2.02 */		\
-			 || TARGET_POWER6	/* ISA 2.05 */		\
-			 || TARGET_POWER7)	/* ISA 2.06 */
+			 || TARGET_POPCNTB	/* ISA 2.02 */		\
+			 || TARGET_CMPB		/* ISA 2.05 */		\
+			 || TARGET_POPCNTD)	/* ISA 2.06 */
 
 #define TARGET_FCTIDZ	TARGET_FCFID
 #define TARGET_STFIWX	TARGET_PPC_GFXOPT
-#define TARGET_LFIWAX	TARGET_POWER6
-#define TARGET_LFIWZX	TARGET_POWER7
-#define TARGET_FCFIDS	TARGET_POWER7
-#define TARGET_FCFIDU	TARGET_POWER7
-#define TARGET_FCFIDUS	TARGET_POWER7
-#define TARGET_FCTIDUZ	TARGET_POWER7
-#define TARGET_FCTIWUZ	TARGET_POWER7
+#define TARGET_LFIWAX	TARGET_CMPB
+#define TARGET_LFIWZX	TARGET_POPCNTD
+#define TARGET_FCFIDS	TARGET_POPCNTD
+#define TARGET_FCFIDU	TARGET_POPCNTD
+#define TARGET_FCFIDUS	TARGET_POPCNTD
+#define TARGET_FCTIDUZ	TARGET_POPCNTD
+#define TARGET_FCTIWUZ	TARGET_POPCNTD
 /* Only powerpc64 and powerpc476 support fctid.  */
 #define TARGET_FCTID	(TARGET_POWERPC64 || rs6000_cpu == PROCESSOR_PPC476)
-#define TARGET_CTZ	TARGET_POWER9
-#define TARGET_EXTSWSLI	(TARGET_POWER9 && TARGET_POWERPC64)
-#define TARGET_MADDLD	TARGET_POWER9
+#define TARGET_CTZ	TARGET_MODULO
+#define TARGET_EXTSWSLI	(TARGET_MODULO && TARGET_POWERPC64)
+#define TARGET_MADDLD	TARGET_MODULO
 
 /* TARGET_DIRECT_MOVE is redundant to TARGET_P8_VECTOR, so alias it to that.  */
 #define TARGET_DIRECT_MOVE	TARGET_P8_VECTOR
@@ -502,20 +501,6 @@ extern int rs6000_vector_align[];
 #define TARGET_MINMAX	(TARGET_HARD_FLOAT && TARGET_PPC_GFXOPT		\
 			 && (TARGET_P9_MINMAX || !flag_trapping_math))
 
-/* In the past we represented the various power cpus (power4, power5, power6,
-   etc.) via ISA bits that highlighted a new instruction or we used an extra
-   option to represent the hardware (i.e. -mpower8-internal or -mpower10).  Now
-   we use architecture flags for this.  */
-#define TARGET_POWER5		((rs6000_arch_flags & ARCH_MASK_POWER5)  != 0)
-#define TARGET_POWER5X		((rs6000_arch_flags & ARCH_MASK_POWER5X) != 0)
-#define TARGET_POWER6		((rs6000_arch_flags & ARCH_MASK_POWER6)  != 0)
-#define TARGET_POWER7		((rs6000_arch_flags & ARCH_MASK_POWER7)  != 0)
-#define TARGET_POWER8		((rs6000_arch_flags & ARCH_MASK_POWER8)  != 0)
-#define TARGET_POWER9		((rs6000_arch_flags & ARCH_MASK_POWER9)  != 0)
-#define TARGET_POWER10		((rs6000_arch_flags & ARCH_MASK_POWER10) != 0)
-#define TARGET_POWER11		((rs6000_arch_flags & ARCH_MASK_POWER11) != 0)
-#define TARGET_FUTURE		((rs6000_arch_flags & ARCH_MASK_FUTURE)  != 0)
-
 /* In switching from using target_flags to using rs6000_isa_flags, the options
    machinery creates OPTION_MASK_<xxx> instead of MASK_<xxx>.  The MASK_<xxxx>
    options that have not yet been replaced by their OPTION_MASK_<xxx>
@@ -542,9 +527,9 @@ extern int rs6000_vector_align[];
 
 #define TARGET_EXTRA_BUILTINS	(TARGET_POWERPC64			 \
 				 || TARGET_PPC_GPOPT /* 970/power4 */	 \
-				 || TARGET_POWER5    /* ISA 2.02 */	 \
-				 || TARGET_POWER6    /* ISA 2.05 */	 \
-				 || TARGET_POWER7    /* ISA 2.06 */	 \
+				 || TARGET_POPCNTB   /* ISA 2.02 */	 \
+				 || TARGET_CMPB      /* ISA 2.05 */	 \
+				 || TARGET_POPCNTD   /* ISA 2.06 */	 \
 				 || TARGET_ALTIVEC			 \
 				 || TARGET_VSX				 \
 				 || TARGET_HARD_FLOAT)
@@ -558,9 +543,9 @@ extern int rs6000_vector_align[];
 #define TARGET_FRES	(TARGET_HARD_FLOAT && TARGET_PPC_GFXOPT)
 
 #define TARGET_FRE	(TARGET_HARD_FLOAT \
-			 && (TARGET_POWER5 || VECTOR_UNIT_VSX_P (DFmode)))
+			 && (TARGET_POPCNTB || VECTOR_UNIT_VSX_P (DFmode)))
 
-#define TARGET_FRSQRTES	(TARGET_HARD_FLOAT && TARGET_POWER5 \
+#define TARGET_FRSQRTES	(TARGET_HARD_FLOAT && TARGET_POPCNTB \
 			 && TARGET_PPC_GFXOPT)
 
 #define TARGET_FRSQRTE	(TARGET_HARD_FLOAT \
@@ -1753,7 +1738,7 @@ typedef struct rs6000_args
    zero.  The hardware instructions added in Power9 and the sequences using
    popcount return 32 or 64.  */
 #define CTZ_DEFINED_VALUE_AT_ZERO(MODE, VALUE)				\
-  (TARGET_CTZ || TARGET_POWER7						\
+  (TARGET_CTZ || TARGET_POPCNTD						\
    ? ((VALUE) = GET_MODE_BITSIZE (MODE), 2)				\
    : ((VALUE) = -1, 2))
 
@@ -2498,27 +2483,3 @@ while (0)
    issues have been resolved.  */
 #define RS6000_DISABLE_SCALAR_MODULO 1
 
-
-
-/* Create the architecture flags.  */
-/* Define an enumeration to number the architecture masks.  */
-#ifdef GCC_HWINT_H
-#undef  ARCH_EXPAND
-#define ARCH_EXPAND(PROC, NAME)	ARCH_ENUM_ ## PROC,
-
-enum {
-#include "rs6000-arch.def"
-  ARCH_ENUM_LAST
-};
-
-/* Create an architecture mask for the newer architectures (power6 and
-   up)..  */
-#undef  ARCH_EXPAND
-#define ARCH_EXPAND(PROC, NAME)						\
-  static const HOST_WIDE_INT ARCH_MASK_ ## PROC				\
-    = HOST_WIDE_INT_1 << ARCH_ENUM_ ## PROC;
-
-#include "rs6000-arch.def"
-
-#undef ARCH_EXPAND
-#endif	/* GCC_HWINT_H.  */
