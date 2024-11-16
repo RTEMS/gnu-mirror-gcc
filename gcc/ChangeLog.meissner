@@ -1,3 +1,42 @@
+==================== Branch work186, patch #80 ====================
+
+Do not allow -mvsx to boost processor to power7.
+
+This patch restructures the code so that -mvsx for example will not silently
+convert the processor to power7.  The user must now use -mcpu=power7 or higher.
+This means if the user does -mvsx and the default processor does not have VSX
+support, it will be an error.
+
+I have built both big endian and little endian bootstrap compilers and there
+were no regressions.
+
+I updated the 2 tests that used -mvsx to raise the cpu to power7, and the test
+case that checks if -mno-vsx produces the expected warning.
+
+Note, Peter had some questions about one of the tests in the previous version of
+the patch.  The test is still the same in this patch.  But the code for
+preventing -mvsx is different from the previous patch, and I wanted to get that
+patch for review before stage1 closes.
+
+Can I install this patch on the GCC 15 trunk?
+
+2024-11-16  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* config/rs6000/rs6000.cc (rs6000_option_override_internal): Check if
+	the user asked for VSX instructions whether the cpu was at least power7.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/ppc-target-4.c: Rewrite the test to add cpu=power7
+	when we need to add VSX support.  Add test for adding cpu=power7 no-vsx
+	to generate only Altivec instructions.
+	* gcc.target/powerpc/pr115688.c: Add cpu=power7 in target __attribute__
+	when requesting VSX instructions.
+	* gcc.target/powerpc/pr87496-1.c: Update options to use
+	-mdejagnu-cpu=power6 to get the appropriate error message.
+
 ==================== Branch work186, patch #73 ====================
 
 Use vector pair load/store for memcpy with -mcpu=future
