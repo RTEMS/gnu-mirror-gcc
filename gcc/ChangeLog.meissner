@@ -1,3 +1,150 @@
+==================== Branch work186, patch #64 ====================
+
+Change TARGET_MODULO to TARGET_POWER9.
+
+This patch changes TARGET_MODULO to TARGET_POWER9.  The -mmodulo switch is not
+being changed, just the name of the macros used to determine if the PowerPC
+processor supports ISA 3.0 (Power9).
+
+2024-11-15  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* gcc/config/rs6000/rs6000-builtin.cc (rs6000_builtin_is_supported):
+	Change TARGET_MODULO to TARGET_POWER9.
+	* gcc/config/rs6000/rs6000.cc (rs6000_option_override_internal):
+	Likewise.
+	* gcc/config/rs6000/rs6000.h (TARGET_CTZ): Likewise.
+	(TARGET_EXTSWSLI): Likewise.
+	(TARGET_MADDLD): Likewise.
+	(TARGET_POWER9): New macro.
+	* gcc/config/rs6000/rs6000.md (enabled attribute): Change TARGET_MODULO
+	to TARGET_POWER9.
+	(mod<mode>3): Likewise.
+	(umod<mode>3): Likewise.
+	(divide/modulo peephole2): Likewise.
+
+==================== Branch work186, patch #63 ====================
+
+Change TARGET_POPCNTD to TARGET_POWER7.
+
+This patch changes TARGET_POPCNTD to TARGET_POWER7.  The -mpopcntd switch is not
+being changed, just the name of the macros used to determine if the PowerPC
+processor supports ISA 2.6 (Power7).
+
+2024-11-15  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* gcc/config/rs6000/dfp.md (cmp<mode>_internal1): Change TARGET_POPCNTD
+	to TARGET_POWER7.
+	* gcc/config/rs6000/rs6000-builtin.cc (rs6000_builtin_is_supported):
+	Likewise.
+	* gcc/config/rs6000/rs6000-string.cc (expand_block_compare): Likewise.
+	* gcc/config/rs6000/rs6000.cc (rs6000_hard_regno_mode_ok_uncached):
+	Likewise.
+	(rs6000_option_override_internal): Likewise.
+	(rs6000_rtx_costs): Likewise.
+	* gcc/config/rs6000/rs6000.h (TARGET_LDBRX): Likewise.
+	(TARGET_FCFID): Likewise.
+	(TARGET_LFIWZX): Likewise.
+	(TARGET_FCFIDS): Likewise.
+	(TARGET_FCFIDU): Likewise.
+	(TARGET_FCFIDUS): Likewise.
+	(TARGET_FCTIDUZ): Likewise.
+	(TARGET_FCTIWUZ): Likewise.
+	(TARGET_FCTIDUZ): Likewise.
+	(TARGET_POWER7): New macro.
+	(TARGET_EXTRA_BUILTINS): Change TARGET_POPCNTD to TARGET_POWER7.
+	(CTZ_DEFINED_VALUE_AT_ZERO): Likewise.
+	* gcc/config/rs6000/rs6000.md (enabled attribute): Likewise.
+	(lrint<mode>si2): Likewise.
+	(lrint<mode>si): Likewise.
+	(lrint<mode>si_di): Likewise.
+	(cmpmemsi): Likewise.
+	(bpermd_<mode>): Likewise.
+	(addg6s): Likewise.
+	(cdtbcd): Likewise.
+	(cbcdtd): Likewise.
+	(div<div_extend>_<mode>): Likewise.
+
+==================== Branch work186, patch #62 ====================
+
+Change TARGET_CMPB to TARGET_POWER6.
+
+This patch changes TARGET_CMPB to TARGET_POWER6.  The -mcmpb switch is not being
+changed, just the name of the macros used to determine if the PowerPC processor
+supports ISA 2.5 (Power6).
+
+2024-11-15  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* gcc/config/rs6000/rs6000-builtin.cc (rs6000_builtin_is_supported):
+	Change TARGET_CMPB to TARGET_POWER6.
+	* gcc/config/rs6000/rs6000.cc (rs6000_option_override_internal):
+	Likewise.
+	(rs6000_rtx_costs): Likewise.
+	(rs6000_emit_parity): Likewise.
+	* gcc/config/rs6000/rs6000.h (TARGET_FCFID): Likewise.
+	(TARGET_LFIWAX): Likewise.
+	(TARGET_POWER6): New macro.
+	(TARGET_EXTRA_BUILTINS): Change TARGET_CMPB to TARGET_POWER6.
+	* gcc/config/rs6000/rs6000.md (enabled attribute): Likewise.
+	(parity<mode>2_cmp): Likewise.
+	(cmpb<mode>3): Likewise.
+	(copysign<mode>3): Likewise.
+	(copysign<mode>3_fcpsgn): Likewise.
+	(cmpstrnsi): Likewise.
+	(cmpstrsi): Likewise.
+
+==================== Branch work186, patch #61 ====================
+
+Change TARGET_FPRND to TARGET_POWER5X.
+
+This patch changes TARGET_POWER5X to TARGET_POWER5.  The -mfprnd switch is not
+being changed, just the name of the macros used to determine if the PowerPC
+processor supports ISA 2.4 (Power5x).
+
+2024-11-15  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* gcc/config/rs6000/rs6000.cc (rs6000_option_override_internal):
+	Change TARGET_FPRND to TARGET_POWER5X.
+	* gcc/config/rs6000/rs6000.h (TARGET_POWERP5X): New macro.
+	* gcc/config/rs6000/rs6000.md (fmod<mode>3): Change TARGET_FPRND to
+	TARGET_POWER5X.
+	(remainder<mode>3): Likewise.
+	(fctiwuz_<mode): Likewise.
+	(btrunc<mode>): Likewise.
+	(ceil<mode>2): Likewise.
+	(floor<mode>2): Likewise.
+	(round<mode>2): Likewise.
+
+==================== Branch work186, patch #60 ====================
+
+Change TARGET_POPCNTB to TARGET_POWER5.
+
+This patch changes TARGET_POPCNTB to TARGET_POWER5.  The -mpopcntb switch is not
+being changed in this patch, just the name of the macros used to determine if
+the PowerPC processor supports ISA 2.2 (Power5).
+
+2024-11-15  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* gcc/config/rs6000/rs6000-builtin.cc (rs6000_builtin_is_supported):
+	Change TARGET_POPCNTB to TARGET_POWER5.
+	* gcc/config/rs6000/rs6000.cc (rs6000_option_override_internal):
+	Likewise.
+	* gcc/config/rs6000/rs6000.h (TARGET_FCFID): Likewise.
+	(TARGET_POWER5): New macro.
+	(TARGET_EXTRA_BUILTINS): Change TARGET_POPCNTB to TARGET_POWER5.
+	(TARGET_FRE): Likewise.
+	(TARGET_FRSQRTES): Likewise.
+	* gcc/config/rs6000/rs6000.md (enabled attribute): Likewise.
+
 ==================== Branch work186, patch #53 was reverted ====================
 ==================== Branch work186, patch #52 was reverted ====================
 ==================== Branch work186, patch #51 was reverted ====================
