@@ -164,6 +164,19 @@ gcc/testsuite/
 	* gcc.target/powerpc/pr87496-1.c: Update options to use
 	-mdejagnu-cpu=power6 to get the appropriate error message.
 
+==================== Branch work186, patch #74 ====================
+
+Vector pair test only runs in 64-bits
+
+In 32-bit mode, the vector pair load and stores are not generated, even if
+-mcpu=future is used.  Only run the future-3.c in 64-bit mode.
+
+2024-11-16  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/future-3.c: Limit test to 64-bit.
+
 ==================== Branch work186, patch #73 ====================
 
 Use vector pair load/store for memcpy with -mcpu=future
