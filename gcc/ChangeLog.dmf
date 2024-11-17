@@ -243,11 +243,11 @@ accumulators if -mcpu=future is used.
 For testing purposes, I added an undocumented option '-mdense-math' to enable
 or disable the dense math support.
 
-This patch adds a new constraint (wD).  If MMA is selected but dense math is
-not selected (i.e. -mcpu=power10), the wD constraint will allow access to
-accumulators that overlap with VSX registers 0..31.  If both MMA and dense math
-are selected (i.e. -mcpu=future), the wD constraint will only allow dense math
-registers.
+This patch updates the wD constraint added in the previous patch.  If MMA is
+selected but dense math is not selected (i.e. -mcpu=power10), the wD constraint
+will allow access to accumulators that overlap with VSX registers 0..31.  If
+both MMA and dense math are selected (i.e. -mcpu=future), the wD constraint
+will only allow dense math registers.
 
 This patch modifies the existing %A output modifier.  If MMA is selected but
 dense math is not selected, then %A output modifier converts the VSX register
