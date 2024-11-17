@@ -1,3 +1,33 @@
+==================== Branch work186-bugs, patch #502 ====================
+
+PR target/108958 -- use mtvsrdd to zero extend GPR DImode to VSX TImode
+
+Previously GCC would zero externd a DImode GPR value to TImode by first zero
+extending the DImode value into a GPR TImode value, and then do a MTVSRDD to
+move this value to a VSX register.
+
+This patch does the move directly, since if the middle argument to MTVSRDD is 0,
+it does the zero extend.
+
+This patch also generates LXVRDX if the DImode value is in memory.
+
+Finally, it the DImode is already in a vector register, it does a XXSPLTIB and
+XXPERMDI to get the value into the bottom 64-bits of the register.
+
+I have built GCC with the patches in this patch set applied on both little and
+big endian PowerPC systems and there were no regressions.  Can I apply this
+patch to GCC 15?
+
+2024-11-17  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* gcc/config/rs6000/rs6000.md (zero_extendditi2): New insn.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/pr108958.c: New test.
+
 ==================== Branch work186-bugs, patch #501 ====================
 
 Add power9 and power10 float to logical optimizations.
