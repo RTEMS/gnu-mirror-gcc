@@ -2,6 +2,78 @@
 
 Add power9 and power10 float to logical optimizations.
 
+I was answering an email from a co-worker and I pointed him to work I had done
+for the Power8 era that optimizes the 32-bit float math library in Glibc.  In
+doing so, I discovered with the Power9 and later computers, this optimization
+is no longer taking place.
+
+The glibc 32-bit floating point math functions have code that looks like:
+
+	union u {
+	  float f;
+	  uint32_t u32;
+	};
+
+	float
+	math_foo (float x, unsigned int mask)
+	{
+	  union u arg;
+	  float x2;
+
+	  arg.f = x;
+	  arg.u32 &= mask;
+
+	  x2 = arg.f;
+	  /* ... */
+	}
+
+On power8 with the optimization it generates:
+
+        xscvdpspn 0,1
+        sldi 9,4,32
+        mtvsrd 32,9
+        xxland 1,0,32
+        xscvspdpn 1,1
+
+I.e., it converts the SFmode to the memory format (instead of the DFmode that
+is used within the register), converts the mask so that it is in the vector
+register in the upper 32-bits, and does a XXLAND (i.e. there is only one direct
+move from GPR to vector register).  Then after doing this, it converts the
+upper 32-bits back to DFmode.
+
+If the XSCVSPDN instruction took the value in the normal 32-bit scalar in a
+vector register, we wouldn't have needed the SLDI of the mask.
+
+On power9/power10/power11 it currently generates:
+
+        xscvdpspn 0,1
+        mfvsrwz 2,0
+        and 2,2,4
+        mtvsrws 1,2
+        xscvspdpn 1,1
+        blr
+
+I.e convert to SFmode representation, move the value to a GPR, do an AND
+operation, move the 32-bit value with a splat, and then convert it back to
+DFmode format.
+
+With this patch, it now generates:
+
+        xscvdpspn 0,1
+        mtvsrwz 32,2
+        xxland 32,0,32
+        xxspltw 1,32,1
+        xscvspdpn 1,1
+        blr
+
+I.e. convert to SFmode representation, move the mask to the vector register, do
+the operation using XXLAND.  Splat the value to get the value in the correct
+location, and then convert back to DFmode.
+
+I have built GCC with the patches in this patch set applied on both little and
+big endian PowerPC systems and there were no regressions.  Can I apply this
+patch to GCC 15?
+
 2024-11-16  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
