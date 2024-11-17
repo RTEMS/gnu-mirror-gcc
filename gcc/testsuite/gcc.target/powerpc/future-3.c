@@ -1,4 +1,5 @@
-/* { dg-do compile } */
+/* 32-bit doesn't generate vector pair instructions.  */
+/* { dg-do compile { target lp64 } } */
 /* { dg-options "-mdejagnu-cpu=future -O2" } */
 
 /* Test to see that memcpy will use load/store vector pair with
