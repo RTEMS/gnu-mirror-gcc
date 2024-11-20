@@ -1161,6 +1161,22 @@ cgraph_edge::make_callback (cgraph_node *n2)
   return e2;
 }
 
+cgraph_edge *
+cgraph_edge::get_callback_parent_edge ()
+{
+  gcc_checking_assert (callback);
+  cgraph_edge *e;
+  fprintf (stderr, "get parent: %s -> %s\n", caller->name (), callee->name ());
+  for (e = caller->callees; e; e = e->next_callee)
+    {
+      fprintf (stderr, "get parent for loop: %s -> %s\n", caller->name (),
+	       callee->name ());
+      if (e->has_callback && e->call_stmt == call_stmt)
+	return e;
+    }
+  gcc_unreachable ();
+}
+
 /* Speculative call consists of an indirect edge and one or more
    direct edge+ref pairs.
 
@@ -1515,8 +1531,24 @@ cgraph_edge::redirect_call_stmt_to_callee (cgraph_edge *e,
 	}
     }
 
-  if (e->indirect_unknown_callee || decl == e->callee->decl || e->callback)
+  if (e->has_callback)
+    {
+      debug_gimple_stmt (e->call_stmt);
+      fprintf (stderr, "gimple pointer: %p\n", (void *) e->call_stmt);
+    }
+
+  if (e->indirect_unknown_callee || decl == e->callee->decl)
     return e->call_stmt;
+
+  if (e->callback)
+    {
+      fprintf (stderr, "redirecting to %s\n", e->callee->name ());
+      fprintf (stderr, "gimple pointer before: %p\n", (void *) e->call_stmt);
+      gimple_call_set_arg (e->call_stmt, 0, e->callee->decl);
+      debug_gimple_stmt (e->call_stmt);
+      fprintf (stderr, "gimple pointer after: %p\n", (void *) e->call_stmt);
+      return e->call_stmt;
+    }
 
   if (decl && ipa_saved_clone_sources)
     {

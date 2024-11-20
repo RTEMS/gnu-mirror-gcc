@@ -1738,6 +1738,9 @@ public:
   /* TODO DOCS */
   cgraph_edge *make_callback (cgraph_node *n2);
 
+  /* TODO DOCS */
+  cgraph_edge *get_callback_parent_edge();
+
   /* Speculative call consists of an indirect edge and one or more
      direct edge+ref pairs.  Speculative will expand to the following sequence:
 

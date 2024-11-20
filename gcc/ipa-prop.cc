@@ -2551,9 +2551,9 @@ ipa_compute_jump_functions_for_bb (struct ipa_func_body_info *fbi, basic_block b
 	  callee = callee->ultimate_alias_target ();
 	  /* We do not need to bother analyzing calls to unknown functions
 	     unless they may become known during lto/whopr.  */
-	  if (!callee->definition && !flag_lto
-	      && !gimple_call_fnspec (cs->call_stmt).known_p ())
-	    continue;
+	  // if (!callee->definition && !flag_lto
+	  //     && !gimple_call_fnspec (cs->call_stmt).known_p ())
+	  //   continue;
 	}
       ipa_compute_jump_functions_for_edge (fbi, cs);
     }
