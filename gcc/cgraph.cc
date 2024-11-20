@@ -804,7 +804,8 @@ cgraph_edge::set_call_stmt (cgraph_edge *e, gcall *new_stmt,
 
   /* Speculative edges has three component, update all of them
      when asked to.  */
-  if (update_speculative && e->speculative
+  if (update_speculative
+      && e->speculative
       /* If we are about to resolve the speculation by calling make_direct
 	 below, do not bother going over all the speculative edges now.  */
       && !new_direct_callee)
@@ -837,8 +838,30 @@ cgraph_edge::set_call_stmt (cgraph_edge *e, gcall *new_stmt,
       return e_indirect ? indirect : direct;
     }
 
-  if (new_direct_callee)
-    e = make_direct (e, new_direct_callee);
+  if (update_speculative && (e->callback || e->has_callback)
+      /* If we are about to resolve the speculation by calling make_direct
+	 below, do not bother going over all the speculative edges now.  */
+  )
+    {
+      fprintf (stderr, "set_call_stmt callback\n");
+      cgraph_edge *direct, *next;
+
+      direct = e;
+
+      gcall *old_stmt = direct->call_stmt;
+      for (cgraph_edge *d = direct; d; d = next)
+	{
+	  next = d->next_callee;
+	  for (; next; next = next->next_callee)
+	    {
+	      if ((next->callback || next->has_callback)
+		  && old_stmt == next->call_stmt)
+		break;
+	    }
+	  cgraph_edge *d2 = set_call_stmt (d, new_stmt, false);
+	  gcc_assert (d2 == d);
+	}
+    }
 
   /* Only direct speculative edges go to call_site_hash.  */
   if (e->caller->call_site_hash
@@ -1544,7 +1567,7 @@ cgraph_edge::redirect_call_stmt_to_callee (cgraph_edge *e,
     {
       fprintf (stderr, "redirecting to %s\n", e->callee->name ());
       fprintf (stderr, "gimple pointer before: %p\n", (void *) e->call_stmt);
-      gimple_call_set_arg (e->call_stmt, 0, e->callee->decl);
+      gimple_call_set_arg (e->call_stmt, 0, build_addr(e->callee->decl));
       debug_gimple_stmt (e->call_stmt);
       fprintf (stderr, "gimple pointer after: %p\n", (void *) e->call_stmt);
       return e->call_stmt;
