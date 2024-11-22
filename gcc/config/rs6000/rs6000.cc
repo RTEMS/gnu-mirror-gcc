@@ -3860,6 +3860,13 @@ rs6000_option_override_internal (bool global_init_p)
 	  rs6000_isa_flags &= ~OPTION_MASK_VSX;
 	  rs6000_isa_flags_explicit |= OPTION_MASK_VSX;
 	}
+      else if (!TARGET_POWER7)
+	{
+	  if (explicit_vsx_p)
+	    error ("%<-mvsx%> requires at least %<-mcpu=power%>");
+	  rs6000_isa_flags &= ~OPTION_MASK_VSX;
+	  rs6000_isa_flags_explicit |= OPTION_MASK_VSX;
+	}
     }
 
   /* If hard-float/altivec/vsx were explicitly turned off then don't allow
