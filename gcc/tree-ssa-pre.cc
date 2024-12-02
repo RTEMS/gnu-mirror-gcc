@@ -1430,12 +1430,16 @@ phi_translate_1 (bitmap_set_t dest,
 		unsigned int op_val_id = VN_INFO (newnary->op[i])->value_id;
 		leader = find_leader_in_sets (op_val_id, set1, set2);
 		result = phi_translate (dest, leader, set1, set2, e);
-		if (result && result != leader)
+		if (result)
 		  /* If op has a leader in the sets we translate make
 		     sure to use the value of the translated expression.
-		     We might need a new representative for that.  */
+		     We might need a new representative for that.  We have to
+		     restrict to a representative whose definition dominates
+		     PRED, as its flow-sensitive information such as value range
+		     or known bits may be used by the simplification attempt
+		     further down.  */
 		  newnary->op[i] = get_representative_for (result, pred);
-		else if (!result)
+		else
 		  return NULL;
 
 		changed |= newnary->op[i] != nary->op[i];
