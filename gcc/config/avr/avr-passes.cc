@@ -2912,6 +2912,14 @@ optimize_data_t::try_split_any (bbinfo_t *)
 	      xsrc = gen_rtx_REG (HImode, r16);
 	      i += step;
 	    }
+	  // ...or a reg-reg move from a multi-byte move...
+	  else if (r_src
+		   // Prefer a reg-reg move over a (potential) load
+		   // of a constant, because the subsequent RTL
+		   // peephole pass may combine it to a MOVW again.
+		   && AVR_HAVE_MOVW
+		   && REG_P (curr.ii.m_src))
+	    xsrc = gen_rtx_REG (QImode, r_src);
 	  // ...or a cheap constant...
 	  else if (val8 >= 0
 		   && AVRasm::constant_cost (SET, r_dest, val8) <= 1)
@@ -4852,23 +4860,23 @@ avr_split_shift_p (int n_bytes, int offset, rtx_code code)
 
   if (n_bytes == 4)
     return select<bool>()
-      : code == ASHIFT ? IN_RANGE (offset, 9, 30) && offset != 15
+      : code == ASHIFT ? IN_RANGE (offset, 9, 31) && offset != 15
       : code == ASHIFTRT ? IN_RANGE (offset, 9, 29) && offset != 15
-      : code == LSHIFTRT ? IN_RANGE (offset, 9, 30) && offset != 15
+      : code == LSHIFTRT ? IN_RANGE (offset, 9, 31) && offset != 15
       : bad_case<bool> ();
 
   if (n_bytes == 3)
     return select<bool>()
-      : code == ASHIFT ? IN_RANGE (offset, 9, 22) && offset != 15
+      : code == ASHIFT ? IN_RANGE (offset, 9, 23) && offset != 15
       : code == ASHIFTRT ? IN_RANGE (offset, 9, 21) && offset != 15
-      : code == LSHIFTRT ? IN_RANGE (offset, 9, 22) && offset != 15
+      : code == LSHIFTRT ? IN_RANGE (offset, 9, 23) && offset != 15
       : bad_case<bool> ();
 
   if (n_bytes == 2)
     return select<bool>()
-      : code == ASHIFT ? IN_RANGE (offset, 9, 14)
+      : code == ASHIFT ? IN_RANGE (offset, 9, 15)
       : code == ASHIFTRT ? IN_RANGE (offset, 9, 13)
-      : code == LSHIFTRT ? IN_RANGE (offset, 9, 14)
+      : code == LSHIFTRT ? IN_RANGE (offset, 9, 15)
       : bad_case<bool> ();
 
   return false;
@@ -4891,6 +4899,8 @@ avr_emit_shift (rtx_code code, rtx dest, rtx src, int off, rtx scratch)
   // Work out which alternatives can handle 3 operands independent
   // of options.
 
+  const bool b8_is_3op = off == 6;
+
   const bool b16_is_3op = select<bool>()
     : code == ASHIFT ? satisfies_constraint_C7c (xoff) // 7...12
     : code == LSHIFTRT ? satisfies_constraint_C7c (xoff)
@@ -4906,6 +4916,7 @@ avr_emit_shift (rtx_code code, rtx dest, rtx src, int off, rtx scratch)
   const bool is_3op = (off % 8 == 0
 		       || off == n_bits - 1
 		       || (code == ASHIFTRT && off == n_bits - 2)
+		       || (n_bits == 8 && b8_is_3op)
 		       || (n_bits == 16 && b16_is_3op)
 		       || (n_bits == 24 && b24_is_3op));
   rtx shift;
@@ -4944,7 +4955,7 @@ avr_split_shift4 (rtx dest, rtx src, int ioff, rtx scratch, rtx_code code)
 
   if (code == ASHIFT)
     {
-      if (IN_RANGE (ioff, 25, 30))
+      if (IN_RANGE (ioff, 25, 31))
 	{
 	  rtx dst8 = avr_byte (dest, 3);
 	  rtx src8 = avr_byte (src, 0);
@@ -4967,7 +4978,7 @@ avr_split_shift4 (rtx dest, rtx src, int ioff, rtx scratch, rtx_code code)
   else if (code == ASHIFTRT
 	   || code == LSHIFTRT)
     {
-      if (IN_RANGE (ioff, 25, 30))
+      if (IN_RANGE (ioff, 25, 30 + (code == LSHIFTRT)))
 	{
 	  rtx dst8 = avr_byte (dest, 0);
 	  rtx src8 = avr_byte (src, 3);
@@ -5031,7 +5042,7 @@ avr_split_shift3 (rtx dest, rtx src, int ioff, rtx scratch, rtx_code code)
 
   if (code == ASHIFT)
     {
-      if (IN_RANGE (ioff, 17, 22))
+      if (IN_RANGE (ioff, 17, 23))
 	{
 	  rtx dst8 = avr_byte (dest, 2);
 	  rtx src8 = avr_byte (src, 0);
@@ -5045,7 +5056,7 @@ avr_split_shift3 (rtx dest, rtx src, int ioff, rtx scratch, rtx_code code)
   else if (code == ASHIFTRT
 	   || code == LSHIFTRT)
     {
-      if (IN_RANGE (ioff, 17, 22))
+      if (IN_RANGE (ioff, 17, 22 + (code == LSHIFTRT)))
 	{
 	  rtx dst8 = avr_byte (dest, 0);
 	  rtx src8 = avr_byte (src, 2);
@@ -5091,7 +5102,7 @@ avr_split_shift2 (rtx dest, rtx src, int ioff, rtx /*scratch*/, rtx_code code)
 
   if (code == ASHIFT)
     {
-      if (IN_RANGE (ioff, 9, 14))
+      if (IN_RANGE (ioff, 9, 15))
 	{
 	  rtx dst8 = avr_byte (dest, 1);
 	  rtx src8 = avr_byte (src, 0);
@@ -5103,7 +5114,7 @@ avr_split_shift2 (rtx dest, rtx src, int ioff, rtx /*scratch*/, rtx_code code)
   else if (code == ASHIFTRT
 	   || code == LSHIFTRT)
     {
-      if (IN_RANGE (ioff, 9, 14))
+      if (IN_RANGE (ioff, 9, 14 + (code == LSHIFTRT)))
 	{
 	  rtx dst8 = avr_byte (dest, 0);
 	  rtx src8 = avr_byte (src, 1);

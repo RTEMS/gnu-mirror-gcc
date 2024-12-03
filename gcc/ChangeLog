@@ -1,3 +1,339 @@
+2024-12-02  David Malcolm  <dmalcolm@redhat.com>
+
+	* doc/libgdiagnostics/tutorial/01-hello-world.rst: Update linker
+	command for renaming.
+
+2024-12-02  Jeff Law  <jlaw@ventanamicro.com>
+
+	* configure.ac: Add sym-exec subdirectory.
+
+2024-12-02  Andreas Schwab  <schwab@suse.de>
+
+	* config/m68k/m68k.md (movdi+1, movdf+1, movxf+2): Split
+	constraints so that the operands cannot both be "o".
+
+2024-12-02  Jakub Jelinek  <jakub@redhat.com>
+
+	* config/mingw/mingw-stdint.h: Add newline at the end of the file.
+	* config/mingw/winnt-dll.cc: Likewise.
+	* sym-exec/sym-exec-expression.h: Likewise.
+	* sym-exec/sym-exec-expression.cc: Likewise.
+	* sym-exec/sym-exec-condition.cc: Likewise.
+	* sym-exec/sym-exec-expr-is-a-helper.h: Likewise.
+	* sym-exec/sym-exec-condition.h: Likewise.
+	* hwint.cc: Likewise.
+	* crc-verification.cc: Likewise.
+	* sarif-spec-urls.def: Likewise.
+
+2024-12-02  Andre Vieira  <andre.simoesdiasvieira@arm.com>
+
+	* config/arm/arm_mve.h: Add Runtime Library Exception.
+	* config/arm/arm_mve_types.h: Likewise.
+
+2024-12-02  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/116352
+	PR tree-optimization/117876
+	* tree-vect-slp.cc (vect_slp_can_convert_to_external): New.
+	(vect_slp_convert_to_external): Call it.
+	(vect_build_slp_tree_2): Likewise.
+
+2024-12-02  yulong  <shiyulong@iscas.ac.cn>
+
+	* config/riscv/generic-vector-ooo.md: New reservation.
+	* config/riscv/genrvv-type-indexer.cc (main): New type.
+	* config/riscv/riscv-vector-builtins-bases.cc (enum frm_op_type): Delete it.
+	* config/riscv/riscv-vector-builtins-bases.h (enum frm_op_type): Redefine in h file.
+	* config/riscv/riscv-vector-builtins-shapes.cc (struct sf_vfnrclip_def): New function.
+	(SHAPE): Ditto.
+	* config/riscv/riscv-vector-builtins-shapes.h: Ditto.
+	* config/riscv/riscv-vector-builtins.cc (DEF_RVV_TYPE_INDEX): New builtins def.
+	* config/riscv/riscv-vector-builtins.def (DEF_RVV_TYPE_INDEX): New base def.
+	(signed_eew8_index): Ditto.
+	* config/riscv/riscv-vector-builtins.h (enum required_ext): New extension.
+	(required_ext_to_isa_name): Ditto.
+	(required_extensions_specified): Ditto.
+	(struct function_group_info): Ditto.
+	* config/riscv/riscv.md: New attr.
+	* config/riscv/sifive-vector-builtins-bases.cc (class sf_vfnrclip_x_f_qf): New function.
+	(class sf_vfnrclip_xu_f_qf): Ditto.
+	(BASE): New base_name.
+	* config/riscv/sifive-vector-builtins-bases.h: New function_base.
+	* config/riscv/sifive-vector-builtins-functions.def
+	(REQUIRED_EXTENSIONS): New intrinsics def.
+	(sf_vfnrclip_x_f_qf): Ditto.
+	(sf_vfnrclip_xu_f_qf): Ditto.
+	* config/riscv/sifive-vector.md (@pred_sf_vfnrclip<v_su><mode>_x_f_qf): New RTL mode.
+	* config/riscv/vector-iterators.md: New iterator.
+
+2024-12-02  Andreas Schwab  <schwab@suse.de>
+
+	* config/riscv/riscv.cc (fli_value_hf, fli_value_sf)
+	(fli_value_df): Use integer constants.  Constify.
+	(riscv_float_const_rtx_index_for_fli): Add const.
+
+2024-12-02  H.J. Lu  <hjl.tools@gmail.com>
+
+	* config/i386/i386-features.cc (pass_apx_nf_convert): Change
+	pass_rpad to pass_apx_nf_convert in comments.
+
+2024-12-01  Slava Barinov  <v.barinov@samsung.com>
+
+	* configure.ac: Only remove -O[0-9] if not preceded with comma
+	* configure: Regenerated
+
+2024-12-01  Jovan Vukic  <Jovan.Vukic@rt-rk.com>
+
+	* tree-ssa-phiopt.cc (rhs_is_fed_for_value_replacement): Add a new
+	optimization opportunity for BIT_IOR_EXPR and a != b.
+	(operand_equal_for_value_replacement): Ditto.
+
+2024-12-01  Mariam Arutunian  <mariamarutunian@gmail.com>
+
+	* gimple-crc-optimization.cc (optimize_crc_loop): New function.
+	(execute): Add optimize_crc_loop function call.
+
+2024-12-01  Mariam Arutunian  <mariamarutunian@gmail.com>
+
+	* Makefile.in (OBJS): Add crc-verification.o.
+	* crc-verification.cc: New file.
+	* crc-verification.h: New file.
+	* gimple-crc-optimization.cc (loop_calculates_crc): New function.
+	(is_output_crc): Likewise.
+	(swap_crc_and_data_if_needed): Likewise.
+	(validate_crc_and_data): Likewise.
+	(optimize_crc_loop): Likewise.
+	(get_output_phi): Likewise.
+	(execute): Add check whether potential CRC loop calculates CRC.
+	* sym-exec/sym-exec-state.cc (create_reversed_lfsr): New function.
+	(create_forward_lfsr): Likewise.
+	(last_set_bit): Likewise.
+	(create_lfsr): Likewise.
+	* sym-exec/sym-exec-state.h (is_bit_vector): Reorder, make the function public and static.
+	(create_reversed_lfsr) New static function declaration.
+	(create_forward_lfsr) New static function declaration.
+
+2024-12-01  Matevos Mehrabyan  <matevosmehrabyan@gmail.com>
+
+	* Makefile.in (OBJS): Add sym-exec/sym-exec-expression.o,
+	sym-exec/sym-exec-state.o, sym-exec/sym-exec-condition.o.
+	* configure (sym-exec): New subdir.
+	* sym-exec/sym-exec-condition.cc: New file.
+	* sym-exec/sym-exec-condition.h: New file.
+	* sym-exec/sym-exec-expr-is-a-helper.h: New file.
+	* sym-exec/sym-exec-expression.cc: New file.
+	* sym-exec/sym-exec-expression.h: New file.
+	* sym-exec/sym-exec-state.cc: New file.
+	* sym-exec/sym-exec-state.h: New file.
+	Co-authored-by: Mariam Arutunian <mariamarutunian@gmail.com>
+
+2024-12-01  Mariam Arutunian  <mariamarutunian@gmail.com>
+
+	* Makefile.in (OBJS): Add gimple-crc-optimization.o.
+	* common.opt (foptimize-crc): New option.
+	* common.opt.urls: Regenerate to add foptimize-crc.
+	* doc/invoke.texi (-foptimize-crc): Add documentation.
+	* gimple-crc-optimization.cc: New file.
+	* opts.cc (default_options_table): Add OPT_foptimize_crc.
+	(enable_fdo_optimizations): Enable optimize_crc.
+	* passes.def (pass_crc_optimization): Add new pass.
+	* timevar.def (TV_GIMPLE_CRC_OPTIMIZATION): New timevar.
+	* tree-pass.h (make_pass_crc_optimization): New extern function
+	declaration.
+
+2024-12-01  Mark Harmstone  <mark@harmstone.com>
+
+	* configure.ac (HAVE_GAS_CV_UCOMP): New check.
+	* configure: Regenerate.
+	* config.in: Regenerate.
+	* dwarf2codeview.cc (enum binary_annotation_opcode): Define.
+	(struct codeview_function): Add htab_next and inline_loc;
+	(struct cv_func_hasher): Define.
+	(cv_func_htab): New global variable.
+	(new_codeview_function): Add new codeview_function to hash table.
+	(codeview_begin_block): Record location of inline block.
+	(codeview_end_block): Add dummy source line at end of inline block.
+	(find_line_function): New function.
+	(write_binary_annotations): New function.
+	(write_s_inlinesite): Call write_binary_annotations.
+	(codeview_debug_finish): Delete cv_func_htab.
+
+2024-12-01  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	PR tree-optimization/117859
+	* tree-ssa-sccvn.cc (insert_predicates_for_cond): If the
+	valueization for the new lhs for `lhs != 0`
+	is the same as the old ones, don't recurse.
+
+2024-12-01  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	* tree-ssa-loop-im.cc (move_computations_worker): While moving
+	phi, reuse the lhs of the conditional if it is a boolean type.
+
+2024-12-01  Alexey Merzlyakov  <alexey.merzlyakov@samsung.com>
+
+	PR rtl-optimization/112398
+	PR rtl-optimization/117476
+	* simplify-rtx.cc (simplify_context::simplify_unary_operation_1):
+	Simplify ZERO_EXTEND (SUBREG (NOT X)) to XOR (X, GET_MODE_MASK(SUBREG))
+	when X doesn't have any non-zero bits outside of SUBREG mode.
+
+2024-11-30  Lewis Hyatt  <lhyatt@gmail.com>
+
+	* diagnostic-show-locus.cc
+	(test_one_liner_fixit_validation_adhoc_locations): Adapt so it can
+	effectively test 7-bit ranges instead of 5-bit ranges.
+	(test_one_liner_fixit_validation_adhoc_locations_utf8): Likewise.
+	* input.cc (get_end_location): Adjust types to support 64-bit
+	location_t.
+	(write_digit_row): Likewise.
+	(dump_location_range): Likewise.
+	(dump_location_info): Likewise.
+	(class line_table_case): Likewise.
+	(test_accessing_ordinary_linemaps): Replace some hard-coded
+	constants with the values defined in line-map.h.
+	(for_each_line_table_case): Likewise.
+
+2024-11-30  Lewis Hyatt  <lhyatt@gmail.com>
+
+	* toplev.cc (general_init): Replace hard-coded constant with
+	line_map_suggested_range_bits.
+
+2024-11-30  Lewis Hyatt  <lhyatt@gmail.com>
+
+	* config/aarch64/aarch64-c.cc (aarch64_resolve_overloaded_builtin):
+	Change "unsigned int" argument to "location_t".
+	* config/avr/avr-c.cc (avr_resolve_overloaded_builtin): Likewise.
+	* config/riscv/riscv-c.cc (riscv_resolve_overloaded_builtin): Likewise.
+	* target.def: Likewise.
+	* doc/tm.texi: Regenerate.
+
+2024-11-30  Joseph Myers  <josmyers@redhat.com>
+	    Richard Biener  <rguenther@suse.de>
+
+	PR c/100501
+	PR c/100792
+	* gimplify.cc (gimplify_asm_expr): Handle void expressions for
+	memory inputs like other non-lvalues.
+
+2024-11-30  Mark Harmstone  <mark@harmstone.com>
+
+	* dwarf2codeview.cc (enum cv_sym_type): Add S_INLINESITE and
+	S_INLINESITE_END.
+	(get_func_id): Add declaration.
+	(write_s_inlinesite): New function.
+	(write_inlinesite_records): New function.
+	(write_function): Call write_inlinesite_records.
+
+2024-11-30  Mark Harmstone  <mark@harmstone.com>
+
+	* dwarf2codeview.cc (DEBUG_S_INLINEELINES): Define.
+	(CV_INLINEE_SOURCE_LINE_SIGNATURE): Define.
+	(struct codeview_inlinee_lines): Define.
+	(struct inlinee_lines_hasher): Define.
+	(func_htab, inlinee_lines_htab): New global variables.
+	(get_file_id): New function.
+	(codeview_source_line): Move file_id logic to get_file_id.
+	(write_inlinee_lines_entry): New function.
+	(write_inlinee_lines): New function.
+	(codeview_debug_finish): Call write_inlinee_lines, and free func_htab
+	and inlinee_lines_htab.
+	(get_func_id): New function.
+	(add_function): Move func_id logic to get_func_id.
+	(codeview_abstract_function): New function.
+	* dwarf2codeview.h (codeview_abstract_function): Add declaration.
+	* dwarf2out.cc (dwarf2out_abstract_function): Call
+	codeview_abstract_function if outputting CodeView debug info.
+
+2024-11-30  Mark Harmstone  <mark@harmstone.com>
+
+	* dwarf2codeview.cc (struct codeview_function): Add parent and
+	inline_block fields.
+	(cur_func): New global variable.
+	(new_codeview_function): New function.
+	(codeview_source_line): Call new_codeview_function, and use cur_func
+	instead of last_func.
+	(codeview_begin_block): New function.
+	(codeview_end_block): New function.
+	(write_line_numbers): No longer free data as we go along.
+	(codeview_switch_text_section): Call new_codeview_function, and use
+	cur_func instead of last_func.
+	(codeview_end_epilogue): Use cur_func instead of last_func.
+	(codeview_debug_finish): Free funcs list and its contents.
+	* dwarf2codeview.h (codeview_begin_block): Add declaration.
+	(codeview_end_block): Add declaration.
+	* dwarf2out.cc (dwarf2out_begin_block): Call codeview_begin_block if
+	outputting CodeView debug info.
+	(dwarf2out_end_block): Call codeview_end_block if outputting CodeView
+	debug info.
+
+2024-11-30  Mark Harmstone  <mark@harmstone.com>
+
+	* debug.cc (do_nothing_debug_hooks): Change begin_block
+	function pointer.
+	(debug_nothing_int_int_tree): New function.
+	* debug.h (struct gcc_debug_hooks): Add tree parameter to begin_block.
+	(debug_nothing_int_int_tree): Add declaration.
+	* dwarf2out.cc (dwarf2out_begin_block): Add tree parameter.
+	(dwarf2_lineno_debug_hooks): Use new dummy function for begin_block.
+	* final.cc (final_scan_insn_1): Pass insn block through to
+	debug_hooks->begin_block.
+	* vmsdbgout.cc (vmsdbgout_begin_block): Add tree parameter.
+
+2024-11-30  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR target/84211
+	* config/avr/avr-passes.cc (try_split_any) [SET, MOVW]: Prefer
+	reg=reg move over reg=const when splitting a reg=reg insn.
+
+2024-11-30  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/117057
+	* tree-ssa-strlen.cc (strlen_pass::count_nonzero_bytes): Punt also
+	when byte_size is equal to offset or nchars.  Punt if offset is bigger
+	than INT_MAX.  Handle vector CONSTRUCTOR with some elements constant,
+	possibly followed by non-constant.
+
+2024-11-30  Jakub Jelinek  <jakub@redhat.com>
+
+	PR libgomp/117851
+	* lto-wrapper.cc (find_crtoffloadtable): Add PIE_OR_SHARED argument,
+	search for crtoffloadtableS.o rather than crtoffloadtable.o if
+	true.
+	(run_gcc): Add pie_or_shared variable.  If OPT_pie or OPT_shared or
+	OPT_static_pie is seen, set pie_or_shared to true, if OPT_no_pie is
+	seen, set pie_or_shared to false.  Pass it to find_crtoffloadtable.
+
+2024-11-30  Jinyang He  <hejinyang@loongson.cn>
+
+	* config/loongarch/constraints.md (Uuv6, Uuvx): Remove Uuv6,
+	add Uuvx as replicated vector const with unsigned range [0,umax].
+	* config/loongarch/lasx.md (xvsrl, xvsra, xvsll): Mask shift
+	offset by its unit bits.
+	* config/loongarch/lsx.md (vsrl, vsra, vsll): Likewise.
+	* config/loongarch/loongarch-protos.h
+	(loongarch_const_vector_same_int_p): Set default for low and high.
+	* config/loongarch/predicates.md: Replace reg_or_vector_same_uimm6
+	_operand to reg_or_vector_same_uimm_operand.
+
+2024-11-30  Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/117360
+	* ext-dce.cc (ext_dce_process_sets): Use HOST_WIDE_INT_UC
+	macro instead of ULL suffixed constants.
+	(carry_backpropagate): Likewise.  Use HOST_WIDE_INT_1U instead of
+	1ULL.  Use GET_MODE_BITSIZE (smode) instead of
+	GET_MODE_BITSIZE (mode) and with that avoid having to use
+	known_lt instead of < or use .to_constant ().  Formatting fixes.
+	(case SIGN_EXTEND): Set mode to GET_MODE_INNER (GET_MODE (XEXP (x, 0)))
+	rather than GET_MODE (XEXP (x, 0)) and don't use GET_MODE_INNER (mode).
+	(ext_dce_process_uses): Use HOST_WIDE_INT_UC macro instead of ULL
+	suffixed constants.
+
+2024-11-30  Jakub Jelinek  <jakub@redhat.com>
+
+	* doc/invoke.texi (-Wdeprecated-variadic-comma-omission): Document.
+
 2010-06-30  Jakub Jelinek  <jakub@redhat.com>
 
 	* config/rs6000/rs6000.c (rs6000_elf_end_indicate_exec_stack): New.

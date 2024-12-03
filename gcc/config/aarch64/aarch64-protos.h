@@ -853,7 +853,8 @@ bool aarch64_and_bitmask_imm (unsigned HOST_WIDE_INT val_in, machine_mode mode);
 int aarch64_branch_cost (bool, bool);
 enum aarch64_symbol_type aarch64_classify_symbolic_expression (rtx);
 bool aarch64_advsimd_struct_mode_p (machine_mode mode);
-opt_machine_mode aarch64_vq_mode (scalar_mode);
+opt_machine_mode aarch64_v64_mode (scalar_mode);
+opt_machine_mode aarch64_v128_mode (scalar_mode);
 opt_machine_mode aarch64_full_sve_mode (scalar_mode);
 bool aarch64_can_const_movi_rtx_p (rtx x, machine_mode mode);
 bool aarch64_const_vec_all_same_int_p (rtx, HOST_WIDE_INT);
@@ -1118,6 +1119,18 @@ bool aarch64_check_required_extensions (location_t, tree,
 bool aarch64_general_check_builtin_call (location_t, vec<location_t>,
 					 unsigned int, tree, unsigned int,
 					 tree *);
+
+namespace aarch64 {
+  void report_non_ice (location_t, tree, unsigned int);
+  void report_out_of_range (location_t, tree, unsigned int, HOST_WIDE_INT,
+			    HOST_WIDE_INT, HOST_WIDE_INT);
+  void report_neither_nor (location_t, tree, unsigned int, HOST_WIDE_INT,
+			   HOST_WIDE_INT, HOST_WIDE_INT);
+  void report_not_one_of (location_t, tree, unsigned int, HOST_WIDE_INT,
+			  HOST_WIDE_INT, HOST_WIDE_INT, HOST_WIDE_INT,
+			  HOST_WIDE_INT);
+  void report_not_enum (location_t, tree, unsigned int, HOST_WIDE_INT, tree);
+}
 
 namespace aarch64_sve {
   void init_builtins ();

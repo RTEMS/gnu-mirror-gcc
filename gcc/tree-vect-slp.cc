@@ -67,6 +67,7 @@ static int vectorizable_slp_permutation_1 (vec_info *, gimple_stmt_iterator *,
 static bool vectorizable_slp_permutation (vec_info *, gimple_stmt_iterator *,
 					  slp_tree, stmt_vector_for_cost *);
 static void vect_print_slp_tree (dump_flags_t, dump_location_t, slp_tree);
+static bool vect_slp_can_convert_to_external (const vec<stmt_vec_info> &);
 
 static object_allocator<_slp_tree> *slp_tree_pool;
 static slp_tree slp_first_node;
@@ -2291,6 +2292,9 @@ vect_build_slp_tree_2 (vec_info *vinfo, slp_tree node,
 		}
 	    }
 	  /* 2. try to build children nodes, associating as necessary.  */
+	  /* 2a. prepare and perform early checks to avoid eating into
+	     discovery limit unnecessarily.  */
+	  vect_def_type *dts = XALLOCAVEC (vect_def_type, chain_len);
 	  for (unsigned n = 0; n < chain_len; ++n)
 	    {
 	      vect_def_type dt = chains[0][n].dt;
@@ -2318,6 +2322,7 @@ vect_build_slp_tree_2 (vec_info *vinfo, slp_tree node,
 		    matches[0] = false;
 		  goto out;
 		}
+	      dts[n] = dt;
 	      if (dt == vect_constant_def
 		  || dt == vect_external_def)
 		{
@@ -2332,16 +2337,6 @@ vect_build_slp_tree_2 (vec_info *vinfo, slp_tree node,
 		      matches[0] = false;
 		      goto out;
 		    }
-		  vec<tree> ops;
-		  ops.create (group_size);
-		  for (lane = 0; lane < group_size; ++lane)
-		    if (stmts[lane])
-		      ops.quick_push (chains[lane][n].op);
-		    else
-		      ops.quick_push (NULL_TREE);
-		  slp_tree child = vect_create_new_slp_node (ops);
-		  SLP_TREE_DEF_TYPE (child) = dt;
-		  children.safe_push (child);
 		}
 	      else if (dt != vect_internal_def)
 		{
@@ -2352,6 +2347,26 @@ vect_build_slp_tree_2 (vec_info *vinfo, slp_tree node,
 		  /* Soft-fail for now.  */
 		  hard_fail = false;
 		  goto out;
+		}
+	    }
+	  /* 2b. do the actual build.  */
+	  for (unsigned n = 0; n < chain_len; ++n)
+	    {
+	      vect_def_type dt = dts[n];
+	      unsigned lane;
+	      if (dt == vect_constant_def
+		  || dt == vect_external_def)
+		{
+		  vec<tree> ops;
+		  ops.create (group_size);
+		  for (lane = 0; lane < group_size; ++lane)
+		    if (stmts[lane])
+		      ops.quick_push (chains[lane][n].op);
+		    else
+		      ops.quick_push (NULL_TREE);
+		  slp_tree child = vect_create_new_slp_node (ops);
+		  SLP_TREE_DEF_TYPE (child) = dt;
+		  children.safe_push (child);
 		}
 	      else
 		{
@@ -2395,6 +2410,11 @@ vect_build_slp_tree_2 (vec_info *vinfo, slp_tree node,
 				term = true;
 				break;
 			      }
+			    if (dump_enabled_p ())
+			      dump_printf_loc (MSG_NOTE, vect_location,
+					       "swapping operand %d and %d "
+					       "of lane %d\n",
+					       n, n + perms[lane] + 1, lane);
 			    std::swap (chains[lane][n],
 				       chains[lane][n + perms[lane] + 1]);
 			    perms[lane]++;
@@ -2887,7 +2907,8 @@ fail:
 	  for (j = 0; j < group_size; ++j)
 	    if (!matches[j])
 	      break;
-	  if (!known_ge (j, TYPE_VECTOR_SUBPARTS (vectype)))
+	  if (!known_ge (j, TYPE_VECTOR_SUBPARTS (vectype))
+	      && vect_slp_can_convert_to_external (oprnd_info->def_stmts))
 	    {
 	      if (dump_enabled_p ())
 		dump_printf_loc (MSG_NOTE, vect_location,
@@ -7764,6 +7785,24 @@ vect_slp_analyze_node_operations_1 (vec_info *vinfo, slp_tree node,
 			    node, node_instance, cost_vec);
 }
 
+/* Verify if we can externalize a set of internal defs.  */
+
+static bool
+vect_slp_can_convert_to_external (const vec<stmt_vec_info> &stmts)
+{
+  basic_block bb = NULL;
+  for (stmt_vec_info stmt : stmts)
+    if (!stmt)
+      return false;
+    /* Constant generation uses get_later_stmt which can only handle
+       defs from the same BB.  */
+    else if (!bb)
+      bb = gimple_bb (stmt->stmt);
+    else if (gimple_bb (stmt->stmt) != bb)
+      return false;
+  return true;
+}
+
 /* Try to build NODE from scalars, returning true on success.
    NODE_INSTANCE is the SLP instance that contains NODE.  */
 
@@ -7779,12 +7818,9 @@ vect_slp_convert_to_external (vec_info *vinfo, slp_tree node,
       || !SLP_TREE_SCALAR_STMTS (node).exists ()
       || vect_contains_pattern_stmt_p (SLP_TREE_SCALAR_STMTS (node))
       /* Force the mask use to be built from scalars instead.  */
-      || VECTOR_BOOLEAN_TYPE_P (SLP_TREE_VECTYPE (node)))
+      || VECTOR_BOOLEAN_TYPE_P (SLP_TREE_VECTYPE (node))
+      || !vect_slp_can_convert_to_external (SLP_TREE_SCALAR_STMTS (node)))
     return false;
-
-  FOR_EACH_VEC_ELT (SLP_TREE_SCALAR_STMTS (node), i, stmt_info)
-    if (!stmt_info)
-      return false;
 
   if (dump_enabled_p ())
     dump_printf_loc (MSG_NOTE, vect_location,

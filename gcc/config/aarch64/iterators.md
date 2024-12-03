@@ -426,6 +426,10 @@
 			     (V8HF "TARGET_SIMD_F16INST")
 			     V2SF V4SF])
 
+;; Modes available for Advanced SIMD lut operations.
+(define_mode_iterator VLUT [V8QI V16QI V4HI V4HF V4BF])
+(define_mode_iterator VLUTx2 [V2x8HI V2x8HF V2x8BF])
+
 ;; Iterators for single modes, for "@" patterns.
 (define_mode_iterator VNx16QI_ONLY [VNx16QI])
 (define_mode_iterator VNx16SI_ONLY [VNx16SI])
@@ -1109,6 +1113,9 @@
     UNSPEC_FCVTXN	; Used in aarch64-simd.md.
     UNSPEC_FAMAX       ; Used in aarch64-simd.md.
     UNSPEC_FAMIN       ; Used in aarch64-simd.md.
+    UNSPEC_LUTI		; Used in aarch64-simd.md.
+    UNSPEC_LUTI2	; Used in aarch64-simd.md.
+    UNSPEC_LUTI4	; Used in aarch64-simd.md.
 
     ;; All used in aarch64-sve2.md
     UNSPEC_ADDQV
@@ -1555,6 +1562,12 @@
 			  (QI   "8b")  (HI    "8b")
 			  (V4BF "8b")  (V8BF  "16b")])
 
+;; Mode to double type mapping.
+(define_mode_attr Vconqtype [(V8QI ".16b") (V16QI ".16b")
+			     (V4HI ".8h") (V8HI ".8h")
+			     (V4HF ".8h") (V8HF ".8h")
+			     (V4BF ".8h") (V8BF ".8h")])
+
 ;; Advanced SIMD vector structure to element modes.
 (define_mode_attr VSTRUCT_ELT [(V2x8QI "V8QI") (V2x4HI "V4HI")
 			       (V2x2SI "V2SI") (V2x1DI "DI")
@@ -1685,6 +1698,7 @@
 			 (V2SI "V4SI") (V4SI "V4SI")
 			 (DI   "V2DI") (V2DI "V2DI")
 			 (V4HF "V8HF") (V8HF "V8HF")
+			 (V4BF "V8BF") (V8BF "V8BF")
 			 (V2SF "V4SF") (V4SF "V4SF")
 			 (V2DF "V2DF") (SI   "V4SI")
 			 (HI   "V8HI") (QI   "V16QI")
@@ -3165,6 +3179,10 @@
 
 (define_int_iterator LAST [UNSPEC_LASTA UNSPEC_LASTB])
 
+;; Iterators for fp8 operations
+
+(define_int_iterator FAMINMAX_UNS [UNSPEC_FAMAX UNSPEC_FAMIN])
+
 (define_int_iterator SVE_INT_UNARY [UNSPEC_REVB
 				    UNSPEC_REVH UNSPEC_REVW])
 
@@ -3738,19 +3756,43 @@
  [UNSPECV_ATOMIC_LDOP_OR UNSPECV_ATOMIC_LDOP_BIC
   UNSPECV_ATOMIC_LDOP_XOR UNSPECV_ATOMIC_LDOP_PLUS])
 
-(define_int_attr atomic_ldop
- [(UNSPECV_ATOMIC_LDOP_OR "set") (UNSPECV_ATOMIC_LDOP_BIC "clr")
-  (UNSPECV_ATOMIC_LDOP_XOR "eor") (UNSPECV_ATOMIC_LDOP_PLUS "add")])
-
-(define_int_attr atomic_ldoptab
- [(UNSPECV_ATOMIC_LDOP_OR "ior") (UNSPECV_ATOMIC_LDOP_BIC "bic")
-  (UNSPECV_ATOMIC_LDOP_XOR "xor") (UNSPECV_ATOMIC_LDOP_PLUS "add")])
-
 (define_int_iterator SUBDI_BITS [8 16 32])
 
 (define_int_iterator BHSD_BITS [8 16 32 64])
 
 (define_int_iterator LUTI_BITS [2 4])
+
+(define_int_iterator GET_FPSCR
+  [UNSPECV_GET_FPSR UNSPECV_GET_FPCR])
+
+(define_int_iterator SET_FPSCR
+  [UNSPECV_SET_FPSR UNSPECV_SET_FPCR])
+
+(define_int_iterator FP8CVT_UNS
+  [UNSPEC_F1CVT
+   UNSPEC_F2CVT
+   UNSPEC_F1CVTLT
+   UNSPEC_F2CVTLT])
+
+(define_int_iterator SVE2_FP8_TERNARY_VNX8HF
+  [UNSPEC_FMLALB_FP8
+   UNSPEC_FMLALT_FP8])
+
+(define_int_iterator SVE2_FP8_TERNARY_VNX4SF
+  [UNSPEC_FMLALLBB_FP8
+   UNSPEC_FMLALLBT_FP8
+   UNSPEC_FMLALLTB_FP8
+   UNSPEC_FMLALLTT_FP8])
+
+(define_int_iterator SVE2_FP8_TERNARY_LANE_VNX8HF
+  [UNSPEC_FMLALB_FP8
+   UNSPEC_FMLALT_FP8])
+
+(define_int_iterator SVE2_FP8_TERNARY_LANE_VNX4SF
+  [UNSPEC_FMLALLBB_FP8
+   UNSPEC_FMLALLBT_FP8
+   UNSPEC_FMLALLTB_FP8
+   UNSPEC_FMLALLTT_FP8])
 
 ;; -------------------------------------------------------------------
 ;; Int Iterators Attributes.
@@ -3968,6 +4010,8 @@
 (define_code_attr binqops_op_rev [(ss_plus "sqsub")
 				  (ss_minus "sqadd")])
 
+(define_code_attr faminmax_op [(smax "famax") (smin "famin")])
+
 ;; The SVE logical instruction that implements an unspec.
 (define_int_attr logicalf_op [(UNSPEC_ANDF "and")
 		 	      (UNSPEC_IORF "orr")
@@ -4179,6 +4223,12 @@
 
 (define_int_attr frintnzs_op [(UNSPEC_FRINT32Z "frint32z") (UNSPEC_FRINT32X "frint32x")
 			      (UNSPEC_FRINT64Z "frint64z") (UNSPEC_FRINT64X "frint64x")])
+
+(define_int_attr faminmax_cond_uns_op
+  [(UNSPEC_COND_SMAX "famax") (UNSPEC_COND_SMIN "famin")])
+
+(define_int_attr faminmax_uns_op
+  [(UNSPEC_FAMAX "famax") (UNSPEC_FAMIN "famin")])
 
 ;; The condition associated with an UNSPEC_COND_<xx>.
 (define_int_attr cmp_op [(UNSPEC_COND_CMPEQ_WIDE "eq")
@@ -4724,12 +4774,6 @@
 
 ;; Iterators and attributes for fpcr fpsr getter setters
 
-(define_int_iterator GET_FPSCR
-  [UNSPECV_GET_FPSR UNSPECV_GET_FPCR])
-
-(define_int_iterator SET_FPSCR
-  [UNSPECV_SET_FPSR UNSPECV_SET_FPCR])
-
 (define_int_attr fpscr_name
   [(UNSPECV_GET_FPSR "fpsr")
    (UNSPECV_SET_FPSR "fpsr")
@@ -4738,52 +4782,19 @@
 
 (define_int_attr bits_etype [(8 "b") (16 "h") (32 "s") (64 "d")])
 
-;; Iterators and attributes for faminmax
+(define_int_attr atomic_ldop
+ [(UNSPECV_ATOMIC_LDOP_OR "set") (UNSPECV_ATOMIC_LDOP_BIC "clr")
+  (UNSPECV_ATOMIC_LDOP_XOR "eor") (UNSPECV_ATOMIC_LDOP_PLUS "add")])
 
-(define_int_iterator FAMINMAX_UNS [UNSPEC_FAMAX UNSPEC_FAMIN])
-
-(define_int_attr faminmax_cond_uns_op
-  [(UNSPEC_COND_SMAX "famax") (UNSPEC_COND_SMIN "famin")])
-
-(define_int_attr faminmax_uns_op
-  [(UNSPEC_FAMAX "famax") (UNSPEC_FAMIN "famin")])
-
-(define_code_attr faminmax_op
-  [(smax "famax") (smin "famin")])
-
-;; Iterators and attributes for fp8 sve/sme conversions
-
-(define_int_iterator FP8CVT_UNS
-  [UNSPEC_F1CVT
-   UNSPEC_F2CVT
-   UNSPEC_F1CVTLT
-   UNSPEC_F2CVTLT])
+(define_int_attr atomic_ldoptab
+ [(UNSPECV_ATOMIC_LDOP_OR "ior") (UNSPECV_ATOMIC_LDOP_BIC "bic")
+  (UNSPECV_ATOMIC_LDOP_XOR "xor") (UNSPECV_ATOMIC_LDOP_PLUS "add")])
 
 (define_int_attr fp8_cvt_uns_op
   [(UNSPEC_F1CVT "f1cvt")
    (UNSPEC_F2CVT "f2cvt")
    (UNSPEC_F1CVTLT "f1cvtlt")
    (UNSPEC_F2CVTLT "f2cvtlt")])
-
-(define_int_iterator SVE2_FP8_TERNARY_VNX8HF
-  [UNSPEC_FMLALB_FP8
-   UNSPEC_FMLALT_FP8])
-
-(define_int_iterator SVE2_FP8_TERNARY_VNX4SF
-  [UNSPEC_FMLALLBB_FP8
-   UNSPEC_FMLALLBT_FP8
-   UNSPEC_FMLALLTB_FP8
-   UNSPEC_FMLALLTT_FP8])
-
-(define_int_iterator SVE2_FP8_TERNARY_LANE_VNX8HF
-  [UNSPEC_FMLALB_FP8
-   UNSPEC_FMLALT_FP8])
-
-(define_int_iterator SVE2_FP8_TERNARY_LANE_VNX4SF
-  [UNSPEC_FMLALLBB_FP8
-   UNSPEC_FMLALLBT_FP8
-   UNSPEC_FMLALLTB_FP8
-   UNSPEC_FMLALLTT_FP8])
 
 (define_int_attr sve2_fp8_fma_op_vnx8hf
   [(UNSPEC_FMLALB_FP8 "fmlalb")

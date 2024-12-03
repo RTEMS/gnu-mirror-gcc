@@ -1,3 +1,374 @@
+2024-12-02  Jakub Jelinek  <jakub@redhat.com>
+
+	* g++.target/aarch64/pr94515-2.C: Add newline at the end of the file.
+	* g++.target/aarch64/return_address_sign_ab_exception.C: Likewise.
+	* gcc.target/arm/thumb2-switchstatement.c: Likewise.
+	* gcc.target/riscv/rvv/base/vssubu-2.c: Likewise.
+	* gcc.target/riscv/rvv/base/vssubu-1.c: Likewise.
+	* gcc.target/riscv/and-shift32.c: Likewise.
+	* gcc.target/riscv/crc-builtin-zbc32.c: Likewise.
+	* gcc.target/riscv/and-shift64.c: Likewise.
+	* gcc.target/riscv/xtheadbb-extu-4.c: Likewise.
+	* gcc.target/i386/avx2-bf16-vec-absneg.c: Likewise.
+	* gcc.target/i386/avx512f-bf16-vec-absneg.c: Likewise.
+	* gcc.target/aarch64/cpunative/native_cpu_26.c: Likewise.
+	* gcc.target/aarch64/cpunative/info_26: Likewise.
+	* gcc.target/aarch64/cpunative/info_25: Likewise.
+	* g++.dg/contracts/pr116607.C: Likewise.
+	* gfortran.dg/pr108889.f90: Likewise.
+	* gcc.dg/crc-not-crc-14.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-13.c: Likewise.
+	* gcc.dg/crc-not-crc-25.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-29.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-10.c: Likewise.
+	* gcc.dg/crc-side-instr-10.c: Likewise.
+	* gcc.dg/crc-side-instr-1.c: Likewise.
+	* gcc.dg/crc-side-instr-3.c: Likewise.
+	* gcc.dg/crc-side-instr-2.c: Likewise.
+	* gcc.dg/crc-not-crc-17.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-7.c: Likewise.
+	* gcc.dg/crc-side-instr-12.c: Likewise.
+	* gcc.dg/crc-side-instr-16.c: Likewise.
+	* gcc.dg/crc-not-crc-16.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-4.c: Likewise.
+	* gcc.dg/crc-not-crc-20.c: Likewise.
+	* gcc.dg/crc-linux-3.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-27.c: Likewise.
+	* gcc.dg/pr109393.c: Likewise.
+	* gcc.dg/crc-side-instr-7.c: Likewise.
+	* gcc.dg/crc-side-instr-4.c: Likewise.
+	* gcc.dg/tree-ssa/ldexp.c: Likewise.
+	* gcc.dg/tree-ssa/pr114760-2.c: Likewise.
+	* gcc.dg/tree-ssa/pr114760-1.c: Likewise.
+	* gcc.dg/crc-side-instr-15.c: Likewise.
+	* gcc.dg/crc-side-instr-9.c: Likewise.
+	* gcc.dg/crc-not-crc-26.c: Likewise.
+	* gcc.dg/crc-side-instr-8.c: Likewise.
+	* gcc.dg/crc-not-crc-23.c: Likewise.
+	* gcc.dg/crc-not-crc-19.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-22.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-16.c: Likewise.
+	* gcc.dg/crc-side-instr-11.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-5.c: Likewise.
+	* gcc.dg/crc-not-crc-22.c: Likewise.
+	* gcc.dg/crc-side-instr-17.c: Likewise.
+	* gcc.dg/crc-linux-4.c: Likewise.
+	* gcc.dg/crc-side-instr-14.c: Likewise.
+	* gcc.dg/crc-not-crc-18.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-23.c: Likewise.
+	* gcc.dg/crc-not-crc-21.c: Likewise.
+	* gcc.dg/crc-linux-2.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-1.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-30.c: Likewise.
+	* gcc.dg/torture/crc-11.c: Likewise.
+	* gcc.dg/torture/crc-27.c: Likewise.
+	* gcc.dg/torture/crc-2.c: Likewise.
+	* gcc.dg/torture/crc-24.c: Likewise.
+	* gcc.dg/torture/crc-crc8.c: Likewise.
+	* gcc.dg/torture/crc-crc8-data8-xorOustideFor.c: Likewise.
+	* gcc.dg/torture/crc-16.c: Likewise.
+	* gcc.dg/torture/crc-crc64-data64.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-32.c: Likewise.
+	* gcc.dg/crc-side-instr-6.c: Likewise.
+	* gcc.dg/crc-side-instr-5.c: Likewise.
+	* gcc.dg/crc-side-instr-13.c: Likewise.
+	* gcc.dg/crc-not-crc-15.c: Likewise.
+	* gcc.dg/crc-not-crc-13.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-6.c: Likewise.
+	* gcc.dg/crc-not-crc-24.c: Likewise.
+
+2024-12-02  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/116352
+	PR tree-optimization/117876
+	* gcc.dg/vect/pr116352.c: New testcase.
+	* gcc.dg/vect/bb-slp-49.c: Remove vectorization check.
+
+2024-12-02  Jakub Jelinek  <jakub@redhat.com>
+
+	PR testsuite/117663
+	* gcc.target/powerpc/rs6000-ldouble-2.c: Add -std=gnu17 to dg-options.
+
+2024-12-02  yulong  <shiyulong@iscas.ac.cn>
+
+	* gcc.target/riscv/rvv/xsfvector/sf_vfnrclip_x_f_qf.c: New test.
+	* gcc.target/riscv/rvv/xsfvector/sf_vfnrclip_xu_f_qf.c: New test.
+
+2024-12-02  Pan Li  <pan2.li@intel.com>
+
+	* gcc.target/riscv/rvv/rvv.exp: Fix the incorrect optimization
+	options passing to testcases.
+
+2024-12-02  Pan Li  <pan2.li@intel.com>
+
+	* gcc.target/riscv/rvv/autovec/strided/strided_ld_st-1-f16.c: Fix
+	the failed test by target any-opts and/or no-opts.
+	* gcc.target/riscv/rvv/autovec/strided/strided_ld_st-1-f32.c: Ditto
+	* gcc.target/riscv/rvv/autovec/strided/strided_ld_st-1-f64.c: Ditto
+	* gcc.target/riscv/rvv/autovec/strided/strided_ld_st-1-i16.c: Ditto
+	* gcc.target/riscv/rvv/autovec/strided/strided_ld_st-1-i32.c: Ditto
+	* gcc.target/riscv/rvv/autovec/strided/strided_ld_st-1-i64.c: Ditto
+	* gcc.target/riscv/rvv/autovec/strided/strided_ld_st-1-i8.c: Ditto
+	* gcc.target/riscv/rvv/autovec/strided/strided_ld_st-1-u16.c: Ditto
+	* gcc.target/riscv/rvv/autovec/strided/strided_ld_st-1-u32.c: Ditto
+	* gcc.target/riscv/rvv/autovec/strided/strided_ld_st-1-u64.c: Ditto
+	* gcc.target/riscv/rvv/autovec/strided/strided_ld_st-1-u8.c: Ditto
+
+2024-12-01  Jovan Vukic  <Jovan.Vukic@rt-rk.com>
+
+	* gcc.dg/tree-ssa/phi-opt-11.c: Add more tests.
+
+2024-12-01  Mariam Arutunian  <mariamarutunian@gmail.com>
+
+	* gcc.dg/crc-from-fedora-packages-1.c: New test.
+	* gcc.dg/crc-from-fedora-packages-2.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-3.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-4.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-5.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-6.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-7.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-8.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-9.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-10.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-11.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-12.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-13.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-14.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-15.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-16.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-17.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-18.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-19.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-20.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-21.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-22.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-23.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-24.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-25.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-26.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-27.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-28.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-29.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-30.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-31.c: Likewise.
+	* gcc.dg/crc-from-fedora-packages-32.c: Likewise.
+	* gcc.dg/crc-linux-1.c: Likewise.
+	* gcc.dg/crc-linux-2.c: Likewise.
+	* gcc.dg/crc-linux-3.c: Likewise.
+	* gcc.dg/crc-linux-4.c: Likewise.
+	* gcc.dg/crc-linux-5.c: Likewise.
+	* gcc.dg/crc-not-crc-1.c: Likewise.
+	* gcc.dg/crc-not-crc-2.c: Likewise.
+	* gcc.dg/crc-not-crc-3.c: Likewise.
+	* gcc.dg/crc-not-crc-4.c: Likewise.
+	* gcc.dg/crc-not-crc-5.c: Likewise.
+	* gcc.dg/crc-not-crc-6.c: Likewise.
+	* gcc.dg/crc-not-crc-7.c: Likewise.
+	* gcc.dg/crc-not-crc-8.c: Likewise.
+	* gcc.dg/crc-not-crc-9.c: Likewise.
+	* gcc.dg/crc-not-crc-10.c: Likewise.
+	* gcc.dg/crc-not-crc-11.c: Likewise.
+	* gcc.dg/crc-not-crc-12.c: Likewise.
+	* gcc.dg/crc-not-crc-13.c: Likewise.
+	* gcc.dg/crc-not-crc-14.c: Likewise.
+	* gcc.dg/crc-not-crc-15.c: Likewise.
+	* gcc.dg/crc-not-crc-16.c: Likewise.
+	* gcc.dg/crc-not-crc-17.c: Likewise.
+	* gcc.dg/crc-not-crc-18.c: Likewise.
+	* gcc.dg/crc-not-crc-19.c: Likewise.
+	* gcc.dg/crc-not-crc-20.c: Likewise.
+	* gcc.dg/crc-not-crc-21.c: Likewise.
+	* gcc.dg/crc-not-crc-22.c: Likewise.
+	* gcc.dg/crc-not-crc-23.c: Likewise.
+	* gcc.dg/crc-not-crc-24.c: Likewise.
+	* gcc.dg/crc-not-crc-25.c: Likewise.
+	* gcc.dg/crc-not-crc-26.c: Likewise.
+	* gcc.dg/crc-side-instr-1.c: Likewise.
+	* gcc.dg/crc-side-instr-2.c: Likewise.
+	* gcc.dg/crc-side-instr-3.c: Likewise.
+	* gcc.dg/crc-side-instr-4.c: Likewise.
+	* gcc.dg/crc-side-instr-5.c: Likewise.
+	* gcc.dg/crc-side-instr-6.c: Likewise.
+	* gcc.dg/crc-side-instr-7.c: Likewise.
+	* gcc.dg/crc-side-instr-8.c: Likewise.
+	* gcc.dg/crc-side-instr-9.c: Likewise.
+	* gcc.dg/crc-side-instr-10.c: Likewise.
+	* gcc.dg/crc-side-instr-11.c: Likewise.
+	* gcc.dg/crc-side-instr-12.c: Likewise.
+	* gcc.dg/crc-side-instr-13.c: Likewise.
+	* gcc.dg/crc-side-instr-14.c: Likewise.
+	* gcc.dg/crc-side-instr-15.c: Likewise.
+	* gcc.dg/crc-side-instr-16.c: Likewise.
+	* gcc.dg/crc-side-instr-17.c: Likewise.
+	* gcc.dg/torture/crc-1.c: Likewise.
+	* gcc.dg/torture/crc-2.c: Likewise.
+	* gcc.dg/torture/crc-3.c: Likewise.
+	* gcc.dg/torture/crc-4.c: Likewise.
+	* gcc.dg/torture/crc-5.c: Likewise.
+	* gcc.dg/torture/crc-6.c: Likewise.
+	* gcc.dg/torture/crc-7.c: Likewise.
+	* gcc.dg/torture/crc-8.c: Likewise.
+	* gcc.dg/torture/crc-9.c: Likewise.
+	* gcc.dg/torture/crc-10.c: Likewise.
+	* gcc.dg/torture/crc-11.c: Likewise.
+	* gcc.dg/torture/crc-12.c: Likewise.
+	* gcc.dg/torture/crc-13.c: Likewise.
+	* gcc.dg/torture/crc-14.c: Likewise.
+	* gcc.dg/torture/crc-15.c: Likewise.
+	* gcc.dg/torture/crc-16.c: Likewise.
+	* gcc.dg/torture/crc-17.c: Likewise.
+	* gcc.dg/torture/crc-18.c: Likewise.
+	* gcc.dg/torture/crc-19.c: Likewise.
+	* gcc.dg/torture/crc-20.c: Likewise.
+	* gcc.dg/torture/crc-21.c: Likewise.
+	* gcc.dg/torture/crc-22.c: Likewise.
+	* gcc.dg/torture/crc-23.c: Likewise.
+	* gcc.dg/torture/crc-24.c: Likewise.
+	* gcc.dg/torture/crc-25.c: Likewise.
+	* gcc.dg/torture/crc-26.c: Likewise.
+	* gcc.dg/torture/crc-27.c: Likewise.
+	* gcc.dg/torture/crc-28.c: Likewise.
+	* gcc.dg/torture/crc-29.c: Likewise.
+	* gcc.dg/torture/crc-CCIT-data16-xorOutside_InsideFor.c: Likewise.
+	* gcc.dg/torture/crc-coremark16-data16.c: Likewise.
+	* gcc.dg/torture/crc-coremark32-data16.c: Likewise.
+	* gcc.dg/torture/crc-coremark32-data32.c: Likewise.
+	* gcc.dg/torture/crc-coremark32-data8.c: Likewise.
+	* gcc.dg/torture/crc-coremark64-data64.c: Likewise.
+	* gcc.dg/torture/crc-coremark8-data8.c: Likewise.
+	* gcc.dg/torture/crc-CCIT-data16.c: Likewise.
+	* gcc.dg/torture/crc-CCIT-data8.c: Likewise.
+	* gcc.dg/torture/crc-crc32-data16.c: Likewise.
+	* gcc.dg/torture/crc-crc32-data24.c: Likewise.
+	* gcc.dg/torture/crc-crc32-data8.c: Likewise.
+	* gcc.dg/torture/crc-crc32.c: Likewise.
+	* gcc.dg/torture/crc-crc64-data32.c: Likewise.
+	* gcc.dg/torture/crc-crc64-data64.c: Likewise.
+	* gcc.dg/torture/crc-crc8-data8-loop-xorInFor.c: Likewise.
+	* gcc.dg/torture/crc-crc8-data8-xorOustideFor.c: Likewise.
+	* gcc.dg/torture/crc-crc8.c: Likewise.
+	Co-Authored: Jeff Law <jlaw@ventanamicro.com>
+	* gcc.dg/torture/crc-coremark64-data32.c: New file.
+	* gcc.dg/torture/crc-crc8-data8-loop-xorOutsideFor.c: New file.
+
+2024-12-01  Dimitar Dimitrov  <dimitar@dinux.eu>
+
+	* gcc.dg/pr117806.c: Test can spill excess
+	errors for default_packed targets.
+
+2024-12-01  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	PR tree-optimization/117859
+	* gcc.dg/torture/pr117859-1.c: New test.
+	* gcc.dg/torture/pr117859-2.c: New test.
+
+2024-12-01  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	* gcc.target/aarch64/sve/acle/general-c/gnu_vectors_1.c: Remove
+	error message on taking address of an element of a vector.
+	* gcc.target/aarch64/sve/acle/general-c/gnu_vectors_2.c: Likewise.
+
+2024-12-01  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	* g++.target/aarch64/sve/acle/general-c++/gnu_vectors_1.C: Remove
+	error message on taking address of an element of a vector.
+	* g++.target/aarch64/sve/acle/general-c++/gnu_vectors_2.C: Likewise.
+
+2024-12-01  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	* g++.dg/ext/sve-sizeless-1.C: Add error message for line 164
+	for C++98 only.
+	* g++.dg/ext/sve-sizeless-2.C: Likewise.
+
+2024-12-01  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	* g++.dg/ext/sve-sizeless-1.C: SVE vectors are now aggregates.
+	* g++.dg/ext/sve-sizeless-2.C: Likewise.
+
+2024-12-01  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	* g++.dg/ext/sve-sizeless-1.C: Update error message for line 165.
+	* g++.dg/ext/sve-sizeless-2.C: Likewise.
+
+2024-12-01  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	* g++.dg/ext/sve-sizeless-2.C: Add declaration of bar.
+
+2024-12-01  Alexey Merzlyakov  <alexey.merzlyakov@samsung.com>
+
+	PR rtl-optimization/112398
+	PR rtl-optimization/117476
+	* gcc.target/riscv/pr112398.c: New test.
+	* gcc.dg/torture/pr117476-1.c: New test. From Zhendong Su.
+	* gcc.dg/torture/pr117476-2.c: New test. From Zdenek Sojka.
+
+2024-11-30  Joseph Myers  <josmyers@redhat.com>
+	    Richard Biener  <rguenther@suse.de>
+
+	PR c/100501
+	PR c/100792
+	* gcc.dg/pr100501-1.c, gcc.dg/pr100792-1.c: New tests.
+	* gcc.dg/pr48552-1.c, gcc.dg/pr48552-2.c,
+	gcc.dg/torture/pr98601.c: Update expected errors.
+
+2024-11-30  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/117057
+	* gcc.dg/strlenopt-32.c: Remove xfail and vect_slp_v2qi_store_unalign
+	specific scan-tree-dump-times directive.
+	* gcc.dg/strlenopt-96.c: New test.
+
+2024-11-30  Jinyang He  <hejinyang@loongson.cn>
+
+	* gcc.target/loongarch/vector/lasx/lasx-shift-sameimm-vec.c: New test.
+	* gcc.target/loongarch/vector/lsx/lsx-shift-sameimm-vec.c: New test.
+
+2024-11-30  Lulu Cheng  <chenglulu@loongson.cn>
+
+	* gcc.target/loongarch/lasx-andn-iorn.c:
+	Add '-fdump-tree-optimized'.
+	* gcc.target/loongarch/lsx-andn-iorn.c:
+	Likewise.
+
+2024-11-30  Lulu Cheng  <chenglulu@loongson.cn>
+
+	* gcc.target/loongarch/vect-frint-scalar.c: Add
+	'-ffp-int-builtin-inexact'.
+
+2024-11-30  Martin Uecker  <uecker@tugraz.at>
+
+	PR c/117806
+	* gcc.dg/pr117806.c: New test.
+
+2024-11-30  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	PR c/117749
+	* gcc.dg/gimplefe-55.c: New test.
+
+2024-11-30  Jakub Jelinek  <jakub@redhat.com>
+
+	* g++.dg/cpp26/variadic-comma1.C: New test.
+	* g++.dg/cpp26/variadic-comma2.C: New test.
+	* g++.dg/cpp26/variadic-comma3.C: New test.
+	* g++.dg/cpp26/variadic-comma4.C: New test.
+	* g++.dg/cpp26/variadic-comma5.C: New test.
+	* g++.dg/cpp1z/fold10.C: Expect a warning for C++26.
+	* g++.dg/ext/attrib33.C: Likewise.
+	* g++.dg/cpp1y/lambda-generic-variadic19.C: Likewise.
+	* g++.dg/cpp2a/lambda-generic10.C: Likewise.
+	* g++.dg/cpp0x/lambda/lambda-const3.C: Likewise.
+	* g++.dg/cpp0x/variadic164.C: Likewise.
+	* g++.dg/cpp0x/variadic17.C: Likewise.
+	* g++.dg/cpp0x/udlit-args-neg.C: Likewise.
+	* g++.dg/cpp0x/variadic28.C: Likewise.
+	* g++.dg/cpp0x/gen-attrs-33.C: Likewise.
+	* g++.dg/cpp23/explicit-obj-diagnostics3.C: Likewise.
+	* g++.old-deja/g++.law/operators15.C: Likewise.
+	* g++.old-deja/g++.mike/p811.C: Likewise.
+	* g++.old-deja/g++.mike/p12306.C (printf): Add , before ... .
+	* g++.dg/analyzer/fd-bind-pr107783.C (bind): Likewise.
+	* g++.dg/cpp0x/vt-65790.C (printf): Likewise.
+
 2010-06-30  Jakub Jelinek  <jakub@redhat.com>
 
 	* g++.dg/opt/ctor1.C: New test.
