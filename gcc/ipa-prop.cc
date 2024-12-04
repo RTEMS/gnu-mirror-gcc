@@ -325,6 +325,10 @@ ipa_get_param_decl_index (class ipa_node_params *info, tree ptree)
   return ipa_get_param_decl_index_1 (info->descriptors, ptree);
 }
 
+static void
+ipa_duplicate_jump_function (cgraph_edge *src, cgraph_edge *dst,
+			     ipa_jump_func *src_jf, ipa_jump_func *dst_jf);
+
 /* Populate the param_decl field in parameter DESCRIPTORS that correspond to
    NODE.  */
 
@@ -2314,20 +2318,45 @@ ipa_set_jfunc_vr (ipa_jump_func *jf, const ipa_vr &vr)
   ipa_set_jfunc_vr (jf, tmp);
 }
 
+static void
+calc_callback_args_idx (cgraph_edge *og, cgraph_edge *cbe)
+{
+  gcc_checking_assert (cbe->callback);
+  ipa_edge_args *args = ipa_edge_args_sum->get_create (cbe);
+  int argn = 0;
+  tree arg;
+  tree cb_args
+    = lookup_attribute ("callback", DECL_ATTRIBUTES (og->callee->decl));
+  for (arg = TREE_CHAIN (TREE_VALUE (cb_args)); arg;
+       arg = TREE_CHAIN (arg), argn++)
+    ;
+  vec_safe_grow_cleared (args->jump_functions, argn, true);
+  vec_safe_grow_cleared (args->callback_args, argn, true);
+  gcc_checking_assert (cb_args);
+  int idx = 0;
+  for (arg = TREE_CHAIN (cb_args); arg; arg = TREE_CHAIN (arg), idx++)
+    {
+      tree val = TREE_VALUE (arg);
+      if (TREE_CODE (val) == INTEGER_CST)
+	{
+	  int arg_idx = TREE_INT_CST_LOW (val);
+	  bool is_data = arg_idx != -1;
+	  if (arg_idx == -1)
+	    {
+	      arg_idx = idx;
+	    }
+	  (*args->callback_args)[idx] = {arg_idx, is_data};
+	}
+      else
+	{
+	  gcc_checking_assert (0);
+	}
+    }
+}
+
 /* Compute jump function for all arguments of callsite CS and insert the
    information in the jump_functions array in the ipa_edge_args corresponding
    to this callsite.  */
-
-static void calc_callback_args_idx(cgraph_edge * e) {
-  gcc_checking_assert(e->callback);
-  ipa_edge_args *args = ipa_edge_args_sum->get_create (e);
-  int argn = 1;
-  vec_safe_grow_cleared (args->callback_args, argn, true);
-  (*args->callback_args)[0] = {1, true};
-  for (int i = 1; i < argn; i++) {
-    (*args->callback_args)[i] = {i, false};
-  }
-}
 
 static void
 ipa_compute_jump_functions_for_edge (struct ipa_func_body_info *fbi,
@@ -2438,13 +2467,13 @@ ipa_compute_jump_functions_for_edge (struct ipa_func_body_info *fbi,
 	    {
 	      tree pointee = TREE_OPERAND (arg, 0);
 	      if (TREE_CODE (pointee) == FUNCTION_DECL
-		  && lookup_attribute ("callback", DECL_ATTRIBUTES (pointee))
+		  && lookup_attribute ("callback", DECL_ATTRIBUTES (cs->callee->decl))
 		  && !cs->callback)
 		{
 		  cgraph_node *kernel_node = cgraph_node::get_create (pointee);
 		  gcc_checking_assert (!callback_edge);
 		  callback_edge = cs->make_callback (kernel_node);
-		  calc_callback_args_idx (callback_edge);
+		  calc_callback_args_idx (cs, callback_edge);
 		}
 	    }
 	}
@@ -2513,16 +2542,17 @@ ipa_compute_jump_functions_for_edge (struct ipa_func_body_info *fbi,
       for (i = 0; i < cb_summary->callback_args->length (); i++)
 	{
 	  cb_arg_info cb = (*cb_summary->callback_args)[i];
-	  ipa_copy_ith_jump_func (cs, cb.idx, callback_edge, i);
+	  class ipa_jump_func * src = ipa_get_ith_jump_func(args, cb.idx);
+    class ipa_jump_func * dst = ipa_get_ith_jump_func(cb_summary, i);
+    ipa_duplicate_jump_function(cs, callback_edge, src, dst);
 	  if (cb.is_data_arg)
 	    {
-	      class ipa_jump_func *jfunc = ipa_get_ith_jump_func (args, cb.idx);
 	      unsigned j;
-	      for (j = 0; jfunc->agg.items && (j < jfunc->agg.items->length ());
+	      for (j = 0; src->agg.items && (j < src->agg.items->length ());
 		   j++)
 		{
-		  if ((*jfunc->agg.items)[j].jftype == IPA_JF_PASS_THROUGH)
-		    (*jfunc->agg.items)[j].value.pass_through.agg_preserved
+		  if ((*src->agg.items)[j].jftype == IPA_JF_PASS_THROUGH)
+		    (*src->agg.items)[j].value.pass_through.agg_preserved
 		      = true;
 		}
 	    }
@@ -4550,111 +4580,6 @@ ipa_edge_args_sum_t::remove (cgraph_edge *cs, ipa_edge_args *args)
 	      && (rdesc = ipa_get_jf_constant_rdesc (jf))
 	      && rdesc->cs == cs)
 	    rdesc->cs = NULL;
-	}
-    }
-}
-
-void
-ipa_copy_ith_jump_func (class cgraph_edge *src, unsigned src_idx,
-			class cgraph_edge *dst, unsigned dst_idx)
-{
-  class ipa_edge_args *src_args = ipa_edge_args_sum->get (src);
-  class ipa_edge_args *dst_args = ipa_edge_args_sum->get (dst);
-  
-  
-  if (dst_idx >= vec_safe_length (dst_args->jump_functions))
-    {
-      vec_safe_grow_cleared (dst_args->jump_functions, dst_idx + 1, true);
-    }
-
-  struct ipa_jump_func *src_jf = ipa_get_ith_jump_func (src_args, src_idx);
-  struct ipa_jump_func *dst_jf = ipa_get_ith_jump_func (dst_args, dst_idx);
-
-  ::new (dst_jf) ipa_jump_func (*src_jf);
-
-  dst_jf->agg.items = vec_safe_copy (src_jf->agg.items);
-  dst_jf->m_vr = src_jf->m_vr;
-
-  if (src_jf->type == IPA_JF_CONST)
-    {
-      struct ipa_cst_ref_desc *src_rdesc = jfunc_rdesc_usable (src_jf);
-
-      if (!src_rdesc)
-	dst_jf->value.constant.rdesc = NULL;
-      else if (src->caller == dst->caller)
-	{
-	  /* Creation of a speculative edge.  If the source edge is the one
-	     grabbing a reference, we must create a new (duplicate)
-	     reference description.  Otherwise they refer to the same
-	     description corresponding to a reference taken in a function
-	     src->caller is inlined to.  In that case we just must
-	     increment the refcount.  */
-	  if (src_rdesc->cs == src)
-	    {
-	      symtab_node *n = symtab_node_for_jfunc (src_jf);
-	      gcc_checking_assert (n);
-	      ipa_ref *ref
-		= src->caller->find_reference (n, src->call_stmt,
-					       src->lto_stmt_uid, IPA_REF_ADDR);
-	      gcc_checking_assert (ref);
-	      dst->caller->clone_reference (ref, ref->stmt);
-
-	      ipa_cst_ref_desc *dst_rdesc = ipa_refdesc_pool.allocate ();
-	      dst_rdesc->cs = dst;
-	      dst_rdesc->refcount = src_rdesc->refcount;
-	      dst_rdesc->next_duplicate = NULL;
-	      dst_jf->value.constant.rdesc = dst_rdesc;
-	    }
-	  else
-	    {
-	      src_rdesc->refcount++;
-	      dst_jf->value.constant.rdesc = src_rdesc;
-	    }
-	}
-      else if (src_rdesc->cs == src)
-	{
-	  struct ipa_cst_ref_desc *dst_rdesc = ipa_refdesc_pool.allocate ();
-	  dst_rdesc->cs = dst;
-	  dst_rdesc->refcount = src_rdesc->refcount;
-	  dst_rdesc->next_duplicate = src_rdesc->next_duplicate;
-	  src_rdesc->next_duplicate = dst_rdesc;
-	  dst_jf->value.constant.rdesc = dst_rdesc;
-	}
-      else
-	{
-	  struct ipa_cst_ref_desc *dst_rdesc;
-	  /* This can happen during inlining, when a JFUNC can refer to a
-	     reference taken in a function up in the tree of inline clones.
-	     We need to find the duplicate that refers to our tree of
-	     inline clones.  */
-
-	  gcc_assert (dst->caller->inlined_to);
-	  for (dst_rdesc = src_rdesc->next_duplicate; dst_rdesc;
-	       dst_rdesc = dst_rdesc->next_duplicate)
-	    {
-	      struct cgraph_node *top;
-	      top = dst_rdesc->cs->caller->inlined_to
-		      ? dst_rdesc->cs->caller->inlined_to
-		      : dst_rdesc->cs->caller;
-	      if (dst->caller->inlined_to == top)
-		break;
-	    }
-	  gcc_assert (dst_rdesc);
-	  dst_jf->value.constant.rdesc = dst_rdesc;
-	}
-    }
-  else if (dst_jf->type == IPA_JF_PASS_THROUGH && src->caller == dst->caller)
-    {
-      struct cgraph_node *inline_root
-	= dst->caller->inlined_to ? dst->caller->inlined_to : dst->caller;
-      ipa_node_params *root_info = ipa_node_params_sum->get (inline_root);
-      int idx = ipa_get_jf_pass_through_formal_id (dst_jf);
-
-      int c = ipa_get_controlled_uses (root_info, idx);
-      if (c != IPA_UNDESCRIBED_USE)
-	{
-	  c++;
-	  ipa_set_controlled_uses (root_info, idx, c);
 	}
     }
 }
