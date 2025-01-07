@@ -1,6 +1,6 @@
 // hashtable.h header -*- C++ -*-
 
-// Copyright (C) 2007-2024 Free Software Foundation, Inc.
+// Copyright (C) 2007-2025 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -1829,12 +1829,18 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     noexcept(__and_<__is_nothrow_swappable<_Hash>,
 			__is_nothrow_swappable<_Equal>>::value)
     {
-      // The only base class with member variables is hash_code_base.
-      // We define _Hash_code_base::_M_swap because different
-      // specializations have different members.
-      this->_M_swap(__x);
+      using std::swap;
+      swap(__hash_code_base::_M_hash._M_obj,
+	   __x.__hash_code_base::_M_hash._M_obj);
+      swap(__hashtable_base::_M_equal._M_obj,
+	   __x.__hashtable_base::_M_equal._M_obj);
 
-      std::__alloc_on_swap(this->_M_node_allocator(), __x._M_node_allocator());
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wc++17-extensions" // if constexpr
+      if constexpr (__node_alloc_traits::propagate_on_container_swap::value)
+	swap(this->_M_node_allocator(), __x._M_node_allocator());
+#pragma GCC diagnostic pop
+
       std::swap(_M_rehash_policy, __x._M_rehash_policy);
 
       // Deal properly with potentially moved instances.
@@ -2171,7 +2177,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	  if (this->_M_equals(__k, __code, *__p))
 	    return __prev_p;
 
-	  if (!__p->_M_nxt || _M_bucket_index(*__p->_M_next()) != __bkt)
+	  if (__builtin_expect (!__p->_M_nxt || _M_bucket_index(*__p->_M_next()) != __bkt, 0))
 	    break;
 	  __prev_p = __p;
 	}
@@ -2201,7 +2207,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	    if (this->_M_equals_tr(__k, __code, *__p))
 	      return __prev_p;
 
-	    if (!__p->_M_nxt || _M_bucket_index(*__p->_M_next()) != __bkt)
+	    if (__builtin_expect (!__p->_M_nxt || _M_bucket_index(*__p->_M_next()) != __bkt, 0))
 	      break;
 	    __prev_p = __p;
 	  }
@@ -2213,7 +2219,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	   typename _ExtractKey, typename _Equal,
 	   typename _Hash, typename _RangeHash, typename _Unused,
 	   typename _RehashPolicy, typename _Traits>
-    auto
+    inline auto
     _Hashtable<_Key, _Value, _Alloc, _ExtractKey, _Equal,
 	       _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits>::
     _M_locate(const key_type& __k) const

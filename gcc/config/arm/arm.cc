@@ -1,5 +1,5 @@
 /* Output routines for GCC for ARM.
-   Copyright (C) 1991-2024 Free Software Foundation, Inc.
+   Copyright (C) 1991-2025 Free Software Foundation, Inc.
    Contributed by Pieter `Tiggr' Schoenmakers (rcpieter@win.tue.nl)
    and Martin Simmons (@harleqn.co.uk).
    More major hacks by Richard Earnshaw (rearnsha@arm.com).
@@ -278,6 +278,7 @@ static rtx_insn *arm_pic_static_addr (rtx orig, rtx reg);
 static bool cortex_a9_sched_adjust_cost (rtx_insn *, int, rtx_insn *, int *);
 static bool xscale_sched_adjust_cost (rtx_insn *, int, rtx_insn *, int *);
 static bool fa726te_sched_adjust_cost (rtx_insn *, int, rtx_insn *, int *);
+static opt_machine_mode arm_array_mode (machine_mode, unsigned HOST_WIDE_INT);
 static bool arm_array_mode_supported_p (machine_mode,
 					unsigned HOST_WIDE_INT);
 static machine_mode arm_preferred_simd_mode (scalar_mode);
@@ -515,6 +516,8 @@ static const scoped_attribute_specs *const arm_attribute_table[] =
 #define TARGET_SHIFT_TRUNCATION_MASK arm_shift_truncation_mask
 #undef TARGET_VECTOR_MODE_SUPPORTED_P
 #define TARGET_VECTOR_MODE_SUPPORTED_P arm_vector_mode_supported_p
+#undef TARGET_ARRAY_MODE
+#define TARGET_ARRAY_MODE arm_array_mode
 #undef TARGET_ARRAY_MODE_SUPPORTED_P
 #define TARGET_ARRAY_MODE_SUPPORTED_P arm_array_mode_supported_p
 #undef TARGET_VECTORIZE_PREFERRED_SIMD_MODE
@@ -3012,17 +3015,17 @@ arm_option_check_internal (struct gcc_options *opts)
       /* We only support -mslow-flash-data on M-profile targets with
 	 MOVT.  */
       if (target_slow_flash_data && (!TARGET_HAVE_MOVT || common_unsupported_modes))
-	error ("%s only supports non-pic code on M-profile targets with the "
+	error ("%qs only supports non-pic code on M-profile targets with the "
 	       "MOVT instruction", flag);
 
       /* We only support -mpure-code on M-profile targets.  */
       if (target_pure_code && common_unsupported_modes)
-	error ("%s only supports non-pic code on M-profile targets", flag);
+	error ("%qs only supports non-pic code on M-profile targets", flag);
 
       /* Cannot load addresses: -mslow-flash-data forbids literal pool and
 	 -mword-relocations forbids relocation of MOVT/MOVW.  */
       if (target_word_relocations)
-	error ("%s incompatible with %<-mword-relocations%>", flag);
+	error ("%qs is incompatible with %<-mword-relocations%>", flag);
     }
 }
 
@@ -20772,9 +20775,13 @@ output_move_neon (rtx *operands)
   nregs = REG_NREGS (reg) / 2;
   gcc_assert (VFP_REGNO_OK_FOR_DOUBLE (regno)
 	      || NEON_REGNO_OK_FOR_QUAD (regno));
-  gcc_assert (VALID_NEON_DREG_MODE (mode)
-	      || VALID_NEON_QREG_MODE (mode)
-	      || VALID_NEON_STRUCT_MODE (mode));
+  gcc_assert ((TARGET_NEON
+	       && (VALID_NEON_DREG_MODE (mode)
+		   || VALID_NEON_QREG_MODE (mode)
+		   || VALID_NEON_STRUCT_MODE (mode)))
+	      || (TARGET_HAVE_MVE
+		  && (VALID_MVE_MODE (mode)
+		      || VALID_MVE_STRUCT_MODE (mode))));
   gcc_assert (MEM_P (mem));
 
   addr = XEXP (mem, 0);
@@ -20877,8 +20884,9 @@ output_move_neon (rtx *operands)
   return "";
 }
 
-/* Compute and return the length of neon_mov<mode>, where <mode> is
-   one of VSTRUCT modes: EI, OI, CI or XI.  */
+/* Compute and return the length of neon_mov<mode>, where <mode> is one of
+   VSTRUCT modes: EI, OI, CI or XI for Neon, and V2x16QI, V2x8HI, V2x4SI,
+   V2x8HF, V2x4SF, V2x16QI, V2x8HI, V2x4SI, V2x8HF, V2x4SF for MVE.  */
 int
 arm_attr_length_move_neon (rtx_insn *insn)
 {
@@ -20895,10 +20903,20 @@ arm_attr_length_move_neon (rtx_insn *insn)
 	{
 	case E_EImode:
 	case E_OImode:
+	case E_V2x16QImode:
+	case E_V2x8HImode:
+	case E_V2x4SImode:
+	case E_V2x8HFmode:
+	case E_V2x4SFmode:
 	  return 8;
 	case E_CImode:
 	  return 12;
 	case E_XImode:
+	case E_V4x16QImode:
+	case E_V4x8HImode:
+	case E_V4x4SImode:
+	case E_V4x8HFmode:
+	case E_V4x4SFmode:
 	  return 16;
 	default:
 	  gcc_unreachable ();
@@ -24949,7 +24967,8 @@ arm_print_operand_address (FILE *stream, machine_mode mode, rtx x)
 			 REGNO (XEXP (x, 0)),
 			 GET_CODE (x) == PRE_DEC ? "-" : "",
 			 GET_MODE_SIZE (mode));
-	  else if (TARGET_HAVE_MVE && (mode == OImode || mode == XImode))
+	  else if (TARGET_HAVE_MVE
+		   && VALID_MVE_STRUCT_MODE (mode))
 	    asm_fprintf (stream, "[%r]!", REGNO (XEXP (x,0)));
 	  else
 	    asm_fprintf (stream, "[%r], #%s%d", REGNO (XEXP (x, 0)),
@@ -25839,7 +25858,17 @@ arm_hard_regno_mode_ok (unsigned int regno, machine_mode mode)
      if (TARGET_HAVE_MVE)
        return ((VALID_MVE_MODE (mode) && NEON_REGNO_OK_FOR_QUAD (regno))
 	       || (mode == OImode && NEON_REGNO_OK_FOR_NREGS (regno, 4))
-	       || (mode == XImode && NEON_REGNO_OK_FOR_NREGS (regno, 8)));
+	       || (mode == V2x16QImode && NEON_REGNO_OK_FOR_NREGS (regno, 4))
+	       || (mode == V2x8HImode && NEON_REGNO_OK_FOR_NREGS (regno, 4))
+	       || (mode == V2x4SImode && NEON_REGNO_OK_FOR_NREGS (regno, 4))
+	       || (mode == V2x8HFmode && NEON_REGNO_OK_FOR_NREGS (regno, 4))
+	       || (mode == V2x4SFmode && NEON_REGNO_OK_FOR_NREGS (regno, 4))
+	       || (mode == XImode && NEON_REGNO_OK_FOR_NREGS (regno, 8))
+	       || (mode == V4x16QImode && NEON_REGNO_OK_FOR_NREGS (regno, 8))
+	       || (mode == V4x8HImode && NEON_REGNO_OK_FOR_NREGS (regno, 8))
+	       || (mode == V4x4SImode && NEON_REGNO_OK_FOR_NREGS (regno, 8))
+	       || (mode == V4x8HFmode && NEON_REGNO_OK_FOR_NREGS (regno, 8))
+	       || (mode == V4x4SFmode && NEON_REGNO_OK_FOR_NREGS (regno, 8)));
 
       return false;
     }
@@ -29785,6 +29814,27 @@ arm_vector_mode_supported_p (machine_mode mode)
   return false;
 }
 
+/* Implements target hook array_mode.  */
+static opt_machine_mode
+arm_array_mode (machine_mode mode, unsigned HOST_WIDE_INT nelems)
+{
+  if (TARGET_HAVE_MVE
+      /* MVE accepts only tuples of 2 or 4 vectors.  */
+      && (nelems == 2
+	  || nelems == 4))
+    {
+      machine_mode struct_mode;
+      FOR_EACH_MODE_IN_CLASS (struct_mode, GET_MODE_CLASS (mode))
+	{
+	  if (GET_MODE_INNER (struct_mode) == GET_MODE_INNER (mode)
+	      && known_eq (GET_MODE_NUNITS (struct_mode),
+			   GET_MODE_NUNITS (mode) * nelems))
+	    return struct_mode;
+	}
+    }
+  return opt_machine_mode ();
+}
+
 /* Implements target hook array_mode_supported_p.  */
 
 static bool
@@ -31803,50 +31853,6 @@ arm_expand_vector_compare (rtx target, rtx_code code, rtx op0, rtx op1,
     }
 }
 
-/* Expand a vcond or vcondu pattern with operands OPERANDS.
-   CMP_RESULT_MODE is the mode of the comparison result.  */
-
-void
-arm_expand_vcond (rtx *operands, machine_mode cmp_result_mode)
-{
-  /* When expanding for MVE, we do not want to emit a (useless) vpsel in
-     arm_expand_vector_compare, and another one here.  */
-  rtx mask;
-
-  if (TARGET_HAVE_MVE)
-    mask = gen_reg_rtx (arm_mode_to_pred_mode (cmp_result_mode).require ());
-  else
-    mask = gen_reg_rtx (cmp_result_mode);
-
-  bool inverted = arm_expand_vector_compare (mask, GET_CODE (operands[3]),
-					     operands[4], operands[5], true);
-  if (inverted)
-    std::swap (operands[1], operands[2]);
-  if (TARGET_NEON)
-  emit_insn (gen_neon_vbsl (GET_MODE (operands[0]), operands[0],
-			    mask, operands[1], operands[2]));
-  else
-    {
-      machine_mode cmp_mode = GET_MODE (operands[0]);
-
-      switch (GET_MODE_CLASS (cmp_mode))
-	{
-	case MODE_VECTOR_INT:
-	  emit_insn (gen_mve_q (VPSELQ_S, VPSELQ_S, cmp_mode, operands[0],
-				operands[1], operands[2], mask));
-	  break;
-	case MODE_VECTOR_FLOAT:
-	  if (TARGET_HAVE_MVE_FLOAT)
-	    emit_insn (gen_mve_q_f (VPSELQ_F, cmp_mode, operands[0],
-				    operands[1], operands[2], mask));
-	  else
-	    gcc_unreachable ();
-	  break;
-	default:
-	  gcc_unreachable ();
-	}
-    }
-}
 
 #define MAX_VECT_LEN 16
 
@@ -34489,6 +34495,30 @@ arm_coproc_ldc_stc_legitimate_address (rtx op)
   return false;
 }
 
+/* Return true if OP is a valid memory operand for LDRD/STRD without any
+   register overlap restrictions.  Allow [base] and [base, imm] for now.  */
+bool
+arm_ldrd_legitimate_address (rtx op)
+{
+  if (!MEM_P (op))
+    return false;
+
+  op = XEXP (op, 0);
+  if (REG_P (op))
+    return true;
+
+  if (GET_CODE (op) != PLUS)
+    return false;
+  if (!REG_P (XEXP (op, 0)) || !CONST_INT_P (XEXP (op, 1)))
+    return false;
+
+  HOST_WIDE_INT val = INTVAL (XEXP (op, 1));
+
+  if (TARGET_ARM)
+    return IN_RANGE (val, -255, 255);
+  return IN_RANGE (val, -1020, 1020) && (val & 3) == 0;
+}
+
 /* Return the diagnostic message string if conversion from FROMTYPE to
    TOTYPE is not allowed, NULL otherwise.  */
 
@@ -36095,6 +36125,9 @@ arm_mode_base_reg_class (machine_mode mode)
 
   return MODE_BASE_REG_REG_CLASS (mode);
 }
+
+#undef TARGET_DOCUMENTATION_NAME
+#define TARGET_DOCUMENTATION_NAME "ARM"
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

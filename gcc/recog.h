@@ -1,5 +1,5 @@
 /* Declarations for interface to insn recognizer and insn-output.cc.
-   Copyright (C) 1987-2024 Free Software Foundation, Inc.
+   Copyright (C) 1987-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -361,6 +361,9 @@ private:
 /* Set by constrain_operands to the number of the alternative that
    matched.  */
 extern int which_alternative;
+
+/* True for inline asm operands with - constraint modifier.  */
+extern bool raw_constraint_p;
 
 /* The following vectors hold the results from insn_extract.  */
 

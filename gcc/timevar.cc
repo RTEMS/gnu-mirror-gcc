@@ -1,5 +1,5 @@
 /* Timing variables for measuring compiler performance.
-   Copyright (C) 2000-2024 Free Software Foundation, Inc.
+   Copyright (C) 2000-2025 Free Software Foundation, Inc.
    Contributed by Alex Samuel <samuel@codesourcery.com>
 
 This file is part of GCC.
@@ -160,7 +160,11 @@ get_time (struct timevar_time_def *now)
 
 #ifdef HAVE_CLOCK_GETTIME
   struct timespec ts;
+#if _POSIX_TIMERS > 0 && defined(_POSIX_MONOTONIC_CLOCK)
   clock_gettime (CLOCK_MONOTONIC, &ts);
+#else
+  clock_gettime (CLOCK_REALTIME, &ts);
+#endif
   now->wall = ts.tv_sec * 1000000000 + ts.tv_nsec;
   return;
 #define HAVE_WALL_TIME 1

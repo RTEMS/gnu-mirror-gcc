@@ -1,5 +1,5 @@
 /* Definitions for c-common.cc.
-   Copyright (C) 1987-2024 Free Software Foundation, Inc.
+   Copyright (C) 1987-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -105,7 +105,7 @@ enum rid
 
   /* C extensions */
   RID_ASM,       RID_TYPEOF,   RID_TYPEOF_UNQUAL, RID_ALIGNOF,  RID_ATTRIBUTE,
-  RID_VA_ARG,
+  RID_C23_VA_START, RID_VA_ARG,
   RID_EXTENSION, RID_IMAGPART, RID_REALPART, RID_LABEL,    RID_CHOOSE_EXPR,
   RID_TYPES_COMPATIBLE_P,      RID_BUILTIN_COMPLEX,	   RID_BUILTIN_SHUFFLE,
   RID_BUILTIN_SHUFFLEVECTOR,   RID_BUILTIN_CONVERTVECTOR,  RID_BUILTIN_TGMATH,
@@ -859,8 +859,8 @@ extern void check_function_arguments_recurse (void (*)
 					      void *, tree,
 					      unsigned HOST_WIDE_INT,
 					      opt_code);
-extern bool check_builtin_function_arguments (location_t, vec<location_t>,
-					      tree, tree, int, tree *);
+extern bool check_builtin_function_arguments (location_t, vec<location_t>, tree,
+					      tree, int, tree *, bool = true);
 extern void check_function_format (const_tree, tree, int, tree *,
 				   vec<location_t> *,
 				   bool (*comp_types) (tree, tree));
@@ -1105,7 +1105,8 @@ extern tree build_function_call_vec (location_t, vec<location_t>, tree,
 				     vec<tree, va_gc> *, vec<tree, va_gc> *,
 				     tree = NULL_TREE);
 
-extern tree resolve_overloaded_builtin (location_t, tree, vec<tree, va_gc> *);
+extern tree resolve_overloaded_builtin (location_t, tree, vec<tree, va_gc> *,
+					bool = true);
 
 extern tree finish_label_address_expr (tree, location_t);
 
@@ -1665,8 +1666,10 @@ extern int parse_tm_stmt_attr (tree, int);
 extern int tm_attr_to_mask (tree);
 extern tree tm_mask_to_attr (int);
 extern tree find_tm_attribute (tree);
+extern const struct attribute_spec::exclusions attr_aligned_exclusions[];
 extern const struct attribute_spec::exclusions attr_cold_hot_exclusions[];
 extern const struct attribute_spec::exclusions attr_noreturn_exclusions[];
+extern tree handle_aligned_attribute (tree *, tree, tree, int, bool *);
 extern tree handle_noreturn_attribute (tree *, tree, tree, int, bool *);
 extern tree handle_musttail_attribute (tree *, tree, tree, int, bool *);
 extern bool has_attribute (location_t, tree, tree, tree (*)(tree));

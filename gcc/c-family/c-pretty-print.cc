@@ -1,5 +1,5 @@
 /* Subroutines common to both C and C++ pretty-printers.
-   Copyright (C) 2002-2024 Free Software Foundation, Inc.
+   Copyright (C) 2002-2025 Free Software Foundation, Inc.
    Contributed by Gabriel Dos Reis <gdr@integrable-solutions.net>
 
 This file is part of GCC.
@@ -753,7 +753,8 @@ c_pretty_printer::storage_class_specifier (tree t)
     pp_c_ws_string (this, "typedef");
   else if (DECL_P (t))
     {
-      if (DECL_REGISTER (t))
+      if ((TREE_CODE (t) == PARM_DECL || VAR_P (t))
+	  && DECL_REGISTER (t))
 	pp_c_ws_string (this, "register");
       else if (TREE_STATIC (t) && VAR_P (t))
 	pp_c_ws_string (this, "static");

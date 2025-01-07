@@ -1,5 +1,5 @@
 /* Combining of if-expressions on trees.
-   Copyright (C) 2007-2024 Free Software Foundation, Inc.
+   Copyright (C) 2007-2025 Free Software Foundation, Inc.
    Contributed by Richard Guenther <rguenther@suse.de>
 
 This file is part of GCC.
@@ -475,7 +475,7 @@ update_profile_after_ifcombine (basic_block inner_cond_bb,
 static void
 ifcombine_mark_ssa_name (bitmap used, tree name, basic_block outer)
 {
-  if (SSA_NAME_IS_DEFAULT_DEF (name))
+  if (!name || TREE_CODE (name) != SSA_NAME || SSA_NAME_IS_DEFAULT_DEF (name))
     return;
 
   gimple *def = SSA_NAME_DEF_STMT (name);
@@ -502,8 +502,7 @@ ifcombine_mark_ssa_name_walk (tree *t, int *, void *data_)
 {
   ifcombine_mark_ssa_name_t *data = (ifcombine_mark_ssa_name_t *)data_;
 
-  if (*t && TREE_CODE (*t) == SSA_NAME)
-    ifcombine_mark_ssa_name (data->used, *t, data->outer);
+  ifcombine_mark_ssa_name (data->used, *t, data->outer);
 
   return NULL;
 }
@@ -900,7 +899,7 @@ ifcombine_ifandif (basic_block inner_cond_bb, bool inner_inv,
       else if (bits1 == name2)
 	std::swap (name1, bits1);
       else
-	return false;
+	goto bits_test_failed;
 
       /* As we strip non-widening conversions in finding a common
          name that is tested make sure to end up with an integral
@@ -945,7 +944,8 @@ ifcombine_ifandif (basic_block inner_cond_bb, bool inner_inv,
     }
 
   /* See if we have two comparisons that we can merge into one.  */
-  else if (TREE_CODE_CLASS (gimple_cond_code (inner_cond)) == tcc_comparison
+  else bits_test_failed:
+    if (TREE_CODE_CLASS (gimple_cond_code (inner_cond)) == tcc_comparison
 	   && TREE_CODE_CLASS (gimple_cond_code (outer_cond)) == tcc_comparison)
     {
       tree t, ts = NULL_TREE;
@@ -971,7 +971,19 @@ ifcombine_ifandif (basic_block inner_cond_bb, bool inner_inv,
 					    outer_cond_code,
 					    gimple_cond_lhs (outer_cond),
 					    gimple_cond_rhs (outer_cond),
-					    gimple_bb (outer_cond))))
+					    gimple_bb (outer_cond)))
+	  && !(t = (fold_truth_andor_for_ifcombine
+		    (TRUTH_ANDIF_EXPR, boolean_type_node,
+		     gimple_location (outer_cond),
+		     outer_cond_code,
+		     gimple_cond_lhs (outer_cond),
+		     gimple_cond_rhs (outer_cond),
+		     gimple_location (inner_cond),
+		     inner_cond_code,
+		     gimple_cond_lhs (inner_cond),
+		     gimple_cond_rhs (inner_cond),
+		     single_pred (inner_cond_bb) != outer_cond_bb
+		     ? &ts : 0))))
 	{
 	  /* Only combine conditions in this fallback case if the blocks are
 	     neighbors.  */

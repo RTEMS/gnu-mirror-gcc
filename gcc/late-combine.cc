@@ -1,5 +1,5 @@
 // Late-stage instruction combination pass.
-// Copyright (C) 2023-2024 Free Software Foundation, Inc.
+// Copyright (C) 2023-2025 Free Software Foundation, Inc.
 //
 // This file is part of GCC.
 //
@@ -730,6 +730,10 @@ late_combine::execute (function *fn)
   // Finalization.
   if (crtl->ssa->perform_pending_updates ())
     cleanup_cfg (0);
+
+  delete crtl->ssa;
+  crtl->ssa = nullptr;
+
   // Make the recognizer allow volatile MEMs again.
   init_recog ();
   free_dominance_info (CDI_DOMINATORS);

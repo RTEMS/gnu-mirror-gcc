@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -98,8 +98,7 @@ package body Freeze is
 
    procedure Check_Address_Clause (E : Entity_Id);
    --  Apply legality checks to address clauses for object declarations,
-   --  at the point the object is frozen. Also ensure any initialization is
-   --  performed only after the object has been frozen.
+   --  at the point the object is frozen.
 
    procedure Check_Component_Storage_Order
      (Encl_Type        : Entity_Id;
@@ -636,11 +635,9 @@ package body Freeze is
       Addr       : constant Node_Id   := Address_Clause (E);
       Typ        : constant Entity_Id := Etype (E);
 
-      Assign : Node_Id;
-      Decl   : Node_Id;
-      Expr   : Node_Id;
-      Init   : Node_Id;
-      Lhs    : Node_Id;
+      Decl : Node_Id;
+      Expr : Node_Id;
+      Init : Node_Id;
 
    begin
       if Present (Addr) then
@@ -743,47 +740,6 @@ package body Freeze is
                      Decl, O_Ent);
                end if;
             end;
-         end if;
-
-         --  Remove side effects from initial expression, except in the case of
-         --  limited build-in-place calls and aggregates, which have their own
-         --  expansion elsewhere. This exception is necessary to avoid copying
-         --  limited objects.
-
-         if Present (Init)
-           and then not Is_Inherently_Limited_Type (Typ)
-         then
-            --  Capture initialization value at point of declaration, and make
-            --  explicit assignment legal, because object may be a constant.
-
-            Remove_Side_Effects (Init);
-            Lhs := New_Occurrence_Of (E, Sloc (Decl));
-            Set_Assignment_OK (Lhs);
-
-            Assign :=
-              Make_Assignment_Statement (Sloc (Decl),
-                Name       => Lhs,
-                Expression => Init);
-
-            Set_No_Initialization (Decl);
-
-            --  If the initialization expression is an aggregate, we do not
-            --  adjust after the assignment but, in either case, we do not
-            --  finalize before since the object is now uninitialized. Note
-            --  that Make_Tag_Ctrl_Assignment will also automatically insert
-            --  the tag assignment in the tagged case.
-
-            if Nkind (Unqualify (Init)) = N_Aggregate then
-               Set_No_Ctrl_Actions (Assign);
-            else
-               Set_No_Finalize_Actions (Assign);
-            end if;
-
-            --  Move initialization to freeze actions, once the object has
-            --  been frozen and the address clause alignment check has been
-            --  performed.
-
-            Append_Freeze_Action (E, Assign);
          end if;
       end if;
    end Check_Address_Clause;
@@ -4229,6 +4185,8 @@ package body Freeze is
       -------------------------------
 
       procedure Freeze_Object_Declaration (E : Entity_Id) is
+         Decl : constant Node_Id := Declaration_Node (E);
+
          procedure Check_Large_Modular_Array (Typ : Entity_Id);
          --  Check that the size of array type Typ can be computed without
          --  overflow, and generates a Storage_Error otherwise. This is only
@@ -4307,11 +4265,11 @@ package body Freeze is
                                   Make_Itype_Reference (Obj_Loc);
                   begin
                      Set_Itype (Ref_Node, Etype (E));
-                     Insert_Action (Declaration_Node (E), Ref_Node);
+                     Insert_Action (Decl, Ref_Node);
                   end;
                end if;
 
-               Insert_Action (Declaration_Node (E),
+               Insert_Action (Decl,
                  Make_Raise_Storage_Error (Obj_Loc,
                    Condition =>
                      Make_Op_Ge (Obj_Loc,
@@ -4494,45 +4452,63 @@ package body Freeze is
          --  checks to freeze time since pragma Import inhibits default
          --  initialization and thus pragma Import affects these checks.
 
-         Validate_Object_Declaration (Declaration_Node (E));
+         Validate_Object_Declaration (Decl);
 
-         --  If there is an address clause, check that it is valid and if need
-         --  be move initialization to the freeze node.
+         --  If there is an address clause, check that it is valid
 
          Check_Address_Clause (E);
 
-         --  Similar processing is needed for aspects that may affect object
-         --  layout, like Address, if there is an initialization expression.
-         --  We don't do this if there is a pragma Linker_Section, because it
-         --  would prevent the back end from statically initializing the
-         --  object; we don't want elaboration code in that case.
+         --  If the object has an address clause or a delayed aspect, remove
+         --  the side effects from initial expression, except in the case of
+         --  limited build-in-place calls and aggregates, which have their own
+         --  expansion elsewhere. This exception is necessary to avoid copying
+         --  limited objects.
 
-         if Has_Delayed_Aspects (E)
-           and then Expander_Active
-           and then Is_Array_Type (Typ)
-           and then Present (Expression (Declaration_Node (E)))
-           and then No (Linker_Section_Pragma (E))
+         if Expander_Active
+           and then
+             (Present (Address_Clause (E)) or else Has_Delayed_Aspects (E))
+           and then Present (Expression (Decl))
+           and then not No_Initialization (Decl)
+           and then not Is_Inherently_Limited_Type (Typ)
          then
             declare
-               Decl : constant Node_Id := Declaration_Node (E);
+               Init : constant Node_Id := Expression (Decl);
                Lhs  : constant Node_Id := New_Occurrence_Of (E, Loc);
+
+               Assign : Node_Id;
 
             begin
                --  Capture initialization value at point of declaration, and
                --  make explicit assignment legal, because object may be a
                --  constant.
 
-               Remove_Side_Effects (Expression (Decl));
+               Remove_Side_Effects (Init);
                Set_Assignment_OK (Lhs);
 
-               --  Move initialization to freeze actions
-
-               Append_Freeze_Action (E,
-                 Make_Assignment_Statement (Loc,
+               Assign :=
+                 Make_Assignment_Statement (Sloc (Decl),
                    Name       => Lhs,
-                   Expression => Expression (Decl)));
+                   Expression => Init);
 
                Set_No_Initialization (Decl);
+
+               --  If the initialization expression is an aggregate, we do not
+               --  adjust after the assignment but, in either case, we do not
+               --  finalize before since the object is now uninitialized. Note
+               --  that Make_Tag_Ctrl_Assignment will also automatically insert
+               --  the tag assignment in the tagged case.
+
+               if Nkind (Unqualify (Init)) = N_Aggregate then
+                  Set_No_Ctrl_Actions (Assign);
+               else
+                  Set_No_Finalize_Actions (Assign);
+               end if;
+
+               --  Move initialization to freeze actions, once the object has
+               --  been frozen and the address clause alignment check has been
+               --  performed.
+
+               Append_Freeze_Action (E, Assign);
             end;
          end if;
 
@@ -4574,8 +4550,7 @@ package body Freeze is
             null;
 
          elsif Has_Default_Initialization (E) then
-            Check_Restriction
-              (No_Default_Initialization, Declaration_Node (E));
+            Check_Restriction (No_Default_Initialization, Decl);
          end if;
 
          --  Ensure that a variable subject to pragma Thread_Local_Storage
@@ -6045,9 +6020,15 @@ package body Freeze is
                then
                   null;
                else
-                  Error_Msg_N
-                    ("Iterator_Element requires indexing aspect",
-                     Iterator_Aspect);
+                  if Get_Aspect_Id (Iterator_Aspect) = Aspect_Iterator_Element
+                  then
+                     Error_Msg_N ("Iterator_Element requires indexing aspect",
+                       Iterator_Aspect);
+
+                  else
+                     Error_Msg_N ("Default_Iterator requires indexing aspect",
+                       Iterator_Aspect);
+                  end if;
                end if;
             end if;
          end;
@@ -6470,9 +6451,11 @@ package body Freeze is
 
          goto Leave;
 
-      --  Do not freeze if we are preanalyzing without freezing
+      --  Do not freeze under strict preanalysis
 
-      elsif Inside_Preanalysis_Without_Freezing > 0 then
+      elsif Preanalysis_Active
+        and then not Within_Spec_Static_Expression (N)
+      then
          Result := No_List;
          goto Leave;
 
@@ -6685,6 +6668,36 @@ package body Freeze is
 
                Pop_Scope;
             end if;
+         end;
+      end if;
+
+      if Is_Derived_Type (E) and then Is_First_Subtype (E) then
+
+         --  If a derived type's parent type is not already frozen and has
+         --  delayed aspects, analyze the parent type's aspects at this point,
+         --  so that the following call to update the type's inherited aspects
+         --  will be effective.
+
+         if not Is_Frozen (Etype (E))
+           and then Has_Delayed_Aspects (Etype (E))
+         then
+            Analyze_Aspects_At_Freeze_Point (Etype (E));
+            Set_Has_Delayed_Aspects (Etype (E), False);
+         end if;
+
+         --  Identify the various subprograms associated with any inherited
+         --  nonoverridable aspects at this point rather than allowing them
+         --  to be resolved during analysis.
+
+         Inherit_Nonoverridable_Aspects (E, Etype (E));
+
+         declare
+            Iface : Node_Id := First (Abstract_Interface_List (E));
+         begin
+            while Present (Iface) loop
+               Inherit_Nonoverridable_Aspects (E, Entity (Iface));
+               Next (Iface);
+            end loop;
          end;
       end if;
 
@@ -8557,29 +8570,21 @@ package body Freeze is
 
       if Must_Not_Freeze (N) then
          return;
-      end if;
 
-      --  If expression is non-static, then it does not freeze in a default
-      --  expression, see section "Handling of Default Expressions" in the
-      --  spec of package Sem for further details. Note that we have to make
-      --  sure that we actually have a real expression (if we have a subtype
-      --  indication, we can't test Is_OK_Static_Expression). However, we
-      --  exclude the case of the prefix of an attribute of a static scalar
-      --  subtype from this early return, because static subtype attributes
-      --  should always cause freezing, even in default expressions, but
-      --  the attribute may not have been marked as static yet (because in
-      --  Resolve_Attribute, the call to Eval_Attribute follows the call of
-      --  Freeze_Expression on the prefix).
+      elsif Preanalysis_Active then
 
-      if In_Spec_Exp
-        and then Nkind (N) in N_Subexpr
-        and then not Is_OK_Static_Expression (N)
-        and then (Nkind (Parent (N)) /= N_Attribute_Reference
-                   or else not (Is_Entity_Name (N)
-                                 and then Is_Type (Entity (N))
-                                 and then Is_OK_Static_Subtype (Entity (N))))
-      then
-         return;
+         --  Do not freeze under strict preanalysis
+
+         if not In_Spec_Exp then
+            return;
+
+         --  If expression is non-static, then it does not freeze in a default
+         --  expression, see section "Handling of Default Expressions" in the
+         --  spec of package Sem for further details.
+
+         elsif not Within_Spec_Static_Expression (N) then
+            return;
+         end if;
       end if;
 
       --  Freeze type of expression if not frozen already
@@ -9388,10 +9393,10 @@ package body Freeze is
          Push_Scope (Def_Id);
          Install_Formals (Def_Id);
 
-         Preanalyze_Spec_Expression (Dup_Expr, Typ);
+         Preanalyze_And_Resolve (Dup_Expr, Typ);
          End_Scope;
       else
-         Preanalyze_Spec_Expression (Dup_Expr, Typ);
+         Preanalyze_And_Resolve (Dup_Expr, Typ);
       end if;
 
       --  Restore certain attributes of Def_Id since the preanalysis may

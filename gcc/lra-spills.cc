@@ -1,5 +1,5 @@
 /* Change pseudos by memory.
-   Copyright (C) 2010-2024 Free Software Foundation, Inc.
+   Copyright (C) 2010-2025 Free Software Foundation, Inc.
    Contributed by Vladimir Makarov <vmakarov@redhat.com>.
 
 This file is part of GCC.
@@ -594,8 +594,9 @@ lra_need_for_scratch_reg_p (void)
 bool
 lra_need_for_spills_p (void)
 {
-  int i; max_regno = max_reg_num ();
+  int i;
 
+  max_regno = max_reg_num ();
   for (i = FIRST_PSEUDO_REGISTER; i < max_regno; i++)
     if (lra_reg_info[i].nrefs != 0 && lra_get_regno_hard_regno (i) < 0
 	&& ! ira_former_scratch_p (i))

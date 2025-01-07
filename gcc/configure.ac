@@ -1,7 +1,7 @@
 # configure.ac for GCC
 # Process this file with autoconf to generate a configuration script.
 
-# Copyright (C) 1997-2024 Free Software Foundation, Inc.
+# Copyright (C) 1997-2025 Free Software Foundation, Inc.
 
 #This file is part of GCC.
 
@@ -463,12 +463,28 @@ ACX_PROG_GDC([-I"$srcdir"/d])
 # Do configure tests with the C++ compiler, since that's what we build with.
 AC_LANG(C++)
 
-# Remove the -O2: for historical reasons, unless bootstrapping we prefer
+# Remove all -O flags: for historical reasons, unless bootstrapping we prefer
 # optimizations to be activated explicitly by the toplevel.
 case "$CC" in
   */prev-gcc/xgcc*) ;;
-  *) CFLAGS=`echo "$CFLAGS " | sed -e "s/-Ofast[[ 	]]//" -e "s/-O[[gs]][[ 	]]//" -e "s/[[^,]]-O[[0-9]]*[[ 	]]//" `
-     CXXFLAGS=`echo "$CXXFLAGS " | sed -e "s/-Ofast[[ 	]]//" -e "s/-O[[gs]][[ 	]]//" -e "s/[[^,]]-O[[0-9]]*[[ 	]]//" ` ;;
+  *)
+    new_CFLAGS=
+    for flag in $CFLAGS; do
+      case $flag in
+	-O*) ;;
+	*) new_CFLAGS="$new_CFLAGS $flag" ;;
+      esac
+    done
+    CFLAGS=$new_CFLAGS
+    new_CXXFLAGS=
+    for flag in $CXXFLAGS; do
+      case $flag in
+	-O*) ;;
+	*) new_CXXFLAGS="$new_CXXFLAGS $flag" ;;
+      esac
+    done
+    CXXFLAGS=$new_CXXFLAGS
+    ;;
 esac
 AC_SUBST(CFLAGS)
 AC_SUBST(CXXFLAGS)
@@ -913,10 +929,10 @@ fi
 
 AC_SUBST(DEFAULT_MATCHPD_PARTITIONS)
 
-# Specify the number of splits of insn-emit.cc to generate.
+# Specify the number of splits of insn-emit.cc and insn-recog.cc to generate.
 AC_ARG_WITH(insnemit-partitions,
 [AS_HELP_STRING([--with-insnemit-partitions=num],
-[Set the number of partitions of insn-emit.cc for genemit to create. [default=10]])],
+[Set the number of partitions of insn-emit.cc for genemit and genrecog to create. [default=10]])],
 [DEFAULT_INSNEMIT_PARTITIONS="$with_insnemit_partitions"], [DEFAULT_INSNEMIT_PARTITIONS=10])
 if (test $DEFAULT_INSNEMIT_PARTITIONS -lt 1); then
   AC_MSG_ERROR(m4_normalize([
@@ -1202,7 +1218,7 @@ if test "x$enable_offload_defaulted" = xyes; then
 fi
 
 AC_ARG_WITH(multilib-list,
-[AS_HELP_STRING([--with-multilib-list], [select multilibs (AArch64, ARM, AVR, OR1K, RISC-V, SH and x86-64 only)])],
+[AS_HELP_STRING([--with-multilib-list], [select multilibs (AArch64, ARM, AVR, nvptx, OR1K, RISC-V, SH and x86-64 only)])],
 :,
 with_multilib_list=default)
 
@@ -1636,7 +1652,7 @@ AC_CHECK_DECLS([basename(const char*), strstr(const char*,const char*)], , ,[
 #include "system.h"])
 
 gcc_AC_CHECK_DECLS(getenv atol atoll asprintf sbrk abort atof getcwd getwd \
-	madvise stpcpy strnlen strsignal strverscmp \
+	madvise mkstemps stpcpy strnlen strsignal strverscmp \
 	strtol strtoul strtoll strtoull setenv unsetenv \
 	errno snprintf vsnprintf vasprintf malloc realloc calloc \
 	free getopt clock getpagesize ffs fmemopen gcc_UNLOCKED_FUNCS, , ,[

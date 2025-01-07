@@ -1,5 +1,5 @@
 /* Definitions for the ubiquitous 'tree' type for GNU compilers.
-   Copyright (C) 1989-2024 Free Software Foundation, Inc.
+   Copyright (C) 1989-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -1172,6 +1172,10 @@ extern void omp_clause_range_check_failed (const_tree, const char *, int,
   (RAW_DATA_CST_CHECK (NODE)->raw_data_cst.str)
 #define RAW_DATA_OWNER(NODE) \
   (RAW_DATA_CST_CHECK (NODE)->raw_data_cst.owner)
+#define RAW_DATA_UCHAR_ELT(NODE, I) \
+  (((const unsigned char *) RAW_DATA_POINTER (NODE))[I])
+#define RAW_DATA_SCHAR_ELT(NODE, I) \
+  (((const signed char *) RAW_DATA_POINTER (NODE))[I])
 
 /* In a COMPLEX_CST node.  */
 #define TREE_REALPART(NODE) (COMPLEX_CST_CHECK (NODE)->complex.real)
@@ -1368,10 +1372,6 @@ class auto_suppress_location_wrappers
   auto_suppress_location_wrappers () { ++suppress_location_wrappers; }
   ~auto_suppress_location_wrappers () { --suppress_location_wrappers; }
 };
-
-/* COND_EXPR identificer/discriminator accessors.  */
-#define SET_EXPR_UID(t, v) EXPR_CHECK ((t))->exp.condition_uid = (v)
-#define EXPR_COND_UID(t) EXPR_CHECK ((t))->exp.condition_uid
 
 /* In a TARGET_EXPR node.  */
 #define TARGET_EXPR_SLOT(NODE) TREE_OPERAND_CHECK_CODE (NODE, TARGET_EXPR, 0)

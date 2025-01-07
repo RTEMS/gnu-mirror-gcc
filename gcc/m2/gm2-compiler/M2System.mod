@@ -1,6 +1,6 @@
 (* M2System.mod defines the SYSTEM builtin types.
 
-Copyright (C) 2001-2024 Free Software Foundation, Inc.
+Copyright (C) 2001-2025 Free Software Foundation, Inc.
 Contributed by Gaius Mulley <gaius.mulley@southwales.ac.uk>.
 
 This file is part of GNU Modula-2.
@@ -86,7 +86,8 @@ FROM m2type IMPORT GetMaxFrom, GetMinFrom,
                    GetM2Real32, GetM2Real64, GetM2Real96, GetM2Real128,
                    GetM2Complex32, GetM2Complex64, GetM2Complex96, GetM2Complex128,
                    GetBitsetType, GetISOByteType, GetISOWordType,
-		   GetCSizeTType, GetCSSizeTType, InitSystemTypes ;
+		   GetCSizeTType, GetCSSizeTType, GetCOffTType,
+                   InitSystemTypes ;
 
 FROM m2expr IMPORT BuildSize, GetSizeOf, AreConstantsEqual ;
 
@@ -327,7 +328,8 @@ END InitISOTypes ;
 PROCEDURE MakeExtraSystemTypes ;
 BEGIN
    CSizeT  := CreateType ('CSIZE_T' , '', '', TRUE, GetCSizeTType ()) ;
-   CSSizeT := CreateType ('CSSIZE_T', '', '', TRUE, GetCSSizeTType ())
+   CSSizeT := CreateType ('CSSIZE_T', '', '', TRUE, GetCSSizeTType ()) ;
+   COffT := CreateType ('COFF_T', '', '', TRUE, GetCOffTType ()) ;
 END MakeExtraSystemTypes ;
 
 

@@ -2,7 +2,7 @@
    This file is consumed by genmatch which produces gimple-match.cc
    and generic-match.cc from it.
 
-   Copyright (C) 2014-2024 Free Software Foundation, Inc.
+   Copyright (C) 2014-2025 Free Software Foundation, Inc.
    Contributed by Richard Biener <rguenther@suse.de>
    and Prathamesh Kulkarni  <bilbotheelffriend@gmail.com>
 
@@ -1472,6 +1472,22 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
  (bit_and:c @0 (bit_not (bit_xor:c @0 @1)))
  (bit_and @0 @1))
 
+/* Transform:
+   (a - 1) & -a ->  0.
+   (a - 1) | -a -> -1.
+   (a - 1) ^ -a -> -1.  */
+(for bit_op (bit_ior bit_xor bit_and)
+ (simplify
+  (bit_op:c (plus @0 integer_minus_onep) (negate @0))
+  (if (bit_op == BIT_AND_EXPR)
+    { build_zero_cst (type); }
+    { build_minus_one_cst (type); }))
+ (simplify
+  (bit_op:c (minus @0 integer_onep) (negate @0))
+  (if (bit_op == BIT_AND_EXPR)
+    { build_zero_cst (type); }
+    { build_minus_one_cst (type); })))
+
 /* a & (a == b)  -->  a & b (boolean version of the above). */
 (simplify
  (bit_and:c @0 (nop_convert? (eq:c @0 @1)))
@@ -2481,7 +2497,7 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 (for first_op (bit_xor eq)
      second_op (eq bit_xor)
  (simplify
-  (first_op:c (bit_and:c truth_valued_p@0 truth_valued_p@1) (second_op:c @0 @1))
+  (first_op:c (bit_and:c truth_valued_p@0 truth_valued_p@1) (second_op @0 @1))
     (bit_not (bit_ior @0 @1))))
 
 /* Convert ~ (A - 1) or ~ (A + -1) to -A.  */
@@ -3146,30 +3162,30 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
  (match (unsigned_integer_sat_add @0 @1)
   /* SUM = ADD_OVERFLOW (X, Y)
      SAT_U_ADD = REALPART (SUM) | -IMAGPART (SUM)   */
-  (bit_ior:c (realpart (IFN_ADD_OVERFLOW:c@2 @0 @1)) (negate (imagpart @2)))
+  (bit_ior:c (realpart (IFN_ADD_OVERFLOW@2 @0 @1)) (negate (imagpart @2)))
   (if (types_match (type, @0, @1))))
  (match (unsigned_integer_sat_add @0 @1)
   /* SUM = ADD_OVERFLOW (X, Y)
      SAT_U_ADD = REALPART (SUM) | -(IMAGPART (SUM) != 0)   */
-  (bit_ior:c (realpart (IFN_ADD_OVERFLOW:c@2 @0 @1))
+  (bit_ior:c (realpart (IFN_ADD_OVERFLOW@2 @0 @1))
 	     (negate (convert (ne (imagpart @2) integer_zerop))))
   (if (types_match (type, @0, @1))))
  (match (unsigned_integer_sat_add @0 @1)
   /* SUM = ADD_OVERFLOW (X, Y)
      SAT_U_ADD = IMAGPART (SUM) == 0 ? REALPART (SUM) : -1   */
-  (cond^ (eq (imagpart (IFN_ADD_OVERFLOW:c@2 @0 @1)) integer_zerop)
+  (cond^ (eq (imagpart (IFN_ADD_OVERFLOW@2 @0 @1)) integer_zerop)
 	 (realpart @2) integer_minus_onep)
   (if (types_match (type, @0, @1))))
  (match (unsigned_integer_sat_add @0 @1)
   /* SUM = ADD_OVERFLOW (X, Y)
      SAT_U_ADD = IMAGPART (SUM) != 0 ? -1 : REALPART (SUM)  */
-  (cond^ (ne (imagpart (IFN_ADD_OVERFLOW:c@2 @0 @1)) integer_zerop)
+  (cond^ (ne (imagpart (IFN_ADD_OVERFLOW@2 @0 @1)) integer_zerop)
 	 integer_minus_onep (realpart @2))
   (if (types_match (type, @0, @1))))
  (match (unsigned_integer_sat_add @0 @1)
   /* SUM = ADD_OVERFLOW (X, IMM)
      SAT_U_ADD = IMAGPART (SUM) != 0 ? -1 : REALPART (SUM)  */
-  (cond^ (ne (imagpart (IFN_ADD_OVERFLOW:c@2 @0 INTEGER_CST@1)) integer_zerop)
+  (cond^ (ne (imagpart (IFN_ADD_OVERFLOW@2 @0 INTEGER_CST@1)) integer_zerop)
 	 integer_minus_onep (realpart @2))
   (if (types_match (type, @0) && int_fits_type_p (@1, type)))))
 
@@ -3262,90 +3278,118 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
     }
     (if (wi::eq_p (sum, wi::uhwi (0, precision))))))))
 
-/* Signed saturation add, case 1:
-   T sum = (T)((UT)X + (UT)Y)
-   SAT_S_ADD = (X ^ sum) & !(X ^ Y) < 0 ? (-(T)(X < 0) ^ MAX) : sum;
+(if (INTEGRAL_TYPE_P (type) && TYPE_UNSIGNED (type))
+ (match (unsigned_integer_sat_trunc @0)
+  /* SAT_U_TRUNC = (NT)x | (NT)(-(X > (WT)(NT)(-1)))  */
+  (bit_ior:c (negate (convert (gt @0 INTEGER_CST@1))) (convert @0))
+  (if (TYPE_UNSIGNED (TREE_TYPE (@0)))
+   (with
+    {
+     unsigned itype_precision = TYPE_PRECISION (TREE_TYPE (@0));
+     unsigned otype_precision = TYPE_PRECISION (type);
+     wide_int trunc_max = wi::mask (otype_precision, false, itype_precision);
+     wide_int int_cst = wi::to_wide (@1, itype_precision);
+    }
+    (if (otype_precision < itype_precision && wi::eq_p (trunc_max, int_cst))))))
+ (match (unsigned_integer_sat_trunc @0)
+  /* SAT_U_TRUNC = (NT)(MIN_EXPR (X, IMM))
+     If Op_0 def is MIN_EXPR and not single_use.  Aka below pattern:
 
-   The T and UT are type pair like T=int8_t, UT=uint8_t.  */
-(match (signed_integer_sat_add @0 @1)
- (cond^ (lt (bit_and:c (bit_xor:c @0 (nop_convert@2 (plus (nop_convert @0)
-							  (nop_convert @1))))
-		       (bit_not (bit_xor:c @0 @1)))
-	    integer_zerop)
-	(bit_xor:c (negate (convert (lt @0 integer_zerop))) max_value)
-	@2)
- (if (INTEGRAL_TYPE_P (type) && !TYPE_UNSIGNED (type))))
+     _18 = MIN_EXPR <left_8, 4294967295>; // op_0 def
+     iftmp.0_11 = (unsigned int) _18;     // op_0
+     stream.avail_out = iftmp.0_11;
+     left_37 = left_8 - _18;              // op_0 use
 
-/* Signed saturation add, case 2:
-   T sum = (T)((UT)X + (UT)Y)
-   SAT_S_ADD = (X ^ sum) & !(X ^ Y) >= 0 ? sum : (-(T)(X < 0) ^ MAX);
+     Transfer to .SAT_TRUNC will have MIN_EXPR still live.  Then the backend
+     (for example x86/riscv) will have 2-3 more insns generation for .SAT_TRUNC
+     besides the MIN_EXPR.  Thus,  keep the normal truncation as is should be
+     the better choose.  */
+  (convert (min@2 @0 INTEGER_CST@1))
+  (if (TYPE_UNSIGNED (TREE_TYPE (@0)) && single_use (@2))
+   (with
+    {
+     unsigned itype_precision = TYPE_PRECISION (TREE_TYPE (@0));
+     unsigned otype_precision = TYPE_PRECISION (type);
+     wide_int trunc_max = wi::mask (otype_precision, false, itype_precision);
+     wide_int int_cst = wi::to_wide (@1, itype_precision);
+    }
+    (if (otype_precision < itype_precision && wi::eq_p (trunc_max, int_cst))))))
+ (match (unsigned_integer_sat_trunc @0)
+  /* SAT_U_TRUNC = (NT)X | ((NT)(X <= (WT)-1) + (NT)-1)  */
+  (bit_ior:c (plus:c (convert (le @0 INTEGER_CST@1)) INTEGER_CST@2)
+	     (convert @0))
+  (if (TYPE_UNSIGNED (TREE_TYPE (@0)))
+   (with
+    {
+     unsigned itype_precision = TYPE_PRECISION (TREE_TYPE (@0));
+     unsigned otype_precision = TYPE_PRECISION (type);
+     wide_int trunc_max = wi::mask (otype_precision, false, itype_precision);
+     wide_int max = wi::mask (otype_precision, false, otype_precision);
+     wide_int int_cst_1 = wi::to_wide (@1);
+     wide_int int_cst_2 = wi::to_wide (@2);
+    }
+    (if (wi::eq_p (trunc_max, int_cst_1) && wi::eq_p (max, int_cst_2)))))))
 
-   The T and UT are type pair like T=int8_t, UT=uint8_t.  */
-(match (signed_integer_sat_add @0 @1)
- (cond^ (ge (bit_and:c (bit_xor @0 (nop_convert@2 (plus (nop_convert @0)
-							(nop_convert @1))))
-		       (bit_not (bit_xor:c @0 @1)))
-	    integer_zerop)
-	@2
-	(bit_xor:c (negate (convert (lt @0 integer_zerop))) max_value))
- (if (INTEGRAL_TYPE_P (type) && !TYPE_UNSIGNED (type))))
-
-/* Signed saturation add, case 3:
-   T sum = (T)((UT)X + (UT)Y)
-   SAT_S_ADD = (X ^ Y) < 0 && (X ^ sum) >= 0 ? (-(T)(X < 0) ^ MAX) : sum;
-
-   The T and UT are type pair like T=int8_t, UT=uint8_t.  */
-(match (signed_integer_sat_add @0 @1)
- (cond^ (bit_and:c (lt (bit_xor @0 (nop_convert@2 (plus (nop_convert @0)
-							(nop_convert @1))))
-		       integer_zerop)
-		   (ge (bit_xor:c @0 @1) integer_zerop))
-	(bit_xor:c (nop_convert (negate (nop_convert (convert
-						      (lt @0 integer_zerop)))))
-		   max_value)
-	@2)
- (if (INTEGRAL_TYPE_P (type) && !TYPE_UNSIGNED (type))))
-
-/* Signed saturation add, case 4:
-   Z = .ADD_OVERFLOW (X, Y)
-   SAT_S_ADD = IMAGPART_EXPR (Z) != 0 ? (-(T)(X < 0) ^ MAX) : sum;  */
-(match (signed_integer_sat_add @0 @1)
- (cond^ (ne (imagpart (IFN_ADD_OVERFLOW:c@2 @0 @1)) integer_zerop)
-	(bit_xor:c (nop_convert?
-		    (negate (nop_convert? (convert (lt @0 integer_zerop)))))
-		   max_value)
-	(realpart @2))
- (if (INTEGRAL_TYPE_P (type) && !TYPE_UNSIGNED (type)
-      && types_match (type, @0, @1))))
-
-/* Signed saturation add, case 5:
-   T sum = (T)((UT)X + (UT)Y);
-   SAT_S_ADD = (X ^ sum) < 0 & ~((X ^ Y) < 0) ? (-(T)(X < 0) ^ MAX) : sum;
-
-   The T and UT are type pair like T=int8_t, UT=uint8_t.  */
-(match (signed_integer_sat_add @0 @1)
- (cond^ (bit_and:c (lt (bit_xor @0 (nop_convert@2 (plus (nop_convert @0)
+(if (INTEGRAL_TYPE_P (type) && !TYPE_UNSIGNED (type))
+ (match (signed_integer_sat_add @0 @1)
+  /* T SUM = (T)((UT)X + (UT)Y)
+     SAT_S_ADD = (X ^ SUM) & !(X ^ Y) < 0 ? (-(T)(X < 0) ^ MAX) : SUM  */
+  (cond^ (lt (bit_and:c (bit_xor:c @0 (nop_convert@2 (plus (nop_convert @0)
+							   (nop_convert @1))))
+			(bit_not (bit_xor:c @0 @1)))
+	     integer_zerop)
+	 (bit_xor:c (negate (convert (lt @0 integer_zerop))) max_value)
+	 @2))
+ (match (signed_integer_sat_add @0 @1)
+  /* T SUM = (T)((UT)X + (UT)Y)
+     SAT_S_ADD = (X ^ SUM) & !(X ^ Y) >= 0 ? SUM : (-(T)(X < 0) ^ MAX)  */
+  (cond^ (ge (bit_and:c (bit_xor @0 (nop_convert@2 (plus (nop_convert @0)
 							 (nop_convert @1))))
-		       integer_zerop)
-		   (bit_not (lt (bit_xor:c @0 @1) integer_zerop)))
-	(bit_xor:c (nop_convert (negate (nop_convert (convert
+			(bit_not (bit_xor:c @0 @1)))
+	     integer_zerop)
+	 @2
+	 (bit_xor:c (negate (convert (lt @0 integer_zerop))) max_value)))
+ (match (signed_integer_sat_add @0 @1)
+  /* T SUM = (T)((UT)X + (UT)Y)
+     SAT_S_ADD = (X ^ Y) < 0 && (X ^ SUM) >= 0 ? (-(T)(X < 0) ^ MAX) : SUM  */
+  (cond^ (bit_and:c (lt (bit_xor @0 (nop_convert@2 (plus (nop_convert @0)
+							 (nop_convert @1))))
+			integer_zerop)
+		    (ge (bit_xor:c @0 @1) integer_zerop))
+	 (bit_xor:c (nop_convert (negate (nop_convert (convert
 						      (lt @0 integer_zerop)))))
-		   max_value)
-	@2)
- (if (INTEGRAL_TYPE_P (type) && !TYPE_UNSIGNED (type))))
-
-/* Signed saturation add, case 6 (one op is imm):
-   T sum = (T)((UT)X + (UT)IMM);
-   SAT_S_ADD = (X ^ IMM) < 0 ? sum : (X ^ sum) >= 0 ? sum : (x < 0) ? MIN : MAX;
-   The T and UT are type pair like T=int8_t, UT=uint8_t.  */
-
-(match (signed_integer_sat_add @0 @1)
-(cond^ (lt (bit_and:c (bit_xor:c @0 (nop_convert@2 (plus (nop_convert @0)
-		       INTEGER_CST@1)))
-		       (bit_xor:c @0 INTEGER_CST@3)) integer_zerop)
-       (bit_xor:c (negate (convert (lt @0 integer_zerop))) max_value) @2)
-(if (INTEGRAL_TYPE_P (type) && !TYPE_UNSIGNED (type)
-     && wi::bit_and (wi::to_wide (@1), wi::to_wide (@3)) == 0)))
+		    max_value)
+	 @2))
+ (match (signed_integer_sat_add @0 @1)
+   /* SUM = .ADD_OVERFLOW (X, Y)
+      SAT_S_ADD = IMAGPART_EXPR (SUM) != 0 ? (-(T)(X < 0) ^ MAX) : SUM  */
+  (cond^ (ne (imagpart (IFN_ADD_OVERFLOW:c@2 @0 @1)) integer_zerop)
+	 (bit_xor:c (nop_convert?
+		     (negate (nop_convert? (convert (lt @0 integer_zerop)))))
+		    max_value)
+	 (realpart @2)))
+ (match (signed_integer_sat_add @0 @1)
+  /* T SUM = (T)((UT)X + (UT)Y)
+     SAT_S_ADD = (X ^ SUM) < 0 & ~((X ^ Y) < 0) ? (-(T)(X < 0) ^ MAX) : SUM  */
+  (cond^ (bit_and:c (lt (bit_xor @0 (nop_convert@2 (plus (nop_convert @0)
+							 (nop_convert @1))))
+			integer_zerop)
+		    (bit_not (lt (bit_xor:c @0 @1) integer_zerop)))
+	 (bit_xor:c (nop_convert (negate (nop_convert (convert
+						       (lt @0 integer_zerop)))))
+		    max_value)
+	 @2))
+ (match (signed_integer_sat_add @0 @1)
+  /* T SUM = (T)((UT)X + (UT)IMM);
+     SAT_S_ADD = (X ^ IMM) < 0 ? SUM : (X ^ SUM) >= 0 ? SUM
+						      : (x < 0) ? MIN : MAX  */
+  (cond^ (lt (bit_and:c (bit_xor:c @0 (nop_convert@2 (plus (nop_convert @0)
+							   INTEGER_CST@1)))
+			(bit_xor:c @0 INTEGER_CST@3)) integer_zerop)
+	 (bit_xor:c (negate (convert (lt @0 integer_zerop))) max_value)
+	 @2)
+  (if (wi::bit_and (wi::to_wide (@1), wi::to_wide (@3)) == 0)))
+)
 
 /* The boundary condition for case 10: IMM = 1:
    SAT_U_SUB = X >= IMM ? (X - IMM) : 0.
@@ -3415,66 +3459,6 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 		   max_value)
 	@2)
  (if (INTEGRAL_TYPE_P (type) && !TYPE_UNSIGNED (type))))
-
-/* Unsigned saturation truncate, case 1, sizeof (WT) > sizeof (NT).
-   SAT_U_TRUNC = (NT)x | (NT)(-(X > (WT)(NT)(-1))).  */
-(match (unsigned_integer_sat_trunc @0)
- (bit_ior:c (negate (convert (gt @0 INTEGER_CST@1)))
-   (convert @0))
- (if (INTEGRAL_TYPE_P (type) && TYPE_UNSIGNED (type)
-      && TYPE_UNSIGNED (TREE_TYPE (@0)))
- (with
-  {
-   unsigned itype_precision = TYPE_PRECISION (TREE_TYPE (@0));
-   unsigned otype_precision = TYPE_PRECISION (type);
-   wide_int trunc_max = wi::mask (otype_precision, false, itype_precision);
-   wide_int int_cst = wi::to_wide (@1, itype_precision);
-  }
-  (if (otype_precision < itype_precision && wi::eq_p (trunc_max, int_cst))))))
-
-/* Unsigned saturation truncate, case 2, sizeof (WT) > sizeof (NT).
-   SAT_U_TRUNC = (NT)(MIN_EXPR (X, 255)).  */
-/* If Op_0 def is MIN_EXPR and not single_use.  Aka below pattern:
-
-     _18 = MIN_EXPR <left_8, 4294967295>; // op_0 def
-     iftmp.0_11 = (unsigned int) _18;     // op_0
-     stream.avail_out = iftmp.0_11;
-     left_37 = left_8 - _18;              // op_0 use
-
-   Transfer to .SAT_TRUNC will have MIN_EXPR still live.  Then the backend
-   (for example x86/riscv) will have 2-3 more insns generation for .SAT_TRUNC
-   besides the MIN_EXPR.  Thus,  keep the normal truncation as is should be
-   the better choose.  */
-(match (unsigned_integer_sat_trunc @0)
- (convert (min@2 @0 INTEGER_CST@1))
- (if (INTEGRAL_TYPE_P (type) && TYPE_UNSIGNED (type)
-      && TYPE_UNSIGNED (TREE_TYPE (@0)) && single_use (@2))
- (with
-  {
-   unsigned itype_precision = TYPE_PRECISION (TREE_TYPE (@0));
-   unsigned otype_precision = TYPE_PRECISION (type);
-   wide_int trunc_max = wi::mask (otype_precision, false, itype_precision);
-   wide_int int_cst = wi::to_wide (@1, itype_precision);
-  }
-  (if (otype_precision < itype_precision && wi::eq_p (trunc_max, int_cst))))))
-
-/* Unsigned saturation truncate, case 3, sizeof (WT) > sizeof (NT).
-   SAT_U_TRUNC = (NT)X | ((NT)(X <= (WT)-1) + (NT)-1).  */
-(match (unsigned_integer_sat_trunc @0)
- (bit_ior:c (plus:c (convert (le @0 INTEGER_CST@1)) INTEGER_CST@2)
-	    (convert @0))
- (if (INTEGRAL_TYPE_P (type) && TYPE_UNSIGNED (type)
-      && TYPE_UNSIGNED (TREE_TYPE (@0)))
- (with
-  {
-   unsigned itype_precision = TYPE_PRECISION (TREE_TYPE (@0));
-   unsigned otype_precision = TYPE_PRECISION (type);
-   wide_int trunc_max = wi::mask (otype_precision, false, itype_precision);
-   wide_int max = wi::mask (otype_precision, false, otype_precision);
-   wide_int int_cst_1 = wi::to_wide (@1);
-   wide_int int_cst_2 = wi::to_wide (@2);
-  }
-  (if (wi::eq_p (trunc_max, int_cst_1) && wi::eq_p (max, int_cst_2))))))
 
 /* Signed saturation truncate, case 1 and case 2, sizeof (WT) > sizeof (NT).
    SAT_S_TRUNC(X) = (unsigned)X + NT_MAX + 1  > Unsigned_MAX ? (NT)X.  */
@@ -3849,7 +3833,7 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
       cmp2 (gt eq ne ge eq ne)
       rcmp (ne le gt ne lt ge)
   (simplify
-   (op:c (cmp1:c @0 @1) (cmp2:c @0 @1))
+   (op:c (cmp1:c @0 @1) (cmp2 @0 @1))
    (if (INTEGRAL_TYPE_P (TREE_TYPE (@0)) || POINTER_TYPE_P (TREE_TYPE (@0)))
     (rcmp @0 @1)))))
 
@@ -3858,7 +3842,7 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
      cmp2 (gt eq ne ge eq ne)
      rcmp (eq gt le eq ge lt)
  (simplify
-  (eq:c (cmp1:c @0 @1) (cmp2:c @0 @1))
+  (eq:c (cmp1:c @0 @1) (cmp2 @0 @1))
   (if (INTEGRAL_TYPE_P (TREE_TYPE (@0)) || POINTER_TYPE_P (TREE_TYPE (@0)))
     (rcmp @0 @1))))
 
@@ -3887,7 +3871,7 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 	  (bit_xor:c @0 @1)
 	  tree_expr_nonzero_p@2)
 	@3)
-      (ne:c@4 @0 @1))
+      (ne@4 @0 @1))
     (bit_ior
       (cmp
 	{ build_zero_cst (TREE_TYPE (@0)); }
@@ -3901,7 +3885,7 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
       (cmp:c
 	(bit_xor:c @0 @1)
 	@2)
-      (ne:c@3 @0 @1))
+      (ne@3 @0 @1))
     (bit_ior
       (cmp
 	{ build_zero_cst (TREE_TYPE (@0)); }
@@ -5988,7 +5972,7 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 (for cnd (cond vec_cond)
  (for eqne (eq ne)
   (simplify
-   (eqne:c (cnd @0 @1 @2) (cnd @3 @1 @2))
+   (eqne (cnd @0 @1 @2) (cnd @3 @1 @2))
     (if (!HONOR_NANS (@1)
 	 && types_match (TREE_TYPE (@0), TREE_TYPE (@3))
          && types_match (type, TREE_TYPE (@0)))
@@ -5996,7 +5980,7 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
       { constant_boolean_node (eqne == NE_EXPR, type); }
       { constant_boolean_node (eqne != NE_EXPR, type); })))
   (simplify
-   (eqne:c (cnd @0 @1 @2) (cnd @3 @2 @1))
+   (eqne (cnd @0 @1 @2) (cnd @3 @2 @1))
     (if (!HONOR_NANS (@1)
 	 && types_match (TREE_TYPE (@0), TREE_TYPE (@3))
          && types_match (type, TREE_TYPE (@0)))
@@ -6448,7 +6432,7 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
   @2)
  /* (a != b) ? (a ^ b) : 0 -> (a ^ b) */
  (simplify
-  (cnd (ne:c @0 @1) (bit_xor:c@2 @0 @1) integer_zerop)
+  (cnd (ne:c @0 @1) (bit_xor@2 @0 @1) integer_zerop)
   @2)
  /* (a != b) ? (a & b) : a -> (a & b) */
  /* (a != b) ? (a | b) : a -> (a | b) */
@@ -9644,13 +9628,17 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
       cmp (lt ge)
   (simplify
    (op (clz:s@2 @0) INTEGER_CST@1)
-   (if (integer_zerop (@1) && single_use (@2))
-    /* clz(X) == 0 is (int)X < 0 and clz(X) != 0 is (int)X >= 0.  */
-    (with { tree stype = signed_type_for (TREE_TYPE (@0)); }
-     (cmp (convert:stype @0) { build_zero_cst (stype); }))
-    /* clz(X) == (prec-1) is X == 1 and clz(X) != (prec-1) is X != 1.  */
-    (if (wi::to_wide (@1) == TYPE_PRECISION (TREE_TYPE (@0)) - 1)
-     (op @0 { build_one_cst (TREE_TYPE (@0)); }))))))
+   (if (!sanitize_flags_p (SANITIZE_BUILTIN)
+	/* For -fsanitize=builtin give ubsan pass a chance
+	   to instrument it first.  */
+	|| (cfun && (cfun->curr_properties & PROP_ssa) != 0))
+    (if (integer_zerop (@1) && single_use (@2))
+     /* clz(X) == 0 is (int)X < 0 and clz(X) != 0 is (int)X >= 0.  */
+     (with { tree stype = signed_type_for (TREE_TYPE (@0)); }
+      (cmp (convert:stype @0) { build_zero_cst (stype); }))
+     /* clz(X) == (prec-1) is X == 1 and clz(X) != (prec-1) is X != 1.  */
+     (if (wi::to_wide (@1) == TYPE_PRECISION (TREE_TYPE (@0)) - 1)
+      (op @0 { build_one_cst (TREE_TYPE (@0)); })))))))
 (for op (eq ne)
      cmp (lt ge)
  (simplify
@@ -9690,7 +9678,13 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
    (op (ctz:s @0) INTEGER_CST@1)
     (with { bool ok = true;
 	    HOST_WIDE_INT val = 0;
-	    if (!tree_fits_shwi_p (@1))
+	    if (sanitize_flags_p (SANITIZE_BUILTIN)
+		/* For -fsanitize=builtin give ubsan pass a chance
+		   to instrument it first.  */
+		&& (!cfun
+		    || (cfun->curr_properties & PROP_ssa) == 0))
+	      ok = false;
+	    else if (!tree_fits_shwi_p (@1))
 	      ok = false;
 	    else
 	      {
@@ -9721,8 +9715,15 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
    (op (ctz:s @0) INTEGER_CST@1)
     (with { tree type0 = TREE_TYPE (@0);
 	    int prec = TYPE_PRECISION (type0);
+	    bool ok = true;
+	    if (sanitize_flags_p (SANITIZE_BUILTIN)
+		/* For -fsanitize=builtin give ubsan pass a chance
+		   to instrument it first.  */
+		&& (!cfun
+		    || (cfun->curr_properties & PROP_ssa) == 0))
+	      ok = false;
 	  }
-     (if (prec <= MAX_FIXED_MODE_SIZE)
+     (if (ok && prec <= MAX_FIXED_MODE_SIZE)
       (if (tree_int_cst_sgn (@1) < 0 || wi::to_widest (@1) >= prec)
        { constant_boolean_node (op == EQ_EXPR ? false : true, type); }
        (op (bit_and @0 { wide_int_to_tree (type0,
@@ -9823,7 +9824,13 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 	       else if (TYPE_PRECISION (type0)
 			== TYPE_PRECISION (long_long_unsigned_type_node))
 		 cfn = CFN_BUILT_IN_CTZLL;
-	     } }
+	     }
+	   if (sanitize_flags_p (SANITIZE_BUILTIN)
+	       /* For -fsanitize=builtin give ubsan pass a chance
+		  to instrument it first.  */
+	       && (!cfun
+		   || (cfun->curr_properties & PROP_ssa) == 0))
+	    cfn = CFN_LAST; }
     (if (cfn == CFN_CTZ)
      (IFN_CTZ (convert:type0 @0))
      (if (cfn == CFN_BUILT_IN_CTZ)

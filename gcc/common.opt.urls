@@ -223,6 +223,9 @@ UrlSuffix(gcc/Warning-Options.html#index-Wno-suggest-attribute_003dnoreturn)
 Wsuggest-attribute=malloc
 UrlSuffix(gcc/Warning-Options.html#index-Wno-suggest-attribute_003dmalloc)
 
+Wsuggest-attribute=returns_nonnull
+UrlSuffix(gcc/Warning-Options.html#index-Wno-suggest-attribute_003dreturns_005fnonnull)
+
 Wsuggest-final-types
 UrlSuffix(gcc/C_002b_002b-Dialect-Options.html#index-Wno-suggest-final-types)
 
@@ -234,6 +237,9 @@ UrlSuffix(gcc/Warning-Options.html#index-Wno-switch-unreachable)
 
 Wsystem-headers
 UrlSuffix(gcc/Warning-Options.html#index-Wno-system-headers)
+
+Wtautological-compare
+UrlSuffix(gcc/Warning-Options.html#index-Wno-tautological-compare)
 
 Wtrampolines
 UrlSuffix(gcc/Warning-Options.html#index-Wno-trampolines)
@@ -721,9 +727,6 @@ UrlSuffix(gcc/Optimize-Options.html#index-fgraphite-identity)
 fhoist-adjacent-loads
 UrlSuffix(gcc/Optimize-Options.html#index-fhoist-adjacent-loads)
 
-flarge-source-files
-UrlSuffix(gcc/Preprocessor-Options.html#index-flarge-source-files)
-
 flate-combine-instructions
 UrlSuffix(gcc/Optimize-Options.html#index-flate-combine-instructions)
 
@@ -1002,19 +1005,19 @@ fnon-call-exceptions
 UrlSuffix(gcc/Code-Gen-Options.html#index-fnon-call-exceptions)
 
 foffload=
-UrlSuffix(gcc/C-Dialect-Options.html#index-foffload)
+UrlSuffix(gcc/OpenMP-and-OpenACC-Options.html#index-foffload)
 
 foffload-options=
-UrlSuffix(gcc/C-Dialect-Options.html#index-foffload-options)
+UrlSuffix(gcc/OpenMP-and-OpenACC-Options.html#index-foffload-options)
 
 fomit-frame-pointer
 UrlSuffix(gcc/Optimize-Options.html#index-fomit-frame-pointer)
 
 fopenmp-target-simd-clone
-UrlSuffix(gcc/C-Dialect-Options.html#index-fopenmp-target-simd-clone)
+UrlSuffix(gcc/OpenMP-and-OpenACC-Options.html#index-fopenmp-target-simd-clone)
 
 fopenmp-target-simd-clone=
-UrlSuffix(gcc/C-Dialect-Options.html#index-fopenmp-target-simd-clone)
+UrlSuffix(gcc/OpenMP-and-OpenACC-Options.html#index-fopenmp-target-simd-clone)
 
 fopt-info
 UrlSuffix(gcc/Developer-Options.html#index-fopt-info)

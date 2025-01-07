@@ -1,3 +1,67 @@
+2025-01-03  Jakub Jelinek  <jakub@redhat.com>
+
+	* configure: Regenerate.
+
+2025-01-03  Paul-Antoine Arras  <parras@baylibre.com>
+
+	* libgomp.texi:
+
+2025-01-02  Paul-Antoine Arras  <parras@baylibre.com>
+
+	* testsuite/libgomp.fortran/declare-variant-2-aux.f90: New test.
+	* testsuite/libgomp.fortran/declare-variant-2.f90: New test (xfail).
+	* testsuite/libgomp.fortran/dispatch-1.f90: New test.
+	* testsuite/libgomp.fortran/dispatch-2.f90: New test.
+	* testsuite/libgomp.fortran/dispatch-3.f90: New test.
+
+2025-01-02  Jakub Jelinek  <jakub@redhat.com>
+
+	* libgomp.texi: Bump @copying's copyright year.
+
+2024-12-19  Tobias Burnus  <tburnus@baylibre.com>
+
+	* libgomp.texi (OpenMP Context Selectors): Document that 'kind' also
+	accepts 'cpu'/'any' on host and 'any'/'nohost' on 'nohost' devices.
+
+2024-12-10  Tobias Burnus  <tburnus@baylibre.com>
+
+	* plugin/plugin-gcn.c (GOMP_OFFLOAD_dev2dev, GOMP_OFFLOAD_async_run):
+	Handle omp_async_queue == NULL after call to maybe_init_omp_async.
+	(GOMP_OFFLOAD_openacc_async_construct): Use error not fatal error,
+	partially reverting r15-5392.
+
+2024-12-06  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* testsuite/libgomp.c/declare-variant-3-sm89.c: New.
+	* testsuite/libgomp.c/declare-variant-3.h: Adjust.
+
+2024-12-06  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* testsuite/libgomp.c/declare-variant-3-sm52.c: New.
+	* testsuite/libgomp.c/declare-variant-3.h: Adjust.
+
+2024-12-06  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* testsuite/libgomp.c/declare-variant-3-sm37.c: New.
+	* testsuite/libgomp.c/declare-variant-3.h: Adjust.
+
+2024-12-06  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* libgomp.texi: Clarify nvptx 'omp_low_lat_mem_space'
+	documentation.
+
+2024-12-06  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	PR testsuite/82250
+	* testsuite/libgomp.oacc-c-c++-common/routine-nohost-1.c: Revert
+	last change.
+
+2024-12-03  Tobias Burnus  <tburnus@baylibre.com>
+
+	* libgomp.texi (Memory allocation): Mention (non-)effect of 'align'
+	on _Alignof.
+	* testsuite/libgomp.c/allocate-7.c: New test.
+
 2024-11-28  Thomas Schwinge  <tschwinge@baylibre.com>
 
 	* testsuite/libgomp.oacc-c-c++-common/acc_get_property-gcn.c
@@ -21785,7 +21849,7 @@
 
 	Initial implementation and checkin.
 
-Copyright (C) 2005-2024 Free Software Foundation, Inc.
+Copyright (C) 2005-2025 Free Software Foundation, Inc.
 
 Copying and distribution of this file, with or without modification,
 are permitted in any medium without royalty provided the copyright

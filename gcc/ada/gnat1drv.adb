@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -523,6 +523,8 @@ procedure Gnat1drv is
          Restore_Warnings
            ((Warnings_Package.Elab_Warnings => True,
              Warnings_Package.Warn_On_Suspicious_Contract => True,
+             Warnings_Package.Warning_Doc_Switch =>
+               Warnsw.Warning_Doc_Switch,
              others => False));
 
          --  Suppress the generation of name tables for enumerations, which are

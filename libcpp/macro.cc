@@ -1,5 +1,5 @@
 /* Part of CPP library.  (Macro and #define handling.)
-   Copyright (C) 1986-2024 Free Software Foundation, Inc.
+   Copyright (C) 1986-2025 Free Software Foundation, Inc.
    Written by Per Bothner, 1994.
    Based on CCCP program by Paul Rubin, June 1986
    Adapted to ANSI C, Richard Stallman, Jan 1987
@@ -2579,10 +2579,8 @@ tokens_buff_new (cpp_reader *pfile, size_t len,
 		 location_t **virt_locs)
 {
   size_t tokens_size = len * sizeof (cpp_token *);
-  size_t locs_size = len * sizeof (location_t);
-
   if (virt_locs != NULL)
-    *virt_locs = XNEWVEC (location_t, locs_size);
+    *virt_locs = XNEWVEC (location_t, len);
   return _cpp_get_buff (pfile, tokens_size);
 }
 

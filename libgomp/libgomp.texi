@@ -7,7 +7,7 @@
 
 
 @copying
-Copyright @copyright{} 2006-2024 Free Software Foundation, Inc.
+Copyright @copyright{} 2006-2025 Free Software Foundation, Inc.
 
 Permission is granted to copy, distribute and/or modify this document
 under the terms of the GNU Free Documentation License, Version 1.3 or
@@ -294,8 +294,8 @@ The OpenMP 4.5 specification is fully supported.
 @item C/C++'s @code{declare variant} directive: elision support of
       preprocessed code @tab N @tab
 @item @code{declare variant}: new clauses @code{adjust_args} and
-      @code{append_args} @tab N @tab
-@item @code{dispatch} construct @tab N @tab
+      @code{append_args} @tab P @tab Only @code{adjust_args}
+@item @code{dispatch} construct @tab Y @tab
 @item device-specific ICV settings with environment variables @tab Y @tab
 @item @code{assume} and @code{assumes} directives @tab Y @tab
 @item @code{nothing} directive @tab Y @tab
@@ -550,7 +550,7 @@ to address of matching mapped list item per 5.1, Sect. 2.21.7.2 @tab N @tab
 @item @code{interchange} loop-transformation construct @tab N @tab
 @item @code{reverse} loop-transformation construct @tab N @tab
 @item @code{split} loop-transformation construct @tab N @tab
-@item @code{stipe} loop-transformation construct @tab N @tab
+@item @code{stripe} loop-transformation construct @tab N @tab
 @item @code{tile} permitting association of grid and inter-tile loops @tab N @tab
 @item @code{strict} modifier keyword to @code{num_threads} @tab N @tab
 @item @code{safesync} clause to the @code{parallel} construct @tab N @tab
@@ -1760,10 +1760,9 @@ The effect of running this routine in a @code{target} region is unspecified.
 Get the value of the @emph{default-device-var} ICV, which is used
 for target regions without a device clause. The value is either a
 nonnegative device number, @code{omp_initial_device} or
-@code{omp_invalid_device}. Note that for the host, the ICV can have two values
-and, hence, this routine might return either the value of the named constant
-@code{omp_initial_device} or the value returned by the
-@code{omp_get_initial_device} routine.
+@code{omp_invalid_device}. Note that for the host, the ICV can have two values:
+either the value of the named constant @code{omp_initial_device} or the value
+returned by the @code{omp_get_num_devices} routine.
 
 The effect of running this routine in a @code{target} region is unspecified.
 
@@ -1791,7 +1790,7 @@ The effect of running this routine in a @code{target} region is unspecified.
 @subsection @code{omp_get_num_devices} -- Number of target devices
 @table @asis
 @item @emph{Description}:
-Returns the number of target devices.
+Returns the number of available non-host devices.
 
 The effect of running this routine in a @code{target} region is unspecified.
 
@@ -1938,7 +1937,8 @@ run-time function is desired.
 @item @emph{Description}:
 This function returns a device number that represents the host device.
 Since OpenMP 5.1, this is equal to the value returned by the
-@code{omp_get_num_devices} function.
+@code{omp_get_num_devices} function; since OpenMP 6.0 it may also return
+the value of @code{omp_initial_device}.
 
 The effect of running this routine in a @code{target} region is unspecified.
 
@@ -6687,9 +6687,10 @@ smaller number.  On non-host devices, the value of the
 @c has to be implemented; cf. also PR target/105640.
 @c For offload devices, add *additionally* gcc/config/*/t-omp-device.
 
-For the host compiler, @code{kind} always matches @code{host}; for the
-offloading architectures AMD GCN and Nvidia PTX, @code{kind} always matches
-@code{gpu}.  For the x86 family of computers, AMD GCN and Nvidia PTX
+For the host compiler, @code{kind} always matches @code{host}, @code{cpu}
+and @code{any}; for the offloading architectures AMD GCN and Nvidia PTX,
+@code{kind} always matches @code{nohost}, @code{gpu} and @code{any}.
+For the x86 family of computers, AMD GCN and Nvidia PTX
 the following traits are supported in addition; while OpenMP is supported
 on more architectures, GCC currently does not match any @code{arch} or
 @code{isa} traits for those.
@@ -6972,8 +6973,10 @@ The implementation remark:
       memory-copy functions of the CUDA library.  Higher dimensions will
       call those functions in a loop and are therefore supported.
 @item Low-latency memory (@code{omp_low_lat_mem_space}) is supported when the
-      the @code{access} trait is set to @code{cgroup}, the ISA is at least
-      @code{sm_53}, and the PTX version is at least 4.1.  The default pool size
+      the @code{access} trait is set to @code{cgroup}, and libgomp has
+      been built for PTX ISA version 4.1 or higher (such as in GCC's
+      default configuration).  @c -mptx=4.1
+      The default pool size
       is 8 kiB per team, but may be adjusted at runtime by setting environment
       variable @code{GOMP_NVPTX_LOWLAT_POOL=@var{bytes}}.  The maximum value is
       limited by the available hardware, and care should be taken that the

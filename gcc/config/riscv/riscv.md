@@ -1,5 +1,5 @@
 ;; Machine description for RISC-V for GNU compiler.
-;; Copyright (C) 2011-2024 Free Software Foundation, Inc.
+;; Copyright (C) 2011-2025 Free Software Foundation, Inc.
 ;; Contributed by Andrew Waterman (andrew@sifive.com).
 ;; Based on MIPS target for GNU compiler.
 
@@ -857,6 +857,34 @@
   "add%i2w\t%0,%1,%2"
   [(set_attr "type" "arith")
    (set_attr "mode" "SI")])
+
+;; Transform (X & C1) + C2 into (X | ~C1) - (-C2 | ~C1)
+;; Where C1 is not a LUI operand, but ~C1 is a LUI operand
+
+(define_insn_and_split "*lui_constraint<X:mode>_and_to_or"
+	[(set (match_operand:X 0 "register_operand" "=r")
+	(plus:X (and:X (match_operand:X 1 "register_operand" "r")
+		       (match_operand 2 "const_int_operand"))
+		(match_operand 3 "const_int_operand")))
+   (clobber (match_scratch:X 4 "=&r"))]
+  "(LUI_OPERAND (~INTVAL (operands[2]))
+    && ((INTVAL (operands[2]) & (-INTVAL (operands[3])))
+	== (-INTVAL (operands[3])))
+    && riscv_const_insns (operands[3], false)
+    && (riscv_const_insns (GEN_INT (~INTVAL (operands[2])
+				    | -INTVAL (operands[3])), false)
+	<= riscv_const_insns (operands[3], false)))"
+  "#"
+  "&& reload_completed"
+  [(set (match_dup 4) (match_dup 5))
+   (set (match_dup 0) (ior:X (match_dup 1) (match_dup 4)))
+   (set (match_dup 4) (match_dup 6))
+   (set (match_dup 0) (minus:X (match_dup 0) (match_dup 4)))]
+  {
+    operands[5] = GEN_INT (~INTVAL (operands[2]));
+    operands[6] = GEN_INT ((~INTVAL (operands[2])) | (-INTVAL (operands[3])));
+  }
+  [(set_attr "type" "arith")])
 
 ;;
 ;;  ....................
@@ -3215,7 +3243,7 @@
   "!TARGET_XCVBI"
 {
   if (get_attr_length (insn) == 12)
-    return "b%N1\t%2,%z3,1f; jump\t%l0,ra; 1:";
+    return "b%n1\t%2,%z3,1f; jump\t%l0,ra; 1:";
 
   return "b%C1\t%2,%z3,%l0";
 }

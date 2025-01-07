@@ -1,5 +1,5 @@
 /* Language-independent node constructors for parse phase of GNU compiler.
-   Copyright (C) 1987-2024 Free Software Foundation, Inc.
+   Copyright (C) 1987-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -6120,6 +6120,10 @@ type_hash_canon_hash (tree type)
       hstate.add_poly_int (TYPE_VECTOR_SUBPARTS (type));
       break;
 
+    case REFERENCE_TYPE:
+      hstate.add_flag (TYPE_REF_IS_RVALUE (type));
+      break;
+
     default:
       break;
     }
@@ -6162,7 +6166,6 @@ type_cache_hasher::equal (type_hash *a, type_hash *b)
     case OPAQUE_TYPE:
     case COMPLEX_TYPE:
     case POINTER_TYPE:
-    case REFERENCE_TYPE:
     case NULLPTR_TYPE:
       return true;
 
@@ -6251,6 +6254,9 @@ type_cache_hasher::equal (type_hash *a, type_hash *b)
 				  TYPE_ARG_TYPES (b->type))))
 	break;
       return false;
+
+    case REFERENCE_TYPE:
+      return TYPE_REF_IS_RVALUE (a->type) == TYPE_REF_IS_RVALUE (b->type);
 
     default:
       return false;
@@ -13914,8 +13920,11 @@ gimple_canonical_types_compatible_p (const_tree t1, const_tree t2,
       || TREE_CODE (t1) == NULLPTR_TYPE)
     return true;
 
-  /* Can't be the same type if they have different mode.  */
-  if (TYPE_MODE (t1) != TYPE_MODE (t2))
+  /* Can't be compatible types if they have different mode.  Because of
+     flexible array members, we allow mismatching modes for structures or
+     unions.  */
+  if (!RECORD_OR_UNION_TYPE_P (t1)
+      && TYPE_MODE (t1) != TYPE_MODE (t2))
     return false;
 
   /* Non-aggregate types can be handled cheaply.  */
@@ -13966,7 +13975,7 @@ gimple_canonical_types_compatible_p (const_tree t1, const_tree t2,
     {
     case ARRAY_TYPE:
       /* Array types are the same if the element types are the same and
-	 the number of elements are the same.  */
+	 minimum and maximum index are the same.  */
       if (!gimple_canonical_types_compatible_p (TREE_TYPE (t1), TREE_TYPE (t2),
 						trust_type_canonical)
 	  || TYPE_STRING_FLAG (t1) != TYPE_STRING_FLAG (t2)
@@ -14060,23 +14069,46 @@ gimple_canonical_types_compatible_p (const_tree t1, const_tree t2,
 	     f1 || f2;
 	     f1 = TREE_CHAIN (f1), f2 = TREE_CHAIN (f2))
 	  {
-	    /* Skip non-fields and zero-sized fields.  */
+	    /* Skip non-fields and zero-sized fields, except zero-sized
+	       arrays at the end.  */
 	    while (f1 && (TREE_CODE (f1) != FIELD_DECL
 			  || (DECL_SIZE (f1)
-			      && integer_zerop (DECL_SIZE (f1)))))
+			      && integer_zerop (DECL_SIZE (f1))
+			      && (TREE_CHAIN (f1)
+				  || TREE_CODE (TREE_TYPE (f1))
+				     != ARRAY_TYPE))))
 	      f1 = TREE_CHAIN (f1);
 	    while (f2 && (TREE_CODE (f2) != FIELD_DECL
 			  || (DECL_SIZE (f2)
-			      && integer_zerop (DECL_SIZE (f2)))))
+			      && integer_zerop (DECL_SIZE (f2))
+			      && (TREE_CHAIN (f2)
+				  || TREE_CODE (TREE_TYPE (f2))
+				     != ARRAY_TYPE))))
 	      f2 = TREE_CHAIN (f2);
 	    if (!f1 || !f2)
 	      break;
-	    /* The fields must have the same name, offset and type.  */
+
+	    tree t1 = TREE_TYPE (f1);
+	    tree t2 = TREE_TYPE (f2);
+
+	    /* If the last element are arrays, we only compare the element
+	       types.  */
+	    if (TREE_CHAIN (f1) == NULL_TREE && TREE_CODE (t1) == ARRAY_TYPE
+		&& TREE_CHAIN (f2) == NULL_TREE && TREE_CODE (t2) == ARRAY_TYPE)
+	      {
+		/* If both arrays have zero size, this is a match.  */
+		if (DECL_SIZE (f1) && integer_zerop (DECL_SIZE (f1))
+		    && DECL_SIZE (f2) && integer_zerop (DECL_SIZE (f2)))
+		  return true;
+
+		t1 = TREE_TYPE (t1);
+		t2 = TREE_TYPE (t2);
+	      }
+
 	    if (DECL_NONADDRESSABLE_P (f1) != DECL_NONADDRESSABLE_P (f2)
 		|| !gimple_compare_field_offset (f1, f2)
 		|| !gimple_canonical_types_compatible_p
-		      (TREE_TYPE (f1), TREE_TYPE (f2),
-		       trust_type_canonical))
+		      (t1, t2, trust_type_canonical))
 	      return false;
 	  }
 
@@ -14218,8 +14250,11 @@ verify_type (const_tree t)
       debug_tree (ct);
       error_found = true;
     }
-
   if (COMPLETE_TYPE_P (t) && TYPE_CANONICAL (t)
+      /* We allow a mismatch for structure or union because of
+	 flexible array members.  */
+      && !RECORD_OR_UNION_TYPE_P (t)
+      && !RECORD_OR_UNION_TYPE_P (TYPE_CANONICAL (t))
       && TYPE_MODE (t) != TYPE_MODE (TYPE_CANONICAL (t)))
     {
       error ("%<TYPE_MODE%> of %<TYPE_CANONICAL%> is not compatible");

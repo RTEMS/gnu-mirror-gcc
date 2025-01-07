@@ -1,5 +1,5 @@
 /* Statement translation -- generate GCC trees from gfc_code.
-   Copyright (C) 2002-2024 Free Software Foundation, Inc.
+   Copyright (C) 2002-2025 Free Software Foundation, Inc.
    Contributed by Paul Brook <paul@nowt.org>
    and Steven Bosscher <s.bosscher@student.tudelft.nl>
 
@@ -2064,6 +2064,20 @@ trans_associate_var (gfc_symbol *sym, gfc_wrapped_block *block)
       gcc_assert (GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (se.expr))
 		  || GFC_ARRAY_TYPE_P (TREE_TYPE (se.expr)));
       gcc_assert (GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (sym->backend_decl)));
+
+      if (sym->ts.type == BT_CHARACTER)
+	{
+	  /* Emit a DECL_EXPR for the variable sized array type in so the
+	     gimplification of its type sizes works correctly.  */
+	  tree arraytype;
+	  tmp = TREE_TYPE (sym->backend_decl);
+	  arraytype = TREE_TYPE (GFC_TYPE_ARRAY_DATAPTR_TYPE (tmp));
+	  if (! TYPE_NAME (arraytype))
+	    TYPE_NAME (arraytype) = build_decl (UNKNOWN_LOCATION, TYPE_DECL,
+						NULL_TREE, arraytype);
+	  gfc_add_expr_to_block (&se.pre, build1 (DECL_EXPR,
+				 arraytype, TYPE_NAME (arraytype)));
+	}
 
       if (GFC_ARRAY_TYPE_P (TREE_TYPE (se.expr)))
 	{
@@ -6992,7 +7006,8 @@ gfc_trans_allocate (gfc_code * code, gfc_omp_namelist *omp_allocate)
 			       label_finish, tmp, &nelems,
 			       e3rhs ? e3rhs : code->expr3,
 			       e3_is == E3_DESC ? expr3 : NULL_TREE,
-			       e3_has_nodescriptor, omp_alloc_item))
+			       e3_has_nodescriptor, omp_alloc_item,
+			       code->ext.alloc.ts.type != BT_UNKNOWN))
 	{
 	  /* A scalar or derived type.  First compute the size to
 	     allocate.

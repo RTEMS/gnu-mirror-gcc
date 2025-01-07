@@ -1,5 +1,5 @@
 /* Subroutines for the C front end on the PowerPC architecture.
-   Copyright (C) 2002-2024 Free Software Foundation, Inc.
+   Copyright (C) 2002-2025 Free Software Foundation, Inc.
 
    Contributed by Zack Weinberg <zack@codesourcery.com>
    and Paolo Bonzini <bonzini@gnu.org>
@@ -1680,7 +1680,7 @@ find_instance (bool *unsupported_builtin, int *instance,
 
 tree
 altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
-				    void *passed_arglist)
+				    void *passed_arglist, bool)
 {
   rs6000_gen_builtins fcode
     = (rs6000_gen_builtins) DECL_MD_FUNCTION_CODE (fndecl);

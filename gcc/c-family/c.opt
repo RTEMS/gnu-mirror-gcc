@@ -1,5 +1,5 @@
 ; Options for the C, ObjC, C++ and ObjC++ front ends.
-; Copyright (C) 2003-2024 Free Software Foundation, Inc.
+; Copyright (C) 2003-2025 Free Software Foundation, Inc.
 ;
 ; This file is part of GCC.
 ;
@@ -1477,10 +1477,6 @@ Wtemplates
 C++ ObjC++ Var(warn_templates) Warning
 Warn on primary template declaration.
 
-Wtautological-compare
-C ObjC C++ ObjC++ Var(warn_tautological_compare) Warning LangEnabledBy(C ObjC C++ ObjC++,Wall)
-Warn if a comparison always evaluates to true or false.
-
 Wtemplate-body
 C++ ObjC++ Var(warn_template_body) Warning Init(1)
 Diagnose errors when parsing a template.
@@ -1488,6 +1484,10 @@ Diagnose errors when parsing a template.
 Wtemplate-id-cdtor
 C++ ObjC++ Var(warn_template_id_cdtor) Warning
 Warn about simple-template-id in a constructor or destructor.
+
+Wtemplate-names-tu-local
+C++ ObjC++ Var(warn_template_names_tu_local) Warning EnabledBy(Wextra)
+Warn about templates naming TU-local entities in a module.
 
 Wterminate
 C++ ObjC++ Warning Var(warn_terminate) Init(1)

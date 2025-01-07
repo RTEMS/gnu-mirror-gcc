@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -153,7 +153,7 @@ package body Rtsfind is
 
    --    packed component size of 43 is not supported
 
-   type CString_Ptr is access constant String;
+   type CString_Ptr is not null access constant String;
 
    type PRE_Id_Entry is record
       Str : CString_Ptr;
@@ -456,7 +456,7 @@ package body Rtsfind is
       end if;
 
    exception
-         --  Generate error message if run-time unit not available
+      --  Generate error message if run-time unit not available
 
       when RE_Not_Available =>
          Error_Msg_N ("& not available", Nam);

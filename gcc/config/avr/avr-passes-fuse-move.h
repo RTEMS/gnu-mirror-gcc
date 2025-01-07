@@ -1,5 +1,5 @@
 /* Support for avr-passes.cc for AVR 8-bit microcontrollers.
-   Copyright (C) 2024 Free Software Foundation, Inc.
+   Copyright (C) 2024-2025 Free Software Foundation, Inc.
 
    This file is part of GCC.
 
@@ -1172,6 +1172,7 @@ struct bbinfo_t
 
   static find_plies_data_t *fpd;
   static bool try_fuse_p;
+  static bool try_mem0_p;
   static bool try_bin_arg1_p;
   static bool try_simplify_p;
   static bool try_split_ldi_p;

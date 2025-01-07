@@ -1,5 +1,5 @@
 /* Code for RTL transformations to satisfy insn constraints.
-   Copyright (C) 2010-2024 Free Software Foundation, Inc.
+   Copyright (C) 2010-2025 Free Software Foundation, Inc.
    Contributed by Vladimir Makarov <vmakarov@redhat.com>.
 
    This file is part of GCC.
@@ -896,6 +896,11 @@ operands_match_p (rtx x, rtx y, int y_hard_regno)
 
 	case 'i':
 	  if (XINT (x, i) != XINT (y, i))
+	    return false;
+	  break;
+
+	case 'L':
+	  if (XLOC (x, i) != XLOC (y, i))
 	    return false;
 	  break;
 

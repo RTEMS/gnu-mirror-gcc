@@ -1,4 +1,4 @@
-.. Copyright (C) 2024 Free Software Foundation, Inc.
+.. Copyright (C) 2024-2025 Free Software Foundation, Inc.
    Originally contributed by David Malcolm <dmalcolm@redhat.com>
 
    This is free software: you can redistribute it and/or modify it
@@ -24,7 +24,8 @@ libgdiagnostics supports adding "fix-it hints" to a :type:`diagnostic`:
 suggestions for the user on how to edit their code to fix a problem.  These
 can be expressed as insertions, replacements, and removals of text.
 
-For example, here we add a replacement fix-it hint to a diagnostic:
+For example, here we use :func:`diagnostic_add_fix_it_hint_replace` to add
+a replacement fix-it hint to a diagnostic:
 
 .. literalinclude:: ../../../testsuite/libgdiagnostics.dg/test-fix-it-hint.c
    :language: c

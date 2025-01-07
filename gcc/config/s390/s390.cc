@@ -1,5 +1,5 @@
 /* Subroutines used for code generation on IBM S/390 and zSeries
-   Copyright (C) 1999-2024 Free Software Foundation, Inc.
+   Copyright (C) 1999-2025 Free Software Foundation, Inc.
    Contributed by Hartmut Penner (hpenner@de.ibm.com) and
                   Ulrich Weigand (uweigand@de.ibm.com) and
                   Andreas Krebbel (Andreas.Krebbel@de.ibm.com).
@@ -1859,7 +1859,7 @@ s390_canonicalize_comparison (int *code, rtx *op0, rtx *op1,
       && CONST_INT_P (XEXP (*op0, 1))
       && CONST_INT_P (*op1)
       && INTVAL (XEXP (*op0, 1)) == -3
-      && *code == EQ)
+      && (*code == EQ || *code == NE))
     {
       if (INTVAL (*op1) == 0)
 	{
@@ -18566,6 +18566,9 @@ s390_c_mode_for_floating_type (enum tree_index ti)
 
 #undef TARGET_C_MODE_FOR_FLOATING_TYPE
 #define TARGET_C_MODE_FOR_FLOATING_TYPE s390_c_mode_for_floating_type
+
+#undef TARGET_DOCUMENTATION_NAME
+#define TARGET_DOCUMENTATION_NAME "S/390"
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

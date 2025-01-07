@@ -1,5 +1,5 @@
 /* Definitions for CPP library.
-   Copyright (C) 1995-2024 Free Software Foundation, Inc.
+   Copyright (C) 1995-2025 Free Software Foundation, Inc.
    Written by Per Bothner, 1994-95.
 
 This program is free software; you can redistribute it and/or modify it
@@ -255,8 +255,10 @@ struct GTY(()) cpp_identifier {
        spelling;
 };
 
-/* A preprocessing token.  This has been carefully packed and should
-   occupy 16 bytes on 32-bit hosts and 24 bytes on 64-bit hosts.  */
+/* A preprocessing token.  This occupies 32 bytes on a 64-bit host.  On a
+   32-bit host it occupies 20 or 24 bytes, depending whether a uint64_t
+   requires 4- or 8-byte alignment.  */
+
 struct GTY(()) cpp_token {
 
   /* Location of first char of token, together with range of full token.  */

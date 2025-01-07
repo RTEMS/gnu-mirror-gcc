@@ -1,5 +1,5 @@
 /* Statement Analysis and Transformation for Vectorization
-   Copyright (C) 2003-2024 Free Software Foundation, Inc.
+   Copyright (C) 2003-2025 Free Software Foundation, Inc.
    Contributed by Dorit Naishlos <dorit@il.ibm.com>
    and Ira Rosen <irar@il.ibm.com>
 
@@ -4297,7 +4297,14 @@ vectorizable_simd_clone_call (vec_info *vinfo, stmt_vec_info stmt_info,
 	  this_badness += floor_log2 (num_calls) * 4096;
 	if (n->simdclone->inbranch)
 	  this_badness += 8192;
-	int target_badness = targetm.simd_clone.usable (n);
+
+	/* If STMT_VINFO_VECTYPE has not been set yet pass the general vector
+	   mode,  which for targets that use it will determine what ISA we can
+	   vectorize this code with.  */
+	machine_mode vector_mode = vinfo->vector_mode;
+	if (vectype)
+	  vector_mode = TYPE_MODE (vectype);
+	int target_badness = targetm.simd_clone.usable (n, vector_mode);
 	if (target_badness < 0)
 	  continue;
 	this_badness += target_badness * 512;
@@ -4957,7 +4964,7 @@ vectorizable_simd_clone_call (vec_info *vinfo, stmt_vec_info stmt_info,
 		{
 		  vec_loop_masks *loop_masks = &LOOP_VINFO_MASKS (loop_vinfo);
 		  mask = vect_get_loop_mask (loop_vinfo, gsi, loop_masks,
-					     ncopies, vectype, j);
+					     ncopies, masktype, j);
 		}
 	      else
 		mask = vect_build_all_ones_mask (vinfo, stmt_info, masktype);
@@ -8827,22 +8834,7 @@ vectorizable_store (vec_info *vinfo,
 		{
 		  if (costing_p)
 		    {
-		      /* Only need vector extracting when there are more
-			 than one stores.  */
-		      if (nstores > 1)
-			inside_cost
-			  += record_stmt_cost (cost_vec, 1, vec_to_scalar,
-					       stmt_info, slp_node,
-					       0, vect_body);
-		      /* Take a single lane vector type store as scalar
-			 store to avoid ICE like 110776.  */
-		      if (VECTOR_TYPE_P (ltype)
-			  && known_ne (TYPE_VECTOR_SUBPARTS (ltype), 1U))
-			n_adjacent_stores++;
-		      else
-			inside_cost
-			  += record_stmt_cost (cost_vec, 1, scalar_store,
-					       stmt_info, 0, vect_body);
+		      n_adjacent_stores++;
 		      continue;
 		    }
 		  tree newref, newoff;
@@ -8898,9 +8890,26 @@ vectorizable_store (vec_info *vinfo,
       if (costing_p)
 	{
 	  if (n_adjacent_stores > 0)
-	    vect_get_store_cost (vinfo, stmt_info, slp_node, n_adjacent_stores,
-				 alignment_support_scheme, misalignment,
-				 &inside_cost, cost_vec);
+	    {
+	      /* Take a single lane vector type store as scalar
+		 store to avoid ICE like 110776.  */
+	      if (VECTOR_TYPE_P (ltype)
+		  && maybe_ne (TYPE_VECTOR_SUBPARTS (ltype), 1U))
+		vect_get_store_cost (vinfo, stmt_info, slp_node,
+				     n_adjacent_stores, alignment_support_scheme,
+				     misalignment, &inside_cost, cost_vec);
+	      else
+		inside_cost
+		  += record_stmt_cost (cost_vec, n_adjacent_stores,
+				       scalar_store, stmt_info, 0, vect_body);
+	      /* Only need vector extracting when there are more
+		 than one stores.  */
+	      if (nstores > 1)
+		inside_cost
+		  += record_stmt_cost (cost_vec, n_adjacent_stores,
+				       vec_to_scalar, stmt_info, slp_node,
+				       0, vect_body);
+	    }
 	  if (dump_enabled_p ())
 	    dump_printf_loc (MSG_NOTE, vect_location,
 			     "vect_model_store_cost: inside_cost = %d, "

@@ -6,7 +6,7 @@
  *                                                                          *
  *                          C Implementation File                           *
  *                                                                          *
- *          Copyright (C) 1992-2024, Free Software Foundation, Inc.         *
+ *          Copyright (C) 1992-2025, Free Software Foundation, Inc.         *
  *                                                                          *
  * GNAT is free software;  you can  redistribute it  and/or modify it under *
  * terms of the  GNU General Public License as published  by the Free Soft- *
@@ -5517,10 +5517,17 @@ Call_to_gnu (Node_Id gnat_node, tree *gnu_result_type_p, tree gnu_target,
 
 	  gigi_checking_assert (!Do_Range_Check (gnat_node));
 
+	  /* If the parent is an initialization statement, we can use the
+	     return slot optimization.  */
+	  if (Nkind (gnat_parent) == N_Assignment_Statement
+	      && (No_Ctrl_Actions (gnat_parent)
+		  || No_Finalize_Actions (gnat_parent)))
+	    op_code = INIT_EXPR;
+
 	  /* ??? If the return type has variable size, then force the return
 	     slot optimization as we would not be able to create a temporary.
 	     That's what has been done historically.  */
-	  if (return_type_with_variable_size_p (gnu_result_type))
+	  else if (return_type_with_variable_size_p (gnu_result_type))
 	    op_code = INIT_EXPR;
 
 	  /* If this is a call to a pure function returning an array of scalar
@@ -5672,6 +5679,29 @@ Handled_Sequence_Of_Statements_to_gnu (Node_Id gnat_node)
            of a decision, which would otherwise confuse control flow based
            coverage analysis tools.  */
 	set_expr_location_from_node (gnu_result, gnat_node, true);
+    }
+
+  if (Present (Finally_Statements (gnat_node)))
+    {
+      tree finally_stmts;
+      location_t locus;
+
+      start_stmt_group ();
+      for (gnat_temp = First_Non_Pragma (Finally_Statements (gnat_node));
+           Present (gnat_temp);
+           gnat_temp = Next_Non_Pragma (gnat_temp))
+        add_stmt (gnat_to_gnu (gnat_temp));
+      finally_stmts = end_stmt_group ();
+
+      gnu_result
+        = build2 (TRY_FINALLY_EXPR, void_type_node, gnu_result, finally_stmts);
+
+      /* Do as above for the TRY_CATCH_EXPR case.  */
+      if (Present (End_Label (gnat_node))
+          && Sloc_to_locus (Sloc (End_Label (gnat_node)), &locus))
+        SET_EXPR_LOCATION (gnu_result, locus);
+      else
+        set_expr_location_from_node (gnu_result, gnat_node, true);
     }
 
   /* Process the At_End_Proc, if any.  */
@@ -7787,6 +7817,12 @@ gnat_to_gnu (Node_Id gnat_node)
 		  CALL_EXPR_ARG (gnu_result, 1)
 		    = build_unary_op (ADDR_EXPR, TREE_TYPE (arg), gnu_lhs);
 		}
+
+	      /* If the statement is an initialization, build one too.  */
+              else if (No_Ctrl_Actions (gnat_node)
+		       || No_Finalize_Actions (gnat_node))
+		gnu_result
+		  = build_binary_op (INIT_EXPR, NULL_TREE, gnu_lhs, gnu_rhs);
 
 	      /* Otherwise build a regular assignment.  */
 	      else

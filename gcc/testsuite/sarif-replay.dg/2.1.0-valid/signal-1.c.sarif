@@ -163,31 +163,51 @@
                                                                        "nestingLevel": 2,
                                                                        "executionOrder": 7}]}]}]}]}]}
 
-// TODO: replay the source code
 // TODO: show the CWE
 /* { dg-begin-multiline-output "" }
+In function 'custom_logger':
 ../../src/gcc/testsuite/gcc.dg/analyzer/signal-1.c:13:3: warning: call to ‘fprintf’ from within signal handler [-Wanalyzer-unsafe-call-within-signal-handler]
-  'main': event 1
+   13 |   fprintf(stderr, "LOG: %s", msg);
+      |   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  'main': events 1-2
     |
-    |
-  'main': event 2
-    |
+    |   21 | int main(int argc, const char *argv)
+    |      |     ^~~~~
+    |      |     |
+    |      |     (1) entry to ‘main’
+    |......
+    |   25 |   signal(SIGINT, handler);
+    |      |   ~~~~~~~~~~~~~~~~~~~~~~~~
+    |      |   |
+    |      |   (2) registering ‘handler’ as signal handler
     |
   event 3
     |
     |GNU C17:
     | (3): later on, when the signal is delivered to the process
     |
-    +--> 'handler': event 4
+    +--> 'handler': events 4-5
            |
+           |   16 | static void handler(int signum)
+           |      |             ^~~~~~~~
+           |      |             |
+           |      |             (4) entry to ‘handler’
+           |   17 | {
+           |   18 |   custom_logger("got signal");
+           |      |   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+           |      |   |
+           |      |   (5) calling ‘custom_logger’ from ‘handler’
            |
-         'handler': event 5
-           |
-           |
-           +--> 'custom_logger': event 6
+           +--> 'custom_logger': events 6-7
                   |
-                  |
-                'custom_logger': event 7
-                  |
+                  |   11 | void custom_logger(const char *msg)
+                  |      |      ^~~~~~~~~~~~~~
+                  |      |      |
+                  |      |      (6) entry to ‘custom_logger’
+                  |   12 | {
+                  |   13 |   fprintf(stderr, "LOG: %s", msg);
+                  |      |   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                  |      |   |
+                  |      |   (7) call to ‘fprintf’ from within signal handler
                   |
    { dg-end-multiline-output "" } */

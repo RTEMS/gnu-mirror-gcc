@@ -1,5 +1,5 @@
 /* A self-testing framework, for use by -fself-test.
-   Copyright (C) 2015-2024 Free Software Foundation, Inc.
+   Copyright (C) 2015-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -232,6 +232,7 @@ extern void et_forest_cc_tests ();
 extern void fibonacci_heap_cc_tests ();
 extern void fold_const_cc_tests ();
 extern void function_tests_cc_tests ();
+extern void gcc_attribute_urlifier_cc_tests ();
 extern void gcc_urlifier_cc_tests ();
 extern void ggc_tests_cc_tests ();
 extern void gimple_cc_tests ();

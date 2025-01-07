@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -4419,9 +4419,9 @@ package body Sprint is
                      Sprint_Node (X);
                      Set_Sloc (X, Old_Sloc);
 
-                     --  Array subtypes
+                  --  Array subtypes
 
-                     --  Preserve Sloc of index subtypes, as above
+                  --  Preserve Sloc of index subtypes, as above
 
                   when E_Array_Subtype =>
                      Write_Header (False);
@@ -4711,6 +4711,10 @@ package body Sprint is
                         Write_Int (UI_To_Int (L + Len) - 1);
                         Write_Str (");");
                      end;
+
+                  when E_Private_Subtype =>
+                     Write_Header (False);
+                     Write_Name_With_Col_Check (Chars (Full_View (Typ)));
 
                   --  For all other Itypes, print a triple ? (fill in later
                   --  if needed).

@@ -1,3 +1,98 @@
+2025-01-02  Paul-Antoine Arras  <parras@baylibre.com>
+
+	* c-attribs.cc: (c_common_gnu_attributes): Rename "omp declare variant
+	variant adjust_args" into "omp declare variant variant args" to also
+	accommodate append_args.
+
+2024-12-20  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	* c.opt.urls: Regenerate.
+
+2024-12-20  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	* c.opt: New warning '-Wtemplate-names-tu-local'.
+
+2024-12-18  Tobias Burnus  <tburnus@baylibre.com>
+
+	* c-omp.cc (c_omp_interop_t_p): Handle error_mark_node.
+
+2024-12-18  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/110345
+	* c-common.h (attr_aligned_exclusions): Declare.
+	(handle_aligned_attribute): Likewise.
+	* c-attribs.cc (handle_aligned_attribute): No longer
+	static.
+	(attr_aligned_exclusions): Use extern instead of static.
+
+2024-12-17  Sandra Loosemore  <sloosemore@baylibre.com>
+
+	PR c/26154
+	* c.opt.urls: Regenerated.
+
+2024-12-16  David Malcolm  <dmalcolm@redhat.com>
+
+	PR sarif-replay/117943
+	* c-format.cc (selftest::test_type_mismatch_range_labels): Use
+	dc.m_source_printing.
+	* c-opts.cc (c_diagnostic_text_finalizer): Use source-printing
+	options from text_output.
+
+2024-12-12  Sandra Loosemore  <sloosemore@baylibre.com>
+	    Peter Eisentraut  <peter@eisentraut.org>
+
+	PR c/115532
+	* c.opt.urls: Regenerated.
+
+2024-12-12  Alexandre Oliva  <oliva@adacore.com>
+
+	* c.opt (Wtautological-compare): Move to ../common.opt.
+
+2024-12-10  Arsen Arsenović  <arsen@aarsen.me>
+	    Iain Sandoe  <iain@sandoe.co.uk>
+
+	* c-pretty-print.cc (c_pretty_printer::storage_class_specifier):
+	Check that we're looking at a PARM_DECL or VAR_DECL before
+	looking at DECL_REGISTER.
+
+2024-12-10  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/117788
+	* c-warn.cc (do_warn_array_compare): Emit a permerror in C++26.
+
+2024-12-09  Matthew Malcomson  <mmalcomson@nvidia.com>
+
+	* c-common.cc (builtin_function_validate_nargs,
+	check_builtin_function_arguments,
+	speculation_safe_value_resolve_call,
+	speculation_safe_value_resolve_params, sync_resolve_size,
+	sync_resolve_params, get_atomic_generic_size,
+	resolve_overloaded_atomic_exchange,
+	resolve_overloaded_atomic_compare_exchange,
+	resolve_overloaded_atomic_load, resolve_overloaded_atomic_store,
+	resolve_overloaded_builtin):  Add `complain` boolean parameter
+	and determine whether to emit errors based on its value.
+	* c-common.h (check_builtin_function_arguments,
+	resolve_overloaded_builtin):  Mention `complain` boolean
+	parameter in declarations.  Give it a default of `true`.
+
+2024-12-06  David Malcolm  <dmalcolm@redhat.com>
+
+	* c-attribs.cc: Include "gcc-urlifier.h".
+	(positional_argument): Use auto_urlify_attributes.
+	* c-common.cc: Include "gcc-urlifier.h".
+	(parse_optimize_options): Use auto_urlify_attributes with
+	OPT_Wattributes.
+	(attribute_fallthrough_p): Use auto_urlify_attributes.
+	* c-warn.cc: Include "gcc-urlifier.h".
+	(diagnose_mismatched_attributes): Use auto_urlify_attributes.
+
+2024-12-05  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/107980
+	* c-common.h (enum rid): Add RID_C23_VA_START.
+	* c-common.cc (c_common_reswords): Add __builtin_c23_va_start.
+
 2024-11-30  Jakub Jelinek  <jakub@redhat.com>
 
 	* c.opt (Wdeprecated-variadic-comma-omission): New option.
@@ -15832,7 +15927,7 @@
 	* c-common.c: Include gt-c-family-c-common.h.
 	* c-pragma.c: Include gt-c-family-c-pragma.h.
 
-Copyright (C) 2010-2024 Free Software Foundation, Inc.
+Copyright (C) 2010-2025 Free Software Foundation, Inc.
 
 Copying and distribution of this file, with or without modification,
 are permitted in any medium without royalty provided the copyright

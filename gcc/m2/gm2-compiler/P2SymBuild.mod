@@ -1,6 +1,6 @@
 (* P2SymBuild.mod pass 2 symbol creation.
 
-Copyright (C) 2001-2024 Free Software Foundation, Inc.
+Copyright (C) 2001-2025 Free Software Foundation, Inc.
 Contributed by Gaius Mulley <gaius.mulley@southwales.ac.uk>.
 
 This file is part of GNU Modula-2.
@@ -182,12 +182,13 @@ PROCEDURE stop ; BEGIN END stop ;
    Debug - call stop if symbol name is name.
 *)
 
-PROCEDURE Debug (sym: CARDINAL; name: ARRAY OF CHAR) ;
+PROCEDURE Debug (tok: CARDINAL; sym: CARDINAL; name: ARRAY OF CHAR) ;
 BEGIN
    IF MakeKey (name) = GetSymName (sym)
    THEN
       stop
-   END
+   END ;
+   MetaErrorT1 (tok, 'procedure {%1Wa}', sym)
 END Debug ;
 
 
@@ -1503,7 +1504,7 @@ BEGIN
    PopT (ParamTotal) ;
    ProcSym := CARDINAL (OperandT (3 + CARDINAL (OperandT (3)) + 2)) ;
    tok := CARDINAL (OperandTok (3 + CARDINAL (OperandT (3)) + 2)) ;
-   Debug (ProcSym, 'foo') ;
+   (* Debug (tok, ProcSym, 'foo') ;   *)
    curkind := GetProcedureKind (ProcSym, tok) ;
    PushT (ParamTotal) ;
    Annotate ("%1d||running total of no. of parameters") ;

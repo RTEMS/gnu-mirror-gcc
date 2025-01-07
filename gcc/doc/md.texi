@@ -1,4 +1,4 @@
-@c Copyright (C) 1988-2024 Free Software Foundation, Inc.
+@c Copyright (C) 1988-2025 Free Software Foundation, Inc.
 @c This is part of the GCC manual.
 @c For copying conditions, see the file gcc.texi.
 
@@ -1504,6 +1504,20 @@ as the predicate in the @code{match_operand}.  This predicate interprets
 the mode specified in the @code{match_operand} as the mode of the memory
 reference for which the address would be valid.
 
+@cindex @samp{:} in constraint
+@item @samp{:}
+This constraint, allowed only in input operands, says the inline @code{asm}
+pattern defines specific function or variable symbol.  The constraint
+shouldn't be mixed with other constraints on the same operand and
+the operand should be address of a function or non-automatic variable.
+Best used with the @samp{cc} modifier when printing the operand, so that
+even in position independent code it prints as a label.
+
+@smallexample
+void foo (void);
+asm (".globl %cc0; %cc0: ret" : : ":" (foo));
+@end smallexample
+
 @cindex other register constraints
 @cindex extensible constraints
 @item @var{other-letters}
@@ -1875,6 +1889,28 @@ register preferences.
   @dots{})
 @end smallexample
 @end ifset
+
+@cindex @samp{-} in constraint
+@item -
+Says that the selected following constraints within the same alternative
+should be matched differently.  Normally in PIC code symbolic operands
+in constraints like @samp{i}, @samp{s} or @samp{n} are not allowed at all
+or severely restricted.  The @samp{-} modifier, which is only allowed
+outside of functions, allows symbolic operands even in PIC code.  This
+modifier is usually used together with the @code{cc} operand modifier.
+
+@smallexample
+extern void foo (void), bar (void);
+int v;
+extern int w;
+asm (".globl %cc0, %cc2; .text; %cc0: call %cc1; ret; .data; %cc2: .word %cc3"
+     :: ":" (foo), "-s" (&bar), ":" (&w), "-i" (&v));
+@end smallexample
+
+This asm declaration tells the compiler it defines function @code{foo} and
+variable @code{w} and uses function @code{bar} and variable @code{v}.  This
+will compile even with PIC, but it is up to the user to ensure it will
+assemble correctly and have the expected behavior.
 @end table
 
 @node Machine Constraints
@@ -3660,6 +3696,16 @@ A vector register, excluding v0 (if available).
 @item vm
 A vector register, only v0 (if available).
 
+@item cr
+RVC general purpose register (x8-x15).
+
+@item cf
+RVC floating-point registers (f8-f15), if available, reuse GPR as FPR when use
+zfinx.
+
+@item R
+Even-odd general purpose register pair.
+
 @end table
 
 @item RX---@file{config/rx/constraints.md}
@@ -5297,34 +5343,28 @@ or @code{vec_cmpu@var{m}@var{n}} instruction pattern is supported,
 it will be preferred over @code{vec_cmpeq@var{m}@var{n}}, so there is
 no need to define this instruction pattern if the others are supported.
 
-@cindex @code{vcond@var{m}@var{n}} instruction pattern
-@item @samp{vcond@var{m}@var{n}}
-Output a conditional vector move.  Operand 0 is the destination to
-receive a combination of operand 1 and operand 2, which are of mode @var{m},
-dependent on the outcome of the predicate in operand 3 which is a signed
-vector comparison with operands of mode @var{n} in operands 4 and 5.  The
-modes @var{m} and @var{n} should have the same size.  Operand 0
-will be set to the value @var{op1} & @var{msk} | @var{op2} & ~@var{msk}
-where @var{msk} is computed by element-wise evaluation of the vector
-comparison with a truth value of all-ones and a false value of all-zeros.
-
-@cindex @code{vcondu@var{m}@var{n}} instruction pattern
-@item @samp{vcondu@var{m}@var{n}}
-Similar to @code{vcond@var{m}@var{n}} but performs unsigned vector
-comparison.
-
-@cindex @code{vcondeq@var{m}@var{n}} instruction pattern
-@item @samp{vcondeq@var{m}@var{n}}
-Similar to @code{vcond@var{m}@var{n}} but performs equality or
-non-equality vector comparison only.  If @code{vcond@var{m}@var{n}}
-or @code{vcondu@var{m}@var{n}} instruction pattern is supported,
-it will be preferred over @code{vcondeq@var{m}@var{n}}, so there is
-no need to define this instruction pattern if the others are supported.
-
 @cindex @code{vcond_mask_@var{m}@var{n}} instruction pattern
 @item @samp{vcond_mask_@var{m}@var{n}}
-Similar to @code{vcond@var{m}@var{n}} but operand 3 holds a pre-computed
-result of vector comparison.
+Output a conditional vector move.  Operand 0 is the destination to
+receive a combination of operand 1 and operand 2, depending on the
+mask in operand 3.  Operands 0, 1, and 2 have mode @var{m} while
+operand 3 has mode @var{n}.
+
+Suppose that @var{m} has @var{e} elements.  There are then two
+supported forms of @var{n}.  The first form is an integer or
+boolean vector that also has @var{e} elements.  In this case, each
+element is -1 or 0, with -1 selecting elements from operand 1 and
+0 selecting elements from operand 2.  The second supported form
+of @var{n} is a scalar integer that has at least @var{e} bits.
+A set bit then selects from operand 1 and a clear bit selects
+from operand 2.  Bits @var{e} and above have no effect.
+
+Subject to those restrictions, the behavior is equivalent to:
+
+@smallexample
+for (i = 0; i < @var{e}; i++)
+  op0[i] = op3[i] ? op1[i] : op2[i];
+@end smallexample
 
 @cindex @code{vcond_mask_len_@var{m}@var{n}} instruction pattern
 @item @samp{vcond_mask_len_@var{m}@var{n}}
@@ -6214,8 +6254,8 @@ Other shift and rotate instructions, analogous to the
 Vector shift and rotate instructions that take vectors as operand 2
 instead of a scalar type.
 
-@cindex @code{uabd@var{m}} instruction pattern
-@cindex @code{sabd@var{m}} instruction pattern
+@cindex @code{uabd@var{m}3} instruction pattern
+@cindex @code{sabd@var{m}3} instruction pattern
 @item @samp{uabd@var{m}}, @samp{sabd@var{m}}
 Signed and unsigned absolute difference instructions.  These
 instructions find the difference between operands 1 and 2
@@ -12364,5 +12404,10 @@ output and three inputs).  This combination would produce separate
 @samp{maybe_gen_@var{name}} and @samp{gen_@var{name}} functions for
 each operand count, but it would still produce a single
 @samp{maybe_code_for_@var{name}} and a single @samp{code_for_@var{name}}.
+
+Currently, these @code{@@} patterns only take into account patterns for
+which no @code{define_subst} has been applied (@pxref{Define Subst}).
+Any @samp{<@dots{}>} placeholders that refer to subst attributes
+(@pxref{Subst Iterators}) are ignored.
 
 @end ifset

@@ -1,5 +1,5 @@
 /* Generate code from machine description to emit insns as rtl.
-   Copyright (C) 1987-2024 Free Software Foundation, Inc.
+   Copyright (C) 1987-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -236,6 +236,10 @@ gen_exp (rtx x, enum rtx_code subroutine_type, char *used, md_rtx_info *info,
 
 	case 'i':
 	  fprintf (file, "%u", XINT (x, i));
+	  break;
+
+	case 'L':
+	  fprintf (file, "%llu", (unsigned long long) XLOC (x, i));
 	  break;
 
 	case 'r':

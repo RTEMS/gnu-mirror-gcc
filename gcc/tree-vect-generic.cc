@@ -1,5 +1,5 @@
 /* Lower vector operations to scalar operations.
-   Copyright (C) 2004-2024 Free Software Foundation, Inc.
+   Copyright (C) 2004-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -292,7 +292,8 @@ expand_vector_piecewise (gimple_stmt_iterator *gsi, elem_op_func f,
   tree part_width = TYPE_SIZE (inner_type);
   tree index = bitsize_int (0);
   int nunits = nunits_for_known_piecewise_op (type);
-  int delta = tree_to_uhwi (part_width) / vector_element_bits (type);
+  int delta = (VECTOR_TYPE_P (inner_type)
+	       ? nunits_for_known_piecewise_op (inner_type) : 1);
   int i;
   location_t loc = gimple_location (gsi_stmt (*gsi));
 

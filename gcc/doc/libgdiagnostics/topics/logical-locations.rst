@@ -1,4 +1,4 @@
-.. Copyright (C) 2024 Free Software Foundation, Inc.
+.. Copyright (C) 2024-2025 Free Software Foundation, Inc.
    Originally contributed by David Malcolm <dmalcolm@redhat.com>
 
    This is free software: you can redistribute it and/or modify it
@@ -87,6 +87,12 @@ source location
    ``decorated_name`` can be NULL or else a string suitable for use by
    the SARIF logicalLocation ``decoratedName`` property
    (SARIF v2.1.0 `§3.33.6 <https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/sarif-v2.1.0-errata01-os-complete.html#_Toc141790975>`_).
+
+   Repeated calls to :func:`diagnostic_manager_new_logical_location` with
+   "equal" input values on the same :type:`diagnostic_manager` will return
+   the same instance of :type:`diagnostic_logical_location`.  "Equal" here
+   includes different string buffers that compare as equal with
+   :func:``strcmp`.
 
 .. function:: void diagnostic_manager_debug_dump_logical_location (const diagnostic_manager *diag_mgr, \
                                                                    const diagnostic_logical_location *loc, \

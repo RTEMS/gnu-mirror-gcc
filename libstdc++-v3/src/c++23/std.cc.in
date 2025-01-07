@@ -1263,8 +1263,30 @@ export namespace std::filesystem
 #endif // __cpp_lib_filesystem
 
 // <flat_map>
+#if __cpp_lib_flat_map
+export namespace std
+{
+  using std::flat_map;
+  using std::flat_multimap;
+  using std::sorted_equivalent;
+  using std::sorted_equivalent_t;
+  using std::sorted_unique;
+  using std::sorted_unique_t;
+}
+#endif
 
 // <flat_set>
+#if __cpp_lib_flat_set
+export namespace std
+{
+  using std::flat_set;
+  using std::flat_multiset;
+  using std::sorted_equivalent;
+  using std::sorted_equivalent_t;
+  using std::sorted_unique;
+  using std::sorted_unique_t;
+}
+#endif
 
 // <format>
 export namespace std

@@ -1,5 +1,5 @@
 /* Code for the C/C++ front end for AVR 8-bit microcontrollers.
-   Copyright (C) 2009-2024 Free Software Foundation, Inc.
+   Copyright (C) 2009-2025 Free Software Foundation, Inc.
    Contributed by Anatoly Sokolov (aesok@post.ru)
 
    This file is part of GCC.
@@ -48,7 +48,7 @@ enum avr_builtin_id
 /* Implement `TARGET_RESOLVE_OVERLOADED_PLUGIN'.  */
 
 static tree
-avr_resolve_overloaded_builtin (location_t loc, tree fndecl, void *vargs)
+avr_resolve_overloaded_builtin (location_t loc, tree fndecl, void *vargs, bool)
 {
   tree type0, type1, fold = NULL_TREE;
   avr_builtin_id id = AVR_BUILTIN_COUNT;

@@ -1,6 +1,6 @@
 ; Options for the language- and target-independent parts of the compiler.
 
-; Copyright (C) 2003-2024 Free Software Foundation, Inc.
+; Copyright (C) 2003-2025 Free Software Foundation, Inc.
 ;
 ; This file is part of GCC.
 ;
@@ -811,6 +811,10 @@ case.
 Wsystem-headers
 Common Var(warn_system_headers) Warning
 Do not suppress warnings from system headers.
+
+Wtautological-compare
+Common Var(warn_tautological_compare) Warning LangEnabledBy(C ObjC C++ ObjC++,Wall)
+Warn if a comparison always evaluates to true or false.
 
 Wtrampolines
 Common Var(warn_trampolines) Warning
@@ -1808,9 +1812,8 @@ Common Undocumented Var(flag_keep_gc_roots_live) Optimization
 ; Always keep a pointer to a live memory block
 
 flarge-source-files
-Common Var(flag_large_source_files) Init(0)
-Improve GCC's ability to track column numbers in large source files,
-at the expense of slower compilation.
+Common Ignore
+Does nothing.  Preserved for backward compatibility.
 
 flate-combine-instructions
 Common Var(flag_late_combine_instructions) Optimization Init(0)
@@ -2235,6 +2238,14 @@ Enable link-time optimization.
 flto=
 Common RejectNegative Joined Var(flag_lto)
 Link-time optimization with number of parallel jobs or jobserver.
+
+flto-incremental=
+Common Joined Var(flag_lto_incremental)
+Enable incremental LTO, with its cache in given directory.
+
+flto-incremental-cache-size=
+Common Joined RejectNegative UInteger Var(flag_lto_incremental_cache_size) Init(2048)
+Number of cache entries in incremental LTO after which to prune old entries.
 
 Enum
 Name(lto_partition_model) Type(enum lto_partition_model) UnknownError(unknown LTO partitioning model %qs)

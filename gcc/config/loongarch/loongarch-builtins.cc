@@ -1,5 +1,5 @@
 /* Subroutines used for expanding LoongArch builtins.
-   Copyright (C) 2021-2024 Free Software Foundation, Inc.
+   Copyright (C) 2021-2025 Free Software Foundation, Inc.
    Contributed by Loongson Ltd.
 
 This file is part of GCC.
@@ -282,10 +282,24 @@ AVAIL_ALL (lasx_frecipe, ISA_HAS_LASX && ISA_HAS_FRECIPE)
 #define CODE_FOR_lsx_vftintrz_l_d CODE_FOR_fix_truncv2dfv2di2
 #define CODE_FOR_lsx_vftintrz_wu_s CODE_FOR_fixuns_truncv4sfv4si2
 #define CODE_FOR_lsx_vftintrz_lu_d CODE_FOR_fixuns_truncv2dfv2di2
+#define CODE_FOR_lsx_vftintrz_w_d CODE_FOR_vec_pack_sfix_trunc_v2df
+#define CODE_FOR_lsx_vftintrzh_l_s CODE_FOR_vec_unpack_sfix_trunc_hi_v4sf
+#define CODE_FOR_lsx_vftintrzl_l_s CODE_FOR_vec_unpack_sfix_trunc_lo_v4sf
 #define CODE_FOR_lsx_vffint_s_w CODE_FOR_floatv4siv4sf2
 #define CODE_FOR_lsx_vffint_d_l CODE_FOR_floatv2div2df2
 #define CODE_FOR_lsx_vffint_s_wu CODE_FOR_floatunsv4siv4sf2
 #define CODE_FOR_lsx_vffint_d_lu CODE_FOR_floatunsv2div2df2
+#define CODE_FOR_lsx_vffint_s_l CODE_FOR_vec_packs_float_v2di
+#define CODE_FOR_lsx_vffinth_d_w CODE_FOR_vec_unpacks_float_hi_v4si
+#define CODE_FOR_lsx_vffintl_d_w CODE_FOR_vec_unpacks_float_lo_v4si
+#define CODE_FOR_lsx_vexth_h_b CODE_FOR_vec_unpacks_hi_v16qi
+#define CODE_FOR_lsx_vexth_w_h CODE_FOR_vec_unpacks_hi_v8hi
+#define CODE_FOR_lsx_vexth_d_w CODE_FOR_vec_unpacks_hi_v4si
+#define CODE_FOR_lsx_vexth_hu_bu CODE_FOR_vec_unpacku_hi_v16qi
+#define CODE_FOR_lsx_vexth_wu_hu CODE_FOR_vec_unpacku_hi_v8hi
+#define CODE_FOR_lsx_vexth_du_wu CODE_FOR_vec_unpacku_hi_v4si
+#define CODE_FOR_lsx_vfcvth_d_s CODE_FOR_vec_unpacks_hi_v4sf
+#define CODE_FOR_lsx_vfcvtl_d_s CODE_FOR_vec_unpacks_lo_v4sf
 #define CODE_FOR_lsx_vfsub_s CODE_FOR_subv4sf3
 #define CODE_FOR_lsx_vfsub_d CODE_FOR_subv2df3
 #define CODE_FOR_lsx_vfmul_s CODE_FOR_mulv4sf3
@@ -448,14 +462,14 @@ AVAIL_ALL (lasx_frecipe, ISA_HAS_LASX && ISA_HAS_FRECIPE)
 #define CODE_FOR_lsx_vssub_hu CODE_FOR_lsx_vssub_u_hu
 #define CODE_FOR_lsx_vssub_wu CODE_FOR_lsx_vssub_u_wu
 #define CODE_FOR_lsx_vssub_du CODE_FOR_lsx_vssub_u_du
-#define CODE_FOR_lsx_vabsd_b CODE_FOR_lsx_vabsd_s_b
-#define CODE_FOR_lsx_vabsd_h CODE_FOR_lsx_vabsd_s_h
-#define CODE_FOR_lsx_vabsd_w CODE_FOR_lsx_vabsd_s_w
-#define CODE_FOR_lsx_vabsd_d CODE_FOR_lsx_vabsd_s_d
-#define CODE_FOR_lsx_vabsd_bu CODE_FOR_lsx_vabsd_u_bu
-#define CODE_FOR_lsx_vabsd_hu CODE_FOR_lsx_vabsd_u_hu
-#define CODE_FOR_lsx_vabsd_wu CODE_FOR_lsx_vabsd_u_wu
-#define CODE_FOR_lsx_vabsd_du CODE_FOR_lsx_vabsd_u_du
+#define CODE_FOR_lsx_vabsd_b CODE_FOR_sabdv16qi3
+#define CODE_FOR_lsx_vabsd_h CODE_FOR_sabdv8hi3
+#define CODE_FOR_lsx_vabsd_w CODE_FOR_sabdv4si3
+#define CODE_FOR_lsx_vabsd_d CODE_FOR_sabdv2di3
+#define CODE_FOR_lsx_vabsd_bu CODE_FOR_uabdv16qi3
+#define CODE_FOR_lsx_vabsd_hu CODE_FOR_uabdv8hi3
+#define CODE_FOR_lsx_vabsd_wu CODE_FOR_uabdv4si3
+#define CODE_FOR_lsx_vabsd_du CODE_FOR_uabdv2di3
 #define CODE_FOR_lsx_vftint_wu_s CODE_FOR_lsx_vftint_u_wu_s
 #define CODE_FOR_lsx_vftint_lu_d CODE_FOR_lsx_vftint_u_lu_d
 #define CODE_FOR_lsx_vandn_v CODE_FOR_andnv16qi3
@@ -563,6 +577,12 @@ AVAIL_ALL (lasx_frecipe, ISA_HAS_LASX && ISA_HAS_FRECIPE)
 #define CODE_FOR_lasx_xvffint_d_l CODE_FOR_floatv4div4df2
 #define CODE_FOR_lasx_xvffint_s_wu CODE_FOR_floatunsv8siv8sf2
 #define CODE_FOR_lasx_xvffint_d_lu CODE_FOR_floatunsv4div4df2
+#define CODE_FOR_lasx_vext2xv_h_b CODE_FOR_vec_unpacks_lo_v32qi
+#define CODE_FOR_lasx_vext2xv_w_h CODE_FOR_vec_unpacks_lo_v16hi
+#define CODE_FOR_lasx_vext2xv_d_w CODE_FOR_vec_unpacks_lo_v8si
+#define CODE_FOR_lasx_vext2xv_hu_bu CODE_FOR_vec_unpacku_lo_v32qi
+#define CODE_FOR_lasx_vext2xv_wu_hu CODE_FOR_vec_unpacku_lo_v16hi
+#define CODE_FOR_lasx_vext2xv_du_wu CODE_FOR_vec_unpacku_lo_v8si
 #define CODE_FOR_lasx_xvfsub_s CODE_FOR_subv8sf3
 #define CODE_FOR_lasx_xvfsub_d CODE_FOR_subv4df3
 #define CODE_FOR_lasx_xvfmul_s CODE_FOR_mulv8sf3
@@ -722,14 +742,14 @@ AVAIL_ALL (lasx_frecipe, ISA_HAS_LASX && ISA_HAS_FRECIPE)
 #define CODE_FOR_lasx_xvssub_hu CODE_FOR_lasx_xvssub_u_hu
 #define CODE_FOR_lasx_xvssub_wu CODE_FOR_lasx_xvssub_u_wu
 #define CODE_FOR_lasx_xvssub_du CODE_FOR_lasx_xvssub_u_du
-#define CODE_FOR_lasx_xvabsd_b CODE_FOR_lasx_xvabsd_s_b
-#define CODE_FOR_lasx_xvabsd_h CODE_FOR_lasx_xvabsd_s_h
-#define CODE_FOR_lasx_xvabsd_w CODE_FOR_lasx_xvabsd_s_w
-#define CODE_FOR_lasx_xvabsd_d CODE_FOR_lasx_xvabsd_s_d
-#define CODE_FOR_lasx_xvabsd_bu CODE_FOR_lasx_xvabsd_u_bu
-#define CODE_FOR_lasx_xvabsd_hu CODE_FOR_lasx_xvabsd_u_hu
-#define CODE_FOR_lasx_xvabsd_wu CODE_FOR_lasx_xvabsd_u_wu
-#define CODE_FOR_lasx_xvabsd_du CODE_FOR_lasx_xvabsd_u_du
+#define CODE_FOR_lasx_xvabsd_b CODE_FOR_sabdv32qi3
+#define CODE_FOR_lasx_xvabsd_h CODE_FOR_sabdv16hi3
+#define CODE_FOR_lasx_xvabsd_w CODE_FOR_sabdv8si3
+#define CODE_FOR_lasx_xvabsd_d CODE_FOR_sabdv4di3
+#define CODE_FOR_lasx_xvabsd_bu CODE_FOR_uabdv32qi3
+#define CODE_FOR_lasx_xvabsd_hu CODE_FOR_uabdv16hi3
+#define CODE_FOR_lasx_xvabsd_wu CODE_FOR_uabdv8si3
+#define CODE_FOR_lasx_xvabsd_du CODE_FOR_uabdv4di3
 #define CODE_FOR_lasx_xvavg_b CODE_FOR_lasx_xvavg_s_b
 #define CODE_FOR_lasx_xvavg_h CODE_FOR_lasx_xvavg_s_h
 #define CODE_FOR_lasx_xvavg_w CODE_FOR_lasx_xvavg_s_w
@@ -2757,6 +2777,8 @@ loongarch_expand_builtin_insn (enum insn_code icode, unsigned int nops,
     case CODE_FOR_lsx_vpickod_h:
     case CODE_FOR_lsx_vpickod_w:
     case CODE_FOR_lsx_vandn_v:
+    case CODE_FOR_lsx_vftintrz_w_d:
+    case CODE_FOR_lsx_vffint_s_l:
     case CODE_FOR_lasx_xvilvh_b:
     case CODE_FOR_lasx_xvilvh_h:
     case CODE_FOR_lasx_xvilvh_w:

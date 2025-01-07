@@ -1,5 +1,5 @@
 /* decl.cc -- Lower D frontend declarations to GCC trees.
-   Copyright (C) 2006-2024 Free Software Foundation, Inc.
+   Copyright (C) 2006-2025 Free Software Foundation, Inc.
 
 GCC is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -561,10 +561,8 @@ public:
 	    if (fd2->isFuture ())
 	      continue;
 
-	    if (FuncDeclaration::leastAsSpecialized (fd, fd2, NULL)
-		    == MATCH::nomatch
-		&& FuncDeclaration::leastAsSpecialized (fd2, fd, NULL)
-		    == MATCH::nomatch)
+	    if (dmd::leastAsSpecialized (fd, fd2, NULL) == MATCH::nomatch
+		&& dmd::leastAsSpecialized (fd2, fd, NULL) == MATCH::nomatch)
 	      continue;
 
 	    /* Hiding detected; same name, overlapping specializations.  */
@@ -805,7 +803,7 @@ public:
 	  return;
 
 	/* How big a symbol can be should depend on back-end.  */
-	tree size = build_integer_cst (d->type->size (d->loc),
+	tree size = build_integer_cst (dmd::size (d->type, d->loc),
 				       build_ctype (Type::tsize_t));
 	if (!valid_constant_size_p (size))
 	  {

@@ -1,5 +1,5 @@
 /* Functions dealing with attribute handling, used by most front ends.
-   Copyright (C) 1992-2024 Free Software Foundation, Inc.
+   Copyright (C) 1992-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -38,6 +38,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "pretty-print-markup.h"
 #include "tree-pretty-print.h"
 #include "intl.h"
+#include "gcc-urlifier.h"
 
 /* Table of the tables of attributes (common, language, format, machine)
    searched.  */
@@ -630,6 +631,8 @@ decl_attributes (tree *node, tree attributes, int flags,
 
   if (!attributes_initialized)
     init_attributes ();
+
+  auto_urlify_attributes sentinel;
 
   /* If this is a function and the user used #pragma GCC optimize, add the
      options to the attribute((optimize(...))) list.  */

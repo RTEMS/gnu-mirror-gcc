@@ -1,4 +1,4 @@
-// Copyright (C) 2023-2024 Free Software Foundation, Inc.
+// Copyright (C) 2023-2025 Free Software Foundation, Inc.
 
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -1834,6 +1834,26 @@
 # endif
 #endif /* !defined(__cpp_lib_adaptor_iterator_pair_constructor) && defined(__glibcxx_want_adaptor_iterator_pair_constructor) */
 #undef __glibcxx_want_adaptor_iterator_pair_constructor
+
+#if !defined(__cpp_lib_flat_map)
+# if (__cplusplus >= 202100L)
+#  define __glibcxx_flat_map 202207L
+#  if defined(__glibcxx_want_all) || defined(__glibcxx_want_flat_map)
+#   define __cpp_lib_flat_map 202207L
+#  endif
+# endif
+#endif /* !defined(__cpp_lib_flat_map) && defined(__glibcxx_want_flat_map) */
+#undef __glibcxx_want_flat_map
+
+#if !defined(__cpp_lib_flat_set)
+# if (__cplusplus >= 202100L)
+#  define __glibcxx_flat_set 202207L
+#  if defined(__glibcxx_want_all) || defined(__glibcxx_want_flat_set)
+#   define __cpp_lib_flat_set 202207L
+#  endif
+# endif
+#endif /* !defined(__cpp_lib_flat_set) && defined(__glibcxx_want_flat_set) */
+#undef __glibcxx_want_flat_set
 
 #if !defined(__cpp_lib_formatters)
 # if (__cplusplus >= 202100L) && _GLIBCXX_HOSTED

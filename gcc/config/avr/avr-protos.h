@@ -1,5 +1,5 @@
 /* Prototypes for tm_p.h for AVR 8-bit microcontrollers.
-   Copyright (C) 2000-2024 Free Software Foundation, Inc.
+   Copyright (C) 2000-2025 Free Software Foundation, Inc.
    Contributed by Denis Chertykov (chertykov@gmail.com)
 
    This file is part of GCC.
@@ -109,9 +109,11 @@ extern const char *avr_out_sbxx_branch (rtx_insn *insn, rtx operands[]);
 extern const char* avr_out_bitop (rtx, rtx*, int*);
 extern const char* avr_out_plus (rtx, rtx*, int* =NULL, bool =true);
 extern const char* avr_out_plus_ext (rtx_insn*, rtx*, int*);
+extern const char* avr_out_add_msb (rtx_insn*, rtx*, rtx_code, int*);
 extern const char* avr_out_round (rtx_insn *, rtx*, int* =NULL);
 extern const char* avr_out_addto_sp (rtx*, int*);
 extern const char* avr_out_xload (rtx_insn *, rtx*, int*);
+extern const char* avr_out_fload (rtx_insn *, rtx*, int*);
 extern const char* avr_out_cpymem (rtx_insn *, rtx*, int*);
 extern const char* avr_out_insert_bits (rtx*, int*);
 extern bool avr_popcount_each_byte (rtx, int, int);
@@ -143,9 +145,13 @@ extern rtx avr_incoming_return_addr_rtx (void);
 extern rtx avr_legitimize_reload_address (rtx*, machine_mode, int, int, int, int, rtx (*)(rtx,int));
 extern bool avr_adiw_reg_p (rtx);
 extern bool avr_mem_flash_p (rtx);
+extern bool avr_mem_flashx_p (rtx);
 extern bool avr_mem_memx_p (rtx);
 extern bool avr_load_libgcc_p (rtx);
 extern bool avr_xload_libgcc_p (machine_mode);
+extern bool avr_fload_libgcc_p (machine_mode);
+extern bool avr_load_libgcc_mem_p (rtx, addr_space_t, bool use_libgcc);
+extern bool avr_load_libgcc_insn_p (rtx_insn *, addr_space_t, bool use_libgcc);
 extern rtx avr_eval_addr_attrib (rtx x);
 
 extern bool avr_float_lib_compare_returns_bool (machine_mode, rtx_code);
@@ -173,6 +179,7 @@ extern int n_avr_fuse_add_executed;
 extern bool avr_shift_is_3op ();
 extern bool avr_split_shift_p (int n_bytes, int offset, rtx_code);
 extern bool avr_split_shift (rtx xop[], rtx xscratch, rtx_code);
+extern bool avr_split_ldst (rtx xop[]);
 
 extern int avr_optimize_size_level ();
 

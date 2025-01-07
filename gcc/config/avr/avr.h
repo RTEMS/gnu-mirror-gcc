@@ -1,6 +1,6 @@
 /* Definitions of target machine for GNU compiler,
    for AVR 8-bit microcontrollers.
-   Copyright (C) 1998-2024 Free Software Foundation, Inc.
+   Copyright (C) 1998-2025 Free Software Foundation, Inc.
    Contributed by Denis Chertykov (chertykov@gmail.com)
 
 This file is part of GCC.
@@ -53,6 +53,7 @@ enum
     ADDR_SPACE_FLASH3,
     ADDR_SPACE_FLASH4,
     ADDR_SPACE_FLASH5,
+    ADDR_SPACE_FLASHX,
     ADDR_SPACE_MEMX,
     /* Sentinel */
     ADDR_SPACE_COUNT

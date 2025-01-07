@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -258,10 +258,10 @@ package body Diagnostics.Utils is
    begin
       if Warning_Doc_Switch
         and then Diag.Kind in Default_Warning
-          | Info
-          | Restriction_Warning
-          | Style
-          | Warning
+                            | Info
+                            | Restriction_Warning
+                            | Style
+                            | Warning
       then
          if Diag.Switch = No_Switch_Id then
             if Diag.Kind = Restriction_Warning then

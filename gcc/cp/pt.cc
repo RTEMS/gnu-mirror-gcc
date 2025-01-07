@@ -1,5 +1,5 @@
 /* Handle parameterized types (templates) for GNU -*- C++ -*-.
-   Copyright (C) 1992-2024 Free Software Foundation, Inc.
+   Copyright (C) 1992-2025 Free Software Foundation, Inc.
    Written by Ken Raeburn (raeburn@cygnus.com) while at Watchmaker Computing.
    Rewritten by Jason Merrill (jason@cygnus.com).
 
@@ -1657,10 +1657,13 @@ register_specialization (tree spec, tree tmpl, tree args, bool is_friend,
   if ((TREE_CODE (spec) == FUNCTION_DECL && DECL_NAMESPACE_SCOPE_P (spec)
        && PRIMARY_TEMPLATE_P (tmpl)
        && DECL_SAVED_TREE (DECL_TEMPLATE_RESULT (tmpl)) == NULL_TREE)
+      || module_maybe_has_cmi_p ()
       || variable_template_p (tmpl))
     /* If TMPL is a forward declaration of a template function, keep a list
        of all specializations in case we need to reassign them to a friend
        template later in tsubst_friend_function.
+
+       If we're building a CMI, keep a list for all function templates.
 
        Also keep a list of all variable template instantiations so that
        process_partial_specialization can check whether a later partial
@@ -5634,8 +5637,7 @@ check_default_tmpl_args (tree decl, tree parms, bool is_primary,
        local scope.  */
     return true;
 
-  if ((TREE_CODE (decl) == TYPE_DECL
-       && TREE_TYPE (decl)
+  if ((DECL_IMPLICIT_TYPEDEF_P (decl)
        && LAMBDA_TYPE_P (TREE_TYPE (decl)))
       || (TREE_CODE (decl) == FUNCTION_DECL
 	  && LAMBDA_FUNCTION_P (decl)))
@@ -5921,7 +5923,7 @@ push_template_decl (tree decl, bool is_friend)
          template <typename T> friend void A<T>::f();
        is not primary.  */
     ;
-  else if (TREE_CODE (decl) == TYPE_DECL && LAMBDA_TYPE_P (TREE_TYPE (decl)))
+  else if (DECL_IMPLICIT_TYPEDEF_P (decl) && LAMBDA_TYPE_P (TREE_TYPE (decl)))
     /* Lambdas are not primary.  */
     ;
   else
@@ -6074,7 +6076,8 @@ push_template_decl (tree decl, bool is_friend)
   else if (!ctx
 	   || TREE_CODE (ctx) == FUNCTION_DECL
 	   || (CLASS_TYPE_P (ctx) && TYPE_BEING_DEFINED (ctx))
-	   || (TREE_CODE (decl) == TYPE_DECL && LAMBDA_TYPE_P (TREE_TYPE (decl)))
+	   || (DECL_IMPLICIT_TYPEDEF_P (decl)
+	       && LAMBDA_TYPE_P (TREE_TYPE (decl)))
 	   || (is_friend && !(DECL_LANG_SPECIFIC (decl)
 			      && DECL_TEMPLATE_INFO (decl))))
     {
@@ -9903,6 +9906,71 @@ add_pending_template (tree d)
     pop_tinst_level ();
 }
 
+/* Emit a diagnostic about instantiating a reference to TU-local entity E.  */
+
+static void
+complain_about_tu_local_entity (tree e)
+{
+  auto_diagnostic_group d;
+  error ("instantiation exposes TU-local entity %qD",
+	 TU_LOCAL_ENTITY_NAME (e));
+  inform (TU_LOCAL_ENTITY_LOCATION (e), "declared here");
+}
+
+/* Checks if T contains a TU-local entity.  */
+
+static bool
+expr_contains_tu_local_entity (tree t)
+{
+  if (!modules_p ())
+    return false;
+
+  auto walker = [](tree *tp, int *walk_subtrees, void *) -> tree
+    {
+      if (TREE_CODE (*tp) == TU_LOCAL_ENTITY)
+	return *tp;
+      if (!EXPR_P (*tp))
+	*walk_subtrees = false;
+      return NULL_TREE;
+    };
+  return cp_walk_tree (&t, walker, nullptr, nullptr);
+}
+
+/* Errors and returns TRUE if X is a function that contains a TU-local
+   entity in its overload set.  */
+
+static bool
+function_contains_tu_local_entity (tree x)
+{
+  if (!modules_p ())
+    return false;
+
+  if (!x || x == error_mark_node)
+    return false;
+
+  if (TREE_CODE (x) == OFFSET_REF
+      || TREE_CODE (x) == COMPONENT_REF)
+    x = TREE_OPERAND (x, 1);
+  x = MAYBE_BASELINK_FUNCTIONS (x);
+  if (TREE_CODE (x) == TEMPLATE_ID_EXPR)
+    x = TREE_OPERAND (x, 0);
+
+  if (OVL_P (x))
+    for (tree ovl : lkp_range (x))
+      if (TREE_CODE (ovl) == TU_LOCAL_ENTITY)
+	{
+	  x = ovl;
+	  break;
+	}
+
+  if (TREE_CODE (x) == TU_LOCAL_ENTITY)
+    {
+      complain_about_tu_local_entity (x);
+      return true;
+    }
+
+  return false;
+}
 
 /* Return a TEMPLATE_ID_EXPR corresponding to the indicated FNS and
    ARGLIST.  Valid choices for FNS are given in the cp-tree.def
@@ -12094,6 +12162,15 @@ tsubst_attribute (tree t, tree *decl_p, tree args,
       tree chain = TREE_CHAIN (val);
       location_t match_loc = cp_expr_loc_or_input_loc (TREE_PURPOSE (chain));
       tree ctx = copy_list (TREE_VALUE (val));
+      tree append_args_list = TREE_CHAIN (TREE_CHAIN (chain));
+      if (append_args_list)
+	{
+	  append_args_list = TREE_VALUE (append_args_list);
+	  if (append_args_list)
+	    TREE_CHAIN (append_args_list)
+	      = tsubst_omp_clauses (TREE_CHAIN (append_args_list),
+				    C_ORT_OMP_DECLARE_SIMD, args, complain, in_decl);
+	}
       for (tree tss = ctx; tss; tss = TREE_CHAIN (tss))
 	{
 	  enum omp_tss_code set = OMP_TSS_CODE (tss);
@@ -12768,8 +12845,10 @@ instantiate_class_template (tree type)
 	}
       else
 	{
-	  if (TYPE_P (t) || DECL_CLASS_TEMPLATE_P (t)
-	      || DECL_TEMPLATE_TEMPLATE_PARM_P (t))
+	  if (TREE_CODE (t) == TU_LOCAL_ENTITY)
+	    /* Ignore.  */;
+	  else if (TYPE_P (t) || DECL_CLASS_TEMPLATE_P (t)
+		   || DECL_TEMPLATE_TEMPLATE_PARM_P (t))
 	    {
 	      /* Build new CLASSTYPE_FRIEND_CLASSES.  */
 
@@ -13984,6 +14063,12 @@ tsubst_pack_index (tree t, tree args, tsubst_flags_t complain, tree in_decl)
   tree pack = PACK_INDEX_PACK (t);
   if (PACK_EXPANSION_P (pack))
     pack = tsubst_pack_expansion (pack, args, complain, in_decl);
+  if (TREE_CODE (pack) == TREE_VEC && TREE_VEC_LENGTH (pack) == 0)
+    {
+      if (complain & tf_error)
+	error ("cannot index an empty pack");
+      return error_mark_node;
+    }
   tree index = tsubst_expr (PACK_INDEX_INDEX (t), args, complain, in_decl);
   const bool parenthesized_p = (TREE_CODE (t) == PACK_INDEX_EXPR
 				&& PACK_INDEX_PARENTHESIZED_P (t));
@@ -15573,7 +15658,8 @@ tsubst_decl (tree t, tree args, tsubst_flags_t complain,
 	  RETURN (error_mark_node);
 
 	if (TREE_CODE (t) == TYPE_DECL
-	    && t == TYPE_MAIN_DECL (TREE_TYPE (t)))
+	    && (TREE_CODE (TREE_TYPE (t)) == TU_LOCAL_ENTITY
+		|| t == TYPE_MAIN_DECL (TREE_TYPE (t))))
 	  {
 	    /* If this is the canonical decl, we don't have to
 	       mess with instantiations, and often we can't (for
@@ -16300,6 +16386,14 @@ tsubst (tree t, tree args, tsubst_flags_t complain, tree in_decl)
       || TREE_CODE (t) == NAMESPACE_DECL
       || TREE_CODE (t) == TRANSLATION_UNIT_DECL)
     return t;
+
+  /* Any instantiation of a template containing a TU-local entity is an
+     exposure, so always issue a hard error irrespective of complain.  */
+  if (TREE_CODE (t) == TU_LOCAL_ENTITY)
+    {
+      complain_about_tu_local_entity (t);
+      return error_mark_node;
+    }
 
   tsubst_flags_t tst_ok_flag = (complain & tf_tst_ok);
   complain &= ~tf_tst_ok;
@@ -17910,7 +18004,7 @@ tsubst_omp_clauses (tree clauses, enum c_omp_region_type ort,
 			     complain, in_decl);
 	  break;
 	case OMP_CLAUSE_INIT:
-	  if (ort == C_ORT_OMP_INTEROP
+	  if ((ort == C_ORT_OMP_INTEROP  || ort == C_ORT_OMP_DECLARE_SIMD)
 	      && OMP_CLAUSE_INIT_PREFER_TYPE (nc)
 	      && TREE_CODE (OMP_CLAUSE_INIT_PREFER_TYPE (nc)) == TREE_LIST
 	      && (OMP_CLAUSE_CHAIN (nc)  == NULL_TREE
@@ -18581,6 +18675,12 @@ dependent_operand_p (tree t)
 {
   while (TREE_CODE (t) == IMPLICIT_CONV_EXPR)
     t = TREE_OPERAND (t, 0);
+
+  /* If we contain a TU_LOCAL_ENTITY assume we're non-dependent; we'll error
+     later when instantiating.  */
+  if (expr_contains_tu_local_entity (t))
+    return false;
+
   ++processing_template_decl;
   bool r = (potential_constant_expression (t)
 	    ? value_dependent_expression_p (t)
@@ -19066,7 +19166,7 @@ tsubst_stmt (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 						complain, in_decl);
 	tmp = finish_asm_stmt (EXPR_LOCATION (t), ASM_VOLATILE_P (t), string,
 			       outputs, inputs, clobbers, labels,
-			       ASM_INLINE_P (t));
+			       ASM_INLINE_P (t), false);
 	tree asm_expr = tmp;
 	if (TREE_CODE (asm_expr) == CLEANUP_POINT_EXPR)
 	  asm_expr = TREE_OPERAND (asm_expr, 0);
@@ -20368,6 +20468,9 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 	else
 	  object = NULL_TREE;
 
+	if (function_contains_tu_local_entity (templ))
+	  RETURN (error_mark_node);
+
 	tree tid = lookup_template_function (templ, targs);
 	protected_set_expr_location (tid, EXPR_LOCATION (t));
 
@@ -21059,6 +21162,9 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 	    if (BASELINK_P (function))
 	      qualified_p = true;
 	  }
+
+	if (function_contains_tu_local_entity (function))
+	  RETURN (error_mark_node);
 
 	nargs = call_expr_nargs (t);
 	releasing_vec call_args;
@@ -21952,6 +22058,14 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 	RETURN (r);
       }
 
+    case RAW_DATA_CST:
+      {
+	tree type = tsubst (TREE_TYPE (t), args, complain, in_decl);
+	r = copy_node (t);
+	TREE_TYPE (r) = type;
+	RETURN (r);
+      }
+
     case PTRMEM_CST:
       /* These can sometimes show up in a partial instantiation, but never
 	 involve template parms.  */
@@ -22115,6 +22229,10 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 	  }
 	RETURN (op);
       }
+
+    case TU_LOCAL_ENTITY:
+      complain_about_tu_local_entity (t);
+      RETURN (error_mark_node);
 
     default:
       /* Handle Objective-C++ constructs, if appropriate.  */
@@ -29797,11 +29915,13 @@ finish_concept_definition (cp_expr id, tree init, tree attrs)
   tree decl = build_lang_decl_loc (loc, CONCEPT_DECL, *id, boolean_type_node);
   DECL_CONTEXT (decl) = current_scope ();
   DECL_INITIAL (decl) = init;
+  TREE_PUBLIC (decl) = true;
 
   if (attrs)
     cplus_decl_attributes (&decl, attrs, 0);
 
   set_originating_module (decl, false);
+  check_module_decl_linkage (decl);
 
   /* Push the enclosing template.  */
   return push_template_decl (decl);

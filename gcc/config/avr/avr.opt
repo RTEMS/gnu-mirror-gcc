@@ -1,6 +1,6 @@
 ; Options for AVR 8-bit microcontrollers.
 
-; Copyright (C) 2005-2024 Free Software Foundation, Inc.
+; Copyright (C) 2005-2025 Free Software Foundation, Inc.
 ;
 ; This file is part of GCC.
 ;
@@ -97,6 +97,10 @@ Optimization. Accumulate outgoing function arguments and acquire/release the nee
 msplit-bit-shift
 Target Var(avropt_split_bit_shift) Init(0) Optimization
 Optimization. Split shifts of 4-byte values into a byte shift and a residual bit shift.
+
+msplit-ldst
+Target Var(avropt_split_ldst) Init(0) Optimization
+Optimization. Split most of the load and store instructions into byte load and stores.
 
 mstrict-X
 Target Var(avropt_strict_X) Init(0) Optimization

@@ -1,3 +1,7 @@
+2025-01-02  Jakub Jelinek  <jakub@redhat.com>
+
+	* libitm.texi: Bump @copying's copyright year.
+
 2024-11-18  David Malcolm  <dmalcolm@redhat.com>
 
 	* testsuite/lib/libitm.exp: Add
@@ -2667,7 +2671,7 @@
 
 	* Initial commit.
 
-Copyright (C) 2008-2024 Free Software Foundation, Inc.
+Copyright (C) 2008-2025 Free Software Foundation, Inc.
 
 Copying and distribution of this file, with or without modification,
 are permitted in any medium without royalty provided the copyright

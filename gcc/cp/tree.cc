@@ -1,5 +1,5 @@
 /* Language-dependent node constructors for parse phase of GNU compiler.
-   Copyright (C) 1987-2024 Free Software Foundation, Inc.
+   Copyright (C) 1987-2025 Free Software Foundation, Inc.
    Hacked by Michael Tiemann (tiemann@cygnus.com)
 
 This file is part of GCC.
@@ -5114,6 +5114,75 @@ handle_likeliness_attribute (tree *node, tree name, tree args,
     return error_mark_node;
 }
 
+/* The C++11 alignment specifier.  It mostly maps to GNU aligned attribute,
+   but we need to do some extra pedantic checking.  */
+
+static tree
+handle_alignas_attribute (tree *node, tree name, tree args, int flags,
+			  bool *no_add_attrs)
+{
+  tree t = *node;
+  tree ret = handle_aligned_attribute (node, name, args, flags, no_add_attrs);
+  if (pedantic)
+    {
+      if (TREE_CODE (*node) == FUNCTION_DECL)
+	pedwarn (input_location, OPT_Wattributes,
+		 "%<alignas%> on function declaration");
+      else if (TREE_CODE (*node) == ENUMERAL_TYPE)
+	pedwarn (input_location, OPT_Wattributes,
+		 "%<alignas%> on enumerated type");
+      else if (TYPE_P (*node) && t != *node)
+	pedwarn (input_location, OPT_Wattributes,
+		 "%<alignas%> on a type other than class");
+      else if (TREE_CODE (*node) == FIELD_DECL && DECL_C_BIT_FIELD (*node))
+	pedwarn (input_location, OPT_Wattributes, "%<alignas%> on bit-field");
+      else if (TREE_CODE (t) == TYPE_DECL)
+	pedwarn (input_location, OPT_Wattributes,
+		 "%<alignas%> on a type alias");
+    }
+  return ret;
+}
+
+/* The C++14 [[deprecated]] attribute mostly maps to the GNU deprecated
+   attribute.  */
+
+static tree
+handle_std_deprecated_attribute (tree *node, tree name, tree args, int flags,
+				 bool *no_add_attrs)
+{
+  tree t = *node;
+  tree ret = handle_deprecated_attribute (node, name, args, flags,
+					  no_add_attrs);
+  if (TYPE_P (*node) && t != *node)
+    pedwarn (input_location, OPT_Wattributes,
+	     "%qE on a type other than class or enumeration definition", name);
+  else if (TREE_CODE (*node) == FIELD_DECL && DECL_UNNAMED_BIT_FIELD (*node))
+    pedwarn (input_location, OPT_Wattributes, "%qE on unnamed bit-field",
+	     name);
+  return ret;
+}
+
+/* The C++17 [[maybe_unused]] attribute mostly maps to the GNU unused
+   attribute.  */
+
+static tree
+handle_maybe_unused_attribute (tree *node, tree name, tree args, int flags,
+			       bool *no_add_attrs)
+{
+  tree t = *node;
+  tree ret = handle_unused_attribute (node, name, args, flags, no_add_attrs);
+  if (TYPE_P (*node) && t != *node)
+    pedwarn (input_location, OPT_Wattributes,
+	     "%qE on a type other than class or enumeration definition", name);
+  else if (TREE_CODE (*node) == FIELD_DECL && DECL_UNNAMED_BIT_FIELD (*node))
+    pedwarn (input_location, OPT_Wattributes, "%qE on unnamed bit-field",
+	     name);
+  else if (TREE_CODE (*node) == LABEL_DECL && DECL_NAME (*node) == NULL_TREE)
+    pedwarn (input_location, OPT_Wattributes,
+	     "%qE on %<case%> or %<default%> label", name);
+  return ret;
+}
+
 /* Table of valid C++ attributes.  */
 static const attribute_spec cxx_gnu_attributes[] =
 {
@@ -5137,8 +5206,10 @@ static const attribute_spec std_attributes[] =
 {
   /* { name, min_len, max_len, decl_req, type_req, fn_type_req,
        affects_type_identity, handler, exclude } */
+  { "deprecated", 0, 1, false, false, false, false,
+    handle_std_deprecated_attribute, NULL },
   { "maybe_unused", 0, 0, false, false, false, false,
-    handle_unused_attribute, NULL },
+    handle_maybe_unused_attribute, NULL },
   { "nodiscard", 0, 1, false, false, false, false,
     handle_nodiscard_attribute, NULL },
   { "no_unique_address", 0, 0, true, false, false, false,
@@ -5160,6 +5231,18 @@ static const attribute_spec std_attributes[] =
 const scoped_attribute_specs std_attribute_table =
 {
   nullptr, { std_attributes }
+};
+
+/* Table of internal attributes.  */
+static const attribute_spec internal_attributes[] =
+{
+  { "aligned", 0, 1, false, false, false, false,
+    handle_alignas_attribute, attr_aligned_exclusions }
+};
+
+const scoped_attribute_specs internal_attribute_table =
+{
+  "internal ", { internal_attributes }
 };
 
 /* Handle an "init_priority" attribute; arguments as in
@@ -5894,14 +5977,16 @@ decl_linkage (tree decl)
      linkage first, and then transform that into a concrete
      implementation.  */
 
-  /* An explicit type alias has no linkage.  */
+  /* An explicit type alias has no linkage.  Nor do the built-in declarations
+     of 'int' and such.  */
   if (TREE_CODE (decl) == TYPE_DECL
-      && !DECL_IMPLICIT_TYPEDEF_P (decl)
-      && !DECL_SELF_REFERENCE_P (decl))
+      && !DECL_IMPLICIT_TYPEDEF_P (decl))
     {
       /* But this could be a typedef name for linkage purposes, in which
 	 case we're interested in the linkage of the main decl.  */
-      if (decl == TYPE_NAME (TYPE_MAIN_VARIANT (TREE_TYPE (decl))))
+      if (decl == TYPE_NAME (TYPE_MAIN_VARIANT (TREE_TYPE (decl)))
+	  /* Likewise for the injected-class-name.  */
+	  || DECL_SELF_REFERENCE_P (decl))
 	decl = TYPE_MAIN_DECL (TREE_TYPE (decl));
       else
 	return lk_none;

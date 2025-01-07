@@ -1,5 +1,5 @@
 /* Handle errors.
-   Copyright (C) 2000-2024 Free Software Foundation, Inc.
+   Copyright (C) 2000-2025 Free Software Foundation, Inc.
    Contributed by Andy Vaught & Niels Kristian Bech Jensen
 
 This file is part of GCC.
@@ -606,7 +606,9 @@ gfc_diagnostic_text_starter (diagnostic_text_output_format &text_output,
       pp_newline (pp);
       pp_set_prefix (pp, NULL);
       pp_newline (pp);
-      diagnostic_show_locus (context, diagnostic->richloc, diagnostic->kind,
+      diagnostic_show_locus (context,
+			     text_output.get_source_printing_options (),
+			     diagnostic->richloc, diagnostic->kind,
 			     pp);
       /* If the caret line was shown, the prefix does not contain the
 	 locus.  */

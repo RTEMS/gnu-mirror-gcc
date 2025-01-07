@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -27,7 +27,6 @@
 --    - controlled types
 --    - transient scopes
 
-with Aspects;        use Aspects;
 with Atree;          use Atree;
 with Debug;          use Debug;
 with Einfo;          use Einfo;
@@ -515,7 +514,13 @@ package body Exp_Ch7 is
    --  cleanup actions are performed at the end of the block.
 
    procedure Store_Actions_In_Scope (AK : Scope_Action_Kind; L : List_Id);
-   --  Shared processing for Store_xxx_Actions_In_Scope
+   --  Shared processing for the Store_xxx_Actions_In_Scope routines: attach
+   --  the list L of actions to the list of actions stored in the top of the
+   --  scope stack specified by AK.
+
+   procedure Store_New_Actions_In_Scope (AK : Scope_Action_Kind; L : List_Id);
+   --  Same as above for the case where the list of actions stored in the top
+   --  of the scope stack specified by AK is empty.
 
    -------------------------------------------
    -- Unnesting procedures for CCG and LLVM --
@@ -707,8 +712,8 @@ package body Exp_Ch7 is
                    else Empty);
 
       function Build_BIP_Cleanup_Stmts
-         (Func_Id  : Entity_Id;
-          Obj_Addr : Node_Id) return Node_Id;
+        (Func_Id  : Entity_Id;
+         Obj_Addr : Node_Id) return Node_Id;
       --  Func_Id denotes a build-in-place function. Generate the following
       --  cleanup code:
       --
@@ -2547,7 +2552,8 @@ package body Exp_Ch7 is
                elsif Ekind (Obj_Id) = E_Variable
                  and then Is_RTE (Obj_Typ, RE_Master_Node)
                then
-                  Processing_Actions (Decl);
+                  Processing_Actions
+                    (Decl, Strict => not Is_Independent (Obj_Id));
 
                --  The object is of the form:
                --    Obj : [constant] Typ [:= Expr];
@@ -3929,7 +3935,8 @@ package body Exp_Ch7 is
                   Set_Scope (Id, Block_Elab_Proc);
 
                when N_Object_Declaration
-                 | N_Object_Renaming_Declaration =>
+                  | N_Object_Renaming_Declaration
+               =>
                   Id := Defining_Entity (Stat);
                   if No (Block_Elab_Proc) then
                      Append_Elmt (Id, Maybe_Reset_Scopes_For_Decl);
@@ -5470,31 +5477,14 @@ package body Exp_Ch7 is
             Related_Node => Target);
       end if;
 
-      --  If the target is the declaration of an object with an address clause
-      --  or aspect, move all the statements that have been inserted after it
-      --  into its Initialization_Statements list, so they can be inserted into
-      --  its freeze actions later.
+      --  If the target is the declaration of an object, park the generated
+      --  statements if need be.
 
       if Nkind (Target) = N_Object_Declaration
-        and then (Present (Following_Address_Clause (Target))
-                   or else
-                  Has_Aspect (Defining_Identifier (Target), Aspect_Address))
         and then Next (Target) /= Marker
+        and then Needs_Initialization_Statements (Target)
       then
-         declare
-            Obj_Id : constant Entity_Id := Defining_Identifier (Target);
-            Stmts  : constant List_Id   := New_List;
-
-         begin
-            while Next (Target) /= Marker loop
-               Append_To (Stmts, Remove_Next (Target));
-            end loop;
-
-            pragma Assert (No (Initialization_Statements (Obj_Id)));
-
-            Set_Initialization_Statements
-              (Obj_Id, Make_Compound_Statement (Loc, Actions => Stmts));
-         end;
+         Move_To_Initialization_Statements (Target, Marker);
       end if;
 
       --  Reset the action lists
@@ -5532,6 +5522,8 @@ package body Exp_Ch7 is
       Obj_Ref : Node_Id;
       Obj_Typ : Entity_Id) return Node_Id
    is
+      Utyp : constant Entity_Id := Underlying_Type (Obj_Typ);
+
       Obj_Addr : Node_Id;
 
    begin
@@ -5547,13 +5539,13 @@ package body Exp_Ch7 is
       --  but the address of the object is still that of its elements,
       --  so we need to shift it.
 
-      if Is_Array_Type (Obj_Typ)
-        and then not Is_Constrained (First_Subtype (Obj_Typ))
+      if Is_Array_Type (Utyp)
+        and then not Is_Constrained (First_Subtype (Utyp))
       then
          --  Shift the address from the start of the elements to the
          --  start of the dope vector:
 
-         --    V - (Obj_Typ'Descriptor_Size / Storage_Unit)
+         --    V - (Utyp'Descriptor_Size / Storage_Unit)
 
          Obj_Addr :=
            Make_Function_Call (Loc,
@@ -5570,7 +5562,7 @@ package body Exp_Ch7 is
                Make_Op_Divide (Loc,
                  Left_Opnd  =>
                    Make_Attribute_Reference (Loc,
-                     Prefix         => New_Occurrence_Of (Obj_Typ, Loc),
+                     Prefix         => New_Occurrence_Of (Utyp, Loc),
                      Attribute_Name => Name_Descriptor_Size),
                  Right_Opnd =>
                    Make_Integer_Literal (Loc, System_Storage_Unit))));
@@ -8921,14 +8913,7 @@ package body Exp_Ch7 is
 
    begin
       if Is_Empty_List (Actions) then
-         Actions := L;
-
-         if Is_List_Member (SE.Node_To_Be_Wrapped) then
-            Set_Parent (L, Parent (SE.Node_To_Be_Wrapped));
-         else
-            Set_Parent (L, SE.Node_To_Be_Wrapped);
-         end if;
-
+         Store_New_Actions_In_Scope (AK, L);
          Analyze_List (L);
 
       elsif AK = Before then
@@ -8948,6 +8933,22 @@ package body Exp_Ch7 is
       Store_Actions_In_Scope (After, L);
    end Store_After_Actions_In_Scope;
 
+   ---------------------------------------------------
+   -- Store_After_Actions_In_Scope_Without_Analysis --
+   ---------------------------------------------------
+
+   procedure Store_After_Actions_In_Scope_Without_Analysis (L : List_Id) is
+      SE      : Scope_Stack_Entry renames Scope_Stack.Table (Scope_Stack.Last);
+      Actions : List_Id renames SE.Actions_To_Be_Wrapped (After);
+
+   begin
+      if Is_Empty_List (Actions) then
+         Store_New_Actions_In_Scope (After, L);
+      else
+         Insert_List_Before (First (Actions), L);
+      end if;
+   end Store_After_Actions_In_Scope_Without_Analysis;
+
    -----------------------------------
    -- Store_Before_Actions_In_Scope --
    -----------------------------------
@@ -8965,6 +8966,29 @@ package body Exp_Ch7 is
    begin
       Store_Actions_In_Scope (Cleanup, L);
    end Store_Cleanup_Actions_In_Scope;
+
+   --------------------------------
+   -- Store_New_Actions_In_Scope --
+   --------------------------------
+
+   procedure Store_New_Actions_In_Scope (AK : Scope_Action_Kind; L : List_Id)
+   is
+      SE      : Scope_Stack_Entry renames Scope_Stack.Table (Scope_Stack.Last);
+      Actions : List_Id renames SE.Actions_To_Be_Wrapped (AK);
+
+   begin
+      pragma Assert (Is_Empty_List (Actions));
+
+      Actions := L;
+
+      --  Set the Parent link to provide the context for the actions
+
+      if Is_List_Member (SE.Node_To_Be_Wrapped) then
+         Set_Parent (L, Parent (SE.Node_To_Be_Wrapped));
+      else
+         Set_Parent (L, SE.Node_To_Be_Wrapped);
+      end if;
+   end Store_New_Actions_In_Scope;
 
    ------------------
    -- Unnest_Block --

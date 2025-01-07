@@ -1,5 +1,5 @@
 ;; Machine description for AArch64 SVE.
-;; Copyright (C) 2009-2024 Free Software Foundation, Inc.
+;; Copyright (C) 2009-2025 Free Software Foundation, Inc.
 ;; Contributed by ARM Ltd.
 ;;
 ;; This file is part of GCC.
@@ -124,7 +124,6 @@
 ;;
 ;; == Comparisons and selects
 ;; ---- [INT,FP] Select based on predicates
-;; ---- [INT,FP] Compare and select
 ;; ---- [INT] Comparisons
 ;; ---- [INT] While tests
 ;; ---- [FP] Direct comparisons
@@ -2840,6 +2839,39 @@
   }
 )
 
+;; Vector constructor combining two half vectors { a, b }
+(define_expand "vec_init<mode><Vhalf>"
+  [(match_operand:SVE_NO2E 0 "register_operand")
+   (match_operand 1 "")]
+  "TARGET_SVE"
+  {
+    aarch64_sve_expand_vector_init_subvector (operands[0], operands[1]);
+    DONE;
+  }
+)
+
+;; Vector constructor combining four quad vectors { a, b, c, d }
+(define_expand "vec_init<mode><Vquad>"
+  [(match_operand:SVE_NO4E 0 "register_operand")
+   (match_operand 1 "")]
+  "TARGET_SVE"
+  {
+    aarch64_sve_expand_vector_init_subvector (operands[0], operands[1]);
+    DONE;
+  }
+)
+
+;; Vector constructor combining eight vectors { a, b, c, d, ... }
+(define_expand "vec_initvnx16qivnx2qi"
+  [(match_operand:VNx16QI 0 "register_operand")
+   (match_operand 1 "")]
+  "TARGET_SVE"
+  {
+    aarch64_sve_expand_vector_init_subvector (operands[0], operands[1]);
+    DONE;
+  }
+)
+
 ;; Shift an SVE vector left and insert a scalar into element 0.
 (define_insn "vec_shl_insert_<mode>"
   [(set (match_operand:SVE_FULL 0 "register_operand")
@@ -5010,34 +5042,34 @@
 
 ;; Unpredicated ASRD.
 (define_expand "sdiv_pow2<mode>3"
-  [(set (match_operand:SVE_I 0 "register_operand")
-	(unspec:SVE_I
+  [(set (match_operand:SVE_VDQ_I 0 "register_operand")
+	(unspec:SVE_VDQ_I
 	  [(match_dup 3)
-	   (unspec:SVE_I
-	     [(match_operand:SVE_I 1 "register_operand")
+	   (unspec:SVE_VDQ_I
+	     [(match_operand:SVE_VDQ_I 1 "register_operand")
 	      (match_operand 2 "aarch64_simd_rshift_imm")]
 	     UNSPEC_ASRD)]
 	 UNSPEC_PRED_X))]
   "TARGET_SVE"
   {
-    operands[3] = aarch64_ptrue_reg (<VPRED>mode);
+    operands[3] = aarch64_ptrue_reg (<VPRED>mode, <MODE>mode);
   }
 )
 
 ;; Predicated ASRD.
 (define_insn "*sdiv_pow2<mode>3"
-  [(set (match_operand:SVE_I 0 "register_operand")
-	(unspec:SVE_I
+  [(set (match_operand:SVE_VDQ_I 0 "register_operand")
+	(unspec:SVE_VDQ_I
 	  [(match_operand:<VPRED> 1 "register_operand")
-	   (unspec:SVE_I
-	     [(match_operand:SVE_I 2 "register_operand")
-	      (match_operand:SVE_I 3 "aarch64_simd_rshift_imm")]
+	   (unspec:SVE_VDQ_I
+	     [(match_operand:SVE_VDQ_I 2 "register_operand")
+	      (match_operand:SVE_VDQ_I 3 "aarch64_simd_rshift_imm")]
 	     UNSPEC_ASRD)]
 	  UNSPEC_PRED_X))]
   "TARGET_SVE"
   {@ [ cons: =0 , 1   , 2 ; attrs: movprfx ]
-     [ w        , Upl , 0 ; *              ] asrd\t%0.<Vetype>, %1/m, %0.<Vetype>, #%3
-     [ ?&w      , Upl , w ; yes            ] movprfx\t%0, %2\;asrd\t%0.<Vetype>, %1/m, %0.<Vetype>, #%3
+     [ w        , Upl , 0 ; *              ] asrd\t%Z0.<Vetype>, %1/m, %Z0.<Vetype>, #%3
+     [ ?&w      , Upl , w ; yes            ] movprfx\t%Z0, %Z2\;asrd\t%Z0.<Vetype>, %1/m, %Z0.<Vetype>, #%3
   }
 )
 
@@ -8063,63 +8095,6 @@
 )
 
 ;; -------------------------------------------------------------------------
-;; ---- [INT,FP] Compare and select
-;; -------------------------------------------------------------------------
-;; The patterns in this section are synthetic.
-;; -------------------------------------------------------------------------
-
-;; Integer (signed) vcond.  Don't enforce an immediate range here, since it
-;; depends on the comparison; leave it to aarch64_expand_sve_vcond instead.
-(define_expand "vcond<SVE_ALL:mode><SVE_I:mode>"
-  [(set (match_operand:SVE_ALL 0 "register_operand")
-	(if_then_else:SVE_ALL
-	  (match_operator 3 "comparison_operator"
-	    [(match_operand:SVE_I 4 "register_operand")
-	     (match_operand:SVE_I 5 "nonmemory_operand")])
-	  (match_operand:SVE_ALL 1 "nonmemory_operand")
-	  (match_operand:SVE_ALL 2 "nonmemory_operand")))]
-  "TARGET_SVE && <SVE_ALL:container_bits> == <SVE_I:container_bits>"
-  {
-    aarch64_expand_sve_vcond (<SVE_ALL:MODE>mode, <SVE_I:MODE>mode, operands);
-    DONE;
-  }
-)
-
-;; Integer vcondu.  Don't enforce an immediate range here, since it
-;; depends on the comparison; leave it to aarch64_expand_sve_vcond instead.
-(define_expand "vcondu<SVE_ALL:mode><SVE_I:mode>"
-  [(set (match_operand:SVE_ALL 0 "register_operand")
-	(if_then_else:SVE_ALL
-	  (match_operator 3 "comparison_operator"
-	    [(match_operand:SVE_I 4 "register_operand")
-	     (match_operand:SVE_I 5 "nonmemory_operand")])
-	  (match_operand:SVE_ALL 1 "nonmemory_operand")
-	  (match_operand:SVE_ALL 2 "nonmemory_operand")))]
-  "TARGET_SVE && <SVE_ALL:container_bits> == <SVE_I:container_bits>"
-  {
-    aarch64_expand_sve_vcond (<SVE_ALL:MODE>mode, <SVE_I:MODE>mode, operands);
-    DONE;
-  }
-)
-
-;; Floating-point vcond.  All comparisons except FCMUO allow a zero operand;
-;; aarch64_expand_sve_vcond handles the case of an FCMUO with zero.
-(define_expand "vcond<mode><v_fp_equiv>"
-  [(set (match_operand:SVE_FULL_HSD 0 "register_operand")
-	(if_then_else:SVE_FULL_HSD
-	  (match_operator 3 "comparison_operator"
-	    [(match_operand:<V_FP_EQUIV> 4 "register_operand")
-	     (match_operand:<V_FP_EQUIV> 5 "aarch64_simd_reg_or_zero")])
-	  (match_operand:SVE_FULL_HSD 1 "nonmemory_operand")
-	  (match_operand:SVE_FULL_HSD 2 "nonmemory_operand")))]
-  "TARGET_SVE"
-  {
-    aarch64_expand_sve_vcond (<MODE>mode, <V_FP_EQUIV>mode, operands);
-    DONE;
-  }
-)
-
-;; -------------------------------------------------------------------------
 ;; ---- [INT] Comparisons
 ;; -------------------------------------------------------------------------
 ;; Includes:
@@ -9345,6 +9320,19 @@
 	  UNSPEC_PACK))]
   "TARGET_SVE"
   "uzp1\t%0.<Vetype>, %1.<Vetype>, %2.<Vetype>"
+)
+
+;; Integer partial pack packing two partial SVE types into a single full SVE
+;; type of the same element type.  Use UZP1 on the wider type, which discards
+;; the high part of each wide element.  This allows to concat SVE partial types
+;; into a wider vector.
+(define_insn "@aarch64_pack_partial<mode>"
+  [(set (match_operand:SVE_NO2E 0 "register_operand" "=w")
+	(vec_concat:SVE_NO2E
+	  (match_operand:<VHALF> 1 "register_operand" "w")
+	  (match_operand:<VHALF> 2 "register_operand" "w")))]
+  "TARGET_SVE"
+  "uzp1\t%0.<Vctype>, %1.<Vctype>, %2.<Vctype>"
 )
 
 ;; -------------------------------------------------------------------------

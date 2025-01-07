@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -1338,13 +1338,22 @@ package body Sem is
       Scope_Stack.Locked := True;
    end Lock;
 
+   ---------------------------
+   -- In_Strict_Preanalysis --
+   ---------------------------
+
+   function In_Strict_Preanalysis return Boolean is
+   begin
+      return Preanalysis_Active and then not In_Spec_Expression;
+   end In_Strict_Preanalysis;
+
    ------------------------
    -- Preanalysis_Active --
    ------------------------
 
    function Preanalysis_Active return Boolean is
    begin
-      return not Full_Analysis and not Expander_Active;
+      return not Full_Analysis and then not Expander_Active;
    end Preanalysis_Active;
 
    ----------------
@@ -1536,18 +1545,9 @@ package body Sem is
       --  unit. All with'ed units are analyzed with config restrictions reset
       --  and we need to restore these saved values at the end.
 
-      Save_Preanalysis_Counter : constant Nat :=
-                                   Inside_Preanalysis_Without_Freezing;
-      --  Saves the preanalysis nesting-level counter; required since we may
-      --  need to analyze a unit as a consequence of the preanalysis of an
-      --  expression without freezing (and the loaded unit must be fully
-      --  analyzed).
-
    --  Start of processing for Semantics
 
    begin
-      Inside_Preanalysis_Without_Freezing := 0;
-
       if Debug_Unit_Walk then
          if Already_Analyzed then
             Write_Str ("(done)");
@@ -1722,8 +1722,6 @@ package body Sem is
             Unit (Comp_Unit),
             Prefix => "<-- ");
       end if;
-
-      Inside_Preanalysis_Without_Freezing := Save_Preanalysis_Counter;
    end Semantics;
 
    --------

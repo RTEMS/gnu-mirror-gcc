@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -1589,6 +1589,9 @@ package body Sem_Aggr is
       Failure : constant Boolean := False;
       Success : constant Boolean := True;
 
+      Ctyp : constant Entity_Id :=
+        Get_Corresponding_Mutably_Tagged_Type_If_Present (Component_Typ);
+
       Index_Typ      : constant Entity_Id := Etype (Index);
       Index_Typ_Low  : constant Node_Id   := Type_Low_Bound  (Index_Typ);
       Index_Typ_High : constant Node_Id   := Type_High_Bound (Index_Typ);
@@ -2005,7 +2008,7 @@ package body Sem_Aggr is
                --  operator, it is still an operator symbol, which will be
                --  transformed into a string when analyzed.
 
-               if Is_Character_Type (Component_Typ)
+               if Is_Character_Type (Ctyp)
                  and then No (Next_Index (Nxt_Ind))
                  and then Nkind (Expr) in N_String_Literal | N_Operator_Symbol
                then
@@ -2043,7 +2046,7 @@ package body Sem_Aggr is
 
             Resolution_OK :=
               Resolve_Array_Aggregate
-                (Expr, Nxt_Ind, Nxt_Ind_Constr, Component_Typ,
+                (Expr, Nxt_Ind, Nxt_Ind_Constr, Ctyp,
                  Iterated => Iterated_Expr, Others_Allowed => Others_Allowed);
 
             if Resolution_OK = Failure then
@@ -2051,38 +2054,61 @@ package body Sem_Aggr is
             end if;
 
          else
-            --  Do not resolve the expressions of discrete or others choices
-            --  unless the expression covers a single component, or else the
-            --  expander is inactive or this is a spec expression.
+            --  In an iterated context, preanalyze a copy of the expression to
+            --  verify legality. We use a copy because the expression will be
+            --  analyzed anew when the enclosing aggregate is expanded and the
+            --  construct is rewritten as a loop with a new iteration variable.
+            --  This does not apply to SPARK mode, where expansion is skipped.
 
-            --  In SPARK mode, expressions that can perform side effects will
-            --  be recognized by the gnat2why back-end, and the whole
-            --  subprogram will be ignored. So semantic analysis can be
-            --  performed safely.
+            --  If the parent is a component association, we also temporarily
+            --  point its Expression field to the copy, because analysis may
+            --  expect this invariant to hold.
 
-            if (Single_Elmt and then not Iterated_Expr)
-              or else not Expander_Active
-              or else In_Spec_Expression
-            then
-               Analyze_And_Resolve (Expr, Component_Typ);
-               Check_Expr_OK_In_Limited_Aggregate (Expr);
-               Check_Non_Static_Context (Expr);
-               Aggregate_Constraint_Checks (Expr, Component_Typ);
-               Check_Unset_Reference (Expr);
-
-            --  Analyze a copy of the expression, to verify legality. We use
-            --  a copy because the expression will be analyzed anew when the
-            --  enclosing aggregate is expanded, and the construct is rewritten
-            --  as a loop with a new index variable.
-
-            elsif Iterated_Expr then
+            if Iterated_Expr and then not GNATprove_Mode then
                declare
+                  In_Assoc : constant Boolean :=
+                    Nkind (Parent (Expr)) in N_Component_Association
+                                           | N_Iterated_Component_Association;
                   New_Expr : constant Node_Id := Copy_Separate_Tree (Expr);
 
                begin
                   Set_Parent (New_Expr, Parent (Expr));
-                  Preanalyze_And_Resolve (New_Expr, Component_Typ);
+                  if In_Assoc then
+                     Set_Expression (Parent (Expr), New_Expr);
+                  end if;
+
+                  Preanalyze_And_Resolve (New_Expr, Ctyp);
+                  Check_Expr_OK_In_Limited_Aggregate (New_Expr);
+                  Check_Expression_Dimensions (New_Expr, Ctyp);
+
+                  if In_Assoc then
+                     Set_Expression (Parent (Expr), Expr);
+                  end if;
                end;
+
+            --  If the expander is active and the choice may cover multiple
+            --  components, then we cannot expand (see the spec of Sem), so
+            --  we preanalyze the expression.
+
+            elsif Expander_Active and then not Single_Elmt then
+               Preanalyze_And_Resolve (Expr, Ctyp);
+               Check_Expr_OK_In_Limited_Aggregate (Expr);
+               Check_Expression_Dimensions (Expr, Ctyp);
+
+               --  The range given by the choice may be empty, in which case we
+               --  do not want spurious warnings about CE raised at run time.
+
+               Remove_Warning_Messages (Expr);
+
+            --  Otherwise, we perform a full analysis of the expression
+
+            else
+               Analyze_And_Resolve (Expr, Ctyp);
+               Check_Expr_OK_In_Limited_Aggregate (Expr);
+               Check_Expression_Dimensions (Expr, Ctyp);
+               Check_Non_Static_Context (Expr);
+               Check_Unset_Reference (Expr);
+               Aggregate_Constraint_Checks (Expr, Ctyp);
             end if;
          end if;
 
@@ -2092,10 +2118,10 @@ package body Sem_Aggr is
          --  component assignments. If the expression covers several components
          --  the analysis and the predicate check take place later.
 
-         if Has_Predicates (Component_Typ)
+         if Has_Predicates (Ctyp)
            and then Analyzed (Expr)
          then
-            Apply_Predicate_Check (Expr, Component_Typ);
+            Apply_Predicate_Check (Expr, Ctyp);
          end if;
 
          if Raises_Constraint_Error (Expr)
@@ -2112,7 +2138,7 @@ package body Sem_Aggr is
          --  the expander is not active.
 
          if Do_Range_Check (Expr) then
-            Generate_Range_Check (Expr, Component_Typ, CE_Range_Check_Failed);
+            Generate_Range_Check (Expr, Ctyp, CE_Range_Check_Failed);
          end if;
 
          return Resolution_OK;
@@ -2129,29 +2155,6 @@ package body Sem_Aggr is
          Loc  : constant Source_Ptr := Sloc (N);
          Id   : constant Entity_Id  := Defining_Identifier (N);
          Expr : constant Node_Id    := Expression (N);
-
-         -----------------------
-         -- Remove_References --
-         -----------------------
-
-         function Remove_Reference (N : Node_Id) return Traverse_Result;
-         --  Remove reference to the entity Id after analysis, so it can be
-         --  properly reanalyzed after construct is expanded into a loop.
-
-         function Remove_Reference (N : Node_Id) return Traverse_Result is
-         begin
-            if Nkind (N) = N_Identifier
-               and then Present (Entity (N))
-               and then Entity (N) = Id
-            then
-               Set_Entity (N, Empty);
-               Set_Etype (N, Empty);
-            end if;
-            Set_Analyzed (N, False);
-            return OK;
-         end Remove_Reference;
-
-         procedure Remove_References is new Traverse_Proc (Remove_Reference);
 
          --  Local variables
 
@@ -2221,18 +2224,9 @@ package body Sem_Aggr is
             Set_Scope (Id, Scop);
          end if;
 
-         --  Analyze expression without expansion, to verify legality.
-         --  When generating code, we then remove references to the index
-         --  variable, because the expression will be analyzed anew when the
-         --  enclosing aggregate is expanded, and the construct is rewritten
-         --  as a loop with a new index variable; when not generating code we
-         --  leave the analyzed expression as it is.
+         --  Analyze expression without expansion, to verify legality
 
          Resolution_OK := Resolve_Aggr_Expr (Expr, Iterated_Elmt => True);
-
-         if Operating_Mode /= Check_Semantics then
-            Remove_References (Expr);
-         end if;
 
          End_Scope;
 
@@ -2346,8 +2340,6 @@ package body Sem_Aggr is
       ----------------------------------------
 
       procedure Warn_On_Null_Component_Association (Expr : Node_Id) is
-         Comp_Typ : constant Entity_Id := Component_Type (Etype (N));
-
          procedure Check_Case_Expr (N : Node_Id);
          --  Check if a case expression may initialize some component with a
          --  null value.
@@ -2445,14 +2437,14 @@ package body Sem_Aggr is
               Make_Raise_Constraint_Error (Sloc (Null_Expr),
                 Reason => CE_Access_Check_Failed));
 
-            Set_Etype    (Null_Expr, Comp_Typ);
+            Set_Etype    (Null_Expr, Ctyp);
             Set_Analyzed (Null_Expr);
          end Warn_On_Null_Expression_And_Rewrite;
 
       --  Start of processing for Warn_On_Null_Component_Association
 
       begin
-         pragma Assert (Can_Never_Be_Null (Comp_Typ));
+         pragma Assert (Can_Never_Be_Null (Ctyp));
 
          case Nkind (Expr) is
             when N_If_Expression =>
@@ -2976,8 +2968,8 @@ package body Sem_Aggr is
                               Scope_Parent : Node_Id;
                            begin
                               if Nkind (Exp) /= N_Identifier
-                                or else not Present (Entity (Exp))
-                                or else not Present (Scope (Entity (Exp)))
+                                or else No (Entity (Exp))
+                                or else No (Scope (Entity (Exp)))
                                 or else Ekind (Scope (Entity (Exp))) /= E_Loop
                               then
                                  return OK;
@@ -3063,7 +3055,7 @@ package body Sem_Aggr is
                   --            (if Func (J) = 0 then A(J)'Access else Null)];
 
                   elsif Ada_Version >= Ada_2022
-                    and then Can_Never_Be_Null (Component_Type (Etype (N)))
+                    and then Can_Never_Be_Null (Ctyp)
                     and then Nkind (Assoc) = N_Iterated_Component_Association
                     and then Nkind (Expression (Assoc)) in N_If_Expression
                                                          | N_Case_Expression
@@ -3111,26 +3103,15 @@ package body Sem_Aggr is
 
                elsif No (Etype (Expression (Assoc))) then
                   declare
-                     Save_Analysis : constant Boolean := Full_Analysis;
-                     Expr          : constant Node_Id :=
-                                       New_Copy_Tree (Expression (Assoc));
+                     Expr : constant Node_Id :=
+                              New_Copy_Tree (Expression (Assoc));
 
                   begin
-                     Expander_Mode_Save_And_Set (False);
-                     Full_Analysis := False;
-
-                     --  Analyze the expression, making sure it is properly
+                     --  Preanalyze the expression, making sure it is properly
                      --  attached to the tree before we do the analysis.
 
                      Set_Parent (Expr, Parent (Expression (Assoc)));
-                     Analyze (Expr);
-
-                     --  Compute its dimensions now, rather than at the end of
-                     --  resolution, because in the case of multidimensional
-                     --  aggregates subsequent expansion may lead to spurious
-                     --  errors.
-
-                     Check_Expression_Dimensions (Expr, Component_Typ);
+                     Preanalyze (Expr);
 
                      --  If the expression is a literal, propagate this info
                      --  to the expression in the association, to enable some
@@ -3140,19 +3121,14 @@ package body Sem_Aggr is
                        and then Present (Entity (Expr))
                        and then Ekind (Entity (Expr)) = E_Enumeration_Literal
                      then
-                        Analyze_And_Resolve
-                          (Expression (Assoc), Component_Typ);
+                        Preanalyze_And_Resolve (Expression (Assoc), Ctyp);
                      end if;
-
-                     Full_Analysis := Save_Analysis;
-                     Expander_Mode_Restore;
 
                      --  Skip tagged checking for mutably tagged CW equivalent
                      --  types.
 
                      if Is_Tagged_Type (Etype (Expr))
-                       and then Is_Class_Wide_Equivalent_Type
-                                  (Component_Type (Etype (N)))
+                       and then Is_Class_Wide_Equivalent_Type (Ctyp)
                      then
                         null;
 
@@ -3161,7 +3137,7 @@ package body Sem_Aggr is
                      elsif Is_Tagged_Type (Etype (Expr)) then
                         Check_Dynamically_Tagged_Expression
                           (Expr => Expr,
-                           Typ  => Component_Type (Etype (N)),
+                           Typ  => Ctyp,
                            Related_Nod => N);
                      end if;
                   end;
@@ -3169,7 +3145,7 @@ package body Sem_Aggr is
                elsif Is_Tagged_Type (Etype (Expression (Assoc))) then
                   Check_Dynamically_Tagged_Expression
                     (Expr        => Expression (Assoc),
-                     Typ         => Component_Type (Etype (N)),
+                     Typ         => Ctyp,
                      Related_Nod => N);
                end if;
 
@@ -3593,7 +3569,7 @@ package body Sem_Aggr is
                if Is_Tagged_Type (Etype (Expr)) then
                   Check_Dynamically_Tagged_Expression
                     (Expr => Expr,
-                     Typ  => Component_Type (Etype (N)),
+                     Typ  => Ctyp,
                      Related_Nod => N);
                end if;
             end if;
@@ -3625,6 +3601,14 @@ package body Sem_Aggr is
                   return Failure;
                end if;
 
+            --  ??? Checks for dynamically tagged expressions below will
+            --  be only applied to iterated_component_association after
+            --  expansion; in particular, errors might not be reported when
+            --  -gnatc switch is used.
+
+            elsif Nkind (Assoc) = N_Iterated_Component_Association then
+               null;   --  handled above, in a loop context
+
             elsif not Resolve_Aggr_Expr (Expression (Assoc),
                                          Single_Elmt => False)
             then
@@ -3635,7 +3619,7 @@ package body Sem_Aggr is
             --  In order to diagnose the semantic error we create a duplicate
             --  tree to analyze it and perform the check.
 
-            elsif Nkind (Assoc) /= N_Iterated_Component_Association then
+            else
                declare
                   Save_Analysis : constant Boolean := Full_Analysis;
                   Expr          : constant Node_Id :=
@@ -3651,7 +3635,7 @@ package body Sem_Aggr is
                   if Is_Tagged_Type (Etype (Expr)) then
                      Check_Dynamically_Tagged_Expression
                        (Expr        => Expr,
-                        Typ         => Component_Type (Etype (N)),
+                        Typ         => Ctyp,
                         Related_Nod => N);
                   end if;
                end;
@@ -3778,7 +3762,7 @@ package body Sem_Aggr is
 
       --  Check the dimensions of each component in the array aggregate
 
-      Analyze_Dimension_Array_Aggregate (N, Component_Typ);
+      Analyze_Dimension_Array_Aggregate (N, Ctyp);
 
       if Serious_Errors_Detected /= Saved_SED then
          return Failure;
@@ -3793,9 +3777,9 @@ package body Sem_Aggr is
 
    procedure Resolve_Container_Aggregate (N : Node_Id; Typ : Entity_Id) is
       procedure Resolve_Iterated_Association
-       (Comp      : Node_Id;
-        Key_Type  : Entity_Id;
-        Elmt_Type : Entity_Id);
+        (Comp      : Node_Id;
+         Key_Type  : Entity_Id;
+         Elmt_Type : Entity_Id);
       --  Resolve choices and expression in an iterated component association
       --  or an iterated element association, which has a key_expression.
       --  This is similar but not identical to the handling of this construct
@@ -3818,9 +3802,9 @@ package body Sem_Aggr is
       ----------------------------------
 
       procedure Resolve_Iterated_Association
-       (Comp      : Node_Id;
-        Key_Type  : Entity_Id;
-        Elmt_Type : Entity_Id)
+        (Comp      : Node_Id;
+         Key_Type  : Entity_Id;
+         Elmt_Type : Entity_Id)
       is
          Loc           : constant Source_Ptr := Sloc (N);
          Choice        : Node_Id;

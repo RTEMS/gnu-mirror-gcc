@@ -1,5 +1,5 @@
 /* ACLE support for Arm MVE
-   Copyright (C) 2021-2024 Free Software Foundation, Inc.
+   Copyright (C) 2021-2025 Free Software Foundation, Inc.
 
    This file is part of GCC.
 
@@ -38,6 +38,7 @@
 #include "gimple-iterator.h"
 #include "explow.h"
 #include "emit-rtl.h"
+#include "stor-layout.h"
 #include "langhooks.h"
 #include "stringpool.h"
 #include "attribs.h"
@@ -207,6 +208,10 @@ CONSTEXPR const type_suffix_info type_suffixes[NUM_TYPE_SUFFIXES + 1] = {
 #define TYPES_signed_32(S, D) \
   S (s32)
 
+/* s64 _u64.  */
+#define TYPES_integer_64(S, D) \
+  S (s64), S (u64)
+
 /* All the type combinations allowed by vcvtq.  */
 #define TYPES_cvt(S, D) \
   D (f16, s16), \
@@ -314,6 +319,7 @@ DEF_MVE_TYPES_ARRAY (integer_8);
 DEF_MVE_TYPES_ARRAY (integer_8_16);
 DEF_MVE_TYPES_ARRAY (integer_16_32);
 DEF_MVE_TYPES_ARRAY (integer_32);
+DEF_MVE_TYPES_ARRAY (integer_64);
 DEF_MVE_TYPES_ARRAY (poly_8_16);
 DEF_MVE_TYPES_ARRAY (signed_16_32);
 DEF_MVE_TYPES_ARRAY (signed_32);
@@ -457,6 +463,48 @@ register_vector_type (vector_type_index type)
   acle_vector_types[0][type] = vectype;
 }
 
+/* Return a structure type that contains a single field of type FIELD_TYPE.
+   The field is called __val, but that's an internal detail rather than
+   an exposed part of the API.  */
+static tree
+wrap_type_in_struct (tree field_type)
+{
+  tree field = build_decl (input_location, FIELD_DECL,
+			   get_identifier ("__val"), field_type);
+  tree struct_type = lang_hooks.types.make_type (RECORD_TYPE);
+  DECL_FIELD_CONTEXT (field) = struct_type;
+  TYPE_FIELDS (struct_type) = field;
+  layout_type (struct_type);
+  return struct_type;
+}
+
+/* Register a built-in TYPE_DECL called NAME for TYPE.  This is used/needed
+   when TYPE is a structure type.  */
+static void
+register_type_decl (tree type, const char *name)
+{
+  tree decl = build_decl (input_location, TYPE_DECL,
+			  get_identifier (name), type);
+  TYPE_NAME (type) = decl;
+  TYPE_STUB_DECL (type) = decl;
+  lang_hooks.decls.pushdecl (decl);
+  /* ??? Undo the effect of set_underlying_type for C.  The C frontend
+     doesn't recognize DECL as a built-in because (as intended) the decl has
+     a real location instead of BUILTINS_LOCATION.  The frontend therefore
+     treats the decl like a normal C "typedef struct foo foo;", expecting
+     the type for tag "struct foo" to have a dummy unnamed TYPE_DECL instead
+     of the named one we attached above.  It then sets DECL_ORIGINAL_TYPE
+     on the supposedly unnamed decl, creating a circularity that upsets
+     dwarf2out.
+
+     We don't want to follow the normal C model and create "struct foo"
+     tags for tuple types since (a) the types are supposed to be opaque
+     and (b) they couldn't be defined as a real struct anyway.  Treating
+     the TYPE_DECLs as "typedef struct foo foo;" without creating
+     "struct foo" would lead to confusing error messages.  */
+  DECL_ORIGINAL_TYPE (decl) = NULL_TREE;
+}
+
 /* Register tuple types of element type TYPE under their arm_mve_types.h
    names.  */
 static void
@@ -474,7 +522,7 @@ register_builtin_tuple_types (vector_type_index type)
     {
       for (unsigned int num_vectors = 2; num_vectors <= 4; num_vectors += 2)
 	acle_vector_types[num_vectors >> 1][type] = void_type_node;
-    return;
+      return;
     }
 
   const char *vector_type_name = info->acle_name;
@@ -487,15 +535,18 @@ register_builtin_tuple_types (vector_type_index type)
 
       tree vectype = acle_vector_types[0][type];
       tree arrtype = build_array_type_nelts (vectype, num_vectors);
-      gcc_assert (TYPE_MODE_RAW (arrtype) == TYPE_MODE (arrtype));
-      tree field = build_decl (input_location, FIELD_DECL,
-			       get_identifier ("val"), arrtype);
+      gcc_assert (VECTOR_MODE_P (TYPE_MODE (arrtype))
+		  && TYPE_MODE_RAW (arrtype) == TYPE_MODE (arrtype)
+		  && TYPE_ALIGN (arrtype) == 64);
 
-      tree t = lang_hooks.types.simulate_record_decl (input_location, buffer,
-						      make_array_slice (&field,
-									1));
-      gcc_assert (TYPE_MODE_RAW (t) == TYPE_MODE (t));
-      acle_vector_types[num_vectors >> 1][type] = TREE_TYPE (t);
+      tree tuple_type = wrap_type_in_struct (arrtype);
+      gcc_assert (VECTOR_MODE_P (TYPE_MODE (tuple_type))
+		  && TYPE_MODE_RAW (tuple_type) == TYPE_MODE (tuple_type)
+		  && TYPE_ALIGN (tuple_type) == 64);
+
+      register_type_decl (tuple_type, buffer);
+
+      acle_vector_types[num_vectors >> 1][type] = tuple_type;
     }
 }
 
@@ -632,6 +683,20 @@ report_out_of_range (location_t location, tree fndecl, unsigned int argno,
   error_at (location, "passing %wd to argument %d of %qE, which expects"
 	    " a value in the range [%wd, %wd]", actual, argno + 1, fndecl,
 	    min, max);
+}
+
+/* Report that LOCATION has a call to FNDECL in which argument ARGNO has the
+   value ACTUAL, whereas the function requires a value multiple of MULT in the
+   range [MIN, MAX].  ARGNO counts from zero.  */
+static void
+report_out_of_range_multiple (location_t location, tree fndecl,
+			      unsigned int argno,
+			      HOST_WIDE_INT actual, HOST_WIDE_INT min,
+			      HOST_WIDE_INT max, HOST_WIDE_INT mult)
+{
+  error_at (location, "passing %wd to argument %d of %qE, which expects"
+	    " a value multiple of %wd in the range [%wd, %wd]", actual,
+	    argno + 1, fndecl, mult, min, max);
 }
 
 /* Report that LOCATION has a call to FNDECL in which argument ARGNO has
@@ -886,11 +951,18 @@ function_builder::get_name (const function_instance &instance,
   if (preserve_user_namespace)
     append_name ("__arm_");
   append_name (instance.base_name);
-  append_name (pred_suffixes[instance.pred]);
+
+  if (instance.shape->mode_after_pred ())
+    append_name (pred_suffixes[instance.pred]);
+
   if (!overloaded_p
       || instance.shape->explicit_mode_suffix_p (instance.pred,
 						 instance.mode_suffix_id))
     append_name (instance.mode_suffix ().string);
+
+  if (!instance.shape->mode_after_pred ())
+    append_name (pred_suffixes[instance.pred]);
+
   for (unsigned int i = 0; i < 2; ++i)
     if (!overloaded_p
 	|| instance.shape->explicit_type_suffix_p (i, instance.pred,
@@ -1267,7 +1339,7 @@ function_resolver::infer_vector_or_tuple_type (unsigned int argno,
 	tree type = acle_vector_types[size_i][type_i];
 	if (type && matches_type_p (type, actual))
 	  {
-	    if (size_i + 1 == num_vectors)
+	    if (size_i == (num_vectors >> 1))
 	      return type_suffix_index (suffix_i);
 
 	    if (num_vectors == 1)
@@ -1306,6 +1378,16 @@ type_suffix_index
 function_resolver::infer_vector_type (unsigned int argno)
 {
   return infer_vector_or_tuple_type (argno, 1);
+}
+
+/* If the function operates on tuples of vectors, require argument ARGNO to be
+   a tuple with the appropriate number of vectors, otherwise require it to be a
+   single vector.  Return the associated type suffix on success.  Report an
+   error and return NUM_TYPE_SUFFIXES on failure.  */
+type_suffix_index
+function_resolver::infer_tuple_type (unsigned int argno)
+{
+  return infer_vector_or_tuple_type (argno, vectors_per_tuple ());
 }
 
 /* Require argument ARGNO to be a vector or scalar argument.  Return true
@@ -1632,6 +1714,31 @@ function_resolver::require_pointer_type (unsigned int argno)
 		argno + 1, fndecl);
       return false;
     }
+  return true;
+}
+
+/* Require argument ARGNO to be a pointer to EXPECTED type.  Return true on
+   success, otherwise report an error and return false.  */
+bool
+function_resolver::require_pointer_to_type (unsigned int argno, tree expected)
+{
+  tree actual = get_argument_type (argno);
+  if (TREE_CODE (actual) != POINTER_TYPE)
+    {
+      error_at (location, "passing %qT to argument %d of %qE, which"
+		" expects a pointer type", actual, argno + 1, fndecl);
+      return false;
+    }
+
+  tree target = TREE_TYPE (actual);
+  if (target != expected)
+    {
+      error_at (location, "passing %qT to argument %d of %qE, which"
+		" expects a pointer to %qT", actual, argno + 1, fndecl,
+		expected);
+      return false;
+    }
+
   return true;
 }
 
@@ -1971,6 +2078,26 @@ function_checker::require_immediate (unsigned int argno,
   return true;
 }
 
+/* Check that argument ARGNO is a signed integer constant expression and store
+   its value in VALUE_OUT if so.  The caller should first check that argument
+   ARGNO exists.  */
+bool
+function_checker::require_signed_immediate (unsigned int argno,
+					    HOST_WIDE_INT &value_out)
+{
+  gcc_assert (argno < m_nargs);
+  tree arg = m_args[argno];
+
+  if (!tree_fits_shwi_p (arg))
+    {
+      report_non_ice (location, fndecl, argno);
+      return false;
+    }
+
+  value_out = tree_to_shwi (arg);
+  return true;
+}
+
 /* Check that argument REL_ARGNO is an integer constant expression that has
    a valid value for enumeration type TYPE.  REL_ARGNO counts from the end
    of the predication arguments.  */
@@ -2052,6 +2179,32 @@ function_checker::require_immediate_range (unsigned int rel_argno,
   if (!IN_RANGE (actual, min, max))
     {
       report_out_of_range (location, fndecl, argno, actual, min, max);
+      return false;
+    }
+
+  return true;
+}
+
+/* Check that argument REL_ARGNO is a signed integer constant expression in the
+   range [MIN, MAX].  Also check that REL_ARGNO is a multiple of MULT.  */
+bool
+function_checker::require_immediate_range_multiple (unsigned int rel_argno,
+						    HOST_WIDE_INT min,
+						    HOST_WIDE_INT max,
+						    HOST_WIDE_INT mult)
+{
+  unsigned int argno = m_base_arg + rel_argno;
+  if (!argument_exists_p (argno))
+    return true;
+
+  HOST_WIDE_INT actual;
+  if (!require_signed_immediate (argno, actual))
+    return false;
+
+  if (!IN_RANGE (actual, min, max)
+      || (actual % mult) != 0)
+    {
+      report_out_of_range_multiple (location, fndecl, argno, actual, min, max, mult);
       return false;
     }
 
@@ -2205,7 +2358,37 @@ function_expander::add_input_operand (insn_code icode, rtx x)
       mode = GET_MODE (x);
     }
   else if (VALID_MVE_PRED_MODE (mode))
-    x = gen_lowpart (mode, x);
+    {
+      if (CONST_INT_P (x))
+	{
+	  if (mode == V8BImode || mode == V4BImode)
+	    {
+	      /* In V8BI or V4BI each element has 2 or 4 bits, if those bits
+		 aren't all the same, gen_lowpart might ICE.  Canonicalize all
+		 the 2 or 4 bits to all ones if any of them is non-zero.  V8BI
+		 and V4BI multi-bit masks are interpreted byte-by-byte at
+		 instruction level, but such constants should describe lanes,
+		 rather than bytes.  See the section on MVE intrinsics in the
+		 Arm ACLE specification.  */
+	      unsigned HOST_WIDE_INT xi = UINTVAL (x);
+	      xi |= ((xi & 0x5555) << 1) | ((xi & 0xaaaa) >> 1);
+	      if (mode == V4BImode)
+		xi |= ((xi & 0x3333) << 2) | ((xi & 0xcccc) >> 2);
+	      if (xi != UINTVAL (x))
+		warning_at (location, 0, "constant predicate argument %d"
+			    " (%wx) does not map to %d lane numbers,"
+			    " converted to %wx",
+			    opno, UINTVAL (x) & 0xffff,
+			    mode == V8BImode ? 8 : 4,
+			    xi & 0xffff);
+
+	      x = gen_int_mode (xi, HImode);
+	    }
+	  x = gen_lowpart (mode, x);
+	}
+      else
+	x = force_lowpart_subreg (mode, x, GET_MODE (x));
+    }
 
   m_ops.safe_grow (m_ops.length () + 1, true);
   create_input_operand (&m_ops.last (), x, mode);

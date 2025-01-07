@@ -1,5 +1,5 @@
 /* Implementation of Fortran 2003 Polymorphism.
-   Copyright (C) 2009-2024 Free Software Foundation, Inc.
+   Copyright (C) 2009-2025 Free Software Foundation, Inc.
    Contributed by Paul Richard Thomas <pault@gcc.gnu.org>
    and Janus Weil <janus@gcc.gnu.org>
 
@@ -2507,20 +2507,6 @@ gfc_find_derived_vtab (gfc_symbol *derived)
 	    {
 	      gfc_component *c;
 	      gfc_symbol *parent = NULL, *parent_vtab = NULL;
-	      bool rdt = false;
-
-	      /* Is this a derived type with recursive allocatable
-		 components?  */
-	      c = (derived->attr.unlimited_polymorphic
-		   || derived->attr.abstract) ?
-		  NULL : derived->components;
-	      for (; c; c= c->next)
-		if (c->ts.type == BT_DERIVED
-		    && c->ts.u.derived == derived)
-		  {
-		    rdt = true;
-		    break;
-		  }
 
 	      gfc_get_symbol (name, ns, &vtype);
 	      if (!gfc_add_flavor (&vtype->attr, FL_DERIVED, NULL,
@@ -2703,9 +2689,8 @@ gfc_find_derived_vtab (gfc_symbol *derived)
 	      c->attr.access = ACCESS_PRIVATE;
 	      c->tb = XCNEW (gfc_typebound_proc);
 	      c->tb->ppc = 1;
-	      if (derived->attr.unlimited_polymorphic
-		  || derived->attr.abstract
-		  || !rdt)
+	      if (derived->attr.unlimited_polymorphic || derived->attr.abstract
+		  || !derived->attr.recursive)
 		c->initializer = gfc_get_null_expr (NULL);
 	      else
 		{

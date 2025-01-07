@@ -1,5 +1,5 @@
 /* Interprocedural scalar replacement of aggregates
-   Copyright (C) 2019-2024 Free Software Foundation, Inc.
+   Copyright (C) 2019-2025 Free Software Foundation, Inc.
    Contributed by Martin Jambor <mjambor@suse.cz>
 
 This file is part of GCC.
@@ -2898,7 +2898,7 @@ ipa_sra_write_summary (void)
         isra_write_node_summary (ob, node);
     }
   streamer_write_char_stream (ob->main_stream, 0);
-  produce_asm (ob, NULL);
+  produce_asm (ob);
   destroy_output_block (ob);
 }
 

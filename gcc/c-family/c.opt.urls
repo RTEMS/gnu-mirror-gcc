@@ -864,14 +864,14 @@ UrlSuffix(gcc/Warning-Options.html#index-Wno-system-headers)
 Wtemplates
 UrlSuffix(gcc/C_002b_002b-Dialect-Options.html#index-Wno-templates)
 
-Wtautological-compare
-UrlSuffix(gcc/Warning-Options.html#index-Wno-tautological-compare)
-
 Wtemplate-body
 UrlSuffix(gcc/C_002b_002b-Dialect-Options.html#index-Wno-template-body)
 
 Wtemplate-id-cdtor
 UrlSuffix(gcc/C_002b_002b-Dialect-Options.html#index-Wno-template-id-cdtor)
+
+Wtemplate-names-tu-local
+UrlSuffix(gcc/C_002b_002b-Dialect-Options.html#index-Wno-template-names-tu-local)
 
 Wterminate
 UrlSuffix(gcc/C_002b_002b-Dialect-Options.html#index-Wno-terminate)
@@ -1259,16 +1259,16 @@ fobjc-nilcheck
 UrlSuffix(gcc/Objective-C-and-Objective-C_002b_002b-Dialect-Options.html#index-fobjc-nilcheck)
 
 fopenacc
-UrlSuffix(gcc/C-Dialect-Options.html#index-fopenacc) LangUrlSuffix_Fortran(gfortran/Fortran-Dialect-Options.html#index-fopenacc)
+UrlSuffix(gcc/OpenMP-and-OpenACC-Options.html#index-fopenacc) LangUrlSuffix_Fortran(gfortran/Fortran-Dialect-Options.html#index-fopenacc)
 
 fopenacc-dim=
-UrlSuffix(gcc/C-Dialect-Options.html#index-fopenacc-dim)
+UrlSuffix(gcc/OpenMP-and-OpenACC-Options.html#index-fopenacc-dim)
 
 fopenmp
-UrlSuffix(gcc/C-Dialect-Options.html#index-fopenmp) LangUrlSuffix_Fortran(gfortran/Fortran-Dialect-Options.html#index-fopenmp)
+UrlSuffix(gcc/OpenMP-and-OpenACC-Options.html#index-fopenmp) LangUrlSuffix_Fortran(gfortran/Fortran-Dialect-Options.html#index-fopenmp)
 
 fopenmp-simd
-UrlSuffix(gcc/C-Dialect-Options.html#index-fopenmp-simd) LangUrlSuffix_Fortran(gfortran/Fortran-Dialect-Options.html#index-fopenmp-simd)
+UrlSuffix(gcc/OpenMP-and-OpenACC-Options.html#index-fopenmp-simd) LangUrlSuffix_Fortran(gfortran/Fortran-Dialect-Options.html#index-fopenmp-simd)
 
 foperator-names
 UrlSuffix(gcc/C_002b_002b-Dialect-Options.html#index-fno-operator-names)

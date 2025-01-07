@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -163,14 +163,14 @@ package body Diagnostics.Pretty_Emitter is
      (Intersecting_Labels : Labeled_Span_List);
 
    function Get_Line_End
-      (Buf : Source_Buffer_Ptr;
-       Loc : Source_Ptr) return Source_Ptr;
+     (Buf : Source_Buffer_Ptr;
+      Loc : Source_Ptr) return Source_Ptr;
    --  Get the source location for the end of the line (LF) in Buf for Loc. If
    --  Loc is past the end of Buf already, return Buf'Last.
 
    function Get_Line_Start
-      (Buf : Source_Buffer_Ptr;
-       Loc : Source_Ptr) return Source_Ptr;
+     (Buf : Source_Buffer_Ptr;
+      Loc : Source_Ptr) return Source_Ptr;
    --  Get the source location for the start of the line in Buf for Loc
 
    function Get_First_Line_Char
@@ -187,22 +187,22 @@ package body Diagnostics.Pretty_Emitter is
    --  Width digits.
 
    procedure Write_Buffer
-      (Buf   : Source_Buffer_Ptr;
-       First : Source_Ptr;
-       Last  : Source_Ptr);
+     (Buf   : Source_Buffer_Ptr;
+      First : Source_Ptr;
+      Last  : Source_Ptr);
    --  Output the characters from First to Last position in Buf, using
    --  Write_Buffer_Char.
 
    procedure Write_Buffer_Char
-      (Buf : Source_Buffer_Ptr;
-       Loc : Source_Ptr);
+     (Buf : Source_Buffer_Ptr;
+      Loc : Source_Ptr);
    --  Output the characters at position Loc in Buf, translating ASCII.HT
    --  in a suitable number of spaces so that the output is not modified
    --  by starting in a different column that 1.
 
    procedure Write_Line_Marker
-      (Num   : Pos;
-       Width : Positive);
+     (Num   : Pos;
+      Width : Positive);
 
    procedure Write_Empty_Bar_Line (Width : Integer);
 
@@ -327,7 +327,6 @@ package body Diagnostics.Pretty_Emitter is
    is
       Cur_Loc : Source_Ptr := Get_Line_End (Buf, Loc);
    begin
-
       while Cur_Loc > Buf'First
         and then Buf (Cur_Loc) in ASCII.LF | ASCII.CR
       loop
@@ -449,8 +448,8 @@ package body Diagnostics.Pretty_Emitter is
    -----------------------
 
    procedure Write_Buffer_Char
-      (Buf : Source_Buffer_Ptr;
-       Loc : Source_Ptr)
+     (Buf : Source_Buffer_Ptr;
+      Loc : Source_Ptr)
    is
    begin
       --  If the character ASCII.HT is not the last one in the file,
@@ -478,8 +477,8 @@ package body Diagnostics.Pretty_Emitter is
    -----------------------
 
    procedure Write_Line_Marker
-      (Num   : Pos;
-       Width : Positive)
+     (Num   : Pos;
+      Width : Positive)
    is
    begin
       Write_Str (Image (Positive (Num), Width => Width - 2));

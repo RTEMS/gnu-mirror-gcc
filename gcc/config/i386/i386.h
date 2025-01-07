@@ -1,5 +1,5 @@
 /* Definitions of target machine for GCC for IA-32.
-   Copyright (C) 1988-2024 Free Software Foundation, Inc.
+   Copyright (C) 1988-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -1099,7 +1099,7 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
    || (MODE) == V8HFmode || (MODE) == V4HFmode || (MODE) == V2HFmode	\
    || (MODE) == V8BFmode || (MODE) == V4BFmode || (MODE) == V2BFmode	\
    || (MODE) == V4QImode || (MODE) == V2HImode || (MODE) == V1SImode	\
-   || (MODE) == V2DImode || (MODE) == V2QImode				\
+   || (MODE) == V2DImode || (MODE) == V2QImode || (MODE) == HImode	\
    || (MODE) == DFmode	|| (MODE) == DImode				\
    || (MODE) == HFmode || (MODE) == BFmode)
 

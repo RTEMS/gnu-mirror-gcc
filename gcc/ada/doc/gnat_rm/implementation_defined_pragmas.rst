@@ -341,7 +341,7 @@ Syntax:
   pragma Always_Terminates [ (boolean_EXPRESSION) ];
 
 For the semantics of this pragma, see the entry for aspect ``Always_Terminates``
-in the SPARK 2014 Reference Manual, section 6.1.10.
+in the SPARK 2014 Reference Manual, section 6.1.11.
 
 .. _Pragma-Annotate:
 
@@ -1925,6 +1925,26 @@ Syntax:
 
 For the semantics of this aspect, see the SPARK 2014 Reference Manual, section
 6.1.9.
+
+Pragma Exit_Cases
+=================
+.. index:: Exit_Cases
+
+Syntax:
+
+::
+
+  pragma Exit_Cases (EXIT_CASE_LIST);
+
+  EXIT_CASE_LIST ::= EXIT_CASE {, EXIT_CASE}
+  EXIT_CASE      ::= GUARD => EXIT_KIND
+  EXIT_KIND      ::= Normal_Return
+                   | Exception_Raised
+		   | (Exception_Raised => exception_name)
+  GUARD          ::= Boolean_expression
+
+For the semantics of this aspect, see the SPARK 2014 Reference Manual, section
+6.1.10.
 
 Pragma Export_Function
 ======================
@@ -5888,7 +5908,7 @@ Syntax:
   pragma Side_Effects [ (static_boolean_EXPRESSION) ];
 
 For the semantics of this pragma, see the entry for aspect
-``Side_Effects`` in the SPARK Reference Manual, section 6.1.11.
+``Side_Effects`` in the SPARK Reference Manual, section 6.1.12.
 
 .. _Pragma-Simple_Storage_Pool_Type:
 
@@ -7046,9 +7066,9 @@ Syntax:
 
 
 If this pragma occurs in a unit that is processed by the compiler, GNAT
-aborts with the message :samp:`xxx not implemented`, where
-``xxx`` is the name of the current compilation unit.  This pragma is
-intended to allow the compiler to handle unimplemented library units in
+aborts with the message :samp:`xxx is not supported in this configuration`,
+where ``xxx`` is the name of the current compilation unit.  This pragma
+is intended to allow the compiler to handle unimplemented library units in
 a clean manner.
 
 The abort only happens if code is being generated.  Thus you can use

@@ -1,5 +1,5 @@
 /* Support for avr-passes.def for AVR 8-bit microcontrollers.
-   Copyright (C) 2024 Free Software Foundation, Inc.
+   Copyright (C) 2024-2025 Free Software Foundation, Inc.
 
    This file is part of GCC.
 
@@ -434,6 +434,11 @@ static machine_mode size_to_mode (int size)
       Split all insns where the operation can be performed on individual
       bytes, like andsi3.  In example (4) the andhi3 can be optimized
       to an andqi3.
+
+   bbinfo_t::try_mem0_p
+      Try to fuse a mem = reg insn to mem = __zero_reg__.
+      This should only occur when -msplit-ldst is on, but may
+      also occur with pushes since push<mode>1 splits them.
 */
 
 
@@ -514,6 +519,7 @@ bool bbinfo_t::try_split_any_p;
 bool bbinfo_t::try_simplify_p;
 bool bbinfo_t::use_arith_p;
 bool bbinfo_t::use_set_some_p;
+bool bbinfo_t::try_mem0_p;
 
 
 // Abstract Interpretation of expressions.
@@ -979,12 +985,12 @@ struct insninfo_t
   // This is an insn that sets the m_size bytes of m_regno to either
   // - A compile time constant m_isrc (m_code = CONST_INT), or
   // - The contents of register number m_rsrc (m_code = REG).
-  int m_size;
+  int m_size = 0;
   int m_regno;
   int m_rsrc;
   rtx_code m_code;
   uint64_t m_isrc;
-  rtx_insn *m_insn;
+  rtx_insn *m_insn = nullptr;
   rtx m_set = NULL_RTX;
   rtx m_src = NULL_RTX;
   int m_scratch = 0; // 0 or the register number of a QImode scratch.
@@ -1087,6 +1093,7 @@ struct optimize_data_t
   {}
 
   bool try_fuse (bbinfo_t *);
+  bool try_mem0 (bbinfo_t *);
   bool try_bin_arg1 (bbinfo_t *);
   bool try_simplify (bbinfo_t *);
   bool try_split_ldi (bbinfo_t *);
@@ -2466,7 +2473,8 @@ bbinfo_t::run_find_plies (const insninfo_t &ii, const memento_t &memo) const
 
   if (hamm == 0)
     {
-      avr_dump (";; Found redundant insn %d\n", INSN_UID (ii.m_insn));
+      avr_dump (";; Found redundant insn %d\n",
+		ii.m_insn ? INSN_UID (ii.m_insn) : 0);
       return true;
     }
 
@@ -2505,6 +2513,44 @@ bbinfo_t::run_find_plies (const insninfo_t &ii, const memento_t &memo) const
   ply_t::max_n_ply_ts = std::max (ply_t::max_n_ply_ts, ply_t::n_ply_ts);
 
   return fpd->solution.n_plies != 0;
+}
+
+
+// Try to propagate __zero_reg__ to a mem = reg insn's source.
+// Returns true on success and sets .n_new_insns.
+bool
+optimize_data_t::try_mem0 (bbinfo_t *)
+{
+  rtx_insn *insn = curr.ii.m_insn;
+  rtx set, mem, reg;
+  machine_mode mode;
+
+  if (insn
+      && (set = single_set (insn))
+      && MEM_P (mem = SET_DEST (set))
+      && REG_P (reg = SET_SRC (set))
+      && GET_MODE_SIZE (mode = GET_MODE (mem)) <= 4
+      && END_REGNO (reg) <= REG_32
+      && ! (regmask (reg) & memento_t::fixed_regs_mask)
+      && curr.regs.have_value (REGNO (reg), GET_MODE_SIZE (mode), 0x0))
+    {
+      avr_dump (";; Found insn %d: mem:%m = 0 = r%d\n", INSN_UID (insn),
+		mode, REGNO (reg));
+
+      // Some insns like PUSHes don't clobber REG_CC.
+      bool clobbers_cc = GET_CODE (PATTERN (insn)) == PARALLEL;
+
+      if (clobbers_cc)
+	emit_valid_move_clobbercc (mem, CONST0_RTX (mode));
+      else
+	emit_valid_insn (gen_rtx_SET (mem, CONST0_RTX (mode)));
+
+      n_new_insns = 1;
+
+      return true;
+    }
+
+  return false;
 }
 
 
@@ -3107,7 +3153,8 @@ bbinfo_t::optimize_one_block (bool &changed)
 		    || (bbinfo_t::try_bin_arg1_p && od.try_bin_arg1 (this))
 		    || (bbinfo_t::try_simplify_p && od.try_simplify (this))
 		    || (bbinfo_t::try_split_ldi_p && od.try_split_ldi (this))
-		    || (bbinfo_t::try_split_any_p && od.try_split_any (this)));
+		    || (bbinfo_t::try_split_any_p && od.try_split_any (this))
+		    || (bbinfo_t::try_mem0_p && od.try_mem0 (this)));
 
       rtx_insn *new_insns = get_insns ();
       end_sequence ();
@@ -3192,6 +3239,7 @@ bbinfo_t::optimize_one_function (function *func)
 
   // Which optimization(s) to perform.
   bbinfo_t::try_fuse_p = avropt_fuse_move & 0x1;      // Digit 0 in [0, 1].
+  bbinfo_t::try_mem0_p = avropt_fuse_move & 0x1;      // Digit 0 in [0, 1].
   bbinfo_t::try_bin_arg1_p = avropt_fuse_move & 0x2;  // Digit 1 in [0, 1].
   bbinfo_t::try_split_any_p = avropt_fuse_move & 0x4; // Digit 2 in [0, 1].
   bbinfo_t::try_split_ldi_p = avropt_fuse_move >> 3;    // Digit 3 in [0, 2].
@@ -4311,7 +4359,8 @@ struct AVR_LdSt_Props
   AVR_LdSt_Props (int regno, bool store_p, bool volatile_p, addr_space_t as)
   {
     bool generic_p = ADDR_SPACE_GENERIC_P (as);
-    bool flashx_p = ! generic_p && as != ADDR_SPACE_MEMX;
+    bool flashx_p = (! generic_p
+		     && as != ADDR_SPACE_MEMX && as != ADDR_SPACE_FLASHX);
     has_postinc = generic_p || (flashx_p && regno == REG_Z);
     has_predec = generic_p;
     has_ldd = ! AVR_TINY && generic_p && (regno == REG_Y || regno == REG_Z);
@@ -5459,6 +5508,112 @@ avr_split_fake_addressing_move (rtx_insn * /*insn*/, rtx *xop)
     {
       insn = emit_move_ccc (base, plus_constant (Pmode, base, sub));
       avr_maybe_adjust_cfa (insn, base, sub);
+    }
+
+  return true;
+}
+
+
+/* Given memory reference mem(ADDR), return true when it can be split into
+   single-byte moves, and all resulting addresses are natively supported.
+   ADDR is in addr-space generic.  */
+
+static bool
+splittable_address_p (rtx addr, int n_bytes)
+{
+  if (CONSTANT_ADDRESS_P (addr)
+      || GET_CODE (addr) == PRE_DEC
+      || GET_CODE (addr) == POST_INC)
+    return true;
+
+  if (! AVR_TINY)
+    {
+      rtx base = select<rtx>()
+	: REG_P (addr) ? addr
+	: GET_CODE (addr) == PLUS ? XEXP (addr, 0)
+	: NULL_RTX;
+
+      int off = select<int>()
+	: REG_P (addr) ? 0
+	: GET_CODE (addr) == PLUS ? (int) INTVAL (XEXP (addr, 1))
+	: -1;
+
+      return (base && REG_P (base)
+	      && (REGNO (base) == REG_Y || REGNO (base) == REG_Z)
+	      && IN_RANGE (off, 0, 64 - n_bytes));
+    }
+
+  return false;
+}
+
+
+/* Like avr_byte(), but also knows how to split POST_INC and PRE_DEC
+   memory references.  */
+
+static rtx
+avr_byte_maybe_mem (rtx x, int n)
+{
+  rtx addr, b;
+  if (MEM_P (x)
+      && (GET_CODE (addr = XEXP (x, 0)) == POST_INC
+	  || GET_CODE (addr) == PRE_DEC))
+    b = gen_rtx_MEM (QImode, copy_rtx (addr));
+  else
+    b = avr_byte (x, n);
+
+  if (MEM_P (x))
+    gcc_assert (MEM_P (b));
+
+  return b;
+}
+
+
+/* Split multi-byte load / stores into 1-byte such insns
+   provided non-volatile, addr-space = generic, no reg-overlap
+   and the resulting addressings are all natively supported.
+   Returns true when the  XOP[0] = XOP[1]  insn has been split and
+   false, otherwise.  */
+
+bool
+avr_split_ldst (rtx *xop)
+{
+  rtx dest = xop[0];
+  rtx src = xop[1];
+  machine_mode mode = GET_MODE (dest);
+  int n_bytes = GET_MODE_SIZE (mode);
+  rtx mem, reg_or_0;
+
+  if (MEM_P (dest) && reg_or_0_operand (src, mode))
+    {
+      mem = dest;
+      reg_or_0 = src;
+    }
+  else if (register_operand (dest, mode) && MEM_P (src))
+    {
+      reg_or_0 = dest;
+      mem = src;
+    }
+  else
+    return false;
+
+  rtx addr = XEXP (mem, 0);
+
+  if (MEM_VOLATILE_P (mem)
+      || ! ADDR_SPACE_GENERIC_P (MEM_ADDR_SPACE (mem))
+      || ! IN_RANGE (n_bytes, 2, 4)
+      || ! splittable_address_p (addr, n_bytes)
+      || reg_overlap_mentioned_p (reg_or_0, addr))
+    return false;
+
+  const int step = GET_CODE (addr) == PRE_DEC ? -1 : 1;
+  const int istart = step > 0 ? 0 : n_bytes - 1;
+  const int iend = istart + step * n_bytes;
+
+  for (int i = istart; i != iend; i += step)
+    {
+      rtx di = avr_byte_maybe_mem (dest, i);
+      rtx si = avr_byte_maybe_mem (src, i);
+      emit_move_ccc (di, si);
     }
 
   return true;

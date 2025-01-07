@@ -1,5 +1,5 @@
 /* typeinfo.cc -- D runtime type identification.
-   Copyright (C) 2013-2024 Free Software Foundation, Inc.
+   Copyright (C) 2013-2025 Free Software Foundation, Inc.
 
 GCC is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -664,7 +664,7 @@ public:
     /* Default initializer for enum.  */
     if (ed->members && !d->tinfo->isZeroInit ())
       {
-	tree length = size_int (ed->type->size ());
+	tree length = size_int (dmd::size (ed->type));
 	tree ptr = build_address (enum_initializer_decl (ed));
 	this->layout_field (d_array_value (array_type_node, length, ptr));
       }

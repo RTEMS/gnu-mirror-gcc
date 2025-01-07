@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -2893,6 +2893,10 @@ package body Checks is
 
       if Deref then
          Expr := Make_Explicit_Dereference (Loc, Prefix => Expr);
+
+         --  Preserve Comes_From_Source for Predicate_Check_In_Scope
+
+         Preserve_Comes_From_Source (Expr, N);
       end if;
 
       --  Disable checks to prevent an infinite recursion
@@ -7302,9 +7306,7 @@ package body Checks is
       --  Delay the generation of the check until 'Loop_Entry has been properly
       --  expanded. This is done in Expand_Loop_Entry_Attributes.
 
-      elsif Nkind (Prefix (N)) = N_Attribute_Reference
-        and then Attribute_Name (Prefix (N)) = Name_Loop_Entry
-      then
+      elsif Is_Attribute_Loop_Entry (Prefix (N)) then
          return;
       end if;
 
@@ -8405,11 +8407,15 @@ package body Checks is
 
       if Inside_A_Generic then
          return;
-      end if;
+
+      --  No check during preanalysis
+
+      elsif Preanalysis_Active then
+         return;
 
       --  No check needed if known to be non-null
 
-      if Known_Non_Null (N) then
+      elsif Known_Non_Null (N) then
          return;
       end if;
 
@@ -8567,6 +8573,11 @@ package body Checks is
       --  expansion is not desirable.
 
       if GNATprove_Mode then
+         return;
+
+      --  No check during preanalysis
+
+      elsif Preanalysis_Active then
          return;
 
       --  Do not generate an elaboration check if all checks have been

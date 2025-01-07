@@ -1,5 +1,5 @@
 /* Routines for manipulation of expression nodes.
-   Copyright (C) 2000-2024 Free Software Foundation, Inc.
+   Copyright (C) 2000-2025 Free Software Foundation, Inc.
    Contributed by Andy Vaught
 
 This file is part of GCC.
@@ -1613,7 +1613,7 @@ find_array_section (gfc_expr *expr, gfc_ref *ref)
 	  /* Zero-sized arrays have no shape and no elements, stop early.  */
 	  if (!begin->shape)
 	    {
-	      mpz_init_set_ui (nelts, 0);
+	      mpz_set_ui (nelts, 0);
 	      break;
 	    }
 
@@ -1714,7 +1714,7 @@ find_array_section (gfc_expr *expr, gfc_ref *ref)
      constructor.  */
   for (idx = 0; idx < (int) mpz_get_si (nelts); idx++)
     {
-      mpz_init_set_ui (ptr, 0);
+      mpz_set_ui (ptr, 0);
 
       incr_ctr = true;
       for (d = 0; d < rank; d++)
@@ -4364,16 +4364,24 @@ gfc_check_pointer_assign (gfc_expr *lvalue, gfc_expr *rvalue,
 
       /* If this can be determined, check that the target must be at least as
 	 large as the pointer assigned to it is.  */
-      if (gfc_array_size (lvalue, &lsize)
-	  && gfc_array_size (rvalue, &rsize)
-	  && mpz_cmp (rsize, lsize) < 0)
+      bool got_lsize = gfc_array_size (lvalue, &lsize);
+      bool got_rsize = got_lsize && gfc_array_size (rvalue, &rsize);
+      bool too_small = got_rsize && mpz_cmp (rsize, lsize) < 0;
+
+      if (too_small)
 	{
 	  gfc_error ("Rank remapping target is smaller than size of the"
 		     " pointer (%ld < %ld) at %L",
 		     mpz_get_si (rsize), mpz_get_si (lsize),
 		     &lvalue->where);
+	  mpz_clear (lsize);
+	  mpz_clear (rsize);
 	  return false;
 	}
+      if (got_lsize)
+	mpz_clear (lsize);
+      if (got_rsize)
+	mpz_clear (rsize);
 
       /* An assumed rank target is an experimental F202y feature.  */
       if (rvalue->rank == -1 && !(gfc_option.allow_std & GFC_STD_F202Y))
@@ -5009,28 +5017,44 @@ is_non_empty_structure_constructor (gfc_expr * e)
 bool
 gfc_has_default_initializer (gfc_symbol *der)
 {
+  static hash_set<gfc_symbol *> seen_derived_types;
   gfc_component *c;
+  /* The rewrite to a result variable and breaks is only needed, because
+     there is no scope_guard in C++ yet.  */
+  bool result = false;
 
   gcc_assert (gfc_fl_struct (der->attr.flavor));
+  seen_derived_types.add (der);
   for (c = der->components; c; c = c->next)
-    if (gfc_bt_struct (c->ts.type))
+    if (gfc_bt_struct (c->ts.type)
+	&& !seen_derived_types.contains (c->ts.u.derived))
       {
-        if (!c->attr.pointer && !c->attr.proc_pointer
-	     && !(c->attr.allocatable && der == c->ts.u.derived)
-	     && ((c->initializer
-		  && is_non_empty_structure_constructor (c->initializer))
-		 || gfc_has_default_initializer (c->ts.u.derived)))
-	  return true;
+	if (!c->attr.pointer && !c->attr.proc_pointer
+	    && !(c->attr.allocatable && der == c->ts.u.derived)
+	    && ((c->initializer
+		 && is_non_empty_structure_constructor (c->initializer))
+		|| gfc_has_default_initializer (c->ts.u.derived)))
+	  {
+	    result = true;
+	    break;
+	  }
 	if (c->attr.pointer && c->initializer)
-	  return true;
+	  {
+	    result = true;
+	    break;
+	  }
       }
     else
       {
-        if (c->initializer)
-	  return true;
+	if (c->initializer)
+	  {
+	    result = true;
+	    break;
+	  }
       }
 
-  return false;
+  seen_derived_types.remove (der);
+  return result;
 }
 
 

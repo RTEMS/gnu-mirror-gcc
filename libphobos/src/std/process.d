@@ -127,26 +127,19 @@ else version (WatchOS)
     version = iOSDerived;
 }
 
-// When the DMC runtime is used, we have to use some custom functions
-// to convert between Windows file handles and FILE*s.
-version (Win32) version (CRuntime_DigitalMars) version = DMC_RUNTIME;
-
 
 // Some of the following should be moved to druntime.
 private
 {
     // Microsoft Visual C Runtime (MSVCRT) declarations.
-    version (Windows)
+    version (CRuntime_Microsoft)
     {
-        version (DMC_RUNTIME) { } else
+        import core.stdc.stdint;
+        enum
         {
-            import core.stdc.stdint;
-            enum
-            {
-                STDIN_FILENO  = 0,
-                STDOUT_FILENO = 1,
-                STDERR_FILENO = 2,
-            }
+            STDIN_FILENO  = 0,
+            STDOUT_FILENO = 1,
+            STDERR_FILENO = 2,
         }
     }
 
@@ -350,6 +343,8 @@ static:
     */
     bool opBinaryRight(string op : "in")(scope const(char)[] name) @trusted
     {
+        if (name is null)
+            return false;
         version (Posix)
             return core.sys.posix.stdlib.getenv(name.tempCString()) !is null;
         else version (Windows)
@@ -451,6 +446,10 @@ private:
     // doesn't exist.
     void getImpl(scope const(char)[] name, scope void delegate(const(OSChar)[]) @safe sink) @trusted
     {
+        // fix issue https://issues.dlang.org/show_bug.cgi?id=24549
+        if (name is null)
+            return sink(null);
+
         version (Windows)
         {
             // first we ask windows how long the environment variable is,
@@ -598,6 +597,15 @@ private:
     // Setting null must have the same effect as remove
     environment["std_process"] = null;
     assert("std_process" !in environment);
+}
+
+// https://issues.dlang.org/show_bug.cgi?id=24549
+@safe unittest
+{
+    import std.exception : assertThrown;
+    assert(environment.get(null) is null);
+    assertThrown(environment[null]);
+    assert(!(null in environment));
 }
 
 // =============================================================================
@@ -1102,6 +1110,14 @@ private Pid spawnProcessPosix(scope const(char[])[] args,
                 }
             }
 
+            if (config.preExecDelegate !is null)
+            {
+                if (config.preExecDelegate() != true)
+                {
+                    abortOnError(forkPipeOut, InternalError.preExec, .errno);
+                }
+            }
+
             // Execute program.
             core.sys.posix.unistd.execve(argz[0], argz.ptr, envz);
 
@@ -1187,7 +1203,7 @@ private Pid spawnProcessPosix(scope const(char[])[] args,
                     errorMsg = "Failed to allocate memory";
                     break;
                 case InternalError.preExec:
-                    errorMsg = "Failed to execute preExecFunction";
+                    errorMsg = "Failed to execute preExecFunction or preExecDelegate";
                     break;
                 case InternalError.noerror:
                     assert(false);
@@ -1269,6 +1285,29 @@ version (Posix)
 
     auto received = receiveTimeout(3.seconds, (int) {});
     assert(received);
+}
+
+version (Posix)
+@system unittest
+{
+    __gshared int j;
+    foreach (i; 0 .. 3)
+    {
+        auto config = Config(
+            preExecFunction: function() @trusted {
+                j = 1;
+                return true;
+            },
+            preExecDelegate: delegate() @trusted {
+                // j should now be 1, as preExecFunction is called before
+                // preExecDelegate is.
+                _Exit(i + j);
+                return true;
+            },
+        );
+        auto pid = spawnProcess(["false"], config: config);
+        assert(wait(pid) == i + 1);
+    }
 }
 
 /*
@@ -2186,13 +2225,30 @@ struct Config
             Please note that the code in this function must only use
             async-signal-safe functions.)
 
+        If $(LREF preExecDelegate) is also set, it is called last.
+
         On Windows, this member is not available.
         */
         bool function() nothrow @nogc @safe preExecFunction;
+
+        /**
+        A delegate that is called before `exec` in $(LREF spawnProcess).
+        It returns `true` if succeeded and otherwise returns `false`.
+
+        $(RED Warning:
+            Please note that the code in this function must only use
+            async-signal-safe functions.)
+
+        If $(LREF preExecFunction) is also set, it is called first.
+
+        On Windows, this member is not available.
+        */
+        bool delegate() nothrow @nogc @safe preExecDelegate;
     }
     else version (Posix)
     {
         bool function() nothrow @nogc @safe preExecFunction;
+        bool delegate() nothrow @nogc @safe preExecDelegate;
     }
 }
 

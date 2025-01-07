@@ -1,5 +1,5 @@
 /* Build executable statement trees.
-   Copyright (C) 2000-2024 Free Software Foundation, Inc.
+   Copyright (C) 2000-2025 Free Software Foundation, Inc.
    Contributed by Andy Vaught
 
 This file is part of GCC.
@@ -222,6 +222,7 @@ gfc_free_statement (gfc_code *p)
     case EXEC_OMP_CANCELLATION_POINT:
     case EXEC_OMP_CRITICAL:
     case EXEC_OMP_DEPOBJ:
+    case EXEC_OMP_DISPATCH:
     case EXEC_OMP_DISTRIBUTE:
     case EXEC_OMP_DISTRIBUTE_PARALLEL_DO:
     case EXEC_OMP_DISTRIBUTE_PARALLEL_DO_SIMD:

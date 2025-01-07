@@ -1,6 +1,6 @@
 // Internal policy header for unordered_set and unordered_map -*- C++ -*-
 
-// Copyright (C) 2010-2024 Free Software Foundation, Inc.
+// Copyright (C) 2010-2025 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -276,7 +276,7 @@ namespace __detail
   template<typename _Hash>
     struct _Hashtable_hash_traits
     {
-      static constexpr std::size_t
+      static constexpr size_t
       __small_size_threshold() noexcept
       { return std::__is_fast_hash<_Hash>::value ? 0 : 20; }
     };
@@ -306,7 +306,7 @@ namespace __detail
   template<typename _Value>
     struct _Hash_node_value_base
     {
-      typedef _Value value_type;
+      using value_type = _Value;
 
       __gnu_cxx::__aligned_buffer<_Value> _M_storage;
 
@@ -343,7 +343,7 @@ namespace __detail
    */
   template<>
     struct _Hash_node_code_cache<true>
-    { std::size_t  _M_hash_code; };
+    { size_t  _M_hash_code; };
 
   template<typename _Value, bool _Cache_hash_code>
     struct _Hash_node_value
@@ -403,9 +403,9 @@ namespace __detail
       using __node_type = typename __base_type::__node_type;
 
     public:
-      using value_type = _Value;
-      using difference_type = std::ptrdiff_t;
-      using iterator_category = std::forward_iterator_tag;
+      using value_type        = _Value;
+      using difference_type   = ptrdiff_t;
+      using iterator_category = forward_iterator_tag;
 
       using pointer = __conditional_t<__constant_iterators,
 				      const value_type*, value_type*>;
@@ -474,12 +474,12 @@ namespace __detail
 	= _Node_iterator<_Value, __constant_iterators, __cache>;
 
     public:
-      typedef _Value					value_type;
-      typedef std::ptrdiff_t				difference_type;
-      typedef std::forward_iterator_tag			iterator_category;
+      using value_type        = _Value;
+      using difference_type   = ptrdiff_t;
+      using iterator_category = forward_iterator_tag;
 
-      typedef const value_type*				pointer;
-      typedef const value_type&				reference;
+      using pointer = const value_type*;
+      using reference = const value_type&;
 
       _Node_const_iterator() = default;
 
@@ -577,13 +577,8 @@ namespace __detail
   /// into the range [0, N).
   struct _Mod_range_hashing
   {
-    typedef std::size_t first_argument_type;
-    typedef std::size_t second_argument_type;
-    typedef std::size_t result_type;
-
-    result_type
-    operator()(first_argument_type __num,
-	       second_argument_type __den) const noexcept
+    size_t
+    operator()(size_t __num, size_t __den) const noexcept
     { return __num % __den; }
   };
 
@@ -609,12 +604,12 @@ namespace __detail
 
     // Return a bucket size no smaller than n.
     // TODO: 'const' qualifier is kept for abi compatibility reason.
-    std::size_t
-    _M_next_bkt(std::size_t __n) const;
+    size_t
+    _M_next_bkt(size_t __n) const;
 
     // Return a bucket count appropriate for n elements
-    std::size_t
-    _M_bkt_for_elements(std::size_t __n) const
+    size_t
+    _M_bkt_for_elements(size_t __n) const
     { return __builtin_ceil(__n / (double)_M_max_load_factor); }
 
     // __n_bkt is current bucket count, __n_elt is current element count,
@@ -622,11 +617,11 @@ namespace __detail
     // increase bucket count?  If so, return make_pair(true, n), where n
     // is the new bucket count.  If not, return make_pair(false, 0).
     // TODO: 'const' qualifier is kept for abi compatibility reason.
-    std::pair<bool, std::size_t>
-    _M_need_rehash(std::size_t __n_bkt, std::size_t __n_elt,
-		   std::size_t __n_ins) const;
+    std::pair<bool, size_t>
+    _M_need_rehash(size_t __n_bkt, size_t __n_elt,
+		   size_t __n_ins) const;
 
-    typedef std::size_t _State;
+    using _State = size_t;
 
     _State
     _M_state() const
@@ -640,30 +635,25 @@ namespace __detail
     _M_reset(_State __state)
     { _M_next_resize = __state; }
 
-    static const std::size_t _S_growth_factor = 2;
+    static const size_t _S_growth_factor = 2;
 
     float		_M_max_load_factor;
 
     // TODO: 'mutable' kept for abi compatibility reason.
-    mutable std::size_t	_M_next_resize;
+    mutable size_t	_M_next_resize;
   };
 
   /// Range hashing function assuming that second arg is a power of 2.
   struct _Mask_range_hashing
   {
-    typedef std::size_t first_argument_type;
-    typedef std::size_t second_argument_type;
-    typedef std::size_t result_type;
-
-    result_type
-    operator()(first_argument_type __num,
-	       second_argument_type __den) const noexcept
+    size_t
+    operator()(size_t __num, size_t __den) const noexcept
     { return __num & (__den - 1); }
   };
 
   /// Compute closest power of 2 not less than __n
-  inline std::size_t
-  __clp2(std::size_t __n) noexcept
+  inline size_t
+  __clp2(size_t __n) noexcept
   {
     using __gnu_cxx::__int_traits;
     // Equivalent to return __n ? std::bit_ceil(__n) : 0;
@@ -691,8 +681,8 @@ namespace __detail
 
     // Return a bucket size no smaller than n (as long as n is not above the
     // highest power of 2).
-    std::size_t
-    _M_next_bkt(std::size_t __n) noexcept
+    size_t
+    _M_next_bkt(size_t __n) noexcept
     {
       if (__n == 0)
 	// Special case on container 1st initialization with 0 bucket count
@@ -702,7 +692,7 @@ namespace __detail
 
       const auto __max_width = std::min<size_t>(sizeof(size_t), 8);
       const auto __max_bkt = size_t(1) << (__max_width * __CHAR_BIT__ - 1);
-      std::size_t __res = __clp2(__n);
+      size_t __res = __clp2(__n);
 
       if (__res == 0)
 	__res = __max_bkt;
@@ -725,17 +715,16 @@ namespace __detail
     }
 
     // Return a bucket count appropriate for n elements
-    std::size_t
-    _M_bkt_for_elements(std::size_t __n) const noexcept
+    size_t
+    _M_bkt_for_elements(size_t __n) const noexcept
     { return __builtin_ceil(__n / (double)_M_max_load_factor); }
 
     // __n_bkt is current bucket count, __n_elt is current element count,
     // and __n_ins is number of elements to be inserted.  Do we need to
     // increase bucket count?  If so, return make_pair(true, n), where n
     // is the new bucket count.  If not, return make_pair(false, 0).
-    std::pair<bool, std::size_t>
-    _M_need_rehash(std::size_t __n_bkt, std::size_t __n_elt,
-		   std::size_t __n_ins) noexcept
+    std::pair<bool, size_t>
+    _M_need_rehash(size_t __n_bkt, size_t __n_elt, size_t __n_ins) noexcept
     {
       if (__n_elt + __n_ins > _M_next_resize)
 	{
@@ -743,12 +732,12 @@ namespace __detail
 	  // far and that we start inserting elements. In this case we start
 	  // with an initial bucket size of 11.
 	  double __min_bkts
-	    = std::max<std::size_t>(__n_elt + __n_ins, _M_next_resize ? 0 : 11)
+	    = std::max<size_t>(__n_elt + __n_ins, _M_next_resize ? 0 : 11)
 	      / (double)_M_max_load_factor;
 	  if (__min_bkts >= __n_bkt)
 	    return { true,
-	      _M_next_bkt(std::max<std::size_t>(__builtin_floor(__min_bkts) + 1,
-						__n_bkt * _S_growth_factor)) };
+	      _M_next_bkt(std::max<size_t>(__builtin_floor(__min_bkts) + 1,
+					   __n_bkt * _S_growth_factor)) };
 
 	  _M_next_resize
 	    = __builtin_floor(__n_bkt * (double)_M_max_load_factor);
@@ -758,7 +747,7 @@ namespace __detail
 	return { false, 0 };
     }
 
-    typedef std::size_t _State;
+    using _State = size_t;
 
     _State
     _M_state() const noexcept
@@ -772,10 +761,10 @@ namespace __detail
     _M_reset(_State __state) noexcept
     { _M_next_resize = __state; }
 
-    static const std::size_t _S_growth_factor = 2;
+    static const size_t _S_growth_factor = 2;
 
     float	_M_max_load_factor;
-    std::size_t	_M_next_resize;
+    size_t	_M_next_resize;
   };
 
   template<typename _RehashPolicy>
@@ -893,7 +882,7 @@ namespace __detail
     {
       __hashtable* __h = static_cast<__hashtable*>(this);
       __hash_code __code = __h->_M_hash_code(__k);
-      std::size_t __bkt = __h->_M_bucket_index(__code);
+      size_t __bkt = __h->_M_bucket_index(__code);
       if (auto __node = __h->_M_find_node(__bkt, __k, __code))
 	return __node->_M_v().second;
 
@@ -920,7 +909,7 @@ namespace __detail
     {
       __hashtable* __h = static_cast<__hashtable*>(this);
       __hash_code __code = __h->_M_hash_code(__k);
-      std::size_t __bkt = __h->_M_bucket_index(__code);
+      size_t __bkt = __h->_M_bucket_index(__code);
       if (auto __node = __h->_M_find_node(__bkt, __k, __code))
 	return __node->_M_v().second;
 
@@ -1005,7 +994,7 @@ namespace __detail
       }
 
       void
-      reserve(std::size_t __n)
+      reserve(size_t __n)
       {
 	__hashtable* __this = static_cast<__hashtable*>(this);
 	__this->rehash(__this->__rehash_policy()._M_bkt_for_elements(__n));
@@ -1015,46 +1004,24 @@ namespace __detail
   /**
    *  Primary class template _Hashtable_ebo_helper.
    *
-   *  Helper class using EBO when it is not forbidden (the type is not
-   *  final) and when it is worth it (the type is empty.)
+   *  Helper class using [[no_unique_address]] to reduce object size.
    */
-  template<int _Nm, typename _Tp,
+  template<typename _Tp,
 	   bool __use_ebo = !__is_final(_Tp) && __is_empty(_Tp)>
-    struct _Hashtable_ebo_helper;
-
-  /// Specialization using EBO.
-  template<int _Nm, typename _Tp>
-    struct _Hashtable_ebo_helper<_Nm, _Tp, true>
-    : private _Tp
+    struct _Hashtable_ebo_helper
     {
-      _Hashtable_ebo_helper() noexcept(noexcept(_Tp())) : _Tp() { }
-
-      template<typename _OtherTp>
-	_Hashtable_ebo_helper(_OtherTp&& __tp)
-	: _Tp(std::forward<_OtherTp>(__tp))
-	{ }
-
-      const _Tp& _M_cget() const { return static_cast<const _Tp&>(*this); }
-      _Tp& _M_get() { return static_cast<_Tp&>(*this); }
+      [[__no_unique_address__]] _Tp _M_obj;
     };
 
-  /// Specialization not using EBO.
-  template<int _Nm, typename _Tp>
-    struct _Hashtable_ebo_helper<_Nm, _Tp, false>
+#if ! _GLIBCXX_INLINE_VERSION
+  // For ABI compatibility reasons, [[no_unique_address]] is only used
+  // for empty non-final types.
+  template<typename _Tp>
+    struct _Hashtable_ebo_helper<_Tp, false>
     {
-      _Hashtable_ebo_helper() = default;
-
-      template<typename _OtherTp>
-	_Hashtable_ebo_helper(_OtherTp&& __tp)
-	: _M_tp(std::forward<_OtherTp>(__tp))
-	{ }
-
-      const _Tp& _M_cget() const { return _M_tp; }
-      _Tp& _M_get() { return _M_tp; }
-
-    private:
-      _Tp _M_tp{};
+      _Tp _M_obj;
     };
+#endif
 
   /**
    *  Primary class template _Local_iterator_base.
@@ -1067,59 +1034,39 @@ namespace __detail
 	   bool __cache_hash_code>
     struct _Local_iterator_base;
 
-  /**
-   *  Primary class template _Hash_code_base.
-   *
-   *  Encapsulates two policy issues that aren't quite orthogonal.
-   *   (1) the difference between using a ranged hash function and using
-   *       the combination of a hash function and a range-hashing function.
-   *       In the former case we don't have such things as hash codes, so
-   *       we have a dummy type as placeholder.
-   *   (2) Whether or not we cache hash codes.  Caching hash codes is
-   *       meaningless if we have a ranged hash function.
-   *
-   *  We also put the key extraction objects here, for convenience.
-   *  Each specialization derives from one or more of the template
-   *  parameters to benefit from Ebo. This is important as this type
-   *  is inherited in some cases by the _Local_iterator_base type used
-   *  to implement local_iterator and const_local_iterator. As with
-   *  any iterator type we prefer to make it as small as possible.
-   */
+  // Wraps the _Hash object and provides some utility functions for using it.
   template<typename _Key, typename _Value, typename _ExtractKey,
 	   typename _Hash, typename _RangeHash, typename _Unused,
-	   bool __cache_hash_code>
+	   bool /* __cache_hash_code */>
     struct _Hash_code_base
-    : private _Hashtable_ebo_helper<1, _Hash>
     {
-    private:
-      using __ebo_hash = _Hashtable_ebo_helper<1, _Hash>;
-
       // Gives the local iterator implementation access to _M_bucket_index().
       friend struct _Local_iterator_base<_Key, _Value, _ExtractKey,
 					 _Hash, _RangeHash, _Unused, false>;
-
     public:
-      typedef _Hash					hasher;
+      using hasher = _Hash;
 
       hasher
       hash_function() const
-      { return _M_hash(); }
+      { return _M_hash._M_obj; }
 
     protected:
-      typedef std::size_t 				__hash_code;
+      [[__no_unique_address__]] _Hashtable_ebo_helper<_Hash> _M_hash{};
+
+      using __hash_code = size_t;
 
       // We need the default constructor for the local iterators and _Hashtable
       // default constructor.
       _Hash_code_base() = default;
 
-      _Hash_code_base(const _Hash& __hash) : __ebo_hash(__hash) { }
+      _Hash_code_base(const _Hash& __hash) : _M_hash{__hash} { }
 
       __hash_code
       _M_hash_code(const _Key& __k) const
       {
 	static_assert(__is_invocable<const _Hash&, const _Key&>{},
 	    "hash function must be invocable with an argument of key type");
-	return _M_hash()(__k);
+	return _M_hash._M_obj(__k);
       }
 
       template<typename _Kt>
@@ -1128,7 +1075,7 @@ namespace __detail
 	{
 	  static_assert(__is_invocable<const _Hash&, const _Kt&>{},
 	    "hash function must be invocable with an argument of key type");
-	  return _M_hash()(__k);
+	  return _M_hash._M_obj(__k);
 	}
 
       __hash_code
@@ -1139,22 +1086,22 @@ namespace __detail
       _M_hash_code(const _Hash_node_value<_Value, true>& __n) const
       { return __n._M_hash_code; }
 
-      std::size_t
-      _M_bucket_index(__hash_code __c, std::size_t __bkt_count) const
+      size_t
+      _M_bucket_index(__hash_code __c, size_t __bkt_count) const
       { return _RangeHash{}(__c, __bkt_count); }
 
-      std::size_t
+      size_t
       _M_bucket_index(const _Hash_node_value<_Value, false>& __n,
-		      std::size_t __bkt_count) const
+		      size_t __bkt_count) const
       noexcept( noexcept(declval<const _Hash&>()(declval<const _Key&>())) )
       {
 	return _RangeHash{}(_M_hash_code(_ExtractKey{}(__n._M_v())),
 			    __bkt_count);
       }
 
-      std::size_t
+      size_t
       _M_bucket_index(const _Hash_node_value<_Value, true>& __n,
-		      std::size_t __bkt_count) const noexcept
+		      size_t __bkt_count) const noexcept
       { return _RangeHash{}(__n._M_hash_code, __bkt_count); }
 
       void
@@ -1174,13 +1121,6 @@ namespace __detail
       _M_copy_code(_Hash_node_code_cache<true>& __to,
 		   const _Hash_node_code_cache<true>& __from) const
       { __to._M_hash_code = __from._M_hash_code; }
-
-      void
-      _M_swap(_Hash_code_base& __x)
-      { std::swap(__ebo_hash::_M_get(), __x.__ebo_hash::_M_get()); }
-
-      const _Hash&
-      _M_hash() const { return __ebo_hash::_M_cget(); }
     };
 
   /// Partial specialization used when nodes contain a cached hash code.
@@ -1196,9 +1136,10 @@ namespace __detail
 					      _Hash, _RangeHash, _Unused, true>;
 
       _Local_iterator_base() = default;
+
       _Local_iterator_base(const __hash_code_base&,
 			   _Hash_node<_Value, true>* __p,
-			   std::size_t __bkt, std::size_t __bkt_count)
+			   size_t __bkt, size_t __bkt_count)
       : __base_node_iter(__p), _M_bucket(__bkt), _M_bucket_count(__bkt_count)
       { }
 
@@ -1208,79 +1149,58 @@ namespace __detail
 	__base_node_iter::_M_incr();
 	if (this->_M_cur)
 	  {
-	    std::size_t __bkt
+	    size_t __bkt
 	      = _RangeHash{}(this->_M_cur->_M_hash_code, _M_bucket_count);
 	    if (__bkt != _M_bucket)
 	      this->_M_cur = nullptr;
 	  }
       }
 
-      std::size_t _M_bucket;
-      std::size_t _M_bucket_count;
+      size_t _M_bucket = 0;
+      size_t _M_bucket_count = 0;
 
     public:
-      std::size_t
+      size_t
       _M_get_bucket() const { return _M_bucket; }  // for debug mode
     };
 
-  // Uninitialized storage for a _Hash_code_base.
-  // This type is DefaultConstructible and Assignable even if the
-  // _Hash_code_base type isn't, so that _Local_iterator_base<..., false>
-  // can be DefaultConstructible and Assignable.
-  template<typename _Tp, bool _IsEmpty = std::is_empty<_Tp>::value>
-    struct _Hash_code_storage
+  // Uninitialized storage for a _Hash object in a local iterator.
+  // This type is DefaultConstructible even if the _Hash type isn't,
+  // so that _Local_iterator_base<..., false> can be DefaultConstructible.
+  template<typename _Hash>
+    struct _Hash_obj_storage
     {
-      __gnu_cxx::__aligned_buffer<_Tp> _M_storage;
+      union _Uninit_storage
+      {
+	_Uninit_storage() noexcept { }
+	~_Uninit_storage() { }
 
-      _Tp*
-      _M_h() { return _M_storage._M_ptr(); }
+	[[__no_unique_address__]] _Hash _M_h;
+      };
 
-      const _Tp*
-      _M_h() const { return _M_storage._M_ptr(); }
+      [[__no_unique_address__]] _Uninit_storage _M_u;
     };
-
-  // Empty partial specialization for empty _Hash_code_base types.
-  template<typename _Tp>
-    struct _Hash_code_storage<_Tp, true>
-    {
-      static_assert( std::is_empty<_Tp>::value, "Type must be empty" );
-
-      // As _Tp is an empty type there will be no bytes written/read through
-      // the cast pointer, so no strict-aliasing violation.
-      _Tp*
-      _M_h() { return reinterpret_cast<_Tp*>(this); }
-
-      const _Tp*
-      _M_h() const { return reinterpret_cast<const _Tp*>(this); }
-    };
-
-  template<typename _Key, typename _Value, typename _ExtractKey,
-	   typename _Hash, typename _RangeHash, typename _Unused>
-    using __hash_code_for_local_iter
-      = _Hash_code_storage<_Hash_code_base<_Key, _Value, _ExtractKey,
-					   _Hash, _RangeHash, _Unused, false>>;
 
   // Partial specialization used when hash codes are not cached
   template<typename _Key, typename _Value, typename _ExtractKey,
 	   typename _Hash, typename _RangeHash, typename _Unused>
     struct _Local_iterator_base<_Key, _Value, _ExtractKey,
 				_Hash, _RangeHash, _Unused, false>
-    : __hash_code_for_local_iter<_Key, _Value, _ExtractKey, _Hash, _RangeHash,
-				 _Unused>
-    , _Node_iterator_base<_Value, false>
+    : _Hash_obj_storage<_Hash>, _Node_iterator_base<_Value, false>
     {
     protected:
       using __hash_code_base = _Hash_code_base<_Key, _Value, _ExtractKey,
 					     _Hash, _RangeHash, _Unused, false>;
+      using __hash_obj_storage = _Hash_obj_storage<_Hash>;
       using __node_iter_base = _Node_iterator_base<_Value, false>;
 
-      _Local_iterator_base() : _M_bucket_count(-1) { }
+      _Local_iterator_base() = default;
 
       _Local_iterator_base(const __hash_code_base& __base,
 			   _Hash_node<_Value, false>* __p,
-			   std::size_t __bkt, std::size_t __bkt_count)
+			   size_t __bkt, size_t __bkt_count)
       : __node_iter_base(__p), _M_bucket(__bkt), _M_bucket_count(__bkt_count)
-      { _M_init(__base); }
+      { _M_init(__base._M_hash._M_obj); }
 
       ~_Local_iterator_base()
       {
@@ -1293,19 +1213,19 @@ namespace __detail
       , _M_bucket_count(__iter._M_bucket_count)
       {
 	if (_M_bucket_count != size_t(-1))
-	  _M_init(*__iter._M_h());
+	  _M_init(__iter._M_h());
       }
 
       _Local_iterator_base&
       operator=(const _Local_iterator_base& __iter)
       {
-	if (_M_bucket_count != -1)
+	if (_M_bucket_count != size_t(-1))
 	  _M_destroy();
 	this->_M_cur = __iter._M_cur;
 	_M_bucket = __iter._M_bucket;
 	_M_bucket_count = __iter._M_bucket_count;
-	if (_M_bucket_count != -1)
-	  _M_init(*__iter._M_h());
+	if (_M_bucket_count != size_t(-1))
+	  _M_init(__iter._M_h());
 	return *this;
       }
 
@@ -1315,25 +1235,28 @@ namespace __detail
 	__node_iter_base::_M_incr();
 	if (this->_M_cur)
 	  {
-	    std::size_t __bkt = this->_M_h()->_M_bucket_index(*this->_M_cur,
-							      _M_bucket_count);
+	    const auto __code = _M_h()(_ExtractKey{}(this->_M_cur->_M_v()));
+	    size_t __bkt = _RangeHash{}(__code, _M_bucket_count);
 	    if (__bkt != _M_bucket)
 	      this->_M_cur = nullptr;
 	  }
       }
 
-      std::size_t _M_bucket;
-      std::size_t _M_bucket_count;
+      size_t _M_bucket = 0;
+      size_t _M_bucket_count = -1;
 
       void
-      _M_init(const __hash_code_base& __base)
-      { ::new(this->_M_h()) __hash_code_base(__base); }
+      _M_init(const _Hash& __h)
+      { std::_Construct(std::__addressof(__hash_obj_storage::_M_u._M_h), __h); }
 
       void
-      _M_destroy() { this->_M_h()->~__hash_code_base(); }
+      _M_destroy() { __hash_obj_storage::_M_u._M_h.~_Hash(); }
+
+      const _Hash&
+      _M_h() const { return __hash_obj_storage::_M_u._M_h; }
 
     public:
-      std::size_t
+      size_t
       _M_get_bucket() const { return _M_bucket; }  // for debug mode
     };
 
@@ -1363,7 +1286,7 @@ namespace __detail
 
       _Local_iterator(const __hash_code_base& __base,
 		      _Hash_node<_Value, __cache>* __n,
-		      std::size_t __bkt, std::size_t __bkt_count)
+		      size_t __bkt, size_t __bkt_count)
       : __base_type(__base, __n, __bkt, __bkt_count)
       { }
 
@@ -1405,17 +1328,17 @@ namespace __detail
       using __hash_code_base = typename __base_type::__hash_code_base;
 
     public:
-      typedef _Value					value_type;
-      typedef const value_type*				pointer;
-      typedef const value_type&				reference;
-      typedef std::ptrdiff_t				difference_type;
-      typedef std::forward_iterator_tag			iterator_category;
+      using value_type        = _Value;
+      using pointer           = const value_type*;
+      using reference         = const value_type&;
+      using difference_type   = ptrdiff_t;
+      using iterator_category = forward_iterator_tag;
 
       _Local_const_iterator() = default;
 
       _Local_const_iterator(const __hash_code_base& __base,
 			    _Hash_node<_Value, __cache>* __n,
-			    std::size_t __bkt, std::size_t __bkt_count)
+			    size_t __bkt, size_t __bkt_count)
       : __base_type(__base, __n, __bkt, __bkt_count)
       { }
 
@@ -1458,22 +1381,20 @@ namespace __detail
    *
    *  Base class templates are:
    *    - __detail::_Hash_code_base
-   *    - __detail::_Hashtable_ebo_helper
    */
   template<typename _Key, typename _Value, typename _ExtractKey,
 	   typename _Equal, typename _Hash, typename _RangeHash,
 	   typename _Unused, typename _Traits>
     struct _Hashtable_base
     : public _Hash_code_base<_Key, _Value, _ExtractKey, _Hash, _RangeHash,
-			     _Unused, _Traits::__hash_cached::value>,
-      private _Hashtable_ebo_helper<0, _Equal>
+			     _Unused, _Traits::__hash_cached::value>
     {
     public:
-      typedef _Key					key_type;
-      typedef _Value					value_type;
-      typedef _Equal					key_equal;
-      typedef std::size_t				size_type;
-      typedef std::ptrdiff_t				difference_type;
+      using key_type        = _Key;
+      using value_type      = _Value;
+      using key_equal       = _Equal;
+      using size_type       = size_t;
+      using difference_type = ptrdiff_t;
 
       using __traits_type = _Traits;
       using __hash_cached = typename __traits_type::__hash_cached;
@@ -1484,14 +1405,13 @@ namespace __detail
 
       using __hash_code = typename __hash_code_base::__hash_code;
 
-    private:
-      using _EqualEBO = _Hashtable_ebo_helper<0, _Equal>;
-
     protected:
+      [[__no_unique_address__]] _Hashtable_ebo_helper<_Equal> _M_equal{};
+
       _Hashtable_base() = default;
 
       _Hashtable_base(const _Hash& __hash, const _Equal& __eq)
-      : __hash_code_base(__hash), _EqualEBO(__eq)
+      : __hash_code_base(__hash), _M_equal{__eq}
       { }
 
       bool
@@ -1557,26 +1477,18 @@ namespace __detail
       }
 #pragma GCC diagnostic pop
 
-      void
-      _M_swap(_Hashtable_base& __x)
-      {
-	__hash_code_base::_M_swap(__x);
-	std::swap(_EqualEBO::_M_get(), __x._EqualEBO::_M_get());
-      }
-
       const _Equal&
-      _M_eq() const { return _EqualEBO::_M_cget(); }
+      _M_eq() const noexcept { return _M_equal._M_obj; }
     };
 
   /**
-   * This type deals with all allocation and keeps an allocator instance
-   * through inheritance to benefit from EBO when possible.
+   * This type deals with all allocation and keeps an allocator instance.
    */
   template<typename _NodeAlloc>
-    struct _Hashtable_alloc : private _Hashtable_ebo_helper<0, _NodeAlloc>
+    struct _Hashtable_alloc
     {
     private:
-      using __ebo_node_alloc = _Hashtable_ebo_helper<0, _NodeAlloc>;
+      [[__no_unique_address__]] _Hashtable_ebo_helper<_NodeAlloc> _M_alloc{};
 
       template<typename>
 	struct __get_value_type;
@@ -1607,16 +1519,16 @@ namespace __detail
 
       template<typename _Alloc>
 	_Hashtable_alloc(_Alloc&& __a)
-	: __ebo_node_alloc(std::forward<_Alloc>(__a))
+	: _M_alloc{std::forward<_Alloc>(__a)}
 	{ }
 
       __node_alloc_type&
       _M_node_allocator()
-      { return __ebo_node_alloc::_M_get(); }
+      { return _M_alloc._M_obj; }
 
       const __node_alloc_type&
       _M_node_allocator() const
-      { return __ebo_node_alloc::_M_cget(); }
+      { return _M_alloc._M_obj; }
 
       // Allocate a node and construct an element within it.
       template<typename... _Args>
@@ -1637,10 +1549,10 @@ namespace __detail
       _M_deallocate_nodes(__node_ptr __n);
 
       __buckets_ptr
-      _M_allocate_buckets(std::size_t __bkt_count);
+      _M_allocate_buckets(size_t __bkt_count);
 
       void
-      _M_deallocate_buckets(__buckets_ptr, std::size_t __bkt_count);
+      _M_deallocate_buckets(__buckets_ptr, size_t __bkt_count);
     };
 
   // Definitions of class template _Hashtable_alloc's out-of-line member
@@ -1681,7 +1593,7 @@ namespace __detail
     void
     _Hashtable_alloc<_NodeAlloc>::_M_deallocate_node_ptr(__node_ptr __n)
     {
-      typedef typename __node_alloc_traits::pointer _Ptr;
+      using _Ptr = typename __node_alloc_traits::pointer;
       auto __ptr = std::pointer_traits<_Ptr>::pointer_to(*__n);
       __n->~__node_type();
       __node_alloc_traits::deallocate(_M_node_allocator(), __ptr, 1);
@@ -1701,7 +1613,7 @@ namespace __detail
 
   template<typename _NodeAlloc>
     auto
-    _Hashtable_alloc<_NodeAlloc>::_M_allocate_buckets(std::size_t __bkt_count)
+    _Hashtable_alloc<_NodeAlloc>::_M_allocate_buckets(size_t __bkt_count)
     -> __buckets_ptr
     {
       __buckets_alloc_type __alloc(_M_node_allocator());
@@ -1715,10 +1627,9 @@ namespace __detail
   template<typename _NodeAlloc>
     void
     _Hashtable_alloc<_NodeAlloc>::
-    _M_deallocate_buckets(__buckets_ptr __bkts,
-			  std::size_t __bkt_count)
+    _M_deallocate_buckets(__buckets_ptr __bkts, size_t __bkt_count)
     {
-      typedef typename __buckets_alloc_traits::pointer _Ptr;
+      using _Ptr = typename __buckets_alloc_traits::pointer;
       auto __ptr = std::pointer_traits<_Ptr>::pointer_to(*__bkts);
       __buckets_alloc_type __alloc(_M_node_allocator());
       __buckets_alloc_traits::deallocate(__alloc, __ptr, __bkt_count);

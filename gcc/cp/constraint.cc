@@ -1,5 +1,5 @@
 /* Processing rules for constraints.
-   Copyright (C) 2013-2024 Free Software Foundation, Inc.
+   Copyright (C) 2013-2025 Free Software Foundation, Inc.
    Contributed by Andrew Sutton (andrew.n.sutton@gmail.com)
 
 This file is part of GCC.
@@ -511,6 +511,27 @@ normalize_concept_check (tree check, tree args, norm_info info)
     entry->norm = norm;
   return norm;
 }
+
+/* A structural hasher for ATOMIC_CONSTRs.  */
+
+struct atom_hasher : default_hash_traits<tree>
+{
+  static hashval_t hash (tree t)
+  {
+    ++comparing_specializations;
+    hashval_t val = hash_atomic_constraint (t);
+    --comparing_specializations;
+    return val;
+  }
+
+  static bool equal (tree t1, tree t2)
+  {
+    ++comparing_specializations;
+    bool eq = atomic_constraints_identical_p (t1, t2);
+    --comparing_specializations;
+    return eq;
+  }
+};
 
 /* Used by normalize_atom to cache ATOMIC_CONSTRs.  */
 
@@ -1324,6 +1345,7 @@ tsubst_valid_expression_requirement (tree t, tree args, sat_info info)
       if (diagnosing_failed_constraint::replay_errors_p ())
 	{
 	  inform (loc, "the required expression %qE is invalid, because", t);
+	  auto_diagnostic_nesting_level sentinel;
 	  if (r == error_mark_node)
 	    tsubst_expr (t, args, info.complain, info.in_decl);
 	  else
@@ -2232,6 +2254,7 @@ satisfy_disjunction (tree t, tree args, sat_info info)
 	      "no operand of the disjunction is satisfied");
       if (diagnosing_failed_constraint::replay_errors_p ())
 	{
+	  auto_diagnostic_nesting_level sentinel;
 	  /* Replay the error in each branch of the disjunction.  */
 	  auto_vec<tree_pair> operands;
 	  collect_operands_of_disjunction (t, &operands);
@@ -2243,6 +2266,7 @@ satisfy_disjunction (tree t, tree args, sat_info info)
 					      disj_expr.get_start (),
 					      disj_expr.get_finish ());
 	      inform (loc, "the operand %qE is unsatisfied because", op);
+	      auto_diagnostic_nesting_level sentinel;
 	      satisfy_constraint_r (norm_op, args, info);
 	    }
 	}
@@ -3292,6 +3316,8 @@ diagnose_constraints (location_t loc, tree t, tree args)
 
   if (concepts_diagnostics_max_depth == 0)
     return;
+
+  auto_diagnostic_nesting_level sentinel;
 
   /* Replay satisfaction, but diagnose unsatisfaction.  */
   sat_info noisy (tf_warning_or_error, NULL_TREE, /*diag_unsat=*/true);

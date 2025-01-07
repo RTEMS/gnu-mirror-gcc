@@ -1,4 +1,4 @@
-.. Copyright (C) 2024 Free Software Foundation, Inc.
+.. Copyright (C) 2024-2025 Free Software Foundation, Inc.
    Originally contributed by David Malcolm <dmalcolm@redhat.com>
 
    This is free software: you can redistribute it and/or modify it
@@ -54,7 +54,7 @@ Source files
 Given these declarations::
 
   static diagnostic_manager *diag_mgr;
-  static const diagnostic_file *main_file;
+  static diagnostic_file *main_file;
 
 we can create a :type:`diagnostic_file` describing an input file ``foo.c``
 via :func:`diagnostic_manager_new_file`::
@@ -165,7 +165,7 @@ underling the pertinent part of the given line.
 
 If libgdiagnostics cannot open the file, it will merely print::
 
-   foo.c:17:8: error: can't find 'foo'
+   foo.c:17:8: error: can't find 'foo.h'
 
 A range can span multiple lines within the same file.
 

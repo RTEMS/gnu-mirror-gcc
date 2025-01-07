@@ -1,4 +1,4 @@
-@c Copyright (C) 1988-2024 Free Software Foundation, Inc.
+@c Copyright (C) 1988-2025 Free Software Foundation, Inc.
 
 @c This is part of the GCC manual.
 @c For copying conditions, see the file gcc.texi.
@@ -98,6 +98,8 @@ extensions, accepted by GCC in C90 mode and in C++.
 * Unnamed Fields::      Unnamed struct/union fields within structs/unions.
 * Thread-Local::        Per-thread variables.
 * Binary constants::    Binary constants using the @samp{0b} prefix.
+* OpenMP::              Multiprocessing extensions.
+* OpenACC::             Extensions for offloading code to accelerator devices.
 @end menu
 
 @node Statement Exprs
@@ -1525,6 +1527,14 @@ address space @code{__flash@var{N}}.
 The compiler sets the @code{RAMPZ} segment register appropriately 
 before reading data by means of the @code{ELPM} instruction.
 
+@cindex @code{__flashx} AVR Named Address Spaces
+@item __flashx
+
+This is a 24-bit flash address space locating data in section
+@code{.progmemx.data}.
+The compiler sets the @code{RAMPZ} segment register appropriately 
+before reading data by means of the @code{ELPM} instruction.
+
 @cindex @code{__memx} AVR Named Address Spaces
 @item __memx
 This is a 24-bit address space that linearizes flash and RAM:
@@ -1604,9 +1614,9 @@ together with attribute @code{progmem}.
 @item
 Reading across the 64@tie{}KiB section boundary of
 the @code{__flash} or @code{__flash@var{N}} address spaces
-shows undefined behavior. The only address space that
-supports reading across the 64@tie{}KiB flash segment boundaries is
-@code{__memx}.
+is not supported. The only address spaces that
+support reading across the 64@tie{}KiB flash segment boundaries are
+@code{__memx} and @code{__flashx}.
 
 @item
 If you use one of the @code{__flash@var{N}} address spaces
@@ -6226,7 +6236,7 @@ Provide a user-defined function to handle warm reset exception.
 These function attributes are supported by the Nvidia PTX back end:
 
 @table @code
-@cindex @code{kernel} attribute, Nvidia PTX
+@cindex @code{kernel} function attribute, Nvidia PTX
 @item kernel
 This attribute indicates that the corresponding function should be compiled
 as a kernel function, which can be invoked from the host via the CUDA RT 
@@ -8320,11 +8330,11 @@ only when the trailing array is declared as a flexible array member per C99
 standard onwards (@samp{[]}), it is treated as a flexible array member.
 
 There are two more levels in between 0 and 3, which are provided to
-support older codes that use GCC zero-length array extension
+support older code that uses the GCC zero-length array extension
 (@samp{[0]}) or one-element array as flexible array members
 (@samp{[1]}).  When @var{level} is 1, the trailing array is treated as
 a flexible array member when it is declared as either @samp{[]},
-@samp{[0]}, or @samp{[1]}; When @var{level} is 2, the trailing array
+@samp{[0]}, or @samp{[1]}.  When @var{level} is 2, the trailing array
 is treated as a flexible array member when it is declared as either
 @samp{[]}, or @samp{[0]}.
 
@@ -8877,7 +8887,7 @@ will be used, and the @code{.lower} prefix will not be added.
 These variable attributes are supported by the Nvidia PTX back end:
 
 @table @code
-@cindex @code{shared} attribute, Nvidia PTX
+@cindex @code{shared} variable attribute, Nvidia PTX
 @item shared
 Use this attribute to place a variable in the @code{.shared} memory space.
 This memory space is private to each cooperative thread array; only threads
@@ -10202,6 +10212,10 @@ Refer to the relevant language standards for exact details on the
 placement of @samp{[[]]} attributes within your code, as they differ
 in some details from the rules for the GNU attribute syntax.
 
+With the @option{-fopenmp} option, GCC additionally recognizes OpenMP
+directives, with names prefixed with @samp{omp::}, using the standard
+@samp{[[]]} syntax.  @xref{OpenMP}.
+
 The remainder of this section describes the details of the GNU extension
 @code{__attribute__} syntax,
 and the constructs to which attribute specifiers bind, for the C
@@ -10841,8 +10855,8 @@ statements.  A @dfn{basic @code{asm}} statement is one with no
 operands (@pxref{Basic Asm}), while an @dfn{extended @code{asm}}
 statement (@pxref{Extended Asm}) includes one or more operands.  
 The extended form is preferred for mixing C and assembly language
-within a function, but to include assembly language at
-top level you must use basic @code{asm}.
+within a function and can be used at top level as well with certain
+restrictions.
 
 You can also use the @code{asm} keyword to override the assembler name
 for a C symbol, or to place a C variable in a specific register.
@@ -10880,6 +10894,8 @@ can be used for code compiled with @option{-fno-asm}.
 @item volatile
 The optional @code{volatile} qualifier has no effect. 
 All basic @code{asm} blocks are implicitly volatile.
+Basic @code{asm} statements outside of functions may not use any
+qualifiers.
 
 @item inline
 If you use the @code{inline} qualifier, then for inlining purposes the size
@@ -10924,25 +10940,19 @@ void function()
 @subsubheading Remarks
 Using extended @code{asm} (@pxref{Extended Asm}) typically produces
 smaller, safer, and more efficient code, and in most cases it is a
-better solution than basic @code{asm}.  However, there are two
-situations where only basic @code{asm} can be used:
+better solution than basic @code{asm}.  However, functions declared
+with the @code{naked} attribute require only basic @code{asm}
+(@pxref{Function Attributes}).
 
-@itemize @bullet
-@item
-Extended @code{asm} statements have to be inside a C
-function, so to write inline assembly language at file scope (``top-level''),
-outside of C functions, you must use basic @code{asm}.
-You can use this technique to emit assembler directives,
+Extended @code{asm} statements may be used both inside a C
+function or at file scope (``top-level''), where
+you can use this technique to emit assembler directives,
 define assembly language macros that can be invoked elsewhere in the file,
 or write entire functions in assembly language.
-Basic @code{asm} statements outside of functions may not use any
-qualifiers.
-
-@item
-Functions declared
-with the @code{naked} attribute also require basic @code{asm}
-(@pxref{Function Attributes}).
-@end itemize
+Extended @code{asm} statements outside of functions may not use any
+qualifiers, may not specify clobbers, may not use @code{%}, @code{+} or
+@code{&} modifiers in constraints and can only use constraints which don't
+allow using any register.
 
 Safely accessing C data and calling functions from basic @code{asm} is more 
 complex than it may appear. To access C data, it is better to use extended 
@@ -12131,6 +12141,11 @@ The following table shows the modifiers supported by all targets and their effec
 @item @code{c}
 @tab Require a constant operand and print the constant expression with no punctuation.
 @tab @code{%c0}
+@item @code{cc}
+@tab Like @samp{%c} except try harder to print it with no punctuation.
+@samp{%c} can e.g.@: fail to print constant addresses in position independent code on
+some architectures.
+@tab @code{%cc0}
 @item @code{n}
 @tab Like @samp{%c} except that the value of the constant is negated before printing.
 @tab @code{%n0}
@@ -12590,6 +12605,7 @@ The list below describes the supported modifiers and their effects for RISC-V.
 @headitem Modifier @tab Description
 @item @code{z} @tab Print ''@code{zero}'' instead of 0 if the operand is an immediate with a value of zero.
 @item @code{i} @tab Print the character ''@code{i}'' if the operand is an immediate.
+@item @code{N} @tab Print the register encoding as integer (0 - 31).
 @end multitable
 
 @anchor{shOperandmodifiers}
@@ -28341,6 +28357,10 @@ The GNU C preprocessor recognizes several pragmas in addition to the
 compiler pragmas documented here.  Refer to the CPP manual for more
 information.
 
+GCC additionally recognizes OpenMP pragmas when the @option{-fopenmp}
+option is specified, and OpenACC pragmas when the @option{-fopenacc}
+option is specified.  @xref{OpenMP}, and @ref{OpenACC}.
+
 @menu
 * AArch64 Pragmas::
 * ARM Pragmas::
@@ -29345,6 +29365,57 @@ i = 0b101010;
 The type of these constants follows the same rules as for octal or
 hexadecimal integer constants, so suffixes like @samp{L} or @samp{UL}
 can be applied.
+
+@node OpenMP
+@section OpenMP
+@cindex OpenMP extension support
+
+OpenMP (Open Multi-Processing) is an application programming
+interface (API) that supports multi-platform shared memory
+multiprocessing programming in C/C++ and Fortran on many
+architectures, including Unix and Microsoft Windows platforms.
+It consists of a set of compiler directives, library routines,
+and environment variables that influence run-time behavior.
+
+GCC implements all of the @uref{https://openmp.org/specifications/,
+OpenMP Application Program Interface v4.5}, and many features from later
+versions of the OpenMP specification.
+@xref{OpenMP Implementation Status,,,libgomp,
+GNU Offloading and Multi Processing Runtime Library},
+for more details about currently supported OpenMP features.
+
+To enable the processing of OpenMP directives @samp{#pragma omp},
+@samp{[[omp::directive(...)]]}, @samp{[[omp::decl(...)]]},
+and @samp{[[omp::sequence(...)]]} in C and C++,
+GCC needs to be invoked with the @option{-fopenmp} option.
+This option also arranges for automatic linking of the OpenMP
+runtime library.
+@xref{,,,libgomp,GNU Offloading and Multi Processing Runtime Library}.
+
+@xref{OpenMP and OpenACC Options}, for additional options useful with
+@option{-fopenmp}.
+
+@node OpenACC
+@section OpenACC
+@cindex OpenACC extension support
+
+OpenACC is an application programming interface (API) that supports
+offloading of code to accelerator devices.  It consists of a set of
+compiler directives, library routines, and environment variables that
+influence run-time behavior.
+
+GCC strives to be compatible with the
+@uref{https://www.openacc.org/, OpenACC Application Programming
+Interface v2.6}.
+
+To enable the processing of OpenACC directives @samp{#pragma acc}
+in C and C++, GCC needs to be invoked with the @option{-fopenacc} option.
+This option also arranges for automatic linking of the OpenACC runtime
+library.
+@xref{,,,libgomp,GNU Offloading and Multi Processing Runtime Library}.
+
+@xref{OpenMP and OpenACC Options}, for additional options useful with
+@option{-fopenacc}.
 
 @node C++ Extensions
 @chapter Extensions to the C++ Language

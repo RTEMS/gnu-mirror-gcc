@@ -1,7 +1,7 @@
 /* This file contains routines to construct OpenACC and OpenMP constructs,
    called from parsing in the C and C++ front ends.
 
-   Copyright (C) 2005-2024 Free Software Foundation, Inc.
+   Copyright (C) 2005-2025 Free Software Foundation, Inc.
    Contributed by Richard Henderson <rth@redhat.com>,
 		  Diego Novillo <dnovillo@redhat.com>.
 
@@ -669,6 +669,8 @@ c_finish_omp_atomic (location_t loc, enum tree_code code,
 bool
 c_omp_interop_t_p (tree type)
 {
+  if (type == error_mark_node)
+    return false;
   type = TYPE_MAIN_VARIANT (type);
   return (TREE_CODE (type) == ENUMERAL_TYPE
 	  && TYPE_NAME (type)

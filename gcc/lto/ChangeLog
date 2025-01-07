@@ -1,3 +1,15 @@
+2024-12-12  Martin Uecker  <uecker@tugraz.at>
+
+	PR c/113688
+	PR c/114014
+	PR c/114713
+	PR c/117724
+	* lto-common.cc (hash_canonical_type): Add exception.
+
+2024-12-12  Martin Uecker  <uecker@tugraz.at>
+
+	* lto-common.cc (hash_canonical_type): Add exception.
+
 2024-11-22  Andrew Pinski  <quic_apinski@quicinc.com>
 
 	PR bootstrap/117737
@@ -6865,7 +6877,7 @@
 	* lto-tree.h: Likewise.
 	* lto-lang.c: Likewise.
 
-Copyright (C) 2006-2024 Free Software Foundation, Inc.
+Copyright (C) 2006-2025 Free Software Foundation, Inc.
 
 Copying and distribution of this file, with or without modification,
 are permitted in any medium without royalty provided the copyright

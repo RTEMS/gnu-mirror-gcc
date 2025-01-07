@@ -1,5 +1,5 @@
 ;; Machine description for SPARC.
-;; Copyright (C) 1987-2024 Free Software Foundation, Inc.
+;; Copyright (C) 1987-2025 Free Software Foundation, Inc.
 ;; Contributed by Michael Tiemann (tiemann@cygnus.com)
 ;; 64-bit SPARC-V9 support by Michael Tiemann, Jim Wilson, and Doug Evans,
 ;; at Cygnus Support.
@@ -9000,16 +9000,12 @@
 
 (define_expand "vec_cmp<FPCMP:mode><P:mode>"
   [(set (match_operand:P 0 "register_operand" "")
-        (match_operator:P 1 "comparison_operator"
+        (match_operator:P 1 "vec_cmp_operator"
           [(match_operand:FPCMP 2 "register_operand" "")
            (match_operand:FPCMP 3 "register_operand" "")]))]
   "TARGET_VIS3"
 {
   enum rtx_code code = GET_CODE (operands[1]);
-
-  /* VIS 4 is required for ordering comparisons if the mode is V8QI.  */
-  if (<FPCMP:MODE>mode == V8QImode && code != EQ && code != NE && !TARGET_VIS4)
-    FAIL;
 
   if (code == LT || code == GE)
     {
@@ -9028,16 +9024,12 @@
 
 (define_expand "vec_cmpu<FPCMP:mode><P:mode>"
   [(set (match_operand:P 0 "register_operand" "")
-        (match_operator:P 1 "comparison_operator"
+        (match_operator:P 1 "vec_cmpu_operator"
           [(match_operand:FPCMP 2 "register_operand" "")
            (match_operand:FPCMP 3 "register_operand" "")]))]
   "TARGET_VIS3"
 {
   enum rtx_code code = GET_CODE (operands[1]);
-
-  /* VIS 4 is required for ordering comparisons if the mode is not V8QI.  */
-  if (<FPCMP:MODE>mode != V8QImode && code != EQ && code != NE && !TARGET_VIS4)
-    FAIL;
 
   if (code == LTU || code == GEU)
     {
@@ -9466,10 +9458,14 @@
   [(set_attr "type" "fp")
    (set_attr "fptype" "double")])
 
-;; VIS4B instructions.
+;; VIS4B instructions (specified in the unpublished OSA 2017)
 
 (define_mode_iterator DUMODE [V8QI V4HI V2SI])
 
+;; Unpack a DUMODE right-justified value from {8,4,2} consecutive bitfields of (opnd 1):
+;; for  0 <= (opnd 2) <= 7 : V8QI value from 8 consecutive bitfields of (opnd 2) + 1 bits
+;; for  8 <= (opnd 2) <= 15: V4HI value from 4 consecutive bitfields of (opnd 2) + 1 bits
+;; for 16 <= (opnd 2) <= 31: V2SI value from 2 consecutive bitfields of (opnd 2) + 1 bits
 (define_insn "dictunpack<DUMODE:vbits>"
   [(set (match_operand:DUMODE 0 "register_operand" "=e")
         (unspec:DUMODE [(match_operand:DF 1 "register_operand" "e")
@@ -9480,6 +9476,7 @@
   [(set_attr "type" "fga")
    (set_attr "subtype" "other")])
 
+;; Same as fpcmp but the {8,4,2}-bit result is shifted left by (opnd 3) * {8,4,2}
 (define_insn "fpcmp<fpcmpcond:code><FPCMP:vbits><P:mode>shl"
   [(set (match_operand:P 0 "register_operand" "=r")
         (unspec:P [(fpcmpcond:FPCMP (match_operand:FPCMP 1 "register_operand" "e")
@@ -9490,6 +9487,7 @@
    "fpcmp<fpcmpcond:code><FPCMP:vbits>shl\t%1, %2, %3, %0"
    [(set_attr "type" "viscmp")])
 
+;; Same as fpcmpu but the {8,4,2}-bit result is shifted left by (opnd 3) * {8,4,2}
 (define_insn "fpcmpu<fpcmpucond:signed_code><FPCMP:vbits><P:mode>shl"
   [(set (match_operand:P 0 "register_operand" "=r")
         (unspec:P [(fpcmpucond:FPCMP (match_operand:FPCMP 1 "register_operand" "e")
@@ -9500,6 +9498,9 @@
    "fpcmpu<fpcmpucond:signed_code><FPCMP:vbits>shl\t%1, %2, %3, %0"
    [(set_attr "type" "viscmp")])
 
+;; Dual Equal comparison: the unshifted result is the OR of two EQ comparisons
+;; of (opnd 1) with 1) the 32-bit highpart of (opnd 2) concatenated with itself
+;; and 2) the 32-bit lowpart of (opnd 2) concatenated with itself.
 (define_insn "fpcmpde<FPCMP:vbits><P:mode>shl"
   [(set (match_operand:P 0 "register_operand" "=r")
         (unspec:P [(match_operand:FPCMP 1 "register_operand" "e")
@@ -9510,6 +9511,10 @@
    "fpcmpde<FPCMP:vbits>shl\t%1, %2, %3, %0"
    [(set_attr "type" "viscmp")])
 
+;; Unsigned Range comparison: the unshifted result is True if (opnd 1) lies in
+;; partitioned unsigned range (LB,HB) with LB) the 32-bit highpart of (opnd 2)
+;; concatenated with itself and HB) the 32-bit lowpart of (opnd 2) concatenated
+;; with itself.
 (define_insn "fpcmpur<FPCMP:vbits><P:mode>shl"
   [(set (match_operand:P 0 "register_operand" "=r")
         (unspec:P [(match_operand:FPCMP 1 "register_operand" "e")

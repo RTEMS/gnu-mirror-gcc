@@ -1,7 +1,7 @@
 /* General types and functions that are useful for processing of OpenMP,
    OpenACC and similar directives at various stages of compilation.
 
-   Copyright (C) 2005-2024 Free Software Foundation, Inc.
+   Copyright (C) 2005-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -1163,7 +1163,7 @@ static const char *const kind_properties[] =
   { "host", "nohost", "cpu", "gpu", "fpga", "any", NULL };
 static const char *const vendor_properties[] =
   { "amd", "arm", "bsc", "cray", "fujitsu", "gnu", "hpe", "ibm", "intel",
-    "llvm", "nvidia", "pgi", "ti", "unknown", NULL };
+    "llvm", "nec", "nvidia", "pgi", "ti", "unknown", NULL };
 static const char *const extension_properties[] =
   { NULL };
 static const char *const atomic_default_mem_order_properties[] =

@@ -1,5 +1,5 @@
 /* Pass manager for Fortran front end.
-   Copyright (C) 2010-2024 Free Software Foundation, Inc.
+   Copyright (C) 2010-2025 Free Software Foundation, Inc.
    Contributed by Thomas König.
 
 This file is part of GCC.
@@ -5630,6 +5630,8 @@ gfc_code_walker (gfc_code **c, walk_code_fn_t codefn, walk_expr_fn_t exprfn,
 		  WALK_SUBEXPR (co->ext.omp_clauses->num_tasks);
 		  WALK_SUBEXPR (co->ext.omp_clauses->priority);
 		  WALK_SUBEXPR (co->ext.omp_clauses->detach);
+		  WALK_SUBEXPR (co->ext.omp_clauses->novariants);
+		  WALK_SUBEXPR (co->ext.omp_clauses->nocontext);
 		  for (idx = 0; idx < ARRAY_SIZE (list_types); idx++)
 		    for (n = co->ext.omp_clauses->lists[list_types[idx]];
 			 n; n = n->next)

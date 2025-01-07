@@ -1,4 +1,4 @@
-.. Copyright (C) 2024 Free Software Foundation, Inc.
+.. Copyright (C) 2024-2025 Free Software Foundation, Inc.
    Originally contributed by David Malcolm <dmalcolm@redhat.com>
 
    This is free software: you can redistribute it and/or modify it
@@ -124,7 +124,7 @@ terminal, and the quotes will be internationalized, so that e.g. with
 
 .. code-block:: console
 
-  progname: erreur: can't find « free »
+  progname: erreur: can't find « foo »
 
 Note that:
 

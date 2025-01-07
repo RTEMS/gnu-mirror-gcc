@@ -1,5 +1,5 @@
 /* Subroutines used for code generation for RISC-V.
-   Copyright (C) 2011-2024 Free Software Foundation, Inc.
+   Copyright (C) 2011-2025 Free Software Foundation, Inc.
    Contributed by Andrew Waterman (andrew@sifive.com).
    Based on MIPS target for GNU compiler.
 
@@ -350,14 +350,14 @@ const enum reg_class riscv_regno_to_class[FIRST_PSEUDO_REGISTER] = {
   JALR_REGS,	JALR_REGS,	JALR_REGS,	JALR_REGS,
   JALR_REGS,	JALR_REGS,	JALR_REGS,	JALR_REGS,
   SIBCALL_REGS,	SIBCALL_REGS,	SIBCALL_REGS,	SIBCALL_REGS,
-  FP_REGS,	FP_REGS,	FP_REGS,	FP_REGS,
-  FP_REGS,	FP_REGS,	FP_REGS,	FP_REGS,
-  FP_REGS,	FP_REGS,	FP_REGS,	FP_REGS,
-  FP_REGS,	FP_REGS,	FP_REGS,	FP_REGS,
-  FP_REGS,	FP_REGS,	FP_REGS,	FP_REGS,
-  FP_REGS,	FP_REGS,	FP_REGS,	FP_REGS,
-  FP_REGS,	FP_REGS,	FP_REGS,	FP_REGS,
-  FP_REGS,	FP_REGS,	FP_REGS,	FP_REGS,
+  RVC_FP_REGS,	RVC_FP_REGS,	RVC_FP_REGS,	RVC_FP_REGS,
+  RVC_FP_REGS,	RVC_FP_REGS,	RVC_FP_REGS,	RVC_FP_REGS,
+  RVC_FP_REGS,	RVC_FP_REGS,	RVC_FP_REGS,	RVC_FP_REGS,
+  RVC_FP_REGS,	RVC_FP_REGS,	RVC_FP_REGS,	RVC_FP_REGS,
+  RVC_FP_REGS,	RVC_FP_REGS,	RVC_FP_REGS,	RVC_FP_REGS,
+  RVC_FP_REGS,	RVC_FP_REGS,	RVC_FP_REGS,	RVC_FP_REGS,
+  RVC_FP_REGS,	RVC_FP_REGS,	RVC_FP_REGS,	RVC_FP_REGS,
+  RVC_FP_REGS,	RVC_FP_REGS,	RVC_FP_REGS,	RVC_FP_REGS,
   FRAME_REGS,	FRAME_REGS,	NO_REGS,	NO_REGS,
   NO_REGS,	NO_REGS,	NO_REGS,	NO_REGS,
   NO_REGS,	NO_REGS,	NO_REGS,	NO_REGS,
@@ -590,6 +590,28 @@ static const struct riscv_tune_param generic_ooo_tune_info = {
   false,					/* slow_unaligned_access */
   true,						/* vector_unaligned_access */
   false,					/* use_divmod_expansion */
+  true,						/* overlap_op_by_pieces */
+  RISCV_FUSE_NOTHING,                           /* fusible_ops */
+  &generic_vector_cost,				/* vector cost */
+  NULL,						/* function_align */
+  NULL,						/* jump_align */
+  NULL,						/* loop_align */
+};
+
+/* Costs to use when optimizing for Tenstorrent Ascalon 8 wide.  */
+static const struct riscv_tune_param tt_ascalon_d8_tune_info = {
+  {COSTS_N_INSNS (2), COSTS_N_INSNS (2)},	/* fp_add */
+  {COSTS_N_INSNS (3), COSTS_N_INSNS (3)},	/* fp_mul */
+  {COSTS_N_INSNS (9), COSTS_N_INSNS (16)},	/* fp_div */
+  {COSTS_N_INSNS (3), COSTS_N_INSNS (3)},	/* int_mul */
+  {COSTS_N_INSNS (13), COSTS_N_INSNS (13)},	/* int_div */
+  8,						/* issue_rate */
+  3,						/* branch_cost */
+  4,						/* memory_cost */
+  4,						/* fmv_cost */
+  false,					/* slow_unaligned_access */
+  true,						/* vector_unaligned_access */
+  true,						/* use_divmod_expansion */
   true,						/* overlap_op_by_pieces */
   RISCV_FUSE_NOTHING,                           /* fusible_ops */
   &generic_vector_cost,				/* vector cost */
@@ -6823,7 +6845,7 @@ riscv_asm_output_opcode (FILE *asm_out_file, const char *p)
 	  any outermost HIGH.
    'R'	Print the low-part relocation associated with OP.
    'C'	Print the integer branch condition for comparison OP.
-   'N'	Print the inverse of the integer branch condition for comparison OP.
+   'n'	Print the inverse of the integer branch condition for comparison OP.
    'A'	Print the atomic operation suffix for memory model OP.
    'I'	Print the LR suffix for memory model OP.
    'J'	Print the SC suffix for memory model OP.
@@ -6833,6 +6855,7 @@ riscv_asm_output_opcode (FILE *asm_out_file, const char *p)
    'S'	Print shift-index of single-bit mask OP.
    'T'	Print shift-index of inverted single-bit mask OP.
    '~'	Print w if TARGET_64BIT is true; otherwise not print anything.
+   'N'  Print register encoding as integer (0-31).
 
    Note please keep this list and the list in riscv.md in sync.  */
 
@@ -6981,67 +7004,82 @@ riscv_print_operand (FILE *file, rtx op, int letter)
       fputs (GET_RTX_NAME (code), file);
       break;
 
-    case 'N':
+    case 'n':
       /* The RTL names match the instruction names. */
       fputs (GET_RTX_NAME (reverse_condition (code)), file);
       break;
 
-    case 'A': {
-      const enum memmodel model = memmodel_base (INTVAL (op));
-      if (riscv_memmodel_needs_amo_acquire (model)
-	  && riscv_memmodel_needs_amo_release (model))
-	fputs (".aqrl", file);
-      else if (riscv_memmodel_needs_amo_acquire (model))
-	fputs (".aq", file);
-      else if (riscv_memmodel_needs_amo_release (model))
-	fputs (".rl", file);
+    case 'A':
+      if (!CONST_INT_P (op))
+	output_operand_lossage ("invalid operand for '%%%c'", letter);
+      else
+	{
+	  const enum memmodel model = memmodel_base (INTVAL (op));
+	  if (riscv_memmodel_needs_amo_acquire (model)
+	      && riscv_memmodel_needs_amo_release (model))
+	    fputs (".aqrl", file);
+	  else if (riscv_memmodel_needs_amo_acquire (model))
+	    fputs (".aq", file);
+	  else if (riscv_memmodel_needs_amo_release (model))
+	    fputs (".rl", file);
+	}
       break;
-    }
 
-    case 'I': {
-      const enum memmodel model = memmodel_base (INTVAL (op));
-      if (TARGET_ZTSO && model != MEMMODEL_SEQ_CST)
-	/* LR ops only have an annotation for SEQ_CST in the Ztso mapping.  */
-	break;
-      else if (model == MEMMODEL_SEQ_CST)
-	fputs (".aqrl", file);
-      else if (riscv_memmodel_needs_amo_acquire (model))
-	fputs (".aq", file);
+    case 'I':
+      if (!CONST_INT_P (op))
+	output_operand_lossage ("invalid operand for '%%%c'", letter);
+      else
+	{
+	  const enum memmodel model = memmodel_base (INTVAL (op));
+	  if (TARGET_ZTSO && model != MEMMODEL_SEQ_CST)
+	    /* LR ops only have an annotation for SEQ_CST in the Ztso mapping.  */
+	    break;
+	  else if (model == MEMMODEL_SEQ_CST)
+	    fputs (".aqrl", file);
+	  else if (riscv_memmodel_needs_amo_acquire (model))
+	    fputs (".aq", file);
+	}
       break;
-    }
 
-    case 'J': {
-      const enum memmodel model = memmodel_base (INTVAL (op));
-      if (TARGET_ZTSO && model == MEMMODEL_SEQ_CST)
-	/* SC ops only have an annotation for SEQ_CST in the Ztso mapping.  */
-	fputs (".rl", file);
-      else if (TARGET_ZTSO)
-	break;
-      else if (riscv_memmodel_needs_amo_release (model))
-	fputs (".rl", file);
+    case 'J':
+      if (!CONST_INT_P (op))
+	output_operand_lossage ("invalid operand for '%%%c'", letter);
+      else
+	{
+	  const enum memmodel model = memmodel_base (INTVAL (op));
+	  if (TARGET_ZTSO && model == MEMMODEL_SEQ_CST)
+	    /* SC ops only have an annotation for SEQ_CST in the Ztso mapping.  */
+	    fputs (".rl", file);
+	  else if (TARGET_ZTSO)
+	    break;
+	  else if (riscv_memmodel_needs_amo_release (model))
+	    fputs (".rl", file);
+	}
       break;
-    }
 
     case 'L':
-      {
-	const char *ntl_hint = NULL;
-	switch (INTVAL (op))
-	  {
-	  case 0:
-	    ntl_hint = "ntl.all";
-	    break;
-	  case 1:
-	    ntl_hint = "ntl.pall";
-	    break;
-	  case 2:
-	    ntl_hint = "ntl.p1";
-	    break;
-	  }
+      if (!CONST_INT_P (op))
+	output_operand_lossage ("invalid operand for '%%%c'", letter);
+      else
+	{
+	  const char *ntl_hint = NULL;
+	  switch (INTVAL (op))
+	    {
+	    case 0:
+	      ntl_hint = "ntl.all";
+	      break;
+	    case 1:
+	      ntl_hint = "ntl.pall";
+	      break;
+	    case 2:
+	      ntl_hint = "ntl.p1";
+	      break;
+	    }
 
-      if (ntl_hint)
-	asm_fprintf (file, "%s\n\t", ntl_hint);
+	  if (ntl_hint)
+	    asm_fprintf (file, "%s\n\t", ntl_hint);
+	}
       break;
-      }
 
     case 'i':
       if (code != REG)
@@ -7053,30 +7091,64 @@ riscv_print_operand (FILE *file, rtx op, int letter)
       break;
 
     case 'S':
-      {
-	rtx newop = GEN_INT (ctz_hwi (INTVAL (op)));
-	output_addr_const (file, newop);
-	break;
-      }
+      if (!CONST_INT_P (op))
+	output_operand_lossage ("invalid operand for '%%%c'", letter);
+      else
+	{
+	  rtx newop = GEN_INT (ctz_hwi (INTVAL (op)));
+	  output_addr_const (file, newop);
+	}
+      break;
     case 'T':
-      {
-	rtx newop = GEN_INT (ctz_hwi (~INTVAL (op)));
-	output_addr_const (file, newop);
-	break;
-      }
+      if (!CONST_INT_P (op))
+	output_operand_lossage ("invalid operand for '%%%c'", letter);
+      else
+	{
+	  rtx newop = GEN_INT (ctz_hwi (~INTVAL (op)));
+	  output_addr_const (file, newop);
+	}
+      break;
     case 'X':
-      {
-	int ival = INTVAL (op) + 1;
-	rtx newop = GEN_INT (ctz_hwi (ival) + 1);
-	output_addr_const (file, newop);
-	break;
-      }
+      if (!CONST_INT_P (op))
+	output_operand_lossage ("invalid operand for '%%%c'", letter);
+      else
+	{
+	  int ival = INTVAL (op) + 1;
+	  rtx newop = GEN_INT (ctz_hwi (ival) + 1);
+	  output_addr_const (file, newop);
+	}
+      break;
     case 'Y':
+      if (!CONST_INT_P (op))
+	output_operand_lossage ("invalid operand for '%%%c'", letter);
+      else
+	{
+	  unsigned int imm = (UINTVAL (op) & 63);
+	  gcc_assert (imm <= 63);
+	  rtx newop = GEN_INT (imm);
+	  output_addr_const (file, newop);
+	}
+      break;
+    case 'N':
       {
-	unsigned int imm = (UINTVAL (op) & 63);
-	gcc_assert (imm <= 63);
-	rtx newop = GEN_INT (imm);
-	output_addr_const (file, newop);
+	if (!REG_P(op))
+	  {
+	    output_operand_lossage ("modifier 'N' require register operand");
+	    break;
+	  }
+
+	unsigned regno = REGNO (op);
+	unsigned offset = 0;
+	if (IN_RANGE (regno, GP_REG_FIRST, GP_REG_LAST))
+	  offset = GP_REG_FIRST;
+	else if (IN_RANGE (regno, FP_REG_FIRST, FP_REG_LAST))
+	  offset = FP_REG_FIRST;
+	else if (IN_RANGE (regno, V_REG_FIRST, V_REG_LAST))
+	  offset = V_REG_FIRST;
+	else
+	  output_operand_lossage ("invalid register number for 'N' modifier");
+
+	asm_fprintf (file, "%u", (regno - offset));
 	break;
       }
     default:
@@ -9500,22 +9572,44 @@ static bool
 riscv_secondary_memory_needed (machine_mode mode, reg_class_t class1,
 			       reg_class_t class2)
 {
+  bool class1_is_fpr = class1 == FP_REGS || class1 == RVC_FP_REGS;
+  bool class2_is_fpr = class2 == FP_REGS || class2 == RVC_FP_REGS;
   return (!riscv_v_ext_mode_p (mode)
 	  && GET_MODE_SIZE (mode).to_constant () > UNITS_PER_WORD
-	  && (class1 == FP_REGS) != (class2 == FP_REGS)
+	  && (class1_is_fpr != class2_is_fpr)
 	  && !TARGET_XTHEADFMV
 	  && !TARGET_ZFA);
 }
 
 /* Implement TARGET_REGISTER_MOVE_COST.  */
 
-static int
+int
 riscv_register_move_cost (machine_mode mode,
 			  reg_class_t from, reg_class_t to)
 {
-  if ((from == FP_REGS && to == GR_REGS) ||
-      (from == GR_REGS && to == FP_REGS))
+  bool from_is_fpr = from == FP_REGS || from == RVC_FP_REGS;
+  bool from_is_gpr = from == GR_REGS || from == RVC_GR_REGS;
+  bool to_is_fpr = to == FP_REGS || to == RVC_FP_REGS;
+  bool to_is_gpr = to == GR_REGS || to == RVC_GR_REGS;
+  if ((from_is_fpr && to == to_is_gpr) ||
+      (from_is_gpr && to_is_fpr))
     return tune_param->fmv_cost;
+
+  if (from == V_REGS)
+    {
+      if (to == GR_REGS)
+	return get_vector_costs ()->regmove->VR2GR;
+      else if (to == FP_REGS)
+	return get_vector_costs ()->regmove->VR2FR;
+    }
+
+  if (to == V_REGS)
+    {
+      if (from == GR_REGS)
+	return get_vector_costs ()->regmove->GR2VR;
+      else if (from == FP_REGS)
+	return get_vector_costs ()->regmove->FR2VR;
+    }
 
   return riscv_secondary_memory_needed (mode, from, to) ? 8 : 2;
 }
@@ -10615,6 +10709,10 @@ riscv_option_override (void)
   SET_OPTION_IF_UNSET (&global_options, &global_options_set,
 		       param_sched_pressure_algorithm,
 		       SCHED_PRESSURE_MODEL);
+
+  SET_OPTION_IF_UNSET (&global_options, &global_options_set,
+		       param_cycle_accurate_model,
+		       0);
 
   /* Function to allocate machine-dependent function status.  */
   init_machine_status = &riscv_init_machine_status;
@@ -12243,7 +12341,13 @@ riscv_builtin_vectorization_cost (enum vect_cost_for_stmt type_of_cost,
       return fp ? common_costs->fp_stmt_cost : common_costs->int_stmt_cost;
 
     case vec_construct:
-      return estimated_poly_value (TYPE_VECTOR_SUBPARTS (vectype));
+	{
+	  /* TODO: This is too pessimistic in case we can splat.  */
+	  int regmove_cost = fp ? costs->regmove->FR2VR
+	    : costs->regmove->GR2VR;
+	  return (regmove_cost + common_costs->scalar_to_vec_cost)
+	    * estimated_poly_value (TYPE_VECTOR_SUBPARTS (vectype));
+	}
 
     default:
       gcc_unreachable ();
@@ -13525,18 +13629,27 @@ riscv_use_by_pieces_infrastructure_p (unsigned HOST_WIDE_INT size,
    we will get the desired one: 1000 1111.  */
 
 void
-generate_reflecting_code_using_brev (rtx *op)
+generate_reflecting_code_using_brev (rtx *op_p)
 {
-  machine_mode op_mode = GET_MODE (*op);
+  rtx op = *op_p;
+  machine_mode op_mode = GET_MODE (op);
+
+  /* OP may be smaller than a word.  We can use a paradoxical subreg
+     to compensate for that.  It should never be larger than a word
+     for RISC-V.  */
+  gcc_assert (op_mode <= word_mode);
+  if (op_mode != word_mode)
+    op = gen_lowpart (word_mode, op);
+
   HOST_WIDE_INT shift_val = (BITS_PER_WORD
 			     - GET_MODE_BITSIZE (op_mode).to_constant ());
-  riscv_expand_op (BSWAP, word_mode, *op, *op, *op);
-  riscv_expand_op (LSHIFTRT, word_mode, *op, *op,
+  riscv_expand_op (BSWAP, word_mode, op, op, op);
+  riscv_expand_op (LSHIFTRT, word_mode, op, op,
 		   gen_int_mode (shift_val, word_mode));
   if (TARGET_64BIT)
-    emit_insn (gen_riscv_brev8_di (*op, *op));
+    emit_insn (gen_riscv_brev8_di (op, op));
   else
-    emit_insn (gen_riscv_brev8_si (*op, *op));
+    emit_insn (gen_riscv_brev8_si (op, op));
 }
 
 
@@ -14064,6 +14177,9 @@ expand_reversed_crc_using_clmul (scalar_mode crc_mode, scalar_mode data_mode,
 #undef TARGET_GET_FUNCTION_VERSIONS_DISPATCHER
 #define TARGET_GET_FUNCTION_VERSIONS_DISPATCHER \
   riscv_get_function_versions_dispatcher
+
+#undef TARGET_DOCUMENTATION_NAME
+#define TARGET_DOCUMENTATION_NAME "RISC-V"
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

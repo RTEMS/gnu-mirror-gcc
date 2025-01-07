@@ -1,5 +1,5 @@
 /* Definition of RISC-V target for GNU compiler.
-   Copyright (C) 2011-2024 Free Software Foundation, Inc.
+   Copyright (C) 2011-2025 Free Software Foundation, Inc.
    Contributed by Andrew Waterman (andrew@sifive.com).
    Based on MIPS target for GNU compiler.
 
@@ -139,6 +139,7 @@ extern void riscv_expand_ussub (rtx, rtx, rtx);
 extern void riscv_expand_sssub (rtx, rtx, rtx);
 extern void riscv_expand_ustrunc (rtx, rtx);
 extern void riscv_expand_sstrunc (rtx, rtx);
+extern int riscv_register_move_cost (machine_mode, reg_class_t, reg_class_t);
 
 #ifdef RTX_CODE
 extern void riscv_expand_int_scc (rtx, enum rtx_code, rtx, rtx, bool *invert_ptr = 0);
@@ -508,9 +509,9 @@ enum insn_type : unsigned int
 
   /* For vcompress.vm */
   COMPRESS_OP = __NORMAL_OP_TA2 | BINARY_OP_P,
-  /* has merge operand but use ta.  */
+  /* has merge operand but use tu.  */
   COMPRESS_OP_MERGE
-  = HAS_DEST_P | HAS_MERGE_P | TDEFAULT_POLICY_P | BINARY_OP_P,
+  = HAS_DEST_P | HAS_MERGE_P | TU_POLICY_P | BINARY_OP_P,
 
   /* For vslideup.up has merge operand but use ta.  */
   SLIDEUP_OP_MERGE = HAS_DEST_P | HAS_MASK_P | USE_ALL_TRUES_MASK_P

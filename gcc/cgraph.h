@@ -1,5 +1,5 @@
 /* Callgraph handling code.
-   Copyright (C) 2003-2024 Free Software Foundation, Inc.
+   Copyright (C) 2003-2025 Free Software Foundation, Inc.
    Contributed by Jan Hubicka
 
 This file is part of GCC.
@@ -121,7 +121,7 @@ public:
       used_from_other_partition (false), in_other_partition (false),
       address_taken (false), in_init_priority_hash (false),
       need_lto_streaming (false), offloadable (false), ifunc_resolver (false),
-      order (false), next_sharing_asm_name (NULL),
+      order (-1), next_sharing_asm_name (NULL),
       previous_sharing_asm_name (NULL), same_comdat_group (NULL), ref_list (),
       alias_target (NULL), lto_file_data (NULL), aux (NULL),
       x_comdat_group (NULL_TREE), x_section (NULL)
@@ -430,6 +430,10 @@ public:
 
   /* Return true if ONE and TWO are part of the same COMDAT group.  */
   inline bool in_same_comdat_group_p (symtab_node *target);
+
+  /* Return true if symbol is known to be nonzero, assume that
+     flag_delete_null_pointer_checks is equal to delete_null_pointer_checks.  */
+  bool nonzero_address (bool delete_null_pointer_checks);
 
   /* Return true if symbol is known to be nonzero.  */
   bool nonzero_address ();
@@ -2815,7 +2819,8 @@ symbol_table::register_symbol (symtab_node *node)
     nodes->previous = node;
   nodes = node;
 
-  node->order = order++;
+  if (node->order == -1)
+    node->order = order++;
 }
 
 /* Register a top-level asm statement ASM_STR.  */

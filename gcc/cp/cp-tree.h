@@ -1,5 +1,5 @@
 /* Definitions for -*- C++ -*- parsing and type checking.
-   Copyright (C) 1987-2024 Free Software Foundation, Inc.
+   Copyright (C) 1987-2025 Free Software Foundation, Inc.
    Contributed by Michael Tiemann (tiemann@cygnus.com)
 
 This file is part of GCC.
@@ -192,6 +192,7 @@ enum cp_tree_index
     CPTI_HEAP_VEC_UNINIT_IDENTIFIER,
     CPTI_HEAP_VEC_IDENTIFIER,
     CPTI_OMP_IDENTIFIER,
+    CPTI_INTERNAL_IDENTIFIER,
 
     CPTI_LANG_NAME_C,
     CPTI_LANG_NAME_CPLUSPLUS,
@@ -345,6 +346,7 @@ extern GTY(()) tree cp_global_trees[CPTI_MAX];
 #define heap_vec_uninit_identifier	cp_global_trees[CPTI_HEAP_VEC_UNINIT_IDENTIFIER]
 #define heap_vec_identifier		cp_global_trees[CPTI_HEAP_VEC_IDENTIFIER]
 #define omp_identifier			cp_global_trees[CPTI_OMP_IDENTIFIER]
+#define internal_identifier		cp_global_trees[CPTI_INTERNAL_IDENTIFIER]
 #define lang_name_c			cp_global_trees[CPTI_LANG_NAME_C]
 #define lang_name_cplusplus		cp_global_trees[CPTI_LANG_NAME_CPLUSPLUS]
 
@@ -989,6 +991,53 @@ public:
   lkp_range (tree t): t(t) { }
   lkp_iterator begin() { return lkp_iterator (t); }
   lkp_iterator end() { return lkp_iterator (NULL_TREE); }
+};
+
+/* Iterator for a RAW_DATA_CST.  */
+
+class raw_data_iterator {
+  tree t;
+  unsigned int n;
+
+ public:
+  explicit raw_data_iterator (tree t, unsigned int n)
+    : t (t), n (n)
+  {
+  }
+
+  operator bool () const
+  {
+    return n < (unsigned) RAW_DATA_LENGTH (t);
+  }
+
+  raw_data_iterator &operator++ ()
+  {
+    ++n;
+    return *this;
+  }
+
+  tree operator* () const
+  {
+    return build_int_cst (TREE_TYPE (t), RAW_DATA_UCHAR_ELT (t, n));
+  }
+
+  bool operator== (const raw_data_iterator &o) const
+  {
+    return t == o.t && n == o.n;
+  }
+};
+
+/* Treat a tree as a range of raw_data_iterator, e.g.
+   for (tree f : raw_data_range (d)) { ... }  */
+
+class raw_data_range
+{
+  tree t;
+public:
+  raw_data_range (tree t) : t (t) { }
+  raw_data_iterator begin () { return raw_data_iterator (t, 0); }
+  raw_data_iterator end ()
+  { return raw_data_iterator (t, RAW_DATA_LENGTH (t)); }
 };
 
 /* hash traits for declarations.  Hashes potential overload sets via
@@ -1778,6 +1827,22 @@ check_constraint_info (tree t)
    it for unscoped enums.  */
 #define DECL_MODULE_EXPORT_P(NODE) TREE_LANG_FLAG_3 (NODE)
 
+/* Represents a streamed-in translation-unit-local entity.  Any use of
+   this node when instantiating a template should emit an error.  */
+struct GTY(()) tree_tu_local_entity {
+  struct tree_base base;
+  tree name;
+  location_t loc;
+};
+
+/* The name of a translation-unit-local entity.  */
+#define TU_LOCAL_ENTITY_NAME(NODE) \
+  (((struct tree_tu_local_entity *)TU_LOCAL_ENTITY_CHECK (NODE))->name)
+
+/* The source location of the translation-unit-local entity.  */
+#define TU_LOCAL_ENTITY_LOCATION(NODE) \
+  (((struct tree_tu_local_entity *)TU_LOCAL_ENTITY_CHECK (NODE))->loc)
+
 
 /* The list of local parameters introduced by this requires-expression,
    in the form of a chain of PARM_DECLs.  */
@@ -1811,7 +1876,8 @@ enum cp_tree_node_structure_enum {
   TS_CP_LAMBDA_EXPR,
   TS_CP_TEMPLATE_INFO,
   TS_CP_CONSTRAINT_INFO,
-  TS_CP_USERDEF_LITERAL
+  TS_CP_USERDEF_LITERAL,
+  TS_CP_TU_LOCAL_ENTITY
 };
 
 /* The resulting tree type.  */
@@ -1842,6 +1908,8 @@ union GTY((desc ("cp_tree_node_structure (&%h)"),
     constraint_info;
   struct tree_userdef_literal GTY ((tag ("TS_CP_USERDEF_LITERAL")))
     userdef_literal;
+  struct tree_tu_local_entity GTY ((tag ("TS_CP_TU_LOCAL_ENTITY")))
+    tu_local_entity;
 };
 
 
@@ -5092,18 +5160,19 @@ get_vec_init_expr (tree t)
    tree is converted to C++ class hiearchy.  */
 #define DECL_TEMPLATE_RESULT(NODE)      \
    ((struct tree_template_decl *)CONST_CAST_TREE(TEMPLATE_DECL_CHECK (NODE)))->result
-/* For a function template at namespace scope, DECL_TEMPLATE_INSTANTIATIONS
-   lists all instantiations and specializations of the function so that
-   tsubst_friend_function can reassign them to another template if we find
-   that the namespace-scope template is really a partial instantiation of a
-   friend template.
+/* For a forward-declared function template at namespace scope, or for any
+   function template in an exporting module, DECL_TEMPLATE_INSTANTIATIONS lists
+   all instantiations and specializations of the function so that
+   tsubst_friend_function can reassign them to another template if we find that
+   the namespace-scope template is really a partial instantiation of a friend
+   template.
 
-   For a class template the DECL_TEMPLATE_INSTANTIATIONS lists holds
-   all instantiations and specializations of the class type, including
-   partial instantiations and partial specializations, so that if we
-   explicitly specialize a partial instantiation we can walk the list
-   in maybe_process_partial_specialization and reassign them or complain
-   as appropriate.
+   For a class or variable template the DECL_TEMPLATE_INSTANTIATIONS lists
+   holds all instantiations and specializations, including partial
+   instantiations and partial specializations, so that if we explicitly
+   specialize a partial instantiation we can walk the list in
+   maybe_process_partial_specialization and reassign them or complain as
+   appropriate.
 
    In both cases, the TREE_PURPOSE of each node contains the arguments
    used; the TREE_VALUE contains the generated variable.  The template
@@ -6708,6 +6777,7 @@ extern cp_parameter_declarator *no_parameters;
 extern int class_dump_id;
 extern int module_dump_id;
 extern int raw_dump_id;
+extern int coro_dump_id;
 
 /* Whether the current context is manifestly constant-evaluated.
    Used by the constexpr machinery to control folding of
@@ -7222,9 +7292,10 @@ extern location_t location_of                   (tree);
 extern void qualified_name_lookup_error		(tree, tree, tree,
 						 location_t);
 
-using erroneous_templates_t
-  = hash_map<tree, location_t, simple_hashmap_traits<tree_decl_hash, location_t>>;
-extern erroneous_templates_t *erroneous_templates;
+struct decl_location_traits
+  : simple_cache_map_traits<tree_decl_hash, location_t> { };
+typedef hash_map<tree, location_t, decl_location_traits> erroneous_templates_t;
+extern GTY((cache)) erroneous_templates_t *erroneous_templates;
 
 extern bool cp_seen_error ();
 #define seen_error() cp_seen_error ()
@@ -7460,6 +7531,7 @@ extern void set_originating_module (tree, bool friend_p = false);
 extern tree get_originating_module_decl (tree) ATTRIBUTE_PURE;
 extern int get_originating_module (tree, bool for_mangle = false) ATTRIBUTE_PURE;
 extern unsigned get_importing_module (tree, bool = false) ATTRIBUTE_PURE;
+extern void check_module_decl_linkage (tree);
 
 /* Where current instance of the decl got declared/defined/instantiated.  */
 extern void set_instantiating_module (tree);
@@ -7875,7 +7947,7 @@ extern tree begin_compound_stmt			(unsigned int);
 
 extern void finish_compound_stmt		(tree);
 extern tree finish_asm_stmt			(location_t, int, tree, tree,
-						 tree, tree, tree, bool);
+						 tree, tree, tree, bool, bool);
 extern tree finish_label_stmt			(tree);
 extern void finish_label_decl			(tree);
 extern cp_expr finish_parenthesized_expr	(cp_expr);
@@ -8166,6 +8238,7 @@ extern bool is_byte_access_type			(tree);
 extern bool is_byte_access_type_not_plain_char	(tree);
 extern const struct scoped_attribute_specs cxx_gnu_attribute_table;
 extern const struct scoped_attribute_specs std_attribute_table;
+extern const struct scoped_attribute_specs internal_attribute_table;
 extern tree make_ptrmem_cst			(tree, tree);
 extern tree cp_build_type_attribute_variant     (tree, tree);
 extern tree cp_build_reference_type		(tree, bool);
@@ -8662,27 +8735,6 @@ extern hashval_t hash_atomic_constraint         (tree);
 extern void diagnose_constraints                (location_t, tree, tree);
 
 extern void note_failed_type_completion_for_satisfaction (tree);
-
-/* A structural hasher for ATOMIC_CONSTRs.  */
-
-struct atom_hasher : default_hash_traits<tree>
-{
-  static hashval_t hash (tree t)
-  {
-    ++comparing_specializations;
-    hashval_t val = hash_atomic_constraint (t);
-    --comparing_specializations;
-    return val;
-  }
-
-  static bool equal (tree t1, tree t2)
-  {
-    ++comparing_specializations;
-    bool eq = atomic_constraints_identical_p (t1, t2);
-    --comparing_specializations;
-    return eq;
-  }
-};
 
 /* in logic.cc */
 extern bool subsumes                            (tree, tree);

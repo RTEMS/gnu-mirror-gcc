@@ -1,5 +1,5 @@
 ;; Machine description for DEC Alpha for GNU C compiler
-;; Copyright (C) 1992-2024 Free Software Foundation, Inc.
+;; Copyright (C) 1992-2025 Free Software Foundation, Inc.
 ;; Contributed by Richard Kenner (kenner@vlsi1.ultra.nyu.edu)
 ;;
 ;; This file is part of GCC.
@@ -4626,7 +4626,7 @@
   [(set (zero_extract:DI (match_operand:BLK 0 "memory_operand")
 			 (match_operand:DI 1 "const_int_operand")
 			 (match_operand:DI 2 "const_int_operand"))
-	(match_operand:DI 3 "register_operand"))]
+	(match_operand:DI 3 "reg_or_0_operand"))]
   ""
 {
   /* We can do 16, 32 and 64 bit fields, if aligned on byte boundaries.  */

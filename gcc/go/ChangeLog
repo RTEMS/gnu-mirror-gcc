@@ -1,3 +1,7 @@
+2025-01-02  Jakub Jelinek  <jakub@redhat.com>
+
+	* gccgo.texi: Bump @copyrights-go year.
+
 2024-11-28  David Malcolm  <dmalcolm@redhat.com>
 
 	PR c/104896
@@ -2136,7 +2140,7 @@
 
 	Go frontend added to gcc repository.
 
-Copyright (C) 2010-2024 Free Software Foundation, Inc.
+Copyright (C) 2010-2025 Free Software Foundation, Inc.
 
 Copying and distribution of this file, with or without modification,
 are permitted in any medium without royalty provided the copyright

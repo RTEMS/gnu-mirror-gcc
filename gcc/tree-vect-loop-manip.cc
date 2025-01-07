@@ -1,5 +1,5 @@
 /* Vectorizer Specific Loop Manipulations
-   Copyright (C) 2003-2024 Free Software Foundation, Inc.
+   Copyright (C) 2003-2025 Free Software Foundation, Inc.
    Contributed by Dorit Naishlos <dorit@il.ibm.com>
    and Ira Rosen <irar@il.ibm.com>
 
@@ -4190,6 +4190,14 @@ vect_loop_versioning (loop_vec_info loop_vinfo,
 			    prob * prob2, (prob * prob2).invert (),
 			    prob * prob2, (prob * prob2).invert (),
 			    true);
+
+      /* If the PHI nodes in the loop header were reallocated, we need to fix up
+	 our internally stashed copies of those.  */
+      if (loop_to_version == loop)
+	for (auto gsi = gsi_start_phis (loop->header);
+	     !gsi_end_p (gsi); gsi_next (&gsi))
+	  loop_vinfo->resync_stmt_addr (gsi.phi ());
+
       /* We will later insert second conditional so overall outcome of
 	 both is prob * prob2.  */
       edge true_e, false_e;

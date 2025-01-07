@@ -1,6 +1,6 @@
 /* A library for re-emitting diagnostics saved in SARIF form
    via libgdiagnostics.
-   Copyright (C) 2022-2024 Free Software Foundation, Inc.
+   Copyright (C) 2022-2025 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -269,6 +269,10 @@ private:
   // "tool" object (§3.18)
   enum status
   handle_tool_obj (const json::object &tool_obj);
+
+  // "artifact" object (§3.24).  */
+  void
+  handle_artifact_obj (const json::object &artifact_obj);
 
   // "result" object (§3.27)
   enum status
@@ -546,7 +550,7 @@ private:
   replayer_location_map m_json_location_map;
 
   const json::object *m_driver_obj;
-  const json::value *m_artifacts_arr;
+  const json::array *m_artifacts_arr;
 };
 
 static const char *
@@ -766,10 +770,18 @@ sarif_replayer::handle_run_obj (const json::object &run_obj)
   if (!m_driver_obj)
     return status::err_invalid_sarif;
 
-#if 0
-  m_artifacts_arr = get_optional_property<json::array>
-    (run_obj, property_spec_ref ("run", "artifacts","3.14.15"));
-#endif
+  const property_spec_ref prop_artifacts ("run", "artifacts", "3.14.15");
+  m_artifacts_arr
+    = get_optional_property<json::array> (run_obj, prop_artifacts);
+  if (m_artifacts_arr)
+    for (auto element : *m_artifacts_arr)
+      {
+	if (const json::object *artifact_obj
+	    = require_object_for_element (*element, prop_artifacts))
+	  handle_artifact_obj (*artifact_obj);
+	else
+	  return status::err_invalid_sarif;
+      }
 
   /* If present, run.results must be null or be an array.  */
   const property_spec_ref prop_results ("run", "results", "3.14.23");
@@ -803,6 +815,58 @@ sarif_replayer::handle_run_obj (const json::object &run_obj)
       }
 
   return status::ok;
+}
+
+/* Process an artifact object (SARIF v2.1.0 section 3.24).
+   Create a libgdiagnostics::file for each artifact that has a uri,
+   effectively prepopulating a cache with source language and contents.  */
+
+void
+sarif_replayer::handle_artifact_obj (const json::object &artifact_obj)
+{
+  const property_spec_ref location ("artifact", "location", "3.24.2");
+  auto artifact_loc_obj
+    = get_optional_property<json::object> (artifact_obj, location);
+  if (!artifact_loc_obj)
+    return;
+
+  // we should now have an artifactLocation object (§3.4)
+
+  // 3.4.3 uri property
+  const property_spec_ref prop_uri ("artifactLocation", "uri", "3.4.3");
+  auto artifact_loc_uri
+    = get_optional_property<json::string> (*artifact_loc_obj, prop_uri);
+  if (!artifact_loc_uri)
+    return;
+
+  const char *sarif_source_language = nullptr;
+  const property_spec_ref prop_source_lang
+    ("artifact", "sourceLanguage", "3.24.10");
+  if (auto source_lang_jstr
+      = get_optional_property<json::string> (artifact_obj,
+					     prop_source_lang))
+    sarif_source_language = source_lang_jstr->get_string ();
+
+  /* Create the libgdiagnostics::file.  */
+  auto file = m_output_mgr.new_file (artifact_loc_uri->get_string (),
+				     sarif_source_language);
+
+  // Set contents, if available
+  const property_spec_ref prop_contents
+    ("artifact", "contents", "3.24.8");
+  if (auto content_obj
+      = get_optional_property<json::object> (artifact_obj,
+					     prop_contents))
+    {
+      // We should have an artifactContent object (§3.3)
+      const property_spec_ref prop_text
+	("artifactContent", "text", "3.3.2");
+      if (auto text_jstr
+	  = get_optional_property<json::string> (*content_obj,
+						 prop_text))
+	file.set_buffered_content (text_jstr->get_string (),
+				   text_jstr->get_length ());
+    }
 }
 
 /* Process a tool object (SARIF v2.1.0 section 3.18).  */
@@ -1004,7 +1068,20 @@ sarif_replayer::handle_result_obj (const json::object &result_obj,
   libgdiagnostics::group g (m_output_mgr);
   auto err (m_output_mgr.begin_diagnostic (level));
   if (rule_id)
-    err.add_rule (rule_id->get_string (), nullptr);
+    {
+      const char *url = nullptr;
+      if (rule_obj)
+	{
+	  /* rule_obj should be a reportingDescriptor object (3.49).
+	     Get any §3.49.12 helpUri property.  */
+	  const property_spec_ref prop_help_uri
+	    ("reportingDescriptor", "helpUri", "3.49.12");
+	  if (auto url_val = get_optional_property<json::string>(*rule_obj,
+								 prop_help_uri))
+	    url = url_val->get_string ();
+	}
+      err.add_rule (rule_id->get_string (), url);
+    }
   err.set_location (physical_loc);
   err.set_logical_location (logical_loc);
   if (path.m_inner)
@@ -1099,11 +1176,91 @@ maybe_consume_placeholder (const char *&iter_src, unsigned *out_arg_idx)
   return false;
 }
 
+struct embedded_link
+{
+  std::string text;
+  std::string destination;
+};
+
+/*  If ITER_SRC starts with an embedded link as per §3.11.6, advance ITER_SRC
+    to immediately beyond the link, and return the link.
+
+    Otherwise, leave ITER_SRC untouched and return nullptr.  */
+
+static std::unique_ptr<embedded_link>
+maybe_consume_embedded_link (const char *&iter_src)
+{
+  if (*iter_src != '[')
+    return nullptr;
+
+  /* This *might* be an embedded link.
+     See §3.11.6 ("Messages with embedded links") and
+     https://github.com/oasis-tcs/sarif-spec/issues/657 */
+
+  /* embedded link = "[", link text, "](", link destination, ")"; */
+
+  embedded_link result;
+
+  /* Try to get the link text.  */
+  const char *iter = iter_src + 1;
+  while (char ch = *(iter++))
+    {
+      if (ch == '\\')
+	{
+	  char next_ch = *iter;
+	  switch (next_ch)
+	    {
+	    case '\\':
+	    case '[':
+	    case ']':
+	      /* escaped link character = "\" | "[" | "]";  */
+	      result.text += next_ch;
+	      iter++;
+	      continue;
+
+	    default:
+	      /* Malformed link text; assume this is not an
+		 embedded link.  */
+	      return nullptr;
+	    }
+	}
+      else if (ch == ']')
+	/* End of link text.  */
+	break;
+      else
+	result.text += ch;
+    }
+
+  if (*iter++ != '(')
+    return nullptr;
+
+  /* Try to get the link destination.  */
+  while (1)
+    {
+      char ch = *(iter++);
+      if (ch == '\0')
+	{
+	  /* String ended before terminating ')'.
+	     Assume this is not an embedded link.  */
+	  return nullptr;
+	}
+      else if (ch == ')')
+	/* Terminator.  */
+	break;
+      else
+	result.destination += ch;
+    }
+
+  iter_src = iter;
+  return ::make_unique<embedded_link> (std::move (result));
+}
+
 /* Lookup the plain text string within a result.message (§3.27.11),
-   and substitute for any placeholders (§3.11.5).
+   and substitute for any placeholders (§3.11.5) and handle any
+   embedded links (§3.11.6).
 
    Limitations:
-   - we don't yet support embedded links
+   - we don't preserve destinations within embedded links
 
    MESSAGE_OBJ is "theMessage"
    RULE_OBJ is "theRule".  */
@@ -1177,6 +1334,13 @@ make_plain_text_within_result_message (const json::object *tool_component_obj,
 				    ch);
 	      return label_text::borrow (nullptr);
 	    }
+	}
+      else if (auto link = maybe_consume_embedded_link (iter_src))
+	{
+	  accum += link->text;
+	  /* TODO: use the destination.  */
+	  /* TODO: potentially could try to convert
+	     intra-sarif links into event ids.  */
 	}
       else
 	{

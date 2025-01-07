@@ -1,6 +1,6 @@
 // Components for manipulating sequences of characters -*- C++ -*-
 
-// Copyright (C) 1997-2024 Free Software Foundation, Inc.
+// Copyright (C) 1997-2025 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -88,6 +88,9 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
     class basic_string
     {
 #if __cplusplus >= 202002L
+      static_assert(is_trivially_copyable_v<_CharT>
+	  && is_trivially_default_constructible_v<_CharT>
+	  && is_standard_layout_v<_CharT>);
       static_assert(is_same_v<_CharT, typename _Traits::char_type>);
       static_assert(is_same_v<_CharT, typename _Alloc::value_type>);
       using _Char_alloc_type = _Alloc;
@@ -4572,6 +4575,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 	__wc['d'] = L'd';
 	__wc['e'] = L'e';
 	__wc['f'] = L'f';
+	__wc['i'] = L'i'; // for "inf"
 	__wc['n'] = L'n'; // for "nan" and "inf"
 	__wc['p'] = L'p'; // for hexfloats "0x1p1"
 	__wc['x'] = L'x';
@@ -4581,6 +4585,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 	__wc['D'] = L'D';
 	__wc['E'] = L'E';
 	__wc['F'] = L'F';
+	__wc['I'] = L'I';
 	__wc['N'] = L'N';
 	__wc['P'] = L'P';
 	__wc['X'] = L'X';

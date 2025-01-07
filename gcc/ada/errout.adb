@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -306,10 +306,10 @@ package body Errout is
    end Error_Msg;
 
    procedure Error_Msg
-      (Msg : String;
-       Flag_Location : Source_Ptr;
-       N : Node_Id;
-       Is_Compile_Time_Pragma : Boolean)
+     (Msg : String;
+      Flag_Location : Source_Ptr;
+      N : Node_Id;
+      Is_Compile_Time_Pragma : Boolean)
    is
       Save_Is_Compile_Time_Msg : constant Boolean := Is_Compile_Time_Msg;
    begin
@@ -2372,7 +2372,8 @@ package body Errout is
          Write_Str ("{""file"":""");
          if Full_Path_Name_For_Brief_Errors then
             Write_JSON_Escaped_String
-              (System.OS_Lib.Normalize_Pathname (Get_Name_String (Name)));
+              (System.OS_Lib.Normalize_Pathname
+                 (Get_Name_String (Name), Resolve_Links => False));
          else
             Write_Name (Name);
          end if;

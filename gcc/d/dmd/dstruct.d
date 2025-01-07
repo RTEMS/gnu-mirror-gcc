@@ -28,6 +28,7 @@ import dmd.dtemplate;
 import dmd.errors;
 import dmd.expression;
 import dmd.func;
+import dmd.funcsem;
 import dmd.globals;
 import dmd.id;
 import dmd.identifier;
@@ -222,7 +223,7 @@ extern (C++) class StructDeclaration : AggregateDeclaration
         bool hasCopyCtor;           // copy constructor
         bool hasPointerField;       // members with indirections
         bool hasVoidInitPointers;   // void-initialized unsafe fields
-        bool hasSystemFields;      // @system members
+        bool hasUnsafeBitpatterns;  // @system members, pointers, bool
         bool hasFieldWithInvariant; // invariants
         bool computedTypeProperties;// the above 3 fields are computed
         // Even if struct is defined as non-root symbol, some built-in operations
@@ -319,11 +320,6 @@ extern (C++) class StructDeclaration : AggregateDeclaration
                          */
                         structsize = 4;
                     }
-                    else if (target.c.bitFieldStyle == TargetC.BitFieldStyle.DM)
-                    {
-                        structsize = 0;
-                        alignsize = 0;
-                    }
                     else
                         structsize = 0;
                     break;
@@ -395,13 +391,16 @@ extern (C++) class StructDeclaration : AggregateDeclaration
         foreach (vd; fields)
         {
             if (vd.storage_class & STC.ref_ || vd.hasPointers())
+            {
                 hasPointerField = true;
+                hasUnsafeBitpatterns = true;
+            }
 
             if (vd._init && vd._init.isVoidInitializer() && vd.type.hasPointers())
                 hasVoidInitPointers = true;
 
-            if (vd.storage_class & STC.system || vd.type.hasSystemFields())
-                hasSystemFields = true;
+            if (vd.storage_class & STC.system || vd.type.hasUnsafeBitpatterns())
+                hasUnsafeBitpatterns = true;
 
             if (!vd._init && vd.type.hasVoidInitPointers())
                 hasVoidInitPointers = true;
@@ -457,7 +456,7 @@ extern (C++) class StructDeclaration : AggregateDeclaration
             Type tv = v.type.baseElemOf();
             if (tv.ty == Tstruct)
             {
-                TypeStruct ts = cast(TypeStruct)tv;
+                auto ts = cast(TypeStruct)tv;
                 StructDeclaration sd = ts.sym;
                 if (!sd.isPOD())
                 {
@@ -609,7 +608,7 @@ bool _isZeroInit(Expression exp)
 
         case EXP.string_:
         {
-            StringExp se = cast(StringExp)exp;
+            auto se = cast(StringExp)exp;
 
             if (se.type.toBasetype().ty == Tarray) // if initializing a dynamic array
                 return se.len == 0;

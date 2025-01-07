@@ -1,5 +1,5 @@
 /* Top level of GCC compilers (cc1, cc1plus, etc.)
-   Copyright (C) 1987-2024 Free Software Foundation, Inc.
+   Copyright (C) 1987-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -1300,7 +1300,7 @@ process_options ()
       flag_section_anchors = 0;
     }
 
-  if (flag_short_enums == 2)
+  if (!OPTION_SET_P (flag_short_enums))
     flag_short_enums = targetm.default_short_enums ();
 
   /* Set aux_base_name if not already set.  */
@@ -1764,9 +1764,6 @@ process_options ()
   if (flag_checking >= 2)
     hash_table_sanitize_eq_limit
       = param_hash_table_verification_limit;
-
-  if (flag_large_source_files)
-    line_table->default_range_bits = 0;
 
   diagnose_options (&global_options, &global_options_set, UNKNOWN_LOCATION);
 

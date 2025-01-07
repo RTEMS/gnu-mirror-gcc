@@ -1,5 +1,5 @@
 /* Some code common to C++ and ObjC++ front ends.
-   Copyright (C) 2004-2024 Free Software Foundation, Inc.
+   Copyright (C) 2004-2025 Free Software Foundation, Inc.
    Contributed by Ziemowit Laski  <zlaski@apple.com>
 
 This file is part of GCC.
@@ -233,6 +233,7 @@ cp_tree_size (enum tree_code code)
     case ASSERTION_STMT:	return sizeof (tree_exp);
     case PRECONDITION_STMT:	return sizeof (tree_exp);
     case POSTCONDITION_STMT:	return sizeof (tree_exp);
+    case TU_LOCAL_ENTITY:	return sizeof (tree_tu_local_entity);
     default:
       switch (TREE_CODE_CLASS (code))
 	{
@@ -610,6 +611,8 @@ cp_register_dumps (gcc::dump_manager *dumps)
 
   raw_dump_id = dumps->dump_register
     (".raw", "lang-raw", "lang-raw", DK_lang, OPTGROUP_NONE, false);
+  coro_dump_id = dumps->dump_register
+    (".coro", "lang-coro", "lang-coro", DK_lang, OPTGROUP_NONE, false);
 }
 
 void

@@ -1,6 +1,6 @@
 (* SymbolTable.mod provides access to the symbol table.
 
-Copyright (C) 2001-2024 Free Software Foundation, Inc.
+Copyright (C) 2001-2025 Free Software Foundation, Inc.
 Contributed by Gaius Mulley <gaius.mulley@southwales.ac.uk>.
 
 This file is part of GNU Modula-2.
@@ -26,6 +26,7 @@ FROM SYSTEM IMPORT ADDRESS, ADR ;
 FROM Storage IMPORT ALLOCATE, DEALLOCATE ;
 FROM M2Debug IMPORT Assert ;
 FROM libc IMPORT printf ;
+FROM ASCII IMPORT nul ;
 
 IMPORT Indexing ;
 
@@ -3939,7 +3940,8 @@ BEGIN
       HasVarArgs := FALSE ;        (* Does the procedure use ... ?  *)
       HasOptArg := FALSE ;         (* Does this procedure use [ ] ? *)
       IsNoReturn := FALSE ;        (* Declared attribute noreturn ? *)
-      ReturnOptional := FALSE      (* Is the return value optional? *)
+      ReturnOptional := FALSE ;    (* Is the return value optional? *)
+      ProcedureTok := UnknownTokenNo
    END
 END InitProcedureDeclaration ;
 
@@ -14958,12 +14960,15 @@ BEGIN
       CASE SymbolType OF
 
       ConstStringSym: WITH ConstString DO
-                         IF Length = 1
+                         IF Length = 0
+                         THEN
+                            PushChar (nul)
+                         ELSIF Length = 1
                          THEN
                             GetKey (Contents, a) ;
                             PushChar (a[0])
                          ELSE
-                            WriteFormat0 ('ConstString must be length 1')
+                            WriteFormat0 ('ConstString must be length 0 or 1')
                          END
                       END
 

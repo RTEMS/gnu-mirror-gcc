@@ -1,5 +1,5 @@
 /* Convert RTL to assembler code and output it, for GNU compiler.
-   Copyright (C) 1987-2024 Free Software Foundation, Inc.
+   Copyright (C) 1987-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -149,7 +149,7 @@ extern const int length_unit_log; /* This is defined in insn-attrtab.cc.  */
 const rtx_insn *this_is_asm_operands;
 
 /* Number of operands of this insn, for an `asm' with operands.  */
-static unsigned int insn_noperands;
+unsigned int insn_noperands;
 
 /* Compare optimization flag.  */
 
@@ -1513,6 +1513,8 @@ reemit_insn_block_notes (void)
 	  case NOTE_INSN_BEGIN_STMT:
 	  case NOTE_INSN_INLINE_ENTRY:
 	    this_block = LOCATION_BLOCK (NOTE_MARKER_LOCATION (insn));
+	    if (!this_block)
+	      continue;
 	    goto set_cur_block_to_this_block;
 
 	  default:
@@ -1538,7 +1540,6 @@ reemit_insn_block_notes (void)
 	    this_block = choose_inner_scope (this_block,
 					     insn_scope (body->insn (i)));
 	}
-    set_cur_block_to_this_block:
       if (! this_block)
 	{
 	  if (INSN_LOCATION (insn) == UNKNOWN_LOCATION)
@@ -1547,6 +1548,7 @@ reemit_insn_block_notes (void)
 	    this_block = DECL_INITIAL (cfun->decl);
 	}
 
+    set_cur_block_to_this_block:
       if (this_block != cur_block)
 	{
 	  change_scope (insn, cur_block, this_block);
@@ -3491,7 +3493,10 @@ output_asm_insn (const char *templ, rtx *operands)
 	    int letter = *p++;
 	    unsigned long opnum;
 	    char *endptr;
+	    int letter2 = 0;
 
+	    if (letter == 'c' && *p == 'c')
+	      letter2 = *p++;
 	    opnum = strtoul (p, &endptr, 10);
 
 	    if (endptr == p)
@@ -3505,7 +3510,7 @@ output_asm_insn (const char *templ, rtx *operands)
 	      output_address (VOIDmode, operands[opnum]);
 	    else if (letter == 'c')
 	      {
-		if (CONSTANT_ADDRESS_P (operands[opnum]))
+		if (letter2 == 'c' || CONSTANT_ADDRESS_P (operands[opnum]))
 		  output_addr_const (asm_out_file, operands[opnum]);
 		else
 		  output_operand (operands[opnum], 'c');
@@ -4210,6 +4215,7 @@ leaf_renumber_regs_insn (rtx in_rtx)
       case 's':
       case '0':
       case 'i':
+      case 'L':
       case 'w':
       case 'p':
       case 'n':

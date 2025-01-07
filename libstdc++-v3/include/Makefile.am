@@ -1,6 +1,6 @@
 ## Makefile for the include subdirectory of the GNU C++ Standard library.
 ##
-## Copyright (C) 2001-2024 Free Software Foundation, Inc.
+## Copyright (C) 2001-2025 Free Software Foundation, Inc.
 ##
 ## This file is part of the libstdc++ version 3 distribution.
 ## Process this file with automake to produce Makefile.in.
@@ -70,6 +70,8 @@ std_headers = \
 	${std_srcdir}/deque \
 	${std_srcdir}/execution \
 	${std_srcdir}/filesystem \
+	${std_srcdir}/flat_map \
+	${std_srcdir}/flat_set \
 	${std_srcdir}/format \
 	${std_srcdir}/forward_list \
 	${std_srcdir}/fstream \

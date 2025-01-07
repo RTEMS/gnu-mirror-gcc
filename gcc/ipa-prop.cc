@@ -1,5 +1,5 @@
 /* Interprocedural analyses.
-   Copyright (C) 2005-2024 Free Software Foundation, Inc.
+   Copyright (C) 2005-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -59,6 +59,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "attr-fnspec.h"
 #include "gimple-range.h"
 #include "value-range-storage.h"
+#include "vr-values.h"
 
 /* Function summary where the parameter infos are actually stored. */
 ipa_node_params_t *ipa_node_params_sum = NULL;
@@ -2311,6 +2312,81 @@ ipa_set_jfunc_vr (ipa_jump_func *jf, const ipa_vr &vr)
   ipa_set_jfunc_vr (jf, tmp);
 }
 
+/* Given VAL that conforms to is_gimple_ip_invariant, produce a VRANGE that
+   represents it as a range.  CONTEXT_NODE is the call graph node representing
+   the function for which optimization flags should be evaluated.  */
+
+void
+ipa_get_range_from_ip_invariant (vrange &r, tree val, cgraph_node *context_node)
+{
+  if (TREE_CODE (val) == ADDR_EXPR)
+    {
+      symtab_node *symbol;
+      tree base = TREE_OPERAND (val, 0);
+      if (!DECL_P (base))
+	{
+	  r.set_varying (TREE_TYPE (val));
+	  return;
+	}
+      if (!decl_in_symtab_p (base))
+	{
+	  r.set_nonzero (TREE_TYPE (val));
+	  return;
+	}
+      if (!(symbol = symtab_node::get (base)))
+	{
+	  r.set_varying (TREE_TYPE (val));
+	  return;
+	}
+
+      bool delete_null_pointer_checks
+	= opt_for_fn (context_node->decl, flag_delete_null_pointer_checks);
+      if (symbol->nonzero_address (delete_null_pointer_checks))
+	r.set_nonzero (TREE_TYPE (val));
+      else
+	r.set_varying (TREE_TYPE (val));
+    }
+  else
+    r.set (val, val);
+}
+
+/* If T is an SSA_NAME that is the result of a simple type conversion statement
+   from an integer type to another integer type which is known to be able to
+   represent the values the operand of the conversion can hold, return the
+   operand of that conversion, otherwise return T.  */
+
+static tree
+skip_a_safe_conversion_op (tree t)
+{
+  if (TREE_CODE (t) != SSA_NAME
+      || SSA_NAME_IS_DEFAULT_DEF (t))
+    return t;
+
+  gimple *def = SSA_NAME_DEF_STMT (t);
+  if (!is_gimple_assign (def)
+      || !CONVERT_EXPR_CODE_P (gimple_assign_rhs_code (def))
+      || !INTEGRAL_TYPE_P (TREE_TYPE (t))
+      || !INTEGRAL_TYPE_P (TREE_TYPE (gimple_assign_rhs1 (def))))
+    return t;
+
+  tree rhs1 = gimple_assign_rhs1 (def);
+  if (TYPE_PRECISION (TREE_TYPE (t))
+      >= TYPE_PRECISION (TREE_TYPE (rhs1)))
+    return gimple_assign_rhs1 (def);
+
+  value_range vr (TREE_TYPE (rhs1));
+  if (!get_range_query (cfun)->range_of_expr (vr, rhs1, def)
+      || vr.undefined_p ())
+    return t;
+
+  irange &ir = as_a <irange> (vr);
+  if (range_fits_type_p (&ir, TYPE_PRECISION (TREE_TYPE (t)),
+			 TYPE_SIGN (TREE_TYPE (t))))
+      return gimple_assign_rhs1 (def);
+
+  return t;
+}
+
 /* Compute jump function for all arguments of callsite CS and insert the
    information in the jump_functions array in the ipa_edge_args corresponding
    to this callsite.  */
@@ -2357,28 +2433,27 @@ ipa_compute_jump_functions_for_edge (struct ipa_func_body_info *fbi,
       value_range vr (TREE_TYPE (arg));
       if (POINTER_TYPE_P (TREE_TYPE (arg)))
 	{
-	  bool addr_nonzero = false;
-	  bool strict_overflow = false;
-
-	  if (TREE_CODE (arg) == SSA_NAME
-	      && param_type
-	      && get_range_query (cfun)->range_of_expr (vr, arg, cs->call_stmt)
-	      && vr.nonzero_p ())
-	    addr_nonzero = true;
-	  else if (tree_single_nonzero_warnv_p (arg, &strict_overflow))
-	    addr_nonzero = true;
-
-	  if (addr_nonzero)
-	    vr.set_nonzero (TREE_TYPE (arg));
-
+	  if (!get_range_query (cfun)->range_of_expr (vr, arg, cs->call_stmt)
+	      || vr.varying_p ()
+	      || vr.undefined_p ())
+	    {
+	      bool strict_overflow = false;
+	      if (tree_single_nonzero_warnv_p (arg, &strict_overflow))
+		vr.set_nonzero (TREE_TYPE (arg));
+	      else
+		vr.set_varying (TREE_TYPE (arg));
+	    }
+	  gcc_assert (!vr.undefined_p ());
 	  unsigned HOST_WIDE_INT bitpos;
-	  unsigned align, prec = TYPE_PRECISION (TREE_TYPE (arg));
+	  unsigned align = BITS_PER_UNIT;
 
-	  get_pointer_alignment_1 (arg, &align, &bitpos);
+	  if (!vr.singleton_p ())
+	    get_pointer_alignment_1 (arg, &align, &bitpos);
 
 	  if (align > BITS_PER_UNIT
 	      && opt_for_fn (cs->caller->decl, flag_ipa_bit_cp))
 	    {
+	      unsigned prec = TYPE_PRECISION (TREE_TYPE (arg));
 	      wide_int mask
 		= wi::bit_and_not (wi::mask (prec, false, prec),
 				   wide_int::from (align / BITS_PER_UNIT - 1,
@@ -2386,12 +2461,10 @@ ipa_compute_jump_functions_for_edge (struct ipa_func_body_info *fbi,
 	      wide_int value = wide_int::from (bitpos / BITS_PER_UNIT, prec,
 					       UNSIGNED);
 	      irange_bitmask bm (value, mask);
-	      if (!addr_nonzero)
-		vr.set_varying (TREE_TYPE (arg));
 	      vr.update_bitmask (bm);
 	      ipa_set_jfunc_vr (jfunc, vr);
 	    }
-	  else if (addr_nonzero)
+	  else if (!vr.varying_p ())
 	    ipa_set_jfunc_vr (jfunc, vr);
 	  else
 	    gcc_assert (!jfunc->m_vr);
@@ -2415,6 +2488,7 @@ ipa_compute_jump_functions_for_edge (struct ipa_func_body_info *fbi,
 	    gcc_assert (!jfunc->m_vr);
 	}
 
+      arg = skip_a_safe_conversion_op (arg);
       if (is_gimple_ip_invariant (arg)
 	  || (VAR_P (arg)
 	      && is_global_var (arg)
@@ -3469,6 +3543,24 @@ update_jump_functions_after_inlining (struct cgraph_edge *cs,
 		  }
 		default:
 		  gcc_unreachable ();
+		}
+
+	      if (src->m_vr && src->m_vr->known_p ())
+		{
+		  value_range svr (src->m_vr->type ());
+		  if (!dst->m_vr || !dst->m_vr->known_p ())
+		    ipa_set_jfunc_vr (dst, *src->m_vr);
+		  else if (ipa_vr_operation_and_type_effects (svr, *src->m_vr,
+							   NOP_EXPR,
+							   dst->m_vr->type (),
+							   src->m_vr->type ()))
+		    {
+		      value_range dvr;
+		      dst->m_vr->get_vrange (dvr);
+		      dvr.intersect (svr);
+		      if (!dvr.undefined_p ())
+			ipa_set_jfunc_vr (dst, dvr);
+		    }
 		}
 
 	      if (src->agg.items
@@ -5338,7 +5430,7 @@ ipa_prop_write_jump_functions (void)
         ipa_write_node_info (ob, node);
     }
   streamer_write_char_stream (ob->main_stream, 0);
-  produce_asm (ob, NULL);
+  produce_asm (ob);
   destroy_output_block (ob);
 }
 
@@ -5536,7 +5628,7 @@ ipcp_write_transformation_summaries (void)
 	write_ipcp_transformation_info (ob, cnode, ts);
     }
   streamer_write_char_stream (ob->main_stream, 0);
-  produce_asm (ob, NULL);
+  produce_asm (ob);
   destroy_output_block (ob);
 }
 

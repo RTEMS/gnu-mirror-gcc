@@ -1,5 +1,5 @@
 /* ACLE support for AArch64 SVE
-   Copyright (C) 2018-2024 Free Software Foundation, Inc.
+   Copyright (C) 2018-2025 Free Software Foundation, Inc.
 
    This file is part of GCC.
 
@@ -1032,15 +1032,18 @@ static GTY(()) hash_map<tree, registered_function *> *overload_names[2];
 
 /* Record that TYPE is an ABI-defined SVE type that contains NUM_ZR SVE vectors
    and NUM_PR SVE predicates.  MANGLED_NAME, if nonnull, is the ABI-defined
-   mangling of the type.  ACLE_NAME is the <arm_sve.h> name of the type.  */
-static void
+   mangling of the type.  mangling of the type.  ACLE_NAME is the <arm_sve.h>
+   name of the type, or null if <arm_sve.h> does not provide the type.  */
+void
 add_sve_type_attribute (tree type, unsigned int num_zr, unsigned int num_pr,
 			const char *mangled_name, const char *acle_name)
 {
   tree mangled_name_tree
     = (mangled_name ? get_identifier (mangled_name) : NULL_TREE);
+  tree acle_name_tree
+    = (acle_name ? get_identifier (acle_name) : NULL_TREE);
 
-  tree value = tree_cons (NULL_TREE, get_identifier (acle_name), NULL_TREE);
+  tree value = tree_cons (NULL_TREE, acle_name_tree, NULL_TREE);
   value = tree_cons (NULL_TREE, mangled_name_tree, value);
   value = tree_cons (NULL_TREE, size_int (num_pr), value);
   value = tree_cons (NULL_TREE, size_int (num_zr), value);
@@ -1125,14 +1128,6 @@ num_vectors_to_group (unsigned int nvectors)
     case 4: return GROUP_x4;
     }
   gcc_unreachable ();
-}
-
-/* Return the vector type associated with TYPE.  */
-static tree
-get_vector_type (sve_type type)
-{
-  auto vector_type = type_suffixes[type.type].vector_type;
-  return acle_vector_types[type.num_vectors - 1][vector_type];
 }
 
 /* If FNDECL is an SVE builtin, return its function instance, otherwise
@@ -2166,7 +2161,7 @@ function_resolver::infer_neon128_vector_type (unsigned int argno)
       int neon_index = type_suffixes[suffix_i].neon128_type;
       if (neon_index != ARM_NEON_H_TYPES_LAST)
 	{
-	  tree type = aarch64_simd_types[neon_index].itype;
+	  tree type = aarch64_simd_types_trees[neon_index].itype;
 	  if (type && matches_type_p (type, actual))
 	    return type_suffix_index (suffix_i);
 	}
@@ -3518,6 +3513,15 @@ is_ptrue (tree v, unsigned int step)
 	  && vector_cst_all_same (v, step));
 }
 
+/* Return true if V is a constant predicate that acts as a pfalse.  */
+bool
+is_pfalse (tree v)
+{
+  return (TREE_CODE (v) == VECTOR_CST
+	  && TYPE_MODE (TREE_TYPE (v)) == VNx16BImode
+	  && integer_zerop (v));
+}
+
 gimple_folder::gimple_folder (const function_instance &instance, tree fndecl,
 			      gimple_stmt_iterator *gsi_in, gcall *call_in)
   : function_call_info (gimple_location (call_in), instance, fndecl),
@@ -3589,6 +3593,7 @@ gimple_folder::redirect_call (const function_instance &instance)
     return NULL;
 
   gimple_call_set_fndecl (call, rfn->decl);
+  gimple_call_set_fntype (call, TREE_TYPE (rfn->decl));
   return call;
 }
 
@@ -3621,6 +3626,86 @@ gimple_folder::redirect_pred_x ()
   function_instance instance (*this);
   instance.pred = PRED_x;
   return redirect_call (instance);
+}
+
+/* Fold calls with predicate pfalse:
+   _m predication: lhs = op1.
+   _x or _z: lhs = {0, ...}.
+   Implicit predication that reads from memory: lhs = {0, ...}.
+   Implicit predication that writes to memory or prefetches: no-op.
+   Return the new gimple statement on success, else NULL.  */
+gimple *
+gimple_folder::fold_pfalse ()
+{
+  if (pred == PRED_none)
+    return nullptr;
+  tree arg0 = gimple_call_arg (call, 0);
+  if (pred == PRED_m)
+    {
+      /* Unary function shapes with _m predication are folded to the
+	 inactive vector (arg0), while other function shapes are folded
+	 to op1 (arg1).  */
+      tree arg1 = gimple_call_arg (call, 1);
+      if (is_pfalse (arg1))
+	return fold_call_to (arg0);
+      if (is_pfalse (arg0))
+	return fold_call_to (arg1);
+      return nullptr;
+    }
+  if ((pred == PRED_x || pred == PRED_z) && is_pfalse (arg0))
+    return fold_call_to (build_zero_cst (TREE_TYPE (lhs)));
+  if (pred == PRED_implicit && is_pfalse (arg0))
+    {
+      unsigned int flags = call_properties ();
+      /* Folding to lhs = {0, ...} is not appropriate for intrinsics with
+	 AGGREGATE types as lhs.  */
+      if ((flags & CP_READ_MEMORY)
+	  && !AGGREGATE_TYPE_P (TREE_TYPE (lhs)))
+	return fold_call_to (build_zero_cst (TREE_TYPE (lhs)));
+      if (flags & (CP_WRITE_MEMORY | CP_PREFETCH_MEMORY))
+	return fold_to_stmt_vops (gimple_build_nop ());
+    }
+  return nullptr;
+}
+
+/* Convert the lhs and all non-boolean vector-type operands to TYPE.
+   Pass the converted variables to the callback FP, and finally convert the
+   result back to the original type. Add the necessary conversion statements.
+   Return the new call.  */
+gimple *
+gimple_folder::convert_and_fold (tree type,
+				 gimple *(*fp) (gimple_folder &,
+						tree, vec<tree> &))
+{
+  gcc_assert (VECTOR_TYPE_P (type)
+	      && TYPE_MODE (type) != VNx16BImode);
+  tree old_ty = TREE_TYPE (lhs);
+  gimple_seq stmts = NULL;
+  bool convert_lhs_p = !useless_type_conversion_p (type, old_ty);
+  tree lhs_conv = convert_lhs_p ? create_tmp_var (type) : lhs;
+  unsigned int num_args = gimple_call_num_args (call);
+  auto_vec<tree, 16> args_conv;
+  args_conv.safe_grow (num_args);
+  for (unsigned int i = 0; i < num_args; ++i)
+    {
+      tree op = gimple_call_arg (call, i);
+      tree op_ty = TREE_TYPE (op);
+      args_conv[i] =
+	(VECTOR_TYPE_P (op_ty)
+	 && TYPE_MODE (op_ty) != VNx16BImode
+	 && !useless_type_conversion_p (op_ty, type))
+	? gimple_build (&stmts, VIEW_CONVERT_EXPR, type, op) : op;
+    }
+
+  gimple *new_stmt = fp (*this, lhs_conv, args_conv);
+  gsi_insert_seq_before (gsi, stmts, GSI_SAME_STMT);
+  if (convert_lhs_p)
+    {
+      tree t = build1 (VIEW_CONVERT_EXPR, old_ty, lhs_conv);
+      gimple *g = gimple_build_assign (lhs, VIEW_CONVERT_EXPR, t);
+      gsi_insert_after (gsi, g, GSI_SAME_STMT);
+    }
+  return new_stmt;
 }
 
 /* Fold the call to constant VAL.  */
@@ -3725,6 +3810,27 @@ gimple_folder::fold_active_lanes_to (tree x)
   return gimple_build_assign (lhs, VEC_COND_EXPR, pred, x, vec_inactive);
 }
 
+/* Fold call to assignment statement lhs = t.  */
+gimple *
+gimple_folder::fold_call_to (tree t)
+{
+  if (types_compatible_p (TREE_TYPE (lhs), TREE_TYPE (t)))
+    return fold_to_stmt_vops (gimple_build_assign (lhs, t));
+
+  tree rhs = build1 (VIEW_CONVERT_EXPR, TREE_TYPE (lhs), t);
+  return fold_to_stmt_vops (gimple_build_assign (lhs, VIEW_CONVERT_EXPR, rhs));
+}
+
+/* Fold call to G, incl. adjustments to the virtual operands.  */
+gimple *
+gimple_folder::fold_to_stmt_vops (gimple *g)
+{
+  gimple_seq stmts = NULL;
+  gimple_seq_add_stmt_without_update (&stmts, g);
+  gsi_replace_with_seq_vops (gsi, stmts);
+  return g;
+}
+
 /* Try to fold the call.  Return the new statement on success and null
    on failure.  */
 gimple *
@@ -3743,6 +3849,8 @@ gimple_folder::fold ()
 
   /* First try some simplifications that are common to many functions.  */
   if (auto *call = redirect_pred_x ())
+    return call;
+  if (auto *call = fold_pfalse ())
     return call;
 
   return base->fold (*this);

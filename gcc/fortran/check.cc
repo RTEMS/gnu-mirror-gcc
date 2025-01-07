@@ -1,5 +1,5 @@
 /* Check functions
-   Copyright (C) 2002-2024 Free Software Foundation, Inc.
+   Copyright (C) 2002-2025 Free Software Foundation, Inc.
    Contributed by Andy Vaught & Katherine Holcomb
 
 This file is part of GCC.
@@ -1825,6 +1825,42 @@ gfc_check_image_status (gfc_expr *image, gfc_expr *team)
 		 &team->where);
       return false;
     }
+  return true;
+}
+
+
+/* Check the arguments for f_c_string.  */
+
+bool
+gfc_check_f_c_string (gfc_expr *string, gfc_expr *asis)
+{
+
+  if (gfc_invalid_null_arg (string))
+    return false;
+
+  if (!scalar_check (string, 0))
+    return false;
+
+  if (string->ts.type != BT_CHARACTER
+      || (string->ts.type == BT_CHARACTER
+	  && (string->ts.kind != gfc_default_character_kind)))
+    {
+      gfc_error ("%qs argument of %qs intrinsic at %L shall have "
+		 "a type of CHARACTER(KIND=C_CHAR)",
+		 gfc_current_intrinsic_arg[0]->name, gfc_current_intrinsic,
+		 &string->where);
+      return false;
+    }
+
+  if (asis)
+    {
+      if (!type_check (asis, 1, BT_LOGICAL))
+	return false;
+
+      if (!scalar_check (asis, 1))
+	return false;
+    }
+
   return true;
 }
 
@@ -7155,12 +7191,16 @@ gfc_check_random_seed (gfc_expr *size, gfc_expr *put, gfc_expr *get)
       if (!kind_value_check (put, 1, gfc_default_integer_kind))
 	return false;
 
-      if (gfc_array_size (put, &put_size)
-	  && mpz_get_ui (put_size) < seed_size)
-	gfc_error ("Size of %qs argument of %qs intrinsic at %L "
-		   "too small (%i/%i)",
-		   gfc_current_intrinsic_arg[1]->name, gfc_current_intrinsic,
-		   &put->where, (int) mpz_get_ui (put_size), seed_size);
+      if (gfc_array_size (put, &put_size))
+	{
+	  if (mpz_get_ui (put_size) < seed_size)
+	    gfc_error ("Size of %qs argument of %qs intrinsic at %L "
+		       "too small (%i/%i)",
+		       gfc_current_intrinsic_arg[1]->name,
+		       gfc_current_intrinsic,
+		       &put->where, (int) mpz_get_ui (put_size), seed_size);
+	  mpz_clear (put_size);
+	}
     }
 
   if (get != NULL)
@@ -7187,12 +7227,16 @@ gfc_check_random_seed (gfc_expr *size, gfc_expr *put, gfc_expr *get)
       if (!kind_value_check (get, 2, gfc_default_integer_kind))
 	return false;
 
-       if (gfc_array_size (get, &get_size)
-	   && mpz_get_ui (get_size) < seed_size)
-	gfc_error ("Size of %qs argument of %qs intrinsic at %L "
-		   "too small (%i/%i)",
-		   gfc_current_intrinsic_arg[2]->name, gfc_current_intrinsic,
-		   &get->where, (int) mpz_get_ui (get_size), seed_size);
+       if (gfc_array_size (get, &get_size))
+	 {
+	   if (mpz_get_ui (get_size) < seed_size)
+	     gfc_error ("Size of %qs argument of %qs intrinsic at %L "
+			"too small (%i/%i)",
+			gfc_current_intrinsic_arg[2]->name,
+			gfc_current_intrinsic,
+			&get->where, (int) mpz_get_ui (get_size), seed_size);
+	   mpz_clear (get_size);
+	 }
     }
 
   /* RANDOM_SEED may not have more than one non-optional argument.  */

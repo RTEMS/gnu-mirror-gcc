@@ -1,5 +1,5 @@
 /* C-family attributes handling.
-   Copyright (C) 1992-2024 Free Software Foundation, Inc.
+   Copyright (C) 1992-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -48,6 +48,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimplify.h"
 #include "tree-pretty-print.h"
 #include "gcc-rich-location.h"
+#include "gcc-urlifier.h"
 
 static tree handle_packed_attribute (tree *, tree, tree, int, bool *);
 static tree handle_nocommon_attribute (tree *, tree, tree, int, bool *);
@@ -100,7 +101,6 @@ static tree handle_destructor_attribute (tree *, tree, tree, int, bool *);
 static tree handle_mode_attribute (tree *, tree, tree, int, bool *);
 static tree handle_section_attribute (tree *, tree, tree, int, bool *);
 static tree handle_special_var_sec_attribute (tree *, tree, tree, int, bool *);
-static tree handle_aligned_attribute (tree *, tree, tree, int, bool *);
 static tree handle_warn_if_not_aligned_attribute (tree *, tree, tree,
 						  int, bool *);
 static tree handle_strict_flex_array_attribute (tree *, tree, tree,
@@ -194,7 +194,7 @@ static tree handle_null_terminated_string_arg_attribute (tree *, tree, tree, int
   { name, function, type, variable }
 
 /* Define attributes that are mutually exclusive with one another.  */
-static const struct attribute_spec::exclusions attr_aligned_exclusions[] =
+extern const struct attribute_spec::exclusions attr_aligned_exclusions[] =
 {
   /* Attribute name     exclusion applies to:
 	                function, type, variable */
@@ -575,7 +575,7 @@ const struct attribute_spec c_common_gnu_attributes[] =
 			      handle_omp_declare_variant_attribute, NULL },
   { "omp declare variant variant", 0, -1, true,  false, false, false,
 			      handle_omp_declare_variant_attribute, NULL },
-  { "omp declare variant adjust_args need_device_ptr", 0, -1, true,  false,
+  { "omp declare variant variant args", 0, -1, true,  false,
 			      false, false,
 			      handle_omp_declare_variant_attribute, NULL },
   { "simd",		      0, 1, true,  false, false, false,
@@ -737,6 +737,8 @@ positional_argument (const_tree fn, const_tree atname, tree &pos,
 		     tree_code code, int argno /* = 0 */,
 		     int flags /* = posargflags () */)
 {
+  auto_urlify_attributes sentinel;
+
   const_tree fndecl = TYPE_P (fn) ? NULL_TREE : fn;
   const_tree fntype = TYPE_P (fn) ? fn : TREE_TYPE (fn);
   if (pos && TREE_CODE (pos) != IDENTIFIER_NODE
@@ -2813,7 +2815,7 @@ common_handle_aligned_attribute (tree *node, tree name, tree args, int flags,
 /* Handle a "aligned" attribute; arguments as in
    struct attribute_spec.handler.  */
 
-static tree
+tree
 handle_aligned_attribute (tree *node, tree name, tree args,
 			  int flags, bool *no_add_attrs)
 {

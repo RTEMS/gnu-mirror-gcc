@@ -1,5 +1,5 @@
 ;; Machine description for AArch64 architecture.
-;; Copyright (C) 2009-2024 Free Software Foundation, Inc.
+;; Copyright (C) 2009-2025 Free Software Foundation, Inc.
 ;; Contributed by ARM Ltd.
 ;;
 ;; This file is part of GCC.
@@ -198,8 +198,10 @@
     UNSPEC_AUTIB1716
     UNSPEC_AUTIASP
     UNSPEC_AUTIBSP
+    UNSPEC_BSL
     UNSPEC_CALLEE_ABI
     UNSPEC_CASESI
+    UNSPEC_COMBINE
     UNSPEC_CPYMEM
     UNSPEC_CRC32B
     UNSPEC_CRC32CB
@@ -209,6 +211,8 @@
     UNSPEC_CRC32H
     UNSPEC_CRC32W
     UNSPEC_CRC32X
+    UNSPEC_DUP
+    UNSPEC_DUP_LANE
     UNSPEC_FCVTZS
     UNSPEC_FCVTZU
     UNSPEC_FJCVTZS
@@ -227,6 +231,7 @@
     UNSPEC_FRINTP
     UNSPEC_FRINTX
     UNSPEC_FRINTZ
+    UNSPEC_GET_LANE
     UNSPEC_GOTSMALLPIC
     UNSPEC_GOTSMALLPIC28K
     UNSPEC_GOTSMALLTLS
@@ -236,6 +241,10 @@
     UNSPEC_LDP_FST
     UNSPEC_LDP_SND
     UNSPEC_LD1
+    UNSPEC_LD1_DUP
+    UNSPEC_LD1x2
+    UNSPEC_LD1x3
+    UNSPEC_LD1x4
     UNSPEC_LD2
     UNSPEC_LD2_DREG
     UNSPEC_LD2_DUP
@@ -265,12 +274,17 @@
     UNSPEC_REV
     UNSPEC_SADALP
     UNSPEC_SCVTF
+    UNSPEC_SET_LANE
     UNSPEC_SETMEM
     UNSPEC_SISD_NEG
     UNSPEC_SISD_SSHL
     UNSPEC_SISD_USHL
     UNSPEC_SSHL_2S
     UNSPEC_ST1
+    UNSPEC_ST1_LANE
+    UNSPEC_ST1x2
+    UNSPEC_ST1x3
+    UNSPEC_ST1x4
     UNSPEC_ST2
     UNSPEC_ST3
     UNSPEC_ST4
@@ -314,6 +328,8 @@
     UNSPEC_UNPACKSLO
     UNSPEC_UNPACKULO
     UNSPEC_PACK
+    UNSPEC_VCREATE
+    UNSPEC_VEC_COPY
     UNSPEC_WHILEGE
     UNSPEC_WHILEGT
     UNSPEC_WHILEHI
@@ -4670,6 +4686,63 @@
       return "<crc_variant>\\t%w0, %w1, %w2";
   }
   [(set_attr "type" "crc")]
+)
+
+;; Reversed CRC
+(define_expand "crc_rev<ALLI:mode><ALLX:mode>4"
+  [;; return value (calculated CRC)
+   (match_operand:ALLX 0 "register_operand" "=r")
+   ;; initial CRC
+   (match_operand:ALLX 1 "register_operand" "r")
+   ;; data
+   (match_operand:ALLI 2 "register_operand" "r")
+   ;; polynomial without leading 1
+   (match_operand:ALLX 3)]
+  ""
+  {
+    /* If the polynomial is the same as the polynomial of crc32c* instruction,
+       put that instruction.  crc32c uses iSCSI polynomial.  */
+    if (TARGET_CRC32 && INTVAL (operands[3]) == 0x1EDC6F41
+	&& <ALLX:MODE>mode == SImode)
+      emit_insn (gen_aarch64_crc32c<ALLI:crc_data_type> (operands[0],
+							 operands[1],
+							 operands[2]));
+    /* If the polynomial is the same as the polynomial of crc32* instruction,
+	put that instruction.  crc32 uses HDLC etc.  polynomial.  */
+    else if (TARGET_CRC32 && INTVAL (operands[3]) == 0x04C11DB7
+	     && <ALLX:MODE>mode == SImode)
+      emit_insn (gen_aarch64_crc32<ALLI:crc_data_type> (operands[0],
+							operands[1],
+							operands[2]));
+    else if (TARGET_AES && <ALLI:sizen> <= <ALLX:sizen>)
+      aarch64_expand_reversed_crc_using_pmull (<ALLX:MODE>mode,
+					       <ALLI:MODE>mode,
+					       operands);
+    else
+      /* Otherwise, generate table-based CRC.  */
+      expand_reversed_crc_table_based (operands[0], operands[1], operands[2],
+				       operands[3], <ALLI:MODE>mode,
+				       generate_reflecting_code_standard);
+    DONE;
+  }
+)
+
+;; Bit-forward CRC
+(define_expand "crc<ALLI:mode><ALLX:mode>4"
+  [;; return value (calculated CRC)
+   (match_operand:ALLX 0 "register_operand" "=r")
+   ;; initial CRC
+   (match_operand:ALLX 1 "register_operand" "r")
+   ;; data
+   (match_operand:ALLI 2 "register_operand" "r")
+   ;; polynomial without leading 1
+   (match_operand:ALLX 3)]
+  "TARGET_AES && <ALLI:sizen> <= <ALLX:sizen>"
+  {
+    aarch64_expand_crc_using_pmull (<ALLX:MODE>mode, <ALLI:MODE>mode,
+				    operands);
+    DONE;
+  }
 )
 
 (define_insn "*csinc2<mode>_insn"

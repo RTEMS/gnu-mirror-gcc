@@ -1,5 +1,5 @@
 /* Implementation of subroutines for the GNU C++ pretty-printer.
-   Copyright (C) 2003-2024 Free Software Foundation, Inc.
+   Copyright (C) 2003-2025 Free Software Foundation, Inc.
    Contributed by Gabriel Dos Reis <gdr@integrable-solutions.net>
 
 This file is part of GCC.
@@ -2294,7 +2294,7 @@ pp_cxx_template_parameter (cxx_pretty_printer *pp, tree t)
     {
     case TYPE_DECL:
       pp_cxx_ws_string (pp, "class");
-      if (TEMPLATE_TYPE_PARAMETER_PACK (TREE_TYPE (t)))
+      if (TEMPLATE_TYPE_PARAMETER_PACK (TREE_TYPE (parameter)))
 	pp_cxx_ws_string (pp, "...");
       if (DECL_NAME (parameter))
 	pp_cxx_tree_identifier (pp, DECL_NAME (parameter));
@@ -2480,6 +2480,7 @@ cxx_pretty_printer::declaration (tree t)
       }
   else switch (TREE_CODE (t))
     {
+    case FIELD_DECL:
     case VAR_DECL:
     case TYPE_DECL:
       pp_cxx_simple_declaration (this, t);

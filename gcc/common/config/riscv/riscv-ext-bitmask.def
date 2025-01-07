@@ -1,6 +1,6 @@
 /* RISC-V Extension Bitmask Definitions, corresponding to Extension Bitmask
    Definitions in RISC-V C API Specification.
-   Copyright (C) 2024 Free Software Foundation, Inc.
+   Copyright (C) 2024-2025 Free Software Foundation, Inc.
    Contributed by Yangyu Chen (cyy@cyyself.name).
 
 This file is part of GCC.
@@ -79,6 +79,5 @@ RISCV_EXT_BITMASK ("zcd",		1,  4)
 RISCV_EXT_BITMASK ("zcf",		1,  5)
 RISCV_EXT_BITMASK ("zcmop",		1,  6)
 RISCV_EXT_BITMASK ("zawrs",		1,  7)
-RISCV_EXT_BITMASK ("svvptc",		1,  8)
 
 #undef RISCV_EXT_BITMASK

@@ -1,5 +1,5 @@
 /* Core data structures for the 'tree' type.
-   Copyright (C) 1989-2024 Free Software Foundation, Inc.
+   Copyright (C) 1989-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -1007,7 +1007,14 @@ enum operand_equal_flag {
   /* In conjunction with OEP_LEXICOGRAPHIC considers names of declarations
      of the same kind.  Used to compare VLA bounds involving parameters
      across redeclarations of the same function.  */
-  OEP_DECL_NAME = 512
+  OEP_DECL_NAME = 512,
+  /* Check if two expressions result in the same bit values while possibly
+     ignoring the sign of the expressions and any differences in undefined
+     behaviour.  The compared expressions must however perform the same
+     operations.  Because this comparison ignores any possible UB it cannot
+     be used blindly without ensuring that the context you are using it in
+     itself doesn't guarantee that there will be no UB.  */
+  OEP_ASSUME_WRAPV = 1024
 };
 
 /* Enum and arrays used for tree allocation stats.
@@ -1663,9 +1670,6 @@ enum omp_clause_linear_kind
 struct GTY(()) tree_exp {
   struct tree_typed typed;
   location_t locus;
-  /* Discriminator for basic conditions in a Boolean expressions.  Trees that
-     are operands of the same Boolean expression should have the same uid.  */
-  unsigned condition_uid;
   tree GTY ((length ("TREE_OPERAND_LENGTH ((tree)&%h)"))) operands[1];
 };
 

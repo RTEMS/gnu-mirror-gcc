@@ -1,5 +1,5 @@
 /* Interprocedural constant propagation
-   Copyright (C) 2005-2024 Free Software Foundation, Inc.
+   Copyright (C) 2005-2025 Free Software Foundation, Inc.
 
    Contributed by Razya Ladelsky <RAZYA@il.ibm.com> and Martin Jambor
    <mjambor@suse.cz>
@@ -307,6 +307,18 @@ ipcp_lattice<valtype>::print (FILE * f, bool dump_sources, bool dump_benefits)
     fprintf (f, "\n");
 }
 
+/* If VALUE has all bits set to one, print "-1" to F, otherwise simply print it
+   hexadecimally to F. */
+
+static void
+ipcp_print_widest_int (FILE *f, const widest_int &value)
+{
+  if (wi::eq_p (wi::bit_not (value), 0))
+    fprintf (f, "-1");
+  else
+    print_hex (value, f);
+}
+
 void
 ipcp_bits_lattice::print (FILE *f)
 {
@@ -316,8 +328,10 @@ ipcp_bits_lattice::print (FILE *f)
     fprintf (f, "         Bits unusable (BOTTOM)\n");
   else
     {
-      fprintf (f, "         Bits: value = "); print_hex (get_value (), f);
-      fprintf (f, ", mask = "); print_hex (get_mask (), f);
+      fprintf (f, "         Bits: value = ");
+      ipcp_print_widest_int (f, get_value ());
+      fprintf (f, ", mask = ");
+      print_hex (get_mask (), f);
       fprintf (f, "\n");
     }
 }
@@ -1653,7 +1667,7 @@ ipa_context_from_jfunc (ipa_node_params *info, cgraph_edge *cs, int csidx,
    DST_TYPE on value range in SRC_VR and store it to DST_VR.  Return true if
    the result is a range that is not VARYING nor UNDEFINED.  */
 
-static bool
+bool
 ipa_vr_operation_and_type_effects (vrange &dst_vr,
 				   const vrange &src_vr,
 				   enum tree_code operation,
@@ -1679,7 +1693,7 @@ ipa_vr_operation_and_type_effects (vrange &dst_vr,
 /* Same as above, but the SRC_VR argument is an IPA_VR which must
    first be extracted onto a vrange.  */
 
-static bool
+bool
 ipa_vr_operation_and_type_effects (vrange &dst_vr,
 				   const ipa_vr &src_vr,
 				   enum tree_code operation,
@@ -1693,11 +1707,14 @@ ipa_vr_operation_and_type_effects (vrange &dst_vr,
 
 /* Given a PASS_THROUGH jump function JFUNC that takes as its source SRC_VR of
    SRC_TYPE and the result needs to be DST_TYPE, if any value range information
-   can be deduced at all, intersect VR with it.  */
+   can be deduced at all, intersect VR with it.  CONTEXT_NODE is the call graph
+   node representing the function for which optimization flags should be
+   evaluated.  */
 
 static void
 ipa_vr_intersect_with_arith_jfunc (vrange &vr,
 				   ipa_jump_func *jfunc,
+				   cgraph_node *context_node,
 				   const value_range &src_vr,
 				   tree src_type,
 				   tree dst_type)
@@ -1720,7 +1737,7 @@ ipa_vr_intersect_with_arith_jfunc (vrange &vr,
   if (!handler)
     return;
   value_range op_vr (TREE_TYPE (operand));
-  ipa_range_set_and_normalize (op_vr, operand);
+  ipa_get_range_from_ip_invariant (op_vr, operand, context_node);
 
   tree operation_type;
   if (TREE_CODE_CLASS (operation) == tcc_comparison)
@@ -1776,7 +1793,8 @@ ipa_value_range_from_jfunc (vrange &vr,
       value_range srcvr;
       (*sum->m_vr)[idx].get_vrange (srcvr);
 
-      ipa_vr_intersect_with_arith_jfunc (vr, jfunc, srcvr, src_type, parm_type);
+      ipa_vr_intersect_with_arith_jfunc (vr, jfunc, cs->caller, srcvr, src_type,
+					 parm_type);
     }
 }
 
@@ -2562,7 +2580,7 @@ propagate_vr_across_jump_function (cgraph_edge *cs, ipa_jump_func *jfunc,
 
       if (ipa_get_jf_pass_through_operation (jfunc) == NOP_EXPR
 	  || !ipa_edge_within_scc (cs))
-	ipa_vr_intersect_with_arith_jfunc (vr, jfunc,
+	ipa_vr_intersect_with_arith_jfunc (vr, jfunc, cs->caller,
 					   src_lats->m_value_range.m_vr,
 					   operand_type, param_type);
     }
@@ -6371,7 +6389,7 @@ ipcp_store_vr_results (void)
 	      dumped_sth = true;
 	    }
 	  fprintf (dump_file, " param %i: value = ", i);
-	  print_hex (bits->get_value (), dump_file);
+	  ipcp_print_widest_int (dump_file, bits->get_value ());
 	  fprintf (dump_file, ", mask = ");
 	  print_hex (bits->get_mask (), dump_file);
 	  fprintf (dump_file, "\n");

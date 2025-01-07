@@ -3,7 +3,7 @@
    building RTL.  These routines are used both during actual parsing
    and during the instantiation of template functions.
 
-   Copyright (C) 1998-2024 Free Software Foundation, Inc.
+   Copyright (C) 1998-2025 Free Software Foundation, Inc.
    Written by Mark Mitchell (mmitchell@usa.net) based on code found
    formerly in parse.y and pt.cc.
 
@@ -2136,12 +2136,13 @@ finish_compound_stmt (tree stmt)
 /* Finish an asm-statement, whose components are a STRING, some
    OUTPUT_OPERANDS, some INPUT_OPERANDS, some CLOBBERS and some
    LABELS.  Also note whether the asm-statement should be
-   considered volatile, and whether it is asm inline.  */
+   considered volatile, and whether it is asm inline.  TOPLEV_P
+   is true if finishing namespace scope extended asm.  */
 
 tree
 finish_asm_stmt (location_t loc, int volatile_p, tree string,
 		 tree output_operands, tree input_operands, tree clobbers,
-		 tree labels, bool inline_p)
+		 tree labels, bool inline_p, bool toplev_p)
 {
   tree r;
   tree t;
@@ -2215,9 +2216,50 @@ finish_asm_stmt (location_t loc, int volatile_p, tree string,
 		 mark it addressable.  */
 	      if (!allows_reg && !cxx_mark_addressable (*op))
 		operand = error_mark_node;
+	      if (allows_reg && toplev_p)
+		{
+		  error_at (loc, "constraint allows registers outside of "
+				 "a function");
+		  operand = error_mark_node;
+		}
 	    }
 	  else
 	    operand = error_mark_node;
+
+	  if (toplev_p && operand != error_mark_node)
+	    {
+	      if (TREE_SIDE_EFFECTS (operand))
+		{
+		  error_at (loc, "side-effects in output operand outside "
+				 "of a function");
+		  operand = error_mark_node;
+		}
+	      else
+		{
+		  tree addr
+		    = cp_build_addr_expr (operand, tf_warning_or_error);
+		  if (addr == error_mark_node)
+		    operand = error_mark_node;
+		  else
+		    {
+		      addr = maybe_constant_value (addr);
+		      if (!initializer_constant_valid_p (addr,
+							 TREE_TYPE (addr)))
+			{
+			  error_at (loc, "output operand outside of a "
+					 "function is not constant");
+			  operand = error_mark_node;
+			}
+		      else
+			operand = build_fold_indirect_ref (addr);
+		    }
+		}
+	    }
+	  else if (operand != error_mark_node && strstr (constraint, "-"))
+	    {
+	      error_at (loc, "%<-%> modifier used inside of a function");
+	      operand = error_mark_node;
+	    }
 
 	  TREE_VALUE (t) = operand;
 	}
@@ -2283,9 +2325,74 @@ finish_asm_stmt (location_t loc, int volatile_p, tree string,
 		  if (TREE_CONSTANT (constop))
 		    operand = constop;
 		}
+	      if (allows_reg && toplev_p)
+		{
+		  error_at (loc, "constraint allows registers outside of "
+				 "a function");
+		  operand = error_mark_node;
+		}
+	      if (constraint[0] == ':' && operand != error_mark_node)
+		{
+		  tree t = operand;
+		  STRIP_NOPS (t);
+		  if (TREE_CODE (t) != ADDR_EXPR
+		      || !(TREE_CODE (TREE_OPERAND (t, 0)) == FUNCTION_DECL
+			   || (VAR_P (TREE_OPERAND (t, 0))
+			       && is_global_var (TREE_OPERAND (t, 0)))))
+		    {
+		      error_at (loc, "%<:%> constraint operand is not address "
+				"of a function or non-automatic variable");
+		      operand = error_mark_node;
+		    }
+		}
 	    }
 	  else
 	    operand = error_mark_node;
+
+	  if (toplev_p && operand != error_mark_node)
+	    {
+	      if (TREE_SIDE_EFFECTS (operand))
+		{
+		  error_at (loc, "side-effects in input operand outside "
+				 "of a function");
+		  operand = error_mark_node;
+		}
+	      else if (allows_mem && lvalue_or_else (operand, lv_asm, tf_none))
+		{
+		  tree addr = cp_build_addr_expr (operand, tf_warning_or_error);
+		  if (addr == error_mark_node)
+		    operand = error_mark_node;
+		  else
+		    {
+		      addr = maybe_constant_value (addr);
+		      if (!initializer_constant_valid_p (addr,
+							 TREE_TYPE (addr)))
+			{
+			  error_at (loc, "input operand outside of a "
+					 "function is not constant");
+			  operand = error_mark_node;
+			}
+		      else
+			operand = build_fold_indirect_ref (addr);
+		    }
+		}
+	      else
+		{
+		  operand = maybe_constant_value (operand);
+		  if (!initializer_constant_valid_p (operand,
+						     TREE_TYPE (operand)))
+		    {
+		      error_at (loc, "input operand outside of a "
+				     "function is not constant");
+		      operand = error_mark_node;
+		    }
+		}
+	    }
+	  else if (operand != error_mark_node && strstr (constraint, "-"))
+	    {
+	      error_at (loc, "%<-%> modifier used inside of a function");
+	      operand = error_mark_node;
+	    }
 
 	  TREE_VALUE (t) = operand;
 	}
@@ -2296,6 +2403,11 @@ finish_asm_stmt (location_t loc, int volatile_p, tree string,
 		  clobbers, labels);
   ASM_VOLATILE_P (r) = volatile_p || noutputs == 0;
   ASM_INLINE_P (r) = inline_p;
+  if (toplev_p)
+    {
+      symtab->finalize_toplevel_asm (r);
+      return r;
+    }
   r = maybe_cleanup_point_expr_void (r);
   return add_stmt (r);
 }
@@ -3199,7 +3311,8 @@ finish_call_expr (tree fn, vec<tree, va_gc> **args, bool disallow_virtual,
       if (TREE_CODE (fn) == FUNCTION_DECL
 	  && (DECL_BUILT_IN_CLASS (fn) == BUILT_IN_NORMAL
 	      || DECL_BUILT_IN_CLASS (fn) == BUILT_IN_MD))
-	result = resolve_overloaded_builtin (input_location, fn, *args);
+	result = resolve_overloaded_builtin (input_location, fn, *args,
+					     complain & tf_error);
 
       if (!result)
 	{
@@ -10083,26 +10196,27 @@ finish_omp_threadprivate (tree vars)
   for (t = vars; t; t = TREE_CHAIN (t))
     {
       tree v = TREE_PURPOSE (t);
+      location_t loc = EXPR_LOCATION (TREE_VALUE (t));
 
       if (error_operand_p (v))
 	;
       else if (!VAR_P (v))
-	error ("%<threadprivate%> %qD is not file, namespace "
-	       "or block scope variable", v);
+	error_at (loc, "%<threadprivate%> %qD is not file, namespace "
+		       "or block scope variable", v);
       /* If V had already been marked threadprivate, it doesn't matter
 	 whether it had been used prior to this point.  */
       else if (TREE_USED (v)
 	  && (DECL_LANG_SPECIFIC (v) == NULL
 	      || !CP_DECL_THREADPRIVATE_P (v)))
-	error ("%qE declared %<threadprivate%> after first use", v);
+	error_at (loc, "%qE declared %<threadprivate%> after first use", v);
       else if (! TREE_STATIC (v) && ! DECL_EXTERNAL (v))
-	error ("automatic variable %qE cannot be %<threadprivate%>", v);
+	error_at (loc, "automatic variable %qE cannot be %<threadprivate%>", v);
       else if (! COMPLETE_TYPE_P (complete_type (TREE_TYPE (v))))
-	error ("%<threadprivate%> %qE has incomplete type", v);
+	error_at (loc, "%<threadprivate%> %qE has incomplete type", v);
       else if (TREE_STATIC (v) && TYPE_P (CP_DECL_CONTEXT (v))
 	       && CP_DECL_CONTEXT (v) != current_class_type)
-	error ("%<threadprivate%> %qE directive not "
-	       "in %qT definition", v, CP_DECL_CONTEXT (v));
+	error_at (loc, "%<threadprivate%> %qE directive not "
+		       "in %qT definition", v, CP_DECL_CONTEXT (v));
       else
 	{
 	  /* Allocate a LANG_SPECIFIC structure for V, if needed.  */

@@ -1,5 +1,5 @@
 /* Subroutines for insn-output.cc for HPPA.
-   Copyright (C) 1992-2024 Free Software Foundation, Inc.
+   Copyright (C) 1992-2025 Free Software Foundation, Inc.
    Contributed by Tim Moore (moore@cs.utah.edu), based on sparc.cc
 
 This file is part of GCC.
@@ -209,6 +209,7 @@ static HOST_WIDE_INT pa_starting_frame_offset (void);
 static section* pa_elf_select_rtx_section(machine_mode, rtx, unsigned HOST_WIDE_INT) ATTRIBUTE_UNUSED;
 static void pa_atomic_assign_expand_fenv (tree *, tree *, tree *);
 static bool pa_use_lra_p (void);
+static bool pa_frame_pointer_required (void);
 
 /* The following extra sections are only used for SOM.  */
 static GTY(()) section *som_readonly_data_section;
@@ -393,6 +394,8 @@ static size_t n_deferred_plabels = 0;
 #define TARGET_DELEGITIMIZE_ADDRESS pa_delegitimize_address
 #undef TARGET_INTERNAL_ARG_POINTER
 #define TARGET_INTERNAL_ARG_POINTER pa_internal_arg_pointer
+#undef TARGET_FRAME_POINTER_REQUIRED
+#define TARGET_FRAME_POINTER_REQUIRED pa_frame_pointer_required
 #undef TARGET_CAN_ELIMINATE
 #define TARGET_CAN_ELIMINATE pa_can_eliminate
 #undef TARGET_CONDITIONAL_REGISTER_USAGE
@@ -6159,13 +6162,12 @@ pa_emit_hpdiv_const (rtx *operands, int unsignedp)
       emit
 	(gen_rtx_PARALLEL
 	 (VOIDmode,
-	  gen_rtvec (6, gen_rtx_SET (gen_rtx_REG (SImode, 29),
+	  gen_rtvec (5, gen_rtx_SET (gen_rtx_REG (SImode, 29),
 				     gen_rtx_fmt_ee (unsignedp ? UDIV : DIV,
 						     SImode,
 						     gen_rtx_REG (SImode, 26),
 						     operands[2])),
-		     gen_rtx_CLOBBER (VOIDmode, operands[4]),
-		     gen_rtx_CLOBBER (VOIDmode, operands[3]),
+		     gen_rtx_CLOBBER (VOIDmode, gen_rtx_REG (SImode, 1)),
 		     gen_rtx_CLOBBER (VOIDmode, gen_rtx_REG (SImode, 26)),
 		     gen_rtx_CLOBBER (VOIDmode, gen_rtx_REG (SImode, 25)),
 		     gen_rtx_CLOBBER (VOIDmode, ret))));
@@ -11333,6 +11335,19 @@ static bool
 pa_use_lra_p ()
 {
   return pa_lra_p;
+}
+
+/* Implement TARGET_FRAME_POINTER_REQUIRED.  */
+
+bool
+pa_frame_pointer_required (void)
+{
+  /* If the function receives nonlocal gotos, it needs to save the frame
+     pointer in the argument save area.  */
+  if (cfun->has_nonlocal_label)
+    return true;
+
+  return false;
 }
 
 #include "gt-pa.h"

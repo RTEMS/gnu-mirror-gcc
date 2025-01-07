@@ -1,6 +1,6 @@
 // Specific definitions for BSD  -*- C++ -*-
 
-// Copyright (C) 2000-2024 Free Software Foundation, Inc.
+// Copyright (C) 2000-2025 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -49,5 +49,8 @@
 #else
 #define _GLIBCXX_USE_C99_FLOAT_TRANSCENDENTALS_DYNAMIC 0
 #endif
+
+// read(2) can return EINVAL for n >= INT_MAX.
+#define _GLIBCXX_MAX_READ_SIZE (__INT_MAX__ - 1)
 
 #endif

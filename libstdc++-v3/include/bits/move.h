@@ -1,6 +1,6 @@
 // Move, forward and identity for C++11 + swap -*- C++ -*-
 
-// Copyright (C) 2007-2024 Free Software Foundation, Inc.
+// Copyright (C) 2007-2025 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -161,7 +161,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     _GLIBCXX_NODISCARD
     inline _GLIBCXX17_CONSTEXPR _Tp*
     addressof(_Tp& __r) noexcept
-    { return std::__addressof(__r); }
+    { return __builtin_addressof(__r); }
 
   // _GLIBCXX_RESOLVE_LIB_DEFECTS
   // 2598. addressof works on temporaries

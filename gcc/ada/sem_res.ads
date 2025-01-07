@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -103,9 +103,6 @@ package Sem_Res is
 
    procedure Preanalyze_And_Resolve (N : Node_Id);
    --  Same, but use type of node because context does not impose a single type
-
-   procedure Preanalyze_With_Freezing_And_Resolve (N : Node_Id; T : Entity_Id);
-   --  Same, but perform freezing of static expressions of N or its children.
 
    procedure Resolve (N : Node_Id; Typ : Entity_Id);
    procedure Resolve (N : Node_Id; Typ : Entity_Id; Suppress : Check_Id);

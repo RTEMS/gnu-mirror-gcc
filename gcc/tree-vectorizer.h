@@ -1,5 +1,5 @@
 /* Vectorizer
-   Copyright (C) 2003-2024 Free Software Foundation, Inc.
+   Copyright (C) 2003-2025 Free Software Foundation, Inc.
    Contributed by Dorit Naishlos <dorit@il.ibm.com>
 
 This file is part of GCC.
@@ -497,6 +497,7 @@ public:
 
   stmt_vec_info add_stmt (gimple *);
   stmt_vec_info add_pattern_stmt (gimple *, stmt_vec_info);
+  stmt_vec_info resync_stmt_addr (gimple *);
   stmt_vec_info lookup_stmt (gimple *);
   stmt_vec_info lookup_def (tree);
   stmt_vec_info lookup_single_use (tree);

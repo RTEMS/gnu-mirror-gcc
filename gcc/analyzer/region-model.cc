@@ -1,5 +1,5 @@
 /* Classes for modeling the state of memory.
-   Copyright (C) 2019-2024 Free Software Foundation, Inc.
+   Copyright (C) 2019-2025 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -81,6 +81,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "analyzer/record-layout.h"
 #include "diagnostic-format-sarif.h"
 #include "text-art/tree-widget.h"
+#include "gcc-urlifier.h"
 
 #if ENABLE_ANALYZER
 
@@ -2060,6 +2061,7 @@ public:
 
   void emit () const final override
   {
+    auto_urlify_attributes sentinel;
     inform (DECL_SOURCE_LOCATION (m_callee_fndecl),
 	    "parameter %i of %qD marked with attribute %qs",
 	    m_ptr_argno + 1, m_callee_fndecl, m_access_str);

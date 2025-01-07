@@ -1,5 +1,5 @@
 /* ACLE support for AArch64 SVE
-   Copyright (C) 2018-2024 Free Software Foundation, Inc.
+   Copyright (C) 2018-2025 Free Software Foundation, Inc.
 
    This file is part of GCC.
 
@@ -648,6 +648,9 @@ public:
 
   gcall *redirect_call (const function_instance &);
   gimple *redirect_pred_x ();
+  gimple *fold_pfalse ();
+  gimple *convert_and_fold (tree, gimple *(*) (gimple_folder &,
+					       tree, vec<tree> &));
 
   gimple *fold_to_cstu (poly_uint64);
   gimple *fold_to_pfalse ();
@@ -655,6 +658,8 @@ public:
   gimple *fold_to_vl_pred (unsigned int);
   gimple *fold_const_binary (enum tree_code);
   gimple *fold_active_lanes_to (tree);
+  gimple *fold_call_to (tree);
+  gimple *fold_to_stmt_vops (gimple *);
 
   gimple *fold ();
 
@@ -848,6 +853,7 @@ extern tree acle_svprfop;
 
 bool vector_cst_all_same (tree, unsigned int);
 bool is_ptrue (tree, unsigned int);
+bool is_pfalse (tree);
 const function_instance *lookup_fndecl (tree);
 
 /* Try to find a mode with the given mode_suffix_info fields.  Return the
@@ -888,6 +894,14 @@ tuple_type_field (tree type)
     if (TREE_CODE (field) == FIELD_DECL)
       return field;
   gcc_unreachable ();
+}
+
+/* Return the vector type associated with TYPE.  */
+inline tree
+get_vector_type (sve_type type)
+{
+  auto vector_type = type_suffixes[type.type].vector_type;
+  return acle_vector_types[type.num_vectors - 1][vector_type];
 }
 
 inline function_instance::

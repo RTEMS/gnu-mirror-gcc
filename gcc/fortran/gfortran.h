@@ -1,5 +1,5 @@
 /* gfortran header file
-   Copyright (C) 2000-2024 Free Software Foundation, Inc.
+   Copyright (C) 2000-2025 Free Software Foundation, Inc.
    Contributed by Andy Vaught
 
 This file is part of GCC.
@@ -324,7 +324,8 @@ enum gfc_statement
   /* Note: gfc_match_omp_nothing returns ST_NONE. */
   ST_OMP_NOTHING, ST_NONE,
   ST_OMP_UNROLL, ST_OMP_END_UNROLL,
-  ST_OMP_TILE, ST_OMP_END_TILE, ST_OMP_INTEROP
+  ST_OMP_TILE, ST_OMP_END_TILE, ST_OMP_INTEROP, ST_OMP_DISPATCH,
+  ST_OMP_END_DISPATCH
 };
 
 /* Types of interfaces that we can have.  Assignment interfaces are
@@ -508,6 +509,7 @@ enum gfc_isym_id
   GFC_ISYM_EXP,
   GFC_ISYM_EXPONENT,
   GFC_ISYM_EXTENDS_TYPE_OF,
+  GFC_ISYM_F_C_STRING,
   GFC_ISYM_FAILED_IMAGES,
   GFC_ISYM_FDATE,
   GFC_ISYM_FE_RUNTIME_ERROR,
@@ -1214,11 +1216,12 @@ typedef struct gfc_component
   /* Needed for procedure pointer components.  */
   struct gfc_typebound_proc *tb;
   /* When allocatable/pointer and in a coarray the associated token.  */
-  tree caf_token;
+  struct gfc_component *caf_token;
 }
 gfc_component;
 
 #define gfc_get_component() XCNEW (gfc_component)
+#define gfc_comp_caf_token(cm) (cm)->caf_token->backend_decl
 
 /* Formal argument lists are lists of symbols.  */
 typedef struct gfc_formal_arglist
@@ -1407,6 +1410,7 @@ typedef struct gfc_omp_namelist
 	  bool target;
 	  bool targetsync;
 	} init;
+      bool need_device_ptr;
     } u;
   union
     {
@@ -1463,6 +1467,7 @@ enum
   OMP_LIST_INIT,
   OMP_LIST_USE,
   OMP_LIST_DESTROY,
+  OMP_LIST_ADJUST_ARGS,
   OMP_LIST_NUM /* Must be the last.  */
 };
 
@@ -1610,6 +1615,8 @@ typedef struct gfc_omp_clauses
   struct gfc_expr *depobj;
   struct gfc_expr *dist_chunk_size;
   struct gfc_expr *message;
+  struct gfc_expr *novariants;
+  struct gfc_expr *nocontext;
   struct gfc_omp_assumptions *assume;
   struct gfc_expr_list *sizes_list;
   const char *critical_name;
@@ -1739,6 +1746,7 @@ typedef struct gfc_omp_declare_variant
   struct gfc_symtree *variant_proc_symtree;
 
   gfc_omp_set_selector *set_selectors;
+  gfc_omp_namelist *adjust_args_list;
 
   bool checked_p : 1; /* Set if previously checked for errors.  */
   bool error_p : 1; /* Set if error found in directive.  */
@@ -3098,7 +3106,7 @@ enum gfc_exec_op
   EXEC_OMP_PARALLEL_MASKED_TASKLOOP, EXEC_OMP_PARALLEL_MASKED_TASKLOOP_SIMD,
   EXEC_OMP_MASKED_TASKLOOP, EXEC_OMP_MASKED_TASKLOOP_SIMD, EXEC_OMP_SCOPE,
   EXEC_OMP_UNROLL, EXEC_OMP_TILE, EXEC_OMP_INTEROP,
-  EXEC_OMP_ERROR, EXEC_OMP_ALLOCATE, EXEC_OMP_ALLOCATORS
+  EXEC_OMP_ERROR, EXEC_OMP_ALLOCATE, EXEC_OMP_ALLOCATORS, EXEC_OMP_DISPATCH
 };
 
 typedef struct gfc_code
@@ -3783,7 +3791,7 @@ void gfc_resolve_do_iterator (gfc_code *, gfc_symbol *, bool);
 void gfc_resolve_omp_local_vars (gfc_namespace *);
 void gfc_resolve_omp_parallel_blocks (gfc_code *, gfc_namespace *);
 void gfc_resolve_omp_do_blocks (gfc_code *, gfc_namespace *);
-void gfc_resolve_omp_declare_simd (gfc_namespace *);
+void gfc_resolve_omp_declare (gfc_namespace *);
 void gfc_resolve_omp_udrs (gfc_symtree *);
 void gfc_omp_save_and_clear_state (struct gfc_omp_saved_state *);
 void gfc_omp_restore_state (struct gfc_omp_saved_state *);
@@ -4171,5 +4179,6 @@ bool gfc_is_reallocatable_lhs (gfc_expr *);
 
 void finish_oacc_declare (gfc_namespace *, gfc_symbol *, bool);
 void gfc_adjust_builtins (void);
+void gfc_add_caf_accessor (gfc_expr *, gfc_expr *);
 
 #endif /* GCC_GFORTRAN_H  */

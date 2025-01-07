@@ -1,5 +1,5 @@
 /* Target-specific code for C family languages.
-   Copyright (C) 2015-2024 Free Software Foundation, Inc.
+   Copyright (C) 2015-2025 Free Software Foundation, Inc.
 
    This file is part of GCC.
 
@@ -268,6 +268,14 @@ aarch64_update_cpp_builtins (cpp_reader *pfile)
   aarch64_def_or_undef (TARGET_SVE_BF16,
 			"__ARM_FEATURE_SVE_BF16", pfile);
 
+  aarch64_def_or_undef (TARGET_FP8, "__ARM_FEATURE_FP8", pfile);
+
+  aarch64_def_or_undef (TARGET_FP8DOT2, "__ARM_FEATURE_FP8DOT2", pfile);
+
+  aarch64_def_or_undef (TARGET_FP8DOT4, "__ARM_FEATURE_FP8DOT4", pfile);
+
+  aarch64_def_or_undef (TARGET_FP8FMA, "__ARM_FEATURE_FP8FMA", pfile);
+
   aarch64_def_or_undef (TARGET_LS64,
 			"__ARM_FEATURE_LS64", pfile);
   aarch64_def_or_undef (TARGET_RCPC, "__ARM_FEATURE_RCPC", pfile);
@@ -383,7 +391,7 @@ aarch64_pragma_aarch64 (cpp_reader *)
 /* Implement TARGET_RESOLVE_OVERLOADED_BUILTIN.  */
 static tree
 aarch64_resolve_overloaded_builtin (location_t location,
-				    tree fndecl, void *uncast_arglist)
+				    tree fndecl, void *uncast_arglist, bool)
 {
   vec<tree, va_gc> empty = {};
   vec<tree, va_gc> *arglist = (uncast_arglist
@@ -411,8 +419,8 @@ aarch64_resolve_overloaded_builtin (location_t location,
 /* Implement TARGET_CHECK_BUILTIN_CALL.  */
 static bool
 aarch64_check_builtin_call (location_t loc, vec<location_t> arg_loc,
-			    tree fndecl, tree orig_fndecl,
-			    unsigned int nargs, tree *args)
+			    tree fndecl, tree orig_fndecl, unsigned int nargs,
+			    tree *args, bool)
 {
   unsigned int code = DECL_MD_FUNCTION_CODE (fndecl);
   unsigned int subcode = code >> AARCH64_BUILTIN_SHIFT;

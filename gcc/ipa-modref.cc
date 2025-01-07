@@ -1,5 +1,5 @@
 /* Search for references that a functions loads or stores.
-   Copyright (C) 2020-2024 Free Software Foundation, Inc.
+   Copyright (C) 2020-2025 Free Software Foundation, Inc.
    Contributed by David Cepelik and Jan Hubicka
 
 This file is part of GCC.
@@ -3746,7 +3746,7 @@ modref_write ()
     {
       streamer_write_uhwi (ob, 0);
       streamer_write_char_stream (ob->main_stream, 0);
-      produce_asm (ob, NULL);
+      produce_asm (ob);
       destroy_output_block (ob);
       return;
     }
@@ -3821,7 +3821,7 @@ modref_write ()
 	}
     }
   streamer_write_char_stream (ob->main_stream, 0);
-  produce_asm (ob, NULL);
+  produce_asm (ob);
   destroy_output_block (ob);
 }
 

@@ -1,4 +1,4 @@
-# Copyright (C) 2022-2024 Free Software Foundation, Inc.
+# Copyright (C) 2022-2025 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -35,6 +35,8 @@ dg-init
 
 # Main loop.
 set CFLAGS "$DEFAULT_CFLAGS -O3"
+dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/*.\[cS\]]] \
+	"" $CFLAGS
 dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/base/*.\[cS\]]] \
 	"" $CFLAGS
 dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/xsfvector/*.\[cS\]]] \
@@ -61,15 +63,15 @@ set AUTOVEC_TEST_OPTS [list \
   {-ftree-vectorize -O2 -mrvv-max-lmul=dynamic} ]
 foreach op $AUTOVEC_TEST_OPTS {
   dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/autovec/partial/*.\[cS\]]] \
-    "" "$op"
+    "$op" ""
   dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/autovec/binop/*.\[cS\]]] \
-    "" "$op"
+    "$op" ""
   dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/autovec/cmp/*.\[cS\]]] \
-    "" "$op"
+    "$op" ""
   dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/autovec/conversions/*.\[cS\]]] \
-    "" "$op"
+    "$op" ""
   dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/autovec/unop/*.\[cS\]]] \
-    "" "$op"
+    "$op" ""
   dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/autovec/ternop/*.\[cS\]]] \
     "$op" ""
   dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/autovec/reduc/*.\[cS\]]] \

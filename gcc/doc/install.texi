@@ -40,7 +40,7 @@
 @settitle Installing GCC: GNU Free Documentation License
 @end ifset
 
-@c Copyright (C) 1988-2024 Free Software Foundation, Inc.
+@c Copyright (C) 1988-2025 Free Software Foundation, Inc.
 @c *** Converted to texinfo by Dean Wakerley, dean@wakerley.com
 
 @c IMPORTANT: whenever you modify this file, run `install.texi2html' to
@@ -64,7 +64,7 @@
 
 @c Part 2 Summary Description and Copyright
 @copying
-Copyright @copyright{} 1988-2024 Free Software Foundation, Inc.
+Copyright @copyright{} 1988-2025 Free Software Foundation, Inc.
 @sp 1
 Permission is granted to copy, distribute and/or modify this document
 under the terms of the GNU Free Documentation License, Version 1.3 or
@@ -1119,7 +1119,7 @@ yielding a slightly slower compiler (but faster than
 at random addresses each time they are executed, therefore provide additional
 protection against Return Oriented Programming (ROP) attacks.
 
-@option{--enable-host-pie}) may be used with @option{--enable-host-shared}),
+@option{--enable-host-pie} may be used with @option{--enable-host-shared},
 in which case @option{-fPIC} is used when compiling, and @option{-pie} when
 linking.
 
@@ -1275,13 +1275,13 @@ sysv, aix.
 
 @end table
 
-@item --with-multilib-list=@var{list}
+@item @anchor{with-multilib-list}--with-multilib-list=@var{list}
 @itemx --without-multilib-list
 Specify what multilibs to build.  @var{list} is a comma separated list of
 values, possibly consisting of a single value.  Currently only implemented
-for aarch64*-*-*, amdgcn*-*-*, arm*-*-*, loongarch*-*-*, riscv*-*-*, sh*-*-*
-and x86-64-*-linux*.  The accepted values and meaning for each target is given
-below.
+for aarch64*-*-*, amdgcn*-*-*, arm*-*-*, loongarch*-*-*, nvptx-*, riscv*-*-*,
+sh*-*-* and x86-64-*-linux*.
+The accepted values and meaning for each target is given below.
 
 @table @code
 @item aarch64*-*-*
@@ -1406,6 +1406,28 @@ for @code{loongarch64-*} targets).
 If @var{list} is empty or @code{default}, or if @option{--with-multilib-list}
 is not specified, then only the default variant of the libraries are built,
 where the default ABI is implied by the configured target triplet.
+
+@item nvptx-*
+The target libraries corresponding to the default value of the
+@option{-march} option are always built,
+@ifnothtml
+@pxref{nvptx-x-none,,host/target specific installation notes}.
+@end ifnothtml
+@ifhtml
+see
+@uref{specific.html#nvptx-x-none,,host/target specific installation notes}.
+@end ifhtml
+If @var{list} is empty, @samp{no}, or @option{--without-multilib-list}
+is specified, then no additional multilibs are built.
+Otherwise, @var{list} is a comma separated list specifying which
+multilibs to build.
+List items are either @samp{sm_SM}, or @samp{default}, which is a
+placeholder specifying a default set of multilibs: @samp{sm_52}.
+Any duplicates are filtered out.
+If @option{--with-multilib-list} is not specified, then
+@option{--with-multilib-list=default} is assumed.
+For @samp{sm_30}, @samp{sm_35} target libraries, @option{-mptx-3.1}
+sub-variants are additionally built.
 
 @item riscv*-*-*
 @var{list} is a single ABI name.  The target architecture must be either
@@ -1536,6 +1558,10 @@ Use big endian by default.  Provide a multilib for little endian.
 @item little,big
 Use little endian by default.  Provide a multilib for big endian.
 @end table
+
+@item --with-cmodel=@var{cmodel}
+Specify what code model to use by default.
+Currently only implemented for riscv*-*-*.
 
 @item --enable-threads
 Specify that the target
@@ -3974,9 +4000,8 @@ Instead of GNU Binutils, you will need to install LLVM 15, or later, and copy
 by specifying a @code{--with-multilib-list=} that does not list @code{gfx1100}
 and @code{gfx1103}.
 
-Use Newlib (4.3.0 or newer; 4.4.0 contains some improvements and git commits
-7dd4eb1db and ed50a50b9 (2024-04-04, post-4.4.0) fix device console output
-for GFX10 and GFX11 devices).
+Use Newlib (4.3.0 or newer; 4.4.0 contains some improvements and 4.5.0 fixes
+the device console output for GFX10 and GFX11 devices).
 
 To run the binaries, install the HSA Runtime from the
 @uref{https://rocm.docs.amd.com/,,ROCm Platform}, and use
@@ -4350,21 +4375,17 @@ Some versions of the AIX binder (linker) can fail with a relocation
 overflow severe error when the @option{-bbigtoc} option is used to link
 GCC-produced object files into an executable that overflows the TOC@.  A fix
 for APAR IX75823 (OVERFLOW DURING LINK WHEN USING GCC AND -BBIGTOC) is
-available from IBM Customer Support and from its
-@uref{https://techsupport.services.ibm.com/,,techsupport.services.ibm.com}
-website as PTF U455193.
+available as PTF U455193.
 
 The AIX 4.3.2.1 linker (bos.rte.bind_cmds Level 4.3.2.1) will dump core
 with a segmentation fault when invoked by any version of GCC@.  A fix for
-APAR IX87327 is available from IBM Customer Support and from its
-@uref{https://techsupport.services.ibm.com/,,techsupport.services.ibm.com}
-website as PTF U461879.  This fix is incorporated in AIX 4.3.3 and above.
+APAR IX87327 is available as PTF U461879.  This fix is incorporated in
+AIX 4.3.3 and above.
 
 The initial assembler shipped with AIX 4.3.0 generates incorrect object
 files.  A fix for APAR IX74254 (64BIT DISASSEMBLED OUTPUT FROM COMPILER FAILS
-TO ASSEMBLE/BIND) is available from IBM Customer Support and from its
-@uref{https://techsupport.services.ibm.com/,,techsupport.services.ibm.com}
-website as PTF U453956.  This fix is incorporated in AIX 4.3.1 and above.
+TO ASSEMBLE/BIND) is available as PTF U453956. This fix is incorporated in
+AIX 4.3.1 and above.
 
 AIX provides National Language Support (NLS)@.  Compilers and assemblers
 use NLS to support locale-specific representations of various data
@@ -4602,11 +4623,19 @@ Use the @option{--disable-sjlj-exceptions} and
 The @option{--with-arch} option may be specified to override the
 default value for the @option{-march} option, and to also build
 corresponding target libraries.
-The default is @option{--with-arch=sm_30}.
+The default is @option{--with-arch=sm_52}.
 
 For example, if @option{--with-arch=sm_70} is specified,
-@option{-march=sm_30} and @option{-march=sm_70} target libraries are
-built, and code generation defaults to @option{-march=sm_70}.
+code generation defaults to @option{-march=sm_70} and
+corresponding target libraries are built, in addition to those
+mandated by @option{--with-multilib-list}, if any,
+@ifnothtml
+@pxref{with-multilib-list,,@option{--with-multilib-list}}.
+@end ifnothtml
+@ifhtml
+see
+@uref{configure.html#with-multilib-list,,@option{--with-multilib-list}}.
+@end ifhtml
 
 @html
 <hr />

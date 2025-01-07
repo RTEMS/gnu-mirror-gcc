@@ -1,5 +1,5 @@
 /* Callgraph clones
-   Copyright (C) 2003-2024 Free Software Foundation, Inc.
+   Copyright (C) 2003-2025 Free Software Foundation, Inc.
    Contributed by Jan Hubicka
 
 This file is part of GCC.
@@ -401,6 +401,7 @@ cgraph_node::create_clone (tree new_decl, profile_count prof_count,
         count = count.combine_with_ipa_count (count.ipa () - prof_count.ipa ());
     }
   new_node->decl = new_decl;
+  new_node->order = order;
   new_node->register_symbol ();
   new_node->lto_file_data = lto_file_data;
   new_node->analyzed = analyzed;

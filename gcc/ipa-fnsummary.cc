@@ -1,5 +1,5 @@
 /* Function summary pass.
-   Copyright (C) 2003-2024 Free Software Foundation, Inc.
+   Copyright (C) 2003-2025 Free Software Foundation, Inc.
    Contributed by Jan Hubicka
 
 This file is part of GCC.
@@ -518,7 +518,7 @@ evaluate_conditions_for_known_args (struct cgraph_node *node,
 		      value_range op0 (TREE_TYPE (op->val[0]));
 		      range_op_handler handler (op->code);
 
-		      ipa_range_set_and_normalize (op0, op->val[0]);
+		      ipa_get_range_from_ip_invariant (op0, op->val[0], node);
 
 		      if (!handler
 			  || !res.supports_type_p (op->type)
@@ -537,7 +537,7 @@ evaluate_conditions_for_known_args (struct cgraph_node *node,
 		  value_range val_vr (TREE_TYPE (c->val));
 		  range_op_handler handler (c->code);
 
-		  ipa_range_set_and_normalize (val_vr, c->val);
+		  ipa_get_range_from_ip_invariant (val_vr, c->val, node);
 
 		  if (!handler
 		      || !val_vr.supports_type_p (TREE_TYPE (c->val))
@@ -5091,7 +5091,7 @@ ipa_fn_summary_write (void)
 	}
     }
   streamer_write_char_stream (ob->main_stream, 0);
-  produce_asm (ob, NULL);
+  produce_asm (ob);
   destroy_output_block (ob);
 
   ipa_prop_write_jump_functions ();

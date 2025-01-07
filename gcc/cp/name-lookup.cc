@@ -1,5 +1,5 @@
 /* Definitions for C++ name lookup routines.
-   Copyright (C) 2003-2024 Free Software Foundation, Inc.
+   Copyright (C) 2003-2025 Free Software Foundation, Inc.
    Contributed by Gabriel Dos Reis <gdr@integrable-solutions.net>
 
 This file is part of GCC.
@@ -6606,7 +6606,7 @@ pop_decl_namespace (void)
 /* Process a namespace-alias declaration.  */
 
 void
-do_namespace_alias (tree alias, tree name_space)
+do_namespace_alias (location_t loc, tree alias, tree name_space)
 {
   if (name_space == error_mark_node)
     return;
@@ -6616,11 +6616,11 @@ do_namespace_alias (tree alias, tree name_space)
   name_space = ORIGINAL_NAMESPACE (name_space);
 
   /* Build the alias.  */
-  alias = build_lang_decl (NAMESPACE_DECL, alias, void_type_node);
+  alias = build_lang_decl_loc (loc, NAMESPACE_DECL, alias, void_type_node);
   DECL_NAMESPACE_ALIAS (alias) = name_space;
   DECL_EXTERNAL (alias) = 1;
   DECL_CONTEXT (alias) = FROB_CONTEXT (current_scope ());
-  TREE_PUBLIC (alias) = TREE_PUBLIC (DECL_CONTEXT (alias));
+  TREE_PUBLIC (alias) = TREE_PUBLIC (CP_DECL_CONTEXT (alias));
 
   alias = pushdecl (alias);
 
@@ -6628,6 +6628,7 @@ do_namespace_alias (tree alias, tree name_space)
     return;
 
   set_originating_module (alias);
+  check_module_decl_linkage (alias);
 
   /* Emit debug info for namespace alias.  */
   if (!building_stmt_list_p ())
@@ -7349,6 +7350,9 @@ suggest_alternative_in_explicit_scope (location_t location, tree name,
 {
   /* Something went very wrong; don't suggest anything.  */
   if (name == error_mark_node)
+    return name_hint ();
+
+  if (TREE_CODE (scope) != NAMESPACE_DECL)
     return name_hint ();
 
   /* Resolve any namespace aliases.  */
@@ -8566,6 +8570,7 @@ pushtag (tree name, tree type, TAG_how how)
   /* Set type visibility now if this is a forward declaration.  */
   TREE_PUBLIC (decl) = 1;
   determine_visibility (decl);
+  check_module_decl_linkage (decl);
 
   return type;
 }
@@ -9118,6 +9123,11 @@ make_namespace_finish (tree ns, tree *slot, bool from_import = false)
 
   if (DECL_NAMESPACE_INLINE_P (ns) || !DECL_NAME (ns))
     emit_debug_info_using_namespace (ctx, ns, true);
+
+  /* An unnamed namespace implicitly has a using-directive inserted so
+     that its contents are usable in the surrounding context.  */
+  if (!DECL_NAMESPACE_INLINE_P (ns) && !DECL_NAME (ns))
+    add_using_namespace (NAMESPACE_LEVEL (ctx)->using_directives, ns);
 }
 
 /* Push into the scope of the NAME namespace.  If NAME is NULL_TREE,
@@ -9254,11 +9264,6 @@ push_namespace (tree name, bool make_inline)
 	      gcc_checking_assert (slot);
 	    }
 	  make_namespace_finish (ns, slot);
-
-	  /* Add the anon using-directive here, we don't do it in
-	     make_namespace_finish.  */
-	  if (!DECL_NAMESPACE_INLINE_P (ns) && !name)
-	    add_using_namespace (current_binding_level->using_directives, ns);
 	}
     }
 
@@ -9271,8 +9276,18 @@ push_namespace (tree name, bool make_inline)
 	  if (TREE_PUBLIC (ns))
 	    DECL_MODULE_EXPORT_P (ns) = true;
 	  else if (!header_module_p ())
-	    error_at (input_location,
-		      "exporting namespace with internal linkage");
+	    {
+	      if (name)
+		{
+		  auto_diagnostic_group d;
+		  error_at (input_location, "exporting namespace %qD with "
+			    "internal linkage", ns);
+		  inform (input_location, "%qD has internal linkage because "
+			  "it was declared in an unnamed namespace", ns);
+		}
+	      else
+		error_at (input_location, "exporting unnamed namespace");
+	    }
 	}
       if (module_purview_p ())
 	DECL_MODULE_PURVIEW_P (ns) = true;
