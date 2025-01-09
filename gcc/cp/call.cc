@@ -2116,6 +2116,9 @@ implicit_conversion (tree to, tree from, tree expr, bool c_cast_p,
 	}
     }
 
+  /* An argument should have gone through convert_from_reference.  */
+  gcc_checking_assert (!expr || !TYPE_REF_P (from));
+
   if (TYPE_REF_P (to))
     conv = reference_binding (to, from, expr, c_cast_p, flags, complain);
   else
@@ -8506,6 +8509,8 @@ convert_like_internal (conversion *convs, tree expr, tree fn, int argnum,
   if (convs->bad_p && !(complain & tf_error))
     return error_mark_node;
 
+  gcc_checking_assert (!TYPE_REF_P (TREE_TYPE (expr)));
+
   if (convs->bad_p
       && convs->kind != ck_user
       && convs->kind != ck_list
@@ -8581,6 +8586,7 @@ convert_like_internal (conversion *convs, tree expr, tree fn, int argnum,
 				   /*issue_conversion_warnings=*/false,
 				   /*c_cast_p=*/false, /*nested_p=*/true,
 				   complain);
+	      break;
 	    }
 	  else if (t->kind == ck_user || !t->bad_p)
 	    {
@@ -13692,6 +13698,14 @@ can_convert_arg (tree to, tree from, tree arg, int flags,
      we'll do the check again when we actually perform the
      conversion.  */
   push_deferring_access_checks (dk_deferred);
+
+  /* Handle callers like check_local_shadow forgetting to
+     convert_from_reference.  */
+  if (TYPE_REF_P (from) && arg)
+    {
+      arg = convert_from_reference (arg);
+      from = TREE_TYPE (arg);
+    }
 
   t  = implicit_conversion (to, from, arg, /*c_cast_p=*/false,
 			    flags, complain);

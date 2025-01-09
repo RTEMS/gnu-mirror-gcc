@@ -6591,7 +6591,17 @@ aarch64_split_sve_subreg_move (rtx dest, rtx ptrue, rtx src)
 static bool
 aarch64_function_ok_for_sibcall (tree, tree exp)
 {
-  if (crtl->abi->id () != expr_callee_abi (exp).id ())
+  auto from_abi = crtl->abi->id ();
+  auto to_abi = expr_callee_abi (exp).id ();
+
+  /* ARM_PCS_SVE preserves strictly more than ARM_PCS_SIMD, which in
+     turn preserves strictly more than the base PCS.  The callee must
+     preserve everything that the caller is required to preserve.  */
+  if (from_abi != to_abi && to_abi == ARM_PCS_SVE)
+    to_abi = ARM_PCS_SIMD;
+  if (from_abi != to_abi && to_abi == ARM_PCS_SIMD)
+    to_abi = ARM_PCS_AAPCS64;
+  if (from_abi != to_abi)
     return false;
 
   tree fntype = TREE_TYPE (TREE_TYPE (CALL_EXPR_FN (exp)));
@@ -11299,6 +11309,36 @@ aarch64_can_const_movi_rtx_p (rtx x, machine_mode mode)
   return aarch64_simd_valid_mov_imm (v_op);
 }
 
+/* Return TRUE if DST and SRC with mode MODE is a valid fp move.  */
+bool
+aarch64_valid_fp_move (rtx dst, rtx src, machine_mode mode)
+{
+  if (!TARGET_FLOAT)
+    return false;
+
+  if (aarch64_reg_or_fp_zero (src, mode))
+    return true;
+
+  if (!register_operand (dst, mode))
+    return false;
+
+  if (MEM_P (src))
+    return true;
+
+  if (!DECIMAL_FLOAT_MODE_P (mode))
+    {
+      if (aarch64_can_const_movi_rtx_p (src, mode)
+	  || aarch64_float_const_representable_p (src)
+	  || aarch64_float_const_zero_rtx_p (src))
+	return true;
+
+      /* Block FP immediates which are split during expand.  */
+      if (aarch64_float_const_rtx_p (src))
+	return false;
+    }
+
+  return can_create_pseudo_p ();
+}
 
 /* Return the fixed registers used for condition codes.  */
 

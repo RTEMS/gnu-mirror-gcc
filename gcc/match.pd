@@ -3115,6 +3115,7 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
        || POINTER_TYPE_P (itype))
       && wi::eq_p (wi::to_wide (int_cst), wi::max_value (itype))))))
 
+/* Saturation add for unsigned integer.  */
 (if (INTEGRAL_TYPE_P (type) && TYPE_UNSIGNED (type))
  (match (usadd_overflow_mask @0 @1)
   /* SAT_U_ADD = (X + Y) | -(X > (X + Y)).
@@ -3189,6 +3190,7 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 	 integer_minus_onep (realpart @2))
   (if (types_match (type, @0) && int_fits_type_p (@1, type)))))
 
+/* Saturation sub for unsigned integer.  */
 (if (INTEGRAL_TYPE_P (type) && TYPE_UNSIGNED (type))
  (match (unsigned_integer_sat_sub @0 @1)
   /* SAT_U_SUB = X > Y ? X - Y : 0  */
@@ -3278,6 +3280,7 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
     }
     (if (wi::eq_p (sum, wi::uhwi (0, precision))))))))
 
+/* Saturation truncate for unsigned integer.  */
 (if (INTEGRAL_TYPE_P (type) && TYPE_UNSIGNED (type))
  (match (unsigned_integer_sat_trunc @0)
   /* SAT_U_TRUNC = (NT)x | (NT)(-(X > (WT)(NT)(-1)))  */
@@ -3331,6 +3334,14 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
     (if (wi::eq_p (trunc_max, int_cst_1) && wi::eq_p (max, int_cst_2)))))))
 
 (if (INTEGRAL_TYPE_P (type) && !TYPE_UNSIGNED (type))
+ /* SAT_VAL = (-(T)(X < 0) ^ MAX)  */
+ (match (signed_integer_sat_val @0)
+  (bit_xor:c (nop_convert? (negate
+			    (nop_convert? (convert (lt @0 integer_zerop)))))
+	     max_value)))
+
+/* Saturation add for signed integer.  */
+(if (INTEGRAL_TYPE_P (type) && !TYPE_UNSIGNED (type))
  (match (signed_integer_sat_add @0 @1)
   /* T SUM = (T)((UT)X + (UT)Y)
      SAT_S_ADD = (X ^ SUM) & !(X ^ Y) < 0 ? (-(T)(X < 0) ^ MAX) : SUM  */
@@ -3338,7 +3349,7 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 							   (nop_convert @1))))
 			(bit_not (bit_xor:c @0 @1)))
 	     integer_zerop)
-	 (bit_xor:c (negate (convert (lt @0 integer_zerop))) max_value)
+	 (signed_integer_sat_val @0)
 	 @2))
  (match (signed_integer_sat_add @0 @1)
   /* T SUM = (T)((UT)X + (UT)Y)
@@ -3356,17 +3367,13 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 							 (nop_convert @1))))
 			integer_zerop)
 		    (ge (bit_xor:c @0 @1) integer_zerop))
-	 (bit_xor:c (nop_convert (negate (nop_convert (convert
-						      (lt @0 integer_zerop)))))
-		    max_value)
+	 (signed_integer_sat_val @0)
 	 @2))
  (match (signed_integer_sat_add @0 @1)
    /* SUM = .ADD_OVERFLOW (X, Y)
       SAT_S_ADD = IMAGPART_EXPR (SUM) != 0 ? (-(T)(X < 0) ^ MAX) : SUM  */
   (cond^ (ne (imagpart (IFN_ADD_OVERFLOW:c@2 @0 @1)) integer_zerop)
-	 (bit_xor:c (nop_convert?
-		     (negate (nop_convert? (convert (lt @0 integer_zerop)))))
-		    max_value)
+	 (signed_integer_sat_val @0)
 	 (realpart @2)))
  (match (signed_integer_sat_add @0 @1)
   /* T SUM = (T)((UT)X + (UT)Y)
@@ -3375,9 +3382,7 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 							 (nop_convert @1))))
 			integer_zerop)
 		    (bit_not (lt (bit_xor:c @0 @1) integer_zerop)))
-	 (bit_xor:c (nop_convert (negate (nop_convert (convert
-						       (lt @0 integer_zerop)))))
-		    max_value)
+	 (signed_integer_sat_val @0)
 	 @2))
  (match (signed_integer_sat_add @0 @1)
   /* T SUM = (T)((UT)X + (UT)IMM);
@@ -3386,10 +3391,79 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
   (cond^ (lt (bit_and:c (bit_xor:c @0 (nop_convert@2 (plus (nop_convert @0)
 							   INTEGER_CST@1)))
 			(bit_xor:c @0 INTEGER_CST@3)) integer_zerop)
-	 (bit_xor:c (negate (convert (lt @0 integer_zerop))) max_value)
+	 (signed_integer_sat_val @0)
 	 @2)
-  (if (wi::bit_and (wi::to_wide (@1), wi::to_wide (@3)) == 0)))
-)
+  (if (wi::bit_and (wi::to_wide (@1), wi::to_wide (@3)) == 0))))
+
+/* Saturation sub for signed integer.  */
+(if (INTEGRAL_TYPE_P (type) && !TYPE_UNSIGNED (type))
+ (match (signed_integer_sat_sub @0 @1)
+  /* T Z = (T)((UT)X - (UT)Y);
+     SAT_S_SUB = (X ^ Y) & (X ^ Z) < 0 ? (-(T)(X < 0) ^ MAX) : Z  */
+  (cond^ (lt (bit_and:c (bit_xor:c @0 @1)
+			(bit_xor @0 (nop_convert@2 (minus (nop_convert @0)
+							  (nop_convert @1)))))
+	     integer_zerop)
+	 (signed_integer_sat_val @0)
+	 @2))
+ (match (signed_integer_sat_sub @0 @1)
+  /* T Z = (T)((UT)X - (UT)Y);
+     SAT_S_SUB = (X ^ Y) & (X ^ Z) >= 0 ? Z : (-(T)(X < 0) ^ MAX)  */
+  (cond^ (ge (bit_and:c (bit_xor:c @0 @1)
+			(bit_xor @0 (nop_convert@2 (minus (nop_convert @0)
+							  (nop_convert @1)))))
+	     integer_zerop)
+	 @2
+	 (signed_integer_sat_val @0)))
+ (match (signed_integer_sat_sub @0 @1)
+  /* T Z = (T)((UT)X - (UT)Y);
+     SAT_S_SUB = (X ^ Y) < 0 & (X ^ Z) < 0 ? (-(T)(X < 0) ^ MAX) : Z  */
+  (cond^ (bit_and:c (lt (bit_xor @0 (nop_convert@2 (minus (nop_convert @0)
+							  (nop_convert @1))))
+			integer_zerop)
+		    (lt (bit_xor:c @0 @1) integer_zerop))
+	 (signed_integer_sat_val @0)
+	 @2))
+ (match (signed_integer_sat_sub @0 @1)
+  /* Z = .SUB_OVERFLOW (X, Y)
+     SAT_S_SUB = IMAGPART (Z) != 0 ? (-(T)(X < 0) ^ MAX) : REALPART (Z)  */
+  (cond^ (ne (imagpart (IFN_SUB_OVERFLOW@2 @0 @1)) integer_zerop)
+	 (signed_integer_sat_val @0)
+	 (realpart @2))
+  (if (types_match (type, @0, @1)))))
+
+/* Saturation truncate for signed integer.  */
+(if (INTEGRAL_TYPE_P (type) && !TYPE_UNSIGNED (type))
+ (match (signed_integer_sat_trunc @0)
+  /* SAT_S_TRUNC(X) = (unsigned)X + NT_MAX + 1  > Unsigned_MAX ? (NT)X  */
+  (cond^ (gt (plus:c (convert@4 @0) INTEGER_CST@1) INTEGER_CST@2)
+	 (bit_xor:c (nop_convert?
+		     (negate (nop_convert? (convert (lt @0 integer_zerop)))))
+		    INTEGER_CST@3)
+	 (convert @0))
+  (if (!TYPE_UNSIGNED (TREE_TYPE (@0)) && TYPE_UNSIGNED (TREE_TYPE (@4)))
+   (with
+    {
+     unsigned itype_prec = TYPE_PRECISION (TREE_TYPE (@0));
+     unsigned otype_prec = TYPE_PRECISION (type);
+     wide_int offset = wi::uhwi (HOST_WIDE_INT_1U << (otype_prec - 1),
+				 itype_prec); // Aka 128 for int8_t
+     wide_int limit_0 = wi::mask (otype_prec, false, itype_prec); // Aka 255
+     wide_int limit_1 = wi::uhwi ((HOST_WIDE_INT_1U << otype_prec) - 3,
+				  itype_prec); // Aka 253
+     wide_int limit_2 = wi::uhwi ((HOST_WIDE_INT_1U << otype_prec) - 2,
+				  itype_prec); // Aka 254
+     wide_int otype_max = wi::mask (otype_prec - 1, false, otype_prec);
+     wide_int itype_max = wi::mask (otype_prec - 1, false, itype_prec);
+     wide_int int_cst_1 = wi::to_wide (@1);
+     wide_int int_cst_2 = wi::to_wide (@2);
+     wide_int int_cst_3 = wi::to_wide (@3);
+    }
+    (if (((wi::eq_p (int_cst_1, offset) && wi::eq_p (int_cst_2, limit_0))
+	 || (wi::eq_p (int_cst_1, itype_max) && wi::eq_p (int_cst_2, limit_2))
+	 || (wi::eq_p (int_cst_1, offset) && wi::eq_p (int_cst_2, limit_2))
+	 || (wi::eq_p (int_cst_1, itype_max) && wi::eq_p (int_cst_2, limit_1)))
+	 && wi::eq_p (int_cst_3, otype_max)))))))
 
 /* The boundary condition for case 10: IMM = 1:
    SAT_U_SUB = X >= IMM ? (X - IMM) : 0.
@@ -3401,97 +3475,6 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
  (if (INTEGRAL_TYPE_P (type))
    (with { tree itype = TREE_TYPE (@2); }
     (convert (minus @2 (convert:itype @1))))))
-
-/* Signed saturation sub, case 1:
-   T minus = (T)((UT)X - (UT)Y);
-   SAT_S_SUB = (X ^ Y) & (X ^ minus) < 0 ? (-(T)(X < 0) ^ MAX) : minus;
-
-   The T and UT are type pair like T=int8_t, UT=uint8_t.  */
-(match (signed_integer_sat_sub @0 @1)
- (cond^ (lt (bit_and:c (bit_xor:c @0 @1)
-		       (bit_xor @0 (nop_convert@2 (minus (nop_convert @0)
-							 (nop_convert @1)))))
-	    integer_zerop)
-	(bit_xor:c (negate (convert (lt @0 integer_zerop))) max_value)
-	@2)
- (if (INTEGRAL_TYPE_P (type) && !TYPE_UNSIGNED (type))))
-
-/* Signed saturation sub, case 2:
-   T minus = (T)((UT)X - (UT)Y);
-   SAT_S_SUB = (X ^ Y) & (X ^ minus) < 0 ? (-(T)(X < 0) ^ MAX) : minus;
-
-   The T and UT are type pair like T=int8_t, UT=uint8_t.  */
-(match (signed_integer_sat_sub @0 @1)
- (cond^ (ge (bit_and:c (bit_xor:c @0 @1)
-		       (bit_xor @0 (nop_convert@2 (minus (nop_convert @0)
-							 (nop_convert @1)))))
-	    integer_zerop)
-	@2
-	(bit_xor:c (negate (convert (lt @0 integer_zerop))) max_value))
- (if (INTEGRAL_TYPE_P (type) && !TYPE_UNSIGNED (type))))
-
-/* Signed saturation sub, case 3:
-   Z = .SUB_OVERFLOW (X, Y)
-   SAT_S_SUB = IMAGPART_EXPR (Z) != 0 ? (-(T)(X < 0) ^ MAX) : REALPART_EXPR (Z);
-
-   The T and UT are type pair like T=int8_t, UT=uint8_t.  */
-(match (signed_integer_sat_sub @0 @1)
- (cond^ (ne (imagpart (IFN_SUB_OVERFLOW@2 @0 @1)) integer_zerop)
-	(bit_xor:c (nop_convert?
-		    (negate (nop_convert? (convert (lt @0 integer_zerop)))))
-		   max_value)
-	(realpart @2))
- (if (INTEGRAL_TYPE_P (type) && !TYPE_UNSIGNED (type)
-      && types_match (type, @0, @1))))
-
-/* Signed saturation sub, case 4:
-   T minus = (T)((UT)X - (UT)Y);
-   SAT_S_SUB = (X ^ Y) < 0 & (X ^ minus) < 0 ? (-(T)(X < 0) ^ MAX) : minus;
-
-   The T and UT are type pair like T=int8_t, UT=uint8_t.  */
-(match (signed_integer_sat_sub @0 @1)
- (cond^ (bit_and:c (lt (bit_xor @0 (nop_convert@2 (minus (nop_convert @0)
-						         (nop_convert @1))))
-		       integer_zerop)
-		   (lt (bit_xor:c @0 @1) integer_zerop))
-	(bit_xor:c (nop_convert (negate (nop_convert (convert
-						      (lt @0 integer_zerop)))))
-		   max_value)
-	@2)
- (if (INTEGRAL_TYPE_P (type) && !TYPE_UNSIGNED (type))))
-
-/* Signed saturation truncate, case 1 and case 2, sizeof (WT) > sizeof (NT).
-   SAT_S_TRUNC(X) = (unsigned)X + NT_MAX + 1  > Unsigned_MAX ? (NT)X.  */
-(match (signed_integer_sat_trunc @0)
- (cond^ (gt (plus:c (convert@4 @0) INTEGER_CST@1) INTEGER_CST@2)
-	(bit_xor:c (nop_convert?
-		    (negate (nop_convert? (convert (lt @0 integer_zerop)))))
-		   INTEGER_CST@3)
-	(convert @0))
- (if (INTEGRAL_TYPE_P (type) && !TYPE_UNSIGNED (type)
-      && !TYPE_UNSIGNED (TREE_TYPE (@0)) && TYPE_UNSIGNED (TREE_TYPE (@4)))
- (with
-  {
-   unsigned itype_prec = TYPE_PRECISION (TREE_TYPE (@0));
-   unsigned otype_prec = TYPE_PRECISION (type);
-   wide_int offset = wi::uhwi (HOST_WIDE_INT_1U << (otype_prec - 1),
-			       itype_prec); // Aka 128 for int8_t
-   wide_int limit_0 = wi::mask (otype_prec, false, itype_prec); // Aka 255
-   wide_int limit_1 = wi::uhwi ((HOST_WIDE_INT_1U << otype_prec) - 3,
-				itype_prec); // Aka 253
-   wide_int limit_2 = wi::uhwi ((HOST_WIDE_INT_1U << otype_prec) - 2,
-				itype_prec); // Aka 254
-   wide_int otype_max = wi::mask (otype_prec - 1, false, otype_prec);
-   wide_int itype_max = wi::mask (otype_prec - 1, false, itype_prec);
-   wide_int int_cst_1 = wi::to_wide (@1);
-   wide_int int_cst_2 = wi::to_wide (@2);
-   wide_int int_cst_3 = wi::to_wide (@3);
-  }
-  (if (((wi::eq_p (int_cst_1, offset) && wi::eq_p (int_cst_2, limit_0))
-	 || (wi::eq_p (int_cst_1, itype_max) && wi::eq_p (int_cst_2, limit_2))
-	 || (wi::eq_p (int_cst_1, offset) && wi::eq_p (int_cst_2, limit_2))
-	 || (wi::eq_p (int_cst_1, itype_max) && wi::eq_p (int_cst_2, limit_1)))
-       && wi::eq_p (int_cst_3, otype_max))))))
 
 /* x >  y  &&  x != XXX_MIN  -->  x > y
    x >  y  &&  x == XXX_MIN  -->  false . */
@@ -4967,14 +4950,32 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
 			    build_int_cst (TREE_TYPE (@1),
 					   element_precision (type)), @1); }))
 
-/* a rrotate (32-b) -> a lrotate b */
-/* a lrotate (32-b) -> a rrotate b */
+/* a rrotate (bitsize-b) -> a lrotate b */
+/* a lrotate (bitsize-b) -> a rrotate b */
+/* Only do the above when it is known that b != bitsize.
+   Otherwise canonicalize to a orotate (b & mask) when the subtraction
+   has single use and prec is a power of two.  */
 (for rotate (lrotate rrotate)
      orotate (rrotate lrotate)
  (simplify
-  (rotate @0 (minus INTEGER_CST@1 @2))
-   (if (element_precision (TREE_TYPE (@0)) == wi::to_wide (@1))
-     (orotate @0 @2))))
+  (rotate @0 (minus@3 INTEGER_CST@1 @2))
+  (with { auto prec = element_precision (TREE_TYPE (@0)); }
+   (if (prec == wi::to_wide (@1))
+    (switch
+     (if (expr_not_equal_to (@2, wi::uhwi (prec,
+					   TYPE_PRECISION (TREE_TYPE (@2)))))
+      (orotate @0 @2))
+     (if (single_use (@3)
+	  && pow2p_hwi (prec)
+	  /* Defer this case until last forwprop, so that VRP could be run and
+	     expr_not_equal_to had a chance to match.  Otherwise we'd do
+	     pretty much always just the second case.  */
+	  && cfun
+	  && ((cfun->curr_properties & PROP_last_full_fold) != 0
+	      || !flag_tree_vrp
+	      || optimize_debug))
+      (orotate @0
+	(bit_and @2 { build_int_cst (TREE_TYPE (@2), prec - 1); }))))))))
 
 /* Turn (a OP c1) OP c2 into a OP (c1+c2).  */
 (for op (lrotate rrotate rshift lshift)

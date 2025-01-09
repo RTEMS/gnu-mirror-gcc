@@ -4513,9 +4513,11 @@ cp_build_function_call_vec (tree function, vec<tree, va_gc> **params,
 
   /* Check for errors in format strings and inappropriately
      null parameters.  */
-  bool warned_p = check_function_arguments (input_location, fndecl, fntype,
-					    nargs, argarray, NULL,
-					    cp_comp_parm_types);
+  bool warned_p
+    = ((complain & tf_warning)
+       && check_function_arguments (input_location, fndecl, fntype,
+				    nargs, argarray, NULL,
+				    cp_comp_parm_types));
 
   ret = build_cxx_call (function, nargs, argarray, complain, orig_fndecl);
 
@@ -7149,11 +7151,11 @@ build_address (tree t)
 /* Return a NOP_EXPR converting EXPR to TYPE.  */
 
 tree
-build_nop (tree type, tree expr)
+build_nop (tree type, tree expr MEM_STAT_DECL)
 {
   if (type == error_mark_node || error_operand_p (expr))
     return expr;
-  return build1_loc (EXPR_LOCATION (expr), NOP_EXPR, type, expr);
+  return build1_loc (EXPR_LOCATION (expr), NOP_EXPR, type, expr PASS_MEM_STAT);
 }
 
 /* Take the address of ARG, whatever that means under C++ semantics.

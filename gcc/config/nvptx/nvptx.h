@@ -86,6 +86,13 @@
 #define Pmode (TARGET_ABI64 ? DImode : SImode)
 #define STACK_SIZE_MODE Pmode
 
+/* We always have to maintain the '-msoft-stack' pointer, but the PTX "native"
+   stack pointer is handled implicitly at function level.  */
+#define STACK_SAVEAREA_MODE(LEVEL) \
+  (TARGET_SOFT_STACK ? Pmode \
+   : (LEVEL == SAVE_FUNCTION ? VOIDmode \
+      : Pmode))
+
 #include "nvptx-gen.h"
 
 /* There are no 'TARGET_PTX_3_1' and smaller conditionals: our baseline is
@@ -95,6 +102,7 @@
 #define TARGET_PTX_6_0 (ptx_version_option >= PTX_VERSION_6_0)
 #define TARGET_PTX_6_3 (ptx_version_option >= PTX_VERSION_6_3)
 #define TARGET_PTX_7_0 (ptx_version_option >= PTX_VERSION_7_0)
+#define TARGET_PTX_7_3 (ptx_version_option >= PTX_VERSION_7_3)
 #define TARGET_PTX_7_8 (ptx_version_option >= PTX_VERSION_7_8)
 
 /* Registers.  Since ptx is a virtual target, we just define a few

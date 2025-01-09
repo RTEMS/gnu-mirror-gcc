@@ -1009,10 +1009,11 @@ proc check_effective_target_alloca {} {
       return 0
     }
     if { [istarget nvptx-*-*] } {
-	return [check_no_compiler_messages alloca assembly {
-	    void f (void*);
-	    void g (int n) { f (__builtin_alloca (n)); }
-	}]
+	if { ![check_effective_target_nvptx_softstack] } {
+	    return 0
+	} else {
+	    return 1
+	}
     }
     return 1
 }
@@ -1902,6 +1903,26 @@ proc check_effective_target_riscv_a { } {
        #error "Not __riscv_a"
        #endif
     }]
+}
+
+# Return 1 if the ABI is either ILP32E or ILP64E, 0 otherwise.
+# Cache the result.
+
+proc check_effective_target_riscv_abi_e { } {
+    # If current ISA is E, then only E ABI is supported.
+    if { [check_no_compiler_messages riscv_abi_e assembly {
+	#ifndef __riscv_e
+	#error "Not __riscv_e"
+	#endif
+	}] } {
+	    return 1
+	}
+
+    # E ABI can be chosen by both E and I base ISA variants.
+    #
+    # TODO - check for I ISA and E ABI combination.
+
+    return 0
 }
 
 # Return 1 if the target arch supports the atomic LRSC extension, 0 otherwise.
@@ -10031,6 +10052,7 @@ proc check_effective_target_sync_char_short { } {
 	     || ([istarget sparc*-*-*] && [check_effective_target_sparc_v9])
 	     || ([istarget arc*-*-*] && [check_effective_target_arc_atomic])
 	     || [istarget loongarch*-*-*]
+	     || [istarget riscv*-*-*]
 	     || [check_effective_target_mips_llsc] }}]
 }
 
@@ -14076,6 +14098,16 @@ proc check_nvptx_default_ptx_isa_version_at_least { major minor } {
 
 proc check_effective_target_nvptx_default_ptx_isa_version_at_least_6_0 { } {
     return [check_nvptx_default_ptx_isa_version_at_least 6 0]
+}
+
+# Return 1 if nvptx '-msoft-stack' is enabled.
+
+proc check_effective_target_nvptx_softstack { } {
+    return [check_no_compiler_messages nvptx_softstack assembly {
+	#if !defined(__nvptx_softstack__)
+	#error !__nvptx_softstack__
+	#endif
+    }]
 }
 
 # Return 1 if nvptx code with PTX ISA version major.minor or higher can be run.

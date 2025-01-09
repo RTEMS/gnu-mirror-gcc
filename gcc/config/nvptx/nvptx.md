@@ -1687,16 +1687,42 @@
   return nvptx_output_set_softstack (REGNO (operands[0]));
 })
 
+(define_expand "save_stack_block"
+  [(match_operand 0 "register_operand" "")
+   (match_operand 1 "register_operand" "")]
+  "!TARGET_SOFT_STACK"
+{
+  /* The concept of a '%stack' pointer doesn't apply like this for
+     PTX "native" stacks.  GCC however occasionally synthesizes
+     '__builtin_stack_save ()', '__builtin_stack_restore ()', and isn't able to
+     optimize them all away.  Just submit a dummy -- user code shouldn't be
+     able to observe this.  */
+  emit_move_insn (operands[0], GEN_INT (0xdeadbeef));
+  DONE;
+})
+
 (define_expand "restore_stack_block"
   [(match_operand 0 "register_operand" "")
    (match_operand 1 "register_operand" "")]
   ""
 {
-  if (TARGET_SOFT_STACK)
+  if (!TARGET_SOFT_STACK)
+    ; /* See 'save_stack_block'.  */
+  else
     {
       emit_move_insn (operands[0], operands[1]);
       emit_insn (gen_set_softstack (Pmode, operands[0]));
     }
+  DONE;
+})
+
+(define_expand "save_stack_function"
+  [(match_operand 0 "register_operand" "")
+   (match_operand 1 "register_operand" "")]
+  "!TARGET_SOFT_STACK"
+{
+  /* See 'STACK_SAVEAREA_MODE'.  */
+  gcc_checking_assert (operands[0] == 0);
   DONE;
 })
 
@@ -1705,6 +1731,9 @@
    (match_operand 1 "register_operand" "")]
   ""
 {
+  if (!TARGET_SOFT_STACK)
+    /* See 'STACK_SAVEAREA_MODE'.  */
+    gcc_checking_assert (operands[1] == 0);
   DONE;
 })
 

@@ -1,3 +1,267 @@
+2025-01-08  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	PR target/65181
+	* config/nvptx/nvptx.cc (default_ptx_version_option): For
+	'-march=sm_52' and higher, default at least to '-mptx=7.3'.
+	* doc/invoke.texi (Nvidia PTX Options): Update '-mptx=[...]'.
+
+2025-01-08  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* config/nvptx/nvptx-opts.h (enum ptx_version): Add
+	'PTX_VERSION_7_3'.
+	* config/nvptx/nvptx.cc (ptx_version_to_string)
+	(ptx_version_to_number): Adjust.
+	* config/nvptx/nvptx.h (TARGET_PTX_7_3): New.
+	* config/nvptx/nvptx.opt (Enum(ptx_version)): Add 'EnumValue'
+	'7.3' for 'PTX_VERSION_7_3'.
+	* doc/invoke.texi (Nvidia PTX Options): Document '-mptx=7.3'.
+
+2025-01-08  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* doc/sourcebuild.texi (Effective-Target Keywords): Document
+	'nvptx_softstack'.
+
+2025-01-08  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	PR target/65181
+	* config/nvptx/nvptx.h (STACK_SAVEAREA_MODE): '#define'.
+	* config/nvptx/nvptx.md [!TARGET_SOFT_STACK]
+	(save_stack_function): 'define_expand'.
+	(restore_stack_function): Handle '!TARGET_SOFT_STACK'.
+
+2025-01-08  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	PR target/65181
+	* config/nvptx/nvptx.md [!TARGET_SOFT_STACK] (save_stack_block):
+	'define_expand'.
+
+2025-01-08  Thiago Jung Bauermann  <thiago.bauermann@linaro.org>
+
+	* configure.ac: Fix check for HAVE_GAS_SHF_MERGE on Arm targets.
+	* configure: Regenerate.
+
+2025-01-08  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR target/107102
+	* config/aarch64/aarch64.cc (aarch64_function_ok_for_sibcall): Only
+	reject calls with different PCSes if the callee clobbers register
+	state that the caller must preserve.
+
+2025-01-08  Tobias Burnus  <tburnus@baylibre.com>
+
+	* gimplify.cc (gimplify_call_expr): Disable variant function's
+	append_args in 'omp dispatch' when invoking the variant directly
+	and not through the base function.
+
+2025-01-08  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* doc/invoke.texi (Nvidia PTX Options): Update '-march-map=sm_50'.
+
+2025-01-08  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/117979
+	* tree-ssa-dce.cc (make_forwarders_with_degenerate_phis):
+	Properly update the irreducible region state.
+
+2025-01-08  Jakub Jelinek  <jakub@redhat.com>
+
+	* dwarf2out.cc (break_out_comdat_types): Copy over
+	DW_AT_language_{name,version} if present.
+	(output_skeleton_debug_sections): Remove also
+	DW_AT_language_{name,version}.
+	(gen_compile_unit_die): For C17, C23, C2Y, C++17, C++20, C++23
+	and C++26 emit for -gdwarf-5 -gno-strict-dwarf also
+	DW_AT_language_{name,version} attributes.
+
+2025-01-08  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/118325
+	* tree-nested.cc (convert_nl_goto_reference): Assign proper
+	context to generated artificial label.
+
+2025-01-08  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/118269
+	* tree-vect-loop.cc (vect_create_epilog_for_reduction):
+	Use the correct stmt for the REDUC_GROUP_FIRST_ELEMENT lookup.
+
+2025-01-08  Christophe Lyon  <christophe.lyon@linaro.org>
+
+	PR target/118332
+	* config/arm/arm-mve-builtins.cc (wrap_type_in_struct): Use 'val'
+	instead of '__val'.
+
+2025-01-08  Haochen Jiang  <haochen.jiang@intel.com>
+
+	* config/i386/amxavx512intrin.h
+	(_tile_cvtrowps2pbf16h_internal): Rename to...
+	(_tile_cvtrowps2bf16h_internal): ...this.
+	(_tile_cvtrowps2pbf16hi_internal): Rename to...
+	(_tile_cvtrowps2bf16hi_internal): ...this.
+	(_tile_cvtrowps2pbf16l_internal): Rename to...
+	(_tile_cvtrowps2bf16l_internal): ...this.
+	(_tile_cvtrowps2pbf16li_internal): Rename to...
+	(_tile_cvtrowps2bf16li_internal): ...this.
+	(_tile_cvtrowps2pbf16h): Rename to...
+	(_tile_cvtrowps2bf16h): ...this.
+	(_tile_cvtrowps2pbf16hi): Rename to...
+	(_tile_cvtrowps2bf16hi): ...this.
+	(_tile_cvtrowps2pbf16l): Rename to...
+	(_tile_cvtrowps2bf16l): ...this.
+	(_tile_cvtrowps2pbf16li): Rename to...
+	(_tile_cvtrowps2bf16li): ...this.
+
+2025-01-08  Hongyu Wang  <hongyu.wang@intel.com>
+
+	* config/i386/i386.cc (ix86_noce_max_ifcvt_seq_cost): Adjust
+	cost with ix86_tune_cost->br_mispredict_scale.
+	* config/i386/i386.h (processor_costs): Add br_mispredict_scale.
+	* config/i386/x86-tune-costs.h: Add new br_mispredict_scale to
+	all processor_costs, in which icelake_cost/alderlake_cost
+	with value COSTS_N_INSNS (2) + 3 and other processor with value
+	COSTS_N_INSNS (2).
+
+2025-01-07  Pan Li  <pan2.li@intel.com>
+
+	* match.pd: Update comments for sat_* pattern.
+
+2025-01-07  Pan Li  <pan2.li@intel.com>
+
+	* match.pd: Extract saturated value match for signed SAT_*.
+
+2025-01-07  Pan Li  <pan2.li@intel.com>
+
+	* match.pd: Refactor sorts of signed SAT_TRUNC match patterns
+
+2025-01-07  Pan Li  <pan2.li@intel.com>
+
+	* match.pd: Refactor sorts of signed SAT_SUB match patterns.
+
+2025-01-07  Vineet Gupta  <vineetg@rivosinc.com>
+	    Pan Li  <pan2.li@intel.com>
+
+	PR target/117722
+	* config/riscv/autovec.md: Add uabd expander.
+
+2025-01-07  Tsung Chun Lin  <tclin914@gmail.com>
+
+	* expr.cc (widest_fixed_size_mode_for_size): Prefer scalar modes
+	over vector modes in more cases.
+
+2025-01-07  Andreas Schwab  <schwab@suse.de>
+
+	PR target/118137
+	* config/riscv/sync.md ("lrsc_atomic_exchange<mode>"): Apply mask
+	to shifted value.
+
+2025-01-07  Jeff Law  <jlaw@ventanamicro.com>
+
+	* config/ft32/ft32.md (casesi expander): Force operands[2] into
+	a register if it's not a suitable rimm operand.
+
+2025-01-07  Wilco Dijkstra  <wilco.dijkstra@arm.com>
+
+	* common/config/aarch64/aarch64-common.cc: Switch off fschedule_insns.
+
+2025-01-07  Wilco Dijkstra  <wilco.dijkstra@arm.com>
+
+	* config/aarch64/aarch64.md (movhf_aarch64): Use aarch64_valid_fp_move.
+	(movsf_aarch64): Likewise.
+	(movdf_aarch64): Likewise.
+	* config/aarch64/aarch64.cc (aarch64_valid_fp_move): New function.
+	* config/aarch64/aarch64-protos.h (aarch64_valid_fp_move): Likewise.
+
+2025-01-07  Paul-Antoine Arras  <parras@baylibre.com>
+
+	* gimplify.cc (gimplify_call_expr): Create variable
+	variant_substituted_p to control whether adjust_args applies.
+
+2025-01-07  Tamar Christina  <tamar.christina@arm.com>
+
+	PR tree-optimization/114932
+	* tree-ssa-loop-ivopts.cc (alloc_iv): Perform affine unsigned fold.
+
+2025-01-07  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	PR tree-optimization/105769
+	* cfgexpand.cc (vars_ssa_cache::operator()): For constructors
+	walk over the elements.
+
+2025-01-07  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	PR middle-end/117426
+	PR middle-end/111422
+	* cfgexpand.cc (struct vars_ssa_cache): New class.
+	(vars_ssa_cache::vars_ssa_cache): New constructor.
+	(vars_ssa_cache::~vars_ssa_cache): New deconstructor.
+	(vars_ssa_cache::create): New method.
+	(vars_ssa_cache::exists): New method.
+	(vars_ssa_cache::add_one): New method.
+	(vars_ssa_cache::update): New method.
+	(vars_ssa_cache::dump): New method.
+	(add_scope_conflicts_2): Factor mostly out to
+	vars_ssa_cache::operator(). New cache argument.
+	Walk the bitmap cache for the stack variables addresses.
+	(vars_ssa_cache::operator()): New method factored out from
+	add_scope_conflicts_2. Rewrite to be a full walk of all operands
+	and use a worklist.
+	(add_scope_conflicts_1): Add cache new argument for the addr cache.
+	Just call add_scope_conflicts_2 for the phi result instead of calling
+	for the uses and don't call walk_stmt_load_store_addr_ops for phis.
+	Update call to add_scope_conflicts_2 to add cache argument.
+	(add_scope_conflicts): Add cache argument and update calls to
+	add_scope_conflicts_1.
+
+2025-01-07  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	* cfgexpand.cc (INVALID_STACK_INDEX): New defined.
+	(decl_stack_index): New function.
+	(visit_op): Use decl_stack_index.
+	(visit_conflict): Likewise.
+	(add_scope_conflicts_1): Likewise.
+
+2025-01-07  Richard Biener  <rguenther@suse.de>
+
+	PR rtl-optimization/118298
+	* loop-unroll.cc (decide_unroll_constant_iterations): Honor
+	loop->unroll even if the loop is too big for heuristics.
+
+2025-01-07  Deng Jianbo  <dengjianbo@loongson.cn>
+
+	* config/loongarch/loongarch.cc (loongarch_output_move):
+	Optimize instructions for initializing fp regsiter to zero.
+
+2025-01-07  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/118010
+	* doc/gm2.texi (Compiler options): New option
+	-fm2-file-offset-bits=.
+
+2025-01-07  Jennifer Schmitz  <jschmitz@nvidia.com>
+
+	* tree-vect-stmts.cc (vectorizable_store): Extend the use of
+	n_adjacent_stores to also cover vec_to_scalar operations.
+	* config/aarch64/aarch64-tuning-flags.def: Remove
+	use_new_vector_costs as tuning option.
+	* config/aarch64/aarch64.cc (aarch64_use_new_vector_costs_p):
+	Remove.
+	(aarch64_vector_costs::add_stmt_cost): Remove use of
+	aarch64_use_new_vector_costs_p.
+	(aarch64_vector_costs::finish_cost): Remove use of
+	aarch64_use_new_vector_costs_p.
+	* config/aarch64/tuning_models/cortexx925.h: Remove
+	AARCH64_EXTRA_TUNE_USE_NEW_VECTOR_COSTS.
+	* config/aarch64/tuning_models/fujitsu_monaka.h: Likewise.
+	* config/aarch64/tuning_models/generic_armv8_a.h: Likewise.
+	* config/aarch64/tuning_models/generic_armv9_a.h: Likewise.
+	* config/aarch64/tuning_models/neoverse512tvb.h: Likewise.
+	* config/aarch64/tuning_models/neoversen2.h: Likewise.
+	* config/aarch64/tuning_models/neoversen3.h: Likewise.
+	* config/aarch64/tuning_models/neoversev1.h: Likewise.
+	* config/aarch64/tuning_models/neoversev2.h: Likewise.
+	* config/aarch64/tuning_models/neoversev3.h: Likewise.
+	* config/aarch64/tuning_models/neoversev3ae.h: Likewise.
+
 2025-01-06  Alexandre Oliva  <oliva@adacore.com>
 
 	PR middle-end/118006
