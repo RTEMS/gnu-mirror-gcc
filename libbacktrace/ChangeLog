@@ -1,3 +1,24 @@
+2024-12-14  Ian Lance Taylor  <iant@golang.org>
+
+	PR libbacktrace/117812
+	* zstdtest.c (test_large): Use 3 rather than ZSTD_CLEVEL_DEFAULT
+
+2024-11-29  Ian Lance Taylor  <iant@golang.org>
+
+	* fileline.c: Use WIN32_LEAN_AND_MEAN, not WIN32_MEAN_AND_LEAN.
+	* pecoff.c: Likewise.
+
+2024-10-25  Ian Lance Taylor  <iant@golang.org>
+
+	* macho.c (dwarf_section_names): Add __debug_addr and
+	__debug_line_str.
+
+2024-10-18  Ian Lance Taylor  <iant@golang.org>
+
+	* dwarf.c (resolve_unit_addrs_overlap_walk): New static function.
+	(resolve_unit_addrs_overlap): New static function.
+	(build_dwarf_data): Call resolve_unit_addrs_overlap.
+
 2024-08-05  Ian Lance Taylor  <iant@golang.org>
 
 	* configure.ac (ACX_PROG_CC_WARNING_OPTS): Add -Wpointer-arith.
@@ -2222,7 +2243,7 @@
 
 	* Initial implementation.
 
-Copyright (C) 2012-2024 Free Software Foundation, Inc.
+Copyright (C) 2012-2025 Free Software Foundation, Inc.
 
 Copying and distribution of this file, with or without modification,
 are permitted in any medium without royalty provided the copyright

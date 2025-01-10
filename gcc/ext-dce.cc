@@ -1,5 +1,5 @@
 /* RTL dead zero/sign extension (code) elimination.
-   Copyright (C) 2000-2022 Free Software Foundation, Inc.
+   Copyright (C) 2000-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -357,8 +357,8 @@ ext_dce_process_sets (rtx_insn *insn, rtx obj, bitmap live_tmp)
 		 Note that BIT need not be a power of two, consider a
 		 ZERO_EXTRACT destination.  */
 	      int start = (bit < 8 ? 0 : bit < 16 ? 1 : bit < 32 ? 2 : 3);
-	      int end = ((mask & ~0xffffffffULL) ? 4
-			 : (mask & 0xffff0000ULL) ? 3
+	      int end = ((mask & ~HOST_WIDE_INT_UC (0xffffffff)) ? 4
+			 : (mask & HOST_WIDE_INT_UC (0xffff0000)) ? 3
 			 : (mask & 0xff00) ? 2 : 1);
 	      bitmap_clear_range (livenow, 4 * rn + start, end - start);
 	    }
@@ -422,8 +422,13 @@ ext_dce_try_optimize_insn (rtx_insn *insn, rtx set)
     {
       int ok = validate_change (insn, &SET_SRC (set), new_pattern, false);
 
+      rtx x = SET_DEST (set);
+      while (SUBREG_P (x) || GET_CODE (x) == ZERO_EXTRACT)
+	x = XEXP (x, 0);
+
+      gcc_assert (REG_P (x));
       if (ok)
-	bitmap_set_bit (changed_pseudos, REGNO (SET_DEST (set)));
+	bitmap_set_bit (changed_pseudos, REGNO (x));
 
       if (dump_file)
 	{
@@ -473,7 +478,12 @@ binop_implies_op2_fully_live (rtx_code code)
    holds true, and bits set in MASK are live in the result.  Compute a
    mask of (potentially) live bits in the non-constant inputs.  In case of
    binop_implies_op2_fully_live (e.g. shifts), the computed mask may
-   exclusively pertain to the first operand.  */
+   exclusively pertain to the first operand.
+
+   This looks wrong as we may have some important operations embedded as
+   operands of another operation.  For example, we might have an extension
+   wrapping a shift.  It really feels like this needs to be recursing down
+   into operands much more often.  */
 
 unsigned HOST_WIDE_INT
 carry_backpropagate (unsigned HOST_WIDE_INT mask, enum rtx_code code, rtx x)
@@ -499,21 +509,21 @@ carry_backpropagate (unsigned HOST_WIDE_INT mask, enum rtx_code code, rtx x)
     case PLUS:
     case MINUS:
     case MULT:
-      return (2ULL << floor_log2 (mask)) - 1;
+      return (HOST_WIDE_INT_UC (2) << floor_log2 (mask)) - 1;
 
     /* We propagate for the shifted operand, but not the shift
        count.  The count is handled specially.  */
     case ASHIFT:
       if (CONST_INT_P (XEXP (x, 1))
-	  && known_lt (UINTVAL (XEXP (x, 1)), GET_MODE_BITSIZE (mode)))
-	return (HOST_WIDE_INT)mask >> INTVAL (XEXP (x, 1));
-      return (2ULL << floor_log2 (mask)) - 1;
+	  && UINTVAL (XEXP (x, 1)) < GET_MODE_BITSIZE (smode))
+	return (HOST_WIDE_INT) mask >> INTVAL (XEXP (x, 1));
+      return (HOST_WIDE_INT_UC (2) << floor_log2 (mask)) - 1;
 
     /* We propagate for the shifted operand, but not the shift
        count.  The count is handled specially.  */
     case LSHIFTRT:
       if (CONST_INT_P (XEXP (x, 1))
-	  && known_lt (UINTVAL (XEXP (x, 1)), GET_MODE_BITSIZE (mode)))
+	  && UINTVAL (XEXP (x, 1)) < GET_MODE_BITSIZE (smode))
 	return mmask & (mask << INTVAL (XEXP (x, 1)));
       return mmask;
 
@@ -521,12 +531,12 @@ carry_backpropagate (unsigned HOST_WIDE_INT mask, enum rtx_code code, rtx x)
        count.  The count is handled specially.  */
     case ASHIFTRT:
       if (CONST_INT_P (XEXP (x, 1))
-	  && known_lt (UINTVAL (XEXP (x, 1)), GET_MODE_BITSIZE (mode)))
+	  && UINTVAL (XEXP (x, 1)) < GET_MODE_BITSIZE (smode))
 	{
 	  HOST_WIDE_INT sign = 0;
 	  if (HOST_BITS_PER_WIDE_INT - clz_hwi (mask) + INTVAL (XEXP (x, 1))
-	      > GET_MODE_BITSIZE (mode).to_constant ())
-	    sign = 1ULL << (GET_MODE_BITSIZE (mode).to_constant () - 1);
+	      > GET_MODE_BITSIZE (smode))
+	    sign = HOST_WIDE_INT_1U << (GET_MODE_BITSIZE (smode) - 1);
 	  return sign | (mmask & (mask << INTVAL (XEXP (x, 1))));
 	}
       return mmask;
@@ -540,34 +550,51 @@ carry_backpropagate (unsigned HOST_WIDE_INT mask, enum rtx_code code, rtx x)
       if (CONST_INT_P (XEXP (x, 1)))
 	{
 	  if (pow2p_hwi (INTVAL (XEXP (x, 1))))
-	    return mmask & (mask << (GET_MODE_BITSIZE (mode).to_constant ()
+	    return mmask & (mask << (GET_MODE_BITSIZE (smode)
 				     - exact_log2 (INTVAL (XEXP (x, 1)))));
 
-	  int bits = (HOST_BITS_PER_WIDE_INT
-		      + GET_MODE_BITSIZE (mode).to_constant ()
+	  int bits = (HOST_BITS_PER_WIDE_INT + GET_MODE_BITSIZE (smode)
 		      - clz_hwi (mask) - ctz_hwi (INTVAL (XEXP (x, 1))));
-	  if (bits < GET_MODE_BITSIZE (mode).to_constant ())
-	    return (1ULL << bits) - 1;
+	  if (bits < GET_MODE_BITSIZE (smode))
+	    return (HOST_WIDE_INT_1U << bits) - 1;
 	}
       return mmask;
 
     case SIGN_EXTEND:
-      if (mask & ~GET_MODE_MASK (GET_MODE_INNER (GET_MODE (XEXP (x, 0)))))
-	mask |= 1ULL << (GET_MODE_BITSIZE (mode).to_constant () - 1);
-      return mask;
+      if (!GET_MODE_BITSIZE (GET_MODE (x)).is_constant ()
+	  || !GET_MODE_BITSIZE (GET_MODE (XEXP (x, 0))).is_constant ())
+	return -1;
+
+      /* We want the mode of the inner object.  We need to ensure its
+	 sign bit is on in MASK.  */
+      mode = GET_MODE_INNER (GET_MODE (XEXP (x, 0)));
+      if (mask & ~GET_MODE_MASK (mode))
+	mask |= HOST_WIDE_INT_1U << (GET_MODE_BITSIZE (mode).to_constant ()
+				     - 1);
+
+      /* Recurse into the operand.  */
+      return carry_backpropagate (mask, GET_CODE (XEXP (x, 0)), XEXP (x, 0));
+
+    case ZERO_EXTEND:
+      if (!GET_MODE_BITSIZE (GET_MODE (x)).is_constant ()
+	  || !GET_MODE_BITSIZE (GET_MODE (XEXP (x, 0))).is_constant ())
+	return -1;
+
+      /* Recurse into the operand.  */
+      return carry_backpropagate (mask, GET_CODE (XEXP (x, 0)), XEXP (x, 0));
 
     /* We propagate for the shifted operand, but not the shift
        count.  The count is handled specially.  */
     case SS_ASHIFT:
     case US_ASHIFT:
       if (CONST_INT_P (XEXP (x, 1))
-	  && UINTVAL (XEXP (x, 1)) < GET_MODE_BITSIZE (mode).to_constant ())
+	  && UINTVAL (XEXP (x, 1)) < GET_MODE_BITSIZE (smode))
 	{
-	  return ((mmask & ~((unsigned HOST_WIDE_INT)mmask
+	  return ((mmask & ~((unsigned HOST_WIDE_INT) mmask
 			     >> (INTVAL (XEXP (x, 1))
 				 + (XEXP (x, 1) != const0_rtx
 				    && code == SS_ASHIFT))))
-		  | ((HOST_WIDE_INT)mask >> INTVAL (XEXP (x, 1))));
+		  | ((HOST_WIDE_INT) mask >> INTVAL (XEXP (x, 1))));
 	}
       return mmask;
 
@@ -654,7 +681,8 @@ ext_dce_process_uses (rtx_insn *insn, rtx obj,
 	      unsigned HOST_WIDE_INT dst_mask = 0;
 	      HOST_WIDE_INT rn = REGNO (dst);
 	      unsigned HOST_WIDE_INT mask_array[]
-		= { 0xff, 0xff00, 0xffff0000ULL, -0x100000000ULL };
+		= { 0xff, 0xff00, HOST_WIDE_INT_UC (0xffff0000),
+		    -HOST_WIDE_INT_UC (0x100000000) };
 	      for (int i = 0; i < 4; i++)
 		if (bitmap_bit_p (live_tmp, 4 * rn + i))
 		  dst_mask |= mask_array[i];
@@ -664,6 +692,8 @@ ext_dce_process_uses (rtx_insn *insn, rtx obj,
 		 consider all the bits live.  */
 	      if (skipped_dest)
 		dst_mask = -1;
+
+	      dst_mask = carry_backpropagate (dst_mask, code, src);
 
 	      /* ??? Could also handle ZERO_EXTRACT / SIGN_EXTRACT
 		 of the source specially to improve optimization.  */
@@ -691,9 +721,7 @@ ext_dce_process_uses (rtx_insn *insn, rtx obj,
 
 	      /* Optimization is done at this point.  We just want to make
 		 sure everything that should get marked as live is marked
-		 from here onward.  Shouldn't the backpropagate step happen
-		 before optimization?  */
-	      dst_mask = carry_backpropagate (dst_mask, code, src);
+		 from here onward.  */
 
 	      /* We will handle the other operand of a binary operator
 		 at the bottom of the loop by resetting Y.  */
@@ -759,7 +787,7 @@ ext_dce_process_uses (rtx_insn *insn, rtx obj,
 			{
 			  dst_mask <<= bit;
 			  if (!dst_mask)
-			    dst_mask = -0x100000000ULL;
+			    dst_mask = -HOST_WIDE_INT_UC (0x100000000);
 			}
 		      y = SUBREG_REG (y);
 		    }
@@ -784,9 +812,9 @@ ext_dce_process_uses (rtx_insn *insn, rtx obj,
 			bitmap_set_bit (livenow, rn);
 		      if (tmp_mask & 0xff00)
 			bitmap_set_bit (livenow, rn + 1);
-		      if (tmp_mask & 0xffff0000ULL)
+		      if (tmp_mask & HOST_WIDE_INT_UC (0xffff0000))
 			bitmap_set_bit (livenow, rn + 2);
-		      if (tmp_mask & -0x100000000ULL)
+		      if (tmp_mask & -HOST_WIDE_INT_UC (0x100000000))
 			bitmap_set_bit (livenow, rn + 3);
 		    }
 		  else if (!CONSTANT_P (y))
@@ -841,7 +869,7 @@ ext_dce_process_uses (rtx_insn *insn, rtx obj,
 	    bitmap_set_bit (livenow, rn + 1);
 	  if (size > 16)
 	    bitmap_set_bit (livenow, rn + 2);
-	  if (size == 32)
+	  if (size >= 32)
 	    bitmap_set_bit (livenow, rn + 3);
 	  iter.skip_subrtxes ();
 	}
@@ -914,6 +942,38 @@ ext_dce_process_bb (basic_block bb)
     }
 }
 
+/* SUBREG_PROMOTED_VAR_P is set by the gimple->rtl optimizers and
+   is usually helpful.  However, in some cases setting the value when
+   it not strictly needed can cause this pass to miss optimizations.
+
+   Specifically consider (set (mem) (subreg (reg))).  If set in that
+   case it will cause more bit groups to be live for REG than would
+   be strictly necessary which in turn can inhibit extension removal.
+
+   So do a pass over the IL wiping the SUBREG_PROMOTED_VAR_P when it
+   is obviously not needed.  */
+
+static void
+maybe_clear_subreg_promoted_p (void)
+{
+  for (rtx_insn *insn = get_insns(); insn; insn = NEXT_INSN (insn))
+    {
+      if (!NONDEBUG_INSN_P (insn))
+	continue;
+
+      rtx set = single_set (insn);
+      if (!set)
+	continue;
+
+      /* There may be other cases where we should clear, but for
+	 now, this is the only known case where it causes problems.  */
+      if (MEM_P (SET_DEST (set)) && SUBREG_P (SET_SRC (set))
+        && GET_MODE (SET_DEST (set)) <= GET_MODE (SUBREG_REG (SET_SRC (set))))
+	SUBREG_PROMOTED_VAR_P (SET_SRC (set)) = 0;
+    }
+}
+
+
 /* We optimize away sign/zero extensions in this pass and replace
    them with SUBREGs indicating certain bits are don't cares.
 
@@ -983,7 +1043,7 @@ ext_dce_init (void)
   all_blocks = BITMAP_ALLOC (NULL);
   changed_pseudos = BITMAP_ALLOC (NULL);
 
-  for (int i = 0; i < n_basic_blocks_for_fn (cfun); i++)
+  for (int i = 0; i < last_basic_block_for_fn (cfun); i++)
     if (i != ENTRY_BLOCK && i != EXIT_BLOCK)
       bitmap_set_bit (all_blocks, i);
 
@@ -1050,6 +1110,9 @@ static bool ext_dce_rd_confluence_n (edge) { return true; }
 void
 ext_dce_execute (void)
 {
+  /* Some settings of SUBREG_PROMOTED_VAR_P are actively harmful
+     to this pass.  Clear it for those cases.  */
+  maybe_clear_subreg_promoted_p ();
   df_analyze ();
   ext_dce_init ();
 
@@ -1076,7 +1139,7 @@ const pass_data pass_data_ext_dce =
   RTL_PASS, /* type */
   "ext_dce", /* name */
   OPTGROUP_NONE, /* optinfo_flags */
-  TV_NONE, /* tv_id */
+  TV_EXT_DCE, /* tv_id */
   PROP_cfglayout, /* properties_required */
   0, /* properties_provided */
   0, /* properties_destroyed */

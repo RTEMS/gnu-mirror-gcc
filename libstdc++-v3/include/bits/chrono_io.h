@@ -30,7 +30,9 @@
 #ifndef _GLIBCXX_CHRONO_IO_H
 #define _GLIBCXX_CHRONO_IO_H 1
 
+#ifdef _GLIBCXX_SYSHDR
 #pragma GCC system_header
+#endif
 
 #if __cplusplus >= 202002L
 
@@ -148,7 +150,9 @@ namespace __detail
       __s.flags(__os.flags());
       __s.imbue(__os.getloc());
       __s.precision(__os.precision());
-      __s << __d.count();
+      // _GLIBCXX_RESOLVE_LIB_DEFECTS
+      // 4118. How should duration formatters format custom rep types?
+      __s << +__d.count();
       __detail::__fmt_units_suffix<period, _CharT>(_Out(__s));
       __os << std::move(__s).str();
       return __os;
@@ -633,8 +637,10 @@ namespace __format
 		case 'Q':
 		  // %Q The duration's numeric value.
 		  if constexpr (chrono::__is_duration_v<_Tp>)
+		    // _GLIBCXX_RESOLVE_LIB_DEFECTS
+		    // 4118. How should duration formatters format custom rep?
 		    __out = std::format_to(__print_sign(), _S_empty_spec,
-					   __t.count());
+					   +__t.count());
 		  else
 		    __throw_format_error("chrono format error: argument is "
 					 "not a duration");
@@ -887,17 +893,19 @@ namespace __format
 	  // %c  Locale's date and time representation.
 	  // %Ec Locale's alternate date and time representation.
 
+	  basic_string<_CharT> __fmt;
 	  auto __t = _S_floor_seconds(__tt);
 	  locale __loc = _M_locale(__ctx);
 	  const auto& __tp = use_facet<__timepunct<_CharT>>(__loc);
 	  const _CharT* __formats[2];
 	  __tp._M_date_time_formats(__formats);
-	  const _CharT* __rep = __formats[__mod];
-	  if (!*__rep)
-	    __rep = _GLIBCXX_WIDEN("%a %b %e %H:%M:%S %Y");
-	  basic_string<_CharT> __fmt(_S_empty_spec);
-	  __fmt.insert(1u, 1u, _S_colon);
-	  __fmt.insert(2u, __rep);
+	  if (*__formats[__mod]) [[likely]]
+	    {
+	      __fmt = _GLIBCXX_WIDEN("{:L}");
+	      __fmt.insert(3u, __formats[__mod]);
+	    }
+	  else
+	    __fmt = _GLIBCXX_WIDEN("{:L%a %b %e %T %Y}");
 	  return std::vformat_to(std::move(__out), __loc, __fmt,
 				 std::make_format_args<_FormatContext>(__t));
 	}
@@ -917,13 +925,14 @@ namespace __format
 
 	  chrono::year __y = _S_year(__t);
 
-	  if (__mod) [[unlikely]]
-	    {
-	      struct tm __tm{};
-	      __tm.tm_year = (int)__y - 1900;
-	      return _M_locale_fmt(std::move(__out), _M_locale(__ctx), __tm,
-				   __conv, __mod);
-	    }
+	  if (__mod && _M_spec._M_localized) [[unlikely]]
+	    if (auto __loc = __ctx.locale(); __loc != locale::classic())
+	      {
+		struct tm __tm{};
+		__tm.tm_year = (int)__y - 1900;
+		return _M_locale_fmt(std::move(__out), __loc, __tm,
+				     __conv, __mod);
+	      }
 
 	  basic_string<_CharT> __s;
 	  int __yi = (int)__y;
@@ -985,13 +994,14 @@ namespace __format
 	  chrono::day __d = _S_day(__t);
 	  unsigned __i = (unsigned)__d;
 
-	  if (__mod) [[unlikely]]
-	    {
-	      struct tm __tm{};
-	      __tm.tm_mday = __i;
-	      return _M_locale_fmt(std::move(__out), _M_locale(__ctx), __tm,
-				   (char)__conv, 'O');
-	    }
+	  if (__mod && _M_spec._M_localized) [[unlikely]]
+	    if (auto __loc = __ctx.locale(); __loc != locale::classic())
+	      {
+		struct tm __tm{};
+		__tm.tm_mday = __i;
+		return _M_locale_fmt(std::move(__out), __loc, __tm,
+				     (char)__conv, 'O');
+	      }
 
 	  auto __sv = _S_two_digits(__i);
 	  _CharT __buf[2];
@@ -1051,13 +1061,14 @@ namespace __format
 	  const auto __hms = _S_hms(__t);
 	  int __i = __hms.hours().count();
 
-	  if (__mod) [[unlikely]]
-	    {
-	      struct tm __tm{};
-	      __tm.tm_hour = __i;
-	      return _M_locale_fmt(std::move(__out), _M_locale(__ctx), __tm,
-				   (char)__conv, 'O');
-	    }
+	  if (__mod && _M_spec._M_localized) [[unlikely]]
+	    if (auto __loc = __ctx.locale(); __loc != locale::classic())
+	      {
+		struct tm __tm{};
+		__tm.tm_hour = __i;
+		return _M_locale_fmt(std::move(__out), __loc, __tm,
+				     (char)__conv, 'O');
+	      }
 
 	  if (__conv == _CharT('I'))
 	    {
@@ -1109,13 +1120,14 @@ namespace __format
 	  auto __m = _S_month(__t);
 	  auto __i = (unsigned)__m;
 
-	  if (__mod) [[unlikely]] // %Om
-	    {
-	      struct tm __tm{};
-	      __tm.tm_mon = __i - 1;
-	      return _M_locale_fmt(std::move(__out), _M_locale(__ctx), __tm,
-				   'm', 'O');
-	    }
+	  if (__mod && _M_spec._M_localized) [[unlikely]] // %Om
+	    if (auto __loc = __ctx.locale(); __loc != locale::classic())
+	      {
+		struct tm __tm{};
+		__tm.tm_mon = __i - 1;
+		return _M_locale_fmt(std::move(__out), __loc, __tm,
+				     'm', 'O');
+	      }
 
 	  return __format::__write(std::move(__out), _S_two_digits(__i));
 	}
@@ -1131,13 +1143,14 @@ namespace __format
 	  auto __m = _S_hms(__t).minutes();
 	  auto __i = __m.count();
 
-	  if (__mod) [[unlikely]] // %OM
-	    {
-	      struct tm __tm{};
-	      __tm.tm_min = __i;
-	      return _M_locale_fmt(std::move(__out), _M_locale(__ctx), __tm,
-				   'M', 'O');
-	    }
+	  if (__mod && _M_spec._M_localized) [[unlikely]] // %OM
+	    if (auto __loc = __ctx.locale(); __loc != locale::classic())
+	      {
+		struct tm __tm{};
+		__tm.tm_min = __i;
+		return _M_locale_fmt(std::move(__out), __loc, __tm,
+				     'M', 'O');
+	      }
 
 	  return __format::__write(std::move(__out), _S_two_digits(__i));
 	}
@@ -1226,22 +1239,30 @@ namespace __format
 	  // %S  Seconds as a decimal number.
 	  // %OS The locale's alternative representation.
 	  auto __hms = _S_hms(__t);
+	  auto __s = __hms.seconds();
 
 	  if (__mod) [[unlikely]] // %OS
 	    {
-	      struct tm __tm{};
-	      __tm.tm_sec = (int)__hms.seconds().count();
-	      return _M_locale_fmt(std::move(__out), _M_locale(__ctx), __tm,
-				   'S', 'O');
+	      if (_M_spec._M_localized)
+		if (auto __loc = __ctx.locale(); __loc != locale::classic())
+		  {
+		    struct tm __tm{};
+		    __tm.tm_sec = (int)__s.count();
+		    return _M_locale_fmt(std::move(__out), __loc, __tm,
+					 'S', 'O');
+		  }
+
+	      // %OS formats don't include subseconds, so just format that:
+	      return __format::__write(std::move(__out),
+				       _S_two_digits(__s.count()));
 	    }
 
 	  if constexpr (__hms.fractional_width == 0)
 	    __out = __format::__write(std::move(__out),
-				      _S_two_digits(__hms.seconds().count()));
+				      _S_two_digits(__s.count()));
 	  else
 	    {
 	      locale __loc = _M_locale(__ctx);
-	      auto __s = __hms.seconds();
 	      auto __ss = __hms.subseconds();
 	      using rep = typename decltype(__ss)::rep;
 	      if constexpr (is_floating_point_v<rep>)
@@ -1291,13 +1312,14 @@ namespace __format
 
 	  chrono::weekday __wd = _S_weekday(__t);
 
-	  if (__mod) [[unlikely]]
-	    {
-	      struct tm __tm{};
-	      __tm.tm_wday = __wd.c_encoding();
-	      return _M_locale_fmt(std::move(__out), _M_locale(__ctx), __tm,
-				   (char)__conv, 'O');
-	    }
+	  if (__mod && _M_spec._M_localized) [[unlikely]]
+	    if (auto __loc = __ctx.locale(); __loc != locale::classic())
+	      {
+		struct tm __tm{};
+		__tm.tm_wday = __wd.c_encoding();
+		return _M_locale_fmt(std::move(__out), __loc, __tm,
+				     (char)__conv, 'O');
+	      }
 
 	  unsigned __wdi = __conv == 'u' ? __wd.iso_encoding()
 					 : __wd.c_encoding();
@@ -1320,17 +1342,18 @@ namespace __format
 	  auto __d = _S_days(__t);
 	  using _TDays = decltype(__d); // Either sys_days or local_days.
 
-	  if (__mod) [[unlikely]]
-	    {
-	      const year_month_day __ymd(__d);
-	      const year __y = __ymd.year();
-	      struct tm __tm{};
-	      __tm.tm_year = (int)__y - 1900;
-	      __tm.tm_yday = (__d - _TDays(__y/January/1)).count();
-	      __tm.tm_wday = weekday(__d).c_encoding();
-	      return _M_locale_fmt(std::move(__out), _M_locale(__ctx), __tm,
-				   (char)__conv, 'O');
-	    }
+	  if (__mod && _M_spec._M_localized) [[unlikely]]
+	    if (auto __loc = __ctx.locale(); __loc != locale::classic())
+	      {
+		const year_month_day __ymd(__d);
+		const year __y = __ymd.year();
+		struct tm __tm{};
+		__tm.tm_year = (int)__y - 1900;
+		__tm.tm_yday = (__d - _TDays(__y/January/1)).count();
+		__tm.tm_wday = weekday(__d).c_encoding();
+		return _M_locale_fmt(std::move(__out), __loc, __tm,
+				     (char)__conv, 'O');
+	      }
 
 	  _TDays __first; // First day of week 1.
 	  if (__conv == 'V') // W01 begins on Monday before first Thursday.
@@ -1686,6 +1709,7 @@ namespace __format
 /// @endcond
 
   template<typename _Rep, typename _Period, typename _CharT>
+    requires __format::__formattable_impl<_Rep, _CharT>
     struct formatter<chrono::duration<_Rep, _Period>, _CharT>
     {
       constexpr typename basic_format_parse_context<_CharT>::iterator
@@ -1705,8 +1729,20 @@ namespace __format
 	       basic_format_context<_Out, _CharT>& __fc) const
 	{
 	  if constexpr (numeric_limits<_Rep>::is_signed)
-	    if (__d < __d.zero())
-	      return _M_f._M_format(-__d, __fc, true);
+	    if (__d < __d.zero()) [[unlikely]]
+	      {
+		if constexpr (is_integral_v<_Rep>)
+		  {
+		    // -d is undefined for the most negative integer.
+		    // Convert duration to corresponding unsigned rep.
+		    using _URep = make_unsigned_t<_Rep>;
+		    auto __ucnt = -static_cast<_URep>(__d.count());
+		    auto __ud = chrono::duration<_URep, _Period>(__ucnt);
+		    return _M_f._M_format(__ud, __fc, true);
+		  }
+		else
+		  return _M_f._M_format(-__d, __fc, true);
+	      }
 	  return _M_f._M_format(__d, __fc, false);
 	}
 
@@ -2378,6 +2414,56 @@ namespace __detail
   template<typename _Duration>
     using _Parser_t = _Parser<common_type_t<_Duration, seconds>>;
 
+  template<typename _Duration>
+    consteval bool
+    __use_floor()
+    {
+      if constexpr (_Duration::period::den == 1)
+	{
+	  switch (_Duration::period::num)
+	  {
+	    case minutes::period::num:
+	    case hours::period::num:
+	    case days::period::num:
+	    case weeks::period::num:
+	    case years::period::num:
+	      return true;
+	  }
+	}
+      return false;
+    }
+
+  // A "do the right thing" rounding function for duration and time_point
+  // values extracted by from_stream. When treat_as_floating_point is true
+  // we don't want to do anything, just a straightforward conversion.
+  // When the destination type has a period of minutes, hours, days, weeks,
+  // or years, we use chrono::floor to truncate towards negative infinity.
+  // This ensures that an extracted timestamp such as 2024-09-05 13:00:00
+  // will produce 2024-09-05 when rounded to days, rather than rounding up
+  // to 2024-09-06 (a different day).
+  // Otherwise, use chrono::round to get the nearest value representable
+  // in the destination type.
+  template<typename _ToDur, typename _Tp>
+    constexpr auto
+    __round(const _Tp& __t)
+    {
+      if constexpr (__is_duration_v<_Tp>)
+	{
+	  if constexpr (treat_as_floating_point_v<typename _Tp::rep>)
+	    return chrono::duration_cast<_ToDur>(__t);
+	  else if constexpr (__detail::__use_floor<_ToDur>())
+	    return chrono::floor<_ToDur>(__t);
+	  else
+	    return chrono::round<_ToDur>(__t);
+	}
+      else
+	{
+	  static_assert(__is_time_point_v<_Tp>);
+	  using _Tpt = time_point<typename _Tp::clock, _ToDur>;
+	  return _Tpt(__detail::__round<_ToDur>(__t.time_since_epoch()));
+	}
+    }
+
 } // namespace __detail
 /// @endcond
 
@@ -2392,7 +2478,7 @@ namespace __detail
       auto __need = __format::_ChronoParts::_TimeOfDay;
       __detail::_Parser_t<duration<_Rep, _Period>> __p(__need);
       if (__p(__is, __fmt, __abbrev, __offset))
-	__d = chrono::duration_cast<duration<_Rep, _Period>>(__p._M_time);
+	__d = __detail::__round<duration<_Rep, _Period>>(__p._M_time);
       return __is;
     }
 
@@ -2853,7 +2939,7 @@ namespace __detail
 	  else
 	    {
 	      auto __st = __p._M_sys_days + __p._M_time - *__offset;
-	      __tp = chrono::time_point_cast<_Duration>(__st);
+	      __tp = __detail::__round<_Duration>(__st);
 	    }
 	}
       return __is;
@@ -2889,7 +2975,7 @@ namespace __detail
 	  // "23:59:60" to correctly produce a time within a leap second.
 	  auto __ut = utc_clock::from_sys(__p._M_sys_days) + __p._M_time
 			- *__offset;
-	  __tp = chrono::time_point_cast<_Duration>(__ut);
+	  __tp = __detail::__round<_Duration>(__ut);
 	}
       return __is;
     }
@@ -2924,9 +3010,10 @@ namespace __detail
 	    __is.setstate(ios_base::failbit);
 	  else
 	    {
-	      auto __st = __p._M_sys_days + __p._M_time - *__offset;
-	      auto __tt = tai_clock::from_utc(utc_clock::from_sys(__st));
-	      __tp = chrono::time_point_cast<_Duration>(__tt);
+	      constexpr sys_days __epoch(-days(4383)); // 1958y/1/1
+	      auto __d = __p._M_sys_days - __epoch + __p._M_time - *__offset;
+	      tai_time<common_type_t<_Duration, seconds>> __tt(__d);
+	      __tp = __detail::__round<_Duration>(__tt);
 	    }
 	}
       return __is;
@@ -2962,9 +3049,10 @@ namespace __detail
 	    __is.setstate(ios_base::failbit);
 	  else
 	    {
-	      auto __st = __p._M_sys_days + __p._M_time - *__offset;
-	      auto __tt = gps_clock::from_utc(utc_clock::from_sys(__st));
-	      __tp = chrono::time_point_cast<_Duration>(__tt);
+	      constexpr sys_days __epoch(days(3657)); // 1980y/1/Sunday[1]
+	      auto __d = __p._M_sys_days - __epoch + __p._M_time - *__offset;
+	      gps_time<common_type_t<_Duration, seconds>> __gt(__d);
+	      __tp = __detail::__round<_Duration>(__gt);
 	    }
 	}
       return __is;
@@ -2989,7 +3077,7 @@ namespace __detail
     {
       sys_time<_Duration> __st;
       if (chrono::from_stream(__is, __fmt, __st, __abbrev, __offset))
-	__tp = chrono::time_point_cast<_Duration>(file_clock::from_sys(__st));
+	__tp = __detail::__round<_Duration>(file_clock::from_sys(__st));
       return __is;
     }
 
@@ -3018,7 +3106,7 @@ namespace __detail
 	{
 	  days __d = __p._M_sys_days.time_since_epoch();
 	  auto __t = local_days(__d) + __p._M_time; // ignore offset
-	  __tp = chrono::time_point_cast<_Duration>(__t);
+	  __tp = __detail::__round<_Duration>(__t);
 	}
       return __is;
     }

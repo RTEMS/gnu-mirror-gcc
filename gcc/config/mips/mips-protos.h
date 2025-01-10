@@ -1,5 +1,5 @@
 /* Prototypes of target machine for GNU compiler.  MIPS version.
-   Copyright (C) 1989-2024 Free Software Foundation, Inc.
+   Copyright (C) 1989-2025 Free Software Foundation, Inc.
    Contributed by A. Lichnewsky (lich@inria.inria.fr).
    Changed by Michael Meissner	(meissner@osf.org).
    64-bit r4000 support by Ian Lance Taylor (ian@cygnus.com) and
@@ -352,6 +352,7 @@ extern void mips_expand_atomic_qihi (union mips_gen_fn_ptrs,
 extern void mips_expand_vector_init (rtx, rtx);
 extern void mips_expand_vec_unpack (rtx op[2], bool, bool);
 extern void mips_expand_vec_reduc (rtx, rtx, rtx (*)(rtx, rtx, rtx));
+extern void mips_expand_msa_reduc (rtx (*)(rtx, rtx, rtx), rtx, rtx);
 extern void mips_expand_vec_minmax (rtx, rtx, rtx,
 				    rtx (*) (rtx, rtx, rtx), bool);
 

@@ -1,6 +1,6 @@
 /* Plugin for AMD GCN execution.
 
-   Copyright (C) 2013-2024 Free Software Foundation, Inc.
+   Copyright (C) 2013-2025 Free Software Foundation, Inc.
 
    Contributed by Mentor Embedded
 
@@ -379,22 +379,15 @@ struct gcn_image_desc
   const unsigned global_variable_count;
 };
 
-/* This enum mirrors the corresponding LLVM enum's values for all ISAs that we
-   support.
-   See https://llvm.org/docs/AMDGPUUsage.html#amdgpu-ef-amdgpu-mach-table */
+/* Enum values corresponding to the the ELF architecture codes.
+   Only 'special' values are actually referenced in this file, but having them
+   all may aid debugging.  */
 
 typedef enum {
   EF_AMDGPU_MACH_UNSUPPORTED = -1,
-  EF_AMDGPU_MACH_AMDGCN_GFX803 = 0x02a,
-  EF_AMDGPU_MACH_AMDGCN_GFX900 = 0x02c,
-  EF_AMDGPU_MACH_AMDGCN_GFX906 = 0x02f,
-  EF_AMDGPU_MACH_AMDGCN_GFX908 = 0x030,
-  EF_AMDGPU_MACH_AMDGCN_GFX90a = 0x03f,
-  EF_AMDGPU_MACH_AMDGCN_GFX90c = 0x032,
-  EF_AMDGPU_MACH_AMDGCN_GFX1030 = 0x036,
-  EF_AMDGPU_MACH_AMDGCN_GFX1036 = 0x045,
-  EF_AMDGPU_MACH_AMDGCN_GFX1100 = 0x041,
-  EF_AMDGPU_MACH_AMDGCN_GFX1103 = 0x044
+#define GCN_DEVICE(name, NAME, ELF, ...) \
+  EF_AMDGPU_MACH_AMDGCN_ ## NAME = ELF,
+#include "../../gcc/config/gcn/gcn-devices.def"
 } EF_AMDGPU_MACH;
 
 const static int EF_AMDGPU_MACH_MASK = 0x000000ff;
@@ -1675,62 +1668,18 @@ elf_gcn_isa_field (Elf64_Ehdr *image)
   return image->e_flags & EF_AMDGPU_MACH_MASK;
 }
 
-const static char *gcn_gfx803_s = "gfx803";
-const static char *gcn_gfx900_s = "gfx900";
-const static char *gcn_gfx906_s = "gfx906";
-const static char *gcn_gfx908_s = "gfx908";
-const static char *gcn_gfx90a_s = "gfx90a";
-const static char *gcn_gfx90c_s = "gfx90c";
-const static char *gcn_gfx1030_s = "gfx1030";
-const static char *gcn_gfx1036_s = "gfx1036";
-const static char *gcn_gfx1100_s = "gfx1100";
-const static char *gcn_gfx1103_s = "gfx1103";
-const static int gcn_isa_name_len = 7;
-
 /* Returns the name that the HSA runtime uses for the ISA or NULL if we do not
    support the ISA. */
 
 static const char*
-isa_hsa_name (int isa) {
+isa_name (int isa) {
   switch(isa)
     {
-    case EF_AMDGPU_MACH_AMDGCN_GFX803:
-      return gcn_gfx803_s;
-    case EF_AMDGPU_MACH_AMDGCN_GFX900:
-      return gcn_gfx900_s;
-    case EF_AMDGPU_MACH_AMDGCN_GFX906:
-      return gcn_gfx906_s;
-    case EF_AMDGPU_MACH_AMDGCN_GFX908:
-      return gcn_gfx908_s;
-    case EF_AMDGPU_MACH_AMDGCN_GFX90a:
-      return gcn_gfx90a_s;
-    case EF_AMDGPU_MACH_AMDGCN_GFX90c:
-      return gcn_gfx90c_s;
-    case EF_AMDGPU_MACH_AMDGCN_GFX1030:
-      return gcn_gfx1030_s;
-    case EF_AMDGPU_MACH_AMDGCN_GFX1036:
-      return gcn_gfx1036_s;
-    case EF_AMDGPU_MACH_AMDGCN_GFX1100:
-      return gcn_gfx1100_s;
-    case EF_AMDGPU_MACH_AMDGCN_GFX1103:
-      return gcn_gfx1103_s;
+#define GCN_DEVICE(name, NAME, ELF, ...) \
+    case ELF: return #name;
+#include "../../gcc/config/gcn/gcn-devices.def"
     }
   return NULL;
-}
-
-/* Returns the user-facing name that GCC uses to identify the architecture (e.g.
-   with -march) or NULL if we do not support the ISA.
-   Keep in sync with /gcc/config/gcn/gcn.{c,opt}.  */
-
-static const char*
-isa_gcc_name (int isa) {
-  switch(isa)
-    {
-    case EF_AMDGPU_MACH_AMDGCN_GFX803:
-      return "fiji";
-    default:
-      return isa_hsa_name (isa);
-    }
 }
 
 /* Returns the code which is used in the GCN object code to identify the ISA with
@@ -1738,35 +1687,9 @@ isa_gcc_name (int isa) {
 
 static gcn_isa
 isa_code(const char *isa) {
-  if (!strncmp (isa, gcn_gfx803_s, gcn_isa_name_len))
-    return EF_AMDGPU_MACH_AMDGCN_GFX803;
-
-  if (!strncmp (isa, gcn_gfx900_s, gcn_isa_name_len))
-    return EF_AMDGPU_MACH_AMDGCN_GFX900;
-
-  if (!strncmp (isa, gcn_gfx906_s, gcn_isa_name_len))
-    return EF_AMDGPU_MACH_AMDGCN_GFX906;
-
-  if (!strncmp (isa, gcn_gfx908_s, gcn_isa_name_len))
-    return EF_AMDGPU_MACH_AMDGCN_GFX908;
-
-  if (!strncmp (isa, gcn_gfx90a_s, gcn_isa_name_len))
-    return EF_AMDGPU_MACH_AMDGCN_GFX90a;
-
-  if (!strncmp (isa, gcn_gfx90c_s, gcn_isa_name_len))
-    return EF_AMDGPU_MACH_AMDGCN_GFX90c;
-
-  if (!strncmp (isa, gcn_gfx1030_s, gcn_isa_name_len))
-    return EF_AMDGPU_MACH_AMDGCN_GFX1030;
-
-  if (!strncmp (isa, gcn_gfx1036_s, gcn_isa_name_len))
-    return EF_AMDGPU_MACH_AMDGCN_GFX1036;
-
-  if (!strncmp (isa, gcn_gfx1100_s, gcn_isa_name_len))
-    return EF_AMDGPU_MACH_AMDGCN_GFX1100;
-
-  if (!strncmp (isa, gcn_gfx1103_s, gcn_isa_name_len))
-    return EF_AMDGPU_MACH_AMDGCN_GFX1103;
+#define GCN_DEVICE(name, NAME, ELF, ...) \
+  if (!strcmp (isa, #name)) return ELF;
+#include "../../gcc/config/gcn/gcn-devices.def"
 
   return EF_AMDGPU_MACH_UNSUPPORTED;
 }
@@ -1778,23 +1701,13 @@ max_isa_vgprs (int isa)
 {
   switch (isa)
     {
-    case EF_AMDGPU_MACH_AMDGCN_GFX803:
-    case EF_AMDGPU_MACH_AMDGCN_GFX900:
-    case EF_AMDGPU_MACH_AMDGCN_GFX906:
-    case EF_AMDGPU_MACH_AMDGCN_GFX908:
-      return 256;
-    case EF_AMDGPU_MACH_AMDGCN_GFX90a:
-      return 512;
-    case EF_AMDGPU_MACH_AMDGCN_GFX90c:
-      return 256;
-    case EF_AMDGPU_MACH_AMDGCN_GFX1030:
-    case EF_AMDGPU_MACH_AMDGCN_GFX1036:
-      return 512;  /* 512 SIMD32 = 256 wavefrontsize64.  */
-    case EF_AMDGPU_MACH_AMDGCN_GFX1100:
-    case EF_AMDGPU_MACH_AMDGCN_GFX1103:
-      return 1536; /* 1536 SIMD32 = 768 wavefrontsize64.  */
+#define GCN_DEVICE(name, NAME, ELF, ISA, XNACK, SRAM, WAVE64, CU, \
+		   MAX_ISA_VGPRS, ...) \
+    case ELF: return MAX_ISA_VGPRS;
+#include "../../gcc/config/gcn/gcn-devices.def"
+    default:
+      GOMP_PLUGIN_fatal ("unhandled ISA in max_isa_vgprs");
     }
-  GOMP_PLUGIN_fatal ("unhandled ISA in max_isa_vgprs");
 }
 
 /* }}}  */
@@ -2492,7 +2405,7 @@ static bool
 isa_matches_agent (struct agent_info *agent, Elf64_Ehdr *image)
 {
   int isa_field = elf_gcn_isa_field (image);
-  const char* isa_s = isa_hsa_name (isa_field);
+  const char* isa_s = isa_name (isa_field);
   if (!isa_s)
     {
       hsa_error ("Unsupported ISA in GCN code object.", HSA_STATUS_ERROR);
@@ -2501,16 +2414,17 @@ isa_matches_agent (struct agent_info *agent, Elf64_Ehdr *image)
 
   if (isa_field != agent->device_isa)
     {
-      char msg[120];
-      const char *agent_isa_s = isa_hsa_name (agent->device_isa);
-      const char *agent_isa_gcc_s = isa_gcc_name (agent->device_isa);
+      char msg[204];
+      const char *agent_isa_s = isa_name (agent->device_isa);
       assert (agent_isa_s);
-      assert (agent_isa_gcc_s);
 
       snprintf (msg, sizeof msg,
-		"GCN code object ISA '%s' does not match GPU ISA '%s'.\n"
-		"Try to recompile with '-foffload-options=-march=%s'.\n",
-		isa_s, agent_isa_s, agent_isa_gcc_s);
+		"GCN code object ISA '%s' does not match GPU ISA '%s' "
+		"(device %d).\n"
+		"Try to recompile with '-foffload-options=-march=%s',\n"
+		"or use ROCR_VISIBLE_DEVICES to disable incompatible "
+		"devices.\n",
+		isa_s, agent_isa_s, agent->device_id, agent_isa_s);
 
       hsa_error (msg, HSA_STATUS_ERROR);
       return false;
@@ -3316,6 +3230,28 @@ GOMP_OFFLOAD_get_name (void)
   return "gcn";
 }
 
+/* Return the UID; if not available return NULL.
+   Returns freshly allocated memoy.  */
+
+const char *
+GOMP_OFFLOAD_get_uid (int ord)
+{
+  char *str;
+  hsa_status_t status;
+  struct agent_info *agent = get_agent_info (ord);
+
+  /* HSA documentation states: maximally 21 characters including NUL.  */
+  str = GOMP_PLUGIN_malloc (21 * sizeof (char));
+  status = hsa_fns.hsa_agent_get_info_fn (agent->id, HSA_AMD_AGENT_INFO_UUID,
+					  str);
+  if (status != HSA_STATUS_SUCCESS)
+    {
+      free (str);
+      return NULL;
+    }
+  return str;
+}
+
 /* Return the specific capabilities the HSA accelerator have.  */
 
 unsigned int
@@ -3356,13 +3292,15 @@ GOMP_OFFLOAD_get_num_devices (unsigned int omp_requires_mask)
       && ((omp_requires_mask
 	   & ~(GOMP_REQUIRES_UNIFIED_ADDRESS
 	       | GOMP_REQUIRES_UNIFIED_SHARED_MEMORY
+	       | GOMP_REQUIRES_SELF_MAPS
 	       | GOMP_REQUIRES_REVERSE_OFFLOAD)) != 0))
     return -1;
   /* Check whether host page access is supported; this is per system level
      (all GPUs supported by HSA).  While intrinsically true for APUs, it
      requires XNACK support for discrete GPUs.  */
   if (hsa_context.agent_count > 0
-      && (omp_requires_mask & GOMP_REQUIRES_UNIFIED_SHARED_MEMORY))
+      && (omp_requires_mask
+	  & (GOMP_REQUIRES_UNIFIED_SHARED_MEMORY | GOMP_REQUIRES_SELF_MAPS)))
     {
       bool b;
       hsa_system_info_t type = HSA_AMD_SYSTEM_INFO_SVM_ACCESSIBLE_BY_DEFAULT;
@@ -3437,7 +3375,12 @@ GOMP_OFFLOAD_init_device (int n)
 
   agent->device_isa = isa_code (agent->name);
   if (agent->device_isa == EF_AMDGPU_MACH_UNSUPPORTED)
-    return hsa_error ("Unknown GCN agent architecture", HSA_STATUS_ERROR);
+    {
+      char msg[33 + 64 + 1];
+      snprintf (msg, sizeof msg,
+		"Unknown GCN agent architecture '%s'", agent->name);
+      return hsa_error (msg, HSA_STATUS_ERROR);
+    }
 
   status = hsa_fns.hsa_agent_get_info_fn (agent->id, HSA_AGENT_INFO_VENDOR_NAME,
 					  &agent->vendor_name);
@@ -3996,6 +3939,8 @@ GOMP_OFFLOAD_dev2dev (int device, void *dst, const void *src, size_t n)
     {
       struct agent_info *agent = get_agent_info (device);
       maybe_init_omp_async (agent);
+      if (!agent->omp_async_queue)
+	return false;
       queue_push_copy (agent->omp_async_queue, dst, src, n);
       return true;
     }
@@ -4407,6 +4352,8 @@ GOMP_OFFLOAD_async_run (int device, void *tgt_fn, void *tgt_vars,
     }
 
   maybe_init_omp_async (agent);
+  if (!agent->omp_async_queue)
+    GOMP_PLUGIN_fatal ("Asynchronous queue initialization failed");
   queue_push_launch (agent->omp_async_queue, kernel, tgt_vars, kla);
   queue_push_callback (agent->omp_async_queue,
 		       GOMP_PLUGIN_target_task_completion, async_data);
@@ -4474,17 +4421,17 @@ GOMP_OFFLOAD_openacc_async_construct (int device)
   if (pthread_mutex_init (&aq->mutex, NULL))
     {
       GOMP_PLUGIN_error ("Failed to initialize a GCN agent queue mutex");
-      return false;
+      return NULL;
     }
   if (pthread_cond_init (&aq->queue_cond_in, NULL))
     {
       GOMP_PLUGIN_error ("Failed to initialize a GCN agent queue cond");
-      return false;
+      return NULL;
     }
   if (pthread_cond_init (&aq->queue_cond_out, NULL))
     {
       GOMP_PLUGIN_error ("Failed to initialize a GCN agent queue cond");
-      return false;
+      return NULL;
     }
 
   hsa_status_t status = hsa_fns.hsa_queue_create_fn (agent->id,

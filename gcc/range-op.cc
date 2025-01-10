@@ -1,5 +1,5 @@
 /* Code for range operators.
-   Copyright (C) 2017-2024 Free Software Foundation, Inc.
+   Copyright (C) 2017-2025 Free Software Foundation, Inc.
    Contributed by Andrew MacLeod <amacleod@redhat.com>
    and Aldy Hernandez <aldyh@redhat.com>.
 
@@ -1960,7 +1960,7 @@ operator_minus::update_bitmask (irange &r, const irange &lh,
   update_known_bitmask (r, MINUS_EXPR, lh, rh);
 }
 
-void 
+void
 operator_minus::wi_fold (irange &r, tree type,
 			 const wide_int &lh_lb, const wide_int &lh_ub,
 			 const wide_int &rh_lb, const wide_int &rh_ub) const
@@ -2251,7 +2251,7 @@ operator_mult::wi_op_overflows (wide_int &res, tree type,
    return overflow;
 }
 
-void 
+void
 operator_mult::wi_fold (irange &r, tree type,
 			const wide_int &lh_lb, const wide_int &lh_ub,
 			const wide_int &rh_lb, const wide_int &rh_ub) const
@@ -2863,7 +2863,7 @@ operator_rshift::op1_range (irange &r,
       // OP1 is anything from 0011 1000 to 0011 1111.  That is, a
       // range from LHS<<3 plus a mask of the 3 bits we shifted on the
       // right hand side (0x07).
-      wide_int mask = wi::bit_not (wi::lshift (wi::minus_one (prec), shift));
+      wide_int mask = wi::mask (shift.to_uhwi (), false, prec);
       int_range_max mask_range (type,
 				wi::zero (TYPE_PRECISION (type)),
 				mask);
@@ -3819,6 +3819,19 @@ operator_bitwise_or::op1_range (irange &r, tree type,
   if (lhs.zero_p ())
     {
       r.set_zero (type);
+      return true;
+    }
+
+  //   if (A < 0 && B < 0)
+  // Sometimes gets translated to
+  //   _1 = A | B
+  //   if (_1 < 0))
+  // It is useful for ranger to recognize a positive LHS means the RHS
+  // operands are also positive when dealing with the ELSE range..
+  if (TYPE_SIGN (type) == SIGNED && wi::ge_p (lhs.lower_bound (), 0, SIGNED))
+    {
+      unsigned prec = TYPE_PRECISION (type);
+      r.set (type, wi::zero (prec), wi::max_value (prec, SIGNED));
       return true;
     }
   r.set_varying (type);

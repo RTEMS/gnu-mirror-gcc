@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -1406,7 +1406,7 @@ package body Sem_Ch7 is
 
       begin
          if Id = Cunit_Entity (Main_Unit)
-           or else Parent (Decl) = Library_Unit (Cunit (Main_Unit))
+           or else Parent (Decl) = Other_Comp_Unit (Cunit (Main_Unit))
          then
             Generate_Reference (Id, Scope (Id), 'k', False);
 
@@ -1422,7 +1422,7 @@ package body Sem_Ch7 is
 
             begin
                if Nkind (Main_Spec) = N_Package_Body then
-                  Main_Spec := Unit (Library_Unit (Cunit (Main_Unit)));
+                  Main_Spec := Unit (Other_Comp_Unit (Cunit (Main_Unit)));
                end if;
 
                U := Parent_Spec (Main_Spec);
@@ -1730,6 +1730,14 @@ package body Sem_Ch7 is
            and then not Is_Generic_Actual_Type (E)
          then
             Error_Msg_N ("no declaration in visible part for incomplete}", E);
+         end if;
+
+         --  A type's nonoverridable aspects need to be resolved at the end
+         --  of the enclosing list of declarations, not only at freeze points
+         --  (see 13.1.1 (11/5)). (Perhaps the proc name should be changed???)
+
+         if Is_Type (E) and then Has_Delayed_Aspects (E) then
+            Analyze_Aspects_At_Freeze_Point (E, Nonoverridable_Only => True);
          end if;
 
          Next_Entity (E);
@@ -3374,6 +3382,9 @@ package body Sem_Ch7 is
                   Next_Elmt (Elmt);
                end loop;
             end;
+
+            Set_Is_Hidden (Id);
+            Set_Is_Potentially_Use_Visible (Id, False);
 
          --  For subtypes of private types the frontend generates two entities:
          --  one associated with the partial view and the other associated with

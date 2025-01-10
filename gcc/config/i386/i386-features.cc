@@ -1,4 +1,4 @@
-/* Copyright (C) 1988-2024 Free Software Foundation, Inc.
+/* Copyright (C) 1988-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -350,7 +350,7 @@ scalar_chain::mark_dual_mode_def (df_ref def)
 	return;
       n_sse_to_integer++;
     }
- 
+
   if (dump_file)
     fprintf (dump_file,
 	     "  Mark r%d def in insn %d as requiring both modes in chain #%d\n",
@@ -1503,6 +1503,23 @@ general_scalar_chain::convert_insn (rtx_insn *insn)
   df_insn_rescan (insn);
 }
 
+/* Helper function to compute gain for loading an immediate constant.
+   Typically, two movabsq for TImode vs. vmovdqa for V1TImode, but
+   with numerous special cases.  */
+
+static int
+timode_immed_const_gain (rtx cst)
+{
+  /* movabsq vs. movabsq+vmovq+vunpacklqdq.  */
+  if (CONST_WIDE_INT_P (cst)
+      && CONST_WIDE_INT_NUNITS (cst) == 2
+      && CONST_WIDE_INT_ELT (cst, 0) == CONST_WIDE_INT_ELT (cst, 1))
+    return optimize_insn_for_size_p () ? -COSTS_N_BYTES (9)
+				       : -COSTS_N_INSNS (2);
+  /* 2x movabsq ~ vmovdqa.  */
+  return 0;
+}
+
 /* Compute a gain for chain conversion.  */
 
 int
@@ -1549,7 +1566,14 @@ timode_scalar_chain::compute_convert_gain ()
 	case CONST_INT:
 	  if (MEM_P (dst)
 	      && standard_sse_constant_p (src, V1TImode))
-	    igain = optimize_insn_for_size_p() ? COSTS_N_BYTES (11) : 1;
+	    igain = optimize_insn_for_size_p () ? COSTS_N_BYTES (11) : 1;
+	  break;
+
+	case CONST_WIDE_INT:
+	  /* 2 x mov vs. vmovdqa.  */
+	  if (MEM_P (dst))
+	    igain = optimize_insn_for_size_p () ? COSTS_N_BYTES (3)
+						: COSTS_N_INSNS (1);
 	  break;
 
 	case NOT:
@@ -1562,6 +1586,8 @@ timode_scalar_chain::compute_convert_gain ()
 	case IOR:
 	  if (!MEM_P (dst))
 	    igain = COSTS_N_INSNS (1);
+	  if (CONST_SCALAR_INT_P (XEXP (src, 1)))
+	    igain += timode_immed_const_gain (XEXP (src, 1));
 	  break;
 
 	case ASHIFT:
@@ -1650,23 +1676,28 @@ timode_scalar_chain::compute_convert_gain ()
 	      else if (op1val == 64)
 		vcost = COSTS_N_INSNS (3);
 	      else if (op1val == 96)
-		vcost = COSTS_N_INSNS (4);
+		vcost = COSTS_N_INSNS (3);
 	      else if (op1val >= 111)
 		vcost = COSTS_N_INSNS (3);
-	      else if (TARGET_AVX2 && op1val == 32)
-		vcost = COSTS_N_INSNS (3);
 	      else if (TARGET_SSE4_1 && op1val == 32)
-		vcost = COSTS_N_INSNS (4);
+		vcost = COSTS_N_INSNS (3);
+	      else if (TARGET_SSE4_1
+		       && (op1val == 8 || op1val == 16 || op1val == 24))
+		vcost = COSTS_N_INSNS (3);
 	      else if (op1val >= 96)
-		vcost = COSTS_N_INSNS (5);
+		vcost = COSTS_N_INSNS (4);
+	      else if (TARGET_SSE4_1 && (op1val == 28 || op1val == 80))
+		vcost = COSTS_N_INSNS (4);
 	      else if ((op1val & 7) == 0)
-		vcost = COSTS_N_INSNS (6);
+		vcost = COSTS_N_INSNS (5);
 	      else if (TARGET_AVX2 && op1val < 32)
 		vcost = COSTS_N_INSNS (6);
+	      else if (TARGET_SSE4_1 && op1val < 15)
+		vcost = COSTS_N_INSNS (6);
 	      else if (op1val == 1 || op1val >= 64)
-		vcost = COSTS_N_INSNS (9);
+		vcost = COSTS_N_INSNS (8);
 	      else
-		vcost = COSTS_N_INSNS (10);
+		vcost = COSTS_N_INSNS (9);
 	    }
 	  igain = scost - vcost;
 	  break;
@@ -2299,14 +2330,16 @@ timode_scalar_to_vector_candidate_p (rtx_insn *insn)
 	      || CONST_SCALAR_INT_P (XEXP (src, 1))
 	      || timode_mem_p (XEXP (src, 1))))
 	return true;
-      return REG_P (XEXP (src, 0))
+      return (REG_P (XEXP (src, 0))
+	      || timode_mem_p (XEXP (src, 0)))
 	     && (REG_P (XEXP (src, 1))
 		 || CONST_SCALAR_INT_P (XEXP (src, 1))
 		 || timode_mem_p (XEXP (src, 1)));
 
     case IOR:
     case XOR:
-      return REG_P (XEXP (src, 0))
+      return (REG_P (XEXP (src, 0))
+	      || timode_mem_p (XEXP (src, 0)))
 	     && (REG_P (XEXP (src, 1))
 		 || CONST_SCALAR_INT_P (XEXP (src, 1))
 		 || timode_mem_p (XEXP (src, 1)));
@@ -3407,7 +3440,7 @@ public:
     {
       return ix86_apx_nf_convert ();
     }
-}; // class pass_rpad
+}; // class pass_apx_nf_convert
 
 } // anon namespace
 
@@ -3586,7 +3619,9 @@ public:
   /* opt_pass methods: */
   bool gate (function *) final override
     {
-      return optimize && optimize_function_for_speed_p (cfun);
+      return TARGET_ALIGN_TIGHT_LOOPS
+	     && optimize
+	     && optimize_function_for_speed_p (cfun);
     }
 
   unsigned int execute (function *) final override
@@ -3624,7 +3659,7 @@ ix86_compare_version_priority (tree decl1, tree decl2)
 
 /* V1 and V2 point to function versions with different priorities
    based on the target ISA.  This function compares their priorities.  */
- 
+
 static int
 feature_compare (const void *v1, const void *v2)
 {
@@ -3673,7 +3708,7 @@ add_condition_to_bb (tree function_decl, tree version_decl,
   convert_expr = build1 (CONVERT_EXPR, ptr_type_node,
 	     		 build_fold_addr_expr (version_decl));
   result_var = create_tmp_var (ptr_type_node);
-  convert_stmt = gimple_build_assign (result_var, convert_expr); 
+  convert_stmt = gimple_build_assign (result_var, convert_expr);
   return_stmt = gimple_build_return (result_var);
 
   if (predicate_chain == NULL_TREE)
@@ -3700,7 +3735,7 @@ add_condition_to_bb (tree function_decl, tree version_decl,
       gimple_seq_add_stmt (&gseq, call_cond_stmt);
 
       predicate_chain = TREE_CHAIN (predicate_chain);
-      
+
       if (and_expr_var == NULL)
 	and_expr_var = cond_var;
       else
@@ -3741,7 +3776,7 @@ add_condition_to_bb (tree function_decl, tree version_decl,
   gimple_set_bb (return_stmt, bb2);
 
   bb3 = e23->dest;
-  make_edge (bb1, bb3, EDGE_FALSE_VALUE); 
+  make_edge (bb1, bb3, EDGE_FALSE_VALUE);
 
   remove_edge (e23);
   make_edge (bb2, EXIT_BLOCK_PTR_FOR_FN (cfun), 0);
@@ -3902,7 +3937,7 @@ ix86_mangle_function_version_assembler_name (tree decl, tree id)
   return ret;
 }
 
-tree 
+tree
 ix86_mangle_decl_assembler_name (tree decl, tree id)
 {
   /* For function version, add the target suffix to the assembler name.  */
@@ -3932,7 +3967,7 @@ ix86_get_function_versions_dispatcher (void *decl)
   tree dispatch_decl = NULL;
 
   struct cgraph_function_version_info *default_version_info = NULL;
- 
+
   gcc_assert (fn != NULL && DECL_FUNCTION_VERSIONED (fn));
 
   node = cgraph_node::get (fn);
@@ -3940,7 +3975,7 @@ ix86_get_function_versions_dispatcher (void *decl)
 
   node_v = node->function_version ();
   gcc_assert (node_v != NULL);
- 
+
   if (node_v->dispatcher_resolver != NULL)
     return node_v->dispatcher_resolver;
 
@@ -4096,7 +4131,7 @@ make_resolver_func (const tree default_decl,
    provide the code to dispatch the right function at run-time.  NODE points
    to the dispatcher decl whose body will be created.  */
 
-tree 
+tree
 ix86_generate_version_dispatcher_body (void *node_p)
 {
   tree resolver_decl;

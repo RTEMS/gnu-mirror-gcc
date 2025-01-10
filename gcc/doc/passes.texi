@@ -1,6 +1,6 @@
 @c markers: BUG TODO
 
-@c Copyright (C) 1988-2024 Free Software Foundation, Inc.
+@c Copyright (C) 1988-2025 Free Software Foundation, Inc.
 @c This is part of the GCC manual.
 @c For copying conditions, see the file gcc.texi.
 
@@ -924,6 +924,14 @@ seeing if the result can be simplified.  It performs copy propagation
 and addressing mode selection.  The pass is run twice, with values
 being propagated into loops only on the second run.  The code is
 located in @file{fwprop.cc}.
+
+@item Store forwarding avoidance
+
+This pass attempts to reduce the overhead of store to load forwarding.
+It detects when a load reads from one or more previous smaller stores and
+then rearranges them so that the stores are done after the load.  The loaded
+value is adjusted with a series of bit insert instructions so that it stays
+the same.  The code is located in @file{avoid-store-forwarding.cc}.
 
 @item Common subexpression elimination
 

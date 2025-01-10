@@ -21,6 +21,7 @@ import dmd.aggregate;
 import dmd.arraytypes;
 import dmd.astenums;
 import dmd.ast_node;
+import dmd.dcast : implicitConvTo;
 import dmd.dclass;
 import dmd.declaration;
 import dmd.denum;
@@ -30,7 +31,6 @@ import dmd.dtemplate;
 import dmd.enumsem;
 import dmd.errors;
 import dmd.expression;
-import dmd.funcsem;
 import dmd.globals;
 import dmd.hdrgen;
 import dmd.id;
@@ -597,6 +597,14 @@ extern (C++) abstract class Type : ASTNode
         tsize_t    = basic[isLP64 ? Tuns64 : Tuns32];
         tptrdiff_t = basic[isLP64 ? Tint64 : Tint32];
         thash_t = tsize_t;
+
+        static if (__VERSION__ == 2081)
+        {
+            // Related issue: https://issues.dlang.org/show_bug.cgi?id=19134
+            // D 2.081.x regressed initializing class objects at compile time.
+            // As a workaround initialize this global at run-time instead.
+            TypeTuple.empty = new TypeTuple();
+        }
     }
 
     /**
@@ -610,20 +618,9 @@ extern (C++) abstract class Type : ASTNode
         stringtable = stringtable.init;
     }
 
-    final uinteger_t size()
-    {
-        return size(Loc.initial);
-    }
-
-    uinteger_t size(const ref Loc loc)
-    {
-        error(loc, "no size for type `%s`", toChars());
-        return SIZE_INVALID;
-    }
-
     uint alignsize()
     {
-        return cast(uint)size(Loc.initial);
+        return cast(uint)size(this, Loc.initial);
     }
 
     /*********************************
@@ -1285,22 +1282,6 @@ extern (C++) abstract class Type : ASTNode
         return ((te = isTypeEnum()) !is null) ? te.toBasetype2() : this;
     }
 
-    /********************************
-     * Determine if 'this' can be implicitly converted
-     * to type 'to'.
-     * Returns:
-     *      MATCH.nomatch, MATCH.convert, MATCH.constant, MATCH.exact
-     */
-    MATCH implicitConvTo(Type to)
-    {
-        //printf("Type::implicitConvTo(this=%p, to=%p)\n", this, to);
-        //printf("from: %s\n", toChars());
-        //printf("to  : %s\n", to.toChars());
-        if (this.equals(to))
-            return MATCH.exact;
-        return MATCH.nomatch;
-    }
-
     /*******************************
      * Determine if converting 'this' to 'to' is an identity operation,
      * a conversion to const operation, or the types aren't the same.
@@ -1412,7 +1393,7 @@ extern (C++) abstract class Type : ASTNode
      * Returns:
      *  true if so
      */
-    bool hasSystemFields()
+    bool hasUnsafeBitpatterns()
     {
         return false;
     }
@@ -1574,7 +1555,7 @@ extern (C++) abstract class Type : ASTNode
         }
     }
 
-    final pure inout nothrow @nogc @safe
+    final pure inout nothrow @nogc @trusted
     {
         inout(TypeError)      isTypeError()      { return ty == Terror     ? cast(typeof(return))this : null; }
         inout(TypeVector)     isTypeVector()     { return ty == Tvector    ? cast(typeof(return))this : null; }
@@ -1648,11 +1629,6 @@ extern (C++) final class TypeError : Type
         return this;
     }
 
-    override uinteger_t size(const ref Loc loc)
-    {
-        return SIZE_INVALID;
-    }
-
     override Expression defaultInitLiteral(const ref Loc loc)
     {
         return ErrorExp.get();
@@ -1690,7 +1666,7 @@ extern (C++) abstract class TypeNext : Type
      * type is meant to be inferred, and semantic() hasn't yet ben run
      * on the function. After semantic(), it must no longer be NULL.
      */
-    override final Type nextOf()
+    override final Type nextOf() @safe
     {
         return next;
     }
@@ -2108,83 +2084,6 @@ extern (C++) final class TypeBasic : Type
         return this;
     }
 
-    override uinteger_t size(const ref Loc loc)
-    {
-        uint size;
-        //printf("TypeBasic::size()\n");
-        switch (ty)
-        {
-        case Tint8:
-        case Tuns8:
-            size = 1;
-            break;
-
-        case Tint16:
-        case Tuns16:
-            size = 2;
-            break;
-
-        case Tint32:
-        case Tuns32:
-        case Tfloat32:
-        case Timaginary32:
-            size = 4;
-            break;
-
-        case Tint64:
-        case Tuns64:
-        case Tfloat64:
-        case Timaginary64:
-            size = 8;
-            break;
-
-        case Tfloat80:
-        case Timaginary80:
-            size = target.realsize;
-            break;
-
-        case Tcomplex32:
-            size = 8;
-            break;
-
-        case Tcomplex64:
-        case Tint128:
-        case Tuns128:
-            size = 16;
-            break;
-
-        case Tcomplex80:
-            size = target.realsize * 2;
-            break;
-
-        case Tvoid:
-            //size = Type::size();      // error message
-            size = 1;
-            break;
-
-        case Tbool:
-            size = 1;
-            break;
-
-        case Tchar:
-            size = 1;
-            break;
-
-        case Twchar:
-            size = 2;
-            break;
-
-        case Tdchar:
-            size = 4;
-            break;
-
-        default:
-            assert(0);
-        }
-        //printf("TypeBasic::size() = %d\n", size);
-        return size;
-    }
-
     override uint alignsize()
     {
         return target.alignsize(this);
@@ -2226,98 +2125,6 @@ extern (C++) final class TypeBasic : Type
         return (flags & TFlags.unsigned) != 0;
     }
 
-    override MATCH implicitConvTo(Type to)
-    {
-        //printf("TypeBasic::implicitConvTo(%s) from %s\n", to.toChars(), toChars());
-        if (this == to)
-            return MATCH.exact;
-
-        if (ty == to.ty)
-        {
-            if (mod == to.mod)
-                return MATCH.exact;
-            else if (MODimplicitConv(mod, to.mod))
-                return MATCH.constant;
-            else if (!((mod ^ to.mod) & MODFlags.shared_)) // for wild matching
-                return MATCH.constant;
-            else
-                return MATCH.convert;
-        }
-
-        if (ty == Tvoid || to.ty == Tvoid)
-            return MATCH.nomatch;
-        if (to.ty == Tbool)
-            return MATCH.nomatch;
-
-        TypeBasic tob;
-        if (to.ty == Tvector && to.deco)
-        {
-            TypeVector tv = cast(TypeVector)to;
-            tob = tv.elementType();
-        }
-        else if (auto te = to.isTypeEnum())
-        {
-            EnumDeclaration ed = te.sym;
-            if (ed.isSpecial())
-            {
-                /* Special enums that allow implicit conversions to them
-                 * with a MATCH.convert
-                 */
-                tob = to.toBasetype().isTypeBasic();
-            }
-            else
-                return MATCH.nomatch;
-        }
-        else
-            tob = to.isTypeBasic();
-        if (!tob)
-            return MATCH.nomatch;
-
-        if (flags & TFlags.integral)
-        {
-            // Disallow implicit conversion of integers to imaginary or complex
-            if (tob.flags & (TFlags.imaginary | TFlags.complex))
-                return MATCH.nomatch;
-
-            // If converting from integral to integral
-            if (tob.flags & TFlags.integral)
-            {
-                const sz = size(Loc.initial);
-                const tosz = tob.size(Loc.initial);
-
-                /* Can't convert to smaller size
-                 */
-                if (sz > tosz)
-                    return MATCH.nomatch;
-                /* Can't change sign if same size
-                 */
-                //if (sz == tosz && (flags ^ tob.flags) & TFlags.unsigned)
-                //    return MATCH.nomatch;
-            }
-        }
-        else if (flags & TFlags.floating)
-        {
-            // Disallow implicit conversion of floating point to integer
-            if (tob.flags & TFlags.integral)
-                return MATCH.nomatch;
-
-            assert(tob.flags & TFlags.floating || to.ty == Tvector);
-
-            // Disallow implicit conversion from complex to non-complex
-            if (flags & TFlags.complex && !(tob.flags & TFlags.complex))
-                return MATCH.nomatch;
-
-            // Disallow implicit conversion of real or imaginary to complex
-            if (flags & (TFlags.real_ | TFlags.imaginary) && tob.flags & TFlags.complex)
-                return MATCH.nomatch;
-
-            // Disallow implicit conversion to-from real and imaginary
-            if ((flags & (TFlags.real_ | TFlags.imaginary)) != (tob.flags & (TFlags.real_ | TFlags.imaginary)))
-                return MATCH.nomatch;
-        }
-        return MATCH.convert;
-    }
-
     override bool isZeroInit(const ref Loc loc)
     {
         switch (ty)
@@ -2338,6 +2145,11 @@ extern (C++) final class TypeBasic : Type
         default:
             return true; // yes
         }
+    }
+
+    override bool hasUnsafeBitpatterns()
+    {
+        return ty == Tbool;
     }
 
     // For eliminating dynamic_cast
@@ -2383,11 +2195,6 @@ extern (C++) final class TypeVector : Type
         return new TypeVector(basetype.syntaxCopy());
     }
 
-    override uinteger_t size(const ref Loc loc)
-    {
-        return basetype.size();
-    }
-
     override uint alignsize()
     {
         return cast(uint)basetype.size();
@@ -2417,29 +2224,6 @@ extern (C++) final class TypeVector : Type
     override bool isBoolean()
     {
         return false;
-    }
-
-    override MATCH implicitConvTo(Type to)
-    {
-        //printf("TypeVector::implicitConvTo(%s) from %s\n", to.toChars(), toChars());
-        if (this == to)
-            return MATCH.exact;
-        if (to.ty != Tvector)
-            return MATCH.nomatch;
-
-        TypeVector tv = cast(TypeVector)to;
-        assert(basetype.ty == Tsarray && tv.basetype.ty == Tsarray);
-
-        // Can't convert to a vector which has different size.
-        if (basetype.size() != tv.basetype.size())
-            return MATCH.nomatch;
-
-        // Allow conversion to void[]
-        if (tv.basetype.nextOf().ty == Tvoid)
-            return MATCH.convert;
-
-        // Otherwise implicitly convertible only if basetypes are.
-        return basetype.implicitConvTo(tv.basetype);
     }
 
     override Expression defaultInitLiteral(const ref Loc loc)
@@ -2532,22 +2316,6 @@ extern (C++) final class TypeSArray : TypeArray
         return dim.isIntegerExp() && dim.isIntegerExp().getInteger() == 0;
     }
 
-    override uinteger_t size(const ref Loc loc)
-    {
-        //printf("TypeSArray::size()\n");
-        const n = numberOfElems(loc);
-        const elemsize = baseElemOf().size(loc);
-        bool overflow = false;
-        const sz = mulu(n, elemsize, overflow);
-        if (overflow || sz >= uint.max)
-        {
-            if (elemsize != SIZE_INVALID && n != uint.max)
-                error(loc, "static array `%s` size overflowed to %lld", toChars(), cast(long)sz);
-            return SIZE_INVALID;
-        }
-        return sz;
-    }
-
     override uint alignsize()
     {
         return next.alignsize();
@@ -2579,65 +2347,6 @@ extern (C++) final class TypeSArray : TypeArray
         return TypeNext.constConv(to);
     }
 
-    override MATCH implicitConvTo(Type to)
-    {
-        //printf("TypeSArray::implicitConvTo(to = %s) this = %s\n", to.toChars(), toChars());
-        if (auto ta = to.isTypeDArray())
-        {
-            if (!MODimplicitConv(next.mod, ta.next.mod))
-                return MATCH.nomatch;
-
-            /* Allow conversion to void[]
-             */
-            if (ta.next.ty == Tvoid)
-            {
-                return MATCH.convert;
-            }
-
-            MATCH m = next.constConv(ta.next);
-            if (m > MATCH.nomatch)
-            {
-                return MATCH.convert;
-            }
-            return MATCH.nomatch;
-        }
-        if (auto tsa = to.isTypeSArray())
-        {
-            if (this == to)
-                return MATCH.exact;
-
-            if (dim.equals(tsa.dim))
-            {
-                MATCH m = next.implicitConvTo(tsa.next);
-
-                /* Allow conversion to non-interface base class.
-                 */
-                if (m == MATCH.convert &&
-                    next.ty == Tclass)
-                {
-                    if (auto toc = tsa.next.isTypeClass)
-                    {
-                        if (!toc.sym.isInterfaceDeclaration)
-                            return MATCH.convert;
-                    }
-                }
-
-                /* Since static arrays are value types, allow
-                 * conversions from const elements to non-const
-                 * ones, just like we allow conversion from const int
-                 * to int.
-                 */
-                if (m >= MATCH.constant)
-                {
-                    if (mod != to.mod)
-                        m = MATCH.constant;
-                    return m;
-                }
-            }
-        }
-        return MATCH.nomatch;
-    }
-
     override Expression defaultInitLiteral(const ref Loc loc)
     {
         static if (LOGDEFAULTINIT)
@@ -2657,9 +2366,9 @@ extern (C++) final class TypeSArray : TypeArray
         return ae;
     }
 
-    override bool hasSystemFields()
+    override bool hasUnsafeBitpatterns()
     {
-        return next.hasSystemFields();
+        return next.hasUnsafeBitpatterns();
     }
 
     override bool hasVoidInitPointers()
@@ -2723,12 +2432,6 @@ extern (C++) final class TypeDArray : TypeArray
         return result;
     }
 
-    override uinteger_t size(const ref Loc loc)
-    {
-        //printf("TypeDArray::size()\n");
-        return target.ptrsize * 2;
-    }
-
     override uint alignsize()
     {
         // A DArray consists of two ptr-sized values, so align it on pointer size
@@ -2750,35 +2453,6 @@ extern (C++) final class TypeDArray : TypeArray
     override bool isBoolean()
     {
         return true;
-    }
-
-    override MATCH implicitConvTo(Type to)
-    {
-        //printf("TypeDArray::implicitConvTo(to = %s) this = %s\n", to.toChars(), toChars());
-        if (equals(to))
-            return MATCH.exact;
-
-        if (auto ta = to.isTypeDArray())
-        {
-            if (!MODimplicitConv(next.mod, ta.next.mod))
-                return MATCH.nomatch; // not const-compatible
-
-            /* Allow conversion to void[]
-             */
-            if (next.ty != Tvoid && ta.next.ty == Tvoid)
-            {
-                return MATCH.convert;
-            }
-
-            MATCH m = next.constConv(ta.next);
-            if (m > MATCH.nomatch)
-            {
-                if (m == MATCH.exact && mod != to.mod)
-                    m = MATCH.constant;
-                return m;
-            }
-        }
-        return Type.implicitConvTo(to);
     }
 
     override void accept(Visitor v)
@@ -2822,11 +2496,6 @@ extern (C++) final class TypeAArray : TypeArray
         return result;
     }
 
-    override uinteger_t size(const ref Loc loc)
-    {
-        return target.ptrsize;
-    }
-
     override bool isZeroInit(const ref Loc loc)
     {
         return true;
@@ -2835,30 +2504,6 @@ extern (C++) final class TypeAArray : TypeArray
     override bool isBoolean()
     {
         return true;
-    }
-
-    override MATCH implicitConvTo(Type to)
-    {
-        //printf("TypeAArray::implicitConvTo(to = %s) this = %s\n", to.toChars(), toChars());
-        if (equals(to))
-            return MATCH.exact;
-
-        if (auto ta = to.isTypeAArray())
-        {
-            if (!MODimplicitConv(next.mod, ta.next.mod))
-                return MATCH.nomatch; // not const-compatible
-
-            if (!MODimplicitConv(index.mod, ta.index.mod))
-                return MATCH.nomatch; // not const-compatible
-
-            MATCH m = next.constConv(ta.next);
-            MATCH mi = index.constConv(ta.index);
-            if (m > MATCH.nomatch && mi > MATCH.nomatch)
-            {
-                return MODimplicitConv(mod, to.mod) ? MATCH.constant : MATCH.nomatch;
-            }
-        }
-        return Type.implicitConvTo(to);
     }
 
     override MATCH constConv(Type to)
@@ -2907,50 +2552,6 @@ extern (C++) final class TypePointer : TypeNext
         auto result = new TypePointer(t);
         result.mod = mod;
         return result;
-    }
-
-    override uinteger_t size(const ref Loc loc)
-    {
-        return target.ptrsize;
-    }
-
-    override MATCH implicitConvTo(Type to)
-    {
-        //printf("TypePointer::implicitConvTo(to = %s) %s\n", to.toChars(), toChars());
-        if (equals(to))
-            return MATCH.exact;
-
-        // Only convert between pointers
-        auto tp = to.isTypePointer();
-        if (!tp)
-            return MATCH.nomatch;
-
-        assert(this.next);
-        assert(tp.next);
-
-        // Conversion to void*
-        if (tp.next.ty == Tvoid)
-        {
-            // Function pointer conversion doesn't check constness?
-            if (this.next.ty == Tfunction)
-                return MATCH.convert;
-
-            if (!MODimplicitConv(next.mod, tp.next.mod))
-                return MATCH.nomatch; // not const-compatible
-
-            return this.next.ty == Tvoid ? MATCH.constant : MATCH.convert;
-        }
-
-        // Conversion between function pointers
-        if (auto thisTf = this.next.isTypeFunction())
-            return thisTf.implicitPointerConv(tp.next);
-
-        // Default, no implicit conversion between the pointer targets
-        MATCH m = next.constConv(tp.next);
-
-        if (m == MATCH.exact && mod != to.mod)
-            m = MATCH.constant;
-        return m;
     }
 
     override MATCH constConv(Type to)
@@ -3005,11 +2606,6 @@ extern (C++) final class TypeReference : TypeNext
         auto result = new TypeReference(t);
         result.mod = mod;
         return result;
-    }
-
-    override uinteger_t size(const ref Loc loc)
-    {
-        return target.ptrsize;
     }
 
     override bool isZeroInit(const ref Loc loc)
@@ -3170,7 +2766,7 @@ extern (C++) final class TypeFunction : TypeNext
      * Returns:
      *  true if D-style variadic
      */
-    bool isDstyleVariadic() const pure nothrow
+    bool isDstyleVariadic() const pure nothrow @safe
     {
         return linkage == LINK.d && parameterList.varargs == VarArg.variadic;
     }
@@ -3270,47 +2866,6 @@ extern (C++) final class TypeFunction : TypeNext
         }
         newArgs.setDim(e);
         return newArgs;
-    }
-
-    /+
-     + Checks whether this function type is convertible to ` to`
-     + when used in a function pointer / delegate.
-     +
-     + Params:
-     +   to = target type
-     +
-     + Returns:
-     +   MATCH.nomatch: `to` is not a covaraint function
-     +   MATCH.convert: `to` is a covaraint function
-     +   MATCH.exact:   `to` is identical to this function
-     +/
-    private MATCH implicitPointerConv(Type to)
-    {
-        assert(to);
-
-        if (this.equals(to))
-            return MATCH.constant;
-
-        if (this.covariant(to) == Covariant.yes)
-        {
-            Type tret = this.nextOf();
-            Type toret = to.nextOf();
-            if (tret.ty == Tclass && toret.ty == Tclass)
-            {
-                /* https://issues.dlang.org/show_bug.cgi?id=10219
-                 * Check covariant interface return with offset tweaking.
-                 * interface I {}
-                 * class C : Object, I {}
-                 * I function() dg = function C() {}    // should be error
-                 */
-                int offset = 0;
-                if (toret.isBaseOf(tret, &offset) && offset != 0)
-                    return MATCH.nomatch;
-            }
-            return MATCH.convert;
-        }
-
-        return MATCH.nomatch;
     }
 
     /** Extends TypeNext.constConv by also checking for matching attributes **/
@@ -3434,37 +2989,9 @@ extern (C++) final class TypeDelegate : TypeNext
         return result;
     }
 
-    override uinteger_t size(const ref Loc loc)
-    {
-        return target.ptrsize * 2;
-    }
-
     override uint alignsize()
     {
         return target.ptrsize;
-    }
-
-    override MATCH implicitConvTo(Type to)
-    {
-        //printf("TypeDelegate.implicitConvTo(this=%p, to=%p)\n", this, to);
-        //printf("from: %s\n", toChars());
-        //printf("to  : %s\n", to.toChars());
-        if (this.equals(to))
-            return MATCH.exact;
-
-        if (auto toDg = to.isTypeDelegate())
-        {
-            MATCH m = this.next.isTypeFunction().implicitPointerConv(toDg.next);
-
-            // Retain the old behaviour for this refactoring
-            // Should probably be changed to constant to match function pointers
-            if (m > MATCH.convert)
-                m = MATCH.convert;
-
-            return m;
-        }
-
-        return MATCH.nomatch;
     }
 
     override bool isZeroInit(const ref Loc loc)
@@ -3487,7 +3014,7 @@ extern (C++) final class TypeDelegate : TypeNext
  * This is a shell containing a TraitsExp that can be
  * either resolved to a type or to a symbol.
  *
- * The point is to allow AliasDeclarationY to use `__traits()`, see https://issues.dlang.org/show_bug.cgi?id=7804.
+ * The point is to allow AliasDeclarationY to use `__traits()`, see $(LINK https://issues.dlang.org/show_bug.cgi?id=7804).
  */
 extern (C++) final class TypeTraits : Type
 {
@@ -3520,11 +3047,6 @@ extern (C++) final class TypeTraits : Type
     override void accept(Visitor v)
     {
         v.visit(this);
-    }
-
-    override uinteger_t size(const ref Loc loc)
-    {
-        return SIZE_INVALID;
     }
 }
 
@@ -3635,12 +3157,6 @@ extern (C++) abstract class TypeQualified : Type
         idents.push(e);
     }
 
-    override uinteger_t size(const ref Loc loc)
-    {
-        error(this.loc, "size of type `%s` is not known", toChars());
-        return SIZE_INVALID;
-    }
-
     override void accept(Visitor v)
     {
         v.visit(this);
@@ -3746,14 +3262,6 @@ extern (C++) final class TypeTypeof : TypeQualified
         return t;
     }
 
-    override uinteger_t size(const ref Loc loc)
-    {
-        if (exp.type)
-            return exp.type.size(loc);
-        else
-            return TypeQualified.size(loc);
-    }
-
     override void accept(Visitor v)
     {
         v.visit(this);
@@ -3810,11 +3318,6 @@ extern (C++) final class TypeStruct : Type
     override const(char)* kind() const
     {
         return "struct";
-    }
-
-    override uinteger_t size(const ref Loc loc)
-    {
-        return sym.size(loc);
     }
 
     override uint alignsize()
@@ -3882,7 +3385,7 @@ extern (C++) final class TypeStruct : Type
         /* Copy from the initializer symbol for larger symbols,
          * otherwise the literals expressed as code get excessively large.
          */
-        if (size(loc) > target.ptrsize * 4 && !needsNested())
+        if (size(this, loc) > target.ptrsize * 4 && !needsNested())
             structinit.useStaticInit = true;
 
         structinit.type = this;
@@ -3976,11 +3479,11 @@ extern (C++) final class TypeStruct : Type
         return sym.hasVoidInitPointers;
     }
 
-    override bool hasSystemFields()
+    override bool hasUnsafeBitpatterns()
     {
         sym.size(Loc.initial); // give error for forward references
         sym.determineTypeProperties();
-        return sym.hasSystemFields;
+        return sym.hasUnsafeBitpatterns;
     }
 
     override bool hasInvariant()
@@ -3992,84 +3495,64 @@ extern (C++) final class TypeStruct : Type
 
     extern (D) MATCH implicitConvToWithoutAliasThis(Type to)
     {
-        MATCH m;
+        //printf("TypeStruct::implicitConvToWithoutAliasThis(%s => %s)\n", toChars(), to.toChars());
 
-        if (ty == to.ty && sym == (cast(TypeStruct)to).sym)
+        auto tos = to.isTypeStruct();
+        if (!(tos && sym == tos.sym))
+            return MATCH.nomatch;
+
+        if (mod == to.mod)
+            return MATCH.exact;
+
+        if (MODimplicitConv(mod, to.mod))
+            return MATCH.constant;
+
+        /* Check all the fields. If they can all be converted,
+         * allow the conversion.
+         */
+        MATCH m = MATCH.constant;
+        uint offset = ~0; // must never match a field offset
+        foreach (v; sym.fields[])
         {
-            m = MATCH.exact; // exact match
-            if (mod != to.mod)
-            {
-                m = MATCH.constant;
-                if (MODimplicitConv(mod, to.mod))
-                {
-                }
-                else
-                {
-                    /* Check all the fields. If they can all be converted,
-                     * allow the conversion.
-                     */
-                    uint offset = ~0; // dead-store to prevent spurious warning
-                    for (size_t i = 0; i < sym.fields.length; i++)
-                    {
-                        VarDeclaration v = sym.fields[i];
-                        if (i == 0)
-                        {
-                        }
-                        else if (v.offset == offset)
-                        {
-                            if (m > MATCH.nomatch)
-                                continue;
-                        }
-                        else
-                        {
-                            if (m == MATCH.nomatch)
-                                return m;
-                        }
+            /* Why are we only looking at the first member of a union?
+             * The check should check for overlap of v with the previous field,
+             * not just starting at the same point
+             */
+            if (!global.params.fixImmutableConv && v.offset == offset) // v is at same offset as previous field
+                continue;       // ignore
 
-                        // 'from' type
-                        Type tvf = v.type.addMod(mod);
+            Type tvf = v.type.addMod(mod);    // from type
+            Type tvt  = v.type.addMod(to.mod); // to type
 
-                        // 'to' type
-                        Type tv = v.type.addMod(to.mod);
+            // field match
+            MATCH mf = tvf.implicitConvTo(tvt);
+            //printf("\t%s => %s, match = %d\n", v.type.toChars(), tvt.toChars(), mf);
 
-                        // field match
-                        MATCH mf = tvf.implicitConvTo(tv);
-                        //printf("\t%s => %s, match = %d\n", v.type.toChars(), tv.toChars(), mf);
-
-                        if (mf == MATCH.nomatch)
-                            return mf;
-                        if (mf < m) // if field match is worse
-                            m = mf;
-                        offset = v.offset;
-                    }
-                }
-            }
+            if (mf == MATCH.nomatch)
+                return MATCH.nomatch;
+            if (mf < m) // if field match is worse
+                m = mf;
+            offset = v.offset;
         }
         return m;
     }
 
     extern (D) MATCH implicitConvToThroughAliasThis(Type to)
     {
-        MATCH m;
-        if (!(ty == to.ty && sym == (cast(TypeStruct)to).sym) && sym.aliasthis && !(att & AliasThisRec.tracing))
+        auto tos = to.isTypeStruct();
+        if (!(tos && sym == tos.sym) &&
+            sym.aliasthis &&
+            !(att & AliasThisRec.tracing))
         {
             if (auto ato = aliasthisOf(this))
             {
                 att = cast(AliasThisRec)(att | AliasThisRec.tracing);
-                m = ato.implicitConvTo(to);
+                MATCH m = ato.implicitConvTo(to);
                 att = cast(AliasThisRec)(att & ~AliasThisRec.tracing);
+                return m;
             }
-            else
-                m = MATCH.nomatch; // no match
         }
-        return m;
-    }
-
-    override MATCH implicitConvTo(Type to)
-    {
-        //printf("TypeStruct::implicitConvTo(%s => %s)\n", toChars(), to.toChars());
-        MATCH m = implicitConvToWithoutAliasThis(to);
-        return m ? m : implicitConvToThroughAliasThis(to);
+        return MATCH.nomatch;
     }
 
     override MATCH constConv(Type to)
@@ -4127,11 +3610,6 @@ extern (C++) final class TypeEnum : Type
     override TypeEnum syntaxCopy()
     {
         return this;
-    }
-
-    override uinteger_t size(const ref Loc loc)
-    {
-        return sym.getMemtype(loc).size(loc);
     }
 
     Type memType()
@@ -4212,19 +3690,6 @@ extern (C++) final class TypeEnum : Type
         return memType().needsNested();
     }
 
-    override MATCH implicitConvTo(Type to)
-    {
-        MATCH m;
-        //printf("TypeEnum::implicitConvTo() %s to %s\n", toChars(), to.toChars());
-        if (ty == to.ty && sym == (cast(TypeEnum)to).sym)
-            m = (mod == to.mod) ? MATCH.exact : MATCH.constant;
-        else if (sym.getMemtype(Loc.initial).implicitConvTo(to))
-            m = MATCH.convert; // match with conversions
-        else
-            m = MATCH.nomatch; // no match
-        return m;
-    }
-
     override MATCH constConv(Type to)
     {
         if (equals(to))
@@ -4252,9 +3717,9 @@ extern (C++) final class TypeEnum : Type
         return memType().hasVoidInitPointers();
     }
 
-    override bool hasSystemFields()
+    override bool hasUnsafeBitpatterns()
     {
-        return memType().hasSystemFields();
+        return memType().hasUnsafeBitpatterns();
     }
 
     override bool hasInvariant()
@@ -4290,11 +3755,6 @@ extern (C++) final class TypeClass : Type
     override const(char)* kind() const
     {
         return "class";
-    }
-
-    override uinteger_t size(const ref Loc loc)
-    {
-        return target.ptrsize;
     }
 
     override TypeClass syntaxCopy()
@@ -4335,13 +3795,6 @@ extern (C++) final class TypeClass : Type
             }
         }
         return m;
-    }
-
-    override MATCH implicitConvTo(Type to)
-    {
-        //printf("TypeClass::implicitConvTo(to = '%s') %s\n", to.toChars(), toChars());
-        MATCH m = implicitConvToWithoutAliasThis(to);
-        return m ? m : implicitConvToThroughAliasThis(to);
     }
 
     override MATCH constConv(Type to)
@@ -4413,7 +3866,10 @@ extern (C++) final class TypeClass : Type
 extern (C++) final class TypeTuple : Type
 {
     // 'logically immutable' cached global - don't modify!
-    __gshared TypeTuple empty = new TypeTuple();
+    static if (__VERSION__ == 2081)
+        __gshared TypeTuple empty;  // See comment in Type._init
+    else
+        __gshared TypeTuple empty = new TypeTuple();
 
     Parameters* arguments;  // types making up the tuple
 
@@ -4539,29 +3995,6 @@ extern (C++) final class TypeTuple : Type
         return false;
     }
 
-    override MATCH implicitConvTo(Type to)
-    {
-        if (this == to)
-            return MATCH.exact;
-        if (auto tt = to.isTypeTuple())
-        {
-            if (arguments.length == tt.arguments.length)
-            {
-                MATCH m = MATCH.exact;
-                for (size_t i = 0; i < tt.arguments.length; i++)
-                {
-                    Parameter arg1 = (*arguments)[i];
-                    Parameter arg2 = (*tt.arguments)[i];
-                    MATCH mi = arg1.type.implicitConvTo(arg2.type);
-                    if (mi < m)
-                        m = mi;
-                }
-                return m;
-            }
-        }
-        return MATCH.nomatch;
-    }
-
     override void accept(Visitor v)
     {
         v.visit(this);
@@ -4623,34 +4056,9 @@ extern (C++) final class TypeNull : Type
         return this;
     }
 
-    override MATCH implicitConvTo(Type to)
-    {
-        //printf("TypeNull::implicitConvTo(this=%p, to=%p)\n", this, to);
-        //printf("from: %s\n", toChars());
-        //printf("to  : %s\n", to.toChars());
-        MATCH m = Type.implicitConvTo(to);
-        if (m != MATCH.nomatch)
-            return m;
-
-        // NULL implicitly converts to any pointer type or dynamic array
-        //if (type.ty == Tpointer && type.nextOf().ty == Tvoid)
-        {
-            Type tb = to.toBasetype();
-            if (tb.ty == Tnull || tb.ty == Tpointer || tb.ty == Tarray || tb.ty == Taarray || tb.ty == Tclass || tb.ty == Tdelegate)
-                return MATCH.constant;
-        }
-
-        return MATCH.nomatch;
-    }
-
     override bool isBoolean()
     {
         return true;
-    }
-
-    override uinteger_t size(const ref Loc loc)
-    {
-        return tvoidptr.size(loc);
     }
 
     override void accept(Visitor v)
@@ -4680,22 +4088,6 @@ extern (C++) final class TypeNoreturn : Type
         return this;
     }
 
-    override MATCH implicitConvTo(Type to)
-    {
-        //printf("TypeNoreturn::implicitConvTo(this=%p, to=%p)\n", this, to);
-        //printf("from: %s\n", toChars());
-        //printf("to  : %s\n", to.toChars());
-        if (this.equals(to))
-            return MATCH.exact;
-
-        // Different qualifiers?
-        if (to.ty == Tnoreturn)
-            return MATCH.constant;
-
-        // Implicitly convertible to any type
-        return MATCH.convert;
-    }
-
     override MATCH constConv(Type to)
     {
         // Either another noreturn or conversion to any type
@@ -4705,11 +4097,6 @@ extern (C++) final class TypeNoreturn : Type
     override bool isBoolean()
     {
         return true;  // bottom type can be implicitly converted to any other type
-    }
-
-    override uinteger_t size(const ref Loc loc)
-    {
-        return 0;
     }
 
     override uint alignsize()

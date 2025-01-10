@@ -3,7 +3,7 @@
    building RTL.  These routines are used both during actual parsing
    and during the instantiation of template functions.
 
-   Copyright (C) 1998-2024 Free Software Foundation, Inc.
+   Copyright (C) 1998-2025 Free Software Foundation, Inc.
 
    This file is part of GCC.
 
@@ -216,7 +216,7 @@ lambda_capture_field_type (tree expr, bool explicit_init_p,
   else if (explicit_init_p)
     {
       tree auto_node = make_auto ();
-      
+
       type = auto_node;
       if (by_reference_p)
 	/* Add the reference now, so deduction doesn't lose
@@ -556,12 +556,14 @@ add_capture (tree lambda, tree id, tree orig_init, bool by_reference_p,
 				     integer_zero_node, tf_warning_or_error);
       initializer = build_constructor_va (init_list_type_node, 2,
 					  NULL_TREE, build_address (elt),
-					  NULL_TREE, array_type_nelts (type));
+					  NULL_TREE,
+					  array_type_nelts_minus_one (type));
       type = vla_capture_type (type);
     }
   else if (!dependent_type_p (type)
 	   && variably_modified_type_p (type, NULL_TREE))
     {
+      auto_diagnostic_group d;
       sorry ("capture of variably-modified type %qT that is not an N3639 array "
 	     "of runtime bound", type);
       if (TREE_CODE (type) == ARRAY_TYPE
@@ -600,6 +602,7 @@ add_capture (tree lambda, tree id, tree orig_init, bool by_reference_p,
 	  type = complete_type (type);
 	  if (!COMPLETE_TYPE_P (type))
 	    {
+	      auto_diagnostic_group d;
 	      error ("capture by copy of incomplete type %qT", type);
 	      cxx_incomplete_type_inform (type);
 	      return error_mark_node;
@@ -757,6 +760,7 @@ add_default_capture (tree lambda_stack, tree id, tree initializer)
 	  && this_capture_p
 	  && LAMBDA_EXPR_DEFAULT_CAPTURE_MODE (lambda) == CPLD_COPY)
 	{
+	  auto_diagnostic_group d;
 	  if (warning_at (LAMBDA_EXPR_LOCATION (lambda), OPT_Wdeprecated,
 			  "implicit capture of %qE via %<[=]%> is deprecated "
 			  "in C++20", this_identifier))
@@ -1559,7 +1563,7 @@ compare_lambda_template_head (tree tmpl_a, tree tmpl_b)
   // synthetic ones.
   int len_a = TREE_VEC_LENGTH (inner_a);
   int len_b = TREE_VEC_LENGTH (inner_b);
-  
+
   for (int ix = 0, len = MAX (len_a, len_b); ix != len; ix++)
     {
       tree parm_a = NULL_TREE;
@@ -1574,7 +1578,7 @@ compare_lambda_template_head (tree tmpl_a, tree tmpl_b)
 	  if (DECL_VIRTUAL_P (parm_a))
 	    parm_a = NULL_TREE;
 	}
-      
+
       tree parm_b = NULL_TREE;
       if (ix < len_b)
 	{
@@ -1607,7 +1611,7 @@ compare_lambda_template_head (tree tmpl_a, tree tmpl_b)
 	  if (!same_type_p (TREE_TYPE (parm_a), TREE_TYPE (parm_b)))
 	    return false;
 	}
-      else 
+      else
 	{
 	  if (TEMPLATE_TYPE_PARAMETER_PACK (TREE_TYPE (parm_a))
 	      != TEMPLATE_TYPE_PARAMETER_PACK (TREE_TYPE (parm_b)))

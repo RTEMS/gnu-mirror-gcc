@@ -1,6 +1,6 @@
 (* decl.def declaration nodes used to create the AST.
 
-Copyright (C) 2015-2024 Free Software Foundation, Inc.
+Copyright (C) 2015-2025 Free Software Foundation, Inc.
 Contributed by Gaius Mulley <gaius@glam.ac.uk>.
 
 This file is part of GNU Modula-2.
@@ -182,6 +182,20 @@ PROCEDURE lookupModule (n: Name) : node ;
 *)
 
 PROCEDURE putDefForC (n: node) ;
+
+
+(*
+   putDefUnqualified - the definition module uses export unqualified.
+*)
+
+PROCEDURE putDefUnqualified (n: node) ;
+
+
+(*
+   isDefUnqualified - returns TRUE if the definition module uses unqualified.
+*)
+
+PROCEDURE isDefUnqualified (n: node) : BOOLEAN ;
 
 
 (*

@@ -1,5 +1,5 @@
 /* Routines for manipulation of expression nodes.
-   Copyright (C) 2000-2024 Free Software Foundation, Inc.
+   Copyright (C) 2000-2025 Free Software Foundation, Inc.
    Contributed by Andy Vaught
 
 This file is part of GCC.
@@ -159,6 +159,7 @@ gfc_get_constant_expr (bt type, int kind, locus *where)
   switch (type)
     {
     case BT_INTEGER:
+    case BT_UNSIGNED:
       mpz_init (e->value.integer);
       break;
 
@@ -223,6 +224,19 @@ gfc_get_int_expr (int kind, locus *where, HOST_WIDE_INT value)
   return p;
 }
 
+/* Get a new expression node that is an unsigned constant.  */
+
+gfc_expr *
+gfc_get_unsigned_expr (int kind, locus *where, HOST_WIDE_INT value)
+{
+  gfc_expr *p;
+  p = gfc_get_constant_expr (BT_UNSIGNED, kind,
+			     where ? where : &gfc_current_locus);
+  const wide_int w = wi::shwi (value, kind * BITS_PER_UNIT);
+  wi::to_mpz (w, p->value.integer, UNSIGNED);
+
+  return p;
+}
 
 /* Get a new expression node that is a logical constant.  */
 
@@ -296,6 +310,7 @@ gfc_copy_expr (gfc_expr *p)
       switch (q->ts.type)
 	{
 	case BT_INTEGER:
+	case BT_UNSIGNED:
 	  mpz_init_set (q->value.integer, p->value.integer);
 	  break;
 
@@ -696,7 +711,6 @@ gfc_extract_int (gfc_expr *expr, int *result, int report_error)
   return false;
 }
 
-
 /* Same as gfc_extract_int, but use a HWI.  */
 
 bool
@@ -899,7 +913,8 @@ gfc_kind_max (gfc_expr *e1, gfc_expr *e2)
 static bool
 numeric_type (bt type)
 {
-  return type == BT_COMPLEX || type == BT_REAL || type == BT_INTEGER;
+  return type == BT_COMPLEX || type == BT_REAL || type == BT_INTEGER
+    || type == BT_UNSIGNED;
 }
 
 
@@ -1598,7 +1613,7 @@ find_array_section (gfc_expr *expr, gfc_ref *ref)
 	  /* Zero-sized arrays have no shape and no elements, stop early.  */
 	  if (!begin->shape)
 	    {
-	      mpz_init_set_ui (nelts, 0);
+	      mpz_set_ui (nelts, 0);
 	      break;
 	    }
 
@@ -1699,7 +1714,7 @@ find_array_section (gfc_expr *expr, gfc_ref *ref)
      constructor.  */
   for (idx = 0; idx < (int) mpz_get_si (nelts); idx++)
     {
-      mpz_init_set_ui (ptr, 0);
+      mpz_set_ui (ptr, 0);
 
       incr_ctr = true;
       for (d = 0; d < rank; d++)
@@ -1818,6 +1833,7 @@ find_inquiry_ref (gfc_expr *p, gfc_expr **newp)
 {
   gfc_ref *ref;
   gfc_ref *inquiry = NULL;
+  gfc_ref *inquiry_head;
   gfc_expr *tmp;
 
   tmp = gfc_copy_expr (p);
@@ -1843,6 +1859,7 @@ find_inquiry_ref (gfc_expr *p, gfc_expr **newp)
       return false;
     }
 
+  inquiry_head = inquiry;
   gfc_resolve_expr (tmp);
 
   /* Leave these to the backend since the type and kind is not confirmed until
@@ -1915,7 +1932,7 @@ find_inquiry_ref (gfc_expr *p, gfc_expr **newp)
 		    mpc_imagref (tmp->value.complex), GFC_RND_MODE);
 	  break;
 	}
-      // TODO: Fix leaking expr tmp, when simplify is done twice.
+
       if (inquiry->next)
 	gfc_replace_expr (tmp, *newp);
     }
@@ -1929,10 +1946,12 @@ find_inquiry_ref (gfc_expr *p, gfc_expr **newp)
     }
 
   gfc_free_expr (tmp);
+  gfc_free_ref_list (inquiry_head);
   return true;
 
 cleanup:
   gfc_free_expr (tmp);
+  gfc_free_ref_list (inquiry_head);
   return false;
 }
 
@@ -3897,7 +3916,8 @@ gfc_check_assign (gfc_expr *lvalue, gfc_expr *rvalue, int conform,
       if (lvalue->ts.type == BT_LOGICAL && rvalue->ts.type == BT_LOGICAL)
 	return true;
 
-      where = lvalue->where.lb ? &lvalue->where : &rvalue->where;
+      where = (GFC_LOCUS_IS_SET (lvalue->where)
+	       ? &lvalue->where : &rvalue->where);
       gfc_error ("Incompatible types in DATA statement at %L; attempted "
 		 "conversion of %s to %s", where,
 		 gfc_typename (rvalue), gfc_typename (lvalue));
@@ -4344,20 +4364,37 @@ gfc_check_pointer_assign (gfc_expr *lvalue, gfc_expr *rvalue,
 
       /* If this can be determined, check that the target must be at least as
 	 large as the pointer assigned to it is.  */
-      if (gfc_array_size (lvalue, &lsize)
-	  && gfc_array_size (rvalue, &rsize)
-	  && mpz_cmp (rsize, lsize) < 0)
+      bool got_lsize = gfc_array_size (lvalue, &lsize);
+      bool got_rsize = got_lsize && gfc_array_size (rvalue, &rsize);
+      bool too_small = got_rsize && mpz_cmp (rsize, lsize) < 0;
+
+      if (too_small)
 	{
 	  gfc_error ("Rank remapping target is smaller than size of the"
 		     " pointer (%ld < %ld) at %L",
 		     mpz_get_si (rsize), mpz_get_si (lsize),
 		     &lvalue->where);
+	  mpz_clear (lsize);
+	  mpz_clear (rsize);
+	  return false;
+	}
+      if (got_lsize)
+	mpz_clear (lsize);
+      if (got_rsize)
+	mpz_clear (rsize);
+
+      /* An assumed rank target is an experimental F202y feature.  */
+      if (rvalue->rank == -1 && !(gfc_option.allow_std & GFC_STD_F202Y))
+	{
+	  gfc_error ("The assumed rank target at %L is an experimental F202y "
+		     "feature. Use option -std=f202y to enable",
+		     &rvalue->where);
 	  return false;
 	}
 
       /* The target must be either rank one or it must be simply contiguous
 	 and F2008 must be allowed.  */
-      if (rvalue->rank != 1)
+      if (rvalue->rank != 1 && rvalue->rank != -1)
 	{
 	  if (!gfc_is_simply_contiguous (rvalue, true, false))
 	    {
@@ -4369,6 +4406,21 @@ gfc_check_pointer_assign (gfc_expr *lvalue, gfc_expr *rvalue,
 			       "rank 1 at %L", &rvalue->where))
 	    return false;
 	}
+    }
+  else if (rvalue->rank == -1)
+    {
+      gfc_error ("The data-target at %L is an assumed rank object and so the "
+		 "data-pointer-object %s must have a bounds remapping list "
+		 "(list of lbound:ubound for each dimension)",
+		  &rvalue->where, lvalue->symtree->name);
+      return false;
+    }
+
+  if (rvalue->rank == -1 && !gfc_is_simply_contiguous (rvalue, true, false))
+    {
+      gfc_error ("The assumed rank data-target at %L must be contiguous",
+		 &rvalue->where);
+      return false;
     }
 
   /* Now punt if we are dealing with a NULLIFY(X) or X = NULL(X).  */
@@ -4965,28 +5017,44 @@ is_non_empty_structure_constructor (gfc_expr * e)
 bool
 gfc_has_default_initializer (gfc_symbol *der)
 {
+  static hash_set<gfc_symbol *> seen_derived_types;
   gfc_component *c;
+  /* The rewrite to a result variable and breaks is only needed, because
+     there is no scope_guard in C++ yet.  */
+  bool result = false;
 
   gcc_assert (gfc_fl_struct (der->attr.flavor));
+  seen_derived_types.add (der);
   for (c = der->components; c; c = c->next)
-    if (gfc_bt_struct (c->ts.type))
+    if (gfc_bt_struct (c->ts.type)
+	&& !seen_derived_types.contains (c->ts.u.derived))
       {
-        if (!c->attr.pointer && !c->attr.proc_pointer
-	     && !(c->attr.allocatable && der == c->ts.u.derived)
-	     && ((c->initializer
-		  && is_non_empty_structure_constructor (c->initializer))
-		 || gfc_has_default_initializer (c->ts.u.derived)))
-	  return true;
+	if (!c->attr.pointer && !c->attr.proc_pointer
+	    && !(c->attr.allocatable && der == c->ts.u.derived)
+	    && ((c->initializer
+		 && is_non_empty_structure_constructor (c->initializer))
+		|| gfc_has_default_initializer (c->ts.u.derived)))
+	  {
+	    result = true;
+	    break;
+	  }
 	if (c->attr.pointer && c->initializer)
-	  return true;
+	  {
+	    result = true;
+	    break;
+	  }
       }
     else
       {
-        if (c->initializer)
-	  return true;
+	if (c->initializer)
+	  {
+	    result = true;
+	    break;
+	  }
       }
 
-  return false;
+  seen_derived_types.remove (der);
+  return result;
 }
 
 
@@ -6231,6 +6299,33 @@ gfc_build_intrinsic_call (gfc_namespace *ns, gfc_isym_id id, const char* name,
 }
 
 
+/* Check if a symbol referenced in a submodule is declared in the ancestor
+   module and not accessed by use-association, and that the submodule is a
+   descendant.  */
+
+static bool
+sym_is_from_ancestor (gfc_symbol *sym)
+{
+  const char dot[2] = ".";
+  /* Symbols take the form module.submodule_ or module.name_. */
+  char ancestor_module[2 * GFC_MAX_SYMBOL_LEN + 2];
+  char *ancestor;
+
+  if (sym == NULL
+      || sym->attr.use_assoc
+      || !sym->attr.used_in_submodule
+      || !sym->module
+      || !sym->ns->proc_name
+      || !sym->ns->proc_name->name)
+    return false;
+
+  memset (ancestor_module, '\0', sizeof (ancestor_module));
+  strcpy (ancestor_module, sym->ns->proc_name->name);
+  ancestor = strtok (ancestor_module, dot);
+  return strcmp (ancestor, sym->module) == 0;
+}
+
+
 /* Check if an expression may appear in a variable definition context
    (F2008, 16.6.7) or pointer association context (F2008, 16.6.8).
    This is called from the various places when resolving
@@ -6409,21 +6504,24 @@ gfc_check_vardef_context (gfc_expr* e, bool pointer, bool alloc_obj,
     }
 
   /* PROTECTED and use-associated.  */
-  if (sym->attr.is_protected && sym->attr.use_assoc && check_intentin)
+  if (sym->attr.is_protected
+      && (sym->attr.use_assoc
+	  || (sym->attr.used_in_submodule && !sym_is_from_ancestor (sym)))
+      && check_intentin)
     {
       if (pointer && is_pointer)
 	{
 	  if (context)
-	    gfc_error ("Variable %qs is PROTECTED and cannot appear in a"
-		       " pointer association context (%s) at %L",
+	    gfc_error ("Variable %qs is PROTECTED and cannot appear in a "
+		       "pointer association context (%s) at %L",
 		       sym->name, context, &e->where);
 	  return false;
 	}
       if (!pointer && !is_pointer)
 	{
 	  if (context)
-	    gfc_error ("Variable %qs is PROTECTED and cannot appear in a"
-		       " variable definition context (%s) at %L",
+	    gfc_error ("Variable %qs is PROTECTED and cannot appear in a "
+		       "variable definition context (%s) at %L",
 		       sym->name, context, &e->where);
 	  return false;
 	}

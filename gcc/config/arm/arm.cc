@@ -1,5 +1,5 @@
 /* Output routines for GCC for ARM.
-   Copyright (C) 1991-2024 Free Software Foundation, Inc.
+   Copyright (C) 1991-2025 Free Software Foundation, Inc.
    Contributed by Pieter `Tiggr' Schoenmakers (rcpieter@win.tue.nl)
    and Martin Simmons (@harleqn.co.uk).
    More major hacks by Richard Earnshaw (rearnsha@arm.com).
@@ -75,6 +75,7 @@
 #include "opts.h"
 #include "aarch-common.h"
 #include "aarch-common-protos.h"
+#include "machmode.h"
 
 /* This file should be included last.  */
 #include "target-def.h"
@@ -277,6 +278,7 @@ static rtx_insn *arm_pic_static_addr (rtx orig, rtx reg);
 static bool cortex_a9_sched_adjust_cost (rtx_insn *, int, rtx_insn *, int *);
 static bool xscale_sched_adjust_cost (rtx_insn *, int, rtx_insn *, int *);
 static bool fa726te_sched_adjust_cost (rtx_insn *, int, rtx_insn *, int *);
+static opt_machine_mode arm_array_mode (machine_mode, unsigned HOST_WIDE_INT);
 static bool arm_array_mode_supported_p (machine_mode,
 					unsigned HOST_WIDE_INT);
 static machine_mode arm_preferred_simd_mode (scalar_mode);
@@ -514,6 +516,8 @@ static const scoped_attribute_specs *const arm_attribute_table[] =
 #define TARGET_SHIFT_TRUNCATION_MASK arm_shift_truncation_mask
 #undef TARGET_VECTOR_MODE_SUPPORTED_P
 #define TARGET_VECTOR_MODE_SUPPORTED_P arm_vector_mode_supported_p
+#undef TARGET_ARRAY_MODE
+#define TARGET_ARRAY_MODE arm_array_mode
 #undef TARGET_ARRAY_MODE_SUPPORTED_P
 #define TARGET_ARRAY_MODE_SUPPORTED_P arm_array_mode_supported_p
 #undef TARGET_VECTORIZE_PREFERRED_SIMD_MODE
@@ -813,6 +817,9 @@ static const scoped_attribute_specs *const arm_attribute_table[] =
 
 #undef TARGET_MODES_TIEABLE_P
 #define TARGET_MODES_TIEABLE_P arm_modes_tieable_p
+
+#undef TARGET_NOCE_CONVERSION_PROFITABLE_P
+#define TARGET_NOCE_CONVERSION_PROFITABLE_P arm_noce_conversion_profitable_p
 
 #undef TARGET_CAN_CHANGE_MODE_CLASS
 #define TARGET_CAN_CHANGE_MODE_CLASS arm_can_change_mode_class
@@ -3008,17 +3015,17 @@ arm_option_check_internal (struct gcc_options *opts)
       /* We only support -mslow-flash-data on M-profile targets with
 	 MOVT.  */
       if (target_slow_flash_data && (!TARGET_HAVE_MOVT || common_unsupported_modes))
-	error ("%s only supports non-pic code on M-profile targets with the "
+	error ("%qs only supports non-pic code on M-profile targets with the "
 	       "MOVT instruction", flag);
 
       /* We only support -mpure-code on M-profile targets.  */
       if (target_pure_code && common_unsupported_modes)
-	error ("%s only supports non-pic code on M-profile targets", flag);
+	error ("%qs only supports non-pic code on M-profile targets", flag);
 
       /* Cannot load addresses: -mslow-flash-data forbids literal pool and
 	 -mword-relocations forbids relocation of MOVT/MOVW.  */
       if (target_word_relocations)
-	error ("%s incompatible with %<-mword-relocations%>", flag);
+	error ("%qs is incompatible with %<-mword-relocations%>", flag);
     }
 }
 
@@ -8006,10 +8013,11 @@ arm_function_ok_for_sibcall (tree decl, tree exp)
       && DECL_WEAK (decl))
     return false;
 
-  /* We cannot tailcall an indirect call by descriptor if all the call-clobbered
-     general registers are live (r0-r3 and ip).  This can happen when:
-      - IP contains the static chain, or
-      - IP is needed for validating the PAC signature.  */
+  /* Indirect tailcalls need a call-clobbered register to hold the function
+     address.  But we only have r0-r3 and ip in that class.  If r0-r3 all hold
+     function arguments, then we can only use IP.  But IP may be needed in the
+     epilogue (for PAC validation), or for passing the static chain.  We have
+     to disable the tail call if nothing is available.  */
   if (!decl
       && ((CALL_EXPR_BY_DESCRIPTOR (exp) && !flag_trampolines)
 	  || arm_current_function_pac_enabled_p()))
@@ -8021,18 +8029,33 @@ arm_function_ok_for_sibcall (tree decl, tree exp)
       arm_init_cumulative_args (&cum, fntype, NULL_RTX, NULL_TREE);
       cum_v = pack_cumulative_args (&cum);
 
-      for (tree t = TYPE_ARG_TYPES (fntype); t; t = TREE_CHAIN (t))
+      tree arg;
+      call_expr_arg_iterator iter;
+      unsigned used_regs = 0;
+
+      /* Layout each actual argument in turn.  If it is allocated to
+	 core regs, note which regs have been allocated.  */
+      FOR_EACH_CALL_EXPR_ARG (arg, iter, exp)
 	{
-	  tree type = TREE_VALUE (t);
-	  if (!VOID_TYPE_P (type))
+	  tree type = TREE_TYPE (arg);
+	  function_arg_info arg_info (type, /*named=*/true);
+	  rtx reg = arm_function_arg (cum_v, arg_info);
+	  if (reg && REG_P (reg)
+	      && REGNO (reg) <= LAST_ARG_REGNUM)
 	    {
-	      function_arg_info arg (type, /*named=*/true);
-	      arm_function_arg_advance (cum_v, arg);
+	      /* Avoid any chance of UB here.  We don't care if TYPE
+		 is very large since it will use up all the argument regs.  */
+	      unsigned nregs = MIN (ARM_NUM_REGS2 (GET_MODE (reg), type),
+				    LAST_ARG_REGNUM + 1);
+	      used_regs |= ((1 << nregs) - 1) << REGNO (reg);
 	    }
+	  arm_function_arg_advance (cum_v, arg_info);
 	}
 
-      function_arg_info arg (integer_type_node, /*named=*/true);
-      if (!arm_function_arg (cum_v, arg))
+      /* We've used all the argument regs, and we know IP is live during the
+	 epilogue for some reason, so we can't tailcall.  */
+      if ((used_regs & ((1 << (LAST_ARG_REGNUM + 1)) - 1))
+	  == ((1 << (LAST_ARG_REGNUM + 1)) - 1))
 	return false;
     }
 
@@ -11891,7 +11914,7 @@ arm_rtx_costs_internal (rtx x, enum rtx_code code, enum rtx_code outer_code,
 
     case CONST_DOUBLE:
       if (TARGET_HARD_FLOAT && GET_MODE_CLASS (mode) == MODE_FLOAT
-	  && (mode == SFmode || !TARGET_VFP_SINGLE))
+	  && (mode == SFmode || mode == HFmode || !TARGET_VFP_SINGLE))
 	{
 	  if (vfp3_const_double_rtx (x))
 	    {
@@ -11916,12 +11939,18 @@ arm_rtx_costs_internal (rtx x, enum rtx_code code, enum rtx_code outer_code,
       return true;
 
     case CONST_VECTOR:
-      /* Fixme.  */
       if (((TARGET_NEON && TARGET_HARD_FLOAT
 	    && (VALID_NEON_DREG_MODE (mode) || VALID_NEON_QREG_MODE (mode)))
 	   || TARGET_HAVE_MVE)
 	  && simd_immediate_valid_for_move (x, mode, NULL, NULL))
 	*cost = COSTS_N_INSNS (1);
+      else if (TARGET_HAVE_MVE)
+	{
+	  /* 128-bit vector requires two vldr.64 on MVE.  */
+	  *cost = COSTS_N_INSNS (2);
+	  if (speed_p)
+	    *cost += extra_cost->ldst.loadd * 2;
+	}
       else
 	*cost = COSTS_N_INSNS (4);
       return true;
@@ -15341,9 +15370,9 @@ arm_block_move_unaligned_straight (rtx dstbase, rtx srcbase,
   HOST_WIDE_INT srcoffset, dstoffset;
   HOST_WIDE_INT src_autoinc, dst_autoinc;
   rtx mem, addr;
-  
+
   gcc_assert (interleave_factor >= 1 && interleave_factor <= 4);
-  
+
   /* Use hard registers if we have aligned source or destination so we can use
      load/store multiple with contiguous registers.  */
   if (dst_aligned || src_aligned)
@@ -15357,7 +15386,7 @@ arm_block_move_unaligned_straight (rtx dstbase, rtx srcbase,
   src = copy_addr_to_reg (XEXP (srcbase, 0));
 
   srcoffset = dstoffset = 0;
-  
+
   /* Calls to arm_gen_load_multiple and arm_gen_store_multiple update SRC/DST.
      For copying the last bytes we want to subtract this offset again.  */
   src_autoinc = dst_autoinc = 0;
@@ -15411,14 +15440,14 @@ arm_block_move_unaligned_straight (rtx dstbase, rtx srcbase,
 
       remaining -= block_size_bytes;
     }
-  
+
   /* Copy any whole words left (note these aren't interleaved with any
      subsequent halfword/byte load/stores in the interests of simplicity).  */
-  
+
   words = remaining / UNITS_PER_WORD;
 
   gcc_assert (words < interleave_factor);
-  
+
   if (src_aligned && words > 1)
     {
       emit_insn (arm_gen_load_multiple (regnos, words, src, TRUE, srcbase,
@@ -15464,11 +15493,11 @@ arm_block_move_unaligned_straight (rtx dstbase, rtx srcbase,
     }
 
   remaining -= words * UNITS_PER_WORD;
-  
+
   gcc_assert (remaining < 4);
-  
+
   /* Copy a halfword if necessary.  */
-  
+
   if (remaining >= 2)
     {
       halfword_tmp = gen_reg_rtx (SImode);
@@ -15492,11 +15521,11 @@ arm_block_move_unaligned_straight (rtx dstbase, rtx srcbase,
       remaining -= 2;
       srcoffset += 2;
     }
-  
+
   gcc_assert (remaining < 2);
-  
+
   /* Copy last byte.  */
-  
+
   if ((remaining & 1) != 0)
     {
       byte_tmp = gen_reg_rtx (SImode);
@@ -15517,9 +15546,9 @@ arm_block_move_unaligned_straight (rtx dstbase, rtx srcbase,
       remaining--;
       srcoffset++;
     }
-  
+
   /* Store last halfword if we haven't done so already.  */
-  
+
   if (halfword_tmp)
     {
       addr = plus_constant (Pmode, dst, dstoffset - dst_autoinc);
@@ -15538,7 +15567,7 @@ arm_block_move_unaligned_straight (rtx dstbase, rtx srcbase,
       emit_move_insn (mem, gen_lowpart (QImode, byte_tmp));
       dstoffset++;
     }
-  
+
   gcc_assert (remaining == 0 && srcoffset == dstoffset);
 }
 
@@ -15557,7 +15586,7 @@ arm_adjust_block_mem (rtx mem, HOST_WIDE_INT length, rtx *loop_reg,
 		      rtx *loop_mem)
 {
   *loop_reg = copy_addr_to_reg (XEXP (mem, 0));
-  
+
   /* Although the new mem does not refer to a known location,
      it does keep up to LENGTH bytes of alignment.  */
   *loop_mem = change_address (mem, BLKmode, *loop_reg);
@@ -15577,14 +15606,14 @@ arm_block_move_unaligned_loop (rtx dest, rtx src, HOST_WIDE_INT length,
 {
   rtx src_reg, dest_reg, final_src, test;
   HOST_WIDE_INT leftover;
-  
+
   leftover = length % bytes_per_iter;
   length -= leftover;
-  
+
   /* Create registers and memory references for use within the loop.  */
   arm_adjust_block_mem (src, bytes_per_iter, &src_reg, &src);
   arm_adjust_block_mem (dest, bytes_per_iter, &dest_reg, &dest);
-  
+
   /* Calculate the value that SRC_REG should have after the last iteration of
      the loop.  */
   final_src = expand_simple_binop (Pmode, PLUS, src_reg, GEN_INT (length),
@@ -15593,7 +15622,7 @@ arm_block_move_unaligned_loop (rtx dest, rtx src, HOST_WIDE_INT length,
   /* Emit the start of the loop.  */
   rtx_code_label *label = gen_label_rtx ();
   emit_label (label);
-  
+
   /* Emit the loop body.  */
   arm_block_move_unaligned_straight (dest, src, bytes_per_iter,
 				     interleave_factor);
@@ -15601,11 +15630,11 @@ arm_block_move_unaligned_loop (rtx dest, rtx src, HOST_WIDE_INT length,
   /* Move on to the next block.  */
   emit_move_insn (src_reg, plus_constant (Pmode, src_reg, bytes_per_iter));
   emit_move_insn (dest_reg, plus_constant (Pmode, dest_reg, bytes_per_iter));
-  
+
   /* Emit the loop condition.  */
   test = gen_rtx_NE (VOIDmode, src_reg, final_src);
   emit_jump_insn (gen_cbranchsi4 (test, src_reg, final_src, label));
-  
+
   /* Mop up any left-over bytes.  */
   if (leftover)
     arm_block_move_unaligned_straight (dest, src, leftover, interleave_factor);
@@ -15619,7 +15648,7 @@ static int
 arm_cpymemqi_unaligned (rtx *operands)
 {
   HOST_WIDE_INT length = INTVAL (operands[2]);
-  
+
   if (optimize_size)
     {
       bool src_aligned = MEM_ALIGN (operands[1]) >= BITS_PER_WORD;
@@ -15630,7 +15659,7 @@ arm_cpymemqi_unaligned (rtx *operands)
 	 resulting code can be smaller.  */
       unsigned int interleave_factor = (src_aligned || dst_aligned) ? 2 : 1;
       HOST_WIDE_INT bytes_per_iter = (src_aligned || dst_aligned) ? 8 : 4;
-      
+
       if (length > 12)
 	arm_block_move_unaligned_loop (operands[0], operands[1], length,
 				       interleave_factor, bytes_per_iter);
@@ -15648,7 +15677,7 @@ arm_cpymemqi_unaligned (rtx *operands)
       else
 	arm_block_move_unaligned_straight (operands[0], operands[1], length, 4);
     }
-  
+
   return 1;
 }
 
@@ -20746,9 +20775,13 @@ output_move_neon (rtx *operands)
   nregs = REG_NREGS (reg) / 2;
   gcc_assert (VFP_REGNO_OK_FOR_DOUBLE (regno)
 	      || NEON_REGNO_OK_FOR_QUAD (regno));
-  gcc_assert (VALID_NEON_DREG_MODE (mode)
-	      || VALID_NEON_QREG_MODE (mode)
-	      || VALID_NEON_STRUCT_MODE (mode));
+  gcc_assert ((TARGET_NEON
+	       && (VALID_NEON_DREG_MODE (mode)
+		   || VALID_NEON_QREG_MODE (mode)
+		   || VALID_NEON_STRUCT_MODE (mode)))
+	      || (TARGET_HAVE_MVE
+		  && (VALID_MVE_MODE (mode)
+		      || VALID_MVE_STRUCT_MODE (mode))));
   gcc_assert (MEM_P (mem));
 
   addr = XEXP (mem, 0);
@@ -20851,8 +20884,9 @@ output_move_neon (rtx *operands)
   return "";
 }
 
-/* Compute and return the length of neon_mov<mode>, where <mode> is
-   one of VSTRUCT modes: EI, OI, CI or XI.  */
+/* Compute and return the length of neon_mov<mode>, where <mode> is one of
+   VSTRUCT modes: EI, OI, CI or XI for Neon, and V2x16QI, V2x8HI, V2x4SI,
+   V2x8HF, V2x4SF, V2x16QI, V2x8HI, V2x4SI, V2x8HF, V2x4SF for MVE.  */
 int
 arm_attr_length_move_neon (rtx_insn *insn)
 {
@@ -20869,10 +20903,20 @@ arm_attr_length_move_neon (rtx_insn *insn)
 	{
 	case E_EImode:
 	case E_OImode:
+	case E_V2x16QImode:
+	case E_V2x8HImode:
+	case E_V2x4SImode:
+	case E_V2x8HFmode:
+	case E_V2x4SFmode:
 	  return 8;
 	case E_CImode:
 	  return 12;
 	case E_XImode:
+	case E_V4x16QImode:
+	case E_V4x8HImode:
+	case E_V4x4SImode:
+	case E_V4x8HFmode:
+	case E_V4x4SFmode:
 	  return 16;
 	default:
 	  gcc_unreachable ();
@@ -24710,11 +24754,11 @@ arm_print_operand (FILE *stream, rtx x, int code)
 	    asm_fprintf (stream, "[%r", REGNO (XEXP (addr, 0)));
 	    inc_val = GET_MODE_SIZE (GET_MODE (x));
 	    if (code == POST_INC || code == POST_DEC)
-	      asm_fprintf (stream, "], #%s%d",(code == POST_INC)
-					      ? "": "-", inc_val);
+	      asm_fprintf (stream, "], #%s%d", (code == POST_INC)
+					       ? "" : "-", inc_val);
 	    else
-	      asm_fprintf (stream, ", #%s%d]!",(code == PRE_INC)
-					       ? "": "-", inc_val);
+	      asm_fprintf (stream, ", #%s%d]!", (code == PRE_INC)
+						? "" : "-", inc_val);
 	  }
 	else if (code == POST_MODIFY || code == PRE_MODIFY)
 	  {
@@ -24723,9 +24767,9 @@ arm_print_operand (FILE *stream, rtx x, int code)
 	    if (postinc_reg && CONST_INT_P (postinc_reg))
 	      {
 		if (code == POST_MODIFY)
-		  asm_fprintf (stream, "], #%wd",INTVAL (postinc_reg));
+		  asm_fprintf (stream, "], #%wd", INTVAL (postinc_reg));
 		else
-		  asm_fprintf (stream, ", #%wd]!",INTVAL (postinc_reg));
+		  asm_fprintf (stream, ", #%wd]!", INTVAL (postinc_reg));
 	      }
 	  }
 	else if (code == PLUS)
@@ -24923,7 +24967,8 @@ arm_print_operand_address (FILE *stream, machine_mode mode, rtx x)
 			 REGNO (XEXP (x, 0)),
 			 GET_CODE (x) == PRE_DEC ? "-" : "",
 			 GET_MODE_SIZE (mode));
-	  else if (TARGET_HAVE_MVE && (mode == OImode || mode == XImode))
+	  else if (TARGET_HAVE_MVE
+		   && VALID_MVE_STRUCT_MODE (mode))
 	    asm_fprintf (stream, "[%r]!", REGNO (XEXP (x,0)));
 	  else
 	    asm_fprintf (stream, "[%r], #%s%d", REGNO (XEXP (x, 0)),
@@ -25813,7 +25858,17 @@ arm_hard_regno_mode_ok (unsigned int regno, machine_mode mode)
      if (TARGET_HAVE_MVE)
        return ((VALID_MVE_MODE (mode) && NEON_REGNO_OK_FOR_QUAD (regno))
 	       || (mode == OImode && NEON_REGNO_OK_FOR_NREGS (regno, 4))
-	       || (mode == XImode && NEON_REGNO_OK_FOR_NREGS (regno, 8)));
+	       || (mode == V2x16QImode && NEON_REGNO_OK_FOR_NREGS (regno, 4))
+	       || (mode == V2x8HImode && NEON_REGNO_OK_FOR_NREGS (regno, 4))
+	       || (mode == V2x4SImode && NEON_REGNO_OK_FOR_NREGS (regno, 4))
+	       || (mode == V2x8HFmode && NEON_REGNO_OK_FOR_NREGS (regno, 4))
+	       || (mode == V2x4SFmode && NEON_REGNO_OK_FOR_NREGS (regno, 4))
+	       || (mode == XImode && NEON_REGNO_OK_FOR_NREGS (regno, 8))
+	       || (mode == V4x16QImode && NEON_REGNO_OK_FOR_NREGS (regno, 8))
+	       || (mode == V4x8HImode && NEON_REGNO_OK_FOR_NREGS (regno, 8))
+	       || (mode == V4x4SImode && NEON_REGNO_OK_FOR_NREGS (regno, 8))
+	       || (mode == V4x8HFmode && NEON_REGNO_OK_FOR_NREGS (regno, 8))
+	       || (mode == V4x4SFmode && NEON_REGNO_OK_FOR_NREGS (regno, 8)));
 
       return false;
     }
@@ -29759,6 +29814,27 @@ arm_vector_mode_supported_p (machine_mode mode)
   return false;
 }
 
+/* Implements target hook array_mode.  */
+static opt_machine_mode
+arm_array_mode (machine_mode mode, unsigned HOST_WIDE_INT nelems)
+{
+  if (TARGET_HAVE_MVE
+      /* MVE accepts only tuples of 2 or 4 vectors.  */
+      && (nelems == 2
+	  || nelems == 4))
+    {
+      machine_mode struct_mode;
+      FOR_EACH_MODE_IN_CLASS (struct_mode, GET_MODE_CLASS (mode))
+	{
+	  if (GET_MODE_INNER (struct_mode) == GET_MODE_INNER (mode)
+	      && known_eq (GET_MODE_NUNITS (struct_mode),
+			   GET_MODE_NUNITS (mode) * nelems))
+	    return struct_mode;
+	}
+    }
+  return opt_machine_mode ();
+}
+
 /* Implements target hook array_mode_supported_p.  */
 
 static bool
@@ -31139,10 +31215,10 @@ int
 vfp3_const_double_for_fract_bits (rtx operand)
 {
   REAL_VALUE_TYPE r0;
-  
+
   if (!CONST_DOUBLE_P (operand))
     return 0;
-  
+
   r0 = *CONST_DOUBLE_REAL_VALUE (operand);
   if (exact_real_inverse (DFmode, &r0)
       && !REAL_VALUE_NEGATIVE (r0))
@@ -31777,50 +31853,6 @@ arm_expand_vector_compare (rtx target, rtx_code code, rtx op0, rtx op1,
     }
 }
 
-/* Expand a vcond or vcondu pattern with operands OPERANDS.
-   CMP_RESULT_MODE is the mode of the comparison result.  */
-
-void
-arm_expand_vcond (rtx *operands, machine_mode cmp_result_mode)
-{
-  /* When expanding for MVE, we do not want to emit a (useless) vpsel in
-     arm_expand_vector_compare, and another one here.  */
-  rtx mask;
-
-  if (TARGET_HAVE_MVE)
-    mask = gen_reg_rtx (arm_mode_to_pred_mode (cmp_result_mode).require ());
-  else
-    mask = gen_reg_rtx (cmp_result_mode);
-
-  bool inverted = arm_expand_vector_compare (mask, GET_CODE (operands[3]),
-					     operands[4], operands[5], true);
-  if (inverted)
-    std::swap (operands[1], operands[2]);
-  if (TARGET_NEON)
-  emit_insn (gen_neon_vbsl (GET_MODE (operands[0]), operands[0],
-			    mask, operands[1], operands[2]));
-  else
-    {
-      machine_mode cmp_mode = GET_MODE (operands[0]);
-
-      switch (GET_MODE_CLASS (cmp_mode))
-	{
-	case MODE_VECTOR_INT:
-	  emit_insn (gen_mve_q (VPSELQ_S, VPSELQ_S, cmp_mode, operands[0],
-				operands[1], operands[2], mask));
-	  break;
-	case MODE_VECTOR_FLOAT:
-	  if (TARGET_HAVE_MVE_FLOAT)
-	    emit_insn (gen_mve_q_f (VPSELQ_F, cmp_mode, operands[0],
-				    operands[1], operands[2], mask));
-	  else
-	    gcc_unreachable ();
-	  break;
-	default:
-	  gcc_unreachable ();
-	}
-    }
-}
 
 #define MAX_VECT_LEN 16
 
@@ -32404,7 +32436,7 @@ arm_autoinc_modes_ok_p (machine_mode mode, enum arm_auto_incmodes code)
 	  else
 	    return false;
 	}
-      
+
       return true;
 
     case ARM_POST_DEC:
@@ -32421,10 +32453,10 @@ arm_autoinc_modes_ok_p (machine_mode mode, enum arm_auto_incmodes code)
 	return false;
 
       return true;
-     
+
     default:
       return false;
-      
+
     }
 
   return false;
@@ -32435,7 +32467,7 @@ arm_autoinc_modes_ok_p (machine_mode mode, enum arm_auto_incmodes code)
    Additionally, the default expansion code is not available or suitable
    for post-reload insn splits (this can occur when the register allocator
    chooses not to do a shift in NEON).
-   
+
    This function is used in both initial expand and post-reload splits, and
    handles all kinds of 64-bit shifts.
 
@@ -33465,6 +33497,15 @@ aarch_gen_bti_j (void)
   return gen_bti_nop ();
 }
 
+/* For AArch32, we always return false because indirect_return attribute
+   is only supported on AArch64 targets.  */
+
+bool
+aarch_fun_is_indirect_return (rtx_insn *)
+{
+  return false;
+}
+
 /* Implement TARGET_SCHED_CAN_SPECULATE_INSN.  Return true if INSN can be
    scheduled for speculative execution.  Reject the long-running division
    and square-root instructions.  */
@@ -33505,7 +33546,7 @@ arm_asan_shadow_offset (void)
 
 /* This is a temporary fix for PR60655.  Ideally we need
    to handle most of these cases in the generic part but
-   currently we reject minus (..) (sym_ref).  We try to 
+   currently we reject minus (..) (sym_ref).  We try to
    ameliorate the case with minus (sym_ref1) (sym_ref2)
    where they are in the same section.  */
 
@@ -33828,7 +33869,7 @@ arm_valid_target_attribute_tree (tree args, struct gcc_options *opts,
   return build_target_option_node (opts, opts_set);
 }
 
-static void 
+static void
 add_attribute (const char * mode, tree *attributes)
 {
   size_t len = strlen (mode);
@@ -33859,7 +33900,7 @@ arm_insert_attributes (tree fndecl, tree * attributes)
   /* Nested definitions must inherit mode.  */
   if (current_function_decl)
    {
-     mode = TARGET_THUMB ? "thumb" : "arm";      
+     mode = TARGET_THUMB ? "thumb" : "arm";
      add_attribute (mode, attributes);
      return;
    }
@@ -34332,7 +34373,7 @@ arm_expand_divmod_libfunc (rtx libfunc, machine_mode mode,
     gcc_assert (!TARGET_IDIV);
 
   scalar_int_mode libval_mode
-    = smallest_int_mode_for_size (2 * GET_MODE_BITSIZE (mode));
+    = smallest_int_mode_for_size (2 * GET_MODE_BITSIZE (mode)).require ();
 
   rtx libval = emit_library_call_value (libfunc, NULL_RTX, LCT_CONST,
 					libval_mode, op0, mode, op1, mode);
@@ -34452,6 +34493,30 @@ arm_coproc_ldc_stc_legitimate_address (rtx op)
 	gcc_unreachable ();
     }
   return false;
+}
+
+/* Return true if OP is a valid memory operand for LDRD/STRD without any
+   register overlap restrictions.  Allow [base] and [base, imm] for now.  */
+bool
+arm_ldrd_legitimate_address (rtx op)
+{
+  if (!MEM_P (op))
+    return false;
+
+  op = XEXP (op, 0);
+  if (REG_P (op))
+    return true;
+
+  if (GET_CODE (op) != PLUS)
+    return false;
+  if (!REG_P (XEXP (op, 0)) || !CONST_INT_P (XEXP (op, 1)))
+    return false;
+
+  HOST_WIDE_INT val = INTVAL (XEXP (op, 1));
+
+  if (TARGET_ARM)
+    return IN_RANGE (val, -255, 255);
+  return IN_RANGE (val, -1020, 1020) && (val & 3) == 0;
 }
 
 /* Return the diagnostic message string if conversion from FROMTYPE to
@@ -35214,6 +35279,32 @@ arm_mve_dlstp_check_inc_counter (loop *loop, rtx_insn* vctp_insn,
   return vctp_insn;
 }
 
+/* Helper function to 'arm_mve_dlstp_check_dec_counter' to make sure DEC_INSN
+   is of the expected form:
+   (set (reg a) (plus (reg a) (const_int)))
+   where (reg a) is the same as CONDCOUNT.
+   Return a rtx with the set if it is in the right format or NULL_RTX
+   otherwise.  */
+
+static rtx
+check_dec_insn (rtx_insn *dec_insn, rtx condcount)
+{
+  if (!NONDEBUG_INSN_P (dec_insn))
+    return NULL_RTX;
+  rtx dec_set = single_set (dec_insn);
+  if (!dec_set
+      || !REG_P (SET_DEST (dec_set))
+      || GET_CODE (SET_SRC (dec_set)) != PLUS
+      || !REG_P (XEXP (SET_SRC (dec_set), 0))
+      || !CONST_INT_P (XEXP (SET_SRC (dec_set), 1))
+      || REGNO (SET_DEST (dec_set))
+	  != REGNO (XEXP (SET_SRC (dec_set), 0))
+      || REGNO (SET_DEST (dec_set)) != REGNO (condcount))
+    return NULL_RTX;
+
+  return dec_set;
+}
+
 /* Helper function to `arm_mve_loop_valid_for_dlstp`.  In the case of a
    counter that is decrementing, ensure that it is decrementing by the
    right amount in each iteration and that the target condition is what
@@ -35230,30 +35321,19 @@ arm_mve_dlstp_check_dec_counter (loop *loop, rtx_insn* vctp_insn,
      loop latch.  Here we simply need to verify that this counter is the same
      reg that is also used in the vctp_insn and that it is not otherwise
      modified.  */
-  rtx_insn *dec_insn = BB_END (loop->latch);
+  rtx dec_set = check_dec_insn (BB_END (loop->latch), condcount);
   /* If not in the loop latch, try to find the decrement in the loop header.  */
-  if (!NONDEBUG_INSN_P (dec_insn))
+  if (dec_set == NULL_RTX)
   {
     df_ref temp = df_bb_regno_only_def_find (loop->header, REGNO (condcount));
     /* If we haven't been able to find the decrement, bail out.  */
     if (!temp)
       return NULL;
-    dec_insn = DF_REF_INSN (temp);
+    dec_set = check_dec_insn (DF_REF_INSN (temp), condcount);
+
+    if (dec_set == NULL_RTX)
+      return NULL;
   }
-
-  rtx dec_set = single_set (dec_insn);
-
-  /* Next, ensure that it is a PLUS of the form:
-     (set (reg a) (plus (reg a) (const_int)))
-     where (reg a) is the same as condcount.  */
-  if (!dec_set
-      || !REG_P (SET_DEST (dec_set))
-      || !REG_P (XEXP (SET_SRC (dec_set), 0))
-      || !CONST_INT_P (XEXP (SET_SRC (dec_set), 1))
-      || REGNO (SET_DEST (dec_set))
-	  != REGNO (XEXP (SET_SRC (dec_set), 0))
-      || REGNO (SET_DEST (dec_set)) != REGNO (condcount))
-    return NULL;
 
   decrementnum = INTVAL (XEXP (SET_SRC (dec_set), 1));
 
@@ -35328,9 +35408,10 @@ arm_mve_dlstp_check_dec_counter (loop *loop, rtx_insn* vctp_insn,
     return NULL;
   else if (REG_P (condconst))
     {
-      basic_block pre_loop_bb = single_pred (loop_preheader_edge (loop)->src);
-      if (!pre_loop_bb)
+      basic_block preheader_b = loop_preheader_edge (loop)->src;
+      if (!single_pred_p (preheader_b))
 	return NULL;
+      basic_block pre_loop_bb = single_pred (preheader_b);
 
       rtx initial_compare = NULL_RTX;
       if (!(prev_nonnote_nondebug_insn_bb (BB_END (pre_loop_bb))
@@ -35796,7 +35877,8 @@ arm_attempt_dlstp_transform (rtx label)
 	  df_ref insn_uses = NULL;
 	  FOR_EACH_INSN_USE (insn_uses, insn)
 	  {
-	    if (rtx_equal_p (vctp_vpr_generated, DF_REF_REG (insn_uses)))
+	    if (reg_overlap_mentioned_p (vctp_vpr_generated,
+					 DF_REF_REG (insn_uses)))
 	      {
 		end_sequence ();
 		return 1;
@@ -36044,6 +36126,9 @@ arm_mode_base_reg_class (machine_mode mode)
   return MODE_BASE_REG_REG_CLASS (mode);
 }
 
+#undef TARGET_DOCUMENTATION_NAME
+#define TARGET_DOCUMENTATION_NAME "ARM"
+
 struct gcc_target targetm = TARGET_INITIALIZER;
 
 /* Implement TARGET_VECTORIZE_GET_MASK_MODE.  */
@@ -36055,6 +36140,143 @@ arm_get_mask_mode (machine_mode mode)
     return arm_mode_to_pred_mode (mode);
 
   return default_get_mask_mode (mode);
+}
+
+/* Helper function to determine whether SEQ represents a sequence of
+   instructions representing the vsel<cond> floating point instructions.
+   This is an heuristic to check whether the proposed optimisation is desired,
+   the choice has no consequence for correctness.  */
+static bool
+arm_is_vsel_fp_insn (rtx_insn *seq)
+{
+  rtx_insn *curr_insn = seq;
+  rtx set = NULL_RTX;
+  /* The pattern may start with a simple set with register operands.  Skip
+     through any of those.  */
+  while (curr_insn)
+    {
+      set = single_set (curr_insn);
+      if (!set
+	  || !REG_P (SET_DEST (set)))
+	return false;
+
+      if (!REG_P (SET_SRC (set)))
+	break;
+      curr_insn = NEXT_INSN (curr_insn);
+    }
+
+  if (!set)
+    return false;
+
+  /* The next instruction should be a compare.  */
+  if (!REG_P (SET_DEST (set))
+      || GET_CODE (SET_SRC (set)) != COMPARE)
+    return false;
+
+  curr_insn = NEXT_INSN (curr_insn);
+  if (!curr_insn)
+    return false;
+
+  /* And the last instruction should be an IF_THEN_ELSE.  */
+  set = single_set (curr_insn);
+  if (!set
+      || !REG_P (SET_DEST (set))
+      || GET_CODE (SET_SRC (set)) != IF_THEN_ELSE)
+    return false;
+
+  return !NEXT_INSN (curr_insn);
+}
+
+
+/* Helper function to determine whether SEQ represents a sequence of
+   instructions representing the Armv8.1-M Mainline conditional arithmetic
+   instructions: csinc, csneg and csinv. The cinc instruction is generated
+   using a different mechanism.
+   This is an heuristic to check whether the proposed optimisation is desired,
+   the choice has no consequence for correctness.  */
+
+static bool
+arm_is_v81m_cond_insn (rtx_insn *seq)
+{
+  rtx_insn *curr_insn = seq;
+  rtx set = NULL_RTX;
+  /* The pattern may start with a simple set with register operands.  Skip
+     through any of those.  */
+  while (curr_insn)
+    {
+      set = single_set (curr_insn);
+      if (!set
+	  || !REG_P (SET_DEST (set)))
+	return false;
+
+      if (!REG_P (SET_SRC (set)))
+	break;
+      curr_insn = NEXT_INSN (curr_insn);
+    }
+
+  if (!set)
+    return false;
+
+  /* The next instruction should be one of:
+     NEG: for csneg,
+     PLUS: for csinc,
+     NOT: for csinv.  */
+  if (GET_CODE (SET_SRC (set)) != NEG
+      && GET_CODE (SET_SRC (set)) != PLUS
+      && GET_CODE (SET_SRC (set)) != NOT)
+    return false;
+
+  curr_insn = NEXT_INSN (curr_insn);
+  if (!curr_insn)
+    return false;
+
+  /* The next instruction should be a COMPARE.  */
+  set = single_set (curr_insn);
+  if (!set
+      || !REG_P (SET_DEST (set))
+      || GET_CODE (SET_SRC (set)) != COMPARE)
+    return false;
+
+  curr_insn = NEXT_INSN (curr_insn);
+  if (!curr_insn)
+    return false;
+
+  /* And the last instruction should be an IF_THEN_ELSE.  */
+  set = single_set (curr_insn);
+  if (!set
+      || !REG_P (SET_DEST (set))
+      || GET_CODE (SET_SRC (set)) != IF_THEN_ELSE)
+    return false;
+
+  return !NEXT_INSN (curr_insn);
+}
+
+/* For Armv8.1-M Mainline we have both conditional execution through IT blocks,
+   as well as conditional arithmetic instructions controlled by
+   TARGET_COND_ARITH.  To generate the latter we rely on a special part of the
+   "ce" pass that generates code for targets that don't support conditional
+   execution of general instructions known as "noce".  These transformations
+   happen before 'reload_completed'.  However, "noce" also triggers for some
+   unwanted patterns [PR 116444] that prevent "ce" optimisations after reload.
+   To make sure we can get both we use the TARGET_NOCE_CONVERSION_PROFITABLE_P
+   hook to only allow "noce" to generate the patterns that are profitable.  */
+
+bool
+arm_noce_conversion_profitable_p (rtx_insn *seq, struct noce_if_info *if_info)
+{
+  if (!TARGET_COND_ARITH
+      || reload_completed)
+    return default_noce_conversion_profitable_p (seq, if_info);
+
+  if (arm_is_v81m_cond_insn (seq))
+    return true;
+
+  /* Look for vsel<cond> opportunities as we still want to codegen these for
+     Armv8.1-M Mainline targets.  */
+  if (arm_is_vsel_fp_insn (seq))
+    return true;
+
+  return false;
 }
 
 /* Output assembly to read the thread pointer from the appropriate TPIDR
@@ -36085,6 +36307,20 @@ arm_output_load_tpidr (rtx dst, bool pred_p)
 	    pred_p ? "%?" : "", tpidr_coproc_num);
   output_asm_insn (buf, &dst);
   return "";
+}
+
+/* Return the MVE vector mode that has NUNITS elements of mode INNER_MODE.  */
+opt_machine_mode
+arm_mve_data_mode (scalar_mode inner_mode, poly_uint64 nunits)
+{
+  enum mode_class mclass
+    = (SCALAR_FLOAT_MODE_P (inner_mode) ? MODE_VECTOR_FLOAT : MODE_VECTOR_INT);
+  machine_mode mode;
+  FOR_EACH_MODE_IN_CLASS (mode, mclass)
+    if (inner_mode == GET_MODE_INNER (mode)
+	&& known_eq (nunits, GET_MODE_NUNITS (mode)))
+      return mode;
+  return opt_machine_mode ();
 }
 
 #include "gt-arm.h"

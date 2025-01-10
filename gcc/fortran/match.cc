@@ -1,5 +1,5 @@
 /* Matching subroutines in all sizes, shapes and colors.
-   Copyright (C) 2000-2024 Free Software Foundation, Inc.
+   Copyright (C) 2000-2025 Free Software Foundation, Inc.
    Contributed by Andy Vaught
 
 This file is part of GCC.
@@ -675,16 +675,21 @@ gfc_match_sym_tree (gfc_symtree **matched_symbol, int host_assoc)
 {
   char buffer[GFC_MAX_SYMBOL_LEN + 1];
   match m;
+  int ret;
 
+  locus loc = gfc_current_locus;
   m = gfc_match_name (buffer);
   if (m != MATCH_YES)
     return m;
-
+  loc = gfc_get_location_range (NULL, 0, &loc, 1, &gfc_current_locus);
   if (host_assoc)
-    return (gfc_get_ha_sym_tree (buffer, matched_symbol))
-	    ? MATCH_ERROR : MATCH_YES;
+    {
+      ret = gfc_get_ha_sym_tree (buffer, matched_symbol, &loc);
+      return ret ? MATCH_ERROR : MATCH_YES;
+    }
 
-  if (gfc_get_sym_tree (buffer, NULL, matched_symbol, false))
+  ret = gfc_get_sym_tree (buffer, NULL, matched_symbol, false, &loc);
+  if (ret)
     return MATCH_ERROR;
 
   return MATCH_YES;
@@ -1920,7 +1925,29 @@ gfc_match_associate (void)
       gfc_association_list* a;
 
       /* Match the next association.  */
-      if (gfc_match (" %n =>", newAssoc->name) != MATCH_YES)
+      if (gfc_match (" %n ", newAssoc->name) != MATCH_YES)
+	{
+	  gfc_error ("Expected associate name at %C");
+	  goto assocListError;
+	}
+
+      /* Required for an assumed rank target.  */
+      if (gfc_peek_char () == '(')
+	{
+	  newAssoc->ar = gfc_get_array_ref ();
+	  if (gfc_match_array_ref (newAssoc->ar, NULL, 0, 0) != MATCH_YES)
+	    {
+	      gfc_error ("Bad bounds remapping list at %C");
+	      goto assocListError;
+	    }
+	}
+
+      if (newAssoc->ar && !(gfc_option.allow_std & GFC_STD_F202Y))
+	gfc_error_now ("The bounds remapping list at %C is an experimental "
+		       "F202y feature. Use std=f202y to enable");
+
+      /* Match the next association.  */
+      if (gfc_match (" =>", newAssoc->name) != MATCH_YES)
 	{
 	  gfc_error ("Expected association at %C");
 	  goto assocListError;
@@ -1962,6 +1989,35 @@ gfc_match_associate (void)
 	  gfc_error ("Association target at %L cannot be a BOZ literal "
 		     "constant", &newAssoc->target->where);
 	  goto assocListError;
+	}
+
+      if (newAssoc->target->expr_type == EXPR_VARIABLE
+	  && newAssoc->target->symtree->n.sym->as
+	  && newAssoc->target->symtree->n.sym->as->type == AS_ASSUMED_RANK)
+	{
+	  bool bounds_remapping_list = true;
+	  if (!newAssoc->ar)
+	    bounds_remapping_list = false;
+	  else
+	    for (int dim = 0; dim < newAssoc->ar->dimen; dim++)
+	      if (!newAssoc->ar->start[dim] || !newAssoc->ar->end[dim]
+		  || newAssoc->ar->stride[dim] != NULL)
+		bounds_remapping_list = false;
+
+	  if (!bounds_remapping_list)
+	    {
+	      gfc_error ("The associate name %s with an assumed rank "
+			 "target at %L must have a bounds remapping list "
+			 "(list of lbound:ubound for each dimension)",
+			 newAssoc->name, &newAssoc->target->where);
+	      goto assocListError;
+	    }
+
+	  if (!newAssoc->target->symtree->n.sym->attr.contiguous)
+	    {
+	      gfc_error ("The assumed rank target at %C must be contiguous");
+	      goto assocListError;
+	    }
 	}
 
       /* The `variable' field is left blank for now; because the target is not
@@ -2128,6 +2184,13 @@ gfc_match_type_spec (gfc_typespec *ts)
   if (gfc_match ("integer") == MATCH_YES)
     {
       ts->type = BT_INTEGER;
+      ts->kind = gfc_default_integer_kind;
+      goto kind_selector;
+    }
+
+  if (flag_unsigned && gfc_match ("unsigned") == MATCH_YES)
+    {
+      ts->type = BT_UNSIGNED;
       ts->kind = gfc_default_integer_kind;
       goto kind_selector;
     }
@@ -5540,10 +5603,11 @@ gfc_free_namelist (gfc_namelist *name)
 void
 gfc_free_omp_namelist (gfc_omp_namelist *name, bool free_ns,
 		       bool free_align_allocator,
-		       bool free_mem_traits_space)
+		       bool free_mem_traits_space, bool free_init)
 {
   gfc_omp_namelist *n;
   gfc_expr *last_allocator = NULL;
+  char *last_init_interop = NULL;
 
   for (; name; name = n)
     {
@@ -5552,6 +5616,7 @@ gfc_free_omp_namelist (gfc_omp_namelist *name, bool free_ns,
 	gfc_free_expr (name->u.align);
       else if (free_mem_traits_space)
 	{ }  /* name->u.memspace_sym: shall not call gfc_free_symbol here. */
+
       if (free_ns)
 	gfc_free_namespace (name->u2.ns);
       else if (free_align_allocator)
@@ -5564,6 +5629,14 @@ gfc_free_omp_namelist (gfc_omp_namelist *name, bool free_ns,
 	}
       else if (free_mem_traits_space)
 	{ }  /* name->u2.traits_sym: shall not call gfc_free_symbol here. */
+      else if (free_init)
+	{
+	  if (name->u2.init_interop != last_init_interop)
+	    {
+	      last_init_interop = name->u2.init_interop;
+	      free (name->u2.init_interop);
+	    }
+	}
       else if (name->u2.udr)
 	{
 	  if (name->u2.udr->combiner)
@@ -5603,9 +5676,11 @@ gfc_match_namelist (void)
 	  return MATCH_ERROR;
 	}
 
+      /* A use associated name shall not be used as a namelist group name
+	 (e.g. F2003:C581).  It is only supported as a legacy extension.  */
       if (group_name->attr.flavor == FL_NAMELIST
 	  && group_name->attr.use_assoc
-	  && !gfc_notify_std (GFC_STD_GNU, "Namelist group name %qs "
+	  && !gfc_notify_std (GFC_STD_LEGACY, "Namelist group name %qs "
 			      "at %C already is USE associated and can"
 			      "not be respecified.", group_name->name))
 	return MATCH_ERROR;
@@ -6194,7 +6269,9 @@ match_case_selector (gfc_case **cp)
 	goto cleanup;
 
       if (c->high->ts.type != BT_LOGICAL && c->high->ts.type != BT_INTEGER
-	  && c->high->ts.type != BT_CHARACTER)
+	  && c->high->ts.type != BT_CHARACTER
+	  && (!flag_unsigned
+	      || (flag_unsigned && c->high->ts.type != BT_UNSIGNED)))
 	{
 	  gfc_error ("Expression in CASE selector at %L cannot be %s",
 		     &c->high->where, gfc_typename (&c->high->ts));
@@ -6210,7 +6287,9 @@ match_case_selector (gfc_case **cp)
 	goto need_expr;
 
       if (c->low->ts.type != BT_LOGICAL && c->low->ts.type != BT_INTEGER
-	  && c->low->ts.type != BT_CHARACTER)
+	  && c->low->ts.type != BT_CHARACTER
+	  && (!flag_unsigned
+	      || (flag_unsigned && c->low->ts.type != BT_UNSIGNED)))
 	{
 	  gfc_error ("Expression in CASE selector at %L cannot be %s",
 		     &c->low->where, gfc_typename (&c->low->ts));
@@ -6229,7 +6308,9 @@ match_case_selector (gfc_case **cp)
 	  if (m == MATCH_YES
 	      && c->high->ts.type != BT_LOGICAL
 	      && c->high->ts.type != BT_INTEGER
-	      && c->high->ts.type != BT_CHARACTER)
+	      && c->high->ts.type != BT_CHARACTER
+	      && (!flag_unsigned
+		  || (flag_unsigned && c->high->ts.type != BT_UNSIGNED)))
 	    {
 	      gfc_error ("Expression in CASE selector at %L cannot be %s",
 			 &c->high->where, gfc_typename (c->high));

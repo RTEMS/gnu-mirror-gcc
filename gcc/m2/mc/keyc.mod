@@ -1,5 +1,5 @@
 (* keyc maintains the C name scope and avoids C/C++ name conflicts.
-   Copyright (C) 2016-2024 Free Software Foundation, Inc.
+   Copyright (C) 2016-2025 Free Software Foundation, Inc.
 
 This file is part of GNU Modula-2.
 
@@ -13,10 +13,9 @@ WARRANTY; without even the implied warranty of MERCHANTABILITY or
 FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
 for more details.
 
-You should have received a copy of the GNU General Public License along
-with gm2; see the file COPYING.  If not, write to the Free Software
-Foundation, 51 Franklin Street, Fifth Floor,
-Boston, MA 02110-1301, USA. *)
+You should have received a copy of the GNU General Public License
+along with GCC; see the file COPYING3.  If not see
+<http://www.gnu.org/licenses/>.  *)
 
 IMPLEMENTATION MODULE keyc ;
 
@@ -45,6 +44,8 @@ VAR
    initializedCP,
    initializedGCC,
 
+   seenGccTree,
+   seenGccLocation,
    seenIntMin,
    seenUIntMin,
    seenLongMin,
@@ -94,11 +95,33 @@ BEGIN
       IF NOT initializedGCC
       THEN
          initializedGCC := TRUE ;
+         print (p, '#define INCLUDE_MEMORY\n');
          print (p, '#include "config.h"\n');
          print (p, '#include "system.h"\n');
+         checkGccTypes (p)
       END
    END
 END checkGccConfigSystem ;
+
+
+(*
+   useGccTree - indicate we have imported tree from gcctypes.
+*)
+
+PROCEDURE useGccTree ;
+BEGIN
+   seenGccTree := TRUE
+END useGccTree ;
+
+
+(*
+   useGccLocation - indicate we have imported tree from gcctypes.
+*)
+
+PROCEDURE useGccLocation ;
+BEGIN
+   seenGccLocation := TRUE
+END useGccLocation ;
 
 
 (*
@@ -242,16 +265,6 @@ END useUCharMin ;
 
 
 (*
-   useUIntMin - indicate we have used UINT_MIN.
-*)
-
-PROCEDURE useUIntMin ;
-BEGIN
-   seenUIntMin := TRUE
-END useUIntMin ;
-
-
-(*
    useIntMax - indicate we have used INT_MAX.
 *)
 
@@ -309,16 +322,6 @@ PROCEDURE useUCharMax ;
 BEGIN
    seenUCharMax := TRUE
 END useUCharMax ;
-
-
-(*
-   useUIntMax - indicate we have used UINT_MAX.
-*)
-
-PROCEDURE useUIntMax ;
-BEGIN
-   seenUIntMax := TRUE
-END useUIntMax ;
 
 
 (*
@@ -413,6 +416,20 @@ END useCtype ;
 
 
 (*
+   checkGccTypes - if we have imported tree or location_t from gcctypes
+                   then we include the gcc headers.
+*)
+
+PROCEDURE checkGccTypes (p: pretty) ;
+BEGIN
+   IF seenGccTree OR seenGccLocation
+   THEN
+      print (p, '#include "gcc-consolidation.h"\n\n')
+   END
+END checkGccTypes ;
+
+
+(*
    checkCtype -
 *)
 
@@ -420,7 +437,7 @@ PROCEDURE checkCtype (p: pretty) ;
 BEGIN
    IF seenCtype
    THEN
-      checkGccConfigSystem (p);
+      checkGccConfigSystem (p) ;
       IF getGccConfigSystem ()
       THEN
          (* GCC header files use a safe variant.  *)
@@ -1150,6 +1167,8 @@ BEGIN
    seenSize_t := FALSE ;
    seenSSize_t := FALSE ;
    seenSysTypes := FALSE ;
+   seenGccTree := FALSE ;
+   seenGccLocation := FALSE ;
    initializedCP := FALSE ;
    initializedGCC := FALSE ;
 

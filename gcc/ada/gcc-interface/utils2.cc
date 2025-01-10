@@ -6,7 +6,7 @@
  *                                                                          *
  *                          C Implementation File                           *
  *                                                                          *
- *          Copyright (C) 1992-2024, Free Software Foundation, Inc.         *
+ *          Copyright (C) 1992-2025, Free Software Foundation, Inc.         *
  *                                                                          *
  * GNAT is free software;  you can  redistribute it  and/or modify it under *
  * terms of the  GNU General Public License as published  by the Free Soft- *
@@ -661,7 +661,7 @@ fast_modulo_reduction (tree op, tree modulus, unsigned int precision)
 	  if (type_precision < BITS_PER_WORD)
 	    {
 	      const scalar_int_mode m
-		= smallest_int_mode_for_size (type_precision + 1);
+		= smallest_int_mode_for_size (type_precision + 1).require ();
 	      tree new_type = gnat_type_for_mode (m, 1);
 	      op = fold_convert (new_type, op);
 	      modulus = fold_convert (new_type, modulus);
@@ -721,7 +721,8 @@ nonbinary_modular_operation (enum tree_code op_code, tree type, tree lhs,
      for its mode since operations are ultimately performed in the mode.  */
   if (TYPE_PRECISION (type) < precision)
     {
-      const scalar_int_mode m = smallest_int_mode_for_size (precision);
+      const scalar_int_mode m
+	= smallest_int_mode_for_size (precision).require ();
       op_type = gnat_type_for_mode (m, 1);
       modulus = fold_convert (op_type, modulus);
       lhs = fold_convert (op_type, lhs);
@@ -2112,7 +2113,23 @@ compare_elmt_bitpos (const void *rt1, const void *rt2)
   const int ret
     = tree_int_cst_compare (bit_position (field1), bit_position (field2));
 
-  return ret ? ret : (int) (DECL_UID (field1) - DECL_UID (field2));
+  if (ret)
+    return ret;
+
+  /* The bit position can be the same if one of the fields has zero size.
+     In this case, if the other has nonzero size, put the former first to
+     match the layout done by components_to_record.  Otherwise, preserve
+     the order of the source code.  */
+
+  const bool field1_zero_size = integer_zerop (DECL_SIZE (field1));
+  const bool field2_zero_size = integer_zerop (DECL_SIZE (field2));
+
+  if (field1_zero_size && !field2_zero_size)
+    return -1;
+  else if (!field1_zero_size && field2_zero_size)
+    return 1;
+  else
+    return (int) (DECL_UID (field1) - DECL_UID (field2));
 }
 
 /* Return a CONSTRUCTOR of TYPE whose elements are V.  */

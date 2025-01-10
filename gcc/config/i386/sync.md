@@ -1,5 +1,5 @@
 ;; GCC machine description for i386 synchronization instructions.
-;; Copyright (C) 2005-2024 Free Software Foundation, Inc.
+;; Copyright (C) 2005-2025 Free Software Foundation, Inc.
 ;;
 ;; This file is part of GCC.
 ;;
@@ -170,7 +170,7 @@
   if (<MODE>mode == DImode && !TARGET_64BIT)
     emit_insn (gen_atomic_loaddi_fpu
 	       (operands[0], operands[1],
-	        assign_386_stack_local (DImode, SLOT_TEMP)));
+	        assign_stack_temp (DImode, GET_MODE_SIZE (DImode))));
   else
     {
       rtx dst = operands[0];
@@ -251,7 +251,7 @@
 	 out to be significantly larger than this plus a barrier.  */
       emit_insn (gen_atomic_storedi_fpu
 		 (operands[0], operands[1],
-	          assign_386_stack_local (DImode, SLOT_TEMP)));
+	          assign_stack_temp (DImode, GET_MODE_SIZE (DImode))));
     }
   else
     {

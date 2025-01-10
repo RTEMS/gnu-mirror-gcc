@@ -1,5 +1,5 @@
 /* Default target hook functions.
-   Copyright (C) 2003-2024 Free Software Foundation, Inc.
+   Copyright (C) 2003-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -95,6 +95,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-vectorizer.h"
 #include "options.h"
 #include "case-cfn-macros.h"
+#include "avoid-store-forwarding.h"
 
 bool
 default_legitimate_address_p (machine_mode mode ATTRIBUTE_UNUSED,
@@ -1769,7 +1770,7 @@ void
 default_addr_space_diagnose_usage (addr_space_t, location_t)
 {
 }
-	 
+
 
 /* The default hook for TARGET_ADDR_SPACE_CONVERT. This hook should never be
    called for targets with only a generic address space.  */
@@ -2232,7 +2233,7 @@ reg_class_t
 default_preferred_reload_class (rtx x ATTRIBUTE_UNUSED,
 			        reg_class_t rclass)
 {
-#ifdef PREFERRED_RELOAD_CLASS 
+#ifdef PREFERRED_RELOAD_CLASS
   return (reg_class_t) PREFERRED_RELOAD_CLASS (x, (enum reg_class) rclass);
 #else
   return rclass;
@@ -2278,6 +2279,32 @@ default_class_max_nregs (reg_class_t rclass ATTRIBUTE_UNUSED,
   unsigned int size = GET_MODE_SIZE (mode).to_constant ();
   return (size + UNITS_PER_WORD - 1) / UNITS_PER_WORD;
 #endif
+}
+
+/* The default implementation of TARGET_AVOID_STORE_FORWARDING_P.  */
+
+bool
+default_avoid_store_forwarding_p (vec<store_fwd_info>, rtx, int total_cost,
+				  bool)
+{
+  /* Use a simple cost heurstic base on param_store_forwarding_max_distance.
+     In general the distance should be somewhat correlated to the store
+     forwarding penalty; if the penalty is large then it is justified to
+     increase the window size.  Use this to reject sequences that are clearly
+     unprofitable.
+     Skip the cost check if param_store_forwarding_max_distance is 0.  */
+  int max_cost = COSTS_N_INSNS (param_store_forwarding_max_distance / 2);
+  const bool unlimited_cost = (param_store_forwarding_max_distance == 0);
+  if (!unlimited_cost && total_cost > max_cost && max_cost)
+    {
+      if (dump_file)
+	fprintf (dump_file, "Not transformed due to cost: %d > %d.\n",
+		 total_cost, max_cost);
+
+      return false;
+    }
+
+  return true;
 }
 
 /* Determine the debugging unwind mechanism for the target.  */

@@ -1,7 +1,7 @@
 // -*- C++ -*-
 // Iterator Wrappers for the C++ library testsuite.
 //
-// Copyright (C) 2004-2024 Free Software Foundation, Inc.
+// Copyright (C) 2004-2025 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -781,6 +781,26 @@ namespace __gnu_test
 	input_iterator_wrapper<T>::operator++();
 	return *this;
       }
+    };
+
+  // An input iterator type with an rvalue reference type.
+  template<typename T>
+    struct input_iterator_wrapper_rval : input_iterator_wrapper<T>
+    {
+      using input_iterator_wrapper<T>::input_iterator_wrapper;
+
+      using input_iterator_wrapper<T>::operator++;
+
+      input_iterator_wrapper_rval&
+      operator++()
+      {
+	input_iterator_wrapper<T>::operator++();
+	return *this;
+      }
+
+      T&&
+      operator*() const
+      { return std::move(input_iterator_wrapper<T>::operator*()); }
     };
 
   // A type meeting the minimum std::range requirements

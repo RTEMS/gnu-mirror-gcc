@@ -1,6 +1,6 @@
 /* Lower GIMPLE_SWITCH expressions to something more efficient than
    a jump table.
-   Copyright (C) 2006-2024 Free Software Foundation, Inc.
+   Copyright (C) 2006-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -54,6 +54,7 @@ Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
 #include "tree-cfgcleanup.h"
 #include "hwint.h"
 #include "internal-fn.h"
+#include "diagnostic-core.h"
 
 /* ??? For lang_hooks.types.type_for_mode, but is there a word_mode
    type in the GIMPLE type system that is language-independent?  */
@@ -64,64 +65,105 @@ Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
 using namespace tree_switch_conversion;
 
 /* Does the target have optabs needed to efficiently compute exact base two
-   logarithm of a value with type TYPE?
+   logarithm of a variable with type TYPE?
 
-   See gen_log2.  */
+   If yes, returns TYPE.  If no, returns NULL_TREE.  May also return another
+   type.  This indicates that logarithm of the variable can be computed but
+   only after it is converted to this type.
 
-static bool
+   Also see gen_log2.  */
+
+static tree
 can_log2 (tree type, optimization_type opt_type)
 {
-  /* Check if target supports FFS.  */
-  return direct_internal_fn_supported_p (IFN_FFS, type, opt_type);
+  /* Check if target supports FFS for given type.  */
+  if (direct_internal_fn_supported_p (IFN_FFS, type, opt_type))
+    return type;
+
+  /* Check if target supports FFS for some type we could convert to.  */
+  int prec = TYPE_PRECISION (type);
+  int i_prec = TYPE_PRECISION (integer_type_node);
+  int li_prec = TYPE_PRECISION (long_integer_type_node);
+  int lli_prec = TYPE_PRECISION (long_long_integer_type_node);
+  tree new_type;
+  if (prec <= i_prec
+      && direct_internal_fn_supported_p (IFN_FFS, integer_type_node, opt_type))
+    new_type = integer_type_node;
+  else if (prec <= li_prec
+	   && direct_internal_fn_supported_p (IFN_FFS, long_integer_type_node,
+					      opt_type))
+    new_type = long_integer_type_node;
+  else if (prec <= lli_prec
+	   && direct_internal_fn_supported_p (IFN_FFS,
+					      long_long_integer_type_node,
+					      opt_type))
+    new_type = long_long_integer_type_node;
+  else
+    return NULL_TREE;
+  return new_type;
 }
 
 /* Assume that OP is a power of two.  Build a sequence of gimple statements
    efficiently computing the base two logarithm of OP using special optabs.
    Return the ssa name represeting the result of the logarithm through RESULT.
 
-   Should only be used if target supports the needed optabs.  See can_log2.  */
+   Before computing the logarithm, OP may have to be converted to another type.
+   This should be specified in TYPE.  Use can_log2 to decide what this type
+   should be.
+
+   Should only be used if can_log2 doesn't reject the type of OP.  */
 
 static gimple_seq
-gen_log2 (tree op, location_t loc, tree *result)
+gen_log2 (tree op, location_t loc, tree *result, tree type)
 {
-  tree type = TREE_TYPE (op);
   gimple_seq stmts = NULL;
   gimple_stmt_iterator gsi = gsi_last (stmts);
-  tree tmp1 = gimple_build (&gsi, false, GSI_NEW_STMT, loc, IFN_FFS, type, op);
-  tree tmp2 = gimple_build (&gsi, false, GSI_NEW_STMT, loc, MINUS_EXPR, type,
-			    tmp1, build_one_cst (type));
-  *result = tmp2;
-  return stmts;
-}
 
-/* Build a sequence of gimple statements checking that OP is a power of 2.  Use
-   special optabs if target supports them.  Return the result as a
-   boolen_type_node ssa name through RESULT.  */
-
-static gimple_seq
-gen_pow2p (tree op, location_t loc, optimization_type opt_type, tree *result)
-{
-  tree type = TREE_TYPE (op);
-  gimple_seq stmts = NULL;
-  gimple_stmt_iterator gsi = gsi_last (stmts);
-  if (direct_internal_fn_supported_p (IFN_POPCOUNT, type, opt_type))
-    {
-      tree tmp = gimple_build (&gsi, false, GSI_NEW_STMT, loc, IFN_POPCOUNT,
-			       type, op);
-      *result = gimple_build (&gsi, false, GSI_NEW_STMT, loc, EQ_EXPR,
-			      boolean_type_node, tmp, build_one_cst (type));
-    }
+  tree orig_type = TREE_TYPE (op);
+  tree tmp1;
+  if (type != orig_type)
+    tmp1 = gimple_convert (&gsi, false, GSI_NEW_STMT, loc, type, op);
   else
-    {
-      tree tmp1 = gimple_build (&gsi, false, GSI_NEW_STMT, loc, NEGATE_EXPR,
-				type, op);
-      tree tmp2 = gimple_build (&gsi, false, GSI_NEW_STMT, loc, BIT_AND_EXPR,
-				type, op, tmp1);
-      *result = gimple_build (&gsi, false, GSI_NEW_STMT, loc, EQ_EXPR,
-			      boolean_type_node, tmp2, op);
-    }
+    tmp1 = op;
+  /* Build FFS (op) - 1.  */
+  tree tmp2 = gimple_build (&gsi, false, GSI_NEW_STMT, loc, IFN_FFS, orig_type,
+			    tmp1);
+  tree tmp3 = gimple_build (&gsi, false, GSI_NEW_STMT, loc, MINUS_EXPR,
+			    orig_type, tmp2, build_one_cst (orig_type));
+  *result = tmp3;
   return stmts;
 }
+
+/* Build a sequence of gimple statements checking that OP is a power of 2.
+   Return the result as a boolean_type_node ssa name through RESULT.  Assumes
+   that OP's value will be non-negative.  The generated check may give
+   arbitrary answer for negative values.  */
+
+static gimple_seq
+gen_pow2p (tree op, location_t loc, tree *result)
+{
+  gimple_seq stmts = NULL;
+  gimple_stmt_iterator gsi = gsi_last (stmts);
+
+  tree type = TREE_TYPE (op);
+  tree utype = unsigned_type_for (type);
+
+  /* Build (op ^ (op - 1)) > (op - 1).  */
+  tree tmp1;
+  if (types_compatible_p (type, utype))
+    tmp1 = op;
+  else
+    tmp1 = gimple_convert (&gsi, false, GSI_NEW_STMT, loc, utype, op);
+  tree tmp2 = gimple_build (&gsi, false, GSI_NEW_STMT, loc, MINUS_EXPR, utype,
+			    tmp1, build_one_cst (utype));
+  tree tmp3 = gimple_build (&gsi, false, GSI_NEW_STMT, loc, BIT_XOR_EXPR,
+			    utype, tmp1, tmp2);
+  *result = gimple_build (&gsi, false, GSI_NEW_STMT, loc, GT_EXPR,
+			  boolean_type_node, tmp3, tmp2);
+
+  return stmts;
+}
+
 
 /* Constructor.  */
 
@@ -285,7 +327,8 @@ switch_conversion::is_exp_index_transform_viable (gswitch *swtch)
   unsigned num_labels = gimple_switch_num_labels (swtch);
 
   optimization_type opt_type = bb_optimization_type (swtch_bb);
-  if (!can_log2 (index_type, opt_type))
+  m_exp_index_transform_log2_type = can_log2 (index_type, opt_type);
+  if (!m_exp_index_transform_log2_type)
     return false;
 
   /* Check that each case label corresponds only to one value
@@ -380,8 +423,7 @@ switch_conversion::exp_index_transform (gswitch *swtch)
   new_edge2->probability = profile_probability::even ();
 
   tree tmp;
-  optimization_type opt_type = bb_optimization_type (cond_bb);
-  gimple_seq stmts = gen_pow2p (index, UNKNOWN_LOCATION, opt_type, &tmp);
+  gimple_seq stmts = gen_pow2p (index, UNKNOWN_LOCATION, &tmp);
   gsi = gsi_last_bb (cond_bb);
   gsi_insert_seq_after (&gsi, stmts, GSI_LAST_NEW_STMT);
   gcond *stmt_cond = gimple_build_cond (NE_EXPR, tmp, boolean_false_node,
@@ -402,7 +444,8 @@ switch_conversion::exp_index_transform (gswitch *swtch)
     }
 
   /* Insert a sequence of stmts that takes the log of the index variable.  */
-  stmts = gen_log2 (index, UNKNOWN_LOCATION, &tmp);
+  stmts = gen_log2 (index, UNKNOWN_LOCATION, &tmp,
+		    m_exp_index_transform_log2_type);
   gsi = gsi_after_labels (swtch_bb);
   gsi_insert_seq_before (&gsi, stmts, GSI_SAME_STMT);
 
@@ -1599,6 +1642,7 @@ jump_table_cluster::find_jump_tables (vec<cluster *> &clusters)
     return clusters.copy ();
 
   unsigned l = clusters.length ();
+
   auto_vec<min_cluster_item> min;
   min.reserve (l + 1);
 
@@ -1729,15 +1773,80 @@ jump_table_cluster::is_beneficial (const vec<cluster *> &,
   return end - start + 1 >= case_values_threshold ();
 }
 
-/* Find bit tests of given CLUSTERS, where all members of the vector
-   are of type simple_cluster.  New clusters are returned.  */
+/* Find bit tests of given CLUSTERS, where all members of the vector are of
+   type simple_cluster.  Use a fast algorithm that might not find the optimal
+   solution (minimal number of clusters on the output).  New clusters are
+   returned.
+
+   You should call find_bit_tests () instead of calling this function
+   directly.  */
 
 vec<cluster *>
-bit_test_cluster::find_bit_tests (vec<cluster *> &clusters)
+bit_test_cluster::find_bit_tests_fast (vec<cluster *> &clusters)
 {
-  if (!is_enabled ())
-    return clusters.copy ();
+  unsigned l = clusters.length ();
+  vec<cluster *> output;
 
+  output.create (l);
+
+  /* Look at sliding BITS_PER_WORD sized windows in the switch value space
+     and determine if they are suitable for a bit test cluster.  Worst case
+     this can examine every value BITS_PER_WORD-1 times.  */
+  unsigned k;
+  for (unsigned i = 0; i < l; i += k)
+    {
+      hash_set<basic_block> targets;
+      cluster *start_cluster = clusters[i];
+
+      /* Find the biggest k such that clusters i to i+k-1 can be turned into a
+	 one big bit test cluster.  */
+      k = 0;
+      while (i + k < l)
+	{
+	  cluster *end_cluster = clusters[i + k];
+
+	  /* Does value range fit into the BITS_PER_WORD window?  */
+	  HOST_WIDE_INT w = cluster::get_range (start_cluster->get_low (),
+						end_cluster->get_high ());
+	  if (w == 0 || w > BITS_PER_WORD)
+	    break;
+
+	  /* Check for max # of targets.  */
+	  if (targets.elements () == m_max_case_bit_tests
+	      && !targets.contains (end_cluster->m_case_bb))
+	    break;
+
+	  targets.add (end_cluster->m_case_bb);
+	  k++;
+	}
+
+      if (is_beneficial (k, targets.elements ()))
+	{
+	  output.safe_push (new bit_test_cluster (clusters, i, i + k - 1,
+						  i == 0 && k == l));
+	}
+      else
+	{
+	  output.safe_push (clusters[i]);
+	  /* ??? Might be able to skip more.  */
+	  k = 1;
+	}
+    }
+
+  return output;
+}
+
+/* Find bit tests of given CLUSTERS, where all members of the vector
+   are of type simple_cluster.  Use a slow (quadratic) algorithm that always
+   finds the optimal solution (minimal number of clusters on the output).  New
+   clusters are returned.
+
+   You should call find_bit_tests () instead of calling this function
+   directly.  */
+
+vec<cluster *>
+bit_test_cluster::find_bit_tests_slow (vec<cluster *> &clusters)
+{
   unsigned l = clusters.length ();
   auto_vec<min_cluster_item> min;
   min.reserve (l + 1);
@@ -1789,6 +1898,25 @@ bit_test_cluster::find_bit_tests (vec<cluster *> &clusters)
 
   output.reverse ();
   return output;
+}
+
+/* Find bit tests of given CLUSTERS, where all members of the vector
+   are of type simple_cluster.  MAX_C is the approx max number of cases per
+   label.  New clusters are returned.  */
+
+vec<cluster *>
+bit_test_cluster::find_bit_tests (vec<cluster *> &clusters, int max_c)
+{
+  if (!is_enabled () || max_c == 1)
+    return clusters.copy ();
+
+  unsigned l = clusters.length ();
+
+  /* Note: l + 1 is the number of cases of the switch.  */
+  if (l + 1 > (unsigned) param_switch_lower_slow_alg_max_cases)
+    return find_bit_tests_fast (clusters);
+  else
+    return find_bit_tests_slow (clusters);
 }
 
 /* Return true when RANGE of case values with UNIQ labels
@@ -2164,18 +2292,26 @@ bit_test_cluster::hoist_edge_and_branch_if_true (gimple_stmt_iterator *gsip,
 }
 
 /* Compute the number of case labels that correspond to each outgoing edge of
-   switch statement.  Record this information in the aux field of the edge.  */
+   switch statement.  Record this information in the aux field of the edge.
+   Return the approx max number of cases per edge.  */
 
-void
+int
 switch_decision_tree::compute_cases_per_edge ()
 {
+  int max_c = 0;
   reset_out_edges_aux (m_switch);
   int ncases = gimple_switch_num_labels (m_switch);
   for (int i = ncases - 1; i >= 1; --i)
     {
       edge case_edge = gimple_switch_edge (cfun, m_switch, i);
       case_edge->aux = (void *) ((intptr_t) (case_edge->aux) + 1);
+      /* For a range case add one extra. That's enough for the bit
+	 cluster heuristic.  */
+      if ((intptr_t)case_edge->aux > max_c)
+	max_c = (intptr_t)case_edge->aux +
+		!!CASE_HIGH (gimple_switch_label (m_switch, i));
     }
+  return max_c;
 }
 
 /* Analyze switch statement and return true when the statement is expanded
@@ -2193,7 +2329,7 @@ switch_decision_tree::analyze_switch_statement ()
   m_case_bbs.reserve (l);
   m_case_bbs.quick_push (default_bb);
 
-  compute_cases_per_edge ();
+  int max_c = compute_cases_per_edge ();
 
   for (unsigned i = 1; i < l; i++)
     {
@@ -2213,10 +2349,19 @@ switch_decision_tree::analyze_switch_statement ()
 
   reset_out_edges_aux (m_switch);
 
-  /* Find bit-test clusters.  */
-  vec<cluster *> output = bit_test_cluster::find_bit_tests (clusters);
+  if (l > (unsigned) param_switch_lower_slow_alg_max_cases)
+    warning_at (gimple_location (m_switch), OPT_Wdisabled_optimization,
+	       "Using faster switch lowering algorithms. "
+	       "Number of switch cases (%d) exceeds "
+	       "%<--param=switch-lower-slow-alg-max-cases=%d%> limit.",
+	       l, param_switch_lower_slow_alg_max_cases);
 
-  /* Find jump table clusters.  */
+  /* Find bit-test clusters.  */
+  vec<cluster *> output = bit_test_cluster::find_bit_tests (clusters, max_c);
+
+  /* Find jump table clusters.  We are looking for these in the sequences of
+     simple clusters which we didn't manage to convert into bit-test
+     clusters.  */
   vec<cluster *> output2;
   auto_vec<cluster *> tmp;
   output2.create (1);

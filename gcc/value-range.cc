@@ -1,5 +1,5 @@
 /* Support routines for value ranges.
-   Copyright (C) 2019-2024 Free Software Foundation, Inc.
+   Copyright (C) 2019-2025 Free Software Foundation, Inc.
    Major hacks by Aldy Hernandez <aldyh@redhat.com> and
    Andrew MacLeod <amacleod@redhat.com>.
 
@@ -48,10 +48,7 @@ get_bitmask_from_range (tree type,
     }
 
   wide_int xorv = min ^ max;
-
-  if (xorv != 0)
-    xorv = wi::mask (prec - wi::clz (xorv), false, prec);
-
+  xorv = wi::mask (prec - wi::clz (xorv), false, prec);
   return irange_bitmask (wi::zero (prec), min | xorv);
 }
 

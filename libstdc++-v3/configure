@@ -54132,6 +54132,8 @@ if test "$ac_cv_have_decl_F_GETFL$ac_cv_have_decl_F_SETFL" = yesyes ; then
 "
 if test "x$ac_cv_have_decl_O_NONBLOCK" = xyes; then :
 
+$as_echo "#define HAVE_O_NONBLOCK 1" >>confdefs.h
+
 fi
 
 fi
@@ -55718,7 +55720,7 @@ $as_echo "$gxx_include_dir" >&6; }
   # OPTIMIZE_CXXFLAGS = -O3 -fstrict-aliasing -fvtable-gc
 
 
-  WARN_FLAGS="-Wall -Wextra -Wwrite-strings -Wcast-qual -Wabi=2"
+  WARN_FLAGS="-Wall -Wextra -Wwrite-strings -Wcast-qual -Wabi=19"
 
 
 

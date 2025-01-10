@@ -6,7 +6,7 @@
 --                                                                          --
 --                                  B o d y                                 --
 --                                                                          --
---         Copyright (C) 1992-2024, Free Software Foundation, Inc.          --
+--         Copyright (C) 1992-2025, Free Software Foundation, Inc.          --
 --                                                                          --
 -- GNARL is free software; you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -584,7 +584,8 @@ package body System.Tasking.Stages is
       end if;
 
       Initialize_ATCB (Self_ID, State, Discriminants, P, Elaborated,
-        Base_Priority, Base_CPU, Domain, Task_Info, Stack_Size, T, Success);
+        Base_Priority, Base_CPU, CPU /= Unspecified_CPU, Domain, Task_Info,
+        Stack_Size, T, Success);
 
       if not Success then
          Free (T);

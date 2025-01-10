@@ -1,6 +1,6 @@
 /* Command line option handling.  Code involving global state that
    should not be shared with the driver.
-   Copyright (C) 2002-2024 Free Software Foundation, Inc.
+   Copyright (C) 2002-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -257,7 +257,7 @@ init_options_once (void)
   initial_lang_mask = lang_hooks.option_lang_mask ();
 
   const bool show_highlight_colors
-    = pp_show_highlight_colors (global_dc->printer);
+    = pp_show_highlight_colors (global_dc->get_reference_printer ());
 
   lang_hooks.initialize_diagnostics (global_dc);
   /* ??? Ideally, we should do this earlier and the FEs will override
@@ -268,6 +268,7 @@ init_options_once (void)
 
   diagnostic_color_init (global_dc);
   diagnostic_urls_init (global_dc);
+  global_dc->refresh_output_sinks ();
 }
 
 /* Decode command-line options to an array, like
@@ -276,7 +277,7 @@ init_options_once (void)
 
 void
 decode_cmdline_options_to_array_default_mask (unsigned int argc,
-					      const char **argv, 
+					      const char **argv,
 					      struct cl_decoded_option **decoded_options,
 					      unsigned int *decoded_options_count)
 {

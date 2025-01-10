@@ -1,6 +1,6 @@
 /* Routines for reading trees from a file stream.
 
-   Copyright (C) 2011-2024 Free Software Foundation, Inc.
+   Copyright (C) 2011-2025 Free Software Foundation, Inc.
    Contributed by Diego Novillo <dnovillo@google.com>
 
 This file is part of GCC.
@@ -35,6 +35,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "attribs.h"
 #include "asan.h"
 #include "opts.h"
+#include "stor-layout.h"
 
 
 /* Read a STRING_CST from the string table in DATA_IN using input
@@ -395,6 +396,17 @@ unpack_ts_type_common_value_fields (struct bitpack_d *bp, tree expr)
 #ifdef ACCEL_COMPILER
   if (TYPE_ALIGN (expr) > targetm.absolute_biggest_alignment)
     SET_TYPE_ALIGN (expr, targetm.absolute_biggest_alignment);
+
+  /* Host streams out VOIDmode for aggregate type. */
+  if (AGGREGATE_TYPE_P (expr) && TYPE_MODE (expr) == VOIDmode)
+    {
+      if (TREE_CODE (expr) == ARRAY_TYPE)
+	compute_array_mode (expr);
+      else if (RECORD_OR_UNION_TYPE_P (expr))
+	compute_record_mode (expr);
+      else
+	gcc_unreachable ();
+    }
 #endif
 }
 
@@ -623,6 +635,19 @@ streamer_alloc_tree (class lto_input_block *ib, class data_in *data_in,
       enum omp_clause_code subcode
 	= (enum omp_clause_code) streamer_read_uhwi (ib);
       return build_omp_clause (UNKNOWN_LOCATION, subcode);
+    }
+  else if (code == RAW_DATA_CST)
+    {
+      unsigned HOST_WIDE_INT len = streamer_read_uhwi (ib);
+      if (len == 0)
+	result = streamer_read_string_cst (data_in, ib);
+      else
+	{
+	  unsigned HOST_WIDE_INT off = streamer_read_uhwi (ib);
+	  result = make_node (code);
+	  RAW_DATA_LENGTH (result) = len;
+	  RAW_DATA_POINTER (result) = (const char *) (uintptr_t) off;
+	}
     }
   else
     {
@@ -1036,6 +1061,22 @@ lto_input_ts_constructor_tree_pointers (class lto_input_block *ib,
 }
 
 
+/* Read all pointer fields in the TS_RAW_DATA_CST structure of EXPR from
+   input block IB.  DATA_IN contains tables and descriptors for the
+   file being read.  */
+
+static void
+lto_input_ts_raw_data_cst_tree_pointers (class lto_input_block *ib,
+					 class data_in *data_in, tree expr)
+{
+  RAW_DATA_OWNER (expr) = stream_read_tree_ref (ib, data_in);
+  gcc_checking_assert (RAW_DATA_OWNER (expr)
+		       && TREE_CODE (RAW_DATA_OWNER (expr)) == STRING_CST);
+  RAW_DATA_POINTER (expr) = (TREE_STRING_POINTER (RAW_DATA_OWNER (expr))
+			     + (uintptr_t) RAW_DATA_POINTER (expr));
+}
+
+
 /* Read all pointer fields in the TS_OMP_CLAUSE structure of EXPR from
    input block IB.  DATA_IN contains tables and descriptors for the
    file being read.  */
@@ -1116,6 +1157,9 @@ streamer_read_tree_body (class lto_input_block *ib, class data_in *data_in,
 
   if (CODE_CONTAINS_STRUCT (code, TS_CONSTRUCTOR))
     lto_input_ts_constructor_tree_pointers (ib, data_in, expr);
+
+  if (code == RAW_DATA_CST)
+    lto_input_ts_raw_data_cst_tree_pointers (ib, data_in, expr);
 
   if (code == OMP_CLAUSE)
     lto_input_ts_omp_clause_tree_pointers (ib, data_in, expr);

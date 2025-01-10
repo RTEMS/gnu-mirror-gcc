@@ -1,5 +1,5 @@
 /* Functions related to building -*- C++ -*- classes and their related objects.
-   Copyright (C) 1987-2024 Free Software Foundation, Inc.
+   Copyright (C) 1987-2025 Free Software Foundation, Inc.
    Contributed by Michael Tiemann (tiemann@cygnus.com)
 
 This file is part of GCC.
@@ -40,7 +40,7 @@ along with GCC; see the file COPYING3.  If not see
 
 /* Id for dumping the class hierarchy.  */
 int class_dump_id;
- 
+
 /* The number of nested classes being processed.  If we are not in the
    scope of any class, this is zero.  */
 
@@ -326,7 +326,7 @@ build_base_path (enum tree_code code,
 		error ("cannot convert from base class %qT to derived "
 		       "class %qT because the base is virtual",
 		       BINFO_TYPE (binfo), BINFO_TYPE (d_binfo));
-	    }	      
+	    }
 	  else
 	    {
 	      if (want_pointer)
@@ -1321,7 +1321,7 @@ add_method (tree type, tree method, bool via_using)
       if ((DECL_CONV_FN_P (fn) || TREE_CODE (fn) == TEMPLATE_DECL)
 	  && !same_type_p (TREE_TYPE (fn_type), TREE_TYPE (method_type)))
 	continue;
-      
+
       /* For templates, the template parameters must be identical.  */
       if (TREE_CODE (fn) == TEMPLATE_DECL)
 	{
@@ -1410,7 +1410,7 @@ add_method (tree type, tree method, bool via_using)
 	  if (!DECL_INHERITED_CTOR (fn))
 	    /* Defer to the other function.  */
 	    return false;
-	    
+
 	  tree basem = DECL_INHERITED_CTOR_BASE (method);
 	  tree basef = DECL_INHERITED_CTOR_BASE (fn);
 	  if (flag_new_inheriting_ctors)
@@ -1431,6 +1431,7 @@ add_method (tree type, tree method, bool via_using)
 		continue;
 	    }
 
+	  auto_diagnostic_group d;
 	  error_at (DECL_SOURCE_LOCATION (method),
 		    "%q#D conflicts with version inherited from %qT",
 		    method, basef);
@@ -1453,6 +1454,7 @@ add_method (tree type, tree method, bool via_using)
 	}
       else
 	{
+	  auto_diagnostic_group d;
 	  error_at (DECL_SOURCE_LOCATION (method),
 		    "%q#D cannot be overloaded with %q#D", method, fn);
 	  inform (DECL_SOURCE_LOCATION (fn),
@@ -1604,6 +1606,7 @@ handle_using_decl (tree using_decl, tree t)
     ;
   else if (is_overloaded_fn (old_value))
     {
+      auto_diagnostic_group d;
       error_at (DECL_SOURCE_LOCATION (using_decl), "%qD invalid in %q#T "
 		"because of local method %q#D with same name",
 		using_decl, t, old_value);
@@ -1613,6 +1616,7 @@ handle_using_decl (tree using_decl, tree t)
     }
   else if (!DECL_ARTIFICIAL (old_value))
     {
+      auto_diagnostic_group d;
       error_at (DECL_SOURCE_LOCATION (using_decl), "%qD invalid in %q#T "
 		"because of local member %q#D with same name",
 		using_decl, t, old_value);
@@ -1982,7 +1986,7 @@ accessible_nvdtor_p (tree t)
 
   if (DECL_VINDEX (dtor))
     return false; /* Virtual */
-  
+
   if (!TREE_PRIVATE (dtor) && !TREE_PROTECTED (dtor))
     return true;  /* Public */
 
@@ -2547,6 +2551,7 @@ maybe_warn_about_overly_private_class (tree t)
 
       if (!nonprivate_ctor)
 	{
+	  auto_diagnostic_group d;
 	  bool w = warning (OPT_Wctor_dtor_privacy,
 			    "%q#T only defines private constructors and has "
 			    "no friends", t);
@@ -2925,7 +2930,7 @@ update_vtable_entry_for_fn (tree t, tree binfo, tree fn, tree* virtuals,
 		{
 		  /* We convert via virtual base.  Adjust the fixed
 		     offset to be from there.  */
-		  offset = 
+		  offset =
 		    size_diffop (offset,
 				 fold_convert (ssizetype,
 					  BINFO_OFFSET (virtual_offset)));
@@ -3815,6 +3820,7 @@ check_field_decl (tree field,
       if (TREE_CODE (t) == UNION_TYPE && cxx_dialect < cxx11)
 	{
 	  static bool warned;
+	  auto_diagnostic_group d;
 	  int oldcount = errorcount;
 	  if (TYPE_NEEDS_CONSTRUCTING (type))
 	    error ("member %q+#D with constructor not allowed in union",
@@ -3932,7 +3938,7 @@ check_field_decls (tree t, tree *access_decls,
 	case CONST_DECL:
 	  DECL_NONLOCAL (field) = 1;
 	  break;
-	  
+
 	case VAR_DECL:
 	  if (TREE_CODE (t) == UNION_TYPE
 	      && cxx_dialect < cxx11)
@@ -3946,7 +3952,7 @@ check_field_decls (tree t, tree *access_decls,
 		       "a member of a union", field);
 	    }
 	  goto data_member;
-	  
+
 	case FIELD_DECL:
 	  if (TREE_CODE (t) == UNION_TYPE)
 	    {
@@ -4131,6 +4137,7 @@ check_field_decls (tree t, tree *access_decls,
 	  if (default_init_member
 	      && TREE_CODE (t) == UNION_TYPE)
 	    {
+	      auto_diagnostic_group d;
 	      error ("multiple fields in union %qT initialized", t);
 	      inform (DECL_SOURCE_LOCATION (default_init_member),
 		      "initialized member %q+D declared here",
@@ -4209,6 +4216,7 @@ check_field_decls (tree t, tree *access_decls,
       && TYPE_HAS_NONTRIVIAL_DESTRUCTOR (t)
       && !(TYPE_HAS_COPY_CTOR (t) && TYPE_HAS_COPY_ASSIGN (t)))
     {
+      auto_diagnostic_group d;
       if (warning (OPT_Weffc__, "%q#T has pointer data members", t))
 	{
 	  if (! TYPE_HAS_COPY_CTOR (t))
@@ -5950,7 +5958,7 @@ classtype_has_move_assign_or_move_ctor_p (tree t, bool user_p)
 	  && DECL_CONTEXT (*iter) == t
 	  && move_fn_p (*iter))
 	return true;
-  
+
   return false;
 }
 
@@ -6375,7 +6383,7 @@ check_bases_and_members (tree t)
   /* [dcl.init.aggr]
 
      An aggregate is an array or a class with no user-provided
-     constructors ... and no virtual functions.  
+     constructors ... and no virtual functions.
 
      Again, other conditions for being an aggregate are checked
      elsewhere.  */
@@ -6421,7 +6429,7 @@ check_bases_and_members (tree t)
       vec<tree, va_gc> *accesses = BINFO_BASE_ACCESSES (binfo);
       tree base_binfo;
       unsigned i;
-      
+
       for (i = 0; BINFO_BASE_ITERATE (binfo, i, base_binfo); i++)
 	{
 	  tree basetype = TREE_TYPE (base_binfo);
@@ -6434,7 +6442,7 @@ check_bases_and_members (tree t)
 		     basetype);
 	}
     }
-  
+
   /* If the class has no user-declared constructor, but does have
      non-static const or reference data members that can never be
      initialized, issue a warning.  */
@@ -6480,27 +6488,14 @@ check_bases_and_members (tree t)
   for (fn = TYPE_FIELDS (t); fn; fn = DECL_CHAIN (fn))
     if (DECL_DECLARES_FUNCTION_P (fn)
 	&& !DECL_ARTIFICIAL (fn)
-	&& DECL_DEFAULTED_IN_CLASS_P (fn))
-      {
+	&& DECL_DEFAULTED_IN_CLASS_P (fn)
 	/* ...except handle comparisons later, in finish_struct_1.  */
-	if (special_function_p (fn) == sfk_comparison)
-	  continue;
-
-	int copy = copy_fn_p (fn);
-	if (copy > 0)
-	  {
-	    bool imp_const_p
-	      = (DECL_CONSTRUCTOR_P (fn) ? !cant_have_const_ctor
-		 : !no_const_asn_ref);
-	    bool fn_const_p = (copy == 2);
-
-	    if (fn_const_p && !imp_const_p)
-	      /* If the function is defaulted outside the class, we just
-		 give the synthesis error.  Core Issue #1331 says this is
-		 no longer ill-formed, it is defined as deleted instead.  */
-	      DECL_DELETED_FN (fn) = true;
-	  }
-	defaulted_late_check (fn);
+	&& special_function_p (fn) != sfk_comparison)
+      {
+	bool imp_const_p
+	  = (DECL_CONSTRUCTOR_P (fn) ? !cant_have_const_ctor
+	     : !no_const_asn_ref);
+	defaulted_late_check (fn, imp_const_p);
       }
 
   if (LAMBDA_TYPE_P (t))
@@ -6586,7 +6581,7 @@ create_vtable_ptr (tree t, tree* virtuals_p)
 	 stores cannot alias stores to void*!  */
       tree field;
 
-      field = build_decl (input_location, 
+      field = build_decl (input_location,
 			  FIELD_DECL, get_vfield_name (t), vtbl_ptr_type_node);
       DECL_VIRTUAL_P (field) = 1;
       DECL_ARTIFICIAL (field) = 1;
@@ -8126,7 +8121,7 @@ finish_struct (tree t, tree attributes)
   /* COMPLETE_TYPE_P is now true.  */
 
   maybe_warn_about_overly_private_class (t);
-  
+
   if (is_std_init_list (t))
     {
       /* People keep complaining that the compiler crashes on an invalid
@@ -8684,7 +8679,7 @@ pop_lang_context (void)
    control of FLAGS.  Permit pointers to member function if FLAGS
    permits.  If TEMPLATE_ONLY, the name of the overloaded function was
    a template-id, and EXPLICIT_TARGS are the explicitly provided
-   template arguments.  
+   template arguments.
 
    If OVERLOAD is for one or more member functions, then ACCESS_PATH
    is the base path used to reference those member functions.  If
@@ -8901,11 +8896,18 @@ resolve_address_of_overloaded_function (tree target_type,
 	  tree match = most_specialized_instantiation (matches);
 
 	  if (match != error_mark_node)
-	    matches = tree_cons (TREE_PURPOSE (match),
-				 NULL_TREE,
-				 NULL_TREE);
+	    {
+	      matches = match;
+	      TREE_CHAIN (match) = NULL_TREE;
+	    }
 	}
     }
+  else if (flag_concepts && TREE_CHAIN (matches))
+    if (tree match = most_constrained_function (matches))
+      {
+	matches = match;
+	TREE_CHAIN (match) = NULL_TREE;
+      }
 
   /* Now we should have exactly one function in MATCHES.  */
   if (matches == NULL_TREE)
@@ -8913,6 +8915,7 @@ resolve_address_of_overloaded_function (tree target_type,
       /* There were *no* matches.  */
       if (complain & tf_error)
 	{
+	  auto_diagnostic_group d;
 	  error ("no matches converting function %qD to type %q#T",
 		 OVL_NAME (overload), target_type);
 
@@ -8940,6 +8943,7 @@ resolve_address_of_overloaded_function (tree target_type,
 	{
 	  if (complain & tf_error)
 	    {
+	      auto_diagnostic_group d;
 	      error ("converting overloaded function %qD to type %q#T is ambiguous",
 		     OVL_NAME (overload), target_type);
 
@@ -9237,7 +9241,7 @@ build_self_reference (void)
   DECL_ARTIFICIAL (decl) = 1;
   SET_DECL_SELF_REFERENCE_P (decl);
   set_underlying_type (decl);
-  set_instantiating_module (decl);  
+  set_instantiating_module (decl);
 
   if (processing_template_decl)
     decl = push_template_decl (decl);
@@ -9397,6 +9401,8 @@ note_name_declared_in_class (tree name, tree decl)
       else
 	/* Make it an error.  */
 	global_dc->m_pedantic_errors = 1;
+
+      auto_diagnostic_group d;
       if (pedwarn (location_of (decl), OPT_Wchanges_meaning,
 		   "declaration of %q#D changes meaning of %qD",
 		   decl, OVL_NAME (decl)))
@@ -10608,7 +10614,7 @@ build_vcall_offset_vtbl_entries (tree binfo, vtbl_init_data* vid)
      compute the indices -- but do not add to the vtable -- when
      building the main vtable for a class.  */
   if (binfo == TYPE_BINFO (vid->derived)
-      || (BINFO_VIRTUAL_P (binfo) 
+      || (BINFO_VIRTUAL_P (binfo)
 	  /* If BINFO is RTTI_BINFO, then (since BINFO does not
 	     correspond to VID->DERIVED), we are building a primary
 	     construction virtual table.  Since this is a primary

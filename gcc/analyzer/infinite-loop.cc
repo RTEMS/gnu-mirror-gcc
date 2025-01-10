@@ -1,5 +1,5 @@
 /* Detection of infinite loops.
-   Copyright (C) 2022-2024 Free Software Foundation, Inc.
+   Copyright (C) 2022-2025 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -19,7 +19,6 @@ along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
 #include "config.h"
-#define INCLUDE_MEMORY
 #define INCLUDE_VECTOR
 #include "system.h"
 #include "coretypes.h"
@@ -106,15 +105,15 @@ struct infinite_loop
 	    && m_loc == other.m_loc);
   }
 
-  json::object *
+  std::unique_ptr<json::object>
   to_json () const
   {
-    json::object *loop_obj = new json::object ();
+    auto loop_obj = ::make_unique<json::object> ();
     loop_obj->set_integer ("enode", m_enode.m_index);
-    json::array *edge_arr = new json::array ();
+    auto edge_arr = ::make_unique<json::array> ();
     for (auto eedge : m_eedge_vec)
       edge_arr->append (eedge->to_json ());
-    loop_obj->set ("eedges", edge_arr);
+    loop_obj->set ("eedges", std::move (edge_arr));
     return loop_obj;
   }
 
@@ -136,7 +135,7 @@ public:
   {
   }
 
-  label_text get_desc (bool can_colorize) const final override
+  void print_desc (pretty_printer &pp) const final override
   {
     bool user_facing = !flag_analyzer_verbose_edges;
     label_text edge_desc (m_sedge->get_description (user_facing));
@@ -144,21 +143,21 @@ public:
       {
 	if (edge_desc.get () && strlen (edge_desc.get ()) > 0)
 	  {
-	    label_text cond_desc = maybe_describe_condition (can_colorize);
-	    label_text result;
+	    label_text cond_desc
+	      = maybe_describe_condition (pp_show_color (&pp));
 	    if (cond_desc.get ())
-	      return make_label_text
-		(can_colorize,
-		 "%s: always following %qs branch...",
-		 cond_desc.get (), edge_desc.get ());
+	      pp_printf (&pp,
+			 "%s: always following %qs branch...",
+			 cond_desc.get (), edge_desc.get ());
 	    else
-	      return make_label_text
-		(can_colorize,
-		 "if it ever follows %qs branch, it will always do so...",
-		 edge_desc.get ());
+	      pp_printf (&pp,
+			 "if it ever follows %qs branch,"
+			 " it will always do so...",
+			 edge_desc.get ());
 	  }
       }
-    return start_cfg_edge_event::get_desc (can_colorize);
+    else
+      return start_cfg_edge_event::print_desc (pp);
   }
 };
 
@@ -171,9 +170,9 @@ public:
   {
   }
 
-  label_text get_desc (bool) const final override
+  void print_desc (pretty_printer &pp) const final override
   {
-    return label_text::borrow ("looping back...");
+    pp_string (&pp, "looping back...");
   }
 };
 
@@ -221,9 +220,12 @@ public:
     return true;
   }
 
-  label_text describe_final_event (const evdesc::final_event &ev) final override
+  bool
+  describe_final_event (pretty_printer &pp,
+			const evdesc::final_event &) final override
   {
-    return ev.formatted_print ("infinite loop here");
+    pp_string (&pp, "infinite loop here");
+    return true;
   }
 
   /* Customize the location where the warning_event appears.  */

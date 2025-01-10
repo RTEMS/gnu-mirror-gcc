@@ -1,7 +1,7 @@
 /* An experimental state machine, for tracking bad calls from within
    signal handlers.
 
-   Copyright (C) 2019-2024 Free Software Foundation, Inc.
+   Copyright (C) 2019-2025 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -21,7 +21,6 @@ along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
 #include "config.h"
-#define INCLUDE_MEMORY
 #define INCLUDE_VECTOR
 #include "system.h"
 #include "coretypes.h"
@@ -32,6 +31,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimple.h"
 #include "options.h"
 #include "bitmap.h"
+#include "diagnostic-core.h"
 #include "diagnostic-path.h"
 #include "analyzer/analyzer.h"
 #include "diagnostic-event-id.h"
@@ -141,24 +141,31 @@ public:
     return false;
   }
 
-  label_text describe_state_change (const evdesc::state_change &change)
-    final override
+  bool
+  describe_state_change (pretty_printer &pp,
+			 const evdesc::state_change &change) final override
   {
     if (change.is_global_p ()
 	&& change.m_new_state == m_sm.m_in_signal_handler)
       {
 	const function *handler = change.m_event.get_dest_function ();
 	gcc_assert (handler);
-	return change.formatted_print ("registering %qD as signal handler",
-				       handler->decl);
+	pp_printf (&pp,
+		   "registering %qD as signal handler",
+		   handler->decl);
+	return true;
       }
-    return label_text ();
+    return false;
   }
 
-  label_text describe_final_event (const evdesc::final_event &ev) final override
+  bool
+  describe_final_event (pretty_printer &pp,
+			const evdesc::final_event &) final override
   {
-    return ev.formatted_print ("call to %qD from within signal handler",
-			       m_unsafe_fndecl);
+    pp_printf (&pp,
+	       "call to %qD from within signal handler",
+	       m_unsafe_fndecl);
+    return true;
   }
 
 private:
@@ -211,12 +218,6 @@ public:
   void print (pretty_printer *pp) const final override
   {
     pp_string (pp, "signal delivered");
-  }
-
-  json::object *to_json () const
-  {
-    json::object *custom_obj = new json::object ();
-    return custom_obj;
   }
 
   bool update_model (region_model *model,

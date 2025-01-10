@@ -1,5 +1,5 @@
 /* elf.c -- Get debug data from a Mach-O file for backtraces.
-   Copyright (C) 2020-2024 Free Software Foundation, Inc.
+   Copyright (C) 2020-2025 Free Software Foundation, Inc.
    Written by Ian Lance Taylor, Google.
 
 Redistribution and use in source and binary forms, with or without
@@ -306,9 +306,9 @@ static const char * const dwarf_section_names[DEBUG_MAX] =
   "__debug_abbrev",
   "__debug_ranges",
   "__debug_str",
-  "", /* DEBUG_ADDR */
+  "__debug_addr",
   "__debug_str_offs",
-  "", /* DEBUG_LINE_STR */
+  "__debug_line_str",
   "__debug_rnglists"
 };
 

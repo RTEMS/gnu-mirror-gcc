@@ -1,5 +1,5 @@
 /* Classes for modeling the state of memory.
-   Copyright (C) 2019-2024 Free Software Foundation, Inc.
+   Copyright (C) 2019-2025 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -177,7 +177,7 @@ public:
   void dump_to_pp (pretty_printer *pp, bool simple, bool multiline) const;
   void dump (bool simple) const;
 
-  json::object *to_json () const;
+  std::unique_ptr<json::object> to_json () const;
 
   std::unique_ptr<text_art::tree_widget>
   make_dump_widget (const text_art::dump_widget_info &dwi) const;
@@ -286,7 +286,7 @@ class region_model
 
   void debug () const;
 
-  json::object *to_json () const;
+  std::unique_ptr<json::object> to_json () const;
 
   std::unique_ptr<text_art::tree_widget>
   make_dump_widget (const text_art::dump_widget_info &dwi) const;
@@ -352,7 +352,7 @@ class region_model
   void update_for_gcall (const gcall *call_stmt,
                          region_model_context *ctxt,
                          function *callee = NULL);
-  
+
   void update_for_return_gcall (const gcall *call_stmt,
                                 region_model_context *ctxt);
 

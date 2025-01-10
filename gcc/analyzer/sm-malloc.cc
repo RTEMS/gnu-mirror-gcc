@@ -1,5 +1,5 @@
 /* A state machine for detecting misuses of the malloc/free API.
-   Copyright (C) 2019-2024 Free Software Foundation, Inc.
+   Copyright (C) 2019-2025 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -19,7 +19,6 @@ along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
 #include "config.h"
-#define INCLUDE_MEMORY
 #define INCLUDE_VECTOR
 #include "system.h"
 #include "coretypes.h"
@@ -584,12 +583,9 @@ deallocator_set::deallocator_set (malloc_state_machine *sm,
 DEBUG_FUNCTION void
 deallocator_set::dump () const
 {
-  pretty_printer pp;
-  pp_show_color (&pp) = pp_show_color (global_dc->printer);
-  pp.set_output_stream (stderr);
+  tree_dump_pretty_printer pp (stderr);
   dump_to_pp (&pp);
   pp_newline (&pp);
-  pp_flush (&pp);
 }
 
 /* struct custom_deallocator_set : public deallocator_set.  */
@@ -757,46 +753,53 @@ public:
     return same_tree_p (m_arg, ((const malloc_diagnostic &)base_other).m_arg);
   }
 
-  label_text describe_state_change (const evdesc::state_change &change)
-    override
+  bool
+  describe_state_change (pretty_printer &pp,
+			 const evdesc::state_change &change) override
   {
     if (change.m_old_state == m_sm.get_start_state ()
 	&& (unchecked_p (change.m_new_state) || nonnull_p (change.m_new_state)))
       // TODO: verify that it's the allocation stmt, not a copy
-      return label_text::borrow ("allocated here");
+      {
+	pp_string (&pp, "allocated here");
+	return true;
+      }
     if (unchecked_p (change.m_old_state)
 	&& nonnull_p (change.m_new_state))
       {
 	if (change.m_expr)
-	  return change.formatted_print ("assuming %qE is non-NULL",
-					 change.m_expr);
+	  pp_printf (&pp, "assuming %qE is non-NULL",
+		     change.m_expr);
 	else
-	  return change.formatted_print ("assuming %qs is non-NULL",
-					 "<unknown>");
+	  pp_printf (&pp, "assuming %qs is non-NULL",
+		     "<unknown>");
+	return true;
       }
     if (change.m_new_state == m_sm.m_null)
       {
 	if (unchecked_p (change.m_old_state))
 	  {
 	    if (change.m_expr)
-	      return change.formatted_print ("assuming %qE is NULL",
-					     change.m_expr);
+	      pp_printf (&pp, "assuming %qE is NULL",
+			 change.m_expr);
 	    else
-	      return change.formatted_print ("assuming %qs is NULL",
-					     "<unknown>");
+	      pp_printf (&pp, "assuming %qs is NULL",
+			 "<unknown>");
+	    return true;
 	  }
 	else
 	  {
 	    if (change.m_expr)
-	      return change.formatted_print ("%qE is NULL",
-					     change.m_expr);
+	      pp_printf (&pp, "%qE is NULL",
+			 change.m_expr);
 	    else
-	      return change.formatted_print ("%qs is NULL",
-					     "<unknown>");
+	      pp_printf (&pp, "%qs is NULL",
+			 "<unknown>");
+	    return true;
 	  }
       }
 
-    return label_text ();
+    return false;
   }
 
   diagnostic_event::meaning
@@ -858,42 +861,48 @@ public:
 			m_actual_dealloc->m_name, m_arg);
   }
 
-  label_text describe_state_change (const evdesc::state_change &change)
-    final override
+  bool
+  describe_state_change (pretty_printer &pp,
+			 const evdesc::state_change &change) final override
   {
     if (unchecked_p (change.m_new_state))
       {
 	m_alloc_event = change.m_event_id;
 	if (const deallocator *expected_dealloc
 	    = m_expected_deallocators->maybe_get_single ())
-	  return change.formatted_print ("allocated here"
-					 " (expects deallocation with %qs)",
-					 expected_dealloc->m_name);
+	  pp_printf (&pp,
+		     "allocated here (expects deallocation with %qs)",
+		     expected_dealloc->m_name);
 	else
-	  return change.formatted_print ("allocated here");
+	  pp_string (&pp, "allocated here");
+	return true;
       }
-    return malloc_diagnostic::describe_state_change (change);
+    return malloc_diagnostic::describe_state_change (pp, change);
   }
 
-  label_text describe_final_event (const evdesc::final_event &ev) final override
+  bool
+  describe_final_event (pretty_printer &pp,
+			const evdesc::final_event &) final override
   {
     if (m_alloc_event.known_p ())
       {
 	if (const deallocator *expected_dealloc
 	    = m_expected_deallocators->maybe_get_single ())
-	  return ev.formatted_print
-	    ("deallocated with %qs here;"
-	     " allocation at %@ expects deallocation with %qs",
-	     m_actual_dealloc->m_name, &m_alloc_event,
-	     expected_dealloc->m_name);
+	  pp_printf (&pp,
+		     "deallocated with %qs here;"
+		     " allocation at %@ expects deallocation with %qs",
+		     m_actual_dealloc->m_name, &m_alloc_event,
+		     expected_dealloc->m_name);
 	else
-	  return ev.formatted_print
-	    ("deallocated with %qs here;"
-	     " allocated at %@",
-	     m_actual_dealloc->m_name, &m_alloc_event);
+	  pp_printf (&pp,
+		     "deallocated with %qs here;"
+		     " allocated at %@",
+		     m_actual_dealloc->m_name, &m_alloc_event);
+	return true;
       }
-    return ev.formatted_print ("deallocated with %qs here",
-			       m_actual_dealloc->m_name);
+    pp_printf (&pp, "deallocated with %qs here",
+	       m_actual_dealloc->m_name);
+    return true;
   }
 
 private:
@@ -925,34 +934,45 @@ public:
     return ctxt.warn ("double-%qs of %qE", m_funcname, m_arg);
   }
 
-  label_text describe_state_change (const evdesc::state_change &change)
-    final override
+  bool
+  describe_state_change (pretty_printer &pp,
+			 const evdesc::state_change &change) final override
   {
     if (freed_p (change.m_new_state))
       {
 	m_first_free_event = change.m_event_id;
-	return change.formatted_print ("first %qs here", m_funcname);
+	pp_printf (&pp, "first %qs here", m_funcname);
+	return true;
       }
-    return malloc_diagnostic::describe_state_change (change);
+    return malloc_diagnostic::describe_state_change (pp, change);
   }
 
-  label_text describe_call_with_state (const evdesc::call_with_state &info)
-    final override
+  bool
+  describe_call_with_state (pretty_printer &pp,
+			    const evdesc::call_with_state &info) final override
   {
     if (freed_p (info.m_state))
-      return info.formatted_print
-	("passing freed pointer %qE in call to %qE from %qE",
-	 info.m_expr, info.m_callee_fndecl, info.m_caller_fndecl);
-    return label_text ();
+      {
+	pp_printf (&pp,
+		   "passing freed pointer %qE in call to %qE from %qE",
+		   info.m_expr, info.m_callee_fndecl, info.m_caller_fndecl);
+	return true;
+      }
+    return false;
   }
 
-  label_text describe_final_event (const evdesc::final_event &ev) final override
+  bool
+  describe_final_event (pretty_printer &pp,
+			const evdesc::final_event &) final override
   {
     if (m_first_free_event.known_p ())
-      return ev.formatted_print ("second %qs here; first %qs was at %@",
-				 m_funcname, m_funcname,
-				 &m_first_free_event);
-    return ev.formatted_print ("second %qs here", m_funcname);
+      pp_printf (&pp,
+		 "second %qs here; first %qs was at %@",
+		 m_funcname, m_funcname,
+		 &m_first_free_event);
+    else
+      pp_printf (&pp, "second %qs here", m_funcname);
+    return true;
   }
 
 private:
@@ -970,25 +990,32 @@ public:
   : malloc_diagnostic (sm, arg)
   {}
 
-  label_text describe_state_change (const evdesc::state_change &change)
-    final override
+  bool
+  describe_state_change (pretty_printer &pp,
+			 const evdesc::state_change &change) final override
   {
     if (change.m_old_state == m_sm.get_start_state ()
 	&& unchecked_p (change.m_new_state))
       {
 	m_origin_of_unchecked_event = change.m_event_id;
-	return label_text::borrow ("this call could return NULL");
+	pp_string (&pp, "this call could return NULL");
+	return true;
       }
-    return malloc_diagnostic::describe_state_change (change);
+    return malloc_diagnostic::describe_state_change (pp, change);
   }
 
-  label_text describe_return_of_state (const evdesc::return_of_state &info)
-    final override
+  bool
+  describe_return_of_state (pretty_printer &pp,
+			    const evdesc::return_of_state &info) final override
   {
     if (unchecked_p (info.m_state))
-      return info.formatted_print ("possible return of NULL to %qE from %qE",
-				   info.m_caller_fndecl, info.m_callee_fndecl);
-    return label_text ();
+      {
+	pp_printf (&pp,
+		   "possible return of NULL to %qE from %qE",
+		   info.m_caller_fndecl, info.m_callee_fndecl);
+	return true;
+      }
+    return false;
   }
 
 protected:
@@ -1019,14 +1046,18 @@ public:
     return ctxt.warn ("dereference of possibly-NULL %qE", m_arg);
   }
 
-  label_text describe_final_event (const evdesc::final_event &ev) final override
+  bool
+  describe_final_event (pretty_printer &pp,
+			const evdesc::final_event &ev) final override
   {
     if (m_origin_of_unchecked_event.known_p ())
-      return ev.formatted_print ("%qE could be NULL: unchecked value from %@",
-				 ev.m_expr,
-				 &m_origin_of_unchecked_event);
+      pp_printf (&pp,
+		 "%qE could be NULL: unchecked value from %@",
+		 ev.m_expr,
+		 &m_origin_of_unchecked_event);
     else
-      return ev.formatted_print ("%qE could be NULL", ev.m_expr);
+      pp_printf (&pp,"%qE could be NULL", ev.m_expr);
+    return true;
   }
 
 };
@@ -1112,20 +1143,22 @@ public:
     return warned;
   }
 
-  label_text describe_final_event (const evdesc::final_event &ev) final override
+  bool
+  describe_final_event (pretty_printer &pp,
+			const evdesc::final_event &ev) final override
   {
     label_text arg_desc = describe_argument_index (m_fndecl, m_arg_idx);
-    label_text result;
     if (m_origin_of_unchecked_event.known_p ())
-      result = ev.formatted_print ("argument %s (%qE) from %@ could be NULL"
-				   " where non-null expected",
-				   arg_desc.get (), ev.m_expr,
-				   &m_origin_of_unchecked_event);
+      pp_printf (&pp,"argument %s (%qE) from %@ could be NULL"
+		 " where non-null expected",
+		 arg_desc.get (), ev.m_expr,
+		 &m_origin_of_unchecked_event);
     else
-      result = ev.formatted_print ("argument %s (%qE) could be NULL"
-				   " where non-null expected",
-				   arg_desc.get (), ev.m_expr);
-    return result;
+      pp_printf (&pp,
+		 "argument %s (%qE) could be NULL"
+		 " where non-null expected",
+		 arg_desc.get (), ev.m_expr);
+    return true;
   }
 
 private:
@@ -1157,18 +1190,26 @@ public:
     return ctxt.warn ("dereference of NULL %qE", m_arg);
   }
 
-  label_text describe_return_of_state (const evdesc::return_of_state &info)
+  bool
+  describe_return_of_state (pretty_printer &pp,
+			    const evdesc::return_of_state &info)
     final override
   {
     if (info.m_state == m_sm.m_null)
-      return info.formatted_print ("return of NULL to %qE from %qE",
-				   info.m_caller_fndecl, info.m_callee_fndecl);
-    return label_text ();
+      {
+	pp_printf (&pp, "return of NULL to %qE from %qE",
+		   info.m_caller_fndecl, info.m_callee_fndecl);
+	return true;
+      }
+    return false;
   }
 
-  label_text describe_final_event (const evdesc::final_event &ev) final override
+  bool
+  describe_final_event (pretty_printer &pp,
+			const evdesc::final_event &ev) final override
   {
-    return ev.formatted_print ("dereference of NULL %qE", ev.m_expr);
+    pp_printf (&pp, "dereference of NULL %qE", ev.m_expr);
+    return true;
   }
 
   /* Implementation of pending_diagnostic::supercedes_p for
@@ -1235,18 +1276,21 @@ public:
     return warned;
   }
 
-  label_text describe_final_event (const evdesc::final_event &ev) final override
+  bool
+  describe_final_event (pretty_printer &pp,
+			const evdesc::final_event &ev) final override
   {
     label_text arg_desc = describe_argument_index (m_fndecl, m_arg_idx);
-    label_text result;
     if (zerop (ev.m_expr))
-      result = ev.formatted_print ("argument %s NULL where non-null expected",
-				   arg_desc.get ());
+      pp_printf (&pp,
+		 "argument %s NULL where non-null expected",
+		 arg_desc.get ());
     else
-      result = ev.formatted_print ("argument %s (%qE) NULL"
-				   " where non-null expected",
-				   arg_desc.get (), ev.m_expr);
-    return result;
+      pp_printf (&pp,
+		 "argument %s (%qE) NULL"
+		 " where non-null expected",
+		 arg_desc.get (), ev.m_expr);
+    return true;
   }
 
 private:
@@ -1276,12 +1320,13 @@ public:
   {
     /* CWE-416: Use After Free.  */
     ctxt.add_cwe (416);
-    return ctxt.warn ("use after %<%s%> of %qE",
+    return ctxt.warn ("use after %qs of %qE",
 		      m_deallocator->m_name, m_arg);
   }
 
-  label_text describe_state_change (const evdesc::state_change &change)
-    final override
+  bool
+  describe_state_change (pretty_printer &pp,
+			 const evdesc::state_change &change) final override
   {
     if (freed_p (change.m_new_state))
       {
@@ -1292,17 +1337,22 @@ public:
 	  case WORDING_REALLOCATED:
 	    gcc_unreachable ();
 	  case WORDING_FREED:
-	    return label_text::borrow ("freed here");
+	    pp_string (&pp, "freed here");
+	    return true;
 	  case WORDING_DELETED:
-	    return label_text::borrow ("deleted here");
+	    pp_string (&pp, "deleted here");
+	    return true;
 	  case WORDING_DEALLOCATED:
-	    return label_text::borrow ("deallocated here");
+	    pp_string (&pp, "deallocated here");
+	    return true;
 	  }
       }
-    return malloc_diagnostic::describe_state_change (change);
+    return malloc_diagnostic::describe_state_change (pp, change);
   }
 
-  label_text describe_final_event (const evdesc::final_event &ev) final override
+  bool
+  describe_final_event (pretty_printer &pp,
+			const evdesc::final_event &ev) final override
   {
     const char *funcname = m_deallocator->m_name;
     if (m_free_event.known_p ())
@@ -1312,19 +1362,29 @@ public:
 	case WORDING_REALLOCATED:
 	  gcc_unreachable ();
 	case WORDING_FREED:
-	  return ev.formatted_print ("use after %<%s%> of %qE; freed at %@",
-				     funcname, ev.m_expr, &m_free_event);
+	  pp_printf (&pp,
+		     "use after %qs of %qE; freed at %@",
+		     funcname, ev.m_expr, &m_free_event);
+	  return true;
 	case WORDING_DELETED:
-	  return ev.formatted_print ("use after %<%s%> of %qE; deleted at %@",
-				     funcname, ev.m_expr, &m_free_event);
+	  pp_printf (&pp,
+		     "use after %qs of %qE; deleted at %@",
+		     funcname, ev.m_expr, &m_free_event);
+	  return true;
 	case WORDING_DEALLOCATED:
-	  return ev.formatted_print ("use after %<%s%> of %qE;"
-				     " deallocated at %@",
-				     funcname, ev.m_expr, &m_free_event);
+	  pp_printf (&pp,
+		     "use after %qs of %qE;"
+		     " deallocated at %@",
+		     funcname, ev.m_expr, &m_free_event);
+	  return true;
 	}
     else
-      return ev.formatted_print ("use after %<%s%> of %qE",
-				 funcname, ev.m_expr);
+      {
+	pp_printf (&pp,
+		   "use after %qs of %qE",
+		   funcname, ev.m_expr);
+	return true;
+      }
   }
 
   /* Implementation of pending_diagnostic::supercedes_p for
@@ -1374,36 +1434,45 @@ public:
       return ctxt.warn ("leak of %qs", "<unknown>");
   }
 
-  label_text describe_state_change (const evdesc::state_change &change)
-    final override
+  bool
+  describe_state_change (pretty_printer &pp,
+			 const evdesc::state_change &change) final override
   {
     if (unchecked_p (change.m_new_state)
 	|| (start_p (change.m_old_state) && nonnull_p (change.m_new_state)))
       {
 	m_alloc_event = change.m_event_id;
-	return label_text::borrow ("allocated here");
+	pp_string (&pp, "allocated here");
+	return true;
       }
-    return malloc_diagnostic::describe_state_change (change);
+    return malloc_diagnostic::describe_state_change (pp, change);
   }
 
-  label_text describe_final_event (const evdesc::final_event &ev) final override
+  bool
+  describe_final_event (pretty_printer &pp,
+			const evdesc::final_event &ev) final override
   {
     if (ev.m_expr)
       {
 	if (m_alloc_event.known_p ())
-	  return ev.formatted_print ("%qE leaks here; was allocated at %@",
-				     ev.m_expr, &m_alloc_event);
+	  pp_printf (&pp,
+		     "%qE leaks here; was allocated at %@",
+		     ev.m_expr, &m_alloc_event);
 	else
-	  return ev.formatted_print ("%qE leaks here", ev.m_expr);
+	  pp_printf (&pp,
+		     "%qE leaks here", ev.m_expr);
       }
     else
       {
 	if (m_alloc_event.known_p ())
-	  return ev.formatted_print ("%qs leaks here; was allocated at %@",
-				     "<unknown>", &m_alloc_event);
+	  pp_printf (&pp,
+		     "%qs leaks here; was allocated at %@",
+		     "<unknown>", &m_alloc_event);
 	else
-	  return ev.formatted_print ("%qs leaks here", "<unknown>");
+	  pp_printf (&pp,
+		     "%qs leaks here", "<unknown>");
       }
+    return true;
   }
 
 private:
@@ -1448,27 +1517,32 @@ public:
       case MEMSPACE_CODE:
       case MEMSPACE_GLOBALS:
       case MEMSPACE_READONLY_DATA:
-	return ctxt.warn ("%<%s%> of %qE which points to memory"
+	return ctxt.warn ("%qs of %qE which points to memory"
 			  " not on the heap",
 			  m_funcname, m_arg);
 	break;
       case MEMSPACE_STACK:
-	return ctxt.warn ("%<%s%> of %qE which points to memory"
+	return ctxt.warn ("%qs of %qE which points to memory"
 			  " on the stack",
 			  m_funcname, m_arg);
 	break;
       }
   }
 
-  label_text describe_state_change (const evdesc::state_change &)
-    final override
+  bool
+  describe_state_change (pretty_printer &pp,
+			 const evdesc::state_change &) final override
   {
-    return label_text::borrow ("pointer is from here");
+    pp_string (&pp, "pointer is from here");
+    return true;
   }
 
-  label_text describe_final_event (const evdesc::final_event &ev) final override
+  bool
+  describe_final_event (pretty_printer &pp,
+			const evdesc::final_event &) final override
   {
-    return ev.formatted_print ("call to %qs here", m_funcname);
+    pp_printf (&pp, "call to %qs here", m_funcname);
+    return true;
   }
 
   void mark_interesting_stuff (interesting_t *interest) final override
@@ -1605,8 +1679,9 @@ public:
 		      m_arg);
   }
 
-  label_text describe_state_change (const evdesc::state_change &change)
-    final override
+  bool
+  describe_state_change (pretty_printer &pp,
+			 const evdesc::state_change &change) final override
   {
     if (change.m_old_state == m_sm.get_start_state ()
 	&& assumed_non_null_p (change.m_new_state))
@@ -1614,23 +1689,30 @@ public:
 	m_first_deref_event = change.m_event_id;
 	m_deref_enode = change.m_event.get_exploded_node ();
 	m_deref_expr = change.m_expr;
-	return change.formatted_print ("pointer %qE is dereferenced here",
-				       m_arg);
+	pp_printf (&pp,
+		   "pointer %qE is dereferenced here",
+		   m_arg);
+	return true;
       }
-    return malloc_diagnostic::describe_state_change (change);
+    return malloc_diagnostic::describe_state_change (pp, change);
   }
 
-  label_text describe_final_event (const evdesc::final_event &ev) final override
+  bool
+  describe_final_event (pretty_printer &pp,
+			const evdesc::final_event &ev) final override
   {
     m_check_enode = ev.m_event.get_exploded_node ();
     if (m_first_deref_event.known_p ())
-      return ev.formatted_print ("pointer %qE is checked for NULL here but"
-				 " it was already dereferenced at %@",
-				 m_arg, &m_first_deref_event);
+      pp_printf (&pp,
+		 "pointer %qE is checked for NULL here but"
+		 " it was already dereferenced at %@",
+		 m_arg, &m_first_deref_event);
     else
-      return ev.formatted_print ("pointer %qE is checked for NULL here but"
-				 " it was already dereferenced",
-				 m_arg);
+      pp_printf (&pp,
+		 "pointer %qE is checked for NULL here but"
+		 " it was already dereferenced",
+		 m_arg);
+    return true;
   }
 
 private:
@@ -1651,14 +1733,13 @@ private:
 
   static bool sufficiently_similar_p (tree expr_a, tree expr_b)
   {
-    pretty_printer *pp_a = global_dc->printer->clone ();
-    pretty_printer *pp_b = global_dc->printer->clone ();
-    pp_printf (pp_a, "%qE", expr_a);
-    pp_printf (pp_b, "%qE", expr_b);
-    bool result = (strcmp (pp_formatted_text (pp_a), pp_formatted_text (pp_b))
+    auto pp_a = global_dc->clone_printer ();
+    auto pp_b = global_dc->clone_printer ();
+    pp_printf (pp_a.get (), "%qE", expr_a);
+    pp_printf (pp_b.get (), "%qE", expr_b);
+    bool result = (strcmp (pp_formatted_text (pp_a.get ()),
+			   pp_formatted_text (pp_b.get ()))
 		   == 0);
-    delete pp_a;
-    delete pp_b;
     return result;
   }
 

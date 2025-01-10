@@ -1,5 +1,5 @@
 /* Common subexpression elimination library for GNU compiler.
-   Copyright (C) 1987-2024 Free Software Foundation, Inc.
+   Copyright (C) 1987-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -751,6 +751,11 @@ remove_useless_values (void)
       }
   *p = &dummy_val;
 
+  if (cselib_preserve_constants)
+    cselib_preserved_hash_table->traverse <void *,
+					   discard_useless_locs> (NULL);
+  gcc_assert (!values_became_useless);
+
   n_useless_values += n_useless_debug_values;
   n_debug_values -= n_useless_debug_values;
   n_useless_debug_values = 0;
@@ -1114,6 +1119,11 @@ rtx_equal_for_cselib_1 (rtx x, rtx y, machine_mode memmode, int depth)
 	case 'n':
 	case 'i':
 	  if (XINT (x, i) != XINT (y, i))
+	    return false;
+	  break;
+
+	case 'L':
+	  if (XLOC (x, i) != XLOC (y, i))
 	    return false;
 	  break;
 
@@ -1558,6 +1568,10 @@ cselib_hash_rtx (rtx x, int create, machine_mode memmode)
 
 	case 'i':
 	  hash.add_hwi (XINT (x, i));
+	  break;
+
+	case 'L':
+	  hash.add_hwi (XLOC (x, i));
 	  break;
 
 	case 'p':
@@ -2074,6 +2088,7 @@ cselib_expand_value_rtx_1 (rtx orig, struct expand_value_data *evd,
       case 't':
       case 'w':
       case 'i':
+      case 'L':
       case 's':
       case 'S':
       case 'T':

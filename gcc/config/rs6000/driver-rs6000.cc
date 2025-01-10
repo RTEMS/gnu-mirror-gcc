@@ -1,5 +1,5 @@
 /* Subroutines for the gcc driver.
-   Copyright (C) 2007-2024 Free Software Foundation, Inc.
+   Copyright (C) 2007-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -628,7 +628,7 @@ host_detect_local_cpu (int argc, const char **argv)
   arch = strcmp (argv[0], "cpu") == 0;
   if (!arch && strcmp (argv[0], "tune"))
     return NULL;
-  
+
   if (arch)
     cpu = "powerpc";
 

@@ -1,5 +1,5 @@
 ;; Machine description for DEC Alpha for GNU C compiler
-;; Copyright (C) 1992-2024 Free Software Foundation, Inc.
+;; Copyright (C) 1992-2025 Free Software Foundation, Inc.
 ;; Contributed by Richard Kenner (kenner@vlsi1.ultra.nyu.edu)
 ;;
 ;; This file is part of GCC.
@@ -4201,7 +4201,7 @@
 })
 
 ;; For the unaligned byte and halfword cases, we use code similar to that
-;; in the ;; Architecture book, but reordered to lower the number of registers
+;; in the Architecture book, but reordered to lower the number of registers
 ;; required.  Operand 0 is the address.  Operand 1 is the data to store.
 ;; Operands 2, 3, and 4 are DImode temporaries, where operands 2 and 4 may
 ;; be the same temporary, if desired.  If the address is in a register,
@@ -4626,7 +4626,7 @@
   [(set (zero_extract:DI (match_operand:BLK 0 "memory_operand")
 			 (match_operand:DI 1 "const_int_operand")
 			 (match_operand:DI 2 "const_int_operand"))
-	(match_operand:DI 3 "register_operand"))]
+	(match_operand:DI 3 "reg_or_0_operand"))]
   ""
 {
   /* We can do 16, 32 and 64 bit fields, if aligned on byte boundaries.  */
@@ -5171,7 +5171,7 @@
     }
   };
 
-  bool write = INTVAL (operands[1]) != 0;
+  bool write = (INTVAL (operands[1]) & 1) != 0;
   bool lru = INTVAL (operands[2]) != 0;
 
   return alt[write][lru];

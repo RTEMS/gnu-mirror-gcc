@@ -1,7 +1,7 @@
 /* Various declarations for language-independent diagnostics
    subroutines that are only for use in the compilers proper and not
    the driver or other programs.
-   Copyright (C) 2000-2024 Free Software Foundation, Inc.
+   Copyright (C) 2000-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -53,6 +53,26 @@ void diagnostic_report_current_function (diagnostic_context *,
 
 void tree_diagnostics_defaults (diagnostic_context *context);
 bool default_tree_printer (pretty_printer *, text_info *, const char *,
-			   int, bool, bool, bool, bool *, const char **);
+			   int, bool, bool, bool, bool *, pp_token_list &);
+
+/* A subclass of pretty_printer for writing "dump" functions.
+   Wires itself up to a FILE *, and colorizes if it's stderr and
+   the user requested colorization.  */
+
+class tree_dump_pretty_printer : public pretty_printer
+{
+public:
+  tree_dump_pretty_printer (FILE *outf)
+  {
+    pp_format_decoder (this) = default_tree_printer;
+    if (outf == stderr)
+      pp_show_color (this) = pp_show_color (global_dc->get_reference_printer ());
+    set_output_stream (outf);
+  }
+  ~tree_dump_pretty_printer ()
+  {
+    pp_flush (this);
+  }
+};
 
 #endif /* ! GCC_TREE_DIAGNOSTIC_H */

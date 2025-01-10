@@ -1,4 +1,4 @@
-/* Copyright (C) 2011-2024 Free Software Foundation, Inc.
+/* Copyright (C) 2011-2025 Free Software Foundation, Inc.
    Contributed by ARM Ltd.
 
    This file is part of GCC.
@@ -24,6 +24,8 @@
 
 #ifndef USED_FOR_TARGET
 #include "bbitmap.h"
+
+constexpr unsigned int AARCH64_NUM_ABI_ATTRIBUTES = 1;
 
 typedef uint64_t aarch64_isa_mode;
 
@@ -113,6 +115,23 @@ enum stack_protector_guard {
 enum aarch64_key_type {
   AARCH64_KEY_A,
   AARCH64_KEY_B
+};
+
+/* An enum for setting the auto-vectorization preference:
+   - AARCH64_AUTOVEC_DEFAULT: Use default heuristics
+   - AARCH64_AUTOVEC_ASIMD_ONLY: Use only Advanced SIMD (Neon)
+   for auto-vectorisation
+   - AARCH64_AUTOVEC_SVE_ONLY: Use only SVE for auto-vectorisation
+   - AARCH64_AUTOVEC_PREFER_ASIMD: Use both Neon and SVE,
+   but prefer Neon when the costs are equal
+   - AARCH64_AUTOVEC_PREFER_SVE: Use both Neon and SVE,
+   but prefer SVE when the costs are equal.  */
+enum aarch64_autovec_preference_enum {
+  AARCH64_AUTOVEC_DEFAULT,
+  AARCH64_AUTOVEC_ASIMD_ONLY,
+  AARCH64_AUTOVEC_SVE_ONLY,
+  AARCH64_AUTOVEC_PREFER_ASIMD,
+  AARCH64_AUTOVEC_PREFER_SVE
 };
 
 /* An enum specifying how to handle load and store pairs using

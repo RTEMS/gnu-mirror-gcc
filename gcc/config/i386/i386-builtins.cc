@@ -1,4 +1,4 @@
-/* Copyright (C) 1988-2024 Free Software Foundation, Inc.
+/* Copyright (C) 1988-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -280,15 +280,18 @@ def_builtin (HOST_WIDE_INT mask, HOST_WIDE_INT mask2,
       if (((mask2 == 0 || (mask2 & ix86_isa_flags2) != 0)
 	   && (mask == 0 || (mask & ix86_isa_flags) != 0))
 	  || ((mask & OPTION_MASK_ISA_MMX) != 0 && TARGET_MMX_WITH_SSE)
-	  /* "Unified" builtin used by either AVXVNNI/AVXIFMA/AES intrinsics
-	     or AVX512VNNIVL/AVX512IFMAVL/VAESVL non-mask intrinsics should be
-	     defined whenever avxvnni/avxifma/aes or avx512vnni/avx512ifma/vaes
-	     && avx512vl exist.  */
+	  /* "Unified" builtin used by either AVXVNNI/AVXIFMA/AES/
+	     AVXVNNIINT{8,16} intrinsics or AVX512VNNIVL/AVX512IFMAVL/VAESVL/
+	     AVX10.2 non-mask intrinsics should be defined whenever avxvnni/
+	     avxifma/aes/avxvnniint{8,16} or avx512vnni && avx512vl/avx512ifma
+	     && avx512vl/vaes && avx512vl/avx10.2 exist.  */
 	  || (mask2 == OPTION_MASK_ISA2_AVXVNNI)
 	  || (mask2 == OPTION_MASK_ISA2_AVXIFMA)
 	  || (mask2 == (OPTION_MASK_ISA2_AVXNECONVERT
 			| OPTION_MASK_ISA2_AVX512BF16))
 	  || ((mask2 & OPTION_MASK_ISA2_VAES) != 0)
+	  || ((mask2 & OPTION_MASK_ISA2_AVXVNNIINT8) != 0)
+	  || ((mask2 & OPTION_MASK_ISA2_AVXVNNIINT16) != 0)
 	  || (lang_hooks.builtin_function
 	      == lang_hooks.builtin_function_ext_scope))
 	{
@@ -1846,7 +1849,7 @@ get_builtin_code_for_version (tree decl, tree *predicate_list)
       target_node
 	= ix86_valid_target_attribute_tree (decl, attrs, &global_options,
 					    &global_options_set, 0);
-    
+
       gcc_assert (target_node);
       if (target_node == error_mark_node)
 	return 0;
@@ -1929,14 +1932,14 @@ get_builtin_code_for_version (tree decl, tree *predicate_list)
 
       cl_target_option_restore (&global_options, &global_options_set,
 				&cur_target);
-	
+
       if (predicate_list && arg_str == NULL)
 	{
 	  error_at (DECL_SOURCE_LOCATION (decl),
 		    "no dispatcher found for the versioning attributes");
 	  return 0;
 	}
-    
+
       if (predicate_list)
 	{
 	  predicate_decl = ix86_builtins [(int) builtin_fn];
@@ -2004,7 +2007,7 @@ get_builtin_code_for_version (tree decl, tree *predicate_list)
       *predicate_list = predicate_chain;
     }
 
-  return priority; 
+  return priority;
 }
 
 /* This builds the processor_model struct type defined in

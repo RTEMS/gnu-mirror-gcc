@@ -1,6 +1,6 @@
 /* Form lists of pseudo register references for autoinc optimization
    for GNU compiler.  This is part of flow optimization.
-   Copyright (C) 1999-2024 Free Software Foundation, Inc.
+   Copyright (C) 1999-2025 Free Software Foundation, Inc.
    Originally contributed by Michael P. Hayes
              (m.hayes@elec.canterbury.ac.nz, mhayes@redhat.com)
    Major rewrite contributed by Danny Berlin (dberlin@dberlin.org)
@@ -219,7 +219,7 @@ typedef void (*df_confluence_function_0) (basic_block);
    Return true if BB input data has changed.  */
 typedef bool (*df_confluence_function_n) (edge);
 
-/* Transfer function for blocks. 
+/* Transfer function for blocks.
    Return true if BB output data has changed.  */
 typedef bool (*df_transfer_function) (int);
 

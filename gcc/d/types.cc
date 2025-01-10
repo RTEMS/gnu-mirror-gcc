@@ -1,5 +1,5 @@
 /* types.cc -- Lower D frontend types to GCC trees.
-   Copyright (C) 2006-2024 Free Software Foundation, Inc.
+   Copyright (C) 2006-2025 Free Software Foundation, Inc.
 
 GCC is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -1181,7 +1181,7 @@ public:
 	TYPE_UNSIGNED (t->ctype) = TYPE_UNSIGNED (basetype);
 	SET_TYPE_ALIGN (t->ctype, TYPE_ALIGN (basetype));
 	TYPE_SIZE (t->ctype) = NULL_TREE;
-	TYPE_PRECISION (t->ctype) = t->size (t->sym->loc) * 8;
+	TYPE_PRECISION (t->ctype) = dmd::size (t, t->sym->loc) * 8;
 
 	layout_type (t->ctype);
 

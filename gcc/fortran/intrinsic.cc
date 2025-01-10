@@ -1,6 +1,6 @@
 /* Build up a list of intrinsic subroutines and functions for the
    name-resolution stage.
-   Copyright (C) 2000-2024 Free Software Foundation, Inc.
+   Copyright (C) 2000-2025 Free Software Foundation, Inc.
    Contributed by Andy Vaught & Katherine Holcomb
 
 This file is part of GCC.
@@ -93,6 +93,12 @@ gfc_type_letter (bt type, bool logical_equals_int)
 
     case BT_HOLLERITH:
       c = 'h';
+      break;
+
+      /* 'u' would be the logical choice, but it is used for
+	 "unknown", let's use m for "modulo".  */
+    case BT_UNSIGNED:
+      c = 'm';
       break;
 
     default:
@@ -287,11 +293,15 @@ do_ts29113_check (gfc_intrinsic_sym *specific, gfc_actual_arglist *arg)
 		     &a->expr->where, gfc_current_intrinsic);
 	  ok = false;
 	}
-      else if (a->expr->rank == -1 && !specific->inquiry)
+      else if (a->expr->rank == -1
+	       && !(specific->inquiry
+		    || (specific->id == GFC_ISYM_RESHAPE
+			&& (gfc_option.allow_std & GFC_STD_F202Y))))
 	{
 	  gfc_error ("Assumed-rank argument at %L is only permitted as actual "
-		     "argument to intrinsic inquiry functions",
-		     &a->expr->where);
+		     "argument to intrinsic inquiry functions or to RESHAPE. "
+		     "The latter is an experimental F202y feature. Use "
+		     "-std=f202y to enable", &a->expr->where);
 	  ok = false;
 	}
       else if (a->expr->rank == -1 && arg != a)
@@ -299,6 +309,13 @@ do_ts29113_check (gfc_intrinsic_sym *specific, gfc_actual_arglist *arg)
 	  gfc_error ("Assumed-rank argument at %L is only permitted as first "
 		     "actual argument to the intrinsic inquiry function %s",
 		     &a->expr->where, gfc_current_intrinsic);
+	  ok = false;
+	}
+      else if (a->expr->rank == -1 && specific->id == GFC_ISYM_RESHAPE
+	       && !gfc_is_simply_contiguous (a->expr, true, false))
+	{
+	  gfc_error ("Assumed rank argument to the RESHAPE intrinsic at %L "
+		     "must be contiguous", &a->expr->where);
 	  ok = false;
 	}
     }
@@ -1656,7 +1673,7 @@ add_functions (void)
   make_generic ("bgt", GFC_ISYM_BGT, GFC_STD_F2008);
 
   add_sym_1 ("bit_size", GFC_ISYM_BIT_SIZE, CLASS_INQUIRY, ACTUAL_NO, BT_INTEGER, di, GFC_STD_F95,
-	     gfc_check_i, gfc_simplify_bit_size, NULL,
+	     gfc_check_iu, gfc_simplify_bit_size, NULL,
 	     i, BT_INTEGER, di, REQUIRED);
 
   make_generic ("bit_size", GFC_ISYM_BIT_SIZE, GFC_STD_F95);
@@ -2257,6 +2274,13 @@ add_functions (void)
 
   make_generic ("long", GFC_ISYM_LONG, GFC_STD_GNU);
 
+  add_sym_2 ("uint", GFC_ISYM_UINT, CLASS_ELEMENTAL, ACTUAL_NO, BT_UNSIGNED,
+	     di, GFC_STD_UNSIGNED, gfc_check_uint, gfc_simplify_uint,
+	     gfc_resolve_uint, a, BT_REAL, dr, REQUIRED, kind, BT_INTEGER, di,
+	     OPTIONAL);
+
+  make_generic ("uint", GFC_ISYM_UINT, GFC_STD_GNU);
+
   add_sym_2 ("ior", GFC_ISYM_IOR, CLASS_ELEMENTAL, ACTUAL_NO, BT_INTEGER, di,
 	     GFC_STD_F95,
 	     gfc_check_iand_ieor_ior, gfc_simplify_ior, gfc_resolve_ior,
@@ -2543,6 +2567,22 @@ add_functions (void)
 
   make_generic ("maskr", GFC_ISYM_MASKR, GFC_STD_F2008);
 
+  add_sym_2 ("umaskl", GFC_ISYM_UMASKL, CLASS_ELEMENTAL, ACTUAL_NO,
+	     BT_INTEGER, di, GFC_STD_F2008,
+	     gfc_check_mask, gfc_simplify_umaskl, gfc_resolve_umasklr,
+	     i, BT_INTEGER, di, REQUIRED,
+	     kind, BT_INTEGER, di, OPTIONAL);
+
+  make_generic ("umaskl", GFC_ISYM_UMASKL, GFC_STD_F2008);
+
+  add_sym_2 ("umaskr", GFC_ISYM_UMASKR, CLASS_ELEMENTAL, ACTUAL_NO,
+	     BT_INTEGER, di, GFC_STD_F2008,
+	     gfc_check_mask, gfc_simplify_umaskr, gfc_resolve_umasklr,
+	     i, BT_INTEGER, di, REQUIRED,
+	     kind, BT_INTEGER, di, OPTIONAL);
+
+  make_generic ("umaskr", GFC_ISYM_UMASKR, GFC_STD_F2008);
+
   add_sym_2 ("matmul", GFC_ISYM_MATMUL, CLASS_TRANSFORMATIONAL, ACTUAL_NO, BT_REAL, dr, GFC_STD_F95,
 	     gfc_check_matmul, gfc_simplify_matmul, gfc_resolve_matmul,
 	     ma, BT_REAL, dr, REQUIRED, mb, BT_REAL, dr, REQUIRED);
@@ -2686,7 +2726,7 @@ add_functions (void)
   make_generic ("minval", GFC_ISYM_MINVAL, GFC_STD_F95);
 
   add_sym_2 ("mod", GFC_ISYM_MOD, CLASS_ELEMENTAL, ACTUAL_YES, BT_INTEGER, di, GFC_STD_F77,
-	     gfc_check_a_p, gfc_simplify_mod, gfc_resolve_mod,
+	     gfc_check_mod, gfc_simplify_mod, gfc_resolve_mod,
 	     a, BT_INTEGER, di, REQUIRED, p, BT_INTEGER, di, REQUIRED);
 
   if (flag_dec_intrinsic_ints)
@@ -2708,7 +2748,7 @@ add_functions (void)
   make_generic ("mod", GFC_ISYM_MOD, GFC_STD_F77);
 
   add_sym_2 ("modulo", GFC_ISYM_MODULO, CLASS_ELEMENTAL, ACTUAL_NO, BT_REAL, di, GFC_STD_F95,
-	     gfc_check_a_p, gfc_simplify_modulo, gfc_resolve_modulo,
+	     gfc_check_mod, gfc_simplify_modulo, gfc_resolve_modulo,
 	     a, BT_REAL, di, REQUIRED, p, BT_REAL, di, REQUIRED);
 
   make_generic ("modulo", GFC_ISYM_MODULO, GFC_STD_F95);
@@ -2736,7 +2776,7 @@ add_functions (void)
   make_generic ("nint", GFC_ISYM_NINT, GFC_STD_F77);
 
   add_sym_1 ("not", GFC_ISYM_NOT, CLASS_ELEMENTAL, ACTUAL_NO, BT_INTEGER, di, GFC_STD_F95,
-	     gfc_check_i, gfc_simplify_not, gfc_resolve_not,
+	     gfc_check_iu, gfc_simplify_not, gfc_resolve_not,
 	     i, BT_INTEGER, di, REQUIRED);
 
   if (flag_dec_intrinsic_ints)
@@ -2785,14 +2825,14 @@ add_functions (void)
 
   add_sym_1 ("popcnt", GFC_ISYM_POPCNT, CLASS_ELEMENTAL, ACTUAL_NO,
 	     BT_INTEGER, di, GFC_STD_F2008,
-	     gfc_check_i, gfc_simplify_popcnt, NULL,
+	     gfc_check_iu, gfc_simplify_popcnt, NULL,
 	     i, BT_INTEGER, di, REQUIRED);
 
   make_generic ("popcnt", GFC_ISYM_POPCNT, GFC_STD_F2008);
 
   add_sym_1 ("poppar", GFC_ISYM_POPPAR, CLASS_ELEMENTAL, ACTUAL_NO,
 	     BT_INTEGER, di, GFC_STD_F2008,
-	     gfc_check_i, gfc_simplify_poppar, NULL,
+	     gfc_check_iu, gfc_simplify_poppar, NULL,
 	     i, BT_INTEGER, di, REQUIRED);
 
   make_generic ("poppar", GFC_ISYM_POPPAR, GFC_STD_F2008);
@@ -2953,6 +2993,14 @@ add_functions (void)
 
   make_generic ("selected_int_kind", GFC_ISYM_SI_KIND, GFC_STD_F95);
 
+  add_sym_1 ("selected_unsigned_kind", GFC_ISYM_SU_KIND,
+	     CLASS_TRANSFORMATIONAL, ACTUAL_NO, BT_INTEGER, di,
+	     GFC_STD_UNSIGNED, gfc_check_selected_int_kind,
+	     gfc_simplify_selected_unsigned_kind, NULL, r, BT_INTEGER, di,
+	     REQUIRED);
+
+      make_generic ("selected_unsigned_kind", GFC_ISYM_SU_KIND, GFC_STD_GNU);
+
   add_sym_1 ("selected_logical_kind", GFC_ISYM_SL_KIND, CLASS_TRANSFORMATIONAL, ACTUAL_NO, BT_INTEGER, di,
 	     GFC_STD_F2023, /* it has the same requirements */ gfc_check_selected_int_kind,
 	     gfc_simplify_selected_logical_kind, NULL, r, BT_INTEGER, di, REQUIRED);
@@ -3095,6 +3143,14 @@ add_functions (void)
 	     BT_VOID, 0, GFC_STD_F2003,
 	     gfc_check_c_funloc, NULL, gfc_resolve_c_funloc,
 	     x, BT_UNKNOWN, 0, REQUIRED);
+  make_from_module();
+
+  add_sym_2 ("f_c_string", GFC_ISYM_F_C_STRING, CLASS_TRANSFORMATIONAL,
+	     ACTUAL_NO,
+	     BT_CHARACTER, dc, GFC_STD_F2023,
+	     gfc_check_f_c_string, NULL, NULL,
+	     stg, BT_CHARACTER, dc, REQUIRED,
+	     "asis", BT_CHARACTER, dc, OPTIONAL);
   make_from_module();
 
   add_sym_1 ("c_sizeof", GFC_ISYM_C_SIZEOF, CLASS_INQUIRY, ACTUAL_NO,
@@ -3253,7 +3309,8 @@ add_functions (void)
 
   make_generic ("transpose", GFC_ISYM_TRANSPOSE, GFC_STD_F95);
 
-  add_sym_1 ("trim", GFC_ISYM_TRIM, CLASS_TRANSFORMATIONAL, ACTUAL_NO, BT_CHARACTER, dc, GFC_STD_F95,
+  add_sym_1 ("trim", GFC_ISYM_TRIM, CLASS_TRANSFORMATIONAL, ACTUAL_NO,
+	     BT_CHARACTER, dc, GFC_STD_F95,
 	     gfc_check_trim, gfc_simplify_trim, gfc_resolve_trim,
 	     stg, BT_CHARACTER, dc, REQUIRED);
 
@@ -4043,6 +4100,15 @@ add_conversions (void)
 	add_conv (BT_COMPLEX, gfc_real_kinds[j].kind,
 		  BT_INTEGER, gfc_integer_kinds[i].kind, GFC_STD_F77);
       }
+
+  if (flag_unsigned)
+    {
+      for (i = 0; gfc_unsigned_kinds[i].kind != 0; i++)
+	for (j = 0; gfc_unsigned_kinds[j].kind != 0; j++)
+	  if (i != j)
+	    add_conv (BT_UNSIGNED, gfc_unsigned_kinds[i].kind,
+		      BT_UNSIGNED, gfc_unsigned_kinds[j].kind, GFC_STD_GNU);
+    }
 
   if ((gfc_option.allow_std & GFC_STD_LEGACY) != 0)
     {
@@ -4911,6 +4977,10 @@ gfc_check_intrinsic_standard (const gfc_intrinsic_sym* isym,
       symstd_msg = _("for backward compatibility");
       break;
 
+    case GFC_STD_UNSIGNED:
+      symstd_msg = _("unsigned");
+      break;
+
     default:
       gfc_internal_error ("Invalid standard code on intrinsic %qs (%d)",
 			  isym->name, isym->standard);
@@ -5317,7 +5387,8 @@ gfc_convert_type_warn (gfc_expr *expr, gfc_typespec *ts, int eflag, int wflag,
       else if (from_ts.type == ts->type
 	       || (from_ts.type == BT_INTEGER && ts->type == BT_REAL)
 	       || (from_ts.type == BT_INTEGER && ts->type == BT_COMPLEX)
-	       || (from_ts.type == BT_REAL && ts->type == BT_COMPLEX))
+	       || (from_ts.type == BT_REAL && ts->type == BT_COMPLEX)
+	       || (from_ts.type == BT_UNSIGNED && ts->type == BT_UNSIGNED))
 	{
 	  /* Larger kinds can hold values of smaller kinds without problems.
 	     Hence, only warn if target kind is smaller than the source

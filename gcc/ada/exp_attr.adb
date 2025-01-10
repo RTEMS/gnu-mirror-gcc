@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -272,6 +272,10 @@ package body Exp_Attr is
    --  can be expanded directly by the back end and does not need front end
    --  expansion. Typically used for rounding and truncation attributes that
    --  appear directly inside a conversion to integer.
+
+   function Is_User_Defined_Enumeration_Type (Typ : Entity_Id) return Boolean;
+   --  Returns True if Typ is a user-defined enumeration type, in the sense
+   --  that its literals are declared in the source.
 
    function Interunit_Ref_OK
      (Subp_Unit, Attr_Ref_Unit : Node_Id) return Boolean is
@@ -2261,18 +2265,6 @@ package body Exp_Attr is
       --  nothing more to do.
 
       case Id is
-
-      --  Attributes related to Ada 2012 iterators. They are only allowed in
-      --  attribute definition clauses and should never be expanded.
-
-      when Attribute_Constant_Indexing
-         | Attribute_Default_Iterator
-         | Attribute_Implicit_Dereference
-         | Attribute_Iterable
-         | Attribute_Iterator_Element
-         | Attribute_Variable_Indexing
-      =>
-         raise Program_Error;
 
       --  Internal attributes used to deal with Ada 2012 delayed aspects. These
       --  were already rejected by the parser. Thus they shouldn't appear here.
@@ -4797,7 +4789,7 @@ package body Exp_Attr is
             --  then replace this attribute with a reference to 'Range_Length
             --  of the appropriate index subtype (since otherwise the
             --  back end will try to give us the value of 'Length for
-            --  this implementation type).s
+            --  this implementation type).
 
             elsif Is_Constrained (Ptyp) then
                Rewrite (N,
@@ -4866,6 +4858,73 @@ package body Exp_Attr is
 
                   Analyze_And_Resolve (N, Typ);
                end if;
+            end;
+
+         --  Overflow-related transformations need Length attribute rewritten
+         --  using non-attribute expressions. So generate
+         --   (if Pref'First > Pref'Last
+         --    then 0
+         --    else ((Pref'Last - Pref'First) + 1)) .
+
+         elsif Overflow_Check_Mode in Minimized_Or_Eliminated
+
+            --  This Comes_From_Source test fixes a regression test failure
+            --  involving a Length attribute reference generated as part of
+            --  the expansion of a concatentation operator; it is unclear
+            --  whether this is the right solution to that problem.
+
+            and then Comes_From_Source (N)
+
+            --  This Base_Type equality test is so that we only perform this
+            --  transformation if we can do it without introducing
+            --  a type conversion anywhere in the resulting expansion;
+            --  a type conversion is just as bad as a Length attribute
+            --  reference for those overflow-related transformations.
+
+            and then Btyp = Base_Type (Get_Index_Subtype (N))
+
+         then
+            declare
+               function Prefix_Bound
+                 (Bound_Attr_Name : Name_Id; Is_First_Copy : Boolean := False)
+                 return Node_Id;
+               --  constructs a Pref'First or Pref'Last attribute reference
+
+               ------------------
+               -- Prefix_Bound --
+               ------------------
+
+               function Prefix_Bound
+                 (Bound_Attr_Name : Name_Id; Is_First_Copy : Boolean := False)
+                 return Node_Id
+               is
+                  Prefix : constant Node_Id :=
+                    (if Is_First_Copy
+                     then Duplicate_Subexpr (Pref)
+                     else Duplicate_Subexpr_No_Checks (Pref));
+               begin
+                  return Make_Attribute_Reference (Loc,
+                           Prefix         => Prefix,
+                           Attribute_Name => Bound_Attr_Name,
+                           Expressions    => New_Copy_List (Exprs));
+               end Prefix_Bound;
+            begin
+               Rewrite (N,
+                 Make_If_Expression (Loc,
+                   Expressions =>
+                     New_List (
+                       Node1 => Make_Op_Gt (Loc,
+                                  Prefix_Bound (Name_First,
+                                                Is_First_Copy => True),
+                                  Prefix_Bound (Name_Last)),
+                       Node2 => Make_Integer_Literal (Loc, 0),
+                       Node3 => Make_Op_Add (Loc,
+                                  Make_Op_Subtract (Loc,
+                                    Prefix_Bound (Name_Last),
+                                    Prefix_Bound (Name_First)),
+                                  Make_Integer_Literal (Loc, 1)))));
+
+               Analyze_And_Resolve (N, Typ);
             end;
 
          --  Otherwise leave it to the back end
@@ -6006,6 +6065,7 @@ package body Exp_Attr is
       when Attribute_Put_Image => Put_Image : declare
          use Exp_Put_Image;
          U_Type : constant Entity_Id := Underlying_Type (Entity (Pref));
+         C_Type : Entity_Id;
          Pname  : Entity_Id;
          Decl   : Node_Id;
 
@@ -6031,6 +6091,21 @@ package body Exp_Attr is
          end if;
 
          if No (Pname) then
+            if Is_String_Type (U_Type) then
+               declare
+                  R : constant Entity_Id := Root_Type (U_Type);
+
+               begin
+                  if Is_Private_Type (R) then
+                     C_Type := Component_Type (Full_View (R));
+                  else
+                     C_Type := Component_Type (R);
+                  end if;
+
+                  C_Type := Root_Type (Underlying_Type (C_Type));
+               end;
+            end if;
+
             --  If Put_Image is disabled, call the "unknown" version
 
             if not Put_Image_Enabled (U_Type) then
@@ -6046,7 +6121,17 @@ package body Exp_Attr is
                Analyze (N);
                return;
 
-            elsif Is_Standard_String_Type (U_Type) then
+            --  String type objects, including custom string types, and
+            --  excluding C arrays.
+
+            elsif Is_String_Type (U_Type)
+              and then C_Type in Standard_Character
+                               | Standard_Wide_Character
+                               | Standard_Wide_Wide_Character
+              and then (not RTU_Loaded (Interfaces_C)
+                          or else Enclosing_Lib_Unit_Entity (U_Type)
+                                    /= RTU_Entity (Interfaces_C))
+            then
                Rewrite (N, Build_String_Put_Image_Call (N));
                Analyze (N);
                return;
@@ -7530,7 +7615,7 @@ package body Exp_Attr is
          --  Floating-point case. This case is handled by the Valid attribute
          --  code in the floating-point attribute run-time library.
 
-         if Is_Floating_Point_Type (Ptyp) then
+         if Is_Floating_Point_Type (PBtyp) then
             Float_Valid : declare
                Pkg : RE_Id;
                Ftp : Entity_Id;
@@ -7555,7 +7640,7 @@ package body Exp_Attr is
             --  Start of processing for Float_Valid
 
             begin
-               Find_Fat_Info (Ptyp, Ftp, Pkg);
+               Find_Fat_Info (PBtyp, Ftp, Pkg);
 
                --  If the prefix is a reverse SSO component, or is possibly
                --  unaligned, first create a temporary copy that is in
@@ -8014,7 +8099,10 @@ package body Exp_Attr is
              Expressions    => New_List (
                Make_Function_Call (Loc,
                  Name =>
-                   New_Occurrence_Of (RTE (RE_Wide_String_To_String), Loc),
+                   New_Occurrence_Of
+                     (RTE (if Is_User_Defined_Enumeration_Type (Typ)
+                           then RE_Enum_Wide_String_To_String
+                           else RE_Wide_String_To_String), Loc),
 
                  Parameter_Associations => New_List (
                    Relocate_Node (First (Exprs)),
@@ -8046,7 +8134,9 @@ package body Exp_Attr is
                Make_Function_Call (Loc,
                  Name                   =>
                    New_Occurrence_Of
-                     (RTE (RE_Wide_Wide_String_To_String), Loc),
+                     (RTE (if Is_User_Defined_Enumeration_Type (Typ)
+                           then RE_Enum_Wide_Wide_String_To_String
+                           else RE_Wide_Wide_String_To_String), Loc),
 
                  Parameter_Associations => New_List (
                    Relocate_Node (First (Exprs)),
@@ -9364,5 +9454,21 @@ package body Exp_Attr is
           or else Id = Attribute_Machine_Rounding
           or else Id = Attribute_Truncation;
    end Is_Inline_Floating_Point_Attribute;
+
+   --------------------------------------
+   -- Is_User_Defined_Enumeration_Type --
+   --------------------------------------
+
+   function Is_User_Defined_Enumeration_Type (Typ : Entity_Id) return Boolean
+   is
+      Rtyp : constant Entity_Id := Root_Type (Base_Type (Typ));
+
+   begin
+      return Is_Enumeration_Type (Rtyp)
+        and then Rtyp not in Standard_Boolean
+                           | Standard_Character
+                           | Standard_Wide_Character
+                           | Standard_Wide_Wide_Character;
+   end Is_User_Defined_Enumeration_Type;
 
 end Exp_Attr;

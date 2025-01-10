@@ -1,5 +1,5 @@
 /* d-lang.cc -- Language-dependent hooks for D.
-   Copyright (C) 2006-2024 Free Software Foundation, Inc.
+   Copyright (C) 2006-2025 Free Software Foundation, Inc.
 
 GCC is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -934,6 +934,10 @@ d_post_options (const char ** fn)
      fields with params.  */
   global.compileEnv.previewIn = global.params.previewIn;
   global.compileEnv.ddocOutput = global.params.ddoc.doOutput;
+  global.compileEnv.cCharLookupTable =
+    IdentifierCharLookup::forTable (IdentifierTable::C11);
+  global.compileEnv.dCharLookupTable =
+    IdentifierCharLookup::forTable (IdentifierTable::LR);
 
   if (warn_return_type == -1)
     warn_return_type = 0;
@@ -1705,8 +1709,8 @@ d_types_compatible_p (tree x, tree y)
 	return true;
 
       /* Type system allows implicit conversion between.  */
-      if (tx->implicitConvTo (ty) != MATCH::nomatch
-	  || ty->implicitConvTo (tx) != MATCH::nomatch)
+      if (dmd::implicitConvTo (tx, ty) != MATCH::nomatch
+	  || dmd::implicitConvTo (ty, tx) != MATCH::nomatch)
 	return true;
     }
 

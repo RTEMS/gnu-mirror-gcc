@@ -1,5 +1,5 @@
 /* Gimple range edge functionality.
-   Copyright (C) 2020-2024 Free Software Foundation, Inc.
+   Copyright (C) 2020-2025 Free Software Foundation, Inc.
    Contributed by Andrew MacLeod <amacleod@redhat.com>
    and Aldy Hernandez <aldyh@redhat.com>.
 
@@ -100,7 +100,7 @@ gimple_outgoing_range::switch_edge_range (irange &r, gswitch *sw, edge e)
   // arguments are 32 bit, causing a trap when we create a case_range.
   // Until this is resolved (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=87798)
   // punt on switches where the labels don't match the argument.
-  if (gimple_switch_num_labels (sw) > 1 && 
+  if (gimple_switch_num_labels (sw) > 1 &&
       TYPE_PRECISION (TREE_TYPE (CASE_LOW (gimple_switch_label (sw, 1)))) !=
       TYPE_PRECISION (TREE_TYPE (gimple_switch_index (sw))))
     return false;
@@ -158,8 +158,14 @@ gimple_outgoing_range::calc_switch_ranges (gswitch *sw)
       // Remove the case range from the default case.
       int_range_max def_range (type, low, high);
       range_cast (def_range, type);
-      def_range.invert ();
-      default_range.intersect (def_range);
+      // If all possible values are taken, set default_range to UNDEFINED.
+      if (def_range.varying_p ())
+	default_range.set_undefined ();
+      else
+	{
+	  def_range.invert ();
+	  default_range.intersect (def_range);
+	}
 
       // Create/union this case with anything on else on the edge.
       int_range_max case_range (type, low, high);

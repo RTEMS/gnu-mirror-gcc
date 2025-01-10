@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -267,6 +267,7 @@ package body Sem_Ch12 is
    --       Initial_Condition        Contract_Cases
    --       Initializes              Depends
    --                                Exceptional_Cases
+   --                                Exit_Cases
    --                                Extensions_Visible
    --                                Global
    --     package body               Post
@@ -1404,7 +1405,7 @@ package body Sem_Ch12 is
                   | N_Formal_Package_Declaration
                   | N_Use_Package_Clause
                   | N_Use_Type_Clause
-                =>
+               =>
                   Action (F, Index);
                   Index := Index + 1;
                when N_Pragma =>
@@ -1461,7 +1462,7 @@ package body Sem_Ch12 is
                   | N_Full_Type_Declaration
                   | N_Private_Type_Declaration
                   | N_Private_Extension_Declaration
-                =>
+               =>
                   if Is_Internal_Name (Chars (Defining_Entity (F))) then
                      null;
                   else
@@ -2265,9 +2266,10 @@ package body Sem_Ch12 is
                            Infer_From_Access (Gen_Assocs, Index, F, A_Full);
 
                         when E_Access_Subtype
-                          | E_Access_Attribute_Type
-                          | E_Allocator_Type
-                          | E_Anonymous_Access_Type =>
+                           | E_Access_Attribute_Type
+                           | E_Allocator_Type
+                           | E_Anonymous_Access_Type
+                        =>
                            raise Program_Error;
 
                         when E_Array_Type | E_Array_Subtype =>
@@ -2295,7 +2297,7 @@ package body Sem_Ch12 is
 
    procedure Abandon_Instantiation (N : Node_Id) is
    begin
-      Error_Msg_N ("\instantiation abandoned!", N);
+      Error_Msg_N ("instantiation abandoned!", N);
       raise Instantiation_Error;
    end Abandon_Instantiation;
 
@@ -2510,6 +2512,52 @@ package body Sem_Ch12 is
 
                if Present (Default_Subtype_Mark (Assoc.Un_Formal)) then
                   Match := New_Copy (Default_Subtype_Mark (Assoc.Un_Formal));
+
+                  --  If the Entity of the default subtype denoted by the
+                  --  unanalyzed formal has not been set, then it must refer
+                  --  to another formal type of the enclosing generic. So we
+                  --  locate the subtype "renaming" in Result_Renamings that
+                  --  corresponds to the formal type (by comparing the simple
+                  --  names), and set Match's Entity to the entity denoted by
+                  --  that subtype's subtype_indication (which will denote the
+                  --  actual subtype corresponding to the other formal type).
+                  --  This must be done before calling Instantiate_Type, since
+                  --  that function relies heavily on the entity being set.
+                  --  (Note also that there's similar code inside procedure
+                  --  Validate_Derived_Type_Instance that deals with retrieving
+                  --  the ancestor type of formal derived types.)
+
+                  if No (Entity (Match)) then
+                     declare
+                        pragma Assert (Is_Non_Empty_List (Result_Renamings));
+
+                        Decl : Node_Id := First (Result_Renamings);
+
+                     begin
+                        --  Locate subtype referenced by the default subtype
+                        --  in the list of renamings.
+
+                        while Present (Decl) loop
+                           if Nkind (Decl) = N_Subtype_Declaration
+                             and then
+                               Chars (Match) =
+                                 Chars (Defining_Identifier (Decl))
+                           then
+                              Set_Entity
+                                (Match,
+                                 Entity (Subtype_Indication (Decl)));
+
+                              exit;
+
+                           else
+                              Next (Decl);
+                           end if;
+                        end loop;
+
+                        pragma Assert (Present (Entity (Match)));
+                     end;
+                  end if;
+
                   Append_List
                    (Instantiate_Type
                       (Assoc.Un_Formal, Match, Assoc.An_Formal,
@@ -3202,9 +3250,9 @@ package body Sem_Ch12 is
    -----------------------------------
 
    procedure Analyze_Formal_Interface_Type
-      (N   : Node_Id;
-       T   : Entity_Id;
-       Def : Node_Id)
+     (N   : Node_Id;
+      T   : Entity_Id;
+      Def : Node_Id)
    is
       Loc   : constant Source_Ptr := Sloc (N);
       New_N : Node_Id;
@@ -5786,7 +5834,7 @@ package body Sem_Ch12 is
                end if;
 
                if Ekind (Curr_Unit) = E_Package_Body then
-                  Remove_Context (Library_Unit (Curr_Comp));
+                  Remove_Context (Spec_Lib_Unit (Curr_Comp));
                end if;
             end if;
 
@@ -6992,10 +7040,10 @@ package body Sem_Ch12 is
 
       Body_Cunit := Parent (N);
 
-      --  The two compilation unit nodes are linked by the Library_Unit field
+      --  Set spec/body links for the two compilation units
 
-      Set_Library_Unit (Decl_Cunit, Body_Cunit);
-      Set_Library_Unit (Body_Cunit, Decl_Cunit);
+      Set_Body_Lib_Unit (Decl_Cunit, Body_Cunit);
+      Set_Spec_Lib_Unit (Body_Cunit, Decl_Cunit);
 
       --  Preserve the private nature of the package if needed
 
@@ -7337,8 +7385,12 @@ package body Sem_Ch12 is
          then
             --  If the formal is a tagged type the corresponding class-wide
             --  type has been generated as well, and it must be skipped.
+            --  Likewise, for a formal discrete type, the base type has been
+            --  generated as well (see Analyze_Formal_Discrete_Type).
 
-            if Is_Type (E2) and then Is_Tagged_Type (E2) then
+            if Is_Type (E2)
+              and then (Is_Tagged_Type (E2) or else Is_Enumeration_Type (E2))
+            then
                Next_Entity (E2);
             end if;
 
@@ -7736,15 +7788,15 @@ package body Sem_Ch12 is
      (Instance      : Entity_Id;
       Is_Formal_Box : Boolean)
    is
-      Gen_Id : constant Entity_Id
-        := (if Is_Generic_Unit (Instance) then
-              Instance
-            elsif Is_Wrapper_Package (Instance) then
-              Generic_Parent
-                (Specification
-                  (Unit_Declaration_Node (Related_Instance (Instance))))
-            else
-              Generic_Parent (Package_Specification (Instance)));
+      Gen_Id : constant Entity_Id :=
+        (if Is_Generic_Unit (Instance) then
+           Instance
+         elsif Is_Wrapper_Package (Instance) then
+           Generic_Parent
+             (Specification
+               (Unit_Declaration_Node (Related_Instance (Instance))))
+         else
+           Generic_Parent (Package_Specification (Instance)));
       --  The generic unit
 
       Parent_Scope : constant Entity_Id := Scope (Gen_Id);
@@ -9171,11 +9223,11 @@ package body Sem_Ch12 is
                --  stub in the original generic unit with the subunit, in order
                --  to preserve non-local references within.
 
-               --  Only the proper body needs to be copied. Library_Unit and
-               --  context clause are simply inherited by the generic copy.
-               --  Note that the copy (which may be recursive if there are
-               --  nested subunits) must be done first, before attaching it to
-               --  the enclosing generic.
+               --  Only the proper body needs to be copied. The context clause
+               --  and Spec_Or_Body_Lib_Unit are simply inherited by the
+               --  generic copy. Note that the copy (which may be recursive
+               --  if there are nested subunits) must be done first, before
+               --  attaching it to the enclosing generic.
 
                New_Body :=
                  Copy_Generic_Node
@@ -9194,7 +9246,7 @@ package body Sem_Ch12 is
                --  copy, which does not have stubs any longer.
 
                Set_Proper_Body (Unit (Subunit), New_Body);
-               Set_Library_Unit (New_N, Subunit);
+               Set_Stub_Subunit (New_N, Subunit);
                Inherit_Context (Unit (Subunit), N);
             end;
 
@@ -9209,17 +9261,17 @@ package body Sem_Ch12 is
 
          <<Subunit_Not_Found>> null;
 
-      --  If the node is a compilation unit, it is the subunit of a stub, which
-      --  has been loaded already (see code below). In this case, the library
-      --  unit field of N points to the parent unit (which is a compilation
-      --  unit) and need not (and cannot) be copied.
+      --  If the node is a compilation unit, it is the subunit of a stub that
+      --  has already been loaded. The parent unit is a compilation unit and
+      --  need not (and cannot) be copied.
 
-      --  When the proper body of the stub is analyzed, the library_unit link
-      --  is used to establish the proper context (see sem_ch10).
+      --  When the proper body of the stub is analyzed, the Subunit_Parent
+      --  field is used to establish the proper context (see Sem_Ch10).
 
       --  The other fields of a compilation unit are copied as usual
 
       elsif Nkind (N) = N_Compilation_Unit then
+         pragma Assert (Unit (N) in N_Subunit_Id);
 
          --  This code can only be executed when not instantiating, because in
          --  the copy made for an instantiation, the compilation unit node has
@@ -10102,7 +10154,7 @@ package body Sem_Ch12 is
      (N         : Node_Id;
       Gen_Body  : Node_Id;
       Pack_Id   : Entity_Id)
-  is
+   is
       function Enclosing_Package_Body (N : Node_Id) return Node_Id;
       --  Find innermost package body that encloses the given node, and which
       --  is not a compilation unit. Freeze nodes for the instance, or for its
@@ -10151,7 +10203,7 @@ package body Sem_Ch12 is
          if Nkind (B) = N_Package_Body then
             Id := Corresponding_Spec (B);
          else pragma Assert (Nkind (B) = N_Package_Body_Stub);
-            Id := Corresponding_Spec (Proper_Body (Unit (Library_Unit (B))));
+            Id := Corresponding_Spec (Proper_Body (Unit (Stub_Subunit (B))));
          end if;
 
          Ensure_Freeze_Node (Id);
@@ -10261,7 +10313,7 @@ package body Sem_Ch12 is
 
          begin
             if Nkind (Enc_N) = N_Package_Body_Stub then
-               Enclosing_Body := Proper_Body (Unit (Library_Unit (Enc_N)));
+               Enclosing_Body := Proper_Body (Unit (Stub_Subunit (Enc_N)));
             else
                Enclosing_Body := Enc_N;
             end if;
@@ -10644,7 +10696,7 @@ package body Sem_Ch12 is
          Item := First (Context_Items (Parent (Gen_Decl)));
          while Present (Item) loop
             if Nkind (Item) = N_With_Clause then
-               Lib_Unit := Library_Unit (Item);
+               Lib_Unit := Withed_Lib_Unit (Item);
 
                --  Take care to prevent direct cyclic with's
 
@@ -10656,7 +10708,7 @@ package body Sem_Ch12 is
                   OK := True;
                   while Present (Clause) loop
                      if Nkind (Clause) = N_With_Clause
-                       and then Library_Unit (Clause) = Lib_Unit
+                       and then Withed_Lib_Unit (Clause) = Lib_Unit
                      then
                         OK := False;
                         exit;
@@ -10667,7 +10719,7 @@ package body Sem_Ch12 is
 
                   if OK then
                      New_I := New_Copy (Item);
-                     Set_Implicit_With (New_I);
+                     Set_Is_Implicit_With (New_I);
 
                      Append (New_I, Current_Context);
                   end if;
@@ -10888,7 +10940,7 @@ package body Sem_Ch12 is
                 not In_Same_Source_Unit (Generic_Parent (Par_Inst), Inst)
             then
                while Present (Decl) loop
-                  if ((Nkind (Decl) in N_Unit_Body
+                  if ((Nkind (Decl) in N_Lib_Unit_Body
                         or else
                        Nkind (Decl) in N_Body_Stub)
                       and then Comes_From_Source (Decl))
@@ -11340,8 +11392,8 @@ package body Sem_Ch12 is
       Parent_Spec : Node_Id;
 
       procedure Find_Matching_Actual
-       (F    : Node_Id;
-        Act  : in out Entity_Id);
+        (F    : Node_Id;
+         Act  : in out Entity_Id);
       --  We need to associate each formal entity in the formal package with
       --  the corresponding entity in the actual package. The actual package
       --  has been analyzed and possibly expanded, and as a result there is
@@ -11390,7 +11442,7 @@ package body Sem_Ch12 is
       procedure Find_Matching_Actual
         (F   : Node_Id;
          Act : in out Entity_Id)
-     is
+      is
          Formal_Ent : Entity_Id;
 
       begin
@@ -13970,6 +14022,22 @@ package body Sem_Ch12 is
               ("non null exclusion of actual and formal & do not match",
                  Actual, Gen_T);
          end if;
+
+         --  formal/actual extended access match required (regardless of
+         --  whether a formal extended access type is currently possible)
+
+         if Is_Extended_Access_Type (Act_T)
+           /= Is_Extended_Access_Type (A_Gen_T)
+         then
+            Error_Msg_N
+              ("actual type must" &
+               String'(if Is_Extended_Access_Type (A_Gen_T)
+                       then ""
+                       else " not") &
+               " be extended access type", Actual);
+
+            Abandon_Instantiation (Actual);
+         end if;
       end Validate_Access_Type_Instance;
 
       ----------------------------------
@@ -13989,22 +14057,16 @@ package body Sem_Ch12 is
          -----------------------
 
          function Formal_Dimensions return Nat is
-            Num   : Nat := 0;
-            Index : Node_Id;
+            Dims : List_Id;
 
          begin
             if Nkind (Def) = N_Constrained_Array_Definition then
-               Index := First (Discrete_Subtype_Definitions (Def));
+               Dims := Discrete_Subtype_Definitions (Def);
             else
-               Index := First (Subtype_Marks (Def));
+               Dims := Subtype_Marks (Def);
             end if;
 
-            while Present (Index) loop
-               Num := Num + 1;
-               Next (Index);
-            end loop;
-
-            return Num;
+            return List_Length (Dims);
          end Formal_Dimensions;
 
       --  Start of processing for Validate_Array_Type_Instance
@@ -14952,6 +15014,18 @@ package body Sem_Ch12 is
          then
             Error_Msg_NE
               ("actual for & must be a tagged type", Actual, Gen_T);
+
+         --  For generic formal tagged types with the First_Controlling_Param
+         --  aspect, ensure that the actual type also has this aspect.
+
+         elsif Is_Tagged_Type (Act_T)
+           and then Is_Tagged_Type (A_Gen_T)
+           and then not Has_First_Controlling_Parameter_Aspect (Act_T)
+           and then Has_First_Controlling_Parameter_Aspect (A_Gen_T)
+         then
+            Error_Msg_NE
+              ("actual for & must be a 'First_'Controlling_'Parameter tagged "
+               & "type", Actual, Gen_T);
          end if;
 
          Validate_Discriminated_Formal_Type;
@@ -15328,10 +15402,10 @@ package body Sem_Ch12 is
 
       return
         Current_Unit = Cunit (Main_Unit)
-          or else Current_Unit = Library_Unit (Cunit (Main_Unit))
+          or else Current_Unit = Other_Comp_Unit (Cunit (Main_Unit))
           or else (Present (Current_Unit)
-                    and then Present (Library_Unit (Current_Unit))
-                    and then Is_In_Main_Unit (Library_Unit (Current_Unit)));
+                    and then Present (Other_Comp_Unit (Current_Unit))
+                    and then Is_In_Main_Unit (Other_Comp_Unit (Current_Unit)));
    end Is_In_Main_Unit;
 
    ----------------------------
@@ -18046,7 +18120,6 @@ package body Sem_Ch12 is
                   Get_Attribute_Id (Attribute_Name (Def));
       T       : constant Entity_Id := Entity (Prefix (Def));
       Is_Fun  : constant Boolean := (Ekind (Nam) = E_Function);
-      F       : Entity_Id;
       Num_F   : Nat;
       OK      : Boolean;
 
@@ -18055,12 +18128,7 @@ package body Sem_Ch12 is
          return;
       end if;
 
-      Num_F := 0;
-      F := First_Formal (Nam);
-      while Present (F) loop
-         Num_F := Num_F + 1;
-         Next_Formal (F);
-      end loop;
+      Num_F := Number_Formals (Nam);
 
       case Attr_Id is
          when Attribute_Adjacent
@@ -18139,6 +18207,7 @@ package body Sem_Ch12 is
       function Reference_Formal (N : Node_Id) return Traverse_Result is
       begin
          if Is_Entity_Name (N)
+           and then Present (Entity (N))
            and then Scope (Entity (N)) = Current_Scope
          then
             return Abandon;
@@ -18334,7 +18403,7 @@ package body Sem_Ch12 is
 
       procedure Validate_Derived_Type_Default is
       begin
-         if not Is_Ancestor (Etype (Formal), Def_Sub) then
+         if not Is_Ancestor (Etype (Base_Type (Formal)), Def_Sub) then
             Error_Msg_NE ("default must be a descendent of&",
               Default, Etype (Formal));
          end if;
@@ -18507,20 +18576,23 @@ package body Sem_Ch12 is
             end if;
 
          when N_Record_Definition =>   -- Formal interface type
-            if not Is_Interface (Def_Sub) then
-               Error_Msg_NE
-                 ("default for formal interface type must be an interface",
-                  Default, Formal);
+            if Is_Tagged_Type (Def_Sub) then
+               if not Is_Interface (Def_Sub) then
+                  Error_Msg_NE
+                    ("default for formal interface type must be an interface",
+                     Default, Formal);
 
-            elsif Is_Limited_Type (Def_Sub) /= Is_Limited_Type (Formal)
-              or else Is_Task_Interface (Formal) /= Is_Task_Interface (Def_Sub)
-              or else Is_Protected_Interface (Formal) /=
-                      Is_Protected_Interface (Def_Sub)
-              or else Is_Synchronized_Interface (Formal) /=
-                      Is_Synchronized_Interface (Def_Sub)
-            then
-               Error_Msg_NE
-                 ("default for interface& does not match", Def_Sub, Formal);
+               elsif Is_Limited_Type (Def_Sub) /= Is_Limited_Type (Formal)
+                 or else Is_Task_Interface (Formal) /=
+                         Is_Task_Interface (Def_Sub)
+                 or else Is_Protected_Interface (Formal) /=
+                         Is_Protected_Interface (Def_Sub)
+                 or else Is_Synchronized_Interface (Formal) /=
+                         Is_Synchronized_Interface (Def_Sub)
+               then
+                  Error_Msg_NE
+                    ("default for interface& does not match", Def_Sub, Formal);
+               end if;
             end if;
 
          when N_Derived_Type_Definition =>

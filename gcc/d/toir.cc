@@ -1,5 +1,5 @@
 /* toir.cc -- Lower D frontend statements to GCC trees.
-   Copyright (C) 2006-2024 Free Software Foundation, Inc.
+   Copyright (C) 2006-2025 Free Software Foundation, Inc.
 
 GCC is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -1491,10 +1491,9 @@ public:
 		       outputs, inputs, clobbers, labels);
     SET_EXPR_LOCATION (exp, make_location_t (s->loc));
 
-    /* If the extended syntax was not used, mark the ASM_EXPR as being an
-       ASM_INPUT expression instead of an ASM_OPERAND with no operands.  */
+    /* Record whether the basic rather than extended syntax was used.  */
     if (s->args == NULL && s->clobbers == NULL)
-      ASM_INPUT_P (exp) = 1;
+      ASM_BASIC_P (exp) = 1;
 
     /* All asm statements are assumed to have a side effect.  As a future
        optimization, this could be unset when building in release mode.  */

@@ -1,5 +1,5 @@
 /* Definitions for C++ contract levels
-   Copyright (C) 2020-2024 Free Software Foundation, Inc.
+   Copyright (C) 2020-2025 Free Software Foundation, Inc.
    Contributed by Jeff Chapman II (jchapman@lock3software.com)
 
 This file is part of GCC.
@@ -145,6 +145,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "print-tree.h"
 #include "stor-layout.h"
 #include "intl.h"
+#include "cgraph.h"
 
 const int max_custom_roles = 32;
 static contract_role contract_build_roles[max_custom_roles] = {
@@ -1458,9 +1459,14 @@ build_contract_condition_function (tree fndecl, bool pre)
       DECL_WEAK (fn) = false;
       DECL_COMDAT (fn) = false;
 
-      /* We haven't set the comdat group on the guarded function yet, we'll add
-	 this to the same group in comdat_linkage later.  */
-      gcc_assert (!DECL_ONE_ONLY (fndecl));
+      /* We may not have set the comdat group on the guarded function yet.
+	 If we haven't, we'll add this to the same group in comdat_linkage
+	 later.  Otherwise, add it to the same comdat group now.  */
+      if (DECL_ONE_ONLY (fndecl))
+	{
+	  symtab_node *n = symtab_node::get (fndecl);
+	  cgraph_node::get_create (fn)->add_to_same_comdat_group (n);
+	}
 
       DECL_INTERFACE_KNOWN (fn) = true;
     }
@@ -1487,7 +1493,7 @@ contract_active_p (tree contract)
 static bool
 has_active_contract_condition (tree d, tree_code c)
 {
-  for (tree as = DECL_CONTRACTS (d) ; as != NULL_TREE; as = TREE_CHAIN (as))
+  for (tree as = DECL_CONTRACTS (d) ; as != NULL_TREE; as = CONTRACT_CHAIN (as))
     {
       tree contract = TREE_VALUE (TREE_VALUE (as));
       if (TREE_CODE (contract) == c && contract_active_p (contract))

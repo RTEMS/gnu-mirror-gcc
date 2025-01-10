@@ -1,5 +1,5 @@
 /* Name mangling for the 3.0 -*- C++ -*- ABI.
-   Copyright (C) 2000-2024 Free Software Foundation, Inc.
+   Copyright (C) 2000-2025 Free Software Foundation, Inc.
    Written by Alex Samuel <samuel@codesourcery.com>
 
    This file is part of GCC.
@@ -1477,7 +1477,7 @@ anon_aggr_naming_decl (tree type)
 			::= <special-name>
 			::= [<module-name>] <source-name>
 			::= [<module-name>] <unnamed-type-name>
-			::= <local-source-name> 
+			::= <local-source-name>
 			::= F <source-name> # member-like constrained friend
 
     <local-source-name>	::= L <source-name> <discriminator> */
@@ -2378,7 +2378,7 @@ write_local_name (tree function, const tree local_entity,
    C++0x extensions
 
      <type> ::= RR <type>   # rvalue reference-to
-     <type> ::= Dt <expression> # decltype of an id-expression or 
+     <type> ::= Dt <expression> # decltype of an id-expression or
                                 # class member access
      <type> ::= DT <expression> # decltype of an expression
      <type> ::= Dn              # decltype of nullptr
@@ -2666,6 +2666,12 @@ write_type (tree type)
 	    case TRAIT_TYPE:
 	      error ("use of built-in trait %qT in function signature; "
 		     "use library traits instead", type);
+	      break;
+
+	    case PACK_INDEX_TYPE:
+	      /* TODO Mangle pack indexing
+		 <https://github.com/itanium-cxx-abi/cxx-abi/issues/175>.  */
+	      sorry ("mangling type pack index");
 	      break;
 
 	    case LANG_TYPE:
@@ -3255,7 +3261,13 @@ write_member_name (tree member)
     }
   else if (DECL_P (member))
     {
-      gcc_assert (!DECL_OVERLOADED_OPERATOR_P (member));
+      if (ANON_AGGR_TYPE_P (TREE_TYPE (member)))
+	;
+      else if (DECL_OVERLOADED_OPERATOR_P (member))
+	{
+	  if (abi_check (16))
+	    write_string ("on");
+	}
       write_unqualified_name (member);
     }
   else if (TREE_CODE (member) == TEMPLATE_ID_EXPR)
@@ -3845,7 +3857,7 @@ write_expression (tree expr)
 	  return;
 	}
       else
-	write_string (name);	
+	write_string (name);
 
       switch (code)
 	{
@@ -3872,7 +3884,7 @@ write_expression (tree expr)
 
 	case CAST_EXPR:
 	  write_type (TREE_TYPE (expr));
-	  if (list_length (TREE_OPERAND (expr, 0)) == 1)	  
+	  if (list_length (TREE_OPERAND (expr, 0)) == 1)
 	    write_expression (TREE_VALUE (TREE_OPERAND (expr, 0)));
 	  else
 	    {

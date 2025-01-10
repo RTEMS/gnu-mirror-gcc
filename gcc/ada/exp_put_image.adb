@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---             Copyright (C) 2020-2024, Free Software Foundation, Inc.      --
+--             Copyright (C) 2020-2025, Free Software Foundation, Inc.      --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -26,6 +26,7 @@
 with Aspects;        use Aspects;
 with Atree;          use Atree;
 with Csets;          use Csets;
+with Debug;          use Debug;
 with Einfo;          use Einfo;
 with Einfo.Entities; use Einfo.Entities;
 with Einfo.Utils;    use Einfo.Utils;
@@ -37,6 +38,7 @@ with Namet;          use Namet;
 with Nlists;         use Nlists;
 with Nmake;          use Nmake;
 with Opt;            use Opt;
+with Output;         use Output;
 with Rtsfind;        use Rtsfind;
 with Sem_Aux;        use Sem_Aux;
 with Sem_Util;       use Sem_Util;
@@ -293,10 +295,9 @@ package body Exp_Put_Image is
       Loc     : constant Source_Ptr := Sloc (N);
       P_Type  : constant Entity_Id  := Entity (Prefix (N));
       U_Type  : constant Entity_Id  := Underlying_Type (P_Type);
-      FST     : constant Entity_Id  := First_Subtype (U_Type);
       Sink    : constant Node_Id    := First (Expressions (N));
       Item    : constant Node_Id    := Next (Sink);
-      P_Size  : constant Uint       := Esize (FST);
+      P_Size  : constant Uint       := Esize (U_Type);
       Lib_RE  : RE_Id;
 
    begin
@@ -417,14 +418,48 @@ package body Exp_Put_Image is
       Lib_RE  : RE_Id;
       use Stand;
    begin
+      pragma Assert (Is_String_Type (U_Type));
+      pragma Assert (not RTU_Loaded (Interfaces_C)
+        or else Enclosing_Lib_Unit_Entity (U_Type)
+                  /= RTU_Entity (Interfaces_C));
+
       if R = Standard_String then
          Lib_RE := RE_Put_Image_String;
       elsif R = Standard_Wide_String then
          Lib_RE := RE_Put_Image_Wide_String;
       elsif R = Standard_Wide_Wide_String then
          Lib_RE := RE_Put_Image_Wide_Wide_String;
+
       else
-         raise Program_Error;
+         --  Handle custom string types. For example:
+
+         --     type T is array (1 .. 10) of Character;
+         --     Obj : T := (others => 'A');
+         --     ...
+         --     Put (Obj'Image);
+
+         declare
+            C_Type : Entity_Id;
+
+         begin
+            if Is_Private_Type (R) then
+               C_Type := Component_Type (Full_View (R));
+            else
+               C_Type := Component_Type (R);
+            end if;
+
+            C_Type := Root_Type (Underlying_Type (C_Type));
+
+            if C_Type = Standard_Character then
+               Lib_RE := RE_Put_Image_String;
+            elsif C_Type = Standard_Wide_Character then
+               Lib_RE := RE_Put_Image_Wide_String;
+            elsif C_Type = Standard_Wide_Wide_Character then
+               Lib_RE := RE_Put_Image_Wide_Wide_String;
+            else
+               raise Program_Error;
+            end if;
+         end;
       end if;
 
       --  Convert parameter to the required type (i.e. the type of the
@@ -1141,11 +1176,30 @@ package body Exp_Put_Image is
       declare
          U_Type : constant Entity_Id := Underlying_Type (Entity (Prefix (N)));
       begin
-         if Has_Aspect (U_Type, Aspect_Put_Image) then
+         if Has_Aspect (U_Type, Aspect_Put_Image)
+           or else not Is_Scalar_Type (U_Type)
+         then
             return True;
          end if;
 
-         return not Is_Scalar_Type (U_Type);
+         --  Deal with Itypes. One case where this is needed is for a
+         --  fixed-point type with a Put_Image aspect specification.
+
+         --  ??? Should we be checking for Itype case here, or in Has_Aspect?
+         --  In other words, do we want to do what we are doing here for all
+         --  aspects, not just for Put_Image?
+
+         if Is_Itype (U_Type)
+           and then Nkind (Associated_Node_For_Itype (U_Type)) in
+                      N_Full_Type_Declaration | N_Subtype_Declaration
+           and then Has_Aspect (Defining_Identifier
+                                  (Associated_Node_For_Itype (U_Type)),
+                                Aspect_Put_Image)
+         then
+            return True;
+         end if;
+
+         return False;
       end;
    end Image_Should_Call_Put_Image;
 
@@ -1342,8 +1396,19 @@ package body Exp_Put_Image is
    -- Preload_Root_Buffer_Type --
    ------------------------------
 
+   Preload_Root_Buffer_Type_Done : Boolean := False;
+   --  True if Preload_Root_Buffer_Type has already done its work;
+   --  no need to do it again in that case.
+
+   Debug_Unit_Walk : Boolean renames Debug_Flag_Dot_WW;
+
    procedure Preload_Root_Buffer_Type (Compilation_Unit : Node_Id) is
+      Ignore : Entity_Id;
    begin
+      if Preload_Root_Buffer_Type_Done then
+         return;
+      end if;
+
       --  We can't call RTE (RE_Root_Buffer_Type) for at least some
       --  predefined units, because it would introduce cyclic dependences.
       --  The package where Root_Buffer_Type is declared, for example, and
@@ -1360,19 +1425,26 @@ package body Exp_Put_Image is
       --  RTE (RE_Root_Buffer_Type) when compiling the compiler itself.
       --  Packages Ada.Strings.Buffer_Types and friends are not included
       --  in the compiler.
-      --
-      --  Don't do it if type Root_Buffer_Type is unavailable in the runtime.
 
       if not In_Predefined_Unit (Compilation_Unit)
         and then Tagged_Seen
         and then not No_Run_Time_Mode
-        and then RTE_Available (RE_Root_Buffer_Type)
       then
-         declare
-            Ignore : constant Entity_Id := RTE (RE_Root_Buffer_Type);
-         begin
-            null;
-         end;
+         Preload_Root_Buffer_Type_Done := True;
+
+         --  Don't do it if type Root_Buffer_Type is unavailable in the
+         --  runtime.
+
+         if RTE_Available (RE_Root_Buffer_Type) then
+            if Debug_Unit_Walk then
+               Write_Line ("Preload_Root_Buffer_Type: ");
+               Write_Unit_Info
+                 (Get_Cunit_Unit_Number (Compilation_Unit),
+                  Unit (Compilation_Unit));
+            end if;
+
+            Ignore := RTE (RE_Root_Buffer_Type);
+         end if;
       end if;
    end Preload_Root_Buffer_Type;
 

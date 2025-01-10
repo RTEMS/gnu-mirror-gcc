@@ -1,6 +1,6 @@
 // Core concepts and definitions for <ranges> -*- C++ -*-
 
-// Copyright (C) 2019-2024 Free Software Foundation, Inc.
+// Copyright (C) 2019-2025 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -30,7 +30,9 @@
 #ifndef _GLIBCXX_RANGES_BASE_H
 #define _GLIBCXX_RANGES_BASE_H 1
 
+#ifdef _GLIBCXX_SYSHDR
 #pragma GCC system_header
+#endif
 
 #if __cplusplus > 201703L
 #include <initializer_list>
@@ -38,6 +40,15 @@
 #include <ext/numeric_traits.h>
 #include <bits/max_size_type.h>
 #include <bits/version.h>
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic" // __int128
+
+#if __glibcxx_algorithm_default_value_type // C++ >= 26
+# define _GLIBCXX26_RANGE_ALGO_DEF_VAL_T(_I, _P) = projected_value_t<_I, _P>
+#else
+# define _GLIBCXX26_RANGE_ALGO_DEF_VAL_T(_I, _P)
+#endif
 
 #ifdef __cpp_lib_concepts
 namespace std _GLIBCXX_VISIBILITY(default)
@@ -936,7 +947,9 @@ namespace ranges
 
   struct __distance_fn final
   {
-    template<input_or_output_iterator _It, sentinel_for<_It> _Sent>
+    // _GLIBCXX_RESOLVE_LIB_DEFECTS
+    // 3664. LWG 3392 broke std::ranges::distance(a, a+3)
+    template<typename _It, sentinel_for<_It> _Sent>
       requires (!sized_sentinel_for<_Sent, _It>)
       constexpr iter_difference_t<_It>
       operator()[[nodiscard]](_It __first, _Sent __last) const
@@ -950,13 +963,11 @@ namespace ranges
 	return __n;
       }
 
-    template<input_or_output_iterator _It, sized_sentinel_for<_It> _Sent>
+    template<typename _It, sized_sentinel_for<decay_t<_It>> _Sent>
       [[nodiscard]]
-      constexpr iter_difference_t<_It>
-      operator()(const _It& __first, const _Sent& __last) const
-      {
-	return __last - __first;
-      }
+      constexpr iter_difference_t<decay_t<_It>>
+      operator()(_It&& __first, _Sent __last) const
+      { return __last - static_cast<const decay_t<_It>&>(__first); }
 
     template<range _Range>
       [[nodiscard]]
@@ -1068,10 +1079,29 @@ namespace ranges
 #if __glibcxx_ranges_to_container // C++ >= 23
   struct from_range_t { explicit from_range_t() = default; };
   inline constexpr from_range_t from_range{};
+
+/// @cond undocumented
+namespace __detail
+{
+  template<typename _Rg, typename _Tp>
+    concept __container_compatible_range
+      = ranges::input_range<_Rg>
+	  && convertible_to<ranges::range_reference_t<_Rg>, _Tp>;
+
+  template<ranges::input_range _Range>
+    using __range_key_type
+      = remove_const_t<typename ranges::range_value_t<_Range>::first_type>;
+
+  template<ranges::input_range _Range>
+    using __range_mapped_type
+      = typename ranges::range_value_t<_Range>::second_type;
+}
+/// @endcond
 #endif
 
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
 #endif // library concepts
+#pragma GCC diagnostic pop
 #endif // C++20
 #endif // _GLIBCXX_RANGES_BASE_H

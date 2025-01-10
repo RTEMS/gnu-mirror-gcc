@@ -1,5 +1,5 @@
 /* Pass manager for Fortran front end.
-   Copyright (C) 2010-2024 Free Software Foundation, Inc.
+   Copyright (C) 2010-2025 Free Software Foundation, Inc.
    Contributed by Thomas König.
 
 This file is part of GCC.
@@ -36,7 +36,6 @@ static bool optimize_op (gfc_expr *);
 static bool optimize_comparison (gfc_expr *, gfc_intrinsic_op);
 static bool optimize_trim (gfc_expr *);
 static bool optimize_lexical_comparison (gfc_expr *);
-static void optimize_minmaxloc (gfc_expr **);
 static bool is_empty_string (gfc_expr *e);
 static void doloop_warn (gfc_namespace *);
 static int do_intent (gfc_expr **);
@@ -191,7 +190,14 @@ check_locus_code (gfc_code **c, int *walk_subtrees ATTRIBUTE_UNUSED,
 		  void *data ATTRIBUTE_UNUSED)
 {
   current_code = c;
-  if (c && *c && (((*c)->loc.nextc == NULL) || ((*c)->loc.lb == NULL)))
+  if (c
+      && *c
+      && (((*c)->loc.nextc == NULL)
+	  || ((*c)->loc.nextc == (gfc_char_t *) -1
+	      && (*c)->loc.u.location == UNKNOWN_LOCATION)
+	  || ((*c)->loc.nextc != (gfc_char_t *) -1
+	      && ((*c)->loc.u.lb == NULL))))
+
     gfc_warning_internal (0, "Inconsistent internal state: "
 			  "No location in statement");
 
@@ -207,7 +213,13 @@ check_locus_expr (gfc_expr **e, int *walk_subtrees ATTRIBUTE_UNUSED,
 		  void *data ATTRIBUTE_UNUSED)
 {
 
-  if (e && *e && (((*e)->where.nextc == NULL || (*e)->where.lb == NULL)))
+  if (e
+      && *e
+      && (((*e)->where.nextc == NULL)
+	  || ((*e)->where.nextc == (gfc_char_t *) -1
+	      && (*e)->where.u.location == UNKNOWN_LOCATION)
+	  || ((*e)->where.nextc != (gfc_char_t *) -1
+	      && ((*e)->where.u.lb == NULL))))
     gfc_warning_internal (0, "Inconsistent internal state: "
 			  "No location in expression near %L",
 			  &((*current_code)->loc));
@@ -355,17 +367,6 @@ optimize_expr (gfc_expr **e, int *walk_subtrees ATTRIBUTE_UNUSED,
 
   if ((*e)->expr_type == EXPR_OP && optimize_op (*e))
     gfc_simplify_expr (*e, 0);
-
-  if ((*e)->expr_type == EXPR_FUNCTION && (*e)->value.function.isym)
-    switch ((*e)->value.function.isym->id)
-      {
-      case GFC_ISYM_MINLOC:
-      case GFC_ISYM_MAXLOC:
-	optimize_minmaxloc (e);
-	break;
-      default:
-	break;
-      }
 
   if (function_expr)
     count_arglist --;
@@ -2266,51 +2267,6 @@ optimize_trim (gfc_expr *e)
   return true;
 }
 
-/* Optimize minloc(b), where b is rank 1 array, into
-   (/ minloc(b, dim=1) /), and similarly for maxloc,
-   as the latter forms are expanded inline.  */
-
-static void
-optimize_minmaxloc (gfc_expr **e)
-{
-  gfc_expr *fn = *e;
-  gfc_actual_arglist *a;
-  char *name, *p;
-
-  if (fn->rank != 1
-      || fn->value.function.actual == NULL
-      || fn->value.function.actual->expr == NULL
-      || fn->value.function.actual->expr->ts.type == BT_CHARACTER
-      || fn->value.function.actual->expr->rank != 1)
-    return;
-
-  *e = gfc_get_array_expr (fn->ts.type, fn->ts.kind, &fn->where);
-  (*e)->shape = fn->shape;
-  fn->rank = 0;
-  fn->corank = 0;
-  fn->shape = NULL;
-  gfc_constructor_append_expr (&(*e)->value.constructor, fn, &fn->where);
-
-  name = XALLOCAVEC (char, strlen (fn->value.function.name) + 1);
-  strcpy (name, fn->value.function.name);
-  p = strstr (name, "loc0");
-  p[3] = '1';
-  fn->value.function.name = gfc_get_string ("%s", name);
-  if (fn->value.function.actual->next)
-    {
-      a = fn->value.function.actual->next;
-      gcc_assert (a->expr == NULL);
-    }
-  else
-    {
-      a = gfc_get_actual_arglist ();
-      fn->value.function.actual->next = a;
-    }
-  a->expr = gfc_get_constant_expr (BT_INTEGER, gfc_default_integer_kind,
-				   &fn->where);
-  mpz_set_ui (a->expr->value.integer, 1);
-}
-
 /* Data package to hand down for DO loop checks in a contained
    procedure.  */
 typedef struct contained_info
@@ -3409,7 +3365,7 @@ runtime_error_ne (gfc_expr *e1, gfc_expr *e2, const char *msg)
   gfc_code *c;
   gfc_actual_arglist *a1, *a2, *a3;
 
-  gcc_assert (e1->where.lb);
+  gcc_assert (GFC_LOCUS_IS_SET (e1->where));
   /* Build the call to runtime_error.  */
   c = XCNEW (gfc_code);
   c->op = EXEC_CALL;
@@ -5674,6 +5630,8 @@ gfc_code_walker (gfc_code **c, walk_code_fn_t codefn, walk_expr_fn_t exprfn,
 		  WALK_SUBEXPR (co->ext.omp_clauses->num_tasks);
 		  WALK_SUBEXPR (co->ext.omp_clauses->priority);
 		  WALK_SUBEXPR (co->ext.omp_clauses->detach);
+		  WALK_SUBEXPR (co->ext.omp_clauses->novariants);
+		  WALK_SUBEXPR (co->ext.omp_clauses->nocontext);
 		  for (idx = 0; idx < ARRAY_SIZE (list_types); idx++)
 		    for (n = co->ext.omp_clauses->lists[list_types[idx]];
 			 n; n = n->next)

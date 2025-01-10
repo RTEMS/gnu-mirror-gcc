@@ -1,5 +1,5 @@
 /* Header file for mixed range operator class.
-   Copyright (C) 2017-2024 Free Software Foundation, Inc.
+   Copyright (C) 2017-2025 Free Software Foundation, Inc.
    Contributed by Andrew MacLeod <amacleod@redhat.com>
    and Aldy Hernandez <aldyh@redhat.com>.
 
@@ -809,9 +809,15 @@ protected:
 class operator_bitwise_or : public range_operator
 {
 public:
+  using range_operator::fold_range;
   using range_operator::op1_range;
   using range_operator::op2_range;
   using range_operator::update_bitmask;
+
+  bool fold_range (prange &r, tree type,
+		   const prange &op1,
+		   const prange &op2,
+		   relation_trio) const final override;
   bool op1_range (irange &r, tree type,
 		  const irange &lhs, const irange &op2,
 		  relation_trio rel = TRIO_VARYING) const override;

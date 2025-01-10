@@ -1,5 +1,5 @@
 /* __builtin_object_size (ptr, object_size_type) computation
-   Copyright (C) 2004-2024 Free Software Foundation, Inc.
+   Copyright (C) 2004-2025 Free Software Foundation, Inc.
    Contributed by Jakub Jelinek <jakub@redhat.com>
 
 This file is part of GCC.
@@ -38,6 +38,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "builtins.h"
 #include "gimplify-me.h"
 #include "gimplify.h"
+#include "tree-ssa-dce.h"
 
 struct object_size_info
 {
@@ -342,7 +343,8 @@ init_offset_limit (void)
    be positive and hence, be within OFFSET_LIMIT for valid offsets.  */
 
 static tree
-size_for_offset (tree sz, tree offset, tree wholesize = NULL_TREE)
+size_for_offset (tree sz, tree offset, tree wholesize = NULL_TREE,
+		 bool strict = true)
 {
   gcc_checking_assert (types_compatible_p (TREE_TYPE (sz), sizetype));
 
@@ -375,9 +377,17 @@ size_for_offset (tree sz, tree offset, tree wholesize = NULL_TREE)
 	return sz;
 
       /* Negative or too large offset even after adjustment, cannot be within
-	 bounds of an object.  */
+	 bounds of an object.  The exception here is when the base object size
+	 has been overestimated (e.g. through PHI nodes or a COND_EXPR) and the
+	 adjusted offset remains negative.  If the caller wants to be
+	 permissive, return the base size.  */
       if (compare_tree_int (offset, offset_limit) > 0)
-	return size_zero_node;
+	{
+	  if (strict)
+	    return size_zero_node;
+	  else
+	    return sz;
+	}
     }
 
   return size_binop (MINUS_EXPR, size_binop (MAX_EXPR, sz, offset), offset);
@@ -1500,8 +1510,7 @@ plus_stmt_object_size (struct object_size_info *osi, tree var, gimple *stmt)
     return false;
 
   /* Handle PTR + OFFSET here.  */
-  if (size_valid_p (op1, object_size_type)
-      && (TREE_CODE (op0) == SSA_NAME || TREE_CODE (op0) == ADDR_EXPR))
+  if ((TREE_CODE (op0) == SSA_NAME || TREE_CODE (op0) == ADDR_EXPR))
     {
       if (TREE_CODE (op0) == SSA_NAME)
 	{
@@ -1520,14 +1529,23 @@ plus_stmt_object_size (struct object_size_info *osi, tree var, gimple *stmt)
 	  addr_object_size (osi, op0, object_size_type, &bytes, &wholesize);
 	}
 
+      bool pos_offset = (size_valid_p (op1, 0)
+			 && compare_tree_int (op1, offset_limit) <= 0);
+
       /* size_for_offset doesn't make sense for -1 size, but it does for size 0
 	 since the wholesize could be non-zero and a negative offset could give
 	 a non-zero size.  */
       if (size_unknown_p (bytes, 0))
 	;
+      /* In the static case, We want SIZE_FOR_OFFSET to go a bit easy on us if
+	 it sees a negative offset since BYTES could have been
+	 overestimated.  */
       else if ((object_size_type & OST_DYNAMIC)
-	       || compare_tree_int (op1, offset_limit) <= 0)
-	bytes = size_for_offset (bytes, op1, wholesize);
+	       || bytes != wholesize
+	       || pos_offset)
+	bytes = size_for_offset (bytes, op1, wholesize,
+				 ((object_size_type & OST_DYNAMIC)
+				  || pos_offset));
       /* In the static case, with a negative offset, the best estimate for
 	 minimum size is size_unknown but for maximum size, the wholesize is a
 	 better estimate than size_unknown.  */
@@ -2187,6 +2205,7 @@ static unsigned int
 object_sizes_execute (function *fun, bool early)
 {
   todo = 0;
+  auto_bitmap sdce_worklist;
 
   basic_block bb;
   FOR_EACH_BB_FN (bb, fun)
@@ -2277,13 +2296,18 @@ object_sizes_execute (function *fun, bool early)
 
 	  /* Propagate into all uses and fold those stmts.  */
 	  if (!SSA_NAME_OCCURS_IN_ABNORMAL_PHI (lhs))
-	    replace_uses_by (lhs, result);
+	    {
+	      replace_uses_by (lhs, result);
+	      /* Mark lhs as being possiblely DCEd. */
+	      bitmap_set_bit (sdce_worklist, SSA_NAME_VERSION (lhs));
+	    }
 	  else
 	    replace_call_with_value (&i, result);
 	}
     }
 
   fini_object_sizes ();
+  simple_dce_from_worklist (sdce_worklist);
   return todo;
 }
 

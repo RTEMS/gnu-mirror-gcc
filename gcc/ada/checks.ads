@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -49,8 +49,8 @@ package Checks is
       record
          Elements : Bit_Vector (1 .. Dimensions);
       end record;
-   Empty_Dimension_Set : constant Dimension_Set
-     := (Dimensions => 0, Elements => (others => <>));
+   Empty_Dimension_Set : constant Dimension_Set :=
+     (Dimensions => 0, Elements => (others => <>));
 
    procedure Initialize;
    --  Called for each new main source program, to initialize internal

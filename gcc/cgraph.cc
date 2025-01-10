@@ -1,5 +1,5 @@
 /* Callgraph handling code.
-   Copyright (C) 2003-2024 Free Software Foundation, Inc.
+   Copyright (C) 2003-2025 Free Software Foundation, Inc.
    Contributed by Jan Hubicka
 
 This file is part of GCC.
@@ -894,7 +894,8 @@ symbol_table::create_edge (cgraph_node *caller, cgraph_node *callee,
   edge->m_summary_id = -1;
   edges_count++;
 
-  gcc_assert (++edges_max_uid != 0);
+  ++edges_max_uid;
+  gcc_assert (edges_max_uid != 0);
   edge->m_uid = edges_max_uid;
   edge->aux = NULL;
   edge->caller = caller;
@@ -1084,7 +1085,7 @@ cgraph_edge::remove (cgraph_edge *edge)
 
 /* Turn edge into speculative call calling N2. Update
    the profile so the direct call is taken COUNT times
-   with FREQUENCY.  
+   with FREQUENCY.
 
    At clone materialization time, the indirect call E will
    be expanded as:
@@ -1096,7 +1097,7 @@ cgraph_edge::remove (cgraph_edge *edge)
 
    At this time the function just creates the direct call,
    the reference representing the if conditional and attaches
-   them all to the original indirect call statement.  
+   them all to the original indirect call statement.
 
    speculative_id is used to link direct calls with their corresponding
    IPA_REF_ADDR references when representing speculative calls.
@@ -2242,7 +2243,7 @@ cgraph_node::dump (FILE *f)
       thunk_info::get (this)->dump (f);
     }
   else gcc_checking_assert (!thunk_info::get (this));
-  
+
   fprintf (f, "  Called by: ");
 
   profile_count sum = profile_count::zero ();
@@ -2309,7 +2310,7 @@ cgraph_node::dump (FILE *f)
 	  if (edge->indirect_info->agg_contents)
 	   fprintf (f, "loaded from %s %s at offset %i ",
 		    edge->indirect_info->member_ptr ? "member ptr" : "aggregate",
-		    edge->indirect_info->by_ref ? "passed by reference":"",
+		    edge->indirect_info->by_ref ? "passed by reference" : "",
 		    (int)edge->indirect_info->offset);
 	  if (edge->indirect_info->vptr_changed)
 	    fprintf (f, "(vptr maybe changed) ");
@@ -2434,7 +2435,9 @@ cgraph_node_cannot_be_local_p_1 (cgraph_node *node, void *)
 		&& !node->forced_by_abi
 		&& !node->used_from_object_file_p ()
 		&& !node->same_comdat_group)
-	       || !node->externally_visible));
+	       || !node->externally_visible)
+	   && !DECL_STATIC_CONSTRUCTOR (node->decl)
+	   && !DECL_STATIC_DESTRUCTOR (node->decl));
 }
 
 /* Return true if cgraph_node can be made local for API change.
@@ -2845,7 +2848,7 @@ set_const_flag_1 (cgraph_node *node, bool set_const, bool looping,
 
    When setting the flag be careful about possible interposition and
    do not set the flag for functions that can be interposed and set pure
-   flag for functions that can bind to other definition. 
+   flag for functions that can bind to other definition.
 
    Return true if any change was done. */
 
@@ -3030,7 +3033,7 @@ cgraph_node::can_remove_if_no_direct_calls_p (bool will_inline)
 {
   struct ipa_ref *ref;
 
-  /* For local symbols or non-comdat group it is the same as 
+  /* For local symbols or non-comdat group it is the same as
      can_remove_if_no_direct_calls_p.  */
   if (!externally_visible || !same_comdat_group)
     {
@@ -4003,7 +4006,7 @@ cgraph_node::function_symbol (enum availability *availability,
 /* Walk the alias chain to return the function cgraph_node is alias of.
    Walk through non virtual thunks, too.  Thus we return either a function
    or a virtual thunk node.
-   When AVAILABILITY is non-NULL, get minimal availability in the chain. 
+   When AVAILABILITY is non-NULL, get minimal availability in the chain.
    When REF is non-NULL, assume that reference happens in symbol REF
    when determining the availability.  */
 
@@ -4095,7 +4098,7 @@ cgraph_node::get_untransformed_body ()
   return true;
 }
 
-/* Prepare function body.  When doing LTO, read cgraph_node's body from disk 
+/* Prepare function body.  When doing LTO, read cgraph_node's body from disk
    if it is not already present.  When some IPA transformations are scheduled,
    apply them.  */
 

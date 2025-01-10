@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -251,15 +251,12 @@ package Einfo is
 --  kinds of entities. In the latter case the attribute should only be set or
 --  accessed if the Ekind field indicates an appropriate entity.
 
---  There are two kinds of attributes that apply to entities, stored and
---  synthesized. Stored attributes correspond to a field or flag in the entity
---  itself. Such attributes are identified in the table below by giving the
---  field or flag in the attribute that is used to hold the attribute value.
---  Synthesized attributes are not stored directly, but are rather computed as
---  needed from other attributes, or from information in the tree. These are
---  marked "synthesized" in the table below. The stored attributes have both
---  access functions and set procedures to set the corresponding values, while
---  synthesized attributes have only access functions.
+--  Attributes that apply to entities are either "stored" or "synthesized".
+--  Stored attributes are stored as fields in the entity node, and have
+--  automatically-generated access functions and Set_... procedures.
+--  Synthesized attributes are marked "(synthesized)" in the documentation
+--  below, and are computed as needed; these have only (hand-written) access
+--  functions.
 
 --  Note: in the case of Node, Uint, or Elist fields, there are cases where the
 --  same physical field is used for different purposes in different entities,
@@ -529,12 +526,11 @@ package Einfo is
 --       references on this list are illegal due to the visible refinement.
 
 --    BIP_Initialization_Call
---       Defined in constants and variables whose corresponding declaration
---       is wrapped in a transient block and the inital value is provided by
+--       Defined in constants and variables whose initial value is provided by
 --       a build-in-place function call. Contains the relocated build-in-place
 --       call after the expansion has decoupled the call from the object. This
---       attribute is used by the finalization machinery to insert cleanup code
---       for all additional transient objects found in the transient block.
+--       attribute is used by the finalization machinery to insert the call to
+--       the routine that attaches the object to the finalization master.
 
 --    C_Pass_By_Copy [implementation base type only]
 --       Defined in record types. Set if a pragma Convention for the record
@@ -1651,6 +1647,11 @@ package Einfo is
 --       that this does not imply a representation with holes, since the rep
 --       clause may merely confirm the default 0..N representation.
 
+--    Has_First_Controlling_Parameter_Aspect
+--       Defined in tagged types, concurrent types and concurrent record types.
+--       Set to indicate that the type has a First_Controlling_Parameter of
+--       True (whether by an aspect_specification, a pragma, or inheritance).
+
 --    Has_Exit
 --       Defined in loop entities. Set if the loop contains an exit statement.
 
@@ -2268,10 +2269,14 @@ package Einfo is
 --       call wrapper if available.
 
 --    Initialization_Statements
---       Defined in constants and variables. For a composite object initialized
---       with an aggregate that has been converted to a sequence of
---       assignments, points to a compound statement containing the
---       assignments.
+--       Defined in constants and variables. For a composite object coming from
+--       source and initialized with an aggregate or a call expanded in place,
+--       points to a compound statement containing the assignment(s). This is
+--       used for a couple of purposes: 1) to defer the initialization to the
+--       freeze point if an address clause or a delayed aspect is present for
+--       the object, 2) to cancel initialization of imported objects generated
+--       by Initialize_Scalars or Normalize_Scalars before the pragma Import is
+--       encountered for the object.
 
 --    Inner_Instances
 --       Defined in generic units. Contains element list of units that are
@@ -2571,9 +2576,12 @@ package Einfo is
 --       entity is associated with a dispatch table.
 
 --    Is_Dispatch_Table_Wrapper
---       Applies to all entities. Set on wrappers built when the subprogram has
---       class-wide preconditions or class-wide postconditions affected by
---       overriding (AI12-0195).
+--       Applies to all entities. Set on wrappers built when a subprogram has
+--       class-wide preconditions or postconditions affected by overriding
+--       (AI12-0195). Also set on wrappers built when an inherited subprogram
+--       implements an interface primitive that has class-wide preconditions
+--       or postconditions. In the former case, the entity also has its
+--       LSP_Subprogram attribute set.
 
 --    Is_Dispatching_Operation
 --       Defined in all entities. Set for procedures, functions, generic
@@ -2794,6 +2802,10 @@ package Einfo is
 --       keyword. For Ada 2012, also applies to formal parameters. In the
 --       case of private and incomplete types, this flag is set in both the
 --       partial view and the full view.
+
+--       This flag is also set on the Master_Node objects generated by the
+--       compiler (see Finalization_Master_Node above) to indicate that the
+--       associated finalizable object has relaxed finalization semantics.
 
 --    Is_Initial_Condition_Procedure
 --       Defined in functions and procedures. Set for a generated procedure
@@ -3504,13 +3516,6 @@ package Einfo is
 --       the use of pragma Suppress (Elaboration_Checks) for that entity
 --       except that the effect is permanent and cannot be undone by a
 --       subsequent pragma Unsuppress.
-
---    Kill_Range_Checks
---       Defined in all entities. Equivalent in effect to the use of pragma
---       Suppress (Range_Checks) for that entity except that the result is
---       permanent and cannot be undone by a subsequent pragma Unsuppress.
---       This is currently only used in one odd situation in Sem_Ch3 for
---       record types, and it would be good to get rid of it???
 
 --    Known_To_Have_Preelab_Init
 --       Defined in all type and subtype entities. If set, then the type is
@@ -4242,6 +4247,15 @@ package Einfo is
 --       within an accept statement. For all remaining cases (discriminants,
 --       loop parameters) the field is Empty.
 
+--    Renames_Limited_View
+--       Defined in package entities. True for a package renaming if either
+--       a) the renamed package is not itself a renaming, and the renaming
+--          denotes a limited view of the renamed package (as seen at the
+--          point of the renaming declaration, as opposed to later on when
+--          the renaming is referenced); or
+--       b) the renamed package is itself a renaming and the
+--          Renames_Limited_View flag is True for the renamed package.
+
 --    Requires_Overriding
 --       Defined in all subprograms and entries. Set for subprograms that
 --       require overriding as defined by RM-2005-3.9.3(6/2). Note that this
@@ -4273,8 +4287,8 @@ package Einfo is
 
 --    Returns_By_Ref
 --       Defined in subprogram type entities and functions. Set if a function
---       (or an access-to-function type) returns a result by reference, either
---       because the result is built in place, or its type is by-reference.
+--       (or a function type) returns a result by reference, either because the
+--       result is built in place or its type is limited in Ada 95.
 
 --    Reverse_Bit_Order [base type only]
 --       Defined in all record type entities. Set if entity has a Bit_Order
@@ -4968,7 +4982,6 @@ package Einfo is
    --    Is_Unimplemented
    --    Is_Visible_Formal
    --    Kill_Elaboration_Checks
-   --    Kill_Range_Checks
    --    Low_Bound_Tested
    --    Materialize_Entity
    --    Needs_Debug_Info
@@ -5973,6 +5986,7 @@ package Einfo is
    --    First_Entity
    --    Corresponding_Record_Type
    --    Entry_Bodies_Array
+   --    Has_First_Controlling_Parameter_Aspect
    --    Last_Entity
    --    Discriminant_Constraint
    --    Scope_Depth_Value
@@ -6014,6 +6028,7 @@ package Einfo is
    --    Component_Alignment                  (special)  (base type only)
    --    C_Pass_By_Copy                       (base type only)
    --    Has_Dispatch_Table                   (base tagged type only)
+   --    Has_First_Controlling_Parameter_Aspect
    --    Has_Pragma_Pack                      (impl base type only)
    --    Has_Private_Ancestor
    --    Has_Private_Extension
@@ -6049,6 +6064,7 @@ package Einfo is
    --    Underlying_Record_View $$$           (base type only)
    --    Predicated_Parent                    (subtype only)
    --    Has_Completion
+   --    Has_First_Controlling_Parameter_Aspect
    --    Has_Private_Ancestor
    --    Has_Private_Extension
    --    Has_Record_Rep_Clause                (base type only)
@@ -6144,6 +6160,7 @@ package Einfo is
    --    Corresponding_Record_Type
    --    Last_Entity
    --    Discriminant_Constraint
+   --    Has_First_Controlling_Parameter_Aspect
    --    Scope_Depth_Value
    --    Stored_Constraint
    --    Task_Body_Procedure

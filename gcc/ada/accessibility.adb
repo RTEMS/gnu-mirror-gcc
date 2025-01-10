@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 2022-2024, Free Software Foundation, Inc.         --
+--          Copyright (C) 2022-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -463,6 +463,23 @@ package body Accessibility is
 
             if Attribute_Name (E) = Name_Access then
                return Accessibility_Level (Prefix (E));
+
+            --  If we have reached a 'Input attribute then this is the
+            --  the result of the expansion of an object declaration with
+            --  an initial value featuring it. Is this the only case ???
+
+            --  For example:
+
+            --    Opaque : aliased Stream_Element_Array :=
+            --      Stream_Element_Array'Input (S);
+
+            elsif Attribute_Name (E) = Name_Input then
+
+               --  Return the level of the enclosing declaration
+
+               return Make_Level_Literal
+                        (Innermost_Master_Scope_Depth
+                          (Enclosing_Declaration (Expr)));
 
             --  Unchecked or unrestricted attributes have unlimited depth
 
@@ -1196,7 +1213,7 @@ package body Accessibility is
             return First (Choices (Assoc));
 
          elsif Nkind (Assoc) = N_Discriminant_Association then
-            return (First (Selector_Names (Assoc)));
+            return First (Selector_Names (Assoc));
 
          else
             raise Program_Error;
@@ -1275,7 +1292,7 @@ package body Accessibility is
                exit;
             end if;
 
-            Nlists.Next (Return_Con);
+            Next (Return_Con);
          end loop;
 
          pragma Assert (Present (Return_Con));
@@ -1676,7 +1693,7 @@ package body Accessibility is
          if not Is_List_Member (Assoc) then
             exit;
          else
-            Nlists.Next (Assoc);
+            Next (Assoc);
          end if;
       end loop;
    end Check_Return_Construct_Accessibility;
@@ -2331,7 +2348,20 @@ package body Accessibility is
          return Scope_Depth (Standard_Standard);
       end if;
 
-      return Scope_Depth (Enclosing_Dynamic_Scope (Btyp));
+      --  It is possible that the current scope is an aliased subprogram -
+      --  this can happen when an abstract primitive from a root type is not
+      --  not visible.
+
+      if Is_Subprogram (Enclosing_Dynamic_Scope (Btyp))
+        and then Present (Alias (Enclosing_Dynamic_Scope (Btyp)))
+      then
+         return Scope_Depth (Ultimate_Alias (Enclosing_Dynamic_Scope (Btyp)));
+
+      --  Otherwise, simply use the enclosing dynamic scope
+
+      else
+         return Scope_Depth (Enclosing_Dynamic_Scope (Btyp));
+      end if;
    end Type_Access_Level;
 
 end Accessibility;

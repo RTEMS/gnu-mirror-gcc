@@ -1,4 +1,4 @@
-/* Copyright (C) 2007-2024 Free Software Foundation, Inc.
+/* Copyright (C) 2007-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -159,7 +159,7 @@ bid64_to_bid32 (UINT64 x _RND_MODE_PARAM _EXC_FLAGS_PARAM
     if (rmode == 0)	//ROUNDING_TO_NEAREST
 #endif
       if (coefficient_x & 1) {
-	// check whether fractional part of initial_P/10^extra_digits 
+	// check whether fractional part of initial_P/10^extra_digits
 	// is exactly .5
 
 	// get remainder

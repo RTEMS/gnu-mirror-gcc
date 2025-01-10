@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -705,6 +705,15 @@ package Sinput is
    --  files that have been loaded so far will not be accessed before being
    --  reloaded. It is intended for tools that parse several times sources,
    --  to avoid memory leaks.
+
+   type C_Array is record
+      Pointer : aliased access constant Character;
+      Length  : aliased Integer;
+   end record;
+   --  WARNING: There is a matching C declaration of this type in fe.h
+
+   function C_Source_Buffer (S : SFI) return C_Array;
+   --  WARNING: There is a matching C declaration of this subprogram in fe.h
 
 private
    pragma Inline (File_Name);

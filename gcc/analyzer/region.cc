@@ -1,5 +1,5 @@
 /* Regions of memory.
-   Copyright (C) 2019-2024 Free Software Foundation, Inc.
+   Copyright (C) 2019-2025 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -19,7 +19,6 @@ along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
 #include "config.h"
-#define INCLUDE_MEMORY
 #define INCLUDE_VECTOR
 #include "system.h"
 #include "coretypes.h"
@@ -59,6 +58,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "analyzer/sm.h"
 #include "analyzer/program-state.h"
 #include "text-art/dump.h"
+#include "make-unique.h"
 
 #if ENABLE_ANALYZER
 
@@ -138,13 +138,9 @@ region_offset::dump_to_pp (pretty_printer *pp, bool simple) const
 DEBUG_FUNCTION void
 region_offset::dump (bool simple) const
 {
-  pretty_printer pp;
-  pp_format_decoder (&pp) = default_tree_printer;
-  pp_show_color (&pp) = pp_show_color (global_dc->printer);
-  pp.set_output_stream (stderr);
+  tree_dump_pretty_printer pp (stderr);
   dump_to_pp (&pp, simple);
   pp_newline (&pp);
-  pp_flush (&pp);
 }
 
 /* An svalue that matches the pattern (BASE * FACTOR) + OFFSET
@@ -1015,13 +1011,9 @@ region::get_relative_concrete_byte_range (byte_range *out) const
 DEBUG_FUNCTION void
 region::dump (bool simple) const
 {
-  pretty_printer pp;
-  pp_format_decoder (&pp) = default_tree_printer;
-  pp_show_color (&pp) = pp_show_color (global_dc->printer);
-  pp.set_output_stream (stderr);
+  tree_dump_pretty_printer pp (stderr);
   dump_to_pp (&pp, simple);
   pp_newline (&pp);
-  pp_flush (&pp);
 }
 
 /* Dump a tree-like representation of this region and its constituent symbols
@@ -1043,11 +1035,11 @@ region::dump () const
 
 /* Return a new json::string describing the region.  */
 
-json::value *
+std::unique_ptr<json::value>
 region::to_json () const
 {
   label_text desc = get_desc (true);
-  json::value *reg_js = new json::string (desc.get ());
+  auto reg_js = ::make_unique<json::string> (desc.get ());
   return reg_js;
 }
 

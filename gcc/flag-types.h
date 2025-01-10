@@ -1,5 +1,5 @@
 /* Compilation switch flag type definitions for GCC.
-   Copyright (C) 1987-2024 Free Software Foundation, Inc.
+   Copyright (C) 1987-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -291,6 +291,13 @@ enum auto_init_type {
   AUTO_INIT_ZERO = 2
 };
 
+/* Initialization of padding bits with zeros.  */
+enum zero_init_padding_bits_kind {
+  ZERO_INIT_PADDING_BITS_STANDARD = 0,
+  ZERO_INIT_PADDING_BITS_UNIONS = 1,
+  ZERO_INIT_PADDING_BITS_ALL = 2
+};
+
 /* Different instrumentation modes.  */
 enum sanitize_code {
   /* AddressSanitizer.  */
@@ -449,6 +456,36 @@ enum gfc_convert
   GFC_FLAG_CONVERT_R16_IBM_BIG,
   GFC_FLAG_CONVERT_R16_IBM_LITTLE,
 };
+
+
+/* gfortran -finline-intrinsics= values;
+   We use two identical bits for each value, and initialize with alternated
+   bits, so that we can check whether a value has been set by checking whether
+   the two bits have identical value.  */
+
+#define GFC_INL_INTR_VAL(idx) (3 << (2 * idx))
+#define GFC_INL_INTR_UNSET_VAL(val) (0x55555555 & (val))
+
+enum gfc_inlineable_intrinsics
+{
+  GFC_FLAG_INLINE_INTRINSIC_NONE = 0,
+  GFC_FLAG_INLINE_INTRINSIC_MAXLOC = GFC_INL_INTR_VAL (0),
+  GFC_FLAG_INLINE_INTRINSIC_MINLOC = GFC_INL_INTR_VAL (1),
+  GFC_FLAG_INLINE_INTRINSIC_ALL = GFC_FLAG_INLINE_INTRINSIC_MAXLOC
+				  | GFC_FLAG_INLINE_INTRINSIC_MINLOC,
+
+  GFC_FLAG_INLINE_INTRINSIC_NONE_UNSET
+		  = GFC_INL_INTR_UNSET_VAL (GFC_FLAG_INLINE_INTRINSIC_NONE),
+  GFC_FLAG_INLINE_INTRINSIC_MAXLOC_UNSET
+		  = GFC_INL_INTR_UNSET_VAL (GFC_FLAG_INLINE_INTRINSIC_MAXLOC),
+  GFC_FLAG_INLINE_INTRINSIC_MINLOC_UNSET
+		  = GFC_INL_INTR_UNSET_VAL (GFC_FLAG_INLINE_INTRINSIC_MINLOC),
+  GFC_FLAG_INLINE_INTRINSIC_ALL_UNSET
+		  = GFC_INL_INTR_UNSET_VAL (GFC_FLAG_INLINE_INTRINSIC_ALL)
+};
+
+#undef GFC_INL_INTR_UNSET_VAL
+#undef GFC_INL_INTR_VAL
 
 
 /* Inline String Operations functions.  */

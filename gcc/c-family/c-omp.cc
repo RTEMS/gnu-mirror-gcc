@@ -1,7 +1,7 @@
 /* This file contains routines to construct OpenACC and OpenMP constructs,
    called from parsing in the C and C++ front ends.
 
-   Copyright (C) 2005-2024 Free Software Foundation, Inc.
+   Copyright (C) 2005-2025 Free Software Foundation, Inc.
    Contributed by Richard Henderson <rth@redhat.com>,
 		  Diego Novillo <dnovillo@redhat.com>.
 
@@ -204,7 +204,7 @@ c_finish_omp_taskyield (location_t loc)
 
 
 /* Complete a #pragma omp atomic construct.  For CODE OMP_ATOMIC
-   the expression to be implemented atomically is LHS opcode= RHS. 
+   the expression to be implemented atomically is LHS opcode= RHS.
    For OMP_ATOMIC_READ V = LHS, for OMP_ATOMIC_CAPTURE_{NEW,OLD} LHS
    opcode= RHS with the new or old content of LHS returned.
    LOC is the location of the atomic statement.  The value returned
@@ -663,6 +663,26 @@ c_finish_omp_atomic (location_t loc, enum tree_code code,
   return x;
 }
 
+
+/* Return true if TYPE is the implementation's omp_interop_t.  */
+
+bool
+c_omp_interop_t_p (tree type)
+{
+  if (type == error_mark_node)
+    return false;
+  type = TYPE_MAIN_VARIANT (type);
+  return (TREE_CODE (type) == ENUMERAL_TYPE
+	  && TYPE_NAME (type)
+	  && ((TREE_CODE (TYPE_NAME (type)) == TYPE_DECL
+	       ? DECL_NAME (TYPE_NAME (type)) : TYPE_NAME (type))
+	      == get_identifier ("omp_interop_t"))
+	  && TYPE_FILE_SCOPE_P (type)
+	  && COMPLETE_TYPE_P (type)
+	  && TREE_CODE (TYPE_SIZE (type)) == INTEGER_CST
+	  && !compare_tree_int (TYPE_SIZE (type),
+				tree_to_uhwi (TYPE_SIZE (ptr_type_node))));
+}
 
 /* Return true if TYPE is the implementation's omp_depend_t.  */
 
@@ -1337,7 +1357,7 @@ c_omp_is_loop_iterator (tree decl, struct c_omp_check_loop_iv_data *d)
 /* Helper function called via walk_tree, to diagnose uses
    of associated loop IVs inside of lb, b and incr expressions
    of OpenMP loops.  */
-   
+
 static tree
 c_omp_check_loop_iv_r (tree *tp, int *walk_subtrees, void *data)
 {
@@ -1617,6 +1637,7 @@ c_find_nested_loop_xform_r (tree *tp, int *walk_subtrees, void *)
       *walk_subtrees = 1;
       break;
     case TRY_FINALLY_EXPR:
+    case CLEANUP_POINT_EXPR:
       *walk_subtrees = 1;
       break;
     default:
@@ -4299,8 +4320,8 @@ const struct c_omp_directive c_omp_directives[] = {
     C_OMP_DIR_DECLARATIVE, false },
   { "depobj", nullptr, nullptr, PRAGMA_OMP_DEPOBJ,
     C_OMP_DIR_STANDALONE, false },
-  /* { "dispatch", nullptr, nullptr, PRAGMA_OMP_DISPATCH,
-    C_OMP_DIR_CONSTRUCT, false },  */
+  { "dispatch", nullptr, nullptr, PRAGMA_OMP_DISPATCH,
+    C_OMP_DIR_DECLARATIVE, false },
   { "distribute", nullptr, nullptr, PRAGMA_OMP_DISTRIBUTE,
     C_OMP_DIR_CONSTRUCT, true },
   { "end", "assumes", nullptr, PRAGMA_OMP_END,
@@ -4320,8 +4341,8 @@ const struct c_omp_directive c_omp_directives[] = {
     C_OMP_DIR_CONSTRUCT, true },
   /* { "groupprivate", nullptr, nullptr, PRAGMA_OMP_GROUPPRIVATE,
     C_OMP_DIR_DECLARATIVE, false },  */
-  /* { "interop", nullptr, nullptr, PRAGMA_OMP_INTEROP,
-    C_OMP_DIR_STANDALONE, false },  */
+  { "interop", nullptr, nullptr, PRAGMA_OMP_INTEROP,
+    C_OMP_DIR_STANDALONE, false },
   { "loop", nullptr, nullptr, PRAGMA_OMP_LOOP,
     C_OMP_DIR_CONSTRUCT, true },
   { "masked", nullptr, nullptr, PRAGMA_OMP_MASKED,

@@ -1,5 +1,5 @@
 /* Symbolic values.
-   Copyright (C) 2019-2024 Free Software Foundation, Inc.
+   Copyright (C) 2019-2025 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -105,7 +105,7 @@ public:
   void dump (bool simple) const;
   label_text get_desc (bool simple=true) const;
 
-  json::value *to_json () const;
+  std::unique_ptr<json::value> to_json () const;
 
   std::unique_ptr<text_art::tree_widget>
   make_dump_widget (const dump_widget_info &dwi,

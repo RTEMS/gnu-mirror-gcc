@@ -1,3 +1,442 @@
+2024-12-06  David Malcolm  <dmalcolm@redhat.com>
+
+	* region-model.cc: Include "gcc-urlifier.h".
+	(reason_attr_access::emit): Use auto_urlify_attributes.
+	* sm-taint.cc: Include "gcc-urlifier.h".
+	(tainted_access_attrib_size::emit): Use auto_urlify_attributes.
+
+2024-11-28  David Malcolm  <dmalcolm@redhat.com>
+
+	* engine.cc (strongly_connected_components::to_json): Avoid naked
+	"new".
+	* infinite-loop.cc (infinite_loop::to_json): Convert return type
+	to unique_ptr.  Avoid naked "new".
+	* sm-signal.cc (signal_delivery_edge_info_t::to_json): Delete
+	unused function.
+	* supergraph.cc (supernode::to_json): Avoid naked "new".
+
+2024-11-28  David Malcolm  <dmalcolm@redhat.com>
+
+	PR c/104896
+	* sm-malloc.cc: Replace "%<%s%>" with "%qs" in message wording.
+
+2024-11-23  Lewis Hyatt  <lhyatt@gmail.com>
+
+	* checker-event.cc (checker_event::dump): Support printing either
+	32- or 64-bit location_t values.
+	* checker-path.cc (checker_path::inject_any_inlined_call_events):
+	Likewise.
+
+2024-11-22  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	PR bootstrap/117737
+	* access-diagram.cc (INCLUDE_MEMORY): Remove.
+	* analysis-plan.cc (INCLUDE_MEMORY): Remove.
+	* analyzer-language.cc (INCLUDE_MEMORY): Remove.
+	* analyzer-logging.cc (INCLUDE_MEMORY): Remove.
+	* analyzer-pass.cc (INCLUDE_MEMORY): Remove.
+	* analyzer-selftests.cc (INCLUDE_MEMORY): Remove.
+	* analyzer.cc (INCLUDE_MEMORY): Remove.
+	* bar-chart.cc (INCLUDE_MEMORY): Remove.
+	* bounds-checking.cc (INCLUDE_MEMORY): Remove.
+	* call-details.cc (INCLUDE_MEMORY): Remove.
+	* call-info.cc (INCLUDE_MEMORY): Remove.
+	* call-string.cc (INCLUDE_MEMORY): Remove.
+	* call-summary.cc (INCLUDE_MEMORY): Remove.
+	* checker-event.cc (INCLUDE_MEMORY): Remove.
+	* checker-path.cc (INCLUDE_MEMORY): Remove.
+	* complexity.cc (INCLUDE_MEMORY): Remove.
+	* constraint-manager.cc (INCLUDE_MEMORY): Remove.
+	* diagnostic-manager.cc (INCLUDE_MEMORY): Remove.
+	* engine.cc (INCLUDE_MEMORY): Remove.
+	* feasible-graph.cc (INCLUDE_MEMORY): Remove.
+	* infinite-loop.cc (INCLUDE_MEMORY): Remove.
+	* infinite-recursion.cc (INCLUDE_MEMORY): Remove.
+	* kf-analyzer.cc (INCLUDE_MEMORY): Remove.
+	* kf-lang-cp.cc (INCLUDE_MEMORY): Remove.
+	* kf.cc (INCLUDE_MEMORY): Remove.
+	* known-function-manager.cc (INCLUDE_MEMORY): Remove.
+	* pending-diagnostic.cc (INCLUDE_MEMORY): Remove.
+	* program-point.cc (INCLUDE_MEMORY): Remove.
+	* program-state.cc (INCLUDE_MEMORY): Remove.
+	* ranges.cc (INCLUDE_MEMORY): Remove.
+	* record-layout.cc (INCLUDE_MEMORY): Remove.
+	* region-model-asm.cc (INCLUDE_MEMORY): Remove.
+	* region-model-manager.cc (INCLUDE_MEMORY): Remove.
+	* region-model-reachability.cc (INCLUDE_MEMORY): Remove.
+	* region-model.cc (INCLUDE_MEMORY): Remove.
+	* region.cc (INCLUDE_MEMORY): Remove.
+	* sm-fd.cc (INCLUDE_MEMORY): Remove.
+	* sm-file.cc (INCLUDE_MEMORY): Remove.
+	* sm-malloc.cc (INCLUDE_MEMORY): Remove.
+	* sm-pattern-test.cc (INCLUDE_MEMORY): Remove.
+	* sm-sensitive.cc (INCLUDE_MEMORY): Remove.
+	* sm-signal.cc (INCLUDE_MEMORY): Remove.
+	* sm-taint.cc (INCLUDE_MEMORY): Remove.
+	* sm.cc (INCLUDE_MEMORY): Remove.
+	* state-purge.cc (INCLUDE_MEMORY): Remove.
+	* store.cc (INCLUDE_MEMORY): Remove.
+	* supergraph.cc (INCLUDE_MEMORY): Remove.
+	* svalue.cc (INCLUDE_MEMORY): Remove.
+	* symbol.cc (INCLUDE_MEMORY): Remove.
+	* trimmed-graph.cc (INCLUDE_MEMORY): Remove.
+	* varargs.cc (INCLUDE_MEMORY): Remove.
+
+2024-11-13  David Malcolm  <dmalcolm@redhat.com>
+
+	* checker-path.cc (checker_path::debug): Explicitly use
+	global_dc's reference printer.
+	* diagnostic-manager.cc
+	(diagnostic_manager::prune_interproc_events): Likewise.
+	(diagnostic_manager::prune_system_headers): Likewise.
+
+2024-11-02  David Malcolm  <dmalcolm@redhat.com>
+
+	* analyzer.cc: Include "make-unique.h".  Convert "to_json"
+	functions to use std::unique_ptr.
+	* call-string.cc: Likewise.
+	* constraint-manager.cc: Likewise.
+	* diagnostic-manager.cc: Likewise.
+	* engine.cc: Likewise.
+	* program-point.cc: Likewise.
+	* program-state.cc: Likewise.
+	* ranges.cc: Likewise.
+	* region-model.cc: Likewise.
+	* region.cc: Likewise.
+	* svalue.cc: Likewise.
+	* sm.cc: Likewise.
+	* store.cc: Likewise.
+	* supergraph.cc: Likewise.
+	* analyzer.h: Convert "to_json" functions to return
+	std::unique_ptr.
+	* call-string.h: Likewise.
+	* constraint-manager.h: Likewise.
+	(bounded_range::set_json_attr): Pass "obj" by reference.
+	* diagnostic-manager.h: Convert "to_json" functions to return
+	std::unique_ptr.
+	* exploded-graph.h: Likewise.
+	* program-point.h: Likewise.
+	* program-state.h: Likewise.
+	* ranges.h: Likewise.
+	* region-model.h: Likewise.
+	* region.h: Likewise.
+	* sm.h: Likewise.
+	* store.h: Likewise.
+	* supergraph.h: Likewise.
+	* svalue.h: Likewise.
+
+2024-11-01  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/117373
+	* infinite-loop.cc
+	(infinite_loop_diagnostic::describe_final_event): Fix
+	-Wunused-parameter warning
+
+2024-10-29  David Malcolm  <dmalcolm@redhat.com>
+
+	PR other/116613
+	* analyzer-language.cc (on_finish_translation_unit): Update for
+	m_printer becoming reference printer.
+	* engine.cc (run_checkers): Likewise.
+	* program-point.cc (function_point::print_source_line): Likewise.
+
+2024-10-25  Jakub Jelinek  <jakub@redhat.com>
+
+	* state-purge.cc: Remove trailing whitespace.
+	* region-model.h: Likewise.
+	* region-model.cc: Likewise.
+	* program-point.cc: Likewise.
+	* exploded-graph.h: Likewise.
+	* program-state.cc: Likewise.
+	* supergraph.cc: Likewise.
+
+2024-10-24  David Malcolm  <dmalcolm@redhat.com>
+
+	PR other/116613
+	* bounds-checking.cc
+	(concrete_buffer_overflow::describe_final_event): Convert return
+	type from label_text to bool.  Add "pp" param and either print to
+	it and return true, or return false.
+	(concrete_buffer_overflow::describe_final_event_as_bytes): Convert
+	to print to a pp rather than returning a label_text.
+	(concrete_buffer_overflow::describe_final_event_as_bits):
+	Likewise.
+	(class concrete_buffer_over_read): Analogous changes to above.
+	(class concrete_buffer_underwrite): Likewise.
+	(class concrete_buffer_under_read): Likewise.
+	(class symbolic_buffer_overflow): Likewise.
+	(class symbolic_buffer_over_read): Likewise.
+	* call-details.cc (class overlapping_buffers): Likewise.
+	* call-info.cc (call_info::print): Reimplement.
+	(class call_info::add_events_to_path::call_event): Convert
+	"get_desc" vfunc to "print_desc", dropping return type, adding
+	"pp" param, and printing to it.
+	(class succeed_or_fail_call_info): Likewise.
+	* call-info.h (class call_info): Likewise.
+	(class succeed_or_fail_call_info): Likewise.
+	* checker-event.cc (checker_event::dump): Reimplement.
+	(checker_event::prepare_for_emission): Update for change from
+	get_desc to print_desc.
+	(debug_event::get_desc): Convert to...
+	(debug_event::print_desc): ...this.
+	(precanned_custom_event::get_desc): Convert to...
+	(precanned_custom_event::print_desc): ...this.
+	(statement_event::get_desc): Convert to...
+	(statement_event::print_desc): ...this.
+	(region_creation_event_memory_space::get_desc): Convert to...
+	(region_creation_event_memory_space::print_desc): ...this.
+	(region_creation_event_capacity::get_desc): Convert to...
+	(region_creation_event_capacity::print_desc): ...this.
+	(region_creation_event_allocation_size::get_desc): Convert to...
+	(region_creation_event_allocation_size::print_desc): ...this.
+	(region_creation_event_debug::get_desc): Convert to...
+	(region_creation_event_debug::print_desc): ...this.
+	(function_entry_event::get_desc): Convert to...
+	(function_entry_event::print_desc): ...this.
+	(state_change_event::get_desc): Convert to...
+	(state_change_event::print_desc): ...this.
+	(state_change_event::get_meaning): Update for change to
+	pending_diagnostic::get_meaning_for_state_change.
+	(superedge_event::should_filter_p): Convert from usage of get_desc
+	to print_desc.
+	(start_cfg_edge_event::get_desc): Convert to...
+	(start_cfg_edge_event::print_desc): ...this.
+	(call_event::get_desc): Convert to...
+	(call_event::print_desc): ...this.
+	(return_event::get_desc): Convert to...
+	(return_event::print_desc): ...this.
+	(start_consolidated_cfg_edges_event::get_desc): Convert to...
+	(start_consolidated_cfg_edges_event::print_desc): ...this.
+	(inlined_call_event::get_desc): Convert to...
+	(inlined_call_event::print_desc): ...this.
+	(setjmp_event::get_desc): Convert to...
+	(setjmp_event::print_desc): ...this.
+	(rewind_from_longjmp_event::get_desc): Convert to...
+	(rewind_from_longjmp_event::print_desc): ...this.
+	(rewind_to_setjmp_event::get_desc): Convert to...
+	(rewind_to_setjmp_event::print_desc): ...this.
+	(warning_event::get_desc): Convert to...
+	(warning_event::print_desc): ...this.
+	* checker-event.h: Convert the various "get_desc" vfunc decls to
+	"print_desc".
+	* checker-path.cc (checker_path::dump): Convert to usage of
+	checker_event::print_desc.
+	(checker_path::debug): Convert to debug form of
+	checker_event::get_desc.
+	* diagnostic-manager.cc
+	(diagnostic_manager::prune_interproc_events): Likewise.
+	(diagnostic_manager::prune_system_headers): Likewise.
+	* engine.cc (call_summary_edge_info::get_desc): Convert to...
+	(call_summary_edge_info::print_desc): ...this.
+	(stale_jmp_buf::describe_final_event): Update for change to
+	this vfunc.
+	(tainted_args_function_custom_event::get_desc): Convert to...
+	(tainted_args_function_custom_event::print_desc): ...this.
+	(tainted_args_field_custom_event::get_desc): Convert to...
+	(tainted_args_field_custom_event::print_desc): ...this.
+	(tainted_args_callback_custom_event::get_desc): Convert to...
+	(tainted_args_callback_custom_event::print_desc): ...this.
+	(jump_through_null::describe_final_event): Update for change to
+	this vfunc.
+	* infinite-loop.cc (perpetual_start_cfg_edge_event::get_desc):
+	Convert to...
+	(perpetual_start_cfg_edge_event::print_desc): ...this.
+	(looping_back_event::get_desc): Convert to...
+	(looping_back_event::print_desc): ...this.
+	(looping_back_event::describe_final_event): Update for change to
+	this vfunc.
+	* infinite-recursion.cc (class infinite_recursion_diagnostic):
+	Update for changes to pending_diagnostic.
+	* kf.cc (class putenv_of_auto_var): Likewise.
+	(kf_realloc::impl_call_post): Update for changes to call_info.
+	(kf_strchr::impl_call_post): Likewise.
+	(kf_strncpy::impl_call_post): Likewise.
+	(kf_strstr::impl_call_post): Likewise.
+	(class kf_strtok::undefined_behavior): Update for changes to
+	pending_diagnostic.
+	(class strtok_call_info): Update for changes to call_info.
+	* pending-diagnostic.cc (evdesc::event_desc::formatted_print):
+	Delete.
+	* pending-diagnostic.h (struct event_desc): Delete.
+	(struct state_change): Drop event_desc base class.
+	(struct call_with_state): Likewise.
+	(struct return_of_state): Likewise.
+	(struct final_event): Likewise.
+	(pending_event::describe_state_change): Convert return
+	type from label_text to bool.  Add "pp" param and either print to
+	it and return true, or return false.  Do the latter for the base
+	class implementation.
+	(pending_event::describe_call_with_state): Likewise.
+	(pending_event::describe_return_of_state): Likewise.
+	(pending_event::describe_final_event): Likewise.
+	* region-model.cc
+	(poisoned_value_diagnostic::describe_final_event): Update for
+	change to this vfunc.
+	(shift_count_negative_diagnostic::describe_final_event): Likewise.
+	(shift_count_overflow_diagnostic::describe_final_event): Likewise.
+	(ptrdiff_region_creation_event::get_desc): Convert to...
+	(ptrdiff_region_creation_event::print_desc): ...this.
+	(undefined_ptrdiff_diagnostic::describe_final_event): Update for
+	change to this vfunc.
+	(write_to_const_diagnostic::describe_final_event): Likewise.
+	(write_to_string_literal_diagnostic::describe_final_event):
+	Likewise.
+	(dubious_allocation_size::describe_final_event): Likewise.
+	(null_terminator_check_event::get_desc): Convert to...
+	(null_terminator_check_event::print_desc): ...this.
+	(float_as_size_arg::describe_final_event): Update for change to
+	this vfunc.
+	(exposure_through_uninit_copy::describe_final_event): Likewise.
+	* sm-fd.cc: Include "diagnostic-core.h".  Update throughout for
+	changes to pending_diagnostic vfuncs.
+	* sm-file.cc: Likewise.
+	* sm-malloc.cc: Likewise.
+	* sm-sensitive.cc: Likewise.
+	* sm-signal.cc: Likewise.
+	* sm-taint.cc: Likewise.
+	* varargs.cc: Likewise.
+
+2024-10-24  David Malcolm  <dmalcolm@redhat.com>
+	    Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR other/116613
+	* analyzer-logging.cc: Add #define INCLUDE_MEMORY
+	(logger::logger): Update for m_pp becoming a unique_ptr.
+	(logger::~logger): Likewise.
+	(logger::log_va_partial): Likewise.
+	(logger::end_log_line): Likewise.
+	* analyzer-logging.h (logger::get_printer): Likewise.
+	(logger::m_pp): Convert to a unique_ptr.
+	* analyzer.cc (make_label_text): Use
+	diagnostic_context::clone_printer and use unique_ptr.
+	(make_label_text_n): Likewise.
+	* bar-chart.cc: Add #define INCLUDE_MEMORY
+	* pending-diagnostic.cc (evdesc::event_desc::formatted_print):
+	Use diagnostic_context::clone_printer and use unique_ptr.
+	* sm-malloc.cc (sufficiently_similar_p): Likewise.
+	* supergraph.cc (supergraph::dump_dot_to_file): Likewise.
+
+2024-09-30  David Malcolm  <dmalcolm@redhat.com>
+
+	PR other/116613
+	* program-point.cc (function_point::print_source_line): Replace
+	call to diagnostic_show_locus with a call to
+	diagnostic_source_print_policy::print.
+
+2024-09-30  David Malcolm  <dmalcolm@redhat.com>
+
+	PR other/116613
+	* kf-analyzer.cc: Include "pretty-print-markup.h".
+	(kf_analyzer_dump_escaped::impl_call_pre): Defer colorization
+	choices by eliminating the construction of a intermediate string,
+	replacing it with a new pp_element subclass via "%e".
+
+2024-09-20  David Malcolm  <dmalcolm@redhat.com>
+
+	PR other/116613
+	* access-diagram.cc (access_range::dump): Simplify using
+	tree_dump_pretty_printer.
+	* call-details.cc (call_details::dump): Likewise.
+	* call-summary.cc (call_summary::dump): Likewise.
+	(call_summary_replay::dump): Likewise.
+	* checker-event.cc (checker_event::debug): Likewise.
+	* constraint-manager.cc (range::dump): Likewise.
+	(bounded_range::dump): Likewise.
+	(bounded_ranges::dump): Likewise.
+	(constraint_manager::dump): Likewise.
+	* engine.cc (exploded_node::dump): Likewise.
+	(exploded_path::dump): Likewise.
+	* program-point.cc (program_point::dump): Likewise.
+	* program-state.cc (extrinsic_state::dump_to_file): Likewise.
+	(sm_state_map::dump): Likewise.
+	(program_state::dump_to_file): Likewise.
+	* ranges.cc (symbolic_byte_offset::dump): Likewise.
+	(symbolic_byte_range::dump): Likewise.
+	* record-layout.cc (record_layout::dump): Likewise.
+	* region-model-reachability.cc (reachable_regions::dump):
+	Likewise.
+	* region-model.cc (region_to_value_map::dump): Likewise.
+	(region_model::dump): Likewise.
+	(model_merger::dump): Likewise.
+	* region.cc (region_offset::dump): Likewise.
+	(region::dump): Likewise.
+	* sm-malloc.cc (deallocator_set::dump): Likewise.
+	* store.cc (uncertainty_t::dump): Likewise.
+	(binding_key::dump): Likewise.
+	(bit_range::dump): Likewise.
+	(byte_range::dump): Likewise.
+	(binding_map::dump): Likewise.
+	(binding_cluster::dump): Likewise.
+	(store::dump): Likewise.
+	* supergraph.cc (superedge::dump): Likewise.
+	* svalue.cc (svalue::dump): Likewise.
+
+2024-09-20  David Malcolm  <dmalcolm@redhat.com>
+
+	PR other/116613
+	* diagnostic-manager.cc (diagnostic_manager::emit_saved_diagnostic):
+	Remove remove redundant 'pp'.
+
+2024-09-09  David Malcolm  <dmalcolm@redhat.com>
+
+	PR other/116613
+	* access-diagram.cc (access_range::dump): Rename
+	diagnostic_context's "printer" field to "m_printer".
+	* analyzer-language.cc (on_finish_translation_unit): Likewise.
+	* analyzer.cc (make_label_text): Likewise.
+	(make_label_text_n): Likewise.
+	* call-details.cc (call_details::dump): Likewise.
+	* call-summary.cc (call_summary::dump): Likewise.
+	(call_summary_replay::dump): Likewise.
+	* checker-event.cc (checker_event::debug): Likewise.
+	* constraint-manager.cc (range::dump): Likewise.
+	(bounded_range::dump): Likewise.
+	(bounded_ranges::dump): Likewise.
+	(constraint_manager::dump): Likewise.
+	* diagnostic-manager.cc
+	(diagnostic_manager::emit_saved_diagnostic): Likewise.
+	* engine.cc (exploded_node::dump): Likewise.
+	(exploded_path::dump): Likewise.
+	(run_checkers): Likewise.
+	* kf-analyzer.cc (kf_analyzer_dump_escaped::impl_call_pre):
+	Likewise.
+	* pending-diagnostic.cc (evdesc::event_desc::formatted_print):
+	Likewise.
+	* program-point.cc (function_point::print_source_line): Likewise.
+	(program_point::dump): Likewise.
+	* program-state.cc (extrinsic_state::dump_to_file): Likewise.
+	(sm_state_map::dump): Likewise.
+	(program_state::dump_to_file): Likewise.
+	* ranges.cc (symbolic_byte_offset::dump): Likewise.
+	(symbolic_byte_range::dump): Likewise.
+	* region-model-reachability.cc (reachable_regions::dump): Likewise.
+	* region-model.cc (region_to_value_map::dump): Likewise.
+	(region_model::dump): Likewise.
+	(model_merger::dump): Likewise.
+	* region.cc (region_offset::dump): Likewise.
+	(region::dump): Likewise.
+	* sm-malloc.cc (deallocator_set::dump): Likewise.
+	(sufficiently_similar_p): Likewise.
+	* store.cc (uncertainty_t::dump): Likewise.
+	(binding_key::dump): Likewise.
+	(binding_map::dump): Likewise.
+	(binding_cluster::dump): Likewise.
+	(store::dump): Likewise.
+	* supergraph.cc (supergraph::dump_dot_to_file): Likewise.
+	(superedge::dump): Likewise.
+	* svalue.cc (svalue::dump): Likewise.
+
+2024-09-09  David Malcolm  <dmalcolm@redhat.com>
+
+	* call-summary.cc
+	(call_summary_replay::convert_region_from_summary_1): Drop unused
+	local "summary_cast_reg"
+
+2024-09-03  David Malcolm  <dmalcolm@redhat.com>
+
+	* analyzer-logging.cc (logger::logger): Prefix all output_buffer
+	fields with "m_".
+
 2024-07-24  David Malcolm  <dmalcolm@redhat.com>
 
 	* checker-event.cc (maybe_add_sarif_properties): Update setting
@@ -12639,9 +13078,8 @@
 2019-12-13  David Malcolm  <dmalcolm@redhat.com>
 
 	* Initial creation
-
 
-Copyright (C) 2019-2024 Free Software Foundation, Inc.
+Copyright (C) 2019-2025 Free Software Foundation, Inc.
 
 Copying and distribution of this file, with or without modification,
 are permitted in any medium without royalty provided the copyright

@@ -1,5 +1,5 @@
 /* Dependency analysis
-   Copyright (C) 2000-2024 Free Software Foundation, Inc.
+   Copyright (C) 2000-2025 Free Software Foundation, Inc.
    Contributed by Paul Brook <paul@nowt.org>
 
 This file is part of GCC.
@@ -473,7 +473,7 @@ gfc_dep_compare_expr (gfc_expr *e1, gfc_expr *e2)
   }
 
   if (e1->expr_type != e2->expr_type)
-    return -3;
+    return -2;
 
   switch (e1->expr_type)
     {

@@ -1,6 +1,6 @@
 // <bitset> -*- C++ -*-
 
-// Copyright (C) 2001-2024 Free Software Foundation, Inc.
+// Copyright (C) 2001-2025 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -42,7 +42,9 @@
 #ifndef _GLIBCXX_BITSET
 #define _GLIBCXX_BITSET 1
 
+#ifdef _GLIBCXX_SYSHDR
 #pragma GCC system_header
+#endif
 
 #include <bits/functexcept.h>   // For invalid_argument, out_of_range,
                                 // overflow_error
@@ -870,10 +872,6 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	_WordT*	_M_wp;
 	size_t 	_M_bpos;
 
-	// left undefined
-	reference();
-
-      public:
 	_GLIBCXX23_CONSTEXPR
 	reference(bitset& __b, size_t __pos) _GLIBCXX_NOEXCEPT
 	{
@@ -881,6 +879,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
 	  _M_bpos = _Base::_S_whichbit(__pos);
 	}
 
+      public:
 #if __cplusplus >= 201103L
 	reference(const reference&) = default;
 #endif

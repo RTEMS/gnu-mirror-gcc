@@ -1,5 +1,5 @@
 /* Convert function calls to rtl insns, for GNU C compiler.
-   Copyright (C) 1989-2024 Free Software Foundation, Inc.
+   Copyright (C) 1989-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -852,6 +852,23 @@ flags_from_decl_or_type (const_tree exp)
 	flags |= ECF_XTHROW;
 
       flags = special_function_p (exp, flags);
+
+      if ((flags & ECF_CONST) == 0
+	  && lookup_attribute ("unsequenced noptr",
+			       TYPE_ATTRIBUTES (TREE_TYPE (exp))))
+	{
+	  /* [[unsequenced]] with no pointers in arguments is like
+	     [[gnu::const]] without finite guarantee.  */
+	  flags |= ECF_CONST;
+	  if ((flags & ECF_PURE) == 0)
+	    flags |= ECF_LOOPING_CONST_OR_PURE;
+	}
+      if ((flags & (ECF_CONST | ECF_PURE)) == 0
+	  && lookup_attribute ("reproducible noptr",
+			       TYPE_ATTRIBUTES (TREE_TYPE (exp))))
+	/* [[reproducible]] with no pointers in arguments is like
+	   [[gnu::pure]] without finite guarantee.  */
+	flags |= ECF_PURE | ECF_LOOPING_CONST_OR_PURE;
     }
   else if (TYPE_P (exp))
     {
@@ -862,6 +879,17 @@ flags_from_decl_or_type (const_tree exp)
 	  && ((flags & ECF_CONST) != 0
 	      || lookup_attribute ("transaction_pure", TYPE_ATTRIBUTES (exp))))
 	flags |= ECF_TM_PURE;
+
+      if ((flags & ECF_CONST) == 0
+	  && lookup_attribute ("unsequenced noptr", TYPE_ATTRIBUTES (exp)))
+	/* [[unsequenced]] with no pointers in arguments is like
+	   [[gnu::const]] without finite guarantee.  */
+	flags |= ECF_CONST | ECF_LOOPING_CONST_OR_PURE;
+      if ((flags & ECF_CONST) == 0
+	  && lookup_attribute ("reproducible noptr", TYPE_ATTRIBUTES (exp)))
+	/* [[reproducible]] with no pointers in arguments is like
+	   [[gnu::pure]] without finite guarantee.  */
+	flags |= ECF_PURE | ECF_LOOPING_CONST_OR_PURE;
     }
   else
     gcc_unreachable ();
@@ -4666,7 +4694,7 @@ emit_library_call_value_1 (int retval, rtx orgfun, rtx value,
       rtx val = argvec[argnum].value;
       rtx reg = argvec[argnum].reg;
       int partial = argvec[argnum].partial;
-      
+
       /* Handle calls that pass values in multiple non-contiguous
 	 locations.  The PA64 has examples of this for library calls.  */
       if (reg != 0 && GET_CODE (reg) == PARALLEL)
@@ -5217,7 +5245,7 @@ store_one_arg (struct arg_data *arg, rtx argblock, int flags,
 		     they aren't really at the same location.  Check for
 		     this by making sure that the incoming size is the
 		     same as the outgoing size.  */
-		  if (maybe_ne (arg->locate.size.constant, size_val))
+		  if (partial != 0)
 		    sibcall_failure = true;
 		}
 	      else if (maybe_in_range_p (arg->locate.offset.constant,

@@ -27,6 +27,7 @@ import dmd.root.array;
 import dmd.common.outbuffer;
 import dmd.root.rmem;
 import dmd.tokens;
+import dmd.typesem : size;
 
 /***********************************************************
  */
@@ -35,7 +36,7 @@ final class CParser(AST) : Parser!AST
     AST.Dsymbols* symbols;      // symbols declared in current scope
 
     bool addFuncName;           /// add declaration of __func__ to function symbol table
-    bool importBuiltins;        /// seen use of C compiler builtins, so import __builtins;
+    bool importBuiltins;        /// seen use of C compiler builtins, so import __importc_builtins;
 
     private
     {
@@ -89,6 +90,9 @@ final class CParser(AST) : Parser!AST
         this.wchar_tsize = target.wchar_tsize;
 
         // C `char` is always unsigned in ImportC
+
+        // We know that we are parsing out C, due the parent not knowing this, we have to setup tables here.
+        charLookup = compileEnv.cCharLookupTable;
     }
 
     /********************************************
@@ -125,7 +129,7 @@ final class CParser(AST) : Parser!AST
                     /* Seen references to C builtin functions.
                      * Import their definitions
                      */
-                    auto s = new AST.Import(Loc.initial, null, Id.builtins, null, false);
+                    auto s = new AST.Import(Loc.initial, null, Id.importc_builtins, null, false);
                     wrap.push(s);
                 }
 
@@ -1869,22 +1873,30 @@ final class CParser(AST) : Parser!AST
              * init-declarator:
              *    declarator simple-asm-expr (opt) gnu-attributes (opt)
              *    declarator simple-asm-expr (opt) gnu-attributes (opt) = initializer
+             *
+             * Clang also allows simple-asm-expr after gnu-attributes.
              */
+            while (1)
+            {
+                if (token.value == TOK.asm_)
+                {
+                    asmName = cparseGnuAsmLabel();
+                    /* This is a data definition, there cannot now be a
+                     * function definition.
+                     */
+                    first = false;
+                }
+                else if (token.value == TOK.__attribute__)
+                    cparseGnuAttributes(specifier);
+                else
+                    break;
+            }
+
             switch (token.value)
             {
                 case TOK.assign:
                 case TOK.comma:
                 case TOK.semicolon:
-                case TOK.asm_:
-                case TOK.__attribute__:
-                    if (token.value == TOK.asm_)
-                        asmName = cparseGnuAsmLabel();
-                    if (token.value == TOK.__attribute__)
-                    {
-                        cparseGnuAttributes(specifier);
-                        if (token.value == TOK.leftCurly)
-                            break;              // function definition
-                    }
                     /* This is a data definition, there cannot now be a
                      * function definition.
                      */
@@ -1919,6 +1931,14 @@ final class CParser(AST) : Parser!AST
                 auto s = cparseFunctionDefinition(id, dt.isTypeFunction(), specifier);
                 typedefTab.setDim(typedefTabLengthSave);
                 symbols = symbolsSave;
+                if (specifier.mod & MOD.x__stdcall)
+                {
+                    // If this function is __stdcall, wrap it in a LinkDeclaration so that
+                    // it's extern(Windows) when imported in D.
+                    auto decls = new AST.Dsymbols(1);
+                    (*decls)[0] = s;
+                    s = new AST.LinkDeclaration(s.loc, LINK.windows, decls);
+                }
                 symbols.push(s);
                 return;
             }
@@ -2071,13 +2091,14 @@ final class CParser(AST) : Parser!AST
                     }
                 }
                 s = applySpecifier(s, specifier);
-                if (level == LVL.local)
+                if (level == LVL.local || (specifier.mod & MOD.x__stdcall))
                 {
-                    // Wrap the declaration in `extern (C) { declaration }`
+                    // Wrap the declaration in `extern (C/Windows) { declaration }`
                     // Necessary for function pointers, but harmless to apply to all.
                     auto decls = new AST.Dsymbols(1);
                     (*decls)[0] = s;
-                    s = new AST.LinkDeclaration(s.loc, linkage, decls);
+                    const lkg = specifier.mod & MOD.x__stdcall ? LINK.windows : linkage;
+                    s = new AST.LinkDeclaration(s.loc, lkg, decls);
                 }
                 symbols.push(s);
             }
@@ -3614,6 +3635,12 @@ final class CParser(AST) : Parser!AST
                  * type on the target machine. It's the opposite of __attribute__((packed))
                  */
             }
+            else if (token.ident == Id.packed)
+            {
+                specifier.packalign.set(1);
+                specifier.packalign.setPack(true);
+                nextToken();
+            }
             else if (token.ident == Id.always_inline) // https://gcc.gnu.org/onlinedocs/gcc/Common-Function-Attributes.html
             {
                 specifier.scw |= SCW.xinline;
@@ -3962,7 +3989,7 @@ final class CParser(AST) : Parser!AST
             members = new AST.Dsymbols();          // so `members` will be non-null even with 0 members
             while (token.value != TOK.rightCurly)
             {
-                cparseStructDeclaration(members);
+                cparseStructDeclaration(members, packalign);
 
                 if (token.value == TOK.endOfFile)
                     break;
@@ -3975,6 +4002,24 @@ final class CParser(AST) : Parser!AST
                  *  struct-declarator-list:
                  *    struct-declarator (opt)
                  */
+            }
+
+            /* GNU Extensions
+             * Parse the postfix gnu-attributes (opt)
+             */
+            Specifier specifier;
+            if (token.value == TOK.__attribute__)
+                cparseGnuAttributes(specifier);
+            if (!specifier.packalign.isUnknown)
+            {
+                packalign.set(specifier.packalign.get());
+                packalign.setPack(specifier.packalign.isPack());
+                foreach (ref d; (*members)[])
+                {
+                    auto decls = new AST.Dsymbols(1);
+                    (*decls)[0] = d;
+                    d = new AST.AlignDeclaration(d.loc, specifier.packalign, decls);
+                }
             }
         }
         else if (!tag)
@@ -4007,8 +4052,9 @@ final class CParser(AST) : Parser!AST
      *    declarator (opt) : constant-expression
      * Params:
      *    members = where to put the fields (members)
+     *    packalign = alignment to use for struct members
      */
-    void cparseStructDeclaration(AST.Dsymbols* members)
+    void cparseStructDeclaration(AST.Dsymbols* members, structalign_t packalign)
     {
         //printf("cparseStructDeclaration()\n");
         if (token.value == TOK._Static_assert)
@@ -4019,7 +4065,7 @@ final class CParser(AST) : Parser!AST
         }
 
         Specifier specifier;
-        specifier.packalign = this.packalign;
+        specifier.packalign = packalign.isUnknown ? this.packalign : packalign;
         auto tspec = cparseSpecifierQualifierList(LVL.member, specifier);
         if (!tspec)
         {
@@ -5860,13 +5906,15 @@ final class CParser(AST) : Parser!AST
 
         const(char)* endp = &slice[length - 7];
 
+        AST.Dsymbols newSymbols;
+
         size_t[void*] defineTab;    // hash table of #define's turned into Symbol's
-                                    // indexed by Identifier, returns index into symbols[]
+                                    // indexed by Identifier, returns index into newSymbols[]
                                     // The memory for this is leaked
 
-        void addVar(AST.Dsymbol s)
+        void addSym(AST.Dsymbol s)
         {
-            //printf("addVar() %s\n", s.toChars());
+            //printf("addSym() %s\n", s.toChars());
             if (auto v = s.isVarDeclaration())
                 v.isCmacro(true);       // mark it as coming from a C #define
             /* If it's already defined, replace the earlier
@@ -5874,13 +5922,22 @@ final class CParser(AST) : Parser!AST
              */
             if (size_t* pd = cast(void*)s.ident in defineTab)
             {
-                //printf("replacing %s\n", v.toChars());
-                (*symbols)[*pd] = s;
+                //printf("replacing %s\n", s.toChars());
+                newSymbols[*pd] = s;
                 return;
             }
-            assert(symbols, "symbols is null");
-            defineTab[cast(void*)s.ident] = symbols.length;
-            symbols.push(s);
+            defineTab[cast(void*)s.ident] = newSymbols.length;
+            newSymbols.push(s);
+        }
+
+        void removeSym(Identifier ident)
+        {
+            //printf("removeSym() %s\n", ident.toChars());
+            if (size_t* pd = cast(void*)ident in defineTab)
+            {
+                //printf("removing %s\n", ident.toChars());
+                newSymbols[*pd] = null;
+            }
         }
 
         while (p < endp)
@@ -5924,7 +5981,7 @@ final class CParser(AST) : Parser!AST
                                  */
                                 AST.Expression e = new AST.IntegerExp(scanloc, intvalue, t);
                                 auto v = new AST.VarDeclaration(scanloc, t, id, new AST.ExpInitializer(scanloc, e), STC.manifest);
-                                addVar(v);
+                                addSym(v);
                                 ++p;
                                 continue;
                             }
@@ -5947,7 +6004,7 @@ final class CParser(AST) : Parser!AST
                                  */
                                 AST.Expression e = new AST.RealExp(scanloc, floatvalue, t);
                                 auto v = new AST.VarDeclaration(scanloc, t, id, new AST.ExpInitializer(scanloc, e), STC.manifest);
-                                addVar(v);
+                                addSym(v);
                                 ++p;
                                 continue;
                             }
@@ -5965,7 +6022,7 @@ final class CParser(AST) : Parser!AST
                                  */
                                 AST.Expression e = new AST.StringExp(scanloc, str[0 .. len], len, 1, postfix);
                                 auto v = new AST.VarDeclaration(scanloc, null, id, new AST.ExpInitializer(scanloc, e), STC.manifest);
-                                addVar(v);
+                                addSym(v);
                                 ++p;
                                 continue;
                             }
@@ -6001,7 +6058,7 @@ final class CParser(AST) : Parser!AST
                             AST.TemplateParameters* tpl = new AST.TemplateParameters();
                             AST.Expression constraint = null;
                             auto tempdecl = new AST.TemplateDeclaration(exp.loc, id, tpl, constraint, decldefs, false);
-                            addVar(tempdecl);
+                            addSym(tempdecl);
                             ++p;
                             continue;
                         }
@@ -6092,7 +6149,7 @@ final class CParser(AST) : Parser!AST
                             AST.Dsymbols* decldefs = new AST.Dsymbols();
                             decldefs.push(fd);
                             auto tempdecl = new AST.TemplateDeclaration(exp.loc, id, tpl, null, decldefs, false);
-                            addVar(tempdecl);
+                            addSym(tempdecl);
 
                             ++p;
                             continue;
@@ -6103,11 +6160,29 @@ final class CParser(AST) : Parser!AST
                     }
                 }
             }
+            else if (p[0 .. 6] == "#undef")
+            {
+                p += 6;
+                nextToken();
+                //printf("undef %s\n", token.toChars());
+                if (token.value == TOK.identifier)
+                    removeSym(token.ident);
+            }
             // scan to end of line
             while (*p)
                 ++p;
             ++p; // advance to start of next line
             scanloc.linnum = scanloc.linnum + 1;
+        }
+
+        if (newSymbols.length)
+        {
+            assert(symbols, "symbols is null");
+            symbols.reserve(newSymbols.length);
+
+            foreach (sym; newSymbols)
+                if (sym) // undefined entries are null
+                    symbols.push(sym);
         }
 
         scanloc = scanlocSave;

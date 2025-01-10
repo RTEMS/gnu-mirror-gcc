@@ -1,5 +1,5 @@
 /* Generic SSA value propagation engine.
-   Copyright (C) 2004-2024 Free Software Foundation, Inc.
+   Copyright (C) 2004-2025 Free Software Foundation, Inc.
    Contributed by Diego Novillo <dnovillo@redhat.com>
 
    This file is part of GCC.
@@ -85,7 +85,7 @@
 	    Blocks are added to this list if their incoming edges are
 	    found executable.
 
-	SSA_EDGE_WORKLIST contains the list of statements that we 
+	SSA_EDGE_WORKLIST contains the list of statements that we
 	    need to revisit.
 
    5- Simulation terminates when all three work lists are drained.

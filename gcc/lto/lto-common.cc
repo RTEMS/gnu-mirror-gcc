@@ -1,5 +1,5 @@
 /* Top-level LTO routines.
-   Copyright (C) 2009-2024 Free Software Foundation, Inc.
+   Copyright (C) 2009-2025 Free Software Foundation, Inc.
    Contributed by CodeSourcery, Inc.
 
 This file is part of GCC.
@@ -254,7 +254,8 @@ hash_canonical_type (tree type)
      checked.  */
   code = tree_code_for_canonical_type_merging (TREE_CODE (type));
   hstate.add_int (code);
-  hstate.add_int (TYPE_MODE (type));
+  if (!RECORD_OR_UNION_TYPE_P (type))
+    hstate.add_int (TYPE_MODE (type));
 
   /* Incorporate common features of numerical types.  */
   if (INTEGRAL_TYPE_P (type)
@@ -332,7 +333,11 @@ hash_canonical_type (tree type)
 	    && (! DECL_SIZE (f)
 		|| ! integer_zerop (DECL_SIZE (f))))
 	  {
-	    iterative_hash_canonical_type (TREE_TYPE (f), hstate);
+	    tree t = TREE_TYPE (f);
+	    if (!TREE_CHAIN (f)
+		&& TREE_CODE (t) == ARRAY_TYPE)
+	      t = TREE_TYPE  (t);
+	    iterative_hash_canonical_type (t, hstate);
 	    nf++;
 	  }
 
@@ -1333,6 +1338,12 @@ compare_tree_sccs_1 (tree t1, tree t2, tree **map)
     if (TREE_STRING_LENGTH (t1) != TREE_STRING_LENGTH (t2)
 	|| memcmp (TREE_STRING_POINTER (t1), TREE_STRING_POINTER (t2),
 		   TREE_STRING_LENGTH (t1)) != 0)
+      return false;
+
+  if (code == RAW_DATA_CST)
+    if (RAW_DATA_LENGTH (t1) != RAW_DATA_LENGTH (t2)
+	|| memcmp (RAW_DATA_POINTER (t1), RAW_DATA_POINTER (t2),
+		   RAW_DATA_LENGTH (t1)) != 0)
       return false;
 
   if (code == OMP_CLAUSE)

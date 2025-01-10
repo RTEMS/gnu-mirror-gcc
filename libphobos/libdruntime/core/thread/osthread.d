@@ -977,7 +977,7 @@ class Thread : ThreadBase
      *
      * ------------------------------------------------------------------------
      */
-    static void sleep( Duration val ) @nogc nothrow
+    static void sleep( Duration val ) @nogc nothrow @trusted
     in
     {
         assert( !val.isNegative );
@@ -1240,6 +1240,12 @@ unittest
     thread_suspendAll();
     assert(!inCriticalRegion);
     thread_resumeAll();
+}
+
+@nogc @safe nothrow
+unittest
+{
+    Thread.sleep(1.msecs);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2205,7 +2211,7 @@ extern (C) void thread_init() @nogc nothrow
         status = sem_init( &suspendCount, 0, 0 );
         assert( status == 0 );
     }
-    _mainThreadStore[] = __traits(initSymbol, Thread)[];
+    _mainThreadStore[] = cast(void[]) __traits(initSymbol, Thread)[];
     Thread.sm_main = attachThread((cast(Thread)_mainThreadStore.ptr).__ctor());
 }
 

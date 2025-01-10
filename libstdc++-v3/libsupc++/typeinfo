@@ -1,5 +1,5 @@
 // RTTI support for -*- C++ -*-
-// Copyright (C) 1994-2024 Free Software Foundation, Inc.
+// Copyright (C) 1994-2025 Free Software Foundation, Inc.
 //
 // This file is part of GCC.
 //
@@ -29,7 +29,9 @@
 #ifndef _TYPEINFO
 #define _TYPEINFO
 
+#ifdef _GLIBCXX_SYSHDR
 #pragma GCC system_header
+#endif
 
 #include <bits/exception.h>
 #if __cplusplus >= 201103L
@@ -210,7 +212,7 @@ namespace std
     return false;
 #endif
   }
-# endif
+#endif
 
 
   /**

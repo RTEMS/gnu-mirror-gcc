@@ -1,6 +1,6 @@
 /* Language specific subroutines used for code generation on IBM S/390
    and zSeries
-   Copyright (C) 2015-2024 Free Software Foundation, Inc.
+   Copyright (C) 2015-2025 Free Software Foundation, Inc.
 
    Contributed by Andreas Krebbel (Andreas.Krebbel@de.ibm.com).
 
@@ -884,9 +884,8 @@ s390_vec_n_elem (tree fndecl)
 /* Return a tree expression for a call to the overloaded builtin
    function OB_FNDECL at LOC with arguments PASSED_ARGLIST.  */
 tree
-s390_resolve_overloaded_builtin (location_t loc,
-				 tree ob_fndecl,
-				 void *passed_arglist)
+s390_resolve_overloaded_builtin (location_t loc, tree ob_fndecl,
+				 void *passed_arglist, bool)
 {
   vec<tree, va_gc> *arglist = static_cast<vec<tree, va_gc> *> (passed_arglist);
   unsigned int in_args_num = vec_safe_length (arglist);

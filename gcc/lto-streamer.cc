@@ -1,7 +1,7 @@
 /* Miscellaneous utilities for GIMPLE streaming.  Things that are used
    in both input and output are here.
 
-   Copyright (C) 2009-2024 Free Software Foundation, Inc.
+   Copyright (C) 2009-2025 Free Software Foundation, Inc.
    Contributed by Doug Kwan <dougkwan@google.com>
 
 This file is part of GCC.
@@ -140,12 +140,12 @@ lto_get_section_name (int section_type, const char *name,
      Randomness would inhibit incremental LTO.  */
   if (section_type == LTO_section_opts || flag_ltrans)
     strcpy (post, "");
-  else if (f != NULL) 
+  else if (f != NULL)
     sprintf (post, "." HOST_WIDE_INT_PRINT_HEX_PURE, f->id);
   else if (flag_wpa)
     strcpy (post, "");
   else
-    sprintf (post, "." HOST_WIDE_INT_PRINT_HEX_PURE, get_random_seed (false)); 
+    sprintf (post, "." HOST_WIDE_INT_PRINT_HEX_PURE, get_random_seed (false));
   char *res = concat (section_name_prefix, sep, add, post, NULL);
   if (buffer)
     free (buffer);

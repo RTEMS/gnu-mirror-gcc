@@ -1,5 +1,5 @@
 /* Classes for modeling the state of memory.
-   Copyright (C) 2020-2024 Free Software Foundation, Inc.
+   Copyright (C) 2020-2025 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -19,7 +19,6 @@ along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
 #include "config.h"
-#define INCLUDE_MEMORY
 #define INCLUDE_VECTOR
 #include "system.h"
 #include "coretypes.h"
@@ -56,6 +55,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "analyzer/analyzer-selftests.h"
 #include "stor-layout.h"
 #include "text-art/tree-widget.h"
+#include "make-unique.h"
 
 #if ENABLE_ANALYZER
 
@@ -107,13 +107,9 @@ uncertainty_t::dump_to_pp (pretty_printer *pp, bool simple) const
 DEBUG_FUNCTION void
 uncertainty_t::dump (bool simple) const
 {
-  pretty_printer pp;
-  pp_format_decoder (&pp) = default_tree_printer;
-  pp_show_color (&pp) = pp_show_color (global_dc->printer);
-  pp.set_output_stream (stderr);
+  tree_dump_pretty_printer pp (stderr);
   dump_to_pp (&pp, simple);
   pp_newline (&pp);
-  pp_flush (&pp);
 }
 
 /* class binding_key.  */
@@ -144,13 +140,9 @@ binding_key::make (store_manager *mgr, const region *r)
 DEBUG_FUNCTION void
 binding_key::dump (bool simple) const
 {
-  pretty_printer pp;
-  pp_format_decoder (&pp) = default_tree_printer;
-  pp_show_color (&pp) = pp_show_color (global_dc->printer);
-  pp.set_output_stream (stderr);
+  tree_dump_pretty_printer pp (stderr);
   dump_to_pp (&pp, simple);
   pp_newline (&pp);
-  pp_flush (&pp);
 }
 
 /* Get a description of this binding_key.  */
@@ -230,21 +222,19 @@ bit_range::dump_to_pp (pretty_printer *pp) const
 DEBUG_FUNCTION void
 bit_range::dump () const
 {
-  pretty_printer pp;
-  pp.set_output_stream (stderr);
+  tree_dump_pretty_printer pp (stderr);
   dump_to_pp (&pp);
   pp_newline (&pp);
-  pp_flush (&pp);
 }
 
 /* Generate a JSON value for this bit_range.
    This is intended for debugging the analyzer rather
    than serialization.  */
 
-json::object *
+std::unique_ptr<json::object>
 bit_range::to_json () const
 {
-  json::object *obj = new json::object ();
+  auto obj = ::make_unique<json::object> ();
   obj->set ("start_bit_offset",
 	    bit_offset_to_json (m_start_bit_offset));
   obj->set ("size_in_bits",
@@ -506,21 +496,19 @@ byte_range::dump_to_pp (pretty_printer *pp) const
 DEBUG_FUNCTION void
 byte_range::dump () const
 {
-  pretty_printer pp;
-  pp.set_output_stream (stderr);
+  tree_dump_pretty_printer pp (stderr);
   dump_to_pp (&pp);
   pp_newline (&pp);
-  pp_flush (&pp);
 }
 
 /* Generate a JSON value for this byte_range.
    This is intended for debugging the analyzer rather
    than serialization.  */
 
-json::object *
+std::unique_ptr<json::object>
 byte_range::to_json () const
 {
-  json::object *obj = new json::object ();
+  auto obj = ::make_unique<json::object> ();
   obj->set ("start_byte_offset",
 	    byte_offset_to_json (m_start_byte_offset));
   obj->set ("size_in_bytes",
@@ -773,23 +761,19 @@ binding_map::dump_to_pp (pretty_printer *pp, bool simple,
 DEBUG_FUNCTION void
 binding_map::dump (bool simple) const
 {
-  pretty_printer pp;
-  pp_format_decoder (&pp) = default_tree_printer;
-  pp_show_color (&pp) = pp_show_color (global_dc->printer);
-  pp.set_output_stream (stderr);
+  tree_dump_pretty_printer pp (stderr);
   dump_to_pp (&pp, simple, true);
   pp_newline (&pp);
-  pp_flush (&pp);
 }
 
 /* Return a new json::object of the form
    {KEY_DESC : SVALUE_DESC,
     ...for the various key/value pairs in this binding_map}.  */
 
-json::object *
+std::unique_ptr<json::object>
 binding_map::to_json () const
 {
-  json::object *map_obj = new json::object ();
+  auto map_obj = ::make_unique<json::object> ();
 
   auto_vec <const binding_key *> binding_keys;
   for (map_t::iterator iter = m_map.begin ();
@@ -1400,17 +1384,13 @@ binding_cluster::dump_to_pp (pretty_printer *pp, bool simple,
 DEBUG_FUNCTION void
 binding_cluster::dump (bool simple) const
 {
-  pretty_printer pp;
-  pp_format_decoder (&pp) = default_tree_printer;
-  pp_show_color (&pp) = pp_show_color (global_dc->printer);
-  pp.set_output_stream (stderr);
+  tree_dump_pretty_printer pp (stderr);
   pp_string (&pp, "  cluster for: ");
   m_base_region->dump_to_pp (&pp, simple);
   pp_string (&pp, ": ");
   pp_newline (&pp);
   dump_to_pp (&pp, simple, true);
   pp_newline (&pp);
-  pp_flush (&pp);
 }
 
 /* Assert that this object is valid.  */
@@ -1439,10 +1419,10 @@ binding_cluster::validate () const
     "touched": true/false,
     "map" : object for the binding_map.  */
 
-json::object *
+std::unique_ptr<json::object>
 binding_cluster::to_json () const
 {
-  json::object *cluster_obj = new json::object ();
+  auto cluster_obj = ::make_unique<json::object> ();
 
   cluster_obj->set_bool ("escaped", m_escaped);
   cluster_obj->set_bool ("touched", m_touched);
@@ -2636,13 +2616,9 @@ store::dump_to_pp (pretty_printer *pp, bool simple, bool multiline,
 DEBUG_FUNCTION void
 store::dump (bool simple) const
 {
-  pretty_printer pp;
-  pp_format_decoder (&pp) = default_tree_printer;
-  pp_show_color (&pp) = pp_show_color (global_dc->printer);
-  pp.set_output_stream (stderr);
+  tree_dump_pretty_printer pp (stderr);
   dump_to_pp (&pp, simple, true, NULL);
   pp_newline (&pp);
-  pp_flush (&pp);
 }
 
 /* Assert that this object is valid.  */
@@ -2660,10 +2636,10 @@ store::validate () const
     ...for each parent region,
     "called_unknown_fn": true/false}.  */
 
-json::object *
+std::unique_ptr<json::object>
 store::to_json () const
 {
-  json::object *store_obj = new json::object ();
+  auto store_obj = ::make_unique<json::object> ();
 
   /* Sort into some deterministic order.  */
   auto_vec<const region *> base_regions;
@@ -2686,7 +2662,7 @@ store::to_json () const
     {
       gcc_assert (parent_reg);
 
-      json::object *clusters_in_parent_reg_obj = new json::object ();
+      auto clusters_in_parent_reg_obj = ::make_unique<json::object> ();
 
       const region *base_reg;
       unsigned j;
@@ -2702,7 +2678,8 @@ store::to_json () const
 					   cluster->to_json ());
 	}
       label_text parent_reg_desc = parent_reg->get_desc ();
-      store_obj->set (parent_reg_desc.get (), clusters_in_parent_reg_obj);
+      store_obj->set (parent_reg_desc.get (),
+		      std::move (clusters_in_parent_reg_obj));
     }
 
   store_obj->set_bool ("called_unknown_fn", m_called_unknown_fn);

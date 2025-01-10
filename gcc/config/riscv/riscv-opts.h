@@ -1,5 +1,5 @@
 /* Definition of RISC-V target for GNU compiler.
-   Copyright (C) 2016-2024 Free Software Foundation, Inc.
+   Copyright (C) 2016-2025 Free Software Foundation, Inc.
    Contributed by Andrew Waterman (andrew@sifive.com).
 
 This file is part of GCC.
@@ -156,5 +156,10 @@ enum riscv_tls_type {
   TLS_TRADITIONAL,
   TLS_DESCRIPTORS
 };
+
+/* On some microarchitectures, vector segment loads and stores are excessively
+   expensive, so predicate the generation of those instrunctions.  */
+#define TARGET_VECTOR_AUTOVEC_SEGMENT					       \
+  (TARGET_VECTOR && riscv_mautovec_segment)
 
 #endif /* ! GCC_RISCV_OPTS_H */

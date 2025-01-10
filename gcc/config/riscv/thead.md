@@ -1,5 +1,5 @@
 ;; Machine description for T-Head vendor extensions
-;; Copyright (C) 2021-2024 Free Software Foundation, Inc.
+;; Copyright (C) 2021-2025 Free Software Foundation, Inc.
 
 ;; This file is part of GCC.
 
@@ -85,7 +85,9 @@
 	(zero_extract:GPR (match_operand:GPR 1 "register_operand" "r")
 			(match_operand 2 "const_int_operand")
 			(match_operand 3 "const_int_operand")))]
-  "TARGET_XTHEADBB"
+  "TARGET_XTHEADBB
+   && (UINTVAL (operands[2]) + UINTVAL (operands[3])
+       <= GET_MODE_BITSIZE (<MODE>mode))"
 {
   operands[2] = GEN_INT (INTVAL (operands[2]) + INTVAL (operands[3]) - 1);
   return "th.extu\t%0,%1,%2,%3";

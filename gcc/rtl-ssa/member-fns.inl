@@ -1,5 +1,5 @@
 // Implementation of public inline member functions for RTL SSA     -*- C++ -*-
-// Copyright (C) 2020-2024 Free Software Foundation, Inc.
+// Copyright (C) 2020-2025 Free Software Foundation, Inc.
 //
 // This file is part of GCC.
 //
@@ -41,7 +41,8 @@ access_array_builder::quick_push (access_info *access)
 inline array_slice<access_info *>
 access_array_builder::finish ()
 {
-  auto num_accesses = obstack_object_size (m_obstack) / sizeof (access_info *);
+  unsigned num_accesses
+    = obstack_object_size (m_obstack) / sizeof (access_info *);
   if (num_accesses == 0)
     return {};
 

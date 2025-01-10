@@ -1,5 +1,5 @@
 // Late-stage instruction combination pass.
-// Copyright (C) 2023-2024 Free Software Foundation, Inc.
+// Copyright (C) 2023-2025 Free Software Foundation, Inc.
 //
 // This file is part of GCC.
 //
@@ -52,7 +52,7 @@ const pass_data pass_data_late_combine =
   RTL_PASS, // type
   "late_combine", // name
   OPTGROUP_NONE, // optinfo_flags
-  TV_NONE, // tv_id
+  TV_LATE_COMBINE, // tv_id
   0, // properties_required
   0, // properties_provided
   0, // properties_destroyed
@@ -730,6 +730,10 @@ late_combine::execute (function *fn)
   // Finalization.
   if (crtl->ssa->perform_pending_updates ())
     cleanup_cfg (0);
+
+  delete crtl->ssa;
+  crtl->ssa = nullptr;
+
   // Make the recognizer allow volatile MEMs again.
   init_recog ();
   free_dominance_info (CDI_DOMINATORS);

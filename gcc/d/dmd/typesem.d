@@ -1282,6 +1282,169 @@ bool hasPointers(Type t)
     }
 }
 
+/**************************************
+ * Returns an indirect type one step from t.
+ */
+Type getIndirection(Type t)
+{
+    t = t.baseElemOf();
+    if (t.ty == Tarray || t.ty == Tpointer)
+        return t.nextOf().toBasetype();
+    if (t.ty == Taarray || t.ty == Tclass)
+        return t;
+    if (t.ty == Tstruct)
+        return t.hasPointers() ? t : null; // TODO
+
+    // should consider TypeDelegate?
+    return null;
+}
+
+uinteger_t size(Type t)
+{
+    return size(t, Loc.initial);
+}
+
+uinteger_t size(Type t, const ref Loc loc)
+{
+
+    uinteger_t visitType(Type t)
+    {
+        error(loc, "no size for type `%s`", t.toChars());
+        return SIZE_INVALID;
+    }
+
+    uinteger_t visitBasic(TypeBasic t)
+    {
+        uint size;
+        //printf("TypeBasic::size()\n");
+        switch (t.ty)
+        {
+            case Tint8:
+            case Tuns8:
+                size = 1;
+                break;
+
+            case Tint16:
+            case Tuns16:
+                size = 2;
+                break;
+
+            case Tint32:
+            case Tuns32:
+            case Tfloat32:
+            case Timaginary32:
+                size = 4;
+                break;
+
+            case Tint64:
+            case Tuns64:
+            case Tfloat64:
+            case Timaginary64:
+                size = 8;
+                break;
+
+            case Tfloat80:
+            case Timaginary80:
+                size = target.realsize;
+                break;
+
+            case Tcomplex32:
+                size = 8;
+                break;
+
+            case Tcomplex64:
+            case Tint128:
+            case Tuns128:
+                size = 16;
+                break;
+
+            case Tcomplex80:
+                size = target.realsize * 2;
+                break;
+
+            case Tvoid:
+                //size = Type::size();      // error message
+                size = 1;
+                break;
+
+            case Tbool:
+                size = 1;
+                break;
+
+            case Tchar:
+                size = 1;
+                break;
+
+            case Twchar:
+                size = 2;
+                break;
+
+            case Tdchar:
+                size = 4;
+                break;
+
+            default:
+                assert(0);
+            }
+
+        //printf("TypeBasic::size() = %d\n", size);
+        return size;
+    }
+
+    uinteger_t visitSArray(TypeSArray t)
+    {
+        //printf("TypeSArray::size()\n");
+        const n = t.numberOfElems(loc);
+        const elemsize = t.baseElemOf().size(loc);
+        bool overflow = false;
+        const sz = mulu(n, elemsize, overflow);
+        if (overflow || sz >= uint.max)
+        {
+            if (elemsize != SIZE_INVALID && n != uint.max)
+                error(loc, "static array `%s` size overflowed to %lld", t.toChars(), cast(long)sz);
+            return SIZE_INVALID;
+        }
+        return sz;
+
+    }
+
+    uinteger_t visitTypeQualified(TypeQualified t)
+    {
+        if (t.ty == Ttypeof)
+        {
+            auto type = (cast(TypeTypeof)t).exp.type;
+            if (type)
+                return type.size(loc);
+        }
+
+        error(t.loc, "size of type `%s` is not known", t.toChars());
+        return SIZE_INVALID;
+    }
+
+    switch(t.ty)
+    {
+        default:            return t.isTypeBasic() ? visitBasic(t.isTypeBasic()) : visitType(t);
+        case Ttraits:
+        case Terror:        return SIZE_INVALID;
+        case Tvector:       return t.isTypeVector().basetype.size();
+        case Tsarray:       return visitSArray(t.isTypeSArray());
+        case Tdelegate:
+        case Tarray:        return target.ptrsize * 2;
+        case Tpointer:
+        case Treference:
+        case Tclass:
+        case Taarray:       return target.ptrsize;
+        case Tident:
+        case Tinstance:
+        case Ttypeof:
+        case Treturn:       return visitTypeQualified(cast(TypeQualified)t);
+        case Tstruct:       return t.isTypeStruct().sym.size(loc);
+        case Tenum:         return t.isTypeEnum().sym.getMemtype(loc).size(loc);
+        case Tnull:         return t.tvoidptr.size(loc);
+        case Tnoreturn:     return 0;
+    }
+}
+
 /******************************************
  * Perform semantic analysis on a type.
  * Params:
@@ -1686,7 +1849,7 @@ Type typeSemantic(Type type, const ref Loc loc, Scope* sc)
 
             if (!ClassDeclaration.object)
             {
-                .error(Loc.initial, "missing or corrupt object.d");
+                ObjectNotFound(Loc.initial, cd.ident);
                 return error();
             }
 
@@ -4083,7 +4246,9 @@ Expression dotExp(Type mt, Scope* sc, Expression e, Identifier ident, DotExpFlag
         }
         if (v)
         {
-            if (ident == Id.offsetof)
+            if (ident == Id.offsetof ||
+                ident == Id.bitoffsetof ||
+                ident == Id.bitwidth)
             {
                 v.dsymbolSemantic(null);
                 if (v.isField())
@@ -4093,7 +4258,20 @@ Expression dotExp(Type mt, Scope* sc, Expression e, Identifier ident, DotExpFlag
                     ad.size(e.loc);
                     if (ad.sizeok != Sizeok.done)
                         return ErrorExp.get();
-                    return new IntegerExp(e.loc, v.offset, Type.tsize_t);
+                    uint value;
+                    if (ident == Id.offsetof)
+                        value = v.offset;
+                    else // Id.bitoffsetof || Id.bitwidth
+                    {
+                        auto bf = v.isBitFieldDeclaration();
+                        if (bf)
+                        {
+                            value = ident == Id.bitoffsetof ? bf.bitOffset : bf.fieldWidth;
+                        }
+                        else
+                            error(v.loc, "`%s` is not a bitfield, cannot apply `%s`", v.toChars(), ident.toChars());
+                    }
+                    return new IntegerExp(e.loc, value, Type.tsize_t);
                 }
             }
             else if (ident == Id._init)
@@ -4512,6 +4690,8 @@ Expression dotExp(Type mt, Scope* sc, Expression e, Identifier ident, DotExpFlag
             ident != Id._mangleof &&
             ident != Id.stringof &&
             ident != Id.offsetof &&
+            ident != Id.bitoffsetof &&
+            ident != Id.bitwidth &&
             // https://issues.dlang.org/show_bug.cgi?id=15045
             // Don't forward special built-in member functions.
             ident != Id.ctor &&
@@ -6687,7 +6867,7 @@ Type substWildTo(Type type, uint mod)
                     t = new TypeSArray(t, (cast(TypeSArray)type).dim.syntaxCopy());
                 else if (type.ty == Taarray)
                 {
-                    t = new TypeAArray(t, (cast(TypeAArray)type).index.syntaxCopy());
+                    t = new TypeAArray(t, (cast(TypeAArray)type).index.substWildTo(mod));
                 }
                 else if (type.ty == Tdelegate)
                 {

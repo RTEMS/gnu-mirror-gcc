@@ -1,5 +1,5 @@
 /* Optimize by combining instructions for GNU compiler.
-   Copyright (C) 1987-2024 Free Software Foundation, Inc.
+   Copyright (C) 1987-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -1754,7 +1754,7 @@ can_combine_p (rtx_insn *insn, rtx_insn *i3, rtx_insn *pred ATTRIBUTE_UNUSED,
     }
   else if (next_active_insn (insn) != i3)
     all_adjacent = false;
-    
+
   /* Can combine only if previous insn is a SET of a REG or a SUBREG,
      or a PARALLEL consisting of such a SET and CLOBBERs.
 
@@ -2614,7 +2614,7 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
 
       /* If I0 loads a memory and I3 sets the same memory, then I1 and I2
 	 are likely manipulating its value.  Ideally we'll be able to combine
-	 all four insns into a bitfield insertion of some kind. 
+	 all four insns into a bitfield insertion of some kind.
 
 	 Note the source in I0 might be inside a sign/zero extension and the
 	 memory modes in I0 and I3 might be different.  So extract the address
@@ -5656,6 +5656,31 @@ maybe_swap_commutative_operands (rtx x)
       SUBST (XEXP (x, 1), temp);
     }
 
+  /* Canonicalize (vec_merge (fma op2 op1 op3) op1 mask) to
+     (vec_merge (fma op1 op2 op3) op1 mask).  */
+  if (GET_CODE (x) == VEC_MERGE
+      && GET_CODE (XEXP (x, 0)) == FMA)
+    {
+      rtx fma_op1 = XEXP (XEXP (x, 0), 0);
+      rtx fma_op2 = XEXP (XEXP (x, 0), 1);
+      rtx masked_op = XEXP (x, 1);
+      if (rtx_equal_p (masked_op, fma_op2))
+	{
+	  if (GET_CODE (fma_op1) == NEG)
+	    {
+	      /* Keep the negate canonicalized to the first operand.  */
+	      fma_op1 = XEXP (fma_op1, 0);
+	      SUBST (XEXP (XEXP (XEXP (x, 0), 0), 0), fma_op2);
+	      SUBST (XEXP (XEXP (x, 0), 1), fma_op1);
+	    }
+	  else
+	    {
+	      SUBST (XEXP (XEXP (x, 0), 0), fma_op2);
+	      SUBST (XEXP (XEXP (x, 0), 1), fma_op1);
+	    }
+	}
+    }
+
   unsigned n_elts = 0;
   if (GET_CODE (x) == VEC_MERGE
       && CONST_INT_P (XEXP (x, 2))
@@ -7799,7 +7824,7 @@ make_extraction (machine_mode mode, rtx inner, HOST_WIDE_INT pos,
     {
       /* Be careful not to go beyond the extracted object and maintain the
 	 natural alignment of the memory.  */
-      wanted_inner_mode = smallest_int_mode_for_size (len);
+      wanted_inner_mode = smallest_int_mode_for_size (len).require ();
       while (pos % GET_MODE_BITSIZE (wanted_inner_mode) + len
 	     > GET_MODE_BITSIZE (wanted_inner_mode))
 	wanted_inner_mode = GET_MODE_WIDER_MODE (wanted_inner_mode).require ();
@@ -9810,7 +9835,7 @@ make_field_assignment (rtx x)
       && rtx_equal_for_field_assignment_p (XEXP (rhs, 0), dest))
     c1 = INTVAL (XEXP (rhs, 1)), other = lhs;
   /* The second SUBREG that might get in the way is a paradoxical
-     SUBREG around the first operand of the AND.  We want to 
+     SUBREG around the first operand of the AND.  We want to
      pretend the operand is as wide as the destination here.   We
      do this by adjusting the MEM to wider mode for the sole
      purpose of the call to rtx_equal_for_field_assignment_p.   Also
@@ -9827,7 +9852,7 @@ make_field_assignment (rtx x)
 	   && rtx_equal_for_field_assignment_p (XEXP (lhs, 0), dest))
     c1 = INTVAL (XEXP (lhs, 1)), other = rhs;
   /* The second SUBREG that might get in the way is a paradoxical
-     SUBREG around the first operand of the AND.  We want to 
+     SUBREG around the first operand of the AND.  We want to
      pretend the operand is as wide as the destination here.   We
      do this by adjusting the MEM to wider mode for the sole
      purpose of the call to rtx_equal_for_field_assignment_p.   Also
@@ -15102,6 +15127,12 @@ make_more_copies (void)
 	    continue;
 
 	  rtx new_reg = gen_reg_rtx (GET_MODE (dest));
+
+	  /* The "original" pseudo copies have important attributes
+	     attached, like pointerness.  We want that for these copies
+	     too, for use by insn recognition and later passes.  */
+	  set_reg_attrs_from_value (new_reg, dest);
+
 	  rtx_insn *new_insn = gen_move_insn (new_reg, src);
 	  SET_SRC (set) = new_reg;
 	  emit_insn_before (new_insn, insn);

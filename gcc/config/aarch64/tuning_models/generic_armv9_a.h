@@ -1,5 +1,5 @@
 /* Tuning model description for AArch64 architecture.
-   Copyright (C) 2009-2024 Free Software Foundation, Inc.
+   Copyright (C) 2009-2025 Free Software Foundation, Inc.
 
    This file is part of GCC.
 
@@ -207,6 +207,18 @@ static const struct cpu_vector_cost generic_armv9_a_vector_cost =
   &generic_armv9_a_vec_issue_info /* issue_info  */
 };
 
+/* Generic prefetch settings (which disable prefetch).  */
+static const cpu_prefetch_tune generic_armv9a_prefetch_tune =
+{
+  0,			/* num_slots  */
+  -1,			/* l1_cache_size  */
+  64,			/* l1_cache_line_size  */
+  -1,			/* l2_cache_size  */
+  true,			/* prefetch_dynamic_strides */
+  -1,			/* minimum_stride */
+  -1			/* default_opt_level  */
+};
+
 static const struct tune_params generic_armv9_a_tunings =
 {
   &cortexa76_extra_costs,
@@ -224,7 +236,9 @@ static const struct tune_params generic_armv9_a_tunings =
     1 /* store_pred.  */
   }, /* memmov_cost.  */
   3, /* issue_rate  */
-  (AARCH64_FUSE_AES_AESMC | AARCH64_FUSE_CMP_BRANCH), /* fusible_ops  */
+  (AARCH64_FUSE_BASE
+   | AARCH64_FUSE_CMP_CSEL
+   | AARCH64_FUSE_CMP_CSET), /* fusible_ops  */
   "32:16",	/* function_align.  */
   "4",		/* jump_align.  */
   "32:16",	/* loop_align.  */
@@ -236,10 +250,9 @@ static const struct tune_params generic_armv9_a_tunings =
   2,	/* min_div_recip_mul_df.  */
   0,	/* max_case_values.  */
   tune_params::AUTOPREFETCHER_WEAK,	/* autoprefetcher_model.  */
-  (AARCH64_EXTRA_TUNE_CHEAP_SHIFT_EXTEND
-   | AARCH64_EXTRA_TUNE_USE_NEW_VECTOR_COSTS
+  (AARCH64_EXTRA_TUNE_BASE
    | AARCH64_EXTRA_TUNE_MATCHED_VECTOR_THROUGHPUT),	/* tune_flags.  */
-  &generic_prefetch_tune,
+  &generic_armv9a_prefetch_tune,
   AARCH64_LDP_STP_POLICY_ALWAYS,   /* ldp_policy_model.  */
   AARCH64_LDP_STP_POLICY_ALWAYS	   /* stp_policy_model.  */
 };

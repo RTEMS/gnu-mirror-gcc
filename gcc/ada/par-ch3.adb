@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -3841,7 +3841,7 @@ package body Ch3 is
                --  end if;
 
                Set_Subtype_Indication (CompDef_Node, Empty);
-               Set_Aliased_Present    (CompDef_Node, False);
+               Set_Aliased_Present    (CompDef_Node, Aliased_Present);
                Set_Access_Definition  (CompDef_Node,
                  P_Access_Definition (Not_Null_Present));
             else

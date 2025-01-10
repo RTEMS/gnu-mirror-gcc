@@ -1,5 +1,5 @@
 /* Symbolic values.
-   Copyright (C) 2019-2024 Free Software Foundation, Inc.
+   Copyright (C) 2019-2025 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -19,7 +19,6 @@ along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
 #include "config.h"
-#define INCLUDE_MEMORY
 #define INCLUDE_VECTOR
 #include "system.h"
 #include "coretypes.h"
@@ -86,13 +85,9 @@ svalue::dump () const
 DEBUG_FUNCTION void
 svalue::dump (bool simple) const
 {
-  pretty_printer pp;
-  pp_format_decoder (&pp) = default_tree_printer;
-  pp_show_color (&pp) = pp_show_color (global_dc->printer);
-  pp.set_output_stream (stderr);
+  tree_dump_pretty_printer pp (stderr);
   dump_to_pp (&pp, simple);
   pp_newline (&pp);
-  pp_flush (&pp);
 }
 
 /* Generate a textual representation of this svalue for debugging purposes.  */
@@ -108,11 +103,11 @@ svalue::get_desc (bool simple) const
 
 /* Return a new json::string describing the svalue.  */
 
-json::value *
+std::unique_ptr<json::value>
 svalue::to_json () const
 {
   label_text desc = get_desc (true);
-  json::value *sval_js = new json::string (desc.get ());
+  auto sval_js = ::make_unique<json::string> (desc.get ());
   return sval_js;
 }
 

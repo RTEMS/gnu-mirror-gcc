@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1997-2024, Free Software Foundation, Inc.         --
+--          Copyright (C) 1997-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -8461,9 +8461,9 @@ package body Sem_Elab is
             Set_Context_Items (Main_Cunit, Items);
          end if;
 
-         --  Locate the with clause for the unit. Note that there may not be a
-         --  clause if the unit is visible through a subunit-body, body-spec,
-         --  or spec-parent relationship.
+         --  Locate the with clause for the unit. Note that there might not be
+         --  a with clause if the unit is visible through a subunit-body,
+         --  body-spec, or spec-parent relationship.
 
          Clause :=
            Find_With_Clause
@@ -8475,16 +8475,16 @@ package body Sem_Elab is
 
          --  Note that adding implicit with clauses is safe because analysis,
          --  resolution, and expansion have already taken place and it is not
-         --  possible to interfere with visibility.
+         --  possible to interfere with visibility. Note that this implicit
+         --  with clause can point at (for example) a package body, which
+         --  is not the case for normal with clauses.
 
          if No (Clause) then
             Clause :=
               Make_With_Clause (Loc,
                 Name => New_Occurrence_Of (Unit_Id, Loc));
-
-            Set_Implicit_With (Clause);
-            Set_Library_Unit  (Clause, Unit_Cunit);
-
+            Set_Is_Implicit_With (Clause);
+            Set_Withed_Lib_Unit (Clause, Unit_Cunit);
             Append_To (Items, Clause);
          end if;
 
@@ -9887,7 +9887,7 @@ package body Sem_Elab is
             elsif Nkind (Item) = N_Package_Body_Stub
               and then Chars (Defining_Entity (Item)) = Spec_Nam
             then
-               Lib_Unit := Library_Unit (Item);
+               Lib_Unit := Stub_Subunit (Item);
 
                --  The corresponding subunit was previously loaded
 
@@ -16318,9 +16318,9 @@ package body Sem_Elab is
    --  to be the enclosing compilation unit of this scope.
 
    procedure Set_Elaboration_Constraint
-    (Call : Node_Id;
-     Subp : Entity_Id;
-     Scop : Entity_Id);
+     (Call : Node_Id;
+      Subp : Entity_Id;
+      Scop : Entity_Id);
    --  The current unit U may depend semantically on some unit P that is not
    --  in the current context. If there is an elaboration call that reaches P,
    --  we need to indicate that P requires an Elaborate_All, but this is not
@@ -16374,6 +16374,8 @@ package body Sem_Elab is
       --  This procedure is called when the elaborate indication must be
       --  applied to a unit not in the context of the referencing unit. The
       --  unit gets added to the context as an implicit with.
+      --  Note that we can be with-ing (for example) a package body, which
+      --  is not the case for normal with clauses.
 
       function In_Withs_Of (UEs : Entity_Id) return Boolean;
       --  UEs is the spec entity of a unit. If the unit to be marked is
@@ -16393,8 +16395,8 @@ package body Sem_Elab is
                   Name => Name (Itm));
 
       begin
-         Set_Library_Unit  (CW, Library_Unit (Itm));
-         Set_Implicit_With (CW);
+         Set_Is_Implicit_With (CW);
+         Set_Withed_Lib_Unit (CW, Withed_Lib_Unit (Itm));
 
          --  Set elaborate all desirable on copy and then append the copy to
          --  the list of body with's and we are done.
@@ -16417,7 +16419,7 @@ package body Sem_Elab is
          while Present (Itm) loop
             if Nkind (Itm) = N_With_Clause then
                Ent :=
-                 Cunit_Entity (Get_Cunit_Unit_Number (Library_Unit (Itm)));
+                 Cunit_Entity (Get_Cunit_Unit_Number (Withed_Lib_Unit (Itm)));
 
                if U = Ent then
                   return True;
@@ -16465,7 +16467,8 @@ package body Sem_Elab is
       Itm := First (CI);
       while Present (Itm) loop
          if Nkind (Itm) = N_With_Clause then
-            Ent := Cunit_Entity (Get_Cunit_Unit_Number (Library_Unit (Itm)));
+            Ent :=
+              Cunit_Entity (Get_Cunit_Unit_Number (Withed_Lib_Unit (Itm)));
 
             --  If we find it, then mark elaborate all desirable and return
 
@@ -16539,10 +16542,10 @@ package body Sem_Elab is
         (Msg_D : String;
          Msg_S : String;
          Ent   : Node_Or_Entity_Id);
-       --  Generate a call to Error_Msg_NE with parameters Msg_D or Msg_S (for
-       --  dynamic or static elaboration model), N and Ent. Msg_D is a real
-       --  warning (output if Msg_D is non-null and Elab_Warnings is set),
-       --  Msg_S is an info message (output if Elab_Info_Messages is set).
+      --  Generate a call to Error_Msg_NE with parameters Msg_D or Msg_S (for
+      --  dynamic or static elaboration model), N and Ent. Msg_D is a real
+      --  warning (output if Msg_D is non-null and Elab_Warnings is set),
+      --  Msg_S is an info message (output if Elab_Info_Messages is set).
 
       function Find_W_Scope return Entity_Id;
       --  Find top-level scope for called entity (not following renamings
@@ -17386,7 +17389,7 @@ package body Sem_Elab is
       --  Nothing to do if call is being preanalyzed, as when within a
       --  pre/postcondition, a predicate, or an invariant.
 
-      elsif In_Spec_Expression then
+      elsif Preanalysis_Active then
          return;
       end if;
 
@@ -19055,8 +19058,8 @@ package body Sem_Elab is
             elsif Nkind (Nod) = N_Package_Body_Stub
               and then Chars (Defining_Identifier (Nod)) = Chars (E)
             then
-               if Present (Library_Unit (Nod)) then
-                  return Unit (Library_Unit (Nod));
+               if Present (Stub_Subunit (Nod)) then
+                  return Unit (Stub_Subunit (Nod));
 
                else
                   return Load_Package_Body (Get_Unit_Name (Nod));
@@ -19520,9 +19523,9 @@ package body Sem_Elab is
    --------------------------------
 
    procedure Set_Elaboration_Constraint
-    (Call : Node_Id;
-     Subp : Entity_Id;
-     Scop : Entity_Id)
+     (Call : Node_Id;
+      Subp : Entity_Id;
+      Scop : Entity_Id)
    is
       Elab_Unit : Entity_Id;
 
@@ -19756,7 +19759,7 @@ package body Sem_Elab is
                   --  in each N_Compilation_Unit node, but that would involve
                   --  rearranging N_Compilation_Unit_Aux to make room.
 
-                  Helper (Get_Cunit_Unit_Number (Library_Unit (Item)));
+                  Helper (Get_Cunit_Unit_Number (Withed_Lib_Unit (Item)));
 
                   if Result then
                      return;

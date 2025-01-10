@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -330,10 +330,11 @@ package body Checks is
 
    function Is_Signed_Integer_Arithmetic_Op (N : Node_Id) return Boolean;
    --  Returns True if node N is for an arithmetic operation with signed
-   --  integer operands. This includes unary and binary operators, and also
-   --  if and case expression nodes where the dependent expressions are of
-   --  a signed integer type. These are the kinds of nodes for which special
-   --  handling applies in MINIMIZED or ELIMINATED overflow checking mode.
+   --  integer operands. This includes unary and binary operators (including
+   --  comparison operators), and also if and case expression nodes which
+   --  yield a value of a signed integer type.
+   --  These are the kinds of nodes for which special handling applies in
+   --  MINIMIZED or ELIMINATED overflow checking mode.
 
    function Range_Or_Validity_Checks_Suppressed
      (Expr : Node_Id) return Boolean;
@@ -1549,7 +1550,7 @@ package body Checks is
       then
          if (Etype (N) = Typ
               or else (Do_Access and then Designated_Type (Typ) = S_Typ))
-           and then not Is_Aliased_View (Lhs)
+           and then (No (Lhs) or else not Is_Aliased_View (Lhs))
          then
             return;
          end if;
@@ -2892,6 +2893,10 @@ package body Checks is
 
       if Deref then
          Expr := Make_Explicit_Dereference (Loc, Prefix => Expr);
+
+         --  Preserve Comes_From_Source for Predicate_Check_In_Scope
+
+         Preserve_Comes_From_Source (Expr, N);
       end if;
 
       --  Disable checks to prevent an infinite recursion
@@ -3975,8 +3980,10 @@ package body Checks is
    -------------------------------------
 
    --  Note: internally Disable/Enable_Atomic_Synchronization is implemented
-   --  using a bogus check called Atomic_Synchronization. This is to make it
-   --  more convenient to get exactly the same semantics as [Un]Suppress.
+   --  using a pseudo-check called _Atomic_Synchronization. This is to make it
+   --  more convenient to get the same placement and scope rules as
+   --  [Un]Suppress. The check name has a leading underscore to make
+   --  it reserved by the implementation.
 
    function Atomic_Synchronization_Disabled (E : Entity_Id) return Boolean is
    begin
@@ -6799,74 +6806,21 @@ package body Checks is
 
          if Is_Scalar_Type (Typ) then
             declare
-               P : Node_Id;
-               N : Node_Id;
-               E : Entity_Id;
-               F : Entity_Id;
-               A : Node_Id;
-               L : List_Id;
+               Formal : Entity_Id;
+               Call   : Node_Id;
 
             begin
-               --  Find actual argument (which may be a parameter association)
-               --  and the parent of the actual argument (the call statement)
+               Find_Actual (Expr, Formal, Call);
 
-               N := Expr;
-               P := Parent (Expr);
-
-               if Nkind (P) = N_Parameter_Association then
-                  N := P;
-                  P := Parent (N);
-               end if;
-
-               --  If this is an indirect or dispatching call, get signature
-               --  from the subprogram type.
-
-               if Nkind (P) in N_Entry_Call_Statement
-                             | N_Function_Call
-                             | N_Procedure_Call_Statement
+               if Present (Formal)
+                 and then
+                   (Ekind (Formal) = E_Out_Parameter
+                      or else Mechanism (Formal) = By_Reference)
                then
-                  E := Get_Called_Entity (P);
-                  L := Parameter_Associations (P);
-
-                  --  Only need to worry if there are indeed actuals, and if
-                  --  this could be a subprogram call, otherwise we cannot get
-                  --  a match (either we are not an argument, or the mode of
-                  --  the formal is not OUT). This test also filters out the
-                  --  generic case.
-
-                  if Is_Non_Empty_List (L) and then Is_Subprogram (E) then
-
-                     --  This is the loop through parameters, looking for an
-                     --  OUT parameter for which we are the argument.
-
-                     F := First_Formal (E);
-                     A := First (L);
-                     while Present (F) loop
-                        if A = N
-                          and then (Ekind (F) = E_Out_Parameter
-                                     or else Mechanism (F) = By_Reference)
-                        then
-                           return;
-                        end if;
-
-                        Next_Formal (F);
-                        Next (A);
-                     end loop;
-                  end if;
+                  return;
                end if;
             end;
          end if;
-      end if;
-
-      --  If this is a boolean expression, only its elementary operands need
-      --  checking: if they are valid, a boolean or short-circuit operation
-      --  with them will be valid as well.
-
-      if Base_Type (Typ) = Standard_Boolean
-        and then
-         (Nkind (Expr) in N_Op or else Nkind (Expr) in N_Short_Circuit)
-      then
-         return;
       end if;
 
       --  If we fall through, a validity check is required
@@ -6885,7 +6839,7 @@ package body Checks is
    ----------------------
 
    function Expr_Known_Valid (Expr : Node_Id) return Boolean is
-      Typ : constant Entity_Id := Etype (Expr);
+      Typ : constant Entity_Id := Validated_View (Etype (Expr));
 
    begin
       --  Non-scalar types are always considered valid, since they never give
@@ -6989,9 +6943,10 @@ package body Checks is
          return True;
 
       --  The result of a membership test is always valid, since it is true or
-      --  false, there are no other possibilities.
+      --  false, there are no other possibilities; same for short-circuit
+      --  operators.
 
-      elsif Nkind (Expr) in N_Membership_Test then
+      elsif Nkind (Expr) in N_Membership_Test | N_Short_Circuit then
          return True;
 
       --  For all other cases, we do not know the expression is valid
@@ -7351,9 +7306,7 @@ package body Checks is
       --  Delay the generation of the check until 'Loop_Entry has been properly
       --  expanded. This is done in Expand_Loop_Entry_Attributes.
 
-      elsif Nkind (Prefix (N)) = N_Attribute_Reference
-        and then Attribute_Name (Prefix (N)) = Name_Loop_Entry
-      then
+      elsif Is_Attribute_Loop_Entry (Prefix (N)) then
          return;
       end if;
 
@@ -8389,6 +8342,9 @@ package body Checks is
          =>
             return Is_Signed_Integer_Type (Etype (N));
 
+         when N_Op_Compare =>
+            return Is_Signed_Integer_Type (Etype (Left_Opnd (N)));
+
          when N_Case_Expression
             | N_If_Expression
          =>
@@ -8451,11 +8407,15 @@ package body Checks is
 
       if Inside_A_Generic then
          return;
-      end if;
+
+      --  No check during preanalysis
+
+      elsif Preanalysis_Active then
+         return;
 
       --  No check needed if known to be non-null
 
-      if Known_Non_Null (N) then
+      elsif Known_Non_Null (N) then
          return;
       end if;
 
@@ -8473,7 +8433,7 @@ package body Checks is
            --  where the expression might not be evaluated, and the warning
            --  appear as extraneous noise.
 
-           and then not Within_Case_Or_If_Expression (N)
+           and then not Within_Conditional_Expression (N)
          then
             Apply_Compile_Time_Constraint_Error
               (N, "null value not allowed here??", CE_Access_Check_Failed);
@@ -8613,6 +8573,11 @@ package body Checks is
       --  expansion is not desirable.
 
       if GNATprove_Mode then
+         return;
+
+      --  No check during preanalysis
+
+      elsif Preanalysis_Active then
          return;
 
       --  Do not generate an elaboration check if all checks have been
@@ -9663,16 +9628,11 @@ package body Checks is
 
    function Range_Checks_Suppressed (E : Entity_Id) return Boolean is
    begin
-      if Present (E) then
-         if Kill_Range_Checks (E) then
-            return True;
-
-         elsif Checks_May_Be_Suppressed (E) then
-            return Is_Check_Suppressed (E, Range_Check);
-         end if;
+      if Present (E) and then Checks_May_Be_Suppressed (E) then
+         return Is_Check_Suppressed (E, Range_Check);
+      else
+         return Scope_Suppress.Suppress (Range_Check);
       end if;
-
-      return Scope_Suppress.Suppress (Range_Check);
    end Range_Checks_Suppressed;
 
    -----------------------------------------
@@ -9760,10 +9720,6 @@ package body Checks is
          Set_Do_Range_Check (N, False);
 
          case Nkind (N) is
-            when N_And_Then =>
-               Traverse (Left_Opnd (N));
-               return Skip;
-
             when N_Attribute_Reference =>
                Set_Do_Overflow_Check (N, False);
 
@@ -9771,34 +9727,28 @@ package body Checks is
                Set_Do_Overflow_Check (N, False);
 
                case Nkind (N) is
-                  when N_Op_Divide =>
+                  when N_Op_Divide
+                     | N_Op_Mod
+                     | N_Op_Rem
+                  =>
                      Set_Do_Division_Check (N, False);
 
-                  when N_Op_And =>
-                     Set_Do_Length_Check (N, False);
-
-                  when N_Op_Mod =>
-                     Set_Do_Division_Check (N, False);
-
-                  when N_Op_Or =>
-                     Set_Do_Length_Check (N, False);
-
-                  when N_Op_Rem =>
-                     Set_Do_Division_Check (N, False);
-
-                  when N_Op_Xor =>
+                  when N_Op_And
+                     | N_Op_Or
+                     | N_Op_Xor
+                  =>
                      Set_Do_Length_Check (N, False);
 
                   when others =>
                      null;
                end case;
 
-            when N_Or_Else =>
-               Traverse (Left_Opnd (N));
-               return Skip;
-
             when N_Selected_Component =>
                Set_Do_Discriminant_Check (N, False);
+
+            when N_Short_Circuit =>
+               Traverse (Left_Opnd (N));
+               return Skip;
 
             when N_Type_Conversion =>
                Set_Do_Length_Check   (N, False);
@@ -9909,7 +9859,15 @@ package body Checks is
          if Ekind (Scope (E)) = E_Record_Type
            and then Has_Discriminants (Scope (E))
          then
-            N := Build_Discriminal_Subtype_Of_Component (E);
+            --  If the expression is a selected component, in other words,
+            --  has a prefix, then build an actual subtype from the prefix.
+            --  Otherwise, build an actual subtype from the discriminal.
+
+            if Nkind (Expr) = N_Selected_Component then
+               N := Build_Actual_Subtype_Of_Component (E, Expr);
+            else
+               N := Build_Discriminal_Subtype_Of_Component (E);
+            end if;
 
             if Present (N) then
                Insert_Action (Expr, N);
@@ -10202,7 +10160,9 @@ package body Checks is
 
             --    T_Typ'Length = string-literal-length
 
-            if Nkind (Expr_Actual) = N_String_Literal
+            --  The above also applies to the External_Initializer case.
+
+            if Nkind (Expr_Actual) in N_String_Literal | N_External_Initializer
               and then Ekind (Etype (Expr_Actual)) = E_String_Literal_Subtype
             then
                Cond :=

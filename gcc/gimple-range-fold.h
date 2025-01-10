@@ -1,5 +1,5 @@
 /* Header file for the GIMPLE fold_using_range interface.
-   Copyright (C) 2019-2024 Free Software Foundation, Inc.
+   Copyright (C) 2019-2025 Free Software Foundation, Inc.
    Contributed by Andrew MacLeod <amacleod@redhat.com>
    and Aldy Hernandez <aldyh@redhat.com>.
 
@@ -148,6 +148,20 @@ public:
 				  tree op2) override;
   virtual void register_relation (edge e, relation_kind k, tree op1,
 				  tree op2) override;
+};
+
+
+// This version of fur_source will pick a range up off an edge.
+
+class fur_edge : public fur_source
+{
+public:
+  fur_edge (edge e, range_query *q = NULL) : fur_source (q)
+    { m_edge = e; }
+  virtual bool get_operand (vrange &r, tree expr) override;
+  virtual bool get_phi_operand (vrange &r, tree expr, edge e) override;
+private:
+  edge m_edge;
 };
 
 // This class uses ranges to fold a gimple statement producing a range for

@@ -1,6 +1,5 @@
-/* Definitions of types that are used to store AVR architecture and
-   device information.
-   Copyright (C) 2012-2024 Free Software Foundation, Inc.
+/* Device information for AVR 8-bit microcontrollers.
+   Copyright (C) 2012-2025 Free Software Foundation, Inc.
    Contributed by Georg-Johann Lay (avr@gjlay.de)
 
 This file is part of GCC.
@@ -14,7 +13,7 @@ GCC is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
-    
+
 You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */

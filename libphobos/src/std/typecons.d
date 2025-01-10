@@ -980,7 +980,7 @@ if (distinctFieldNames!(Specs))
         {
             import std.algorithm.mutation : swap;
 
-            static if (is(R : Tuple!Types) && !__traits(isRef, rhs) && isTuple!R)
+            static if (is(R == Tuple!Types) && !__traits(isRef, rhs) && isTuple!R)
             {
                 if (__ctfe)
                 {
@@ -3125,7 +3125,10 @@ private:
         }
 
         // call possible struct destructors
-        .destroy!(No.initialize)(*cast(T*) &this.data);
+        static if (is(T == struct))
+        {
+            .destroy!(No.initialize)(*cast(T*) &this.data);
+        }
     }
 }
 

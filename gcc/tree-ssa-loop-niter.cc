@@ -1,5 +1,5 @@
 /* Functions to determine/estimate number of iterations of a loop.
-   Copyright (C) 2004-2024 Free Software Foundation, Inc.
+   Copyright (C) 2004-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -887,8 +887,8 @@ inverse (tree x, tree mask)
    condition S * i <> C.  If NO_OVERFLOW is true, then the control variable of
    the loop does not overflow.  EXIT_MUST_BE_TAKEN is true if we are guaranteed
    that the loop ends through this exit, i.e., the induction variable ever
-   reaches the value of C.  
-   
+   reaches the value of C.
+
    The value C is equal to final - base, where final and base are the final and
    initial value of the actual induction variable in the analysed loop.  BNDS
    bounds the value of this difference when computed in signed type with
@@ -1199,17 +1199,6 @@ number_of_iterations_lt_to_ne (tree type, affine_iv *iv0, affine_iv *iv1,
 	  if (integer_zerop (assumption))
 	    return false;
 	}
-      if (mpz_cmp (mmod, bnds->below) < 0)
-	noloop = boolean_false_node;
-      else if (POINTER_TYPE_P (type))
-	noloop = fold_build2 (GT_EXPR, boolean_type_node,
-			      iv0->base,
-			      fold_build_pointer_plus (iv1->base, tmod));
-      else
-	noloop = fold_build2 (GT_EXPR, boolean_type_node,
-			      iv0->base,
-			      fold_build2 (PLUS_EXPR, type1,
-					   iv1->base, tmod));
     }
   else
     {
@@ -1225,20 +1214,14 @@ number_of_iterations_lt_to_ne (tree type, affine_iv *iv0, affine_iv *iv1,
 	  if (integer_zerop (assumption))
 	    return false;
 	}
-      if (mpz_cmp (mmod, bnds->below) < 0)
-	noloop = boolean_false_node;
-      else if (POINTER_TYPE_P (type))
-	noloop = fold_build2 (GT_EXPR, boolean_type_node,
-			      fold_build_pointer_plus (iv0->base,
-						       fold_build1 (NEGATE_EXPR,
-								    type1, tmod)),
-			      iv1->base);
-      else
-	noloop = fold_build2 (GT_EXPR, boolean_type_node,
-			      fold_build2 (MINUS_EXPR, type1,
-					   iv0->base, tmod),
-			      iv1->base);
     }
+
+  /* IV0 < IV1 does not loop if IV0->base >= IV1->base.  */
+  if (mpz_cmp (mmod, bnds->below) < 0)
+    noloop = boolean_false_node;
+  else
+    noloop = fold_build2 (GE_EXPR, boolean_type_node,
+			  iv0->base, iv1->base);
 
   if (!integer_nonzerop (assumption))
     niter->assumptions = fold_build2 (TRUTH_AND_EXPR, boolean_type_node,
@@ -1809,7 +1792,7 @@ number_of_iterations_cond (class loop *loop,
   bounds bnds;
 
   /* If the test is not executed every iteration, wrapping may make the test
-     to pass again. 
+     to pass again.
      TODO: the overflow case can be still used as unreliable estimate of upper
      bound.  But we have no API to pass it down to number of iterations code
      and, at present, it will not use it anyway.  */
@@ -2328,7 +2311,7 @@ is_rshift_by_1 (gassign *stmt)
   if (gimple_assign_rhs_code (stmt) == RSHIFT_EXPR
       && integer_onep (gimple_assign_rhs2 (stmt)))
     return true;
-  if (gimple_assign_rhs_code (stmt) == TRUNC_DIV_EXPR
+  if (trunc_or_exact_div_p (gimple_assign_rhs_code (stmt))
       && tree_fits_shwi_p (gimple_assign_rhs2 (stmt))
       && tree_to_shwi (gimple_assign_rhs2 (stmt)) == 2)
     return true;
@@ -4166,7 +4149,7 @@ idx_infer_loop_bounds (tree base, tree *idx, void *dta)
     return true;
 
   /* For arrays that might have flexible sizes, it is not guaranteed that they
-     do not really extend over their declared size.  */ 
+     do not really extend over their declared size.  */
   if (array_ref_flexible_size_p (base))
     {
       has_flexible_size = true;
@@ -4430,7 +4413,7 @@ infer_loop_bounds_from_undefined (class loop *loop, basic_block *bbs)
 
       /* If BB is not executed in each iteration of the loop, we cannot
 	 use the operations in it to infer reliable upper bound on the
-	 # of iterations of the loop.  However, we can use it as a guess. 
+	 # of iterations of the loop.  However, we can use it as a guess.
 	 Reliable guesses come only from array bounds.  */
       reliable = dominated_by_p (CDI_DOMINATORS, loop->latch, bb);
 
@@ -4628,7 +4611,7 @@ discover_iteration_bound_by_body_walk (class loop *loop)
 		      insert = true;
 		      *entry = bound_index;
 		    }
-		    
+
 		  if (insert)
 		    queues[bound_index].safe_push (e->dest);
 		}
@@ -4667,7 +4650,7 @@ maybe_lower_iteration_bound (class loop *loop)
   bitmap visited;
 
   /* Collect all statements with interesting (i.e. lower than
-     nb_iterations_upper_bound) bound on them. 
+     nb_iterations_upper_bound) bound on them.
 
      TODO: Due to the way record_estimate choose estimates to store, the bounds
      will be always nb_iterations_upper_bound-1.  We can change this to record
@@ -4744,7 +4727,7 @@ maybe_lower_iteration_bound (class loop *loop)
   /* If every path through the loop reach bounding statement before exit,
      then we know the last iteration of the loop will have undefined effect
      and we can decrease number of iterations.  */
-    
+
   if (!found_exit)
     {
       if (dump_file && (dump_flags & TDF_DETAILS))
@@ -5183,7 +5166,7 @@ n_of_executions_at_most (gimple *stmt,
 
      -- If NITER_BOUND->is_exit is false, then if we can prove that when STMT
 	is executed, then NITER_BOUND->stmt is executed as well in the same
-	iteration then STMT is executed at most NITER_BOUND->bound + 1 times. 
+	iteration then STMT is executed at most NITER_BOUND->bound + 1 times.
 
 	If we can determine that NITER_BOUND->stmt is always executed
 	after STMT, then STMT is executed at most NITER_BOUND->bound + 2 times.

@@ -1,5 +1,5 @@
 /* Loop invariant motion.
-   Copyright (C) 2003-2024 Free Software Foundation, Inc.
+   Copyright (C) 2003-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -1304,11 +1304,22 @@ move_computations_worker (basic_block bb)
 	     edges of COND.  */
 	  extract_true_false_args_from_phi (dom, stmt, &arg0, &arg1);
 	  gcc_assert (arg0 && arg1);
-	  t = make_ssa_name (boolean_type_node);
-	  new_stmt = gimple_build_assign (t, gimple_cond_code (cond),
-					  gimple_cond_lhs (cond),
-					  gimple_cond_rhs (cond));
-	  gsi_insert_on_edge (loop_preheader_edge (level), new_stmt);
+	  /* For `bool_val != 0`, reuse bool_val. */
+	  if (gimple_cond_code (cond) == NE_EXPR
+	      && integer_zerop (gimple_cond_rhs (cond))
+	      && types_compatible_p (TREE_TYPE (gimple_cond_lhs (cond)),
+				     boolean_type_node))
+	    {
+	      t = gimple_cond_lhs (cond);
+	    }
+	  else
+	    {
+	      t = make_ssa_name (boolean_type_node);
+	      new_stmt = gimple_build_assign (t, gimple_cond_code (cond),
+					      gimple_cond_lhs (cond),
+					      gimple_cond_rhs (cond));
+	      gsi_insert_on_edge (loop_preheader_edge (level), new_stmt);
+	    }
 	  new_stmt = gimple_build_assign (gimple_phi_result (stmt),
 					  COND_EXPR, t, arg0, arg1);
 	  todo |= TODO_cleanup_cfg;
@@ -1674,7 +1685,7 @@ gather_mem_refs_stmt (class loop *loop, gimple *stmt)
       aor.max_size = saved_maxsize;
       if (*slot)
 	{
-	  if (!(*slot)->ref_canonical 
+	  if (!(*slot)->ref_canonical
 	      && !operand_equal_p (*mem, (*slot)->mem.ref, 0))
 	    {
 	      /* If we didn't yet canonicalize the hashtable ref (which
@@ -2057,7 +2068,7 @@ first_mem_ref_loc (class loop *loop, im_mem_ref *ref)
        MEM = lsm;	<-- (X)
 
   In case MEM and TMP_VAR are NULL the function will return the then
-  block so the caller can insert (X) and other related stmts. 
+  block so the caller can insert (X) and other related stmts.
 */
 
 static basic_block

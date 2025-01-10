@@ -1,5 +1,5 @@
 /* Induction variable optimizations.
-   Copyright (C) 2003-2024 Free Software Foundation, Inc.
+   Copyright (C) 2003-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -1189,19 +1189,19 @@ alloc_iv (struct ivopts_data *data, tree base, tree step,
 					      sizeof (struct iv));
   gcc_assert (step != NULL_TREE);
 
-  /* Lower address expression in base except ones with DECL_P as operand.
-     By doing this:
+  /* Canonicalize the address expression in base if it were an unsigned
+      computation. That leads to more equalities being detected and results in:
+
        1) More accurate cost can be computed for address expressions;
        2) Duplicate candidates won't be created for bases in different
-	  forms, like &a[0] and &a.  */
+	  forms, like &a[0] and &a.
+       3) Duplicate candidates won't be created for IV expressions that differ
+	  only in their sign.  */
+  aff_tree comb;
   STRIP_NOPS (expr);
-  if ((TREE_CODE (expr) == ADDR_EXPR && !DECL_P (TREE_OPERAND (expr, 0)))
-      || contain_complex_addr_expr (expr))
-    {
-      aff_tree comb;
-      tree_to_aff_combination (expr, TREE_TYPE (expr), &comb);
-      base = fold_convert (TREE_TYPE (base), aff_combination_to_tree (&comb));
-    }
+  expr = fold_convert (unsigned_type_for (TREE_TYPE (expr)), expr);
+  tree_to_aff_combination (expr, TREE_TYPE (expr), &comb);
+  base = fold_convert (TREE_TYPE (base), aff_combination_to_tree (&comb));
 
   iv->base = base;
   iv->base_object = determine_base_object (data, base);
@@ -1460,7 +1460,8 @@ find_givs_in_bb (struct ivopts_data *data, basic_block bb)
   gimple_stmt_iterator bsi;
 
   for (bsi = gsi_start_bb (bb); !gsi_end_p (bsi); gsi_next (&bsi))
-    find_givs_in_stmt (data, gsi_stmt (bsi));
+    if (!is_gimple_debug (gsi_stmt (bsi)))
+      find_givs_in_stmt (data, gsi_stmt (bsi));
 }
 
 /* Finds general ivs.  */
@@ -1623,8 +1624,8 @@ record_group_use (struct ivopts_data *data, tree *use_p,
 
 	  /* Check if it has the same stripped base and step.  */
 	  if (operand_equal_p (iv->base_object, use->iv->base_object, 0)
-	      && operand_equal_p (iv->step, use->iv->step, 0)
-	      && operand_equal_p (addr_base, use->addr_base, 0))
+	      && operand_equal_p (iv->step, use->iv->step, OEP_ASSUME_WRAPV)
+	      && operand_equal_p (addr_base, use->addr_base, OEP_ASSUME_WRAPV))
 	    break;
 	}
       if (i == data->vgroups.length ())
@@ -4367,6 +4368,7 @@ force_expr_to_var_cost (tree expr, bool speed)
     case PLUS_EXPR:
     case MINUS_EXPR:
     case MULT_EXPR:
+    case EXACT_DIV_EXPR:
     case TRUNC_DIV_EXPR:
     case BIT_AND_EXPR:
     case BIT_IOR_EXPR:
@@ -4480,6 +4482,7 @@ force_expr_to_var_cost (tree expr, bool speed)
 	return comp_cost (target_spill_cost [speed], 0);
       break;
 
+    case EXACT_DIV_EXPR:
     case TRUNC_DIV_EXPR:
       /* Division by power of two is usually cheap, so we allow it.  Forbid
 	 anything else.  */
@@ -7560,7 +7563,7 @@ get_alias_ptr_type_for_ptr_address (iv_use *use)
     case IFN_MASK_LEN_LOAD:
     case IFN_MASK_LEN_STORE:
       /* The second argument contains the correct alias type.  */
-      gcc_assert (use->op_p = gimple_call_arg_ptr (call, 0));
+      gcc_assert (use->op_p == gimple_call_arg_ptr (call, 0));
       return TREE_TYPE (gimple_call_arg (call, 1));
 
     default:

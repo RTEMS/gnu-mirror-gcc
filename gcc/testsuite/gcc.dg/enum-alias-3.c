@@ -1,4 +1,5 @@
 /* { dg-do run } */
+/* { dg-require-effective-target lto } */
 /* { dg-options "-O2 -flto" } */
 
 typedef int *A;
@@ -8,7 +9,7 @@ void* foo(void* a, void *b, void *c, void *d)
 	*(A**)a = c;
 
 	typedef enum E *B;
-	enum E { E1 = -1, E2 = 0, E3 = 1 };
+	enum E { E1 = -1, E2 = 0, E3 = 1, MAX = __INT_MAX__ };
 	{
 		*(B**)b = d;
 	}

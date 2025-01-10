@@ -94,6 +94,7 @@ contains
     B = src3                                ! Now D was like B in test3. B OK back to gfc10
     call foo
     deallocate (B, D)
+    if (allocated (src3)) deallocate (src3)
   end
 
   subroutine class_rebar (arg)
@@ -127,7 +128,6 @@ module unlimited_tests
   public :: test_unlimited
 
   integer :: j
-  integer :: src(10)
   character(len = 2, kind = 1) :: chr(10)
   character(len = 2, kind = 1) :: chr3(5, 2, 1)
   type (s), allocatable :: src3 (:,:,:)
@@ -159,17 +159,17 @@ contains
     call foo
 
     call unlimited_rebar(reshape(B, [10]))       ! Unlimited/ character version of the original failure
-
     deallocate (B, D)
 
     chr3 = reshape (chr, shape(chr3))
     B = chr3
     call foo
     deallocate (B, D)
+    if (allocated (src3)) deallocate (src3)
   end
 
   subroutine unlimited_rebar (arg)
-    class(*) :: arg(:)
+    class(*), allocatable :: arg(:)              ! Not having this allocatable => pr117901
     call class_bar (arg)
   end
 

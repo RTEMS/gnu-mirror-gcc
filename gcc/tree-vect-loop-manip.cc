@@ -1,5 +1,5 @@
 /* Vectorizer Specific Loop Manipulations
-   Copyright (C) 2003-2024 Free Software Foundation, Inc.
+   Copyright (C) 2003-2025 Free Software Foundation, Inc.
    Contributed by Dorit Naishlos <dorit@il.ibm.com>
    and Ira Rosen <irar@il.ibm.com>
 
@@ -3099,12 +3099,12 @@ vect_get_main_loop_result (loop_vec_info loop_vinfo, tree main_loop_value,
    The analysis resulting in this epilogue loop's loop_vec_info was performed
    in the same vect_analyze_loop call as the main loop's.  At that time
    vect_analyze_loop constructs a list of accepted loop_vec_info's for lower
-   vectorization factors than the main loop.  This list is stored in the main
-   loop's loop_vec_info in the 'epilogue_vinfos' member.  Everytime we decide to
-   vectorize the epilogue loop for a lower vectorization factor,  the
-   loop_vec_info sitting at the top of the epilogue_vinfos list is removed,
-   updated and linked to the epilogue loop.  This is later used to vectorize
-   the epilogue.  The reason the loop_vec_info needs updating is that it was
+   vectorization factors than the main loop.  This list is chained in the
+   loop's loop_vec_info in the 'epilogue_vinfo' member.  When we decide to
+   vectorize the epilogue loop for a lower vectorization factor, the
+   loop_vec_info in epilogue_vinfo is updated and linked to the epilogue loop.
+   This is later used to vectorize the epilogue.
+   The reason the loop_vec_info needs updating is that it was
    constructed based on the original main loop, and the epilogue loop is a
    copy of this loop, so all links pointing to statements in the original loop
    need updating.  Furthermore, these loop_vec_infos share the
@@ -3127,7 +3127,7 @@ vect_do_peeling (loop_vec_info loop_vinfo, tree niters, tree nitersm1,
   profile_probability prob_prolog, prob_vector, prob_epilog;
   int estimated_vf;
   int prolog_peeling = 0;
-  bool vect_epilogues = loop_vinfo->epilogue_vinfos.length () > 0;
+  bool vect_epilogues = loop_vinfo->epilogue_vinfo != NULL;
   /* We currently do not support prolog peeling if the target alignment is not
      known at compile time.  'vect_gen_prolog_loop_niters' depends on the
      target alignment being constant.  */
@@ -3254,13 +3254,7 @@ vect_do_peeling (loop_vec_info loop_vinfo, tree niters, tree nitersm1,
   else
     niters_prolog = build_int_cst (type, 0);
 
-  loop_vec_info epilogue_vinfo = NULL;
-  if (vect_epilogues)
-    {
-      epilogue_vinfo = loop_vinfo->epilogue_vinfos[0];
-      loop_vinfo->epilogue_vinfos.ordered_remove (0);
-    }
-
+  loop_vec_info epilogue_vinfo = loop_vinfo->epilogue_vinfo;
   tree niters_vector_mult_vf = NULL_TREE;
   /* Saving NITERs before the loop, as this may be changed by prologue.  */
   tree before_loop_niters = LOOP_VINFO_NITERS (loop_vinfo);
@@ -4111,7 +4105,7 @@ vect_loop_versioning (loop_vec_info loop_vinfo,
      non-perfect nests but allow if-conversion versioned loops inside.  */
   class loop *loop_to_version = loop;
   if (flow_loop_nested_p (outermost, loop))
-    { 
+    {
       if (dump_enabled_p ())
 	dump_printf_loc (MSG_NOTE, vect_location,
 			 "trying to apply versioning to outer loop %d\n",
@@ -4196,6 +4190,14 @@ vect_loop_versioning (loop_vec_info loop_vinfo,
 			    prob * prob2, (prob * prob2).invert (),
 			    prob * prob2, (prob * prob2).invert (),
 			    true);
+
+      /* If the PHI nodes in the loop header were reallocated, we need to fix up
+	 our internally stashed copies of those.  */
+      if (loop_to_version == loop)
+	for (auto gsi = gsi_start_phis (loop->header);
+	     !gsi_end_p (gsi); gsi_next (&gsi))
+	  loop_vinfo->resync_stmt_addr (gsi.phi ());
+
       /* We will later insert second conditional so overall outcome of
 	 both is prob * prob2.  */
       edge true_e, false_e;

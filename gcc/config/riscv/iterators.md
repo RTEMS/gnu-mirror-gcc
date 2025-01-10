@@ -1,5 +1,5 @@
 ;; Iterators for the machine description for RISC-V
-;; Copyright (C) 2011-2024 Free Software Foundation, Inc.
+;; Copyright (C) 2011-2025 Free Software Foundation, Inc.
 
 ;; This file is part of GCC.
 ;;
@@ -62,8 +62,14 @@
 ;; Iterator for hardware integer modes narrower than XLEN.
 (define_mode_iterator SUBX [QI HI (SI "TARGET_64BIT")])
 
+;; Iterator for hardware integer modes narrower than XLEN, same as SUBX.
+(define_mode_iterator SUBX1 [QI HI (SI "TARGET_64BIT")])
+
 ;; Iterator for hardware-supported integer modes.
 (define_mode_iterator ANYI [QI HI SI (DI "TARGET_64BIT")])
+
+;; Iterator for hardware integer modes narrower than XLEN, same as ANYI.
+(define_mode_iterator ANYI1 [QI HI SI (DI "TARGET_64BIT")])
 
 (define_mode_iterator ANYI_DOUBLE_TRUNC [HI SI (DI "TARGET_64BIT")])
 
@@ -233,6 +239,10 @@
 (define_code_iterator any_ge [ge geu])
 (define_code_iterator any_lt [lt ltu])
 (define_code_iterator any_le [le leu])
+(define_code_iterator any_eq [eq ne])
+
+;; Iterators for conditions we can emit a sCC against 0 or a reg directly
+(define_code_iterator scc_0  [eq ne gt gtu])
 
 ; atomics code iterator
 (define_code_iterator any_atomic [plus ior xor and])
@@ -283,6 +293,8 @@
 			 (le "le")
 			 (gt "gt")
 			 (lt "lt")
+			 (eq "eq")
+			 (ne "ne")
 			 (ior "ior")
 			 (xor "xor")
 			 (and "and")

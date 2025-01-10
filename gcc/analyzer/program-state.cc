@@ -1,5 +1,5 @@
 /* Classes for representing the state of interest at a given path of analysis.
-   Copyright (C) 2019-2024 Free Software Foundation, Inc.
+   Copyright (C) 2019-2025 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -19,7 +19,6 @@ along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
 #include "config.h"
-#define INCLUDE_MEMORY
 #define INCLUDE_VECTOR
 #include "system.h"
 #include "coretypes.h"
@@ -56,6 +55,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "analyzer/analyzer-selftests.h"
 #include "text-art/tree-widget.h"
 #include "text-art/dump.h"
+#include "make-unique.h"
 
 #if ENABLE_ANALYZER
 
@@ -83,12 +83,8 @@ extrinsic_state::dump_to_pp (pretty_printer *pp) const
 void
 extrinsic_state::dump_to_file (FILE *outf) const
 {
-  pretty_printer pp;
-  if (outf == stderr)
-    pp_show_color (&pp) = pp_show_color (global_dc->printer);
-  pp.set_output_stream (outf);
+  tree_dump_pretty_printer pp (outf);
   dump_to_pp (&pp);
-  pp_flush (&pp);
 }
 
 /* Dump a multiline representation of this state to stderr.  */
@@ -102,18 +98,18 @@ extrinsic_state::dump () const
 /* Return a new json::object of the form
    {"checkers"  : array of objects, one for each state_machine}.  */
 
-json::object *
+std::unique_ptr<json::object>
 extrinsic_state::to_json () const
 {
-  json::object *ext_state_obj = new json::object ();
+  auto ext_state_obj = ::make_unique<json::object> ();
 
   {
-    json::array *checkers_arr = new json::array ();
+    auto checkers_arr = ::make_unique<json::array> ();
     unsigned i;
     state_machine *sm;
     FOR_EACH_VEC_ELT (m_checkers, i, sm)
       checkers_arr->append (sm->to_json ());
-    ext_state_obj->set ("checkers", checkers_arr);
+    ext_state_obj->set ("checkers", std::move (checkers_arr));
   }
 
   return ext_state_obj;
@@ -271,23 +267,19 @@ sm_state_map::print (const region_model *model,
 DEBUG_FUNCTION void
 sm_state_map::dump (bool simple) const
 {
-  pretty_printer pp;
-  pp_format_decoder (&pp) = default_tree_printer;
-  pp_show_color (&pp) = pp_show_color (global_dc->printer);
-  pp.set_output_stream (stderr);
+  tree_dump_pretty_printer pp (stderr);
   print (NULL, simple, true, &pp);
   pp_newline (&pp);
-  pp_flush (&pp);
 }
 
 /* Return a new json::object of the form
    {"global"  : (optional) value for global state,
     SVAL_DESC : value for state}.  */
 
-json::object *
+std::unique_ptr<json::object>
 sm_state_map::to_json () const
 {
-  json::object *map_obj = new json::object ();
+  auto map_obj = ::make_unique<json::object> ();
 
   if (m_global_state != m_sm.get_start_state ())
     map_obj->set ("global", m_global_state->to_json ());
@@ -1165,13 +1157,8 @@ program_state::dump_to_file (const extrinsic_state &ext_state,
 			     bool summarize, bool multiline,
 			     FILE *outf) const
 {
-  pretty_printer pp;
-  pp_format_decoder (&pp) = default_tree_printer;
-  if (outf == stderr)
-    pp_show_color (&pp) = pp_show_color (global_dc->printer);
-  pp.set_output_stream (outf);
+  tree_dump_pretty_printer pp (outf);
   dump_to_pp (ext_state, summarize, multiline, &pp);
-  pp_flush (&pp);
 }
 
 /* Dump a multiline representation of this state to stderr.  */
@@ -1198,10 +1185,10 @@ program_state::dump () const
     "checkers" : { STATE_NAME : object per sm_state_map },
     "valid" : true/false}.  */
 
-json::object *
+std::unique_ptr<json::object>
 program_state::to_json (const extrinsic_state &ext_state) const
 {
-  json::object *state_obj = new json::object ();
+  auto state_obj = ::make_unique<json::object> ();
 
   state_obj->set ("store", m_region_model->get_store ()->to_json ());
   state_obj->set ("constraints",
@@ -1212,7 +1199,7 @@ program_state::to_json (const extrinsic_state &ext_state) const
 
   /* Provide m_checker_states as an object, using names as keys.  */
   {
-    json::object *checkers_obj = new json::object ();
+    auto checkers_obj = ::make_unique<json::object> ();
 
     int i;
     sm_state_map *smap;
@@ -1220,7 +1207,7 @@ program_state::to_json (const extrinsic_state &ext_state) const
       if (!smap->is_empty_p ())
 	checkers_obj->set (ext_state.get_name (i), smap->to_json ());
 
-    state_obj->set ("checkers", checkers_obj);
+    state_obj->set ("checkers", std::move (checkers_obj));
   }
 
   state_obj->set_bool ("valid", m_valid);
@@ -1356,7 +1343,7 @@ program_state::on_edge (exploded_graph &eg,
 
 /* Update this program_state to reflect a call to function
    represented by CALL_STMT.
-   currently used only when the call doesn't have a superedge representing 
+   currently used only when the call doesn't have a superedge representing
    the call ( like call via a function pointer )  */
 void
 program_state::push_call (exploded_graph &eg,
@@ -1379,7 +1366,7 @@ program_state::push_call (exploded_graph &eg,
 
 /* Update this program_state to reflect a return from function
    call to which is represented by CALL_STMT.
-   currently used only when the call doesn't have a superedge representing 
+   currently used only when the call doesn't have a superedge representing
    the return */
 void
 program_state::returning_call (exploded_graph &eg,

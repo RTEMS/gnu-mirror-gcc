@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 2014-2024, Free Software Foundation, Inc.         --
+--          Copyright (C) 2014-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -507,78 +507,90 @@ package body Exp_Unst is
             is
                T : constant Entity_Id := Get_Fullest_View (In_T);
 
-               procedure Note_Uplevel_Bound (N : Node_Id; Ref : Node_Id);
+               procedure Note_Uplevel_Bound (N : Node_Id);
                --  N is the bound of a dynamic type. This procedure notes that
                --  this bound is uplevel referenced, it can handle references
                --  to entities (typically _FIRST and _LAST entities), and also
                --  attribute references of the form T'name (name is typically
                --  FIRST or LAST) where T is the uplevel referenced bound.
-               --  Ref, if Present, is the location of the reference to
-               --  replace.
 
                ------------------------
                -- Note_Uplevel_Bound --
                ------------------------
 
-               procedure Note_Uplevel_Bound (N : Node_Id; Ref : Node_Id) is
-               begin
-                  --  Entity name case. Make sure that the entity is declared
-                  --  in a subprogram. This may not be the case for a type in a
-                  --  loop appearing in a precondition.
-                  --  Exclude explicitly discriminants (that can appear
-                  --  in bounds of discriminated components) and enumeration
-                  --  literals.
+               procedure Note_Uplevel_Bound (N : Node_Id) is
 
-                  if Is_Entity_Name (N) then
-                     if Present (Entity (N))
-                       and then not Is_Type (Entity (N))
-                       and then Present (Enclosing_Subprogram (Entity (N)))
-                       and then
-                         Ekind (Entity (N))
-                           not in E_Discriminant | E_Enumeration_Literal
-                     then
-                        Note_Uplevel_Ref
-                          (E      => Entity (N),
-                           N      => Empty,
-                           Caller => Current_Subprogram,
-                           Callee => Enclosing_Subprogram (Entity (N)));
+                  function Note_Uplevel_Bound_Trav
+                    (N : Node_Id) return Traverse_Result;
+                  --  Tree visitor that marks entities that are uplevel
+                  --  referenced.
+
+                  procedure Do_Note_Uplevel_Bound
+                    is new Traverse_Proc (Note_Uplevel_Bound_Trav);
+                  --  Subtree visitor instantiation
+
+                  -----------------------------
+                  -- Note_Uplevel_Bound_Trav --
+                  -----------------------------
+
+                  function Note_Uplevel_Bound_Trav
+                    (N : Node_Id) return Traverse_Result
+                  is
+                  begin
+                     --  Entity name case. Make sure that the entity is
+                     --  declared in a subprogram. This may not be the case for
+                     --  a type in a loop appearing in a precondition. Exclude
+                     --  explicitly discriminants (that can appear in bounds of
+                     --  discriminated components), enumeration literals and
+                     --  block.
+
+                     if Is_Entity_Name (N) then
+                        if Present (Entity (N))
+                          and then not Is_Type (Entity (N))
+                          and then Present
+                            (Enclosing_Subprogram (Entity (N)))
+                          and then
+                            Ekind (Entity (N))
+                              not in E_Discriminant | E_Enumeration_Literal
+                                | E_Block
+                        then
+                           Note_Uplevel_Ref
+                             (E      => Entity (N),
+                              N      => Empty,
+                              Caller => Current_Subprogram,
+                              Callee => Enclosing_Subprogram (Entity (N)));
+                        end if;
                      end if;
 
-                  --  Attribute or indexed component case
+                     --  N_Function_Call are handled later, don't touch them
+                     --  yet.
+                     if Nkind (N) in N_Function_Call
+                     then
+                        return Skip;
 
-                  elsif Nkind (N) in
-                          N_Attribute_Reference | N_Indexed_Component
-                  then
-                     Note_Uplevel_Bound (Prefix (N), Ref);
+                     --  In N_Selected_Component and N_Expanded_Name, only the
+                     --  prefix may be referencing a uplevel entity.
 
-                     --  The indices of the indexed components, or the
-                     --  associated expressions of an attribute reference,
-                     --  may also involve uplevel references.
-
-                     declare
-                        Expr : Node_Id;
-
-                     begin
-                        Expr := First (Expressions (N));
-                        while Present (Expr) loop
-                           Note_Uplevel_Bound (Expr, Ref);
-                           Next (Expr);
-                        end loop;
-                     end;
+                     elsif Nkind (N) in N_Selected_Component
+                         | N_Expanded_Name
+                     then
+                        Do_Note_Uplevel_Bound (Prefix (N));
+                        return Skip;
 
                      --  The type of the prefix may be have an uplevel
                      --  reference if this needs bounds.
 
-                     if Nkind (N) = N_Attribute_Reference then
+                     elsif Nkind (N) = N_Attribute_Reference then
                         declare
                            Attr : constant Attribute_Id :=
                                     Get_Attribute_Id (Attribute_Name (N));
                            DT   : Boolean := False;
 
                         begin
-                           if (Attr = Attribute_First
-                                 or else Attr = Attribute_Last
-                                 or else Attr = Attribute_Length)
+                           if Attr in
+                                Attribute_First
+                                | Attribute_Last
+                                | Attribute_Length
                              and then Is_Constrained (Etype (Prefix (N)))
                            then
                               Check_Static_Type
@@ -587,59 +599,10 @@ package body Exp_Unst is
                         end;
                      end if;
 
-                  --  Binary operator cases. These can apply to arrays for
-                  --  which we may need bounds.
-
-                  elsif Nkind (N) in N_Binary_Op then
-                     Note_Uplevel_Bound (Left_Opnd (N),  Ref);
-                     Note_Uplevel_Bound (Right_Opnd (N), Ref);
-
-                  --  Unary operator case
-
-                  elsif Nkind (N) in N_Unary_Op then
-                     Note_Uplevel_Bound (Right_Opnd (N), Ref);
-
-                  --  Explicit dereference and selected component case
-
-                  elsif Nkind (N) in
-                          N_Explicit_Dereference | N_Selected_Component
-                  then
-                     Note_Uplevel_Bound (Prefix (N), Ref);
-
-                  --  Conditional expressions
-
-                  elsif Nkind (N) = N_If_Expression then
-                     declare
-                        Expr : Node_Id;
-
-                     begin
-                        Expr := First (Expressions (N));
-                        while Present (Expr) loop
-                           Note_Uplevel_Bound (Expr, Ref);
-                           Next (Expr);
-                        end loop;
-                     end;
-
-                  elsif Nkind (N) = N_Case_Expression then
-                     declare
-                        Alternative : Node_Id;
-
-                     begin
-                        Note_Uplevel_Bound (Expression (N), Ref);
-
-                        Alternative := First (Alternatives (N));
-                        while Present (Alternative) loop
-                           Note_Uplevel_Bound (Expression (Alternative), Ref);
-                        end loop;
-                     end;
-
-                  --  Conversion case
-
-                  elsif Nkind (N) in
-                          N_Type_Conversion | N_Unchecked_Type_Conversion
-                  then
-                     Note_Uplevel_Bound (Expression (N), Ref);
-                  end if;
+                     return OK;
+                  end Note_Uplevel_Bound_Trav;
+               begin
+                  Do_Note_Uplevel_Bound (N);
                end Note_Uplevel_Bound;
 
             --  Start of processing for Check_Static_Type
@@ -673,12 +636,12 @@ package body Exp_Unst is
 
                   begin
                      if not Is_Static_Expression (LB) then
-                        Note_Uplevel_Bound (LB, N);
+                        Note_Uplevel_Bound (LB);
                         DT := True;
                      end if;
 
                      if not Is_Static_Expression (UB) then
-                        Note_Uplevel_Bound (UB, N);
+                        Note_Uplevel_Bound (UB);
                         DT := True;
                      end if;
                   end;
@@ -704,7 +667,7 @@ package body Exp_Unst is
                         D := First_Elmt (Discriminant_Constraint (T));
                         while Present (D) loop
                            if not Is_Static_Expression (Node (D)) then
-                              Note_Uplevel_Bound (Node (D), N);
+                              Note_Uplevel_Bound (Node (D));
                               DT := True;
                            end if;
 
@@ -1106,14 +1069,14 @@ package body Exp_Unst is
                      end;
                   end if;
 
-                  --  A selected component can have an implicit up-level
-                  --  reference due to the bounds of previous fields in the
-                  --  record. We simplify the processing here by examining
-                  --  all components of the record.
+               --  A selected component can have an implicit up-level
+               --  reference due to the bounds of previous fields in the
+               --  record. We simplify the processing here by examining
+               --  all components of the record.
 
-                  --  Selected components appear as unit names and end labels
-                  --  for child units. Prefixes of these nodes denote parent
-                  --  units and carry no type information so they are skipped.
+               --  Selected components appear as unit names and end labels
+               --  for child units. Prefixes of these nodes denote parent
+               --  units and carry no type information so they are skipped.
 
                when N_Selected_Component =>
                   if Present (Etype (Prefix (N))) then
@@ -1213,7 +1176,7 @@ package body Exp_Unst is
                --  is a semantic descendant of the stub.
 
                when N_Body_Stub =>
-                  Visit (Library_Unit (N));
+                  Visit (Stub_Subunit (N));
 
                --  A declaration of a wrapper package indicates a subprogram
                --  instance for which there is no explicit body. Enter the
@@ -2391,7 +2354,7 @@ package body Exp_Unst is
          --  recursively in Visit_Node.
 
          elsif Nkind (N) in N_Body_Stub then
-            Do_Search (Library_Unit (N));
+            Do_Search (Stub_Subunit (N));
 
          --  Skip generic packages
 
@@ -2422,7 +2385,7 @@ package body Exp_Unst is
         or else (Nkind (Unit (N)) = N_Subprogram_Body
                   and then not Acts_As_Spec (N))
       then
-         Do_Search (Library_Unit (N));
+         Do_Search (Spec_Lib_Unit (N));
       end if;
 
       Do_Search (N);

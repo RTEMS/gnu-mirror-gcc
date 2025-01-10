@@ -1,5 +1,5 @@
 /* C-family attributes handling.
-   Copyright (C) 1992-2024 Free Software Foundation, Inc.
+   Copyright (C) 1992-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -48,6 +48,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimplify.h"
 #include "tree-pretty-print.h"
 #include "gcc-rich-location.h"
+#include "gcc-urlifier.h"
 
 static tree handle_packed_attribute (tree *, tree, tree, int, bool *);
 static tree handle_nocommon_attribute (tree *, tree, tree, int, bool *);
@@ -100,7 +101,6 @@ static tree handle_destructor_attribute (tree *, tree, tree, int, bool *);
 static tree handle_mode_attribute (tree *, tree, tree, int, bool *);
 static tree handle_section_attribute (tree *, tree, tree, int, bool *);
 static tree handle_special_var_sec_attribute (tree *, tree, tree, int, bool *);
-static tree handle_aligned_attribute (tree *, tree, tree, int, bool *);
 static tree handle_warn_if_not_aligned_attribute (tree *, tree, tree,
 						  int, bool *);
 static tree handle_strict_flex_array_attribute (tree *, tree, tree,
@@ -138,6 +138,8 @@ static tree handle_vector_size_attribute (tree *, tree, tree, int,
 static tree handle_vector_mask_attribute (tree *, tree, tree, int,
 					  bool *) ATTRIBUTE_NONNULL(3);
 static tree handle_nonnull_attribute (tree *, tree, tree, int, bool *);
+static tree handle_nonnull_if_nonzero_attribute (tree *, tree, tree, int,
+						 bool *);
 static tree handle_nonstring_attribute (tree *, tree, tree, int, bool *);
 static tree handle_nothrow_attribute (tree *, tree, tree, int, bool *);
 static tree handle_expected_throw_attribute (tree *, tree, tree, int, bool *);
@@ -184,6 +186,7 @@ static tree handle_signed_bool_precision_attribute (tree *, tree, tree, int,
 static tree handle_hardbool_attribute (tree *, tree, tree, int, bool *);
 static tree handle_retain_attribute (tree *, tree, tree, int, bool *);
 static tree handle_fd_arg_attribute (tree *, tree, tree, int, bool *);
+static tree handle_flag_enum_attribute (tree *, tree, tree, int, bool *);
 static tree handle_null_terminated_string_arg_attribute (tree *, tree, tree, int, bool *);
 
 /* Helper to define attribute exclusions.  */
@@ -191,7 +194,7 @@ static tree handle_null_terminated_string_arg_attribute (tree *, tree, tree, int
   { name, function, type, variable }
 
 /* Define attributes that are mutually exclusive with one another.  */
-static const struct attribute_spec::exclusions attr_aligned_exclusions[] =
+extern const struct attribute_spec::exclusions attr_aligned_exclusions[] =
 {
   /* Attribute name     exclusion applies to:
 	                function, type, variable */
@@ -444,6 +447,14 @@ const struct attribute_spec c_common_gnu_attributes[] =
   { "pure",                   0, 0, true,  false, false, false,
 			      handle_pure_attribute,
 	                      attr_const_pure_exclusions },
+  { "reproducible",           0, 0, false, true,  true,  false,
+			      handle_reproducible_attribute, NULL },
+  { "unsequenced",            0, 0, false, true,  true,  false,
+			      handle_unsequenced_attribute, NULL },
+  { "reproducible noptr",     0, 0, false, true,  true,  false,
+			      handle_reproducible_attribute, NULL },
+  { "unsequenced noptr",      0, 0, false, true,  true,  false,
+			      handle_unsequenced_attribute, NULL },
   { "transaction_callable",   0, 0, false, true,  false, false,
 			      handle_tm_attribute, NULL },
   { "transaction_unsafe",     0, 0, false, true,  false, true,
@@ -478,6 +489,8 @@ const struct attribute_spec c_common_gnu_attributes[] =
 			      handle_tls_model_attribute, NULL },
   { "nonnull",                0, -1, false, true, true, false,
 			      handle_nonnull_attribute, NULL },
+  { "nonnull_if_nonzero",     2, 2, false, true, true, false,
+			      handle_nonnull_if_nonzero_attribute, NULL },
   { "nonstring",              0, 0, true, false, false, false,
 			      handle_nonstring_attribute, NULL },
   { "nothrow",                0, 0, true,  false, false, false,
@@ -562,6 +575,9 @@ const struct attribute_spec c_common_gnu_attributes[] =
 			      handle_omp_declare_variant_attribute, NULL },
   { "omp declare variant variant", 0, -1, true,  false, false, false,
 			      handle_omp_declare_variant_attribute, NULL },
+  { "omp declare variant variant args", 0, -1, true,  false,
+			      false, false,
+			      handle_omp_declare_variant_attribute, NULL },
   { "simd",		      0, 1, true,  false, false, false,
 			      handle_simd_attribute, NULL },
   { "omp declare target",     0, -1, true, false, false, false,
@@ -618,11 +634,13 @@ const struct attribute_spec c_common_gnu_attributes[] =
   { "tainted_args",	      0, 0, true,  false, false, false,
 			      handle_tainted_args_attribute, NULL },
   { "fd_arg",             1, 1, false, true, true, false,
-            handle_fd_arg_attribute, NULL},      
+            handle_fd_arg_attribute, NULL},
   { "fd_arg_read",        1, 1, false, true, true, false,
             handle_fd_arg_attribute, NULL},
   { "fd_arg_write",       1, 1, false, true, true, false,
-            handle_fd_arg_attribute, NULL},         
+            handle_fd_arg_attribute, NULL},
+  { "flag_enum",	      0, 0, false, true, false, false,
+			      handle_flag_enum_attribute, NULL },
   { "null_terminated_string_arg", 1, 1, false, true, true, false,
 			      handle_null_terminated_string_arg_attribute, NULL}
 };
@@ -630,6 +648,17 @@ const struct attribute_spec c_common_gnu_attributes[] =
 const struct scoped_attribute_specs c_common_gnu_attribute_table =
 {
   "gnu", { c_common_gnu_attributes }
+};
+
+/* Attributes also recognized in the clang:: namespace.  */
+const struct attribute_spec c_common_clang_attributes[] = {
+  { "flag_enum",	      0, 0, false, true, false, false,
+			      handle_flag_enum_attribute, NULL }
+};
+
+const struct scoped_attribute_specs c_common_clang_attribute_table =
+{
+  "clang", { c_common_clang_attributes }
 };
 
 /* Give the specifications for the format attributes, used by C and all
@@ -708,6 +737,8 @@ positional_argument (const_tree fn, const_tree atname, tree &pos,
 		     tree_code code, int argno /* = 0 */,
 		     int flags /* = posargflags () */)
 {
+  auto_urlify_attributes sentinel;
+
   const_tree fndecl = TYPE_P (fn) ? NULL_TREE : fn;
   const_tree fntype = TYPE_P (fn) ? fn : TREE_TYPE (fn);
   if (pos && TREE_CODE (pos) != IDENTIFIER_NODE
@@ -2784,7 +2815,7 @@ common_handle_aligned_attribute (tree *node, tree name, tree args, int flags,
 /* Handle a "aligned" attribute; arguments as in
    struct attribute_spec.handler.  */
 
-static tree
+tree
 handle_aligned_attribute (tree *node, tree name, tree args,
 			  int flags, bool *no_add_attrs)
 {
@@ -2859,8 +2890,16 @@ handle_counted_by_attribute (tree *node, tree name,
   tree argval = TREE_VALUE (args);
   tree old_counted_by = lookup_attribute ("counted_by", DECL_ATTRIBUTES (decl));
 
+  /* This attribute is not supported in C++.  */
+  if (c_dialect_cxx ())
+    {
+      warning_at (DECL_SOURCE_LOCATION (decl), OPT_Wattributes,
+		  "%qE attribute is not supported for C++ for now, ignored",
+		  name);
+      *no_add_attrs = true;
+    }
   /* This attribute only applies to field decls of a structure.  */
-  if (TREE_CODE (decl) != FIELD_DECL)
+  else if (TREE_CODE (decl) != FIELD_DECL)
     {
       error_at (DECL_SOURCE_LOCATION (decl),
 		"%qE attribute is not allowed for a non-field"
@@ -4280,6 +4319,53 @@ handle_pure_attribute (tree *node, tree name, tree ARG_UNUSED (args),
   return NULL_TREE;
 }
 
+/* Handle an "unsequenced" attribute; arguments as in
+   struct attribute_spec.handler.  */
+
+tree
+handle_unsequenced_attribute (tree *node, tree name, tree ARG_UNUSED (args),
+			      int flags, bool *no_add_attrs)
+{
+  tree fntype = *node;
+  for (tree argtype = TYPE_ARG_TYPES (fntype); argtype;
+       argtype = TREE_CHAIN (argtype))
+    /* If any of the arguments have pointer or reference type, just
+       add the attribute alone.  */
+    if (POINTER_TYPE_P (TREE_VALUE (argtype)))
+      return NULL_TREE;
+
+  if (VOID_TYPE_P (TREE_TYPE (fntype)))
+    warning (OPT_Wattributes, "%qE attribute on function type "
+	     "without pointer arguments returning %<void%>", name);
+  const char *name2;
+  if (IDENTIFIER_LENGTH (name) == sizeof ("unsequenced") - 1)
+    name2 = "unsequenced noptr";
+  else
+    name2 = "reproducible noptr";
+  if (!lookup_attribute (name2, TYPE_ATTRIBUTES (fntype)))
+    {
+      *no_add_attrs = true;
+      gcc_assert ((flags & (int) ATTR_FLAG_TYPE_IN_PLACE) == 0);
+      tree attr = tree_cons (get_identifier (name2), NULL_TREE,
+			     TYPE_ATTRIBUTES (fntype));
+      if (!lookup_attribute (IDENTIFIER_POINTER (name),
+			     TYPE_ATTRIBUTES (fntype)))
+	attr = tree_cons (name, NULL_TREE, attr);
+      *node = build_type_attribute_variant (*node, attr);
+    }
+  return NULL_TREE;
+}
+
+/* Handle a "reproducible" attribute; arguments as in
+   struct attribute_spec.handler.  */
+
+tree
+handle_reproducible_attribute (tree *node, tree name, tree args, int flags,
+			       bool *no_add_attrs)
+{
+  return handle_unsequenced_attribute (node, name, args, flags, no_add_attrs);
+}
+
 /* Digest an attribute list destined for a transactional memory statement.
    ALLOWED is the set of attributes that are allowed for this statement;
    return the attribute we parsed.  Multiple attributes are never allowed.  */
@@ -4922,7 +5008,7 @@ handle_nonnull_attribute (tree *node, tree name,
       /* NEXT is null when the attribute includes just one argument.
 	 That's used to tell positional_argument to avoid mentioning
 	 the argument number in diagnostics (since there's just one
-	 mentioning it is unnecessary and coule be confusing).  */
+	 mentioning it is unnecessary and could be confusing).  */
       tree next = TREE_CHAIN (args);
       if (tree val = positional_argument (type, name, pos, POINTER_TYPE,
 					  next || i > 1 ? i : 0))
@@ -4934,6 +5020,29 @@ handle_nonnull_attribute (tree *node, tree name,
 	}
       args = next;
     }
+
+  return NULL_TREE;
+}
+
+/* Handle the "nonnull_if_nonzero" attribute.  */
+
+static tree
+handle_nonnull_if_nonzero_attribute (tree *node, tree name,
+				     tree args, int ARG_UNUSED (flags),
+				     bool *no_add_attrs)
+{
+  tree type = *node;
+  tree pos = TREE_VALUE (args);
+  tree pos2 = TREE_VALUE (TREE_CHAIN (args));
+  tree val = positional_argument (type, name, pos, POINTER_TYPE, 1);
+  tree val2 = positional_argument (type, name, pos2, INTEGER_TYPE, 2);
+  if (val && val2)
+    {
+      TREE_VALUE (args) = val;
+      TREE_VALUE (TREE_CHAIN (args)) = val2;
+    }
+  else
+    *no_add_attrs = true;
 
   return NULL_TREE;
 }
@@ -4958,7 +5067,23 @@ handle_fd_arg_attribute (tree *node, tree name, tree args,
   if (positional_argument (*node, name, TREE_VALUE (args), INTEGER_TYPE))
       return NULL_TREE;
 
-  *no_add_attrs = true;  
+  *no_add_attrs = true;
+  return NULL_TREE;
+}
+
+/* Handle the "flag_enum" attribute.  */
+
+static tree
+handle_flag_enum_attribute (tree *node, tree ARG_UNUSED (name),
+			    tree ARG_UNUSED (args), int ARG_UNUSED (flags),
+			    bool *no_add_attrs)
+{
+  if (TREE_CODE (*node) != ENUMERAL_TYPE)
+    {
+      warning (OPT_Wattributes, "%qE attribute ignored on non-enum", name);
+      *no_add_attrs = true;
+    }
+
   return NULL_TREE;
 }
 

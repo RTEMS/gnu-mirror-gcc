@@ -1,5 +1,5 @@
 /* Definitions for 64-bit SPARC running Linux-based GNU systems with ELF.
-   Copyright (C) 1996-2024 Free Software Foundation, Inc.
+   Copyright (C) 1996-2025 Free Software Foundation, Inc.
    Contributed by David S. Miller (davem@caip.rutgers.edu)
 
 This file is part of GCC.
@@ -254,7 +254,7 @@ do {									\
 
 /* DWARF bits.  */
 
-/* Follow Irix 6 and not the Dwarf2 draft in using 64-bit offsets. 
+/* Follow Irix 6 and not the Dwarf2 draft in using 64-bit offsets.
    Obviously the Dwarf2 folks haven't tried to actually build systems
    with their spec.  On a 64-bit system, only 64-bit relocs become
    RELATIVE relocations.  */

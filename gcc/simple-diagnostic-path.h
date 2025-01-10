@@ -1,5 +1,5 @@
 /* Concrete classes for implementing diagnostic paths.
-   Copyright (C) 2019-2024 Free Software Foundation, Inc.
+   Copyright (C) 2019-2025 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>
 
 This file is part of GCC.
@@ -39,10 +39,7 @@ class simple_diagnostic_event : public diagnostic_event
 
   location_t get_location () const final override { return m_loc; }
   int get_stack_depth () const final override { return m_depth; }
-  label_text get_desc (bool) const final override
-  {
-    return label_text::borrow (m_desc);
-  }
+  void print_desc (pretty_printer &pp) const final override;
   const logical_location *get_logical_location () const final override
   {
     if (m_fndecl)

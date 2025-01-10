@@ -1,5 +1,5 @@
 /* Code for RTL transformations to satisfy insn constraints.
-   Copyright (C) 2010-2024 Free Software Foundation, Inc.
+   Copyright (C) 2010-2025 Free Software Foundation, Inc.
    Contributed by Vladimir Makarov <vmakarov@redhat.com>.
 
    This file is part of GCC.
@@ -200,12 +200,13 @@ get_hard_regno (rtx x)
     reg = SUBREG_REG (x);
   if (! REG_P (reg))
     return -1;
-  if (! HARD_REGISTER_NUM_P (hard_regno = REGNO (reg)))
-    hard_regno = lra_get_regno_hard_regno (hard_regno);
+  int regno = REGNO (reg);
+  if (HARD_REGISTER_NUM_P (regno))
+    hard_regno = lra_get_elimination_hard_regno (regno);
+  else
+    hard_regno = lra_get_regno_hard_regno (regno);
   if (hard_regno < 0)
     return -1;
-  if (HARD_REGISTER_NUM_P (REGNO (reg)))
-    hard_regno = lra_get_elimination_hard_regno (hard_regno);
   if (SUBREG_P (x))
     hard_regno += subreg_regno_offset (hard_regno, GET_MODE (reg),
 				       SUBREG_BYTE (x),  GET_MODE (x));
@@ -221,13 +222,12 @@ get_reg_class (int regno)
 {
   int hard_regno;
 
-  if (! HARD_REGISTER_NUM_P (hard_regno = regno))
+  if (HARD_REGISTER_NUM_P (regno))
+    hard_regno = lra_get_elimination_hard_regno (regno);
+  else
     hard_regno = lra_get_regno_hard_regno (regno);
   if (hard_regno >= 0)
-    {
-      hard_regno = lra_get_elimination_hard_regno (hard_regno);
-      return REGNO_REG_CLASS (hard_regno);
-    }
+    return REGNO_REG_CLASS (hard_regno);
   if (regno >= new_regno_start)
     return lra_get_allocno_class (regno);
   return NO_REGS;
@@ -240,7 +240,7 @@ enough_allocatable_hard_regs_p (enum reg_class reg_class,
 				enum machine_mode reg_mode)
 {
   int i, j, hard_regno, class_size, nregs;
-  
+
   if (hard_reg_set_subset_p (reg_class_contents[reg_class], lra_no_alloc_regs))
     return false;
   class_size = ira_class_hard_regs_num[reg_class];
@@ -518,7 +518,7 @@ static void
 update_equiv (int regno)
 {
   rtx x;
-  
+
   if ((x = ira_reg_equiv[regno].memory) != NULL_RTX)
     ira_reg_equiv[regno].memory
       = simplify_replace_fn_rtx (x, NULL_RTX, loc_equivalence_callback,
@@ -663,7 +663,6 @@ get_reload_reg (enum op_type type, machine_mode mode, rtx original,
 {
   int i, regno;
   enum reg_class new_class;
-  bool unique_p = false;
 
   if (type == OP_OUT)
     {
@@ -680,7 +679,8 @@ get_reload_reg (enum op_type type, machine_mode mode, rtx original,
 	 used by reload instructions.  */
       if (REG_P (original)
 	  && (int) REGNO (original) >= new_regno_start
-	  && INSN_UID (curr_insn) >= new_insn_uid_start
+	  && (INSN_UID (curr_insn) >= new_insn_uid_start
+	      || ira_former_scratch_p (REGNO (original)))
 	  && in_class_p (original, rclass, &new_class, true))
 	{
 	  unsigned int regno = REGNO (original);
@@ -701,6 +701,8 @@ get_reload_reg (enum op_type type, machine_mode mode, rtx original,
 						exclude_start_hard_regs, title);
       return true;
     }
+
+  bool unique_p = early_clobber_p;
   /* Prevent reuse value of expression with side effects,
      e.g. volatile memory.  */
   if (! side_effects_p (original))
@@ -897,6 +899,11 @@ operands_match_p (rtx x, rtx y, int y_hard_regno)
 	    return false;
 	  break;
 
+	case 'L':
+	  if (XLOC (x, i) != XLOC (y, i))
+	    return false;
+	  break;
+
 	case 'p':
 	  if (maybe_ne (SUBREG_BYTE (x), SUBREG_BYTE (y)))
 	    return false;
@@ -1045,7 +1052,7 @@ match_reload (signed char out, signed char *ins, signed char *outs,
 	  bool asm_p = asm_noperands (PATTERN (curr_insn)) >= 0;
 	  int hr;
 	  HARD_REG_SET temp_hard_reg_set;
-	  
+
 	  if (asm_p && (hr = get_hard_regno (out_rtx)) >= 0
 	      && hard_regno_nregs (hr, inmode) > 1)
 	    {
@@ -1104,7 +1111,7 @@ match_reload (signed char out, signed char *ins, signed char *outs,
 	  if (GET_CODE (in_rtx) == SUBREG)
 	    {
 	      rtx subreg_reg = SUBREG_REG (in_rtx);
-	      
+
 	      /* If SUBREG_REG is dying here and sub-registers IN_RTX
 		 and NEW_IN_REG are similar, we can use the same hard
 		 register for REG and SUBREG_REG.  */
@@ -2044,7 +2051,7 @@ prohibited_class_reg_set_mode_p (enum reg_class rclass,
 				 machine_mode mode)
 {
   HARD_REG_SET temp;
-  
+
   lra_assert (hard_reg_set_subset_p (reg_class_contents[rclass], set));
   temp = set & ~lra_no_alloc_regs;
   return (hard_reg_set_subset_p
@@ -2066,7 +2073,7 @@ update_and_check_small_class_inputs (int nop, int nalt,
 {
   static unsigned int small_class_check[LIM_REG_CLASSES];
   static int small_class_input_nums[LIM_REG_CLASSES];
-  
+
   if (SMALL_REGISTER_CLASS_P (op_class)
       /* We are interesting in classes became small because of fixing
 	 some hard regs, e.g. by an user through GCC options.  */
@@ -2219,7 +2226,7 @@ process_alt_operands (int only_alternative)
 	  print_curr_insn_alt (nalt);
 	  fprintf (lra_dump_file, "\n");
 	}
-      
+
       bool matching_early_clobber[MAX_RECOG_OPERANDS];
       curr_small_class_check++;
       overall = losers = addr_losers = 0;
@@ -2366,7 +2373,7 @@ process_alt_operands (int only_alternative)
 			    || curr_operand_mode[nop] == BLKmode)
 			&& curr_operand_mode[m] != curr_operand_mode[nop])
 		      break;
-		    
+
 		    m_hregno = get_hard_regno (*curr_id->operand_loc[m]);
 		    /* We are supposed to match a previous operand.
 		       If we do, we win if that one did.  If we do
@@ -2437,7 +2444,7 @@ process_alt_operands (int only_alternative)
 				&& REG_USERVAR_P (m_reg))
 			      {
 				int i;
-				
+
 				for (i = 0; i < early_clobbered_regs_num; i++)
 				  if (m == early_clobbered_nops[i])
 				    break;
@@ -3114,7 +3121,7 @@ process_alt_operands (int only_alternative)
 		       nop);
 		  reject += 3;
 		}
-	      
+
 	      /* If reload requires moving value through secondary
 		 memory, it will need one more insn at least.  */
 	      if (this_alternative != NO_REGS
@@ -3991,7 +3998,7 @@ process_address_1 (int nop, bool check_only_p,
 					  SCRATCH, SCRATCH,
 					  curr_insn);
       rtx addr = *ad.inner;
-      
+
       new_reg = lra_create_new_reg (Pmode, NULL_RTX, cl, NULL, "addr");
       /* addr => new_base.  */
       lra_emit_move (new_reg, addr);
@@ -4184,7 +4191,7 @@ curr_insn_transform (bool check_only_p)
 
 	if (curr_static_id->operand[i].is_operator)
 	  continue;
-	
+
 	old = op = *curr_id->operand_loc[i];
 	if (GET_CODE (old) == SUBREG)
 	  old = SUBREG_REG (old);
@@ -4233,7 +4240,7 @@ curr_insn_transform (bool check_only_p)
 	change_p = true;
 	lra_update_dup (curr_id, i);
       }
-  
+
   if (change_p)
     /* If we've changed the instruction then any alternative that
        we chose previously may no longer be valid.  */
@@ -4586,7 +4593,7 @@ curr_insn_transform (bool check_only_p)
 	      for (j = 0; goal_alt_matched[i][j] != -1; j++)
 		{
 		  rtx op2 = *curr_id->operand_loc[goal_alt_matched[i][j]];
-		  
+
 		  if (REG_P (op2) && REGNO (op) != REGNO (op2))
 		    break;
 		}
@@ -4605,7 +4612,7 @@ curr_insn_transform (bool check_only_p)
 	  else
 	    {
 	      enum reg_class rclass, common_class;
-	      
+
 	      if (REG_P (op) && goal_alt[i] != NO_REGS
 		  && (regno = REGNO (op)) >= new_regno_start
 		  && (rclass = get_reg_class (regno)) == ALL_REGS
@@ -5160,7 +5167,7 @@ combine_reload_insn (rtx_insn *from, rtx_insn *to)
   enum reg_class to_class, from_class;
   int n, nop;
   signed char changed_nops[MAX_RECOG_OPERANDS + 1];
-  
+
   /* Check conditions for second memory reload and original insn:  */
   if ((targetm.secondary_memory_needed
        == hook_bool_mode_reg_class_t_reg_class_t_false)
@@ -5171,7 +5178,7 @@ combine_reload_insn (rtx_insn *from, rtx_insn *to)
 
   lra_insn_recog_data_t id = lra_get_insn_recog_data (to);
   struct lra_static_insn_data *static_id = id->insn_static_data;
-  
+
   if (id->used_insn_alternative == LRA_UNKNOWN_ALT
       || (set = single_set (from)) == NULL_RTX)
     return false;
@@ -5443,7 +5450,7 @@ lra_constraints (bool first_p)
 		      cannot be changed.  Such insns might be not in
 		      init_insns because we don't update equiv data
 		      during insn transformations.
-		      
+
 		      As an example, let suppose that a pseudo got
 		      hard register and on the 1st pass was not
 		      changed to equivalent constant.  We generate an
@@ -5871,6 +5878,20 @@ inherit_reload_reg (bool def_p, int original_regno,
 	}
       return false;
     }
+  if (ira_reg_class_min_nregs[rclass][GET_MODE (original_reg)]
+      != ira_reg_class_max_nregs[rclass][GET_MODE (original_reg)])
+    {
+      if (lra_dump_file != NULL)
+	{
+	  fprintf (lra_dump_file,
+		   "    Rejecting inheritance for %d "
+		   "because of requiring non-uniform class %s\n",
+		   original_regno, reg_class_names[rclass]);
+	  fprintf (lra_dump_file,
+		   "    >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
+	}
+      return false;
+    }
   new_reg = lra_create_new_reg (GET_MODE (original_reg), original_reg,
 				rclass, NULL, "inheritance");
   start_sequence ();
@@ -6158,7 +6179,7 @@ split_reg (bool before_p, int original_regno, rtx_insn *insn,
   if (lra_dump_file != NULL)
     fprintf (lra_dump_file,
 	     "	  ((((((((((((((((((((((((((((((((((((((((((((((((\n");
-	  
+
   if (call_save_p)
     {
       mode = HARD_REGNO_CALLER_SAVE_MODE (hard_regno,
@@ -6322,7 +6343,7 @@ spill_hard_reg_in_range (int regno, enum reg_class rclass, rtx_insn *from, rtx_i
   unsigned int uid;
   bitmap_iterator bi;
   HARD_REG_SET ignore;
-  
+
   lra_assert (from != NULL && to != NULL);
   ignore = lra_no_alloc_regs;
   EXECUTE_IF_SET_IN_BITMAP (&lra_reg_info[regno].insn_bitmap, 0, uid, bi)
@@ -6330,7 +6351,7 @@ spill_hard_reg_in_range (int regno, enum reg_class rclass, rtx_insn *from, rtx_i
       lra_insn_recog_data_t id = lra_insn_recog_data[uid];
       struct lra_static_insn_data *static_id = id->insn_static_data;
       struct lra_insn_reg *reg;
-      
+
       for (reg = id->regs; reg != NULL; reg = reg->next)
 	if (reg->regno < FIRST_PSEUDO_REGISTER)
 	  SET_HARD_REG_BIT (ignore, reg->regno);

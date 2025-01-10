@@ -1,5 +1,5 @@
 /* Intrinsic translation
-   Copyright (C) 2002-2024 Free Software Foundation, Inc.
+   Copyright (C) 2002-2025 Free Software Foundation, Inc.
    Contributed by Paul Brook <paul@nowt.org>
    and Steven Bosscher <s.bosscher@student.tudelft.nl>
 
@@ -42,6 +42,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "dependency.h"	/* For CAF array alias analysis.  */
 #include "attribs.h"
 #include "realmpfr.h"
+#include "constructor.h"
 
 /* Only for gfc_trans_assign and gfc_trans_pointer_assign.  */
 
@@ -1326,7 +1327,8 @@ conv_expr_ref_to_caf_ref (stmtblock_t *block, gfc_expr *expr)
 				      arr_desc_token_offset);
 	    }
 	  else if (ref->u.c.component->caf_token)
-	    tmp2 = compute_component_offset (ref->u.c.component->caf_token,
+	    tmp2 = compute_component_offset (gfc_comp_caf_token (
+					       ref->u.c.component),
 					     TREE_TYPE (tmp));
 	  else
 	    tmp2 = integer_zero_node;
@@ -1666,31 +1668,59 @@ conv_expr_ref_to_caf_ref (stmtblock_t *block, gfc_expr *expr)
 			      : NULL_TREE;
 }
 
+static tree
+conv_shape_to_cst (gfc_expr *e)
+{
+  tree tmp = NULL;
+  for (int d = 0; d < e->rank; ++d)
+    {
+      if (!tmp)
+	tmp = gfc_conv_mpz_to_tree (e->shape[d], gfc_size_kind);
+      else
+	tmp = fold_build2 (MULT_EXPR, TREE_TYPE (tmp), tmp,
+			   gfc_conv_mpz_to_tree (e->shape[d], gfc_size_kind));
+    }
+  return fold_convert (size_type_node, tmp);
+}
+
 /* Get data from a remote coarray.  */
 
 static void
-gfc_conv_intrinsic_caf_get (gfc_se *se, gfc_expr *expr, tree lhs, tree lhs_kind,
-			    tree may_require_tmp, bool may_realloc,
-			    symbol_attribute *caf_attr)
+gfc_conv_intrinsic_caf_get (gfc_se *se, gfc_expr *expr, tree lhs,
+			    bool may_realloc, symbol_attribute *caf_attr)
 {
+  static int call_cnt = 0;
   gfc_expr *array_expr, *tmp_stat;
   gfc_se argse;
-  tree caf_decl, token, offset, image_index, tmp;
-  tree res_var, dst_var, type, kind, vec, stat;
-  tree caf_reference;
+  tree caf_decl, token, image_index, tmp, res_var, type, stat, dest_size,
+    dest_data, opt_dest_desc, rget_index_tree, rget_data_tree, rget_data_size,
+    opt_src_desc, opt_src_charlen, opt_dest_charlen;
   symbol_attribute caf_attr_store;
+  gfc_namespace *ns;
+  gfc_expr *rget_hash = expr->value.function.actual->next->expr,
+	   *rget_fn_expr = expr->value.function.actual->next->next->expr;
+  gfc_symbol *gdata_sym
+    = rget_fn_expr->symtree->n.sym->formal->next->next->next->sym;
+  gfc_expr rget_data, rget_data_init, rget_index;
+  char *name;
+  gfc_symtree *data_st, *index_st;
+  gfc_constructor *con;
+  stmtblock_t blk;
 
   gcc_assert (flag_coarray == GFC_FCOARRAY_LIB);
 
   if (se->ss && se->ss->info->useflags)
     {
-       /* Access the previously obtained result.  */
-       gfc_conv_tmp_array_ref (se);
-       return;
+      /* Access the previously obtained result.  */
+      gfc_conv_tmp_array_ref (se);
+      return;
     }
 
-  /* If lhs is set, the CAF_GET intrinsic has already been stripped.  */
-  array_expr = (lhs == NULL_TREE) ? expr->value.function.actual->expr : expr;
+  array_expr = expr->value.function.actual->expr;
+  ns = array_expr->expr_type == EXPR_VARIABLE
+	   && !array_expr->symtree->n.sym->attr.associate_var
+	 ? array_expr->symtree->n.sym->ns
+	 : gfc_current_ns;
   type = gfc_typenode_for_spec (&array_expr->ts);
 
   if (caf_attr == NULL)
@@ -1700,9 +1730,7 @@ gfc_conv_intrinsic_caf_get (gfc_se *se, gfc_expr *expr, tree lhs, tree lhs_kind,
     }
 
   res_var = lhs;
-  dst_var = lhs;
 
-  vec = null_pointer_node;
   tmp_stat = gfc_find_stat_co (expr);
 
   if (tmp_stat)
@@ -1717,198 +1745,172 @@ gfc_conv_intrinsic_caf_get (gfc_se *se, gfc_expr *expr, tree lhs, tree lhs_kind,
   else
     stat = null_pointer_node;
 
-  /* Only use the new get_by_ref () where it is necessary.  I.e., when the lhs
-     is reallocatable or the right-hand side has allocatable components.  */
-  if (caf_attr->alloc_comp || caf_attr->pointer_comp || may_realloc)
+  memset (&rget_data, 0, sizeof (gfc_expr));
+  gfc_clear_ts (&rget_data.ts);
+  rget_data.expr_type = EXPR_VARIABLE;
+  name = xasprintf ("__caf_rget_data_%d", call_cnt);
+  gcc_assert (!gfc_get_sym_tree (name, ns, &data_st, false));
+  name = xasprintf ("__caf_rget_index_%d", call_cnt);
+  ++call_cnt;
+  gcc_assert (!gfc_get_sym_tree (name, ns, &index_st, false));
+  free (name);
+  data_st->n.sym->attr.flavor = FL_VARIABLE;
+  data_st->n.sym->ts = gdata_sym->ts;
+  rget_data.symtree = data_st;
+  gfc_set_sym_referenced (rget_data.symtree->n.sym);
+  rget_data.ts = data_st->n.sym->ts;
+  gfc_commit_symbol (data_st->n.sym);
+
+  memset (&rget_data_init, 0, sizeof (gfc_expr));
+  gfc_clear_ts (&rget_data_init.ts);
+  rget_data_init.expr_type = EXPR_STRUCTURE;
+  rget_data_init.ts = rget_data.ts;
+  for (gfc_component *comp = rget_data.ts.u.derived->components; comp;
+       comp = comp->next)
     {
-      /* Get using caf_get_by_ref.  */
-      caf_reference = conv_expr_ref_to_caf_ref (&se->pre, array_expr);
-
-      if (caf_reference != NULL_TREE)
-	{
-	  if (lhs == NULL_TREE)
-	    {
-	      if (array_expr->ts.type == BT_CHARACTER)
-		gfc_init_se (&argse, NULL);
-	      if (array_expr->rank == 0)
-		{
-		  symbol_attribute attr;
-		  gfc_clear_attr (&attr);
-		  if (array_expr->ts.type == BT_CHARACTER)
-		    {
-		      res_var = gfc_conv_string_tmp (se,
-						     build_pointer_type (type),
-					     array_expr->ts.u.cl->backend_decl);
-		      argse.string_length = array_expr->ts.u.cl->backend_decl;
-		    }
-		  else
-		    res_var = gfc_create_var (type, "caf_res");
-		  dst_var = gfc_conv_scalar_to_descriptor (se, res_var, attr);
-		  dst_var = gfc_build_addr_expr (NULL_TREE, dst_var);
-		}
-	      else
-		{
-		  /* Create temporary.  */
-		  if (array_expr->ts.type == BT_CHARACTER)
-		    gfc_conv_expr_descriptor (&argse, array_expr);
-		  may_realloc = gfc_trans_create_temp_array (&se->pre,
-							     &se->post,
-							     se->ss, type,
-							     NULL_TREE, false,
-							     false, false,
-							     &array_expr->where)
-		      == NULL_TREE;
-		  res_var = se->ss->info->data.array.descriptor;
-		  dst_var = gfc_build_addr_expr (NULL_TREE, res_var);
-		  if (may_realloc)
-		    {
-		      tmp = gfc_conv_descriptor_data_get (res_var);
-		      tmp = gfc_deallocate_with_status (tmp, NULL_TREE,
-							NULL_TREE, NULL_TREE,
-							NULL_TREE, true,
-							NULL,
-						     GFC_CAF_COARRAY_NOCOARRAY);
-		      gfc_add_expr_to_block (&se->post, tmp);
-		    }
-		}
-	    }
-
-	  kind = build_int_cst (integer_type_node, expr->ts.kind);
-	  if (lhs_kind == NULL_TREE)
-	    lhs_kind = kind;
-
-	  caf_decl = gfc_get_tree_for_caf_expr (array_expr);
-	  if (TREE_CODE (TREE_TYPE (caf_decl)) == REFERENCE_TYPE)
-	    caf_decl = build_fold_indirect_ref_loc (input_location, caf_decl);
-	  image_index = gfc_caf_get_image_index (&se->pre, array_expr,
-						 caf_decl);
-	  gfc_get_caf_token_offset (se, &token, NULL, caf_decl, NULL,
-				    array_expr);
-
-	  /* No overlap possible as we have generated a temporary.  */
-	  if (lhs == NULL_TREE)
-	    may_require_tmp = boolean_false_node;
-
-	  /* It guarantees memory consistency within the same segment.  */
-	  tmp = gfc_build_string_const (strlen ("memory") + 1, "memory");
-	  tmp = build5_loc (input_location, ASM_EXPR, void_type_node,
-			    gfc_build_string_const (1, ""), NULL_TREE,
-			    NULL_TREE, tree_cons (NULL_TREE, tmp, NULL_TREE),
-			    NULL_TREE);
-	  ASM_VOLATILE_P (tmp) = 1;
-	  gfc_add_expr_to_block (&se->pre, tmp);
-
-	  tmp = build_call_expr_loc (input_location, gfor_fndecl_caf_get_by_ref,
-				     10, token, image_index, dst_var,
-				     caf_reference, lhs_kind, kind,
-				     may_require_tmp,
-				     may_realloc ? boolean_true_node :
-						   boolean_false_node,
-				     stat, build_int_cst (integer_type_node,
-							  array_expr->ts.type));
-
-	  gfc_add_expr_to_block (&se->pre, tmp);
-
-	  if (se->ss)
-	    gfc_advance_se_ss_chain (se);
-
-	  se->expr = res_var;
-	  if (array_expr->ts.type == BT_CHARACTER)
-	    se->string_length = argse.string_length;
-
-	  return;
-	}
+      con = gfc_constructor_get ();
+      con->expr = comp->initializer;
+      comp->initializer = NULL;
+      gfc_constructor_append (&rget_data_init.value.constructor, con);
     }
 
+  index_st->n.sym->attr.flavor = FL_VARIABLE;
+  index_st->n.sym->attr.save = SAVE_EXPLICIT;
+  index_st->n.sym->value
+    = gfc_get_constant_expr (BT_INTEGER, gfc_default_integer_kind,
+			     &gfc_current_locus);
+  mpz_init_set_si (index_st->n.sym->value->value.integer, -1);
+  index_st->n.sym->ts.type = BT_INTEGER;
+  index_st->n.sym->ts.kind = gfc_default_integer_kind;
+  gfc_set_sym_referenced (index_st->n.sym);
+  memset (&rget_index, 0, sizeof (gfc_expr));
+  gfc_clear_ts (&rget_index.ts);
+  rget_index.expr_type = EXPR_VARIABLE;
+  rget_index.symtree = index_st;
+  rget_index.ts = index_st->n.sym->ts;
+  gfc_commit_symbol (index_st->n.sym);
+
   gfc_init_se (&argse, NULL);
-  if (array_expr->rank == 0)
+  gfc_conv_expr (&argse, &rget_index);
+  gfc_add_block_to_block (&se->pre, &argse.pre);
+  rget_index_tree = argse.expr;
+
+  gfc_init_se (&argse, NULL);
+  gfc_conv_expr (&argse, rget_hash);
+
+  gfc_init_block (&blk);
+  tmp = build_call_expr (gfor_fndecl_caf_get_remote_function_index, 1,
+			 argse.expr);
+
+  gfc_add_modify (&blk, rget_index_tree, tmp);
+  gfc_add_expr_to_block (
+    &se->pre,
+    build3 (COND_EXPR, void_type_node,
+	    gfc_likely (build2 (EQ_EXPR, logical_type_node, rget_index_tree,
+				build_int_cst (integer_type_node, -1)),
+			PRED_FIRST_MATCH),
+	    gfc_finish_block (&blk), NULL_TREE));
+
+  if (rget_data.ts.u.derived->components)
     {
-      symbol_attribute attr;
-
-      gfc_clear_attr (&attr);
-      gfc_conv_expr (&argse, array_expr);
-
-      if (lhs == NULL_TREE)
-	{
-	  gfc_clear_attr (&attr);
-	  if (array_expr->ts.type == BT_CHARACTER)
-	    res_var = gfc_conv_string_tmp (se, build_pointer_type (type),
-					   argse.string_length);
-	  else
-	    res_var = gfc_create_var (type, "caf_res");
-	  dst_var = gfc_conv_scalar_to_descriptor (&argse, res_var, attr);
-	  dst_var = gfc_build_addr_expr (NULL_TREE, dst_var);
-	}
-      argse.expr = gfc_conv_scalar_to_descriptor (&argse, argse.expr, attr);
-      argse.expr = gfc_build_addr_expr (NULL_TREE, argse.expr);
+      gfc_init_se (&argse, NULL);
+      gfc_conv_expr (&argse, &rget_data);
+      rget_data_tree = argse.expr;
+      gfc_add_expr_to_block (&se->pre,
+			     gfc_trans_structure_assign (rget_data_tree,
+							 &rget_data_init, true,
+							 false));
+      gfc_constructor_free (rget_data_init.value.constructor);
+      rget_data_size = TREE_TYPE (rget_data_tree)->type_common.size_unit;
+      rget_data_tree = gfc_build_addr_expr (pvoid_type_node, rget_data_tree);
     }
   else
     {
-      /* If has_vector, pass descriptor for whole array and the
-         vector bounds separately.  */
-      gfc_array_ref *ar, ar2;
-      bool has_vector = false;
-
-      if (gfc_is_coindexed (expr) && gfc_has_vector_subscript (expr))
-	{
-          has_vector = true;
-          ar = gfc_find_array_ref (expr);
-	  ar2 = *ar;
-	  memset (ar, '\0', sizeof (*ar));
-	  ar->as = ar2.as;
-	  ar->type = AR_FULL;
-	}
-      // TODO: Check whether argse.want_coarray = 1 can help with the below.
-      gfc_conv_expr_descriptor (&argse, array_expr);
-      /* Using gfc_conv_expr_descriptor, we only get the descriptor, but that
-	 has the wrong type if component references are done.  */
-      gfc_add_modify (&argse.pre, gfc_conv_descriptor_dtype (argse.expr),
-		      gfc_get_dtype_rank_type (has_vector ? ar2.dimen
-							  : array_expr->rank,
-					       type));
-      if (has_vector)
-	{
-	  vec = conv_caf_vector_subscript (&argse.pre, argse.expr, &ar2);
-	  *ar = ar2;
-	}
-
-      if (lhs == NULL_TREE)
-	{
-	  /* Create temporary.  */
-	  for (int n = 0; n < se->ss->loop->dimen; n++)
-	    if (se->loop->to[n] == NULL_TREE)
-	      {
-		se->loop->from[n] = gfc_conv_descriptor_lbound_get (argse.expr,
-							       gfc_rank_cst[n]);
-		se->loop->to[n] = gfc_conv_descriptor_ubound_get (argse.expr,
-							       gfc_rank_cst[n]);
-	      }
-	  gfc_trans_create_temp_array (&argse.pre, &argse.post, se->ss, type,
-				       NULL_TREE, false, true, false,
-				       &array_expr->where);
-	  res_var = se->ss->info->data.array.descriptor;
-	  dst_var = gfc_build_addr_expr (NULL_TREE, res_var);
-	}
-      argse.expr = gfc_build_addr_expr (NULL_TREE, argse.expr);
+      rget_data_tree = build_zero_cst (pvoid_type_node);
+      rget_data_size = build_zero_cst (size_type_node);
     }
 
-  kind = build_int_cst (integer_type_node, expr->ts.kind);
-  if (lhs_kind == NULL_TREE)
-    lhs_kind = kind;
+  if (array_expr->rank == 0)
+    {
+      res_var = gfc_create_var (type, "caf_res");
+      if (array_expr->ts.type == BT_CHARACTER)
+	{
+	  gfc_conv_string_length (array_expr->ts.u.cl, array_expr, &se->pre);
+	  argse.string_length = array_expr->ts.u.cl->backend_decl;
+	  opt_src_charlen = gfc_build_addr_expr (
+	    NULL_TREE, gfc_trans_force_lval (&se->pre, argse.string_length));
+	  dest_size = build_int_cstu (size_type_node, array_expr->ts.kind);
+	}
+      else
+	{
+	  dest_size = res_var->typed.type->type_common.size_unit;
+	  opt_src_charlen
+	    = build_zero_cst (build_pointer_type (size_type_node));
+	}
+      dest_data
+	= gfc_evaluate_now (gfc_build_addr_expr (NULL_TREE, res_var), &se->pre);
+      res_var = build_fold_indirect_ref (dest_data);
+      dest_data = gfc_build_addr_expr (pvoid_type_node, dest_data);
+      opt_dest_desc = build_zero_cst (pvoid_type_node);
+    }
+  else
+    {
+      /* Create temporary.  */
+      may_realloc = gfc_trans_create_temp_array (&se->pre, &se->post, se->ss,
+						 type, NULL_TREE, false, false,
+						 false, &array_expr->where)
+		    == NULL_TREE;
+      res_var = se->ss->info->data.array.descriptor;
+      if (array_expr->ts.type == BT_CHARACTER)
+	{
+	  argse.string_length = array_expr->ts.u.cl->backend_decl;
+	  opt_src_charlen = gfc_build_addr_expr (
+	    NULL_TREE, gfc_trans_force_lval (&se->pre, argse.string_length));
+	  dest_size = build_int_cstu (size_type_node, array_expr->ts.kind);
+	}
+      else
+	{
+	  opt_src_charlen
+	    = build_zero_cst (build_pointer_type (size_type_node));
+	  dest_size = fold_build2 (
+	    MULT_EXPR, size_type_node,
+	    fold_convert (size_type_node,
+			  array_expr->shape
+			    ? conv_shape_to_cst (array_expr)
+			    : gfc_conv_descriptor_size (res_var,
+							array_expr->rank)),
+	    fold_convert (size_type_node,
+			  gfc_conv_descriptor_span_get (res_var)));
+	}
+      opt_dest_desc = res_var;
+      dest_data = gfc_conv_descriptor_data_get (res_var);
+      opt_dest_desc = gfc_build_addr_expr (NULL_TREE, opt_dest_desc);
+      if (may_realloc)
+	{
+	  tmp = gfc_conv_descriptor_data_get (res_var);
+	  tmp = gfc_deallocate_with_status (tmp, NULL_TREE, NULL_TREE,
+					    NULL_TREE, NULL_TREE, true, NULL,
+					    GFC_CAF_COARRAY_NOCOARRAY);
+	  gfc_add_expr_to_block (&se->post, tmp);
+	}
+      dest_data
+	= gfc_build_addr_expr (NULL_TREE,
+			       gfc_trans_force_lval (&se->pre, dest_data));
+    }
 
-  gfc_add_block_to_block (&se->pre, &argse.pre);
-  gfc_add_block_to_block (&se->post, &argse.post);
-
+  opt_dest_charlen = opt_src_charlen;
   caf_decl = gfc_get_tree_for_caf_expr (array_expr);
   if (TREE_CODE (TREE_TYPE (caf_decl)) == REFERENCE_TYPE)
     caf_decl = build_fold_indirect_ref_loc (input_location, caf_decl);
-  image_index = gfc_caf_get_image_index (&se->pre, array_expr, caf_decl);
-  gfc_get_caf_token_offset (se, &token, &offset, caf_decl, argse.expr,
-			    array_expr);
 
-  /* No overlap possible as we have generated a temporary.  */
-  if (lhs == NULL_TREE)
-    may_require_tmp = boolean_false_node;
+  if (!TYPE_LANG_SPECIFIC (TREE_TYPE (caf_decl))->rank
+      || GFC_ARRAY_TYPE_P (TREE_TYPE (caf_decl)))
+    opt_src_desc = build_zero_cst (pvoid_type_node);
+  else
+    opt_src_desc = gfc_build_addr_expr (pvoid_type_node, caf_decl);
+
+  image_index = gfc_caf_get_image_index (&se->pre, array_expr, caf_decl);
+  gfc_get_caf_token_offset (se, &token, NULL, caf_decl, NULL, array_expr);
 
   /* It guarantees memory consistency within the same segment.  */
   tmp = gfc_build_string_const (strlen ("memory") + 1, "memory");
@@ -1918,9 +1920,12 @@ gfc_conv_intrinsic_caf_get (gfc_se *se, gfc_expr *expr, tree lhs, tree lhs_kind,
   ASM_VOLATILE_P (tmp) = 1;
   gfc_add_expr_to_block (&se->pre, tmp);
 
-  tmp = build_call_expr_loc (input_location, gfor_fndecl_caf_get, 10,
-			     token, offset, image_index, argse.expr, vec,
-			     dst_var, kind, lhs_kind, may_require_tmp, stat);
+  tmp = build_call_expr_loc (
+    input_location, gfor_fndecl_caf_get_by_ct, 15, token, opt_src_desc,
+    opt_src_charlen, image_index, dest_size, dest_data, opt_dest_charlen,
+    opt_dest_desc, constant_boolean_node (may_realloc, boolean_type_node),
+    rget_index_tree, rget_data_tree, rget_data_size, stat, null_pointer_node,
+    null_pointer_node);
 
   gfc_add_expr_to_block (&se->pre, tmp);
 
@@ -1930,8 +1935,18 @@ gfc_conv_intrinsic_caf_get (gfc_se *se, gfc_expr *expr, tree lhs, tree lhs_kind,
   se->expr = res_var;
   if (array_expr->ts.type == BT_CHARACTER)
     se->string_length = argse.string_length;
+
+  return;
 }
 
+static bool
+has_ref_after_cafref (gfc_expr *expr)
+{
+  for (gfc_ref *ref = expr->ref; ref; ref = ref->next)
+    if (ref->type == REF_ARRAY && ref->u.ar.codimen)
+      return ref->next;
+  return false;
+}
 
 /* Send data to a remote coarray.  */
 
@@ -1945,11 +1960,22 @@ conv_caf_send (gfc_code *code) {
   tree lhs_type = NULL_TREE;
   tree vec = null_pointer_node, rhs_vec = null_pointer_node;
   symbol_attribute lhs_caf_attr, rhs_caf_attr;
+  bool lhs_is_coindexed, rhs_is_coindexed;
 
   gcc_assert (flag_coarray == GFC_FCOARRAY_LIB);
 
-  lhs_expr = code->ext.actual->expr;
-  rhs_expr = code->ext.actual->next->expr;
+  lhs_expr
+    = code->ext.actual->expr->expr_type == EXPR_FUNCTION
+	  && code->ext.actual->expr->value.function.isym->id == GFC_ISYM_CAF_GET
+	? code->ext.actual->expr->value.function.actual->expr
+	: code->ext.actual->expr;
+  rhs_expr = code->ext.actual->next->expr->expr_type == EXPR_FUNCTION
+		 && code->ext.actual->next->expr->value.function.isym->id
+		      == GFC_ISYM_CAF_GET
+	       ? code->ext.actual->next->expr->value.function.actual->expr
+	       : code->ext.actual->next->expr;
+  lhs_is_coindexed = gfc_is_coindexed (lhs_expr);
+  rhs_is_coindexed = gfc_is_coindexed (rhs_expr);
   may_require_tmp = gfc_check_dependency (lhs_expr, rhs_expr, true) == 0
 		    ? boolean_false_node : boolean_true_node;
   gfc_init_block (&block);
@@ -1966,7 +1992,8 @@ conv_caf_send (gfc_code *code) {
       if (lhs_expr->ts.type == BT_CHARACTER && lhs_expr->ts.deferred)
 	{
 	  lhs_se.expr = gfc_get_tree_for_caf_expr (lhs_expr);
-	  lhs_se.expr = gfc_build_addr_expr (NULL_TREE, lhs_se.expr);
+	  if (!POINTER_TYPE_P (TREE_TYPE (lhs_se.expr)))
+	    lhs_se.expr = gfc_build_addr_expr (NULL_TREE, lhs_se.expr);
 	}
       else
 	{
@@ -1974,8 +2001,9 @@ conv_caf_send (gfc_code *code) {
 	  gfc_clear_attr (&attr);
 	  gfc_conv_expr (&lhs_se, lhs_expr);
 	  lhs_type = TREE_TYPE (lhs_se.expr);
-	  lhs_se.expr = gfc_conv_scalar_to_descriptor (&lhs_se, lhs_se.expr,
-						       attr);
+	  if (lhs_is_coindexed)
+	    lhs_se.expr = gfc_conv_scalar_to_descriptor (&lhs_se, lhs_se.expr,
+							 attr);
 	  lhs_se.expr = gfc_build_addr_expr (NULL_TREE, lhs_se.expr);
 	}
     }
@@ -1999,7 +2027,7 @@ conv_caf_send (gfc_code *code) {
     {
       bool has_vector = gfc_has_vector_subscript (lhs_expr);
 
-      if (gfc_is_coindexed (lhs_expr) || !has_vector)
+      if (lhs_is_coindexed || !has_vector)
 	{
 	  /* If has_vector, pass descriptor for whole array and the
 	     vector bounds separately.  */
@@ -2030,7 +2058,7 @@ conv_caf_send (gfc_code *code) {
 	      *ar = ar2;
 	    }
 	}
-      else
+      else if (rhs_is_coindexed)
 	{
 	  /* Special casing for arr1 ([...]) = arr2[...], i.e. caf_get to
 	     indexed array expression.  This is rewritten to:
@@ -2122,13 +2150,12 @@ conv_caf_send (gfc_code *code) {
 
   /* Special case: RHS is a coarray but LHS is not; this code path avoids a
      temporary and a loop.  */
-  if (!gfc_is_coindexed (lhs_expr)
+  if (!lhs_is_coindexed && rhs_is_coindexed
       && (!lhs_caf_attr.codimension
 	  || !(lhs_expr->rank > 0
 	       && (lhs_caf_attr.allocatable || lhs_caf_attr.pointer))))
     {
       bool lhs_may_realloc = lhs_expr->rank > 0 && lhs_caf_attr.allocatable;
-      gcc_assert (gfc_is_coindexed (rhs_expr));
       gfc_init_se (&rhs_se, NULL);
       if (lhs_expr->rank == 0 && lhs_caf_attr.allocatable)
 	{
@@ -2154,9 +2181,8 @@ conv_caf_send (gfc_code *code) {
 	lhs_may_realloc = lhs_may_realloc
 	    && gfc_full_array_ref_p (lhs_expr->ref, NULL);
       gfc_add_block_to_block (&block, &lhs_se.pre);
-      gfc_conv_intrinsic_caf_get (&rhs_se, rhs_expr, lhs_se.expr, lhs_kind,
-				  may_require_tmp, lhs_may_realloc,
-				  &rhs_caf_attr);
+      gfc_conv_intrinsic_caf_get (&rhs_se, code->ext.actual->next->expr,
+				  lhs_se.expr, lhs_may_realloc, &rhs_caf_attr);
       gfc_add_block_to_block (&block, &rhs_se.pre);
       gfc_add_block_to_block (&block, &rhs_se.post);
       gfc_add_block_to_block (&block, &lhs_se.post);
@@ -2217,7 +2243,7 @@ conv_caf_send (gfc_code *code) {
       bool has_vector = false;
       tree tmp2;
 
-      if (gfc_is_coindexed (rhs_expr) && gfc_has_vector_subscript (rhs_expr))
+      if (rhs_is_coindexed && gfc_has_vector_subscript (rhs_expr))
 	{
           has_vector = true;
           ar = gfc_find_array_ref (rhs_expr);
@@ -2271,14 +2297,15 @@ conv_caf_send (gfc_code *code) {
       gfc_add_block_to_block (&block, &team_se.post);
     }
 
-  if (!gfc_is_coindexed (rhs_expr))
+  if (!rhs_is_coindexed)
     {
-      if (lhs_caf_attr.alloc_comp || lhs_caf_attr.pointer_comp)
+      if (lhs_caf_attr.alloc_comp || lhs_caf_attr.pointer_comp
+	  || has_ref_after_cafref (lhs_expr))
 	{
 	  tree reference, dst_realloc;
 	  reference = conv_expr_ref_to_caf_ref (&block, lhs_expr);
-	  dst_realloc = lhs_caf_attr.allocatable ? boolean_true_node
-					     : boolean_false_node;
+	  dst_realloc
+	    = lhs_caf_attr.allocatable ? boolean_true_node : boolean_false_node;
 	  tmp = build_call_expr_loc (input_location,
 				     gfor_fndecl_caf_send_by_ref,
 				     10, token, image_index, rhs_se.expr,
@@ -2286,7 +2313,7 @@ conv_caf_send (gfc_code *code) {
 				     may_require_tmp, dst_realloc, src_stat,
 				     build_int_cst (integer_type_node,
 						    lhs_expr->ts.type));
-	  }
+	}
       else
 	tmp = build_call_expr_loc (input_location, gfor_fndecl_caf_send, 11,
 				   token, offset, image_index, lhs_se.expr, vec,
@@ -2310,7 +2337,8 @@ conv_caf_send (gfc_code *code) {
 	caf_decl = build_fold_indirect_ref_loc (input_location, caf_decl);
       rhs_image_index = gfc_caf_get_image_index (&block, rhs_expr, caf_decl);
       tmp = rhs_se.expr;
-      if (rhs_caf_attr.alloc_comp || rhs_caf_attr.pointer_comp)
+      if (rhs_caf_attr.alloc_comp || rhs_caf_attr.pointer_comp
+	  || has_ref_after_cafref (lhs_expr))
 	{
 	  tmp_stat = gfc_find_stat_co (lhs_expr);
 
@@ -3421,6 +3449,13 @@ gfc_conv_intrinsic_mod (gfc_se * se, gfc_expr * expr, int modulo)
       else
        se->expr = fold_build2_loc (input_location, TRUNC_MOD_EXPR, type,
 				   args[0], args[1]);
+      break;
+
+    case BT_UNSIGNED:
+      /* Even easier, we only need one.  */
+      type = TREE_TYPE (args[0]);
+      se->expr = fold_build2_loc (input_location, TRUNC_MOD_EXPR, type,
+				  args[0], args[1]);
       break;
 
     case BT_REAL:
@@ -5273,66 +5308,162 @@ strip_kind_from_actual (gfc_actual_arglist * actual)
    we need to handle.  For performance reasons we sometimes create two
    loops instead of one, where the second one is much simpler.
    Examples for minloc intrinsic:
-   1) Result is an array, a call is generated
-   2) Array mask is used and NaNs need to be supported:
-      limit = Infinity;
-      pos = 0;
-      S = from;
-      while (S <= to) {
-	if (mask[S]) {
-	  if (pos == 0) pos = S + (1 - from);
-	  if (a[S] <= limit) { limit = a[S]; pos = S + (1 - from); goto lab1; }
-	}
-	S++;
-      }
-      goto lab2;
-      lab1:;
-      while (S <= to) {
-	if (mask[S]) if (a[S] < limit) { limit = a[S]; pos = S + (1 - from); }
-	S++;
-      }
-      lab2:;
-   3) NaNs need to be supported, but it is known at compile time or cheaply
-      at runtime whether array is nonempty or not:
-      limit = Infinity;
-      pos = 0;
-      S = from;
-      while (S <= to) {
-	if (a[S] <= limit) { limit = a[S]; pos = S + (1 - from); goto lab1; }
-	S++;
-      }
-      if (from <= to) pos = 1;
-      goto lab2;
-      lab1:;
-      while (S <= to) {
-	if (a[S] < limit) { limit = a[S]; pos = S + (1 - from); }
-	S++;
-      }
-      lab2:;
-   4) NaNs aren't supported, array mask is used:
-      limit = infinities_supported ? Infinity : huge (limit);
-      pos = 0;
-      S = from;
-      while (S <= to) {
-	if (mask[S]) { limit = a[S]; pos = S + (1 - from); goto lab1; }
-	S++;
-      }
-      goto lab2;
-      lab1:;
-      while (S <= to) {
-	if (mask[S]) if (a[S] < limit) { limit = a[S]; pos = S + (1 - from); }
-	S++;
-      }
-      lab2:;
-   5) Same without array mask:
-      limit = infinities_supported ? Infinity : huge (limit);
-      pos = (from <= to) ? 1 : 0;
-      S = from;
-      while (S <= to) {
-	if (a[S] < limit) { limit = a[S]; pos = S + (1 - from); }
-	S++;
-      }
-   For 3) and 5), if mask is scalar, this all goes into a conditional,
+   A: Result is scalar.
+      1) Array mask is used and NaNs need to be supported:
+	 limit = Infinity;
+	 pos = 0;
+	 S = from;
+	 while (S <= to) {
+	   if (mask[S]) {
+	     if (pos == 0) pos = S + (1 - from);
+	     if (a[S] <= limit) {
+	       limit = a[S];
+	       pos = S + (1 - from);
+	       goto lab1;
+	     }
+	   }
+	   S++;
+	 }
+	 goto lab2;
+	 lab1:;
+	 while (S <= to) {
+	   if (mask[S])
+	     if (a[S] < limit) {
+	       limit = a[S];
+	       pos = S + (1 - from);
+	     }
+	   S++;
+	 }
+	 lab2:;
+      2) NaNs need to be supported, but it is known at compile time or cheaply
+	 at runtime whether array is nonempty or not:
+	 limit = Infinity;
+	 pos = 0;
+	 S = from;
+	 while (S <= to) {
+	   if (a[S] <= limit) {
+	     limit = a[S];
+	     pos = S + (1 - from);
+	     goto lab1;
+	   }
+	   S++;
+	 }
+	 if (from <= to) pos = 1;
+	 goto lab2;
+	 lab1:;
+	 while (S <= to) {
+	   if (a[S] < limit) {
+	     limit = a[S];
+	     pos = S + (1 - from);
+	   }
+	   S++;
+	 }
+	 lab2:;
+      3) NaNs aren't supported, array mask is used:
+	 limit = infinities_supported ? Infinity : huge (limit);
+	 pos = 0;
+	 S = from;
+	 while (S <= to) {
+	   if (mask[S]) {
+	     limit = a[S];
+	     pos = S + (1 - from);
+	     goto lab1;
+	   }
+	   S++;
+	 }
+	 goto lab2;
+	 lab1:;
+	 while (S <= to) {
+	   if (mask[S])
+	     if (a[S] < limit) {
+	       limit = a[S];
+	       pos = S + (1 - from);
+	     }
+	   S++;
+	 }
+	 lab2:;
+      4) Same without array mask:
+	 limit = infinities_supported ? Infinity : huge (limit);
+	 pos = (from <= to) ? 1 : 0;
+	 S = from;
+	 while (S <= to) {
+	   if (a[S] < limit) {
+	     limit = a[S];
+	     pos = S + (1 - from);
+	   }
+	   S++;
+	 }
+   B: Array result, non-CHARACTER type, DIM absent
+      Generate similar code as in the scalar case, using a collection of
+      variables (one per dimension) instead of a single variable as result.
+      Picking only cases 1) and 4) with ARRAY of rank 2, the generated code
+      becomes:
+      1) Array mask is used and NaNs need to be supported:
+	 limit = Infinity;
+	 pos0 = 0;
+	 pos1 = 0;
+	 S1 = from1;
+	 second_loop_entry = false;
+	 while (S1 <= to1) {
+	   S0 = from0;
+	   while (s0 <= to0 {
+	     if (mask[S1][S0]) {
+	       if (pos0 == 0) {
+		 pos0 = S0 + (1 - from0);
+		 pos1 = S1 + (1 - from1);
+	       }
+	       if (a[S1][S0] <= limit) {
+		 limit = a[S1][S0];
+		 pos0 = S0 + (1 - from0);
+		 pos1 = S1 + (1 - from1);
+		 second_loop_entry = true;
+		 goto lab1;
+	       }
+	     }
+	     S0++;
+	   }
+	   S1++;
+	 }
+	 goto lab2;
+	 lab1:;
+	 S1 = second_loop_entry ? S1 : from1;
+	 while (S1 <= to1) {
+	   S0 = second_loop_entry ? S0 : from0;
+	   while (S0 <= to0) {
+	     if (mask[S1][S0])
+	       if (a[S1][S0] < limit) {
+		 limit = a[S1][S0];
+		 pos0 = S + (1 - from0);
+		 pos1 = S + (1 - from1);
+	       }
+	     second_loop_entry = false;
+	     S0++;
+	   }
+	   S1++;
+	 }
+	 lab2:;
+	 result = { pos0, pos1 };
+      ...
+      4) NANs aren't supported, no array mask.
+	 limit = infinities_supported ? Infinity : huge (limit);
+	 pos0 = (from0 <= to0 && from1 <= to1) ? 1 : 0;
+	 pos1 = (from0 <= to0 && from1 <= to1) ? 1 : 0;
+	 S1 = from1;
+	 while (S1 <= to1) {
+	   S0 = from0;
+	   while (S0 <= to0) {
+	     if (a[S1][S0] < limit) {
+	       limit = a[S1][S0];
+	       pos0 = S + (1 - from0);
+	       pos1 = S + (1 - from1);
+	     }
+	     S0++;
+	   }
+	   S1++;
+	 }
+	 result = { pos0, pos1 };
+   C: Otherwise, a call is generated.
+   For 2) and 4), if mask is scalar, this all goes into a conditional,
    setting pos = 0; in the else branch.
 
    Since we now also support the BACK argument, instead of using
@@ -5345,8 +5476,8 @@ strip_kind_from_actual (gfc_actual_arglist * actual)
    if (cond) {
      ....
 
-     The optimizer is smart enough to move the condition out of the loop.
-     The are now marked as unlikely to for further speedup.  */
+   The optimizer is smart enough to move the condition out of the loop.
+   They are now marked as unlikely too for further speedup.  */
 
 static void
 gfc_conv_intrinsic_minmaxloc (gfc_se * se, gfc_expr * expr, enum tree_code op)
@@ -5361,26 +5492,40 @@ gfc_conv_intrinsic_minmaxloc (gfc_se * se, gfc_expr * expr, enum tree_code op)
   tree cond;
   tree elsetmp;
   tree ifbody;
-  tree offset;
+  tree offset[GFC_MAX_DIMENSIONS];
   tree nonempty;
   tree lab1, lab2;
   tree b_if, b_else;
   tree back;
-  gfc_loopinfo loop;
-  gfc_actual_arglist *actual;
-  gfc_ss *arrayss;
-  gfc_ss *maskss;
+  gfc_loopinfo loop, *ploop;
+  gfc_actual_arglist *actual, *array_arg, *dim_arg, *mask_arg, *kind_arg;
+  gfc_actual_arglist *back_arg;
+  gfc_ss *arrayss = nullptr;
+  gfc_ss *maskss = nullptr;
+  gfc_ss *orig_ss = nullptr;
   gfc_se arrayse;
   gfc_se maskse;
+  gfc_se nested_se;
+  gfc_se *base_se;
   gfc_expr *arrayexpr;
   gfc_expr *maskexpr;
   gfc_expr *backexpr;
   gfc_se backse;
-  tree pos;
+  tree pos[GFC_MAX_DIMENSIONS];
+  tree idx[GFC_MAX_DIMENSIONS];
+  tree result_var = NULL_TREE;
   int n;
   bool optional_mask;
 
   actual = expr->value.function.actual;
+  array_arg = actual;
+  dim_arg = array_arg->next;
+  mask_arg = dim_arg->next;
+  kind_arg = mask_arg->next;
+  back_arg = kind_arg->next;
+
+  bool dim_present = dim_arg->expr != nullptr;
+  bool nested_loop = dim_present && expr->rank > 0;
 
   /* The last argument, BACK, is passed by value. Ensure that
      by setting its name to %VAL. */
@@ -5392,8 +5537,23 @@ gfc_conv_intrinsic_minmaxloc (gfc_se * se, gfc_expr * expr, enum tree_code op)
 
   if (se->ss)
     {
-      gfc_conv_intrinsic_funcall (se, expr);
-      return;
+      if (se->ss->info->useflags)
+	{
+	  if (!dim_present || !gfc_inline_intrinsic_function_p (expr))
+	    {
+	      /* The code generating and initializing the result array has been
+		 generated already before the scalarization loop, either with a
+		 library function call or with inline code; now we can just use
+		 the result.  */
+	      gfc_conv_tmp_array_ref (se);
+	      return;
+	    }
+	}
+      else if (!gfc_inline_intrinsic_function_p (expr))
+	{
+	  gfc_conv_intrinsic_funcall (se, expr);
+	  return;
+	}
     }
 
   arrayexpr = actual->expr;
@@ -5403,8 +5563,9 @@ gfc_conv_intrinsic_minmaxloc (gfc_se * se, gfc_expr * expr, enum tree_code op)
 
   if (arrayexpr->ts.type == BT_CHARACTER)
     {
-      gfc_actual_arglist *a;
-      a = actual;
+      gcc_assert (expr->rank == 0);
+
+      gfc_actual_arglist *a = actual;
       strip_kind_from_actual (a);
       while (a)
 	{
@@ -5419,24 +5580,46 @@ gfc_conv_intrinsic_minmaxloc (gfc_se * se, gfc_expr * expr, enum tree_code op)
       return;
     }
 
-  /* Initialize the result.  */
-  pos = gfc_create_var (gfc_array_index_type, "pos");
-  offset = gfc_create_var (gfc_array_index_type, "offset");
   type = gfc_typenode_for_spec (&expr->ts);
 
-  /* Walk the arguments.  */
-  arrayss = gfc_walk_expr (arrayexpr);
-  gcc_assert (arrayss != gfc_ss_terminator);
+  if (expr->rank > 0 && !dim_present)
+    {
+      gfc_array_spec as;
+      memset (&as, 0, sizeof (as));
 
-  actual = actual->next->next;
-  gcc_assert (actual);
-  maskexpr = actual->expr;
+      as.rank = 1;
+      as.lower[0] = gfc_get_int_expr (gfc_index_integer_kind,
+				      &arrayexpr->where,
+				      HOST_WIDE_INT_1);
+      as.upper[0] = gfc_get_int_expr (gfc_index_integer_kind,
+				      &arrayexpr->where,
+				      arrayexpr->rank);
+
+      tree array = gfc_get_nodesc_array_type (type, &as, PACKED_STATIC, true);
+
+      result_var = gfc_create_var (array, "loc_result");
+    }
+
+  const int reduction_dimensions = dim_present ? 1 : arrayexpr->rank;
+
+  /* Initialize the result.  */
+  for (int i = 0; i < reduction_dimensions; i++)
+    {
+      pos[i] = gfc_create_var (gfc_array_index_type,
+			       gfc_get_string ("pos%d", i));
+      offset[i] = gfc_create_var (gfc_array_index_type,
+				  gfc_get_string ("offset%d", i));
+      idx[i] = gfc_create_var (gfc_array_index_type,
+			       gfc_get_string ("idx%d", i));
+    }
+
+  maskexpr = mask_arg->expr;
   optional_mask = maskexpr && maskexpr->expr_type == EXPR_VARIABLE
     && maskexpr->symtree->n.sym->attr.dummy
     && maskexpr->symtree->n.sym->attr.optional;
-  backexpr = actual->next->next->expr;
+  backexpr = back_arg->expr;
 
-  gfc_init_se (&backse, NULL);
+  gfc_init_se (&backse, nested_loop ? se : nullptr);
   if (backexpr == nullptr)
     back = logical_false_node;
   else if (maybe_absent_optional_variable (backexpr))
@@ -5459,16 +5642,48 @@ gfc_conv_intrinsic_minmaxloc (gfc_se * se, gfc_expr * expr, enum tree_code op)
   back = gfc_evaluate_now_loc (input_location, back, &se->pre);
   gfc_add_block_to_block (&se->pre, &backse.post);
 
-  nonempty = NULL;
-  if (maskexpr && maskexpr->rank != 0)
+  if (nested_loop)
     {
-      maskss = gfc_walk_expr (maskexpr);
-      gcc_assert (maskss != gfc_ss_terminator);
+      gfc_init_se (&nested_se, se);
+      base_se = &nested_se;
     }
   else
     {
+      /* Walk the arguments.  */
+      arrayss = gfc_walk_expr (arrayexpr);
+      gcc_assert (arrayss != gfc_ss_terminator);
+
+      if (maskexpr && maskexpr->rank != 0)
+	{
+	  maskss = gfc_walk_expr (maskexpr);
+	  gcc_assert (maskss != gfc_ss_terminator);
+	}
+
+      base_se = nullptr;
+    }
+
+  nonempty = nullptr;
+  if (!(maskexpr && maskexpr->rank > 0))
+    {
       mpz_t asize;
-      if (gfc_array_size (arrayexpr, &asize))
+      bool reduction_size_known;
+
+      if (dim_present)
+	{
+	  int reduction_dim;
+	  if (dim_arg->expr->expr_type == EXPR_CONSTANT)
+	    reduction_dim = mpz_get_si (dim_arg->expr->value.integer) - 1;
+	  else if (arrayexpr->rank == 1)
+	    reduction_dim = 0;
+	  else
+	    gcc_unreachable ();
+	  reduction_size_known = gfc_array_dimen_size (arrayexpr, reduction_dim,
+						       &asize);
+	}
+      else
+	reduction_size_known = gfc_array_size (arrayexpr, &asize);
+
+      if (reduction_size_known)
 	{
 	  nonempty = gfc_conv_mpz_to_tree (asize, gfc_index_integer_kind);
 	  mpz_clear (asize);
@@ -5492,6 +5707,21 @@ gfc_conv_intrinsic_minmaxloc (gfc_se * se, gfc_expr * expr, enum tree_code op)
 				  arrayexpr->ts.kind);
       break;
 
+    case BT_UNSIGNED:
+      /* For MAXVAL, the minimum is zero, for MINVAL it is HUGE().  */
+      if (op == GT_EXPR)
+	{
+	  tmp = gfc_get_unsigned_type (arrayexpr->ts.kind);
+	  tmp = build_int_cst (tmp, 0);
+	}
+      else
+	{
+	  n = gfc_validate_kind (arrayexpr->ts.type, arrayexpr->ts.kind, false);
+	  tmp = gfc_conv_mpz_unsigned_to_tree (gfc_unsigned_kinds[n].huge,
+					       expr->ts.kind);
+	}
+      break;
+
     default:
       gcc_unreachable ();
     }
@@ -5499,8 +5729,9 @@ gfc_conv_intrinsic_minmaxloc (gfc_se * se, gfc_expr * expr, enum tree_code op)
   /* We start with the most negative possible value for MAXLOC, and the most
      positive possible value for MINLOC. The most negative possible value is
      -HUGE for BT_REAL and (-HUGE - 1) for BT_INTEGER; the most positive
-     possible value is HUGE in both cases.  */
-  if (op == GT_EXPR)
+     possible value is HUGE in both cases.  BT_UNSIGNED has already been dealt
+     with above.  */
+  if (op == GT_EXPR && expr->ts.type != BT_UNSIGNED)
     tmp = fold_build1_loc (input_location, NEGATE_EXPR, TREE_TYPE (tmp), tmp);
   if (op == GT_EXPR && arrayexpr->ts.type == BT_INTEGER)
     tmp = fold_build2_loc (input_location, MINUS_EXPR, TREE_TYPE (tmp), tmp,
@@ -5508,43 +5739,77 @@ gfc_conv_intrinsic_minmaxloc (gfc_se * se, gfc_expr * expr, enum tree_code op)
 
   gfc_add_modify (&se->pre, limit, tmp);
 
-  /* Initialize the scalarizer.  */
-  gfc_init_loopinfo (&loop);
+  /* If we are in a case where we generate two sets of loops, the second one
+     should continue where the first stopped instead of restarting from the
+     beginning.  So nested loops in the second set should have a partial range
+     on the first iteration, but they should start from the beginning and span
+     their full range on the following iterations.  So we use conditionals in
+     the loops lower bounds, and use the following variable in those
+     conditionals to decide whether to use the original loop bound or to use
+     the index at which the loop from the first set stopped.  */
+  tree second_loop_entry = gfc_create_var (logical_type_node,
+					   "second_loop_entry");
+  gfc_add_modify (&se->pre, second_loop_entry, logical_false_node);
 
-  /* We add the mask first because the number of iterations is taken
-     from the last ss, and this breaks if an absent optional argument
-     is used for mask.  */
+  if (nested_loop)
+    {
+      ploop = enter_nested_loop (&nested_se);
+      orig_ss = nested_se.ss;
+      ploop->temp_dim = 1;
+    }
+  else
+    {
+      /* Initialize the scalarizer.  */
+      gfc_init_loopinfo (&loop);
 
-  if (maskss)
-    gfc_add_ss_to_loop (&loop, maskss);
+      /* We add the mask first because the number of iterations is taken
+	 from the last ss, and this breaks if an absent optional argument
+	 is used for mask.  */
 
-  gfc_add_ss_to_loop (&loop, arrayss);
+      if (maskss)
+	gfc_add_ss_to_loop (&loop, maskss);
 
-  /* Initialize the loop.  */
-  gfc_conv_ss_startstride (&loop);
+      gfc_add_ss_to_loop (&loop, arrayss);
 
-  /* The code generated can have more than one loop in sequence (see the
-     comment at the function header).  This doesn't work well with the
-     scalarizer, which changes arrays' offset when the scalarization loops
-     are generated (see gfc_trans_preloop_setup).  Fortunately, {min,max}loc
-     are  currently inlined in the scalar case only (for which loop is of rank
-     one).  As there is no dependency to care about in that case, there is no
-     temporary, so that we can use the scalarizer temporary code to handle
-     multiple loops.  Thus, we set temp_dim here, we call gfc_mark_ss_chain_used
-     with flag=3 later, and we use gfc_trans_scalarized_loop_boundary even later
-     to restore offset.
-     TODO: this prevents inlining of rank > 0 minmaxloc calls, so this
-     should eventually go away.  We could either create two loops properly,
-     or find another way to save/restore the array offsets between the two
-     loops (without conflicting with temporary management), or use a single
-     loop minmaxloc implementation.  See PR 31067.  */
-  loop.temp_dim = loop.dimen;
-  gfc_conv_loop_setup (&loop, &expr->where);
+      /* Initialize the loop.  */
+      gfc_conv_ss_startstride (&loop);
 
-  gcc_assert (loop.dimen == 1);
-  if (nonempty == NULL && maskss == NULL && loop.from[0] && loop.to[0])
-    nonempty = fold_build2_loc (input_location, LE_EXPR, logical_type_node,
-				loop.from[0], loop.to[0]);
+      /* The code generated can have more than one loop in sequence (see the
+	 comment at the function header).  This doesn't work well with the
+	 scalarizer, which changes arrays' offset when the scalarization loops
+	 are generated (see gfc_trans_preloop_setup).  Fortunately, we can use
+	 the scalarizer temporary code to handle multiple loops.  Thus, we set
+	 temp_dim here, we call gfc_mark_ss_chain_used with flag=3 later, and
+	 we use gfc_trans_scalarized_loop_boundary even later to restore
+	 offset.  */
+      loop.temp_dim = loop.dimen;
+      gfc_conv_loop_setup (&loop, &expr->where);
+
+      ploop = &loop;
+    }
+
+  gcc_assert (reduction_dimensions == ploop->dimen);
+
+  if (nonempty == NULL && !(maskexpr && maskexpr->rank > 0))
+    {
+      nonempty = logical_true_node;
+
+      for (int i = 0; i < ploop->dimen; i++)
+	{
+	  if (!(ploop->from[i] && ploop->to[i]))
+	    {
+	      nonempty = NULL;
+	      break;
+	    }
+
+	  tree tmp = fold_build2_loc (input_location, LE_EXPR,
+				      logical_type_node, ploop->from[i],
+				      ploop->to[i]);
+
+	  nonempty = fold_build2_loc (input_location, TRUTH_ANDIF_EXPR,
+				      logical_type_node, nonempty, tmp);
+	}
+    }
 
   lab1 = NULL;
   lab2 = NULL;
@@ -5554,14 +5819,18 @@ gfc_conv_intrinsic_minmaxloc (gfc_se * se, gfc_expr * expr, enum tree_code op)
      is non-empty and no MASK is used, we can initialize to 1 to simplify
      the inner loop.  */
   if (nonempty != NULL && !HONOR_NANS (DECL_MODE (limit)))
-    gfc_add_modify (&loop.pre, pos,
-		    fold_build3_loc (input_location, COND_EXPR,
-				     gfc_array_index_type,
-				     nonempty, gfc_index_one_node,
-				     gfc_index_zero_node));
+    {
+      tree init = fold_build3_loc (input_location, COND_EXPR,
+				   gfc_array_index_type, nonempty,
+				   gfc_index_one_node,
+				   gfc_index_zero_node);
+      for (int i = 0; i < ploop->dimen; i++)
+	gfc_add_modify (&ploop->pre, pos[i], init);
+    }
   else
     {
-      gfc_add_modify (&loop.pre, pos, gfc_index_zero_node);
+      for (int i = 0; i < ploop->dimen; i++)
+	gfc_add_modify (&ploop->pre, pos[i], gfc_index_zero_node);
       lab1 = gfc_build_label_decl (NULL_TREE);
       TREE_USED (lab1) = 1;
       lab2 = gfc_build_label_decl (NULL_TREE);
@@ -5570,24 +5839,32 @@ gfc_conv_intrinsic_minmaxloc (gfc_se * se, gfc_expr * expr, enum tree_code op)
 
   /* An offset must be added to the loop
      counter to obtain the required position.  */
-  gcc_assert (loop.from[0]);
+  for (int i = 0; i < ploop->dimen; i++)
+    {
+      gcc_assert (ploop->from[i]);
 
-  tmp = fold_build2_loc (input_location, MINUS_EXPR, gfc_array_index_type,
-			 gfc_index_one_node, loop.from[0]);
-  gfc_add_modify (&loop.pre, offset, tmp);
+      tmp = fold_build2_loc (input_location, MINUS_EXPR, gfc_array_index_type,
+			     gfc_index_one_node, ploop->from[i]);
+      gfc_add_modify (&ploop->pre, offset[i], tmp);
+    }
 
-  gfc_mark_ss_chain_used (arrayss, lab1 ? 3 : 1);
-  if (maskss)
-    gfc_mark_ss_chain_used (maskss, lab1 ? 3 : 1);
+  if (!nested_loop)
+    {
+      gfc_mark_ss_chain_used (arrayss, lab1 ? 3 : 1);
+      if (maskss)
+	gfc_mark_ss_chain_used (maskss, lab1 ? 3 : 1);
+    }
+
   /* Generate the loop body.  */
-  gfc_start_scalarized_body (&loop, &body);
+  gfc_start_scalarized_body (ploop, &body);
 
   /* If we have a mask, only check this element if the mask is set.  */
-  if (maskss)
+  if (maskexpr && maskexpr->rank > 0)
     {
-      gfc_init_se (&maskse, NULL);
-      gfc_copy_loopinfo_to_se (&maskse, &loop);
-      maskse.ss = maskss;
+      gfc_init_se (&maskse, base_se);
+      gfc_copy_loopinfo_to_se (&maskse, ploop);
+      if (!nested_loop)
+	maskse.ss = maskss;
       gfc_conv_expr_val (&maskse, maskexpr);
       gfc_add_block_to_block (&body, &maskse.pre);
 
@@ -5597,9 +5874,10 @@ gfc_conv_intrinsic_minmaxloc (gfc_se * se, gfc_expr * expr, enum tree_code op)
     gfc_init_block (&block);
 
   /* Compare with the current limit.  */
-  gfc_init_se (&arrayse, NULL);
-  gfc_copy_loopinfo_to_se (&arrayse, &loop);
-  arrayse.ss = arrayss;
+  gfc_init_se (&arrayse, base_se);
+  gfc_copy_loopinfo_to_se (&arrayse, ploop);
+  if (!nested_loop)
+    arrayse.ss = arrayss;
   gfc_conv_expr_val (&arrayse, arrayexpr);
   gfc_add_block_to_block (&block, &arrayse.pre);
 
@@ -5615,20 +5893,30 @@ gfc_conv_intrinsic_minmaxloc (gfc_se * se, gfc_expr * expr, enum tree_code op)
       tree ifbody2;
 
       gfc_start_block (&ifblock2);
-      tmp = fold_build2_loc (input_location, PLUS_EXPR, TREE_TYPE (pos),
-			     loop.loopvar[0], offset);
-      gfc_add_modify (&ifblock2, pos, tmp);
+      for (int i = 0; i < ploop->dimen; i++)
+	{
+	  tmp = fold_build2_loc (input_location, PLUS_EXPR, TREE_TYPE (pos[i]),
+				 ploop->loopvar[i], offset[i]);
+	  gfc_add_modify (&ifblock2, pos[i], tmp);
+	}
       ifbody2 = gfc_finish_block (&ifblock2);
-      cond = fold_build2_loc (input_location, EQ_EXPR, logical_type_node, pos,
-			      gfc_index_zero_node);
+
+      cond = fold_build2_loc (input_location, EQ_EXPR, logical_type_node,
+			      pos[0], gfc_index_zero_node);
       tmp = build3_v (COND_EXPR, cond, ifbody2,
 		      build_empty_stmt (input_location));
       gfc_add_expr_to_block (&block, tmp);
     }
 
-  tmp = fold_build2_loc (input_location, PLUS_EXPR, TREE_TYPE (pos),
-			 loop.loopvar[0], offset);
-  gfc_add_modify (&ifblock, pos, tmp);
+  for (int i = 0; i < ploop->dimen; i++)
+    {
+      tmp = fold_build2_loc (input_location, PLUS_EXPR, TREE_TYPE (pos[i]),
+			     ploop->loopvar[i], offset[i]);
+      gfc_add_modify (&ifblock, pos[i], tmp);
+      gfc_add_modify (&ifblock, idx[i], ploop->loopvar[i]);
+    }
+
+  gfc_add_modify (&ifblock, second_loop_entry, logical_true_node);
 
   if (lab1)
     gfc_add_expr_to_block (&ifblock, build1_v (GOTO_EXPR, lab1));
@@ -5674,7 +5962,7 @@ gfc_conv_intrinsic_minmaxloc (gfc_se * se, gfc_expr * expr, enum tree_code op)
     }
   gfc_add_expr_to_block (&block, ifbody);
 
-  if (maskss)
+  if (maskexpr && maskexpr->rank > 0)
     {
       /* We enclose the above in if (mask) {...}.  If the mask is an
 	 optional argument, generate IF (.NOT. PRESENT(MASK)
@@ -5692,28 +5980,52 @@ gfc_conv_intrinsic_minmaxloc (gfc_se * se, gfc_expr * expr, enum tree_code op)
 
   if (lab1)
     {
-      gfc_trans_scalarized_loop_boundary (&loop, &body);
+      for (int i = 0; i < ploop->dimen; i++)
+	ploop->from[i] = fold_build3_loc (input_location, COND_EXPR,
+					  TREE_TYPE (ploop->from[i]),
+					  second_loop_entry, idx[i],
+					  ploop->from[i]);
+
+      gfc_trans_scalarized_loop_boundary (ploop, &body);
+
+      if (nested_loop)
+	{
+	  /* The first loop already advanced the parent se'ss chain, so clear
+	     the parent now to avoid doing it a second time, making the chain
+	     out of sync.  */
+	  nested_se.parent = nullptr;
+	  nested_se.ss = orig_ss;
+	}
+
+      stmtblock_t * const outer_block = &ploop->code[ploop->dimen - 1];
 
       if (HONOR_NANS (DECL_MODE (limit)))
 	{
 	  if (nonempty != NULL)
 	    {
-	      ifbody = build2_v (MODIFY_EXPR, pos, gfc_index_one_node);
+	      stmtblock_t init_block;
+	      gfc_init_block (&init_block);
+
+	      for (int i = 0; i < ploop->dimen; i++)
+		gfc_add_modify (&init_block, pos[i], gfc_index_one_node);
+
+	      tree ifbody = gfc_finish_block (&init_block);
 	      tmp = build3_v (COND_EXPR, nonempty, ifbody,
 			      build_empty_stmt (input_location));
-	      gfc_add_expr_to_block (&loop.code[0], tmp);
+	      gfc_add_expr_to_block (outer_block, tmp);
 	    }
 	}
 
-      gfc_add_expr_to_block (&loop.code[0], build1_v (GOTO_EXPR, lab2));
-      gfc_add_expr_to_block (&loop.code[0], build1_v (LABEL_EXPR, lab1));
+      gfc_add_expr_to_block (outer_block, build1_v (GOTO_EXPR, lab2));
+      gfc_add_expr_to_block (outer_block, build1_v (LABEL_EXPR, lab1));
 
       /* If we have a mask, only check this element if the mask is set.  */
-      if (maskss)
+      if (maskexpr && maskexpr->rank > 0)
 	{
-	  gfc_init_se (&maskse, NULL);
-	  gfc_copy_loopinfo_to_se (&maskse, &loop);
-	  maskse.ss = maskss;
+	  gfc_init_se (&maskse, base_se);
+	  gfc_copy_loopinfo_to_se (&maskse, ploop);
+	  if (!nested_loop)
+	    maskse.ss = maskss;
 	  gfc_conv_expr_val (&maskse, maskexpr);
 	  gfc_add_block_to_block (&body, &maskse.pre);
 
@@ -5723,9 +6035,10 @@ gfc_conv_intrinsic_minmaxloc (gfc_se * se, gfc_expr * expr, enum tree_code op)
 	gfc_init_block (&block);
 
       /* Compare with the current limit.  */
-      gfc_init_se (&arrayse, NULL);
-      gfc_copy_loopinfo_to_se (&arrayse, &loop);
-      arrayse.ss = arrayss;
+      gfc_init_se (&arrayse, base_se);
+      gfc_copy_loopinfo_to_se (&arrayse, ploop);
+      if (!nested_loop)
+	arrayse.ss = arrayss;
       gfc_conv_expr_val (&arrayse, arrayexpr);
       gfc_add_block_to_block (&block, &arrayse.pre);
 
@@ -5735,9 +6048,12 @@ gfc_conv_intrinsic_minmaxloc (gfc_se * se, gfc_expr * expr, enum tree_code op)
       /* Assign the value to the limit...  */
       gfc_add_modify (&ifblock, limit, arrayse.expr);
 
-      tmp = fold_build2_loc (input_location, PLUS_EXPR, TREE_TYPE (pos),
-			     loop.loopvar[0], offset);
-      gfc_add_modify (&ifblock, pos, tmp);
+      for (int i = 0; i < ploop->dimen; i++)
+	{
+	  tmp = fold_build2_loc (input_location, PLUS_EXPR, TREE_TYPE (pos[i]),
+				 ploop->loopvar[i], offset[i]);
+	  gfc_add_modify (&ifblock, pos[i], tmp);
+	}
 
       ifbody = gfc_finish_block (&ifblock);
 
@@ -5772,7 +6088,7 @@ gfc_conv_intrinsic_minmaxloc (gfc_se * se, gfc_expr * expr, enum tree_code op)
 
       gfc_add_expr_to_block (&block, tmp);
 
-      if (maskss)
+      if (maskexpr && maskexpr->rank > 0)
 	{
 	  /* We enclose the above in if (mask) {...}.  If the mask is
 	 an optional argument, generate IF (.NOT. PRESENT(MASK)
@@ -5786,35 +6102,35 @@ gfc_conv_intrinsic_minmaxloc (gfc_se * se, gfc_expr * expr, enum tree_code op)
 	}
       else
 	tmp = gfc_finish_block (&block);
+
       gfc_add_expr_to_block (&body, tmp);
-      /* Avoid initializing loopvar[0] again, it should be left where
-	 it finished by the first loop.  */
-      loop.from[0] = loop.loopvar[0];
+      gfc_add_modify (&body, second_loop_entry, logical_false_node);
     }
 
-  gfc_trans_scalarizing_loops (&loop, &body);
+  gfc_trans_scalarizing_loops (ploop, &body);
 
   if (lab2)
-    gfc_add_expr_to_block (&loop.pre, build1_v (LABEL_EXPR, lab2));
+    gfc_add_expr_to_block (&ploop->pre, build1_v (LABEL_EXPR, lab2));
 
   /* For a scalar mask, enclose the loop in an if statement.  */
-  if (maskexpr && maskss == NULL)
+  if (maskexpr && maskexpr->rank == 0)
     {
       tree ifmask;
 
-      gfc_init_se (&maskse, NULL);
+      gfc_init_se (&maskse, nested_loop ? se : nullptr);
       gfc_conv_expr_val (&maskse, maskexpr);
       gfc_add_block_to_block (&se->pre, &maskse.pre);
       gfc_init_block (&block);
-      gfc_add_block_to_block (&block, &loop.pre);
-      gfc_add_block_to_block (&block, &loop.post);
+      gfc_add_block_to_block (&block, &ploop->pre);
+      gfc_add_block_to_block (&block, &ploop->post);
       tmp = gfc_finish_block (&block);
 
       /* For the else part of the scalar mask, just initialize
 	 the pos variable the same way as above.  */
 
       gfc_init_block (&elseblock);
-      gfc_add_modify (&elseblock, pos, gfc_index_zero_node);
+      for (int i = 0; i < ploop->dimen; i++)
+	gfc_add_modify (&elseblock, pos[i], gfc_index_zero_node);
       elsetmp = gfc_finish_block (&elseblock);
       ifmask = conv_mask_condition (&maskse, maskexpr, optional_mask);
       tmp = build3_v (COND_EXPR, ifmask, tmp, elsetmp);
@@ -5823,12 +6139,29 @@ gfc_conv_intrinsic_minmaxloc (gfc_se * se, gfc_expr * expr, enum tree_code op)
     }
   else
     {
-      gfc_add_block_to_block (&se->pre, &loop.pre);
-      gfc_add_block_to_block (&se->pre, &loop.post);
+      gfc_add_block_to_block (&se->pre, &ploop->pre);
+      gfc_add_block_to_block (&se->pre, &ploop->post);
     }
-  gfc_cleanup_loop (&loop);
 
-  se->expr = convert (type, pos);
+  if (!nested_loop)
+    gfc_cleanup_loop (&loop);
+
+  if (!dim_present)
+    {
+      for (int i = 0; i < arrayexpr->rank; i++)
+	{
+	  tree res_idx = build_int_cst (gfc_array_index_type, i);
+	  tree res_arr_ref = gfc_build_array_ref (result_var, res_idx,
+						  NULL_TREE, true);
+
+	  tree value = convert (type, pos[i]);
+	  gfc_add_modify (&se->pre, res_arr_ref, value);
+	}
+
+      se->expr = result_var;
+    }
+  else
+    se->expr = convert (type, pos[0]);
 }
 
 /* Emit code for findloc.  */
@@ -6228,6 +6561,15 @@ gfc_conv_intrinsic_minmaxval (gfc_se * se, gfc_expr * expr, enum tree_code op)
       tmp = gfc_conv_mpz_to_tree (gfc_integer_kinds[n].huge, expr->ts.kind);
       break;
 
+    case BT_UNSIGNED:
+      /* For MAXVAL, the minimum is zero, for MINVAL it is HUGE().  */
+      if (op == GT_EXPR)
+	tmp = build_int_cst (type, 0);
+      else
+	tmp = gfc_conv_mpz_unsigned_to_tree (gfc_unsigned_kinds[n].huge,
+					     expr->ts.kind);
+      break;
+
     default:
       gcc_unreachable ();
     }
@@ -6235,8 +6577,9 @@ gfc_conv_intrinsic_minmaxval (gfc_se * se, gfc_expr * expr, enum tree_code op)
   /* We start with the most negative possible value for MAXVAL, and the most
      positive possible value for MINVAL. The most negative possible value is
      -HUGE for BT_REAL and (-HUGE - 1) for BT_INTEGER; the most positive
-     possible value is HUGE in both cases.  */
-  if (op == GT_EXPR)
+     possible value is HUGE in both cases.   BT_UNSIGNED has already been dealt
+     with above.  */
+  if (op == GT_EXPR && expr->ts.type != BT_UNSIGNED)
     {
       tmp = fold_build1_loc (input_location, NEGATE_EXPR, TREE_TYPE (tmp), tmp);
       if (huge_cst)
@@ -6772,6 +7115,7 @@ gfc_conv_intrinsic_shift (gfc_se * se, gfc_expr * expr, bool right_shift,
 {
   tree args[2], type, num_bits, cond;
   tree bigshift;
+  bool do_convert = false;
 
   gfc_conv_intrinsic_function_args (se, expr, args, 2);
 
@@ -6780,15 +7124,24 @@ gfc_conv_intrinsic_shift (gfc_se * se, gfc_expr * expr, bool right_shift,
   type = TREE_TYPE (args[0]);
 
   if (!arithmetic)
-    args[0] = fold_convert (unsigned_type_for (type), args[0]);
+    {
+      args[0] = fold_convert (unsigned_type_for (type), args[0]);
+      do_convert = true;
+    }
   else
     gcc_assert (right_shift);
+
+  if (flag_unsigned && arithmetic && expr->ts.type == BT_UNSIGNED)
+    {
+      do_convert = true;
+      args[0] = fold_convert (signed_type_for (type), args[0]);
+    }
 
   se->expr = fold_build2_loc (input_location,
 			      right_shift ? RSHIFT_EXPR : LSHIFT_EXPR,
 			      TREE_TYPE (args[0]), args[0], args[1]);
 
-  if (!arithmetic)
+  if (do_convert)
     se->expr = fold_convert (type, se->expr);
 
   if (!arithmetic)
@@ -8213,10 +8566,17 @@ gfc_conv_intrinsic_sizeof (gfc_se *se, gfc_expr *expr)
       else if (arg->rank > 0
 	       || (arg->rank == 0
 		   && arg->ref && arg->ref->type == REF_COMPONENT))
-	/* The scalarizer added an additional temp.  To get the class' vptr
-	   one has to look at the original backend_decl.  */
-	byte_size = gfc_class_vtab_size_get (
+	{
+	  /* The scalarizer added an additional temp.  To get the class' vptr
+	     one has to look at the original backend_decl.  */
+	  if (argse.class_container)
+	    byte_size = gfc_class_vtab_size_get (argse.class_container);
+	  else if (DECL_LANG_SPECIFIC (arg->symtree->n.sym->backend_decl))
+	    byte_size = gfc_class_vtab_size_get (
 	      GFC_DECL_SAVED_DESCRIPTOR (arg->symtree->n.sym->backend_decl));
+	  else
+	    gcc_unreachable ();
+	}
       else
 	gcc_unreachable ();
     }
@@ -9664,11 +10024,39 @@ gfc_conv_intrinsic_loc (gfc_se * se, gfc_expr * expr)
 }
 
 
-/* The following routine generates code for the intrinsic
-   functions from the ISO_C_BINDING module:
-    * C_LOC
-    * C_FUNLOC
-    * C_ASSOCIATED  */
+/* Specialized trim for f_c_string.  */
+
+static void
+conv_trim (gfc_se *tse, gfc_se *str)
+{
+  tree cond, plen, pvar, tlen, ttmp, tvar;
+
+  tlen = gfc_create_var (gfc_charlen_type_node, "tlen");
+  plen = gfc_build_addr_expr (NULL_TREE, tlen);
+
+  tvar = gfc_create_var (pchar_type_node, "tstr");
+  pvar = gfc_build_addr_expr (ppvoid_type_node, tvar);
+
+  ttmp = build_call_expr_loc (input_location, gfor_fndecl_string_trim, 4,
+			      plen, pvar, str->string_length, str->expr);
+
+  gfc_add_expr_to_block (&tse->pre, ttmp);
+
+  /* Free the temporary afterwards, if necessary.  */
+  cond = fold_build2_loc (input_location, GT_EXPR, logical_type_node,
+			  tlen, build_int_cst (TREE_TYPE (tlen), 0));
+  ttmp = gfc_call_free (tvar);
+  ttmp = build3_v (COND_EXPR, cond, ttmp, build_empty_stmt (input_location));
+  gfc_add_expr_to_block (&tse->post, ttmp);
+
+  tse->expr = tvar;
+  tse->string_length = tlen;
+}
+
+
+/* The following routine generates code for the intrinsic functions from
+   the ISO_C_BINDING module: C_LOC, C_FUNLOC, C_ASSOCIATED, and
+   F_C_STRING.  */
 
 static void
 conv_isocbinding_function (gfc_se *se, gfc_expr *expr)
@@ -9742,6 +10130,149 @@ conv_isocbinding_function (gfc_se *se, gfc_expr *expr)
 				      logical_type_node,
 				      not_null_expr, eq_expr);
 	}
+    }
+  else if (expr->value.function.isym->id == GFC_ISYM_F_C_STRING)
+    {
+      /* There are three cases:
+	 f_c_string(string)          -> trim(string) // c_null_char
+	 f_c_string(string, .false.) -> trim(string) // c_null_char
+	 f_c_string(string, .true.)  -> string       // c_null_char  */
+
+      gfc_se lse, rse, tse;
+      tree len, tmp, var;
+      gfc_expr *string = arg->expr;
+      gfc_expr *asis = arg->next->expr;
+      gfc_expr *cnc;
+
+      /* Convert string. */
+      gfc_init_se (&lse, se);
+      gfc_conv_expr (&lse, string);
+      gfc_conv_string_parameter (&lse);
+
+      /* Create a string for C_NULL_CHAR and convert it.  */
+      cnc = gfc_get_character_expr (gfc_default_character_kind,
+				    &string->where, "\0", 1);
+      gfc_init_se (&rse, se);
+      gfc_conv_expr (&rse, cnc);
+      gfc_conv_string_parameter (&rse);
+      gfc_free_expr (cnc);
+
+#ifdef cnode
+#undef cnode
+#endif
+#define cnode gfc_charlen_type_node
+      if (asis)
+	{
+	  stmtblock_t block;
+	  gfc_se asis_se, vse;
+	  tree elen, evar, tlen, tvar;
+	  tree else_branch, then_branch;
+
+	  elen = evar = tlen = tvar = NULL_TREE;
+
+	  /* f_c_string(string, .true.) -> string // c_null_char  */
+
+	  gfc_init_block (&block);
+
+	  gfc_add_block_to_block (&block, &lse.pre);
+	  gfc_add_block_to_block (&block, &rse.pre);
+
+	  tlen = fold_build2_loc (input_location, PLUS_EXPR, cnode,
+				  fold_convert (cnode, lse.string_length),
+				  fold_convert (cnode, rse.string_length));
+
+	  gfc_init_se (&vse, se);
+	  tvar = gfc_conv_string_tmp (&vse, pchar_type_node, tlen);
+	  gfc_add_block_to_block (&block, &vse.pre);
+
+	  tmp = build_call_expr_loc (input_location, gfor_fndecl_concat_string,
+				     6, tlen, tvar,
+				     lse.string_length, lse.expr,
+				     rse.string_length, rse.expr);
+	  gfc_add_expr_to_block (&block, tmp);
+
+	  then_branch = gfc_finish_block (&block);
+
+	  /* f_c_string(string, .false.) = trim(string) // c_null_char  */
+
+	  gfc_init_block (&block);
+
+	  gfc_init_se (&tse, se);
+	  conv_trim (&tse, &lse);
+	  gfc_add_block_to_block (&block, &tse.pre);
+	  gfc_add_block_to_block (&block, &rse.pre);
+
+	  elen = fold_build2_loc (input_location, PLUS_EXPR, cnode,
+				  fold_convert (cnode, tse.string_length),
+				  fold_convert (cnode, rse.string_length));
+
+	  gfc_init_se (&vse, se);
+	  evar = gfc_conv_string_tmp (&vse, pchar_type_node, elen);
+	  gfc_add_block_to_block (&block, &vse.pre);
+
+	  tmp = build_call_expr_loc (input_location, gfor_fndecl_concat_string,
+				     6, elen, evar,
+				     tse.string_length, tse.expr,
+				     rse.string_length, rse.expr);
+	  gfc_add_expr_to_block (&block, tmp);
+
+	  else_branch = gfc_finish_block (&block);
+
+	  gfc_init_se (&asis_se, se);
+	  gfc_conv_expr (&asis_se, asis);
+	  if (asis->expr_type == EXPR_VARIABLE
+	    && asis->symtree->n.sym->attr.dummy
+	    && asis->symtree->n.sym->attr.optional)
+	    {
+	      tree present = gfc_conv_expr_present (asis->symtree->n.sym);
+	      asis_se.expr = build3_loc (input_location, COND_EXPR,
+					 logical_type_node, present,
+					 asis_se.expr,
+					 build_int_cst (logical_type_node, 0));
+	    }
+	  gfc_add_block_to_block (&se->pre, &asis_se.pre);
+	  tmp = fold_build3_loc (input_location, COND_EXPR, void_type_node,
+				 asis_se.expr, then_branch, else_branch);
+
+	  gfc_add_expr_to_block (&se->pre, tmp);
+
+	  var = fold_build3_loc (input_location, COND_EXPR, pchar_type_node,
+				 asis_se.expr, tvar, evar);
+	  gfc_add_expr_to_block (&se->pre, var);
+
+	  len = fold_build3_loc (input_location, COND_EXPR, cnode,
+				 asis_se.expr, tlen, elen);
+	  gfc_add_expr_to_block (&se->pre, len);
+	}
+      else
+	{
+	  /* f_c_string(string) = trim(string) // c_null_char  */
+
+	  gfc_add_block_to_block (&se->pre, &lse.pre);
+	  gfc_add_block_to_block (&se->pre, &rse.pre);
+
+	  gfc_init_se (&tse, se);
+	  conv_trim (&tse, &lse);
+	  gfc_add_block_to_block (&se->pre, &tse.pre);
+	  gfc_add_block_to_block (&se->post, &tse.post);
+
+	  len = fold_build2_loc (input_location, PLUS_EXPR, cnode,
+				 fold_convert (cnode, tse.string_length),
+				 fold_convert (cnode, rse.string_length));
+
+	  var = gfc_conv_string_tmp (se, pchar_type_node, len);
+
+	  tmp = build_call_expr_loc (input_location, gfor_fndecl_concat_string,
+				     6, len, var,
+				     tse.string_length, tse.expr,
+				     rse.string_length, rse.expr);
+	  gfc_add_expr_to_block (&se->pre, tmp);
+	}
+
+      se->expr = var;
+      se->string_length = len;
+
+#undef cnode
     }
   else
     gcc_unreachable ();
@@ -10883,6 +11414,7 @@ gfc_conv_intrinsic_function (gfc_se * se, gfc_expr * expr)
     case GFC_ISYM_C_ASSOCIATED:
     case GFC_ISYM_C_FUNLOC:
     case GFC_ISYM_C_LOC:
+    case GFC_ISYM_F_C_STRING:
       conv_isocbinding_function (se, expr);
       break;
 
@@ -10908,6 +11440,7 @@ gfc_conv_intrinsic_function (gfc_se * se, gfc_expr * expr)
     case GFC_ISYM_INT2:
     case GFC_ISYM_INT8:
     case GFC_ISYM_LONG:
+    case GFC_ISYM_UINT:
       gfc_conv_intrinsic_int (se, expr, RND_TRUNC);
       break;
 
@@ -10932,8 +11465,7 @@ gfc_conv_intrinsic_function (gfc_se * se, gfc_expr * expr)
       break;
 
     case GFC_ISYM_CAF_GET:
-      gfc_conv_intrinsic_caf_get (se, expr, NULL_TREE, NULL_TREE, NULL_TREE,
-				  false, NULL);
+      gfc_conv_intrinsic_caf_get (se, expr, NULL_TREE, false, NULL);
       break;
 
     case GFC_ISYM_CMPLX:
@@ -11537,6 +12069,83 @@ walk_inline_intrinsic_arith (gfc_ss *ss, gfc_expr *expr)
 }
 
 
+/* Create the gfc_ss list for the arguments to MINLOC or MAXLOC when the
+   function is to be inlined.  */
+
+static gfc_ss *
+walk_inline_intrinsic_minmaxloc (gfc_ss *ss, gfc_expr *expr ATTRIBUTE_UNUSED)
+{
+  if (expr->rank == 0)
+    return ss;
+
+  gfc_actual_arglist *array_arg = expr->value.function.actual;
+  gfc_actual_arglist *dim_arg = array_arg->next;
+  gfc_actual_arglist *mask_arg = dim_arg->next;
+  gfc_actual_arglist *kind_arg = mask_arg->next;
+  gfc_actual_arglist *back_arg = kind_arg->next;
+
+  gfc_expr *array = array_arg->expr;
+  gfc_expr *dim = dim_arg->expr;
+  gfc_expr *mask = mask_arg->expr;
+  gfc_expr *back = back_arg->expr;
+
+  if (dim == nullptr)
+    return gfc_get_array_ss (ss, expr, 1, GFC_SS_INTRINSIC);
+
+  gfc_ss *tmp_ss = gfc_ss_terminator;
+
+  bool scalar_mask = false;
+  if (mask)
+    {
+      gfc_ss *mask_ss = gfc_walk_subexpr (tmp_ss, mask);
+      if (mask_ss == tmp_ss)
+	scalar_mask = true;
+      else if (maybe_absent_optional_variable (mask))
+	mask_ss->info->can_be_null_ref = true;
+
+      tmp_ss = mask_ss;
+    }
+
+  gfc_ss *array_ss = gfc_walk_subexpr (tmp_ss, array);
+  gcc_assert (array_ss != tmp_ss);
+
+  tmp_ss = array_ss;
+
+  /* Move the dimension on which we will sum to a separate nested scalarization
+     chain, "hiding" that dimension from the outer scalarization.  */
+  int dim_val = mpz_get_si (dim->value.integer);
+  gfc_ss *tail = nest_loop_dimension (tmp_ss, dim_val - 1);
+
+  if (back && array->rank > 1)
+    {
+      /* If there are nested scalarization loops, include BACK in the
+	 scalarization chains to avoid evaluating it multiple times in a loop.
+	 Otherwise, prefer to handle it outside of scalarization.  */
+      gfc_ss *back_ss = gfc_get_scalar_ss (ss, back);
+      back_ss->info->type = GFC_SS_REFERENCE;
+      if (maybe_absent_optional_variable (back))
+	back_ss->info->can_be_null_ref = true;
+
+      tail->next = back_ss;
+    }
+  else
+    tail->next = ss;
+
+  if (scalar_mask)
+    {
+      tmp_ss = gfc_get_scalar_ss (tmp_ss, mask);
+      /* MASK can be a forwarded optional argument, so make the necessary setup
+	 to avoid the scalarizer generating any unguarded pointer dereference in
+	 that case.  */
+      tmp_ss->info->type = GFC_SS_REFERENCE;
+      if (maybe_absent_optional_variable (mask))
+	tmp_ss->info->can_be_null_ref = true;
+    }
+
+  return tmp_ss;
+}
+
+
 static gfc_ss *
 walk_inline_intrinsic_function (gfc_ss * ss, gfc_expr * expr)
 {
@@ -11549,6 +12158,10 @@ walk_inline_intrinsic_function (gfc_ss * ss, gfc_expr * expr)
 
       case GFC_ISYM_TRANSPOSE:
 	return walk_inline_intrinsic_transpose (ss, expr);
+
+      case GFC_ISYM_MAXLOC:
+      case GFC_ISYM_MINLOC:
+	return walk_inline_intrinsic_minmaxloc (ss, expr);
 
       default:
 	gcc_unreachable ();
@@ -11569,6 +12182,8 @@ gfc_add_intrinsic_ss_code (gfc_loopinfo * loop ATTRIBUTE_UNUSED, gfc_ss * ss)
     case GFC_ISYM_LBOUND:
     case GFC_ISYM_UCOBOUND:
     case GFC_ISYM_LCOBOUND:
+    case GFC_ISYM_MAXLOC:
+    case GFC_ISYM_MINLOC:
     case GFC_ISYM_THIS_IMAGE:
     case GFC_ISYM_SHAPE:
       break;
@@ -11616,10 +12231,11 @@ gfc_inline_intrinsic_function_p (gfc_expr *expr)
   gfc_actual_arglist *args, *dim_arg, *mask_arg;
   gfc_expr *maskexpr;
 
-  if (!expr->value.function.isym)
+  gfc_intrinsic_sym *isym = expr->value.function.isym;
+  if (!isym)
     return false;
 
-  switch (expr->value.function.isym->id)
+  switch (isym->id)
     {
     case GFC_ISYM_PRODUCT:
     case GFC_ISYM_SUM:
@@ -11651,6 +12267,37 @@ gfc_inline_intrinsic_function_p (gfc_expr *expr)
 
     case GFC_ISYM_TRANSPOSE:
       return true;
+
+    case GFC_ISYM_MINLOC:
+    case GFC_ISYM_MAXLOC:
+      {
+	if ((isym->id == GFC_ISYM_MINLOC
+	     && (flag_inline_intrinsics
+		 & GFC_FLAG_INLINE_INTRINSIC_MINLOC) == 0)
+	    || (isym->id == GFC_ISYM_MAXLOC
+		&& (flag_inline_intrinsics
+		    & GFC_FLAG_INLINE_INTRINSIC_MAXLOC) == 0))
+	  return false;
+
+	gfc_actual_arglist *array_arg = expr->value.function.actual;
+	gfc_actual_arglist *dim_arg = array_arg->next;
+
+	gfc_expr *array = array_arg->expr;
+	gfc_expr *dim = dim_arg->expr;
+
+	if (!(array->ts.type == BT_INTEGER
+	      || array->ts.type == BT_REAL))
+	  return false;
+
+	if (array->rank == 1)
+	  return true;
+
+	if (dim != nullptr
+	    && dim->expr_type != EXPR_CONSTANT)
+	  return false;
+
+	return true;
+      }
 
     default:
       return false;
@@ -12896,7 +13543,7 @@ conv_intrinsic_move_alloc (gfc_code *code)
       gfc_add_expr_to_block (&block, tmp);
     }
 
-  /* Move the pointer and update the array descriptor data.  */
+  /* Copy the array descriptor data.  */
   gfc_add_modify_loc (input_location, &block, to_se.expr, from_se.expr);
 
   /* Set "from" to NULL.  */

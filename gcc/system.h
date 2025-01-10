@@ -1,6 +1,6 @@
 /* Get common system includes and various definitions and declarations based
    on autoconf macros.
-   Copyright (C) 1998-2024 Free Software Foundation, Inc.
+   Copyright (C) 1998-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -56,8 +56,8 @@ along with GCC; see the file COPYING3.  If not see
    the names to 64bit capable functions for LARGE_FILES support. These
    redefs are pointless here so we can override them.  */
 
-#undef fopen 
-#undef freopen 
+#undef fopen
+#undef freopen
 
 #define fopen(PATH, MODE) fopen_unlocked (PATH, MODE)
 #define fdopen(FILDES, MODE) fdopen_unlocked (FILDES, MODE)
@@ -222,6 +222,10 @@ extern int fprintf_unlocked (FILE *, const char *, ...);
 #ifdef INCLUDE_FUNCTIONAL
 # include <functional>
 #endif
+#ifdef INCLUDE_SSTREAM
+# include <sstream>
+#endif
+# include <memory>
 # include <cstring>
 # include <initializer_list>
 # include <new>
@@ -400,7 +404,7 @@ extern int errno;
 
 /* This macro rounds x down to the y boundary.  */
 #define ROUND_DOWN(x,y) ((x) & ~((y) - 1))
- 	
+
 #ifdef HAVE_SYS_WAIT_H
 #include <sys/wait.h>
 #endif
@@ -758,20 +762,9 @@ private:
 #define LIKELY(x) (__builtin_expect ((x), 1))
 #define UNLIKELY(x) (__builtin_expect ((x), 0))
 
-/* Some of the headers included by <memory> can use "abort" within a
-   namespace, e.g. "_VSTD::abort();", which fails after we use the
-   preprocessor to redefine "abort" as "fancy_abort" below.  */
-
-#ifdef INCLUDE_MEMORY
-# include <memory>
-#endif
 
 #ifdef INCLUDE_MUTEX
 # include <mutex>
-#endif
-
-#ifdef INCLUDE_SSTREAM
-# include <sstream>
 #endif
 
 #ifdef INCLUDE_MALLOC_H

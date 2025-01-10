@@ -1,5 +1,5 @@
 ;; Machine Description for LoongArch for GNU compiler.
-;; Copyright (C) 2021-2024 Free Software Foundation, Inc.
+;; Copyright (C) 2021-2025 Free Software Foundation, Inc.
 ;; Contributed by Loongson Ltd.
 ;; Based on MIPS target for GNU compiler.
 
@@ -527,13 +527,15 @@
 		     (gt "") (gtu "u")
 		     (ge "") (geu "u")
 		     (lt "") (ltu "u")
-		     (le "") (leu "u")])
+		     (le "") (leu "u")
+		     (smax "") (umax "u")])
 
 ;; <U> is like <u> except uppercase.
 (define_code_attr U [(sign_extend "") (zero_extend "U")])
 
 ;; <su> is like <u>, but the signed form expands to "s" rather than "".
-(define_code_attr su [(sign_extend "s") (zero_extend "u")])
+(define_code_attr su [(sign_extend "s") (zero_extend "u")
+                      (smax "s") (umax "u")])
 
 (define_code_attr u_bool [(sign_extend "false") (zero_extend "true")])
 
@@ -3111,13 +3113,14 @@
 
 (define_insn "bstrpick_alsl_paired"
   [(set (match_operand:DI 0 "register_operand" "=&r")
-	(plus:DI (match_operand:DI 1 "register_operand" "r")
-		 (and:DI (ashift:DI (match_operand:DI 2 "register_operand" "r")
-				    (match_operand 3 "const_immalsl_operand" ""))
-			 (match_operand 4 "immediate_operand" ""))))]
+	(plus:DI
+	  (and:DI (ashift:DI (match_operand:DI 1 "register_operand" "r")
+			     (match_operand 2 "const_immalsl_operand" ""))
+		  (match_operand 3 "immediate_operand" ""))
+	  (match_operand:DI 4 "register_operand" "r")))]
   "TARGET_64BIT
-   && ((INTVAL (operands[4]) >> INTVAL (operands[3])) == 0xffffffff)"
-  "bstrpick.d\t%0,%2,31,0\n\talsl.d\t%0,%0,%1,%3"
+   && ((INTVAL (operands[3]) >> INTVAL (operands[2])) == 0xffffffff)"
+  "bstrpick.d\t%0,%1,31,0\n\talsl.d\t%0,%0,%4,%2"
   [(set_attr "type" "arith")
    (set_attr "mode" "DI")
    (set_attr "insn_count" "2")])
@@ -3496,12 +3499,22 @@
   DONE;
 })
 
+(define_mode_attr mode_size [(DI "8") (SI "4")])
+
 (define_insn "@tablejump<mode>"
   [(set (pc)
 	(match_operand:P 0 "register_operand" "e"))
    (use (label_ref (match_operand 1 "" "")))]
   ""
-  "jr\t%0"
+  {
+    return TARGET_ANNOTATE_TABLEJUMP
+      ? "1:jr\t%0\n\t"
+	".pushsection\t.discard.tablejump_annotate\n\t"
+	"\t.<mode_size>byte\t1b\n\t"
+	"\t.<mode_size>byte\t%1\n\t"
+	".popsection"
+      : "jr\t%0";
+  }
   [(set_attr "type" "jump")
    (set_attr "mode" "none")])
 
@@ -4081,7 +4094,8 @@
 {
   switch (INTVAL (operands[1]))
   {
-    case 0: return "preld\t0,%a0";
+    case 0:
+    case 2: return "preld\t0,%a0";
     case 1: return "preld\t8,%a0";
     default: gcc_unreachable ();
   }
@@ -4210,6 +4224,16 @@
   "bytepick.d\t%0,%1,%2,<bytepick_imm>"
   [(set_attr "mode" "DI")])
 
+(define_insn "bytepick_d_<bytepick_imm>_rev"
+  [(set (match_operand:DI 0 "register_operand" "=r")
+	(ior:DI (ashift (match_operand:DI 1 "register_operand" "r")
+			(const_int bytepick_d_ashift_amount))
+		(lshiftrt (match_operand:DI 2 "register_operand" "r")
+			  (const_int <bytepick_d_lshiftrt_amount>))))]
+  "TARGET_64BIT"
+  "bytepick.d\t%0,%2,%1,<bytepick_imm>"
+  [(set_attr "mode" "DI")])
+
 (define_insn "bitrev_4b"
   [(set (match_operand:SI 0 "register_operand" "=r")
 	(unspec:SI [(match_operand:SI 1 "register_operand" "r")]
@@ -4227,6 +4251,57 @@
   "bitrev.8b\t%0,%1"
   [(set_attr "type" "unknown")
    (set_attr "mode" "DI")])
+
+(define_insn "@rbit<mode>"
+  [(set (match_operand:GPR 0 "register_operand" "=r")
+	(bitreverse:GPR (match_operand:GPR 1 "register_operand" "r")))]
+  ""
+  "bitrev.<size>\t%0,%1"
+  [(set_attr "type" "unknown")
+   (set_attr "mode" "<MODE>")])
+
+(define_insn "rbitsi_extended"
+  [(set (match_operand:DI 0 "register_operand" "=r")
+	(sign_extend:DI
+	  (bitreverse:SI (match_operand:SI 1 "register_operand" "r"))))]
+  "TARGET_64BIT"
+  "bitrev.w\t%0,%1"
+  [(set_attr "type" "unknown")
+   (set_attr "mode" "SI")])
+
+;; If we don't care high bits, bitrev.4b can reverse bits of values in
+;; QImode.
+(define_insn "rbitqi"
+  [(set (match_operand:QI 0 "register_operand" "=r")
+	(bitreverse:QI (match_operand:QI 1 "register_operand" "r")))]
+  ""
+  "bitrev.4b\t%0,%1"
+  [(set_attr "type" "unknown")
+   (set_attr "mode" "SI")])
+
+;; For HImode it's a little complicated...
+(define_expand "rbithi"
+  [(match_operand:HI 0 "register_operand")
+   (match_operand:HI 1 "register_operand")]
+  ""
+  {
+    rtx t = gen_reg_rtx (word_mode);
+
+    /* Oh, using paradoxical subreg.  I learnt the trick from RISC-V,
+       hoping we won't be blown up altogether one day.  */
+    emit_insn (gen_rbit(word_mode, t,
+			gen_lowpart (word_mode, operands[1])));
+    t = expand_simple_binop (word_mode, LSHIFTRT, t,
+			     GEN_INT (GET_MODE_BITSIZE (word_mode) - 16),
+			     NULL_RTX, false, OPTAB_DIRECT);
+
+    t = gen_lowpart (HImode, t);
+    SUBREG_PROMOTED_VAR_P (t) = 1;
+    SUBREG_PROMOTED_SET (t, SRP_UNSIGNED);
+    emit_move_insn (operands[0], t);
+
+    DONE;
+  })
 
 (define_insn "@stack_tie<mode>"
   [(set (mem:BLK (scratch))
@@ -4334,13 +4409,12 @@
 
 
 
-(define_mode_iterator QHSD [QI HI SI DI])
 (define_int_iterator CRC [UNSPEC_CRC UNSPEC_CRCC])
 (define_int_attr crc [(UNSPEC_CRC "crc") (UNSPEC_CRCC "crcc")])
 
 (define_insn "loongarch_<crc>_w_<size>_w"
   [(set (match_operand:SI 0 "register_operand" "=r")
-	(unspec:SI [(match_operand:QHSD 1 "register_operand" "r")
+	(unspec:SI [(match_operand:QHWD 1 "register_operand" "r")
 		   (match_operand:SI 2 "register_operand" "r")]
 		     CRC))]
   ""
@@ -4351,13 +4425,95 @@
 (define_insn "loongarch_<crc>_w_<size>_w_extended"
   [(set (match_operand:DI 0 "register_operand" "=r")
 	(sign_extend:DI
-	  (unspec:SI [(match_operand:QHSD 1 "register_operand" "r")
+	  (unspec:SI [(match_operand:QHWD 1 "register_operand" "r")
 		      (match_operand:SI 2 "register_operand" "r")]
 		     CRC)))]
   "TARGET_64BIT"
   "<crc>.w.<size>.w\t%0,%1,%2"
   [(set_attr "type" "unknown")
    (set_attr "mode" "<MODE>")])
+
+(define_expand "crc_rev<mode>si4"
+  [(match_operand:SI	0 "register_operand")	; new_chksum
+   (match_operand:SI	1 "register_operand")	; old_chksum
+   (match_operand:SUBDI	2 "reg_or_0_operand")	; msg
+   (match_operand	3 "const_int_operand")]	; poly
+  ""
+  {
+    unsigned HOST_WIDE_INT poly = UINTVAL (operands[3]);
+    rtx msg = operands[2];
+    rtx (*crc_insn)(rtx, rtx, rtx) = nullptr;
+
+    /* TODO: Review this when adding LA32 support.  If we're going to
+       support CRC instructions on LA32 we'll need a "-mcrc" switch as
+       they are optional on LA32.  */
+
+    if (TARGET_64BIT)
+      {
+	if (poly == reflect_hwi (0xedb88320u, 32))
+	  crc_insn = gen_loongarch_crc_w_<size>_w;
+	else if (poly == reflect_hwi (0x82f63b78u, 32))
+	  crc_insn = gen_loongarch_crcc_w_<size>_w;
+      }
+
+    if (crc_insn)
+      {
+	/* We cannot make crc_insn to accept const0_rtx easily:
+	   it's not possible to figure out the mode of const0_rtx so we'd
+	   have to separate both UNSPEC_CRC and UNSPEC_CRCC to 4 different
+	   UNSPECs.  Instead just hack it around here.  */
+	if (msg == const0_rtx)
+	  msg = gen_rtx_REG (<MODE>mode, 0);
+
+	emit_insn (crc_insn (operands[0], msg, operands[1]));
+      }
+    else
+      {
+	/* No CRC instruction is suitable, use the generic table-based
+	   implementation but optimize bit reversion.  */
+	auto rbit = [](rtx *r)
+	  {
+	    /* Well, this is ugly.  The problem is
+	       expand_reversed_crc_table_based only accepts one helper
+	       for reversing data elements and CRC states.  */
+	    auto mode = GET_MODE (*r);
+	    auto rbit = (mode == <MODE>mode ? gen_rbit<mode> : gen_rbitsi);
+	    rtx out = gen_reg_rtx (mode);
+
+	    emit_insn (rbit (out, *r));
+	    *r = out;
+	  };
+	expand_reversed_crc_table_based (operands[0], operands[1],
+					 msg, operands[3], <MODE>mode,
+					 rbit);
+      }
+    DONE;
+  })
+
+(define_insn_and_split "*crc_combine"
+  [(set (match_operand:SI 0 "register_operand" "=r,r")
+	(unspec:SI
+	  [(reg:SUBDI 0)
+	   (subreg:SI
+	     (xor:DI
+	       (match_operand:DI 1 "register_operand" "r,r")
+	       ; Our LOAD_EXTEND_OP makes this same as sign_extend
+	       ; if SUBDI is SI, or zero_extend if SUBDI is QI or HI.
+	       ; For the former the high bits in rk are ignored by
+	       ; crc.w.w.w anyway, for the latter the zero extension is
+	       ; necessary for the correctness of this transformation.
+	       (subreg:DI
+		 (match_operand:SUBDI 2 "memory_operand" "m,k") 0)) 0)]
+	  CRC))]
+  "TARGET_64BIT && loongarch_pre_reload_split ()"
+  "#"
+  "&& true"
+  [(set (match_dup 3) (match_dup 2))
+   (set (match_dup 0)
+	(unspec:SI [(match_dup 3) (subreg:SI (match_dup 1) 0)] CRC))]
+  {
+    operands[3] = gen_reg_rtx (<MODE>mode);
+  })
 
 ;; With normal or medium code models, if the only use of a pc-relative
 ;; address is for loading or storing a value, then relying on linker

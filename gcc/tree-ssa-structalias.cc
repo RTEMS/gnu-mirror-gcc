@@ -1,5 +1,5 @@
 /* Tree based points-to analysis
-   Copyright (C) 2005-2024 Free Software Foundation, Inc.
+   Copyright (C) 2005-2025 Free Software Foundation, Inc.
    Contributed by Daniel Berlin <dberlin@dberlin.org>
 
    This file is part of GCC.
@@ -930,7 +930,7 @@ constraint_vec_find (vec<constraint_t> vec,
   return found;
 }
 
-/* Union two constraint vectors, TO and FROM.  Put the result in TO. 
+/* Union two constraint vectors, TO and FROM.  Put the result in TO.
    Returns true of TO set is changed.  */
 
 static bool
@@ -1089,7 +1089,7 @@ insert_into_complex (constraint_graph_t graph,
 
 
 /* Condense two variable nodes into a single variable node, by moving
-   all associated info from FROM to TO. Returns true if TO node's 
+   all associated info from FROM to TO. Returns true if TO node's
    constraint set changes after the merge.  */
 
 static bool
@@ -2986,7 +2986,8 @@ static void
 insert_vi_for_tree (tree t, varinfo_t vi)
 {
   gcc_assert (vi);
-  gcc_assert (!vi_for_tree->put (t, vi));
+  bool existed = vi_for_tree->put (t, vi);
+  gcc_assert (!existed);
 }
 
 /* Find the variable info for tree T in VI_FOR_TREE.  If T does not
@@ -3220,15 +3221,15 @@ process_constraint (constraint_t t)
 /* Return the position, in bits, of FIELD_DECL from the beginning of its
    structure.  */
 
-static HOST_WIDE_INT
+static unsigned HOST_WIDE_INT
 bitpos_of_field (const tree fdecl)
 {
-  if (!tree_fits_shwi_p (DECL_FIELD_OFFSET (fdecl))
-      || !tree_fits_shwi_p (DECL_FIELD_BIT_OFFSET (fdecl)))
+  if (!tree_fits_uhwi_p (DECL_FIELD_OFFSET (fdecl))
+      || !tree_fits_uhwi_p (DECL_FIELD_BIT_OFFSET (fdecl)))
     return -1;
 
-  return (tree_to_shwi (DECL_FIELD_OFFSET (fdecl)) * BITS_PER_UNIT
-	  + tree_to_shwi (DECL_FIELD_BIT_OFFSET (fdecl)));
+  return (tree_to_uhwi (DECL_FIELD_OFFSET (fdecl)) * BITS_PER_UNIT
+	  + tree_to_uhwi (DECL_FIELD_BIT_OFFSET (fdecl)));
 }
 
 
@@ -3646,7 +3647,7 @@ get_constraint_for_1 (tree t, vec<ce_s> *results, bool address_p,
       }
     case tcc_reference:
       {
-	if (TREE_THIS_VOLATILE (t))
+	if (!lhs_p && TREE_THIS_VOLATILE (t))
 	  /* Fall back to anything.  */
 	  break;
 
@@ -3751,7 +3752,7 @@ get_constraint_for_1 (tree t, vec<ce_s> *results, bool address_p,
       }
     case tcc_declaration:
       {
-	if (VAR_P (t) && TREE_THIS_VOLATILE (t))
+	if (!lhs_p && VAR_P (t) && TREE_THIS_VOLATILE (t))
 	  /* Fall back to anything.  */
 	  break;
 	get_constraint_for_ssa_var (t, results, address_p);
@@ -3759,7 +3760,7 @@ get_constraint_for_1 (tree t, vec<ce_s> *results, bool address_p,
       }
     case tcc_constant:
       {
-	/* We cannot refer to automatic variables through constants.  */ 
+	/* We cannot refer to automatic variables through constants.  */
 	temp.type = ADDRESSOF;
 	temp.var = nonlocal_id;
 	temp.offset = 0;
@@ -4046,7 +4047,7 @@ make_heapvar (const char *name, bool add_id)
 {
   varinfo_t vi;
   tree heapvar;
-  
+
   heapvar = build_fake_var_decl (ptr_type_node);
   DECL_EXTERNAL (heapvar) = 1;
 
@@ -4161,7 +4162,7 @@ handle_call_arg (gcall *stmt, tree arg, vec<ce_s> *results, int flags,
 	 (except through the escape solution).
 	 For all flags we get these implications right except for
 	 not_returned because we miss return functions in ipa-prop.  */
-	 
+
       if (flags & EAF_NO_DIRECT_READ)
 	flags |= EAF_NOT_RETURNED_INDIRECTLY;
     }
@@ -4194,7 +4195,6 @@ handle_call_arg (gcall *stmt, tree arg, vec<ce_s> *results, int flags,
     {
       make_transitive_closure_constraints (tem);
       callarg_transitive = true;
-      gcc_checking_assert (!(flags & EAF_NO_DIRECT_READ));
     }
 
   /* If necessary, produce varinfo for indirect accesses to ARG.  */
@@ -4379,7 +4379,7 @@ determine_global_memory_access (gcall *stmt,
 /* For non-IPA mode, generate constraints necessary for a call on the
    RHS and collect return value constraint to RESULTS to be used later in
    handle_lhs_call.
-  
+
    IMPLICIT_EAF_FLAGS are added to each function argument.  If
    WRITES_GLOBAL_MEMORY is true function is assumed to possibly write to global
    memory.  Similar for READS_GLOBAL_MEMORY.  */
@@ -5197,7 +5197,7 @@ find_func_aliases (struct function *fn, gimple *origt)
      pointer passed by address.  */
   else if (is_gimple_call (t))
     find_func_aliases_for_call (fn, as_a <gcall *> (t));
-    
+
   /* Otherwise, just a regular assignment statement.  Only care about
      operations with pointer result, others are dealt with as escape
      points if they have pointer operands.  */
@@ -5925,7 +5925,7 @@ field_must_have_pointers (tree t)
 
 static bool
 push_fields_onto_fieldstack (tree type, vec<fieldoff_s> *fieldstack,
-			     HOST_WIDE_INT offset)
+			     unsigned HOST_WIDE_INT offset)
 {
   tree field;
   bool empty_p = true;
@@ -5943,7 +5943,7 @@ push_fields_onto_fieldstack (tree type, vec<fieldoff_s> *fieldstack,
     if (TREE_CODE (field) == FIELD_DECL)
       {
 	bool push = false;
-	HOST_WIDE_INT foff = bitpos_of_field (field);
+	unsigned HOST_WIDE_INT foff = bitpos_of_field (field);
 	tree field_type = TREE_TYPE (field);
 
 	if (!var_can_have_subvars (field)
@@ -5988,7 +5988,7 @@ push_fields_onto_fieldstack (tree type, vec<fieldoff_s> *fieldstack,
 		&& !must_have_pointers_p
 		&& !pair->must_have_pointers
 		&& !pair->has_unknown_size
-		&& pair->offset + (HOST_WIDE_INT)pair->size == offset + foff)
+		&& pair->offset + pair->size == offset + foff)
 	      {
 		pair->size += tree_to_uhwi (DECL_SIZE (field));
 	      }

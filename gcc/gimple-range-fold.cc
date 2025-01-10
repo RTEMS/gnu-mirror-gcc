@@ -1,5 +1,5 @@
 /* Code for GIMPLE range related routines.
-   Copyright (C) 2019-2024 Free Software Foundation, Inc.
+   Copyright (C) 2019-2025 Free Software Foundation, Inc.
    Contributed by Andrew MacLeod <amacleod@redhat.com>
    and Aldy Hernandez <aldyh@redhat.com>.
 
@@ -106,26 +106,6 @@ fur_source::register_relation (edge e ATTRIBUTE_UNUSED,
 			       tree op1 ATTRIBUTE_UNUSED,
 			       tree op2 ATTRIBUTE_UNUSED)
 {
-}
-
-// This version of fur_source will pick a range up off an edge.
-
-class fur_edge : public fur_source
-{
-public:
-  fur_edge (edge e, range_query *q = NULL);
-  virtual bool get_operand (vrange &r, tree expr) override;
-  virtual bool get_phi_operand (vrange &r, tree expr, edge e) override;
-private:
-  edge m_edge;
-};
-
-// Instantiate an edge based fur_source.
-
-inline
-fur_edge::fur_edge (edge e, range_query *q) : fur_source (q)
-{
-  m_edge = e;
 }
 
 // Get the value of EXPR on edge m_edge.
@@ -1139,7 +1119,8 @@ fold_using_range::condexpr_adjust (vrange &r1, vrange &r2, gimple *, tree cond,
       || TREE_CODE_CLASS (gimple_assign_rhs_code (cond_def)) != tcc_comparison)
     return false;
   tree type = TREE_TYPE (gimple_assign_rhs1 (cond_def));
-  if (!range_compatible_p (type, TREE_TYPE (gimple_assign_rhs2 (cond_def))))
+  if (!value_range::supports_type_p (type)
+      || !range_compatible_p (type, TREE_TYPE (gimple_assign_rhs2 (cond_def))))
     return false;
   range_op_handler hand (gimple_assign_rhs_code (cond_def));
   if (!hand)

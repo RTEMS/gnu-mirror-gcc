@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -108,12 +108,6 @@ package body Exp_Intr is
    procedure Expand_To_Pointer (N : Node_Id);
    --  Expand a call to corresponding function, declared in an instance of
    --  System.Address_To_Access_Conversions.
-
-   procedure Expand_Source_Info (N : Node_Id; Nam : Name_Id);
-   --  Rewrite the node as the appropriate string literal or positive
-   --  constant. Nam is the name of one of the intrinsics declared in
-   --  GNAT.Source_Info; see g-souinf.ads for documentation of these
-   --  intrinsics.
 
    ---------------------
    -- Add_Source_Info --

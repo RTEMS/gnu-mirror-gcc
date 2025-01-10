@@ -1,6 +1,6 @@
 /* Glibc.c provides access to some libc functions.
 
-Copyright (C) 2016-2024 Free Software Foundation, Inc.
+Copyright (C) 2016-2025 Free Software Foundation, Inc.
 Contributed by Gaius Mulley <gaius@glam.ac.uk>.
 
 This file is part of GNU Modula-2.
@@ -343,10 +343,10 @@ libc_creat (char *p, mode_t mode)
 
 EXTERN
 int
-libc_open (void *p, int oflag, int mode)
+libc_open (void *p, int flags, int mode)
 {
-  tracedb_open (p, oflag, mode);
-  int result = open (reinterpret_cast <char *> (p), oflag, mode);
+  tracedb_open (p, flags, mode);
+  int result = open (reinterpret_cast <char *> (p), flags, mode);
   tracedb_result (result);
   return result;
 }
@@ -356,7 +356,7 @@ off_t
 libc_lseek (int fd, off_t offset, int whence)
 {
   tracedb ("libc_lseek (%s, %p, %d)\n", fd, offset, whence);
-  int result = lseek (fd, offset, whence);
+  off_t result = lseek (fd, offset, whence);
   tracedb_result (result);
   return result;
 }

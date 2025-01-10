@@ -1,4 +1,5 @@
-/* Copyright (C) 2009-2024 Free Software Foundation, Inc.
+/* Code for the C/C++ front end for AVR 8-bit microcontrollers.
+   Copyright (C) 2009-2025 Free Software Foundation, Inc.
    Contributed by Anatoly Sokolov (aesok@post.ru)
 
    This file is part of GCC.
@@ -7,12 +8,12 @@
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; either version 3, or (at your option)
    any later version.
-   
+
    GCC is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-   
+
    You should have received a copy of the GNU General Public License
    along with GCC; see the file COPYING3.  If not see
    <http://www.gnu.org/licenses/>.  */
@@ -47,12 +48,11 @@ enum avr_builtin_id
 /* Implement `TARGET_RESOLVE_OVERLOADED_PLUGIN'.  */
 
 static tree
-avr_resolve_overloaded_builtin (unsigned int iloc, tree fndecl, void *vargs)
+avr_resolve_overloaded_builtin (location_t loc, tree fndecl, void *vargs, bool)
 {
   tree type0, type1, fold = NULL_TREE;
-  enum avr_builtin_id id = AVR_BUILTIN_COUNT;
-  location_t loc = (location_t) iloc;
-  vec<tree, va_gc> &args = * (vec<tree, va_gc>*) vargs;
+  avr_builtin_id id = AVR_BUILTIN_COUNT;
+  vec<tree, va_gc> &args = * (vec<tree, va_gc> *) vargs;
 
   switch (DECL_MD_FUNCTION_CODE (fndecl))
     {
@@ -60,10 +60,10 @@ avr_resolve_overloaded_builtin (unsigned int iloc, tree fndecl, void *vargs)
       break;
 
     case AVR_BUILTIN_ABSFX:
-      if (args.length() != 1)
+      if (args.length () != 1)
 	{
 	  error_at (loc, "%qs expects 1 argument but %d given",
-		    "absfx", (int) args.length());
+		    "absfx", (int) args.length ());
 
 	  fold = error_mark_node;
 	  break;
@@ -119,10 +119,10 @@ avr_resolve_overloaded_builtin (unsigned int iloc, tree fndecl, void *vargs)
       break; // absfx
 
     case AVR_BUILTIN_ROUNDFX:
-      if (args.length() != 2)
+      if (args.length () != 2)
 	{
 	  error_at (loc, "%qs expects 2 arguments but %d given",
-		    "roundfx", (int) args.length());
+		    "roundfx", (int) args.length ());
 
 	  fold = error_mark_node;
 	  break;
@@ -185,10 +185,10 @@ avr_resolve_overloaded_builtin (unsigned int iloc, tree fndecl, void *vargs)
       break; // roundfx
 
     case AVR_BUILTIN_COUNTLSFX:
-      if (args.length() != 1)
+      if (args.length () != 1)
 	{
 	  error_at (loc, "%qs expects 1 argument but %d given",
-		    "countlsfx", (int) args.length());
+		    "countlsfx", (int) args.length ());
 
 	  fold = error_mark_node;
 	  break;
@@ -290,7 +290,7 @@ avr_toupper (char *up, const char *lo)
 /* Worker function for TARGET_CPU_CPP_BUILTINS.  */
 
 void
-avr_cpu_cpp_builtins (struct cpp_reader *pfile)
+avr_cpu_cpp_builtins (cpp_reader *pfile)
 {
   builtin_define_std ("AVR");
 

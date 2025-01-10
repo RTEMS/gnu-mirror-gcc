@@ -1,5 +1,5 @@
 /* Subroutines for insn-output.cc for Tensilica's Xtensa architecture.
-   Copyright (C) 2001-2024 Free Software Foundation, Inc.
+   Copyright (C) 2001-2025 Free Software Foundation, Inc.
    Contributed by Bob Wilson (bwilson@tensilica.com) at Tensilica.
 
 This file is part of GCC.
@@ -362,6 +362,9 @@ static rtx xtensa_delegitimize_address (rtx);
 
 #undef TARGET_MAX_ANCHOR_OFFSET
 #define TARGET_MAX_ANCHOR_OFFSET 1020
+
+#undef TARGET_DIFFERENT_ADDR_DISPLACEMENT_P
+#define TARGET_DIFFERENT_ADDR_DISPLACEMENT_P hook_bool_void_true
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

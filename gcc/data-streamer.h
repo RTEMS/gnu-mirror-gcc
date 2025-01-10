@@ -1,6 +1,6 @@
 /* Generic streaming support for various data types.
 
-   Copyright (C) 2011-2024 Free Software Foundation, Inc.
+   Copyright (C) 2011-2025 Free Software Foundation, Inc.
    Contributed by Diego Novillo <dnovillo@google.com>
 
 This file is part of GCC.
@@ -183,7 +183,7 @@ bp_unpack_value (struct bitpack_d *bp, unsigned nbits)
      switch to the next one.  */
   if (pos + nbits > BITS_PER_BITPACK_WORD)
     {
-      bp->word = val 
+      bp->word = val
 	= streamer_read_uhwi ((class lto_input_block *)bp->stream);
       bp->pos = nbits;
       return val & mask;

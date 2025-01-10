@@ -1,5 +1,5 @@
 /* Subroutines for the gcc driver.
-   Copyright (C) 2006-2024 Free Software Foundation, Inc.
+   Copyright (C) 2006-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -252,7 +252,7 @@ decode_caches_intel (unsigned reg, bool xeon_mp,
 /* Detect cache parameters using CPUID function 2.  */
 
 static void
-detect_caches_cpuid2 (bool xeon_mp, 
+detect_caches_cpuid2 (bool xeon_mp,
 		      struct cache_desc *level1, struct cache_desc *level2)
 {
   unsigned regs[4];
@@ -295,7 +295,7 @@ detect_caches_cpuid4 (struct cache_desc *level1, struct cache_desc *level2,
   int count;
 
   for (count = 0;; count++)
-    { 
+    {
       __cpuid_count(4, count, eax, ebx, ecx, edx);
       switch (eax & 0x1f)
 	{
@@ -580,6 +580,7 @@ const char *host_detect_local_cpu (int argc, const char **argv)
 	  processor = PROCESSOR_PENTIUM;
 	  break;
 	case 6:
+	case 19:
 	  processor = PROCESSOR_PENTIUMPRO;
 	  break;
 	case 15:
@@ -622,11 +623,14 @@ const char *host_detect_local_cpu (int argc, const char **argv)
 	{
 	  if (arch)
 	    {
-	      /* This is unknown family 0x6 CPU.  */
+	      /* This is unknown CPU.  */
 	      if (has_feature (FEATURE_AVX512F))
 		{
+		  /* Assume Diamond Rapids.  */
+		  if (has_feature (FEATURE_AVX10_2_512))
+		    cpu = "diamondrapids";
 		  /* Assume Granite Rapids D.  */
-		  if (has_feature (FEATURE_AMX_COMPLEX))
+		  else if (has_feature (FEATURE_AMX_COMPLEX))
 		    cpu = "graniterapids-d";
 		  /* Assume Granite Rapids.  */
 		  else if (has_feature (FEATURE_AMX_FP16))
@@ -688,7 +692,7 @@ const char *host_detect_local_cpu (int argc, const char **argv)
 		    cpu = "haswell";
 		  /* Assume Sandy Bridge.  */
 		  else
-		    cpu = "sandybridge";	      
+		    cpu = "sandybridge";
 	      }
 	      else if (has_feature (FEATURE_SSE4_2))
 		{

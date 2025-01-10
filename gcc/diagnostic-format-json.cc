@@ -1,5 +1,5 @@
 /* JSON output for diagnostics
-   Copyright (C) 2018-2024 Free Software Foundation, Inc.
+   Copyright (C) 2018-2025 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -20,23 +20,69 @@ along with GCC; see the file COPYING3.  If not see
 
 
 #include "config.h"
-#define INCLUDE_MEMORY
+#define INCLUDE_VECTOR
 #include "system.h"
 #include "coretypes.h"
 #include "diagnostic.h"
 #include "selftest-diagnostic.h"
 #include "diagnostic-metadata.h"
 #include "diagnostic-path.h"
+#include "diagnostic-format.h"
+#include "diagnostic-buffer.h"
 #include "json.h"
 #include "selftest.h"
 #include "logical-location.h"
 #include "make-unique.h"
+
+class json_output_format;
+
+/* Concrete buffering implementation subclass for JSON output.  */
+
+class diagnostic_json_format_buffer : public diagnostic_per_format_buffer
+{
+public:
+  friend class json_output_format;
+
+  diagnostic_json_format_buffer (json_output_format &format)
+  : m_format (format)
+  {}
+
+  void dump (FILE *out, int indent) const final override;
+  bool empty_p () const final override;
+  void move_to (diagnostic_per_format_buffer &dest) final override;
+  void clear () final override;
+  void flush () final override;
+
+private:
+  json_output_format &m_format;
+  std::vector<std::unique_ptr<json::object>> m_results;
+};
 
 /* Subclass of diagnostic_output_format for JSON output.  */
 
 class json_output_format : public diagnostic_output_format
 {
 public:
+  friend class diagnostic_json_format_buffer;
+
+  void dump (FILE *out, int indent) const override
+  {
+    fprintf (out, "%*sjson_output_format\n", indent, "");
+    diagnostic_output_format::dump (out, indent);
+  }
+
+  std::unique_ptr<diagnostic_per_format_buffer>
+  make_per_format_buffer () final override
+  {
+    return ::make_unique<diagnostic_json_format_buffer> (*this);
+  }
+  void set_buffer (diagnostic_per_format_buffer *base_buffer) final override
+  {
+    diagnostic_json_format_buffer *buffer
+      = static_cast<diagnostic_json_format_buffer *> (base_buffer);
+    m_buffer = buffer;
+  }
+
   void on_begin_group () final override
   {
     /* No-op.  */
@@ -47,22 +93,31 @@ public:
     m_cur_children_array = nullptr;
   }
   void
-  on_begin_diagnostic (const diagnostic_info &) final override
-  {
-    /* No-op.  */
-  }
-  void
-  on_end_diagnostic (const diagnostic_info &diagnostic,
-		     diagnostic_t orig_diag_kind) final override;
+  on_report_diagnostic (const diagnostic_info &diagnostic,
+			diagnostic_t orig_diag_kind) final override;
   void on_diagram (const diagnostic_diagram &) final override
   {
     /* No-op.  */
+  }
+  void after_diagnostic (const diagnostic_info &) final override
+  {
+    /* No-op.  */
+  }
+  void update_printer () final override
+  {
+    m_printer = m_context.clone_printer ();
+    pp_show_color (m_printer.get ()) = false;
+  }
+  bool follows_reference_printer_p () const final override
+  {
+    return false;
   }
 
 protected:
   json_output_format (diagnostic_context &context,
 		      bool formatted)
   : diagnostic_output_format (context),
+    m_buffer (nullptr),
     m_toplevel_array (::make_unique<json::array> ()),
     m_cur_group (nullptr),
     m_cur_children_array (nullptr),
@@ -80,6 +135,8 @@ protected:
   }
 
 private:
+  diagnostic_json_format_buffer *m_buffer;
+
   /* The top-level JSON array of pending diagnostics.  */
   std::unique_ptr<json::array> m_toplevel_array;
 
@@ -117,7 +174,8 @@ json_from_expanded_location (diagnostic_context &context, location_t loc)
   for (int i = 0; i != ARRAY_SIZE (column_fields); ++i)
     {
       context.m_column_unit = column_fields[i].unit;
-      const int col = context.converted_column (exploc);
+      diagnostic_column_policy col_policy (context);
+      const int col = col_policy.converted_column (exploc);
       result->set_integer (column_fields[i].name, col);
       if (column_fields[i].unit == orig_unit)
 	the_column = col;
@@ -199,6 +257,7 @@ json_from_metadata (const diagnostic_metadata *metadata)
 
 static std::unique_ptr<json::array>
 make_json_for_path (diagnostic_context &context,
+		    pretty_printer *ref_pp,
 		    const diagnostic_path *path)
 {
   std::unique_ptr<json::array> path_array = ::make_unique<json::array> ();
@@ -211,8 +270,9 @@ make_json_for_path (diagnostic_context &context,
 	event_obj->set ("location",
 			json_from_expanded_location (context,
 						     event.get_location ()));
-      label_text event_text (event.get_desc (false));
-      event_obj->set_string ("description", event_text.get ());
+      auto pp = ref_pp->clone ();
+      event.print_desc (*pp.get ());
+      event_obj->set_string ("description", pp_formatted_text (pp.get ()));
       if (const logical_location *logical_loc = event.get_logical_location ())
 	{
 	  label_text name (logical_loc->get_name_for_path_output ());
@@ -224,15 +284,63 @@ make_json_for_path (diagnostic_context &context,
   return path_array;
 }
 
+/* class diagnostic_json_format_buffer : public diagnostic_per_format_buffer.  */
 
-/* Implementation of "on_end_diagnostic" vfunc for JSON output.
+void
+diagnostic_json_format_buffer::dump (FILE *out, int indent) const
+{
+  fprintf (out, "%*sdiagnostic_json_format_buffer:\n", indent, "");
+  int idx = 0;
+  for (auto &result : m_results)
+    {
+      fprintf (out, "%*sresult[%i]:\n", indent + 2, "", idx);
+      result->dump (out, true);
+      fprintf (out, "\n");
+      ++idx;
+    }
+}
+
+bool
+diagnostic_json_format_buffer::empty_p () const
+{
+  return m_results.empty ();
+}
+
+void
+diagnostic_json_format_buffer::move_to (diagnostic_per_format_buffer &base)
+{
+  diagnostic_json_format_buffer &dest
+    = static_cast<diagnostic_json_format_buffer &> (base);
+  for (auto &&result : m_results)
+    dest.m_results.push_back (std::move (result));
+  m_results.clear ();
+}
+
+void
+diagnostic_json_format_buffer::clear ()
+{
+  m_results.clear ();
+}
+
+void
+diagnostic_json_format_buffer::flush ()
+{
+  for (auto &&result : m_results)
+    m_format.m_toplevel_array->append (std::move (result));
+  m_results.clear ();
+}
+
+/* Implementation of "on_report_diagnostic" vfunc for JSON output.
    Generate a JSON object for DIAGNOSTIC, and store for output
    within current diagnostic group.  */
 
 void
-json_output_format::on_end_diagnostic (const diagnostic_info &diagnostic,
-				       diagnostic_t orig_diag_kind)
+json_output_format::on_report_diagnostic (const diagnostic_info &diagnostic,
+					  diagnostic_t orig_diag_kind)
 {
+  pretty_printer *const pp = get_printer ();
+  pp_output_formatted_text (pp, m_context.get_urlifier ());
+
   json::object *diag_obj = new json::object ();
 
   /* Get "kind" of diagnostic.  */
@@ -250,10 +358,10 @@ json_output_format::on_end_diagnostic (const diagnostic_info &diagnostic,
   }
 
   // FIXME: encoding of the message (json::string requires UTF-8)
-  diag_obj->set_string ("message", pp_formatted_text (m_context.printer));
-  pp_clear_output_area (m_context.printer);
+  diag_obj->set_string ("message", pp_formatted_text (pp));
+  pp_clear_output_area (pp);
 
-  if (char *option_text = m_context.make_option_name (diagnostic.option_index,
+  if (char *option_text = m_context.make_option_name (diagnostic.option_id,
 						      orig_diag_kind,
 						      diagnostic.kind))
     {
@@ -261,30 +369,38 @@ json_output_format::on_end_diagnostic (const diagnostic_info &diagnostic,
       free (option_text);
     }
 
-  if (char *option_url = m_context.make_option_url (diagnostic.option_index))
+  if (char *option_url = m_context.make_option_url (diagnostic.option_id))
     {
       diag_obj->set_string ("option_url", option_url);
       free (option_url);
     }
 
-  /* If we've already emitted a diagnostic within this auto_diagnostic_group,
-     then add diag_obj to its "children" array.  */
-  if (m_cur_group)
+  if (m_buffer)
     {
-      gcc_assert (m_cur_children_array);
-      m_cur_children_array->append (diag_obj);
+      gcc_assert (!m_cur_group);
+      m_buffer->m_results.push_back (std::unique_ptr<json::object> (diag_obj));
     }
   else
     {
-      /* Otherwise, make diag_obj be the top-level object within the group;
-	 add a "children" array and record the column origin.  */
-      m_cur_group = diag_obj;
-      std::unique_ptr<json::array> children_array
-	= ::make_unique<json::array> ();
-      m_cur_children_array = children_array.get (); // borrowed
-      diag_obj->set ("children", std::move (children_array));
-      diag_obj->set_integer ("column-origin", m_context.m_column_origin);
-      m_toplevel_array->append (diag_obj);
+      /* If we've already emitted a diagnostic within this auto_diagnostic_group,
+	 then add diag_obj to its "children" array.  */
+      if (m_cur_group)
+	{
+	  gcc_assert (m_cur_children_array);
+	  m_cur_children_array->append (diag_obj);
+	}
+      else
+	{
+	  /* Otherwise, make diag_obj be the top-level object within the group;
+	     add a "children" array and record the column origin.  */
+	  m_cur_group = diag_obj;
+	  std::unique_ptr<json::array> children_array
+	    = ::make_unique<json::array> ();
+	  m_cur_children_array = children_array.get (); // borrowed
+	  diag_obj->set ("children", std::move (children_array));
+	  diag_obj->set_integer ("column-origin", m_context.m_column_origin);
+	  m_toplevel_array->append (diag_obj);
+	}
     }
 
   /* diag_obj is now owned by either m_cur_children_array or
@@ -325,7 +441,7 @@ json_output_format::on_end_diagnostic (const diagnostic_info &diagnostic,
 
   const diagnostic_path *path = richloc->get_path ();
   if (path)
-    diag_obj->set ("path", make_json_for_path (m_context, path));
+    diag_obj->set ("path", make_json_for_path (m_context, get_printer (), path));
 
   diag_obj->set_bool ("escape-source", richloc->escape_on_output_p ());
 }
@@ -390,21 +506,14 @@ private:
    to a file).  */
 
 static void
-diagnostic_output_format_init_json (diagnostic_context &context)
+diagnostic_output_format_init_json (diagnostic_context &context,
+				    std::unique_ptr<json_output_format> fmt)
 {
-  /* Suppress normal textual path output.  */
-  context.set_path_format (DPF_NONE);
-
-  /* The metadata is handled in JSON format, rather than as text.  */
-  context.set_show_cwe (false);
-  context.set_show_rules (false);
-
-  /* The option is handled in JSON format, rather than as text.  */
-  context.set_show_option_requested (false);
-
   /* Don't colorize the text.  */
-  pp_show_color (context.printer) = false;
+  pp_show_color (fmt->get_printer ()) = false;
   context.set_show_highlight_colors (false);
+
+  context.set_output_format (std::move (fmt));
 }
 
 /* Populate CONTEXT in preparation for JSON output to stderr.  */
@@ -413,9 +522,10 @@ void
 diagnostic_output_format_init_json_stderr (diagnostic_context &context,
 					   bool formatted)
 {
-  diagnostic_output_format_init_json (context);
-  context.set_output_format (new json_stderr_output_format (context,
-							    formatted));
+  diagnostic_output_format_init_json
+    (context,
+     ::make_unique<json_stderr_output_format> (context,
+					       formatted));
 }
 
 /* Populate CONTEXT in preparation for JSON output to a file named
@@ -426,10 +536,11 @@ diagnostic_output_format_init_json_file (diagnostic_context &context,
 					 bool formatted,
 					 const char *base_file_name)
 {
-  diagnostic_output_format_init_json (context);
-  context.set_output_format (new json_file_output_format (context,
-							  formatted,
-							  base_file_name));
+  diagnostic_output_format_init_json
+    (context,
+     ::make_unique<json_file_output_format> (context,
+					     formatted,
+					     base_file_name));
 }
 
 #if CHECKING_P

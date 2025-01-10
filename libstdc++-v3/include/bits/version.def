@@ -1,5 +1,5 @@
 // Feature test macro definitions                                  -*- C++ -*-
-// Copyright (C) 2023-2024 Free Software Foundation, Inc.
+// Copyright (C) 2023-2025 Free Software Foundation, Inc.
 
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -275,7 +275,6 @@ ftms = {
   values = {
     v = 201304;
     cxxmin = 14;
-    hosted = yes;
   };
 };
 
@@ -700,6 +699,11 @@ ftms = {
 ftms = {
   name = string_view;
   values = {
+    v = 202403;
+    cxxmin = 26;
+    hosted = yes;
+  };
+  values = {
     v = 201803;
     cxxmin = 17;
     hosted = yes;
@@ -1072,7 +1076,12 @@ ftms = {
 ftms = {
   name = ranges;
   values = {
-    v = 202211;
+    v = 202406;
+    cxxmin = 26;
+    extra_cond = "__glibcxx_concepts";
+  };
+  values = {
+    v = 202302;
     cxxmin = 23;
     extra_cond = "__glibcxx_concepts";
   };
@@ -1252,7 +1261,7 @@ ftms = {
 ftms = {
   name = constrained_equality;
   values = {
-    v = 202403;
+    v = 202411; // FIXME: 202403 for P2944R3, ??? for P3379R0
     cxxmin = 20;
     extra_cond = "__glibcxx_three_way_comparison";
   };
@@ -1655,6 +1664,22 @@ ftms = {
 };
 
 ftms = {
+  name = flat_map;
+  values = {
+    v = 202207;
+    cxxmin = 23;
+  };
+};
+
+ftms = {
+  name = flat_set;
+  values = {
+    v = 202207;
+    cxxmin = 23;
+  };
+};
+
+ftms = {
   name = formatters;
   values = {
     v = 202302;
@@ -1778,11 +1803,45 @@ ftms = {
 };
 
 ftms = {
+  name = algorithm_default_value_type;
+  values = {
+    v = 202403;
+    cxxmin = 26;
+  };
+};
+
+ftms = {
+  name = constexpr_new;
+  values = {
+    v = 202406;
+    cxxmin = 26;
+    extra_cond = "__cpp_constexpr >= 202406L";
+  };
+};
+
+ftms = {
   name = fstream_native_handle;
   values = {
     v = 202306;
     cxxmin = 26;
     hosted = yes;
+  };
+};
+
+ftms = {
+  name = is_virtual_base_of;
+  values = {
+    v = 202406;
+    cxxmin = 26;
+    extra_cond = "__has_builtin(__builtin_is_virtual_base_of)";
+  };
+};
+
+ftms = {
+  name = ranges_concat;
+  values = {
+    v = 202403;
+    cxxmin = 26;
   };
 };
 
@@ -1811,6 +1870,14 @@ ftms = {
 };
 
 ftms = {
+  name = span_initializer_list;
+  values = {
+    v = 202311;
+    cxxmin = 26;
+  };
+};
+
+ftms = {
   name = text_encoding;
   values = {
     v = 202306;
@@ -1831,19 +1898,11 @@ ftms = {
 };
 
 ftms = {
-  name = ranges_concat;
+  name = modules;
   values = {
-    v = 202403;
-    cxxmin = 26;
-  };
-};
-
-ftms = {
-  name = constexpr_new;
-  values = {
-    v = 202406;
-    cxxmin = 26;
-    extra_cond = "__cpp_constexpr >= 202406L";
+    v = 202207;
+    cxxmin = 20;
+    extra_cond = "__cpp_modules";
   };
 };
 

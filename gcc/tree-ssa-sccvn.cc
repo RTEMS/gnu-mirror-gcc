@@ -1,5 +1,5 @@
 /* SCC value numbering for trees
-   Copyright (C) 2006-2024 Free Software Foundation, Inc.
+   Copyright (C) 2006-2025 Free Software Foundation, Inc.
    Contributed by Daniel Berlin <dan@dberlin.org>
 
 This file is part of GCC.
@@ -179,7 +179,7 @@ static int
 vn_phi_eq (const_vn_phi_t const vp1, const_vn_phi_t const vp2);
 
 struct vn_phi_hasher : nofree_ptr_hash <vn_phi_s>
-{ 
+{
   static inline hashval_t hash (const vn_phi_s *);
   static inline bool equal (const vn_phi_s *, const vn_phi_s *);
 };
@@ -325,7 +325,7 @@ typedef struct vn_tables_s
 /* vn_constant hashtable helpers.  */
 
 struct vn_constant_hasher : free_ptr_hash <vn_constant_s>
-{ 
+{
   static inline hashval_t hash (const vn_constant_s *);
   static inline bool equal (const vn_constant_s *, const vn_constant_s *);
 };
@@ -838,7 +838,8 @@ vn_reference_eq (const_vn_reference_t const vr1, const_vn_reference_t const vr2)
 	return false;
     }
   else if (TYPE_MODE (vr1->type) != TYPE_MODE (vr2->type)
-	   && !mode_can_transfer_bits (TYPE_MODE (vr1->type)))
+	   && (!mode_can_transfer_bits (TYPE_MODE (vr1->type))
+	       || !mode_can_transfer_bits (TYPE_MODE (vr2->type))))
     return false;
 
   i = 0;
@@ -984,11 +985,14 @@ copy_reference_ops_from_ref (tree ref, vec<vn_reference_op_s> *result)
 		    poly_offset_int off
 		      = (wi::to_poly_offset (this_offset)
 			 + (wi::to_offset (bit_offset) >> LOG2_BITS_PER_UNIT));
-		    /* Probibit value-numbering zero offset components
+		    /* Prohibit value-numbering zero offset components
 		       of addresses the same before the pass folding
-		       __builtin_object_size had a chance to run.  */
+		       __builtin_object_size had a chance to run.  Likewise
+		       for components of zero size at arbitrary offset.  */
 		    if (TREE_CODE (orig) != ADDR_EXPR
-			|| maybe_ne (off, 0)
+			|| (TYPE_SIZE (temp.type)
+			    && integer_nonzerop (TYPE_SIZE (temp.type))
+			    && maybe_ne (off, 0))
 			|| (cfun->curr_properties & PROP_objsz))
 		      off.to_shwi (&temp.off);
 		  }
@@ -1009,9 +1013,31 @@ copy_reference_ops_from_ref (tree ref, vec<vn_reference_op_s> *result)
 	    if (! temp.op2)
 	      temp.op2 = size_binop (EXACT_DIV_EXPR, TYPE_SIZE_UNIT (eltype),
 				     size_int (TYPE_ALIGN_UNIT (eltype)));
+	    /* Prohibit value-numbering addresses of one-after-the-last
+	       element ARRAY_REFs the same as addresses of other components
+	       before the pass folding __builtin_object_size had a chance
+	       to run.  */
+	    bool avoid_oob = true;
+	    if (TREE_CODE (orig) != ADDR_EXPR
+		|| cfun->curr_properties & PROP_objsz)
+	      avoid_oob = false;
+	    else if (poly_int_tree_p (temp.op0))
+	      {
+		tree ub = array_ref_up_bound (ref);
+		if (ub
+		    && poly_int_tree_p (ub)
+		    /* ???  The C frontend for T[0] uses [0:] and the
+		       C++ frontend [0:-1U].  See layout_type for how
+		       awkward this is.  */
+		    && !integer_minus_onep (ub)
+		    && known_le (wi::to_poly_offset (temp.op0),
+				 wi::to_poly_offset (ub)))
+		  avoid_oob = false;
+	      }
 	    if (poly_int_tree_p (temp.op0)
 		&& poly_int_tree_p (temp.op1)
-		&& TREE_CODE (temp.op2) == INTEGER_CST)
+		&& TREE_CODE (temp.op2) == INTEGER_CST
+		&& !avoid_oob)
 	      {
 		poly_offset_int off = ((wi::to_poly_offset (temp.op0)
 					- wi::to_poly_offset (temp.op1))
@@ -1753,6 +1779,24 @@ re_valueize:
 	       && poly_int_tree_p (vro->op1)
 	       && TREE_CODE (vro->op2) == INTEGER_CST)
 	{
+	    /* Prohibit value-numbering addresses of one-after-the-last
+	       element ARRAY_REFs the same as addresses of other components
+	       before the pass folding __builtin_object_size had a chance
+	       to run.  */
+	  if (!(cfun->curr_properties & PROP_objsz)
+	      && (*orig)[0].opcode == ADDR_EXPR)
+	    {
+	      tree dom = TYPE_DOMAIN ((*orig)[i + 1].type);
+	      if (!dom
+		  || !TYPE_MAX_VALUE (dom)
+		  || !poly_int_tree_p (TYPE_MAX_VALUE (dom))
+		  || integer_minus_onep (TYPE_MAX_VALUE (dom)))
+		continue;
+	      if (!known_le (wi::to_poly_offset (vro->op0),
+			     wi::to_poly_offset (TYPE_MAX_VALUE (dom))))
+		continue;
+	    }
+
 	  poly_offset_int off = ((wi::to_poly_offset (vro->op0)
 				  - wi::to_poly_offset (vro->op1))
 				 * wi::to_offset (vro->op2)
@@ -1776,7 +1820,7 @@ static vec<vn_reference_op_s> shared_lookup_references;
    this function.  *VALUEIZED_ANYTHING will specify whether any
    operands were valueized.  */
 
-static vec<vn_reference_op_s> 
+static vec<vn_reference_op_s>
 valueize_shared_reference_ops_from_ref (tree ref, bool *valueized_anything)
 {
   if (!ref)
@@ -1791,7 +1835,7 @@ valueize_shared_reference_ops_from_ref (tree ref, bool *valueized_anything)
    call statement.  The vector is shared among all callers of
    this function.  */
 
-static vec<vn_reference_op_s> 
+static vec<vn_reference_op_s>
 valueize_shared_reference_ops_from_call (gcall *call)
 {
   if (!call)
@@ -4102,7 +4146,7 @@ vn_reference_lookup_call (gcall *call, vn_reference_t *vnresult,
 
 /* Insert OP into the current hash table with a value number of RESULT.  */
 
-static void 
+static void
 vn_reference_insert (tree op, tree result, tree vuse, tree vdef)
 {
   vn_reference_s **slot;
@@ -5947,8 +5991,7 @@ visit_phi (gimple *phi, bool *inserted, bool backedges_varying_p)
   tree sameval_base = NULL_TREE;
   poly_int64 soff, doff;
   unsigned n_executable = 0;
-  edge_iterator ei;
-  edge e, sameval_e = NULL;
+  edge sameval_e = NULL;
 
   /* TODO: We could check for this in initialization, and replace this
      with a gcc_assert.  */
@@ -5961,10 +6004,32 @@ visit_phi (gimple *phi, bool *inserted, bool backedges_varying_p)
   if (!inserted)
     gimple_set_plf (phi, GF_PLF_1, false);
 
+  basic_block bb = gimple_bb (phi);
+
+  /* For the equivalence handling below make sure to first process an
+     edge with a non-constant.  */
+  auto_vec<edge, 2> preds;
+  preds.reserve_exact (EDGE_COUNT (bb->preds));
+  bool seen_nonconstant = false;
+  for (unsigned i = 0; i < EDGE_COUNT (bb->preds); ++i)
+    {
+      edge e = EDGE_PRED (bb, i);
+      preds.quick_push (e);
+      if (!seen_nonconstant)
+	{
+	  tree def = PHI_ARG_DEF_FROM_EDGE (phi, e);
+	  if (TREE_CODE (def) == SSA_NAME)
+	    {
+	      seen_nonconstant = true;
+	      if (i != 0)
+		std::swap (preds[0], preds[i]);
+	    }
+	}
+    }
+
   /* See if all non-TOP arguments have the same value.  TOP is
      equivalent to everything, so we can ignore it.  */
-  basic_block bb = gimple_bb (phi);
-  FOR_EACH_EDGE (e, ei, bb->preds)
+  for (edge e : preds)
     if (e->flags & EDGE_EXECUTABLE)
       {
 	tree def = PHI_ARG_DEF_FROM_EDGE (phi, e);
@@ -6044,6 +6109,9 @@ visit_phi (gimple *phi, bool *inserted, bool backedges_varying_p)
 		tree ops[2];
 		ops[0] = def;
 		ops[1] = sameval;
+		/* Canonicalize the operands order for eq below. */
+		if (tree_swap_operands_p (ops[0], ops[1]))
+		  std::swap (ops[0], ops[1]);
 		tree val = vn_nary_op_lookup_pieces (2, EQ_EXPR,
 						     boolean_type_node,
 						     ops, &vnresult);
@@ -6062,27 +6130,6 @@ visit_phi (gimple *phi, bool *inserted, bool backedges_varying_p)
 			    fprintf (dump_file, " are equal on edge %d -> %d\n",
 				     e->src->index, e->dest->index);
 			  }
-			continue;
-		      }
-		    /* If on all previous edges the value was equal to def
-		       we can change sameval to def.  */
-		    if (EDGE_COUNT (bb->preds) == 2
-			&& (val = vn_nary_op_get_predicated_value
-				    (vnresult, EDGE_PRED (bb, 0)))
-			&& integer_truep (val)
-			&& !(e->flags & EDGE_DFS_BACK))
-		      {
-			if (dump_file && (dump_flags & TDF_DETAILS))
-			  {
-			    fprintf (dump_file, "Predication says ");
-			    print_generic_expr (dump_file, def, TDF_NONE);
-			    fprintf (dump_file, " and ");
-			    print_generic_expr (dump_file, sameval, TDF_NONE);
-			    fprintf (dump_file, " are equal on edge %d -> %d\n",
-				     EDGE_PRED (bb, 0)->src->index,
-				     EDGE_PRED (bb, 0)->dest->index);
-			  }
-			sameval = def;
 			continue;
 		      }
 		  }
@@ -7893,6 +7940,101 @@ insert_related_predicates_on_edge (enum tree_code code, tree *ops, edge pred_e)
     }
 }
 
+/* Insert on the TRUE_E true and FALSE_E false predicates
+   derived from LHS CODE RHS.  */
+
+static void
+insert_predicates_for_cond (tree_code code, tree lhs, tree rhs,
+			    edge true_e, edge false_e)
+{
+  /* If both edges are null, then there is nothing to be done. */
+  if (!true_e && !false_e)
+    return;
+
+  /* Canonicalize the comparison if needed, putting
+     the constant in the rhs.  */
+  if (tree_swap_operands_p (lhs, rhs))
+    {
+      std::swap (lhs, rhs);
+      code = swap_tree_comparison (code);
+    }
+
+  /* If the lhs is not a ssa name, don't record anything. */
+  if (TREE_CODE (lhs) != SSA_NAME)
+    return;
+
+  tree_code icode = invert_tree_comparison (code, HONOR_NANS (lhs));
+  tree ops[2];
+  ops[0] = lhs;
+  ops[1] = rhs;
+  if (true_e)
+    vn_nary_op_insert_pieces_predicated (2, code, boolean_type_node, ops,
+					 boolean_true_node, 0, true_e);
+  if (false_e)
+    vn_nary_op_insert_pieces_predicated (2, code, boolean_type_node, ops,
+					 boolean_false_node, 0, false_e);
+  if (icode != ERROR_MARK)
+    {
+      if (true_e)
+	vn_nary_op_insert_pieces_predicated (2, icode, boolean_type_node, ops,
+					     boolean_false_node, 0, true_e);
+      if (false_e)
+	vn_nary_op_insert_pieces_predicated (2, icode, boolean_type_node, ops,
+					     boolean_true_node, 0, false_e);
+    }
+  /* Relax for non-integers, inverted condition handled
+     above.  */
+  if (INTEGRAL_TYPE_P (TREE_TYPE (lhs)))
+    {
+      if (true_e)
+	insert_related_predicates_on_edge (code, ops, true_e);
+      if (false_e)
+	insert_related_predicates_on_edge (icode, ops, false_e);
+  }
+  if (integer_zerop (rhs)
+      && (code == NE_EXPR || code == EQ_EXPR))
+    {
+      gimple *def_stmt = SSA_NAME_DEF_STMT (lhs);
+      /* (A CMP B) != 0 is the same as (A CMP B).
+	 (A CMP B) == 0 is just (A CMP B) with the edges swapped.  */
+      if (is_gimple_assign (def_stmt)
+	  && TREE_CODE_CLASS (gimple_assign_rhs_code (def_stmt)) == tcc_comparison)
+	  {
+	    tree_code nc = gimple_assign_rhs_code (def_stmt);
+	    tree nlhs = vn_valueize (gimple_assign_rhs1 (def_stmt));
+	    tree nrhs = vn_valueize (gimple_assign_rhs2 (def_stmt));
+	    edge nt = true_e;
+	    edge nf = false_e;
+	    if (code == EQ_EXPR)
+	      std::swap (nt, nf);
+	    if (lhs != nlhs)
+	      insert_predicates_for_cond (nc, nlhs, nrhs, nt, nf);
+	  }
+      /* (a | b) == 0 ->
+	    on true edge assert: a == 0 & b == 0. */
+      /* (a | b) != 0 ->
+	    on false edge assert: a == 0 & b == 0. */
+      if (is_gimple_assign (def_stmt)
+	  && gimple_assign_rhs_code (def_stmt) == BIT_IOR_EXPR)
+	{
+	  edge e = code == EQ_EXPR ? true_e : false_e;
+	  tree nlhs;
+
+	  nlhs = vn_valueize (gimple_assign_rhs1 (def_stmt));
+	  /* A valueization of the `a` might return the old lhs
+	     which is already handled above. */
+	  if (nlhs != lhs)
+	    insert_predicates_for_cond (EQ_EXPR, nlhs, rhs, e, nullptr);
+
+	  /* A valueization of the `b` might return the old lhs
+	     which is already handled above. */
+	  nlhs = vn_valueize (gimple_assign_rhs2 (def_stmt));
+	  if (nlhs != lhs)
+	    insert_predicates_for_cond (EQ_EXPR, nlhs, rhs, e, nullptr);
+	}
+    }
+}
+
 /* Main stmt worker for RPO VN, process BB.  */
 
 static unsigned
@@ -8057,7 +8199,15 @@ process_bb (rpo_elim &avail, basic_block bb,
 	  {
 	    tree lhs = vn_valueize (gimple_cond_lhs (last));
 	    tree rhs = vn_valueize (gimple_cond_rhs (last));
-	    tree val = gimple_simplify (gimple_cond_code (last),
+	    tree_code cmpcode = gimple_cond_code (last);
+	    /* Canonicalize the comparison if needed, putting
+	       the constant in the rhs.  */
+	    if (tree_swap_operands_p (lhs, rhs))
+	      {
+		std::swap (lhs, rhs);
+		cmpcode = swap_tree_comparison (cmpcode);
+	       }
+	    tree val = gimple_simplify (cmpcode,
 					boolean_type_node, lhs, rhs,
 					NULL, vn_valueize);
 	    /* If the condition didn't simplfy see if we have recorded
@@ -8068,9 +8218,19 @@ process_bb (rpo_elim &avail, basic_block bb,
 		tree ops[2];
 		ops[0] = lhs;
 		ops[1] = rhs;
-		val = vn_nary_op_lookup_pieces (2, gimple_cond_code (last),
+		val = vn_nary_op_lookup_pieces (2, cmpcode,
 						boolean_type_node, ops,
 						&vnresult);
+		/* Got back a ssa name, then try looking up `val != 0`
+		   as it might have been recorded that way.  */
+		if (val && TREE_CODE (val) == SSA_NAME)
+		  {
+		    ops[0] = val;
+		    ops[1] = build_zero_cst (TREE_TYPE (val));
+		    val = vn_nary_op_lookup_pieces (2, NE_EXPR,
+						    boolean_type_node, ops,
+						    &vnresult);
+		  }
 		/* Did we get a predicated value?  */
 		if (! val && vnresult && vnresult->predicated_values)
 		  {
@@ -8095,46 +8255,13 @@ process_bb (rpo_elim &avail, basic_block bb,
 		   important as early cleanup.  */
 		edge true_e, false_e;
 		extract_true_false_edges_from_block (bb, &true_e, &false_e);
-		enum tree_code code = gimple_cond_code (last);
-		enum tree_code icode
-		  = invert_tree_comparison (code, HONOR_NANS (lhs));
-		tree ops[2];
-		ops[0] = lhs;
-		ops[1] = rhs;
 		if ((do_region && bitmap_bit_p (exit_bbs, true_e->dest->index))
 		    || !can_track_predicate_on_edge (true_e))
 		  true_e = NULL;
 		if ((do_region && bitmap_bit_p (exit_bbs, false_e->dest->index))
 		    || !can_track_predicate_on_edge (false_e))
 		  false_e = NULL;
-		if (true_e)
-		  vn_nary_op_insert_pieces_predicated
-		    (2, code, boolean_type_node, ops,
-		     boolean_true_node, 0, true_e);
-		if (false_e)
-		  vn_nary_op_insert_pieces_predicated
-		    (2, code, boolean_type_node, ops,
-		     boolean_false_node, 0, false_e);
-		if (icode != ERROR_MARK)
-		  {
-		    if (true_e)
-		      vn_nary_op_insert_pieces_predicated
-			(2, icode, boolean_type_node, ops,
-			 boolean_false_node, 0, true_e);
-		    if (false_e)
-		      vn_nary_op_insert_pieces_predicated
-			(2, icode, boolean_type_node, ops,
-			 boolean_true_node, 0, false_e);
-		  }
-		/* Relax for non-integers, inverted condition handled
-		   above.  */
-		if (INTEGRAL_TYPE_P (TREE_TYPE (lhs)))
-		  {
-		    if (true_e)
-		      insert_related_predicates_on_edge (code, ops, true_e);
-		    if (false_e)
-		      insert_related_predicates_on_edge (icode, ops, false_e);
-		  }
+		insert_predicates_for_cond (cmpcode, lhs, rhs, true_e, false_e);
 	      }
 	    break;
 	  }

@@ -1,5 +1,5 @@
 /* Perform optimizations on tree structure.
-   Copyright (C) 1998-2024 Free Software Foundation, Inc.
+   Copyright (C) 1998-2025 Free Software Foundation, Inc.
    Written by Mark Michell (mark@codesourcery.com).
 
 This file is part of GCC.
@@ -23,6 +23,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "coretypes.h"
 #include "target.h"
 #include "cp-tree.h"
+#include "decl.h"
 #include "stringpool.h"
 #include "cgraph.h"
 #include "debug.h"
@@ -287,6 +288,11 @@ maybe_thunk_body (tree fn, bool force)
   if (ctor_omit_inherited_parms (fns[0]))
     return 0;
 
+  /* Don't diagnose deprecated or unavailable cdtors just because they
+     have thunks emitted for them.  */
+  auto du = make_temp_override (deprecated_state,
+				UNAVAILABLE_DEPRECATED_SUPPRESS);
+
   DECL_ABSTRACT_P (fn) = false;
   if (!DECL_WEAK (fn))
     {
@@ -503,7 +509,7 @@ maybe_clone_body (tree fn)
 
       clone = fns[idx];
       if (!clone)
-	continue;      
+	continue;
 
       /* Update CLONE's source position information to match FN's.  */
       DECL_SOURCE_LOCATION (clone) = DECL_SOURCE_LOCATION (fn);

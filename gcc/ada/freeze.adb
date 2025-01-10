@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -33,7 +33,6 @@ with Einfo.Entities; use Einfo.Entities;
 with Einfo.Utils;    use Einfo.Utils;
 with Elists;         use Elists;
 with Errout;         use Errout;
-with Exp_Ch3;        use Exp_Ch3;
 with Exp_Ch7;        use Exp_Ch7;
 with Exp_Disp;       use Exp_Disp;
 with Exp_Pakd;       use Exp_Pakd;
@@ -99,8 +98,7 @@ package body Freeze is
 
    procedure Check_Address_Clause (E : Entity_Id);
    --  Apply legality checks to address clauses for object declarations,
-   --  at the point the object is frozen. Also ensure any initialization is
-   --  performed only after the object has been frozen.
+   --  at the point the object is frozen.
 
    procedure Check_Component_Storage_Order
      (Encl_Type        : Entity_Id;
@@ -636,11 +634,10 @@ package body Freeze is
    procedure Check_Address_Clause (E : Entity_Id) is
       Addr       : constant Node_Id   := Address_Clause (E);
       Typ        : constant Entity_Id := Etype (E);
-      Decl       : Node_Id;
-      Expr       : Node_Id;
-      Init       : Node_Id;
-      Lhs        : Node_Id;
-      Tag_Assign : Node_Id;
+
+      Decl : Node_Id;
+      Expr : Node_Id;
+      Init : Node_Id;
 
    begin
       if Present (Addr) then
@@ -743,41 +740,6 @@ package body Freeze is
                      Decl, O_Ent);
                end if;
             end;
-         end if;
-
-         --  Remove side effects from initial expression, except in the case of
-         --  limited build-in-place calls and aggregates, which have their own
-         --  expansion elsewhere. This exception is necessary to avoid copying
-         --  limited objects.
-
-         if Present (Init)
-           and then not Is_Inherently_Limited_Type (Typ)
-         then
-            --  Capture initialization value at point of declaration, and make
-            --  explicit assignment legal, because object may be a constant.
-
-            Remove_Side_Effects (Init);
-            Lhs := New_Occurrence_Of (E, Sloc (Decl));
-            Set_Assignment_OK (Lhs);
-
-            --  Move initialization to freeze actions, once the object has
-            --  been frozen and the address clause alignment check has been
-            --  performed.
-
-            Append_Freeze_Action (E,
-              Make_Assignment_Statement (Sloc (Decl),
-                Name       => Lhs,
-                Expression => Expression (Decl)));
-
-            Set_No_Initialization (Decl);
-
-            --  If the object is tagged, check whether the tag must be
-            --  reassigned explicitly.
-
-            Tag_Assign := Make_Tag_Assignment (Decl);
-            if Present (Tag_Assign) then
-               Append_Freeze_Action (E, Tag_Assign);
-            end if;
          end if;
       end if;
    end Check_Address_Clause;
@@ -1463,7 +1425,7 @@ package body Freeze is
       Par_Prim       : Entity_Id;
       Prim           : Entity_Id;
 
-      type Wrapper_Kind is (No_Wrapper, LSP_Wrapper, Postcond_Wrapper);
+      type Wrapper_Kind is (No_Wrapper, LSP_Wrapper, Condition_Wrapper);
 
       Wrapper_Needed : Wrapper_Kind;
       --  Kind of wrapper needed by a given inherited primitive of tagged
@@ -1471,8 +1433,9 @@ package body Freeze is
       --  * No_Wrapper: No wrapper is needed.
       --  * LSP_Wrapper: Wrapper that handles inherited class-wide pre/post
       --    conditions that call overridden primitives.
-      --  * Postcond_Wrapper: Wrapper that handles postconditions of interface
-      --    primitives.
+      --  * Condition_Wrapper: Wrapper of inherited subprogram that implements
+      --    additional interface primitives of the derived type that have
+      --    class-wide pre-/postconditions.
 
       function Build_DTW_Body
         (Loc          : Source_Ptr;
@@ -1855,9 +1818,9 @@ package body Freeze is
       --  List containing identifiers of built wrappers. Used to defer building
       --  and analyzing their class-wide precondition subprograms.
 
-      Postcond_Candidates_List : Elist_Id := No_Elist;
+      Condition_Candidates_List : Elist_Id := No_Elist;
       --  List containing inherited primitives of tagged type R that implement
-      --  interface primitives that have postconditions.
+      --  interface primitives that have pre-/postconditions.
 
    --  Start of processing for Check_Inherited_Conditions
 
@@ -1907,9 +1870,7 @@ package body Freeze is
             --  When the primitive is an LSP wrapper we climb to the parent
             --  primitive that has the inherited contract.
 
-            if Is_Wrapper (Par_Prim)
-              and then Present (LSP_Subprogram (Par_Prim))
-            then
+            if Is_LSP_Wrapper (Par_Prim) then
                Par_Prim := LSP_Subprogram (Par_Prim);
             end if;
 
@@ -1943,7 +1904,7 @@ package body Freeze is
       end loop;
 
       --  Collect inherited primitives that may need a wrapper to handle
-      --  postconditions of interface primitives; done to improve the
+      --  pre-/postconditions of interface primitives; done to improve the
       --  performance when checking if postcondition wrappers are needed.
 
       Op_Node := First_Elmt (Prim_Ops);
@@ -1952,13 +1913,16 @@ package body Freeze is
 
          if Present (Interface_Alias (Prim))
            and then not Comes_From_Source (Alias (Prim))
-           and then Present (Class_Postconditions (Interface_Alias (Prim)))
+           and then
+             (Present (Class_Preconditions (Interface_Alias (Prim)))
+                or else
+              Present (Class_Postconditions (Interface_Alias (Prim))))
          then
-            if No (Postcond_Candidates_List) then
-               Postcond_Candidates_List := New_Elmt_List;
+            if No (Condition_Candidates_List) then
+               Condition_Candidates_List := New_Elmt_List;
             end if;
 
-            Append_Unique_Elmt (Alias (Prim), Postcond_Candidates_List);
+            Append_Unique_Elmt (Alias (Prim), Condition_Candidates_List);
          end if;
 
          Next_Elmt (Op_Node);
@@ -1986,9 +1950,7 @@ package body Freeze is
             --  When the primitive is an LSP wrapper we climb to the parent
             --  primitive that has the inherited contract.
 
-            if Is_Wrapper (Par_Prim)
-              and then Present (LSP_Subprogram (Par_Prim))
-            then
+            if Is_LSP_Wrapper (Par_Prim) then
                Par_Prim := LSP_Subprogram (Par_Prim);
             end if;
 
@@ -2014,12 +1976,12 @@ package body Freeze is
             --  implements additional interface types, and this inherited
             --  primitive covers an interface primitive of these additional
             --  interface types that has class-wide postconditions, then it
-            --  requires a postconditions wrapper.
+            --  requires a pre-/postconditions wrapper.
 
             if Wrapper_Needed = No_Wrapper
               and then Present (Interfaces (R))
-              and then Present (Postcond_Candidates_List)
-              and then Contains (Postcond_Candidates_List, Prim)
+              and then Present (Condition_Candidates_List)
+              and then Contains (Condition_Candidates_List, Prim)
             then
                declare
                   Elmt       : Elmt_Id;
@@ -2029,7 +1991,8 @@ package body Freeze is
 
                begin
                   Elmt := First_Elmt (Prim_Ops);
-                  while Present (Elmt) loop
+
+                  Search : while Present (Elmt) loop
                      Ent := Node (Elmt);
 
                      --  Perform the search relying on the internal entities
@@ -2039,7 +2002,9 @@ package body Freeze is
                      if Present (Interface_Alias (Ent))
                        and then (Alias (Ent)) = Prim
                        and then
-                         Present (Class_Postconditions (Interface_Alias (Ent)))
+                         (Present (Class_Preconditions (Interface_Alias (Ent)))
+                            or else Present (Class_Postconditions
+                                               (Interface_Alias (Ent))))
                      then
                         Iface := Find_Dispatching_Type (Interface_Alias (Ent));
 
@@ -2052,8 +2017,8 @@ package body Freeze is
                         Iface_Elmt := First_Elmt (Interfaces (R));
                         while Present (Iface_Elmt) loop
                            if Node (Iface_Elmt) = Iface then
-                              Wrapper_Needed := Postcond_Wrapper;
-                              exit;
+                              Wrapper_Needed := Condition_Wrapper;
+                              exit Search;
                            end if;
 
                            Next_Elmt (Iface_Elmt);
@@ -2061,7 +2026,7 @@ package body Freeze is
                      end if;
 
                      Next_Elmt (Elmt);
-                  end loop;
+                  end loop Search;
                end;
             end if;
          end if;
@@ -2108,7 +2073,8 @@ package body Freeze is
 
                --  LSP wrappers reference the parent primitive that has the
                --  the class-wide pre/post condition that calls overridden
-               --  primitives.
+               --  primitives. Condition wrappers do not have this attribute
+               --  (see predicate Is_LSP_Wrapper).
 
                if Wrapper_Needed = LSP_Wrapper then
                   Set_LSP_Subprogram (DTW_Id, Par_Prim);
@@ -2124,11 +2090,12 @@ package body Freeze is
 
                Set_Sloc (DTW_Id, Sloc (Prim));
 
-               --  For inherited class-wide preconditions the DTW wrapper
-               --  reuses the ICW of the parent (which checks the parent
-               --  interpretation of the class-wide preconditions); the
-               --  interpretation of the class-wide preconditions for the
-               --  inherited subprogram is checked at the caller side.
+               --  For LSP_Wrappers of subprograms that inherit class-wide
+               --  preconditions the DTW wrapper reuses the ICW of the parent
+               --  (which checks the parent interpretation of the class-wide
+               --  preconditions); the interpretation of the class-wide
+               --  preconditions for the inherited subprogram is checked
+               --  at the caller side.
 
                --  When the subprogram inherits class-wide postconditions
                --  the DTW also checks the interpretation of the class-wide
@@ -2137,12 +2104,14 @@ package body Freeze is
                --  the class-wide postconditions.
 
                --      procedure Prim (F1 : T1; ...) is
-               --         [ pragma Check (Postcondition, Expr); ]
+               --         [ pragma Postcondition (check => Expr); ]
                --      begin
                --         Par_Prim_ICW (Par_Type (F1), ...);
                --      end;
 
-               if Present (Indirect_Call_Wrapper (Par_Prim)) then
+               if Wrapper_Needed = LSP_Wrapper
+                 and then Present (Indirect_Call_Wrapper (Par_Prim))
+               then
                   DTW_Body :=
                     Build_DTW_Body (Loc,
                       DTW_Spec     => DTW_Spec,
@@ -2150,18 +2119,26 @@ package body Freeze is
                       Par_Prim     => Par_Prim,
                       Wrapped_Subp => Indirect_Call_Wrapper (Par_Prim));
 
-               --  For subprograms that only inherit class-wide postconditions
-               --  the DTW wrapper calls the parent primitive (which on its
-               --  body checks the interpretation of the class-wide post-
-               --  conditions for the parent subprogram), and the DTW checks
-               --  the interpretation of the class-wide postconditions for the
+               --  For LSP_Wrappers of subprograms that only inherit class-wide
+               --  postconditions, and also for Condition_Wrappers (wrappers of
+               --  inherited subprograms that implement additional interface
+               --  primitives that have class-wide pre-/postconditions), the
+               --  DTW wrapper calls the parent primitive (which on its body
+               --  checks the interpretation of the class-wide post-conditions
+               --  for the parent subprogram), and the DTW checks the
+               --  interpretation of the class-wide postconditions for the
                --  inherited subprogram.
 
                --      procedure Prim (F1 : T1; ...) is
-               --         pragma Check (Postcondition, Expr);
+               --         pragma Postcondition (check => Expr);
                --      begin
                --         Par_Prim (Par_Type (F1), ...);
                --      end;
+
+               --  No class-wide preconditions runtime check is generated for
+               --  this wrapper call to the parent primitive, since the check
+               --  is performed by the caller of the DTW wrapper (see routine
+               --  Install_Class_Preconditions_Check).
 
                else
                   DTW_Body :=
@@ -2446,11 +2423,19 @@ package body Freeze is
       if Present (Init_Stmts)
         and then Nkind (Init_Stmts) = N_Compound_Statement
       then
-         Insert_List_Before (Init_Stmts, Actions (Init_Stmts));
+         --  If the entity has its freezing delayed, append the initialization
+         --  actions to its freeze actions. Otherwise insert them back at the
+         --  point where they have been generated.
 
-         --  Note that we rewrite Init_Stmts into a NULL statement, rather than
+         if Has_Delayed_Freeze (E) then
+            Append_Freeze_Actions (E, Actions (Init_Stmts));
+         else
+            Insert_List_Before (Init_Stmts, Actions (Init_Stmts));
+         end if;
+
+         --  Note that we rewrite Init_Stmts into a null statement, rather than
          --  just removing it, because Freeze_All may rely on this particular
-         --  Node_Id still being present in the enclosing list to know where to
+         --  node still being present in the enclosing list to know where to
          --  stop freezing.
 
          Rewrite (Init_Stmts, Make_Null_Statement (Sloc (Init_Stmts)));
@@ -3287,7 +3272,7 @@ package body Freeze is
                     ("aspect % applied to task type &", Typ);
                   Error_Msg_N
                     ("\replace task components with access-to-task-type "
-                     & "components??", Typ);
+                     & "components", Typ);
                end if;
 
             else
@@ -4200,6 +4185,8 @@ package body Freeze is
       -------------------------------
 
       procedure Freeze_Object_Declaration (E : Entity_Id) is
+         Decl : constant Node_Id := Declaration_Node (E);
+
          procedure Check_Large_Modular_Array (Typ : Entity_Id);
          --  Check that the size of array type Typ can be computed without
          --  overflow, and generates a Storage_Error otherwise. This is only
@@ -4278,11 +4265,11 @@ package body Freeze is
                                   Make_Itype_Reference (Obj_Loc);
                   begin
                      Set_Itype (Ref_Node, Etype (E));
-                     Insert_Action (Declaration_Node (E), Ref_Node);
+                     Insert_Action (Decl, Ref_Node);
                   end;
                end if;
 
-               Insert_Action (Declaration_Node (E),
+               Insert_Action (Decl,
                  Make_Raise_Storage_Error (Obj_Loc,
                    Condition =>
                      Make_Op_Ge (Obj_Loc,
@@ -4465,46 +4452,63 @@ package body Freeze is
          --  checks to freeze time since pragma Import inhibits default
          --  initialization and thus pragma Import affects these checks.
 
-         Validate_Object_Declaration (Declaration_Node (E));
+         Validate_Object_Declaration (Decl);
 
-         --  If there is an address clause, check that it is valid and if need
-         --  be move initialization to the freeze node.
+         --  If there is an address clause, check that it is valid
 
          Check_Address_Clause (E);
 
-         --  Similar processing is needed for aspects that may affect object
-         --  layout, like Address, if there is an initialization expression.
-         --  We don't do this if there is a pragma Linker_Section, because it
-         --  would prevent the back end from statically initializing the
-         --  object; we don't want elaboration code in that case.
+         --  If the object has an address clause or a delayed aspect, remove
+         --  the side effects from initial expression, except in the case of
+         --  limited build-in-place calls and aggregates, which have their own
+         --  expansion elsewhere. This exception is necessary to avoid copying
+         --  limited objects.
 
-         if Has_Delayed_Aspects (E)
-           and then Expander_Active
-           and then Is_Array_Type (Typ)
-           and then Present (Expression (Declaration_Node (E)))
-           and then No (Linker_Section_Pragma (E))
+         if Expander_Active
+           and then
+             (Present (Address_Clause (E)) or else Has_Delayed_Aspects (E))
+           and then Present (Expression (Decl))
+           and then not No_Initialization (Decl)
+           and then not Is_Inherently_Limited_Type (Typ)
          then
             declare
-               Decl : constant Node_Id := Declaration_Node (E);
+               Init : constant Node_Id := Expression (Decl);
                Lhs  : constant Node_Id := New_Occurrence_Of (E, Loc);
+
+               Assign : Node_Id;
 
             begin
                --  Capture initialization value at point of declaration, and
                --  make explicit assignment legal, because object may be a
                --  constant.
 
-               Remove_Side_Effects (Expression (Decl));
+               Remove_Side_Effects (Init);
                Set_Assignment_OK (Lhs);
 
-               --  Move initialization to freeze actions
-
-               Append_Freeze_Action (E,
-                 Make_Assignment_Statement (Loc,
+               Assign :=
+                 Make_Assignment_Statement (Sloc (Decl),
                    Name       => Lhs,
-                   Expression => Expression (Decl)));
+                   Expression => Init);
 
                Set_No_Initialization (Decl);
-               --  Set_Is_Frozen (E, False);
+
+               --  If the initialization expression is an aggregate, we do not
+               --  adjust after the assignment but, in either case, we do not
+               --  finalize before since the object is now uninitialized. Note
+               --  that Make_Tag_Ctrl_Assignment will also automatically insert
+               --  the tag assignment in the tagged case.
+
+               if Nkind (Unqualify (Init)) = N_Aggregate then
+                  Set_No_Ctrl_Actions (Assign);
+               else
+                  Set_No_Finalize_Actions (Assign);
+               end if;
+
+               --  Move initialization to freeze actions, once the object has
+               --  been frozen and the address clause alignment check has been
+               --  performed.
+
+               Append_Freeze_Action (E, Assign);
             end;
          end if;
 
@@ -4546,8 +4550,7 @@ package body Freeze is
             null;
 
          elsif Has_Default_Initialization (E) then
-            Check_Restriction
-              (No_Default_Initialization, Declaration_Node (E));
+            Check_Restriction (No_Default_Initialization, Decl);
          end if;
 
          --  Ensure that a variable subject to pragma Thread_Local_Storage
@@ -5066,6 +5069,11 @@ package body Freeze is
          --  variants referenceed by the Variant_Part VP are frozen. This is
          --  a recursive routine to deal with nested variants.
 
+         procedure Warn_If_Implicitly_Inherited_Aspects (Tag_Typ : Entity_Id);
+         --  Report a warning for Tag_Typ when it implicitly inherits the
+         --  First_Controlling_Parameter aspect but does not explicitly
+         --  specify it.
+
          -----------------
          -- Check_Itype --
          -----------------
@@ -5143,6 +5151,193 @@ package body Freeze is
                Next_Non_Pragma (Variant);
             end loop;
          end Freeze_Choices_In_Variant_Part;
+
+         ------------------------------------------
+         -- Warn_If_Implicitly_Inherited_Aspects --
+         ------------------------------------------
+
+         procedure Warn_If_Implicitly_Inherited_Aspects (Tag_Typ : Entity_Id)
+         is
+            function Has_First_Ctrl_Param_Aspect return Boolean;
+            --  Determines if Tag_Typ explicitly has the aspect/pragma
+            --  First_Controlling_Parameter.
+
+            ---------------------------------
+            -- Has_First_Ctrl_Param_Aspect --
+            ---------------------------------
+
+            function Has_First_Ctrl_Param_Aspect return Boolean is
+               Decl_Nod   : constant Node_Id := Parent (Tag_Typ);
+               Asp_Nod    : Node_Id;
+               Nod        : Node_Id;
+               Pragma_Arg : Node_Id;
+               Pragma_Ent : Entity_Id;
+
+            begin
+               pragma Assert (Nkind (Decl_Nod) = N_Full_Type_Declaration);
+
+               if Present (Aspect_Specifications (Decl_Nod)) then
+                  Asp_Nod := First (Aspect_Specifications (Decl_Nod));
+                  while Present (Asp_Nod) loop
+                     if Chars (Identifier (Asp_Nod))
+                       = Name_First_Controlling_Parameter
+                     then
+                        return True;
+                     end if;
+
+                     Next (Asp_Nod);
+                  end loop;
+               end if;
+
+               --  Search for the occurrence of the pragma
+
+               Nod := Next (Decl_Nod);
+               while Present (Nod) loop
+                  if Nkind (Nod) = N_Pragma
+                    and then Chars (Pragma_Identifier (Nod))
+                               = Name_First_Controlling_Parameter
+                    and then Present (Pragma_Argument_Associations (Nod))
+                  then
+                     Pragma_Arg :=
+                       Expression (First (Pragma_Argument_Associations (Nod)));
+
+                     if Nkind (Pragma_Arg) = N_Identifier
+                       and then Present (Entity (Pragma_Arg))
+                     then
+                        Pragma_Ent := Entity (Pragma_Arg);
+
+                        if Pragma_Ent = Tag_Typ
+                          or else
+                            (Is_Concurrent_Type (Pragma_Ent)
+                               and then
+                                 Corresponding_Record_Type (Pragma_Ent)
+                                   = Tag_Typ)
+                        then
+                           return True;
+                        end if;
+                     end if;
+                  end if;
+
+                  Next (Nod);
+               end loop;
+
+               return False;
+            end Has_First_Ctrl_Param_Aspect;
+
+            --  Local Variables
+
+            Has_Aspect_First_Ctrl_Param : constant Boolean :=
+                                            Has_First_Ctrl_Param_Aspect;
+
+         --  Start of processing for Warn_Implicitly_Inherited_Aspects
+
+         begin
+            --  Handle cases where reporting the warning is not needed
+
+            if not Warn_On_Non_Dispatching_Primitives then
+               return;
+
+            --  No check needed when this is the full view of a private type
+            --  declaration since the pragma/aspect must be placed and checked
+            --  in the partial view, and it is implicitly propagated to the
+            --  full view.
+
+            elsif Has_Private_Declaration (Tag_Typ)
+              and then Is_Tagged_Type (Incomplete_Or_Partial_View (Tag_Typ))
+            then
+               return;
+
+            --  Similar case but applied to concurrent types
+
+            elsif Is_Concurrent_Record_Type (Tag_Typ)
+              and then Has_Private_Declaration
+                         (Corresponding_Concurrent_Type (Tag_Typ))
+              and then Is_Tagged_Type
+                         (Incomplete_Or_Partial_View
+                           (Corresponding_Concurrent_Type (Tag_Typ)))
+            then
+               return;
+            end if;
+
+            if Etype (Tag_Typ) /= Tag_Typ
+              and then Has_First_Controlling_Parameter_Aspect (Etype (Tag_Typ))
+            then
+               --  The attribute was implicitly inherited
+               pragma Assert
+                 (Has_First_Controlling_Parameter_Aspect (Tag_Typ));
+
+               --  No warning needed when the current tagged type is not
+               --  an interface type since by definition the aspect is
+               --  implicitly propagated from its parent type; the warning
+               --  is reported on interface types since it may not be so
+               --  clear when some implemented interface types have the
+               --  aspect and other interface types don't have it. For
+               --  interface types, we don't report the warning when the
+               --  interface type is an extension of a single interface
+               --  type (for similarity with the behavior with regular
+               --  tagged types).
+
+               if not Has_Aspect_First_Ctrl_Param
+                 and then Is_Interface (Tag_Typ)
+                 and then not Is_Empty_Elmt_List (Interfaces (Tag_Typ))
+               then
+                  Error_Msg_N
+                    ("?_j?implicitly inherits aspect 'First_'Controlling_'"
+                     & "Parameter!", Tag_Typ);
+                  Error_Msg_NE
+                    ("\?_j?from & and must be confirmed explicitly!",
+                     Tag_Typ, Etype (Tag_Typ));
+               end if;
+
+            elsif Present (Interfaces (Tag_Typ))
+              and then not Is_Empty_Elmt_List (Interfaces (Tag_Typ))
+            then
+               --  To maintain consistency with the behavior when the aspect
+               --  is implicitly inherited from its parent type, we do not
+               --  report a warning for concurrent record types that implement
+               --  a single interface type. By definition, the aspect is
+               --  propagated from that interface type as if it were the parent
+               --  type. For example:
+
+               --     type Iface is interface with First_Controlling_Parameter;
+               --     task type T is new Iface with ...
+
+               if Is_Concurrent_Record_Type (Tag_Typ)
+                 and then No (Next_Elmt (First_Elmt (Interfaces (Tag_Typ))))
+               then
+                  null;
+
+               else
+                  declare
+                     Elmt  : Elmt_Id := First_Elmt (Interfaces (Tag_Typ));
+                     Iface : Entity_Id;
+
+                  begin
+                     while Present (Elmt) loop
+                        Iface := Node (Elmt);
+                        pragma Assert (Present (Iface));
+
+                        if Has_First_Controlling_Parameter_Aspect (Iface)
+                          and then not Has_Aspect_First_Ctrl_Param
+                        then
+                           pragma Assert
+                             (Has_First_Controlling_Parameter_Aspect
+                               (Tag_Typ));
+                           Error_Msg_N
+                             ("?_j?implicitly inherits aspect 'First_'"
+                              & "Controlling_'Parameter", Tag_Typ);
+                           Error_Msg_NE
+                             ("\?_j?from & and must be confirmed explicitly!",
+                              Tag_Typ, Iface);
+                           exit;
+                        end if;
+
+                        Next_Elmt (Elmt);
+                     end loop;
+                  end;
+               end if;
+            end if;
+         end Warn_If_Implicitly_Inherited_Aspects;
 
       --  Start of processing for Freeze_Record_Type
 
@@ -5825,9 +6020,15 @@ package body Freeze is
                then
                   null;
                else
-                  Error_Msg_N
-                    ("Iterator_Element requires indexing aspect",
-                     Iterator_Aspect);
+                  if Get_Aspect_Id (Iterator_Aspect) = Aspect_Iterator_Element
+                  then
+                     Error_Msg_N ("Iterator_Element requires indexing aspect",
+                       Iterator_Aspect);
+
+                  else
+                     Error_Msg_N ("Default_Iterator requires indexing aspect",
+                       Iterator_Aspect);
+                  end if;
                end if;
             end if;
          end;
@@ -5918,6 +6119,13 @@ package body Freeze is
                   Next_Elmt (Elmt);
                end loop;
             end;
+         end if;
+
+         --  For tagged types, warn on an implicitly inherited aspect/pragma
+         --  First_Controlling_Parameter that is not explicitly set.
+
+         if Is_Tagged_Type (Rec) then
+            Warn_If_Implicitly_Inherited_Aspects (Rec);
          end if;
       end Freeze_Record_Type;
 
@@ -6243,9 +6451,11 @@ package body Freeze is
 
          goto Leave;
 
-      --  Do not freeze if we are preanalyzing without freezing
+      --  Do not freeze under strict preanalysis
 
-      elsif Inside_Preanalysis_Without_Freezing > 0 then
+      elsif Preanalysis_Active
+        and then not Within_Spec_Static_Expression (N)
+      then
          Result := No_List;
          goto Leave;
 
@@ -6461,6 +6671,36 @@ package body Freeze is
          end;
       end if;
 
+      if Is_Derived_Type (E) and then Is_First_Subtype (E) then
+
+         --  If a derived type's parent type is not already frozen and has
+         --  delayed aspects, analyze the parent type's aspects at this point,
+         --  so that the following call to update the type's inherited aspects
+         --  will be effective.
+
+         if not Is_Frozen (Etype (E))
+           and then Has_Delayed_Aspects (Etype (E))
+         then
+            Analyze_Aspects_At_Freeze_Point (Etype (E));
+            Set_Has_Delayed_Aspects (Etype (E), False);
+         end if;
+
+         --  Identify the various subprograms associated with any inherited
+         --  nonoverridable aspects at this point rather than allowing them
+         --  to be resolved during analysis.
+
+         Inherit_Nonoverridable_Aspects (E, Etype (E));
+
+         declare
+            Iface : Node_Id := First (Abstract_Interface_List (E));
+         begin
+            while Present (Iface) loop
+               Inherit_Nonoverridable_Aspects (E, Entity (Iface));
+               Next (Iface);
+            end loop;
+         end;
+      end if;
+
       if Has_Delayed_Aspects (E) then
          Analyze_Aspects_At_Freeze_Point (E);
       end if;
@@ -6585,23 +6825,6 @@ package body Freeze is
               and then Within_Scope (Etype (E), Current_Scope)
             then
                Freeze_And_Append (Etype (E), N, Result);
-
-               --  For an object of an anonymous array type, aspects on the
-               --  object declaration apply to the type itself. This is the
-               --  case for Atomic_Components, Volatile_Components, and
-               --  Independent_Components. In these cases analysis of the
-               --  generated pragma will mark the anonymous types accordingly,
-               --  and the object itself does not require a freeze node.
-
-               if Ekind (E) = E_Variable
-                 and then Is_Itype (Etype (E))
-                 and then Is_Array_Type (Etype (E))
-                 and then Has_Delayed_Aspects (E)
-               then
-                  Set_Has_Delayed_Aspects (E, False);
-                  Set_Has_Delayed_Freeze  (E, False);
-                  Set_Freeze_Node (E, Empty);
-               end if;
             end if;
 
             --  Special processing for objects created by object declaration;
@@ -6738,6 +6961,21 @@ package body Freeze is
                  ("\can only be specified for a tagged type", Prag);
             end if;
          end;
+
+         --  If the entity is a declaration of an access-to-subprogram type
+         --  with pre/postcondition contracts, build the wrapper (if it hasn't
+         --  already been done during aspect processing), and propagate the
+         --  pre/postcondition pragmas to the wrapper.
+
+         if Ada_Version >= Ada_2022
+           and then Expander_Active
+           and then Ekind (E) = E_Access_Subprogram_Type
+           and then Nkind (Parent (E)) = N_Full_Type_Declaration
+           and then Present (Contract (Designated_Type (E)))
+           and then not Is_Derived_Type (E)
+         then
+            Build_Access_Subprogram_Wrapper (Parent (E));
+         end if;
 
          --  Deal with special cases of freezing for subtype
 
@@ -7418,16 +7656,16 @@ package body Freeze is
 
                if Ada_Version >= Ada_2005 then
                   Error_Msg_N
-                    ("\would be legal if Storage_Size of 0 given??", E);
+                    ("\would be legal if Storage_Size of 0 given", E);
 
                elsif No_Pool_Assigned (E) then
                   Error_Msg_N
-                    ("\would be legal in Ada 2005??", E);
+                    ("\would be legal in Ada 2005", E);
 
                else
                   Error_Msg_N
                     ("\would be legal in Ada 2005 if "
-                     & "Storage_Size of 0 given??", E);
+                     & "Storage_Size of 0 given", E);
                end if;
             end if;
          end if;
@@ -7793,9 +8031,11 @@ package body Freeze is
          --  generation, and so the size and alignment values for such types
          --  are irrelevant. Ditto for types declared within a generic unit,
          --  which may have components that depend on generic parameters, and
-         --  that will be recreated in an instance.
+         --  that will be recreated in an instance, except for static subtypes
+         --  because they may be referenced in the static expressions of the
+         --  generic unit, which need to be evaluated during its processing.
 
-         if Inside_A_Generic then
+         if Inside_A_Generic and then not Is_Static_Subtype (E) then
             null;
 
          --  Otherwise we call the layout procedure
@@ -8127,10 +8367,9 @@ package body Freeze is
 
       function In_Expanded_Body (N : Node_Id) return Boolean;
       --  Given an N_Handled_Sequence_Of_Statements node, determines whether it
-      --  is the statement sequence of an expander-generated subprogram: body
-      --  created for an expression function, for a predicate function, an init
-      --  proc, a stream subprogram, or a renaming as body. If so, this is not
-      --  a freezing context and the entity will be frozen at a later point.
+      --  is the statement sequence of an expander-generated subprogram body or
+      --  of a renaming_as_body. If so, this is not a freezing context and the
+      --  entity will be frozen at a later point.
 
       function Has_Decl_In_List
         (E : Entity_Id;
@@ -8239,11 +8478,19 @@ package body Freeze is
          then
             return True;
 
+         --  This is the body of a helper/wrapper built for CW preconditions
+
+         elsif Present (Corresponding_Spec (P))
+           and then
+             Present (Class_Preconditions_Subprogram (Corresponding_Spec (P)))
+         then
+            return True;
+
          else
             Id := Defining_Unit_Name (Specification (P));
 
-            --  The following are expander-created bodies, or bodies that
-            --  are not freeze points.
+            --  This is the body of a Type-Specific Support routine or the one
+            --  generated for a renaming_as_body.
 
             if Nkind (Id) = N_Defining_Identifier
               and then (Is_Init_Proc (Id)
@@ -8323,29 +8570,21 @@ package body Freeze is
 
       if Must_Not_Freeze (N) then
          return;
-      end if;
 
-      --  If expression is non-static, then it does not freeze in a default
-      --  expression, see section "Handling of Default Expressions" in the
-      --  spec of package Sem for further details. Note that we have to make
-      --  sure that we actually have a real expression (if we have a subtype
-      --  indication, we can't test Is_OK_Static_Expression). However, we
-      --  exclude the case of the prefix of an attribute of a static scalar
-      --  subtype from this early return, because static subtype attributes
-      --  should always cause freezing, even in default expressions, but
-      --  the attribute may not have been marked as static yet (because in
-      --  Resolve_Attribute, the call to Eval_Attribute follows the call of
-      --  Freeze_Expression on the prefix).
+      elsif Preanalysis_Active then
 
-      if In_Spec_Exp
-        and then Nkind (N) in N_Subexpr
-        and then not Is_OK_Static_Expression (N)
-        and then (Nkind (Parent (N)) /= N_Attribute_Reference
-                   or else not (Is_Entity_Name (N)
-                                 and then Is_Type (Entity (N))
-                                 and then Is_OK_Static_Subtype (Entity (N))))
-      then
-         return;
+         --  Do not freeze under strict preanalysis
+
+         if not In_Spec_Exp then
+            return;
+
+         --  If expression is non-static, then it does not freeze in a default
+         --  expression, see section "Handling of Default Expressions" in the
+         --  spec of package Sem for further details.
+
+         elsif not Within_Spec_Static_Expression (N) then
+            return;
+         end if;
       end if;
 
       --  Freeze type of expression if not frozen already
@@ -8817,8 +9056,9 @@ package body Freeze is
         or else Ekind (Current_Scope) = E_Void
       then
          declare
-            Freeze_Nodes : List_Id := No_List;
-            Pos          : Int     := Scope_Stack.Last;
+            Freeze_Nodes : List_Id   := No_List;
+            Pos          : Int       := Scope_Stack.Last;
+            Scop         : Entity_Id := Current_Scope;
 
          begin
             if Present (Desig_Typ) then
@@ -8845,12 +9085,18 @@ package body Freeze is
             --  If the expression is within a top-level pragma, as for a pre-
             --  condition on a library-level subprogram, nothing to do.
 
-            if not Is_Compilation_Unit (Current_Scope)
-              and then (Is_Record_Type (Scope (Current_Scope))
-                         or else (Ekind (Current_Scope) in E_Block | E_Loop
-                                   and then Is_Internal (Current_Scope)))
-            then
-               Pos := Pos - 1;
+            if not Is_Compilation_Unit (Scop) then
+               if Is_Record_Type (Scope (Scop)) then
+                  Pos := Pos - 1;
+
+               else
+                  while Ekind (Scop) in E_Block | E_Loop
+                    and then Is_Internal (Scop)
+                  loop
+                     Pos  := Pos - 1;
+                     Scop := Scope (Scop);
+                  end loop;
+               end if;
             end if;
 
             if Is_Non_Empty_List (Freeze_Nodes) then
@@ -9143,10 +9389,12 @@ package body Freeze is
       --  pre/postconditions during expansion of the subprogram body, the
       --  subprogram is already installed.
 
+      --  Call Preanalyze_Spec_Expression instead of Preanalyze_And_Resolve
+      --  for the sake of consistency with Analyze_Expression_Function.
+
       if Def_Id /= Current_Scope then
          Push_Scope (Def_Id);
          Install_Formals (Def_Id);
-
          Preanalyze_Spec_Expression (Dup_Expr, Typ);
          End_Scope;
       else
@@ -10276,6 +10524,86 @@ package body Freeze is
       then
          Check_Overriding_Indicator (E, Empty, Is_Primitive (E));
       end if;
+
+      --  Check illegal subprograms of tagged types and interface types that
+      --  have aspect/pragma First_Controlling_Parameter.
+
+      if Comes_From_Source (E)
+        and then Is_Abstract_Subprogram (E)
+      then
+         if Is_Dispatching_Operation (E) then
+            if Ekind (E) = E_Function
+              and then Is_Interface (Etype (E))
+              and then not Is_Class_Wide_Type (Etype (E))
+              and then Has_First_Controlling_Parameter_Aspect
+                         (Find_Dispatching_Type (E))
+            then
+               Error_Msg_NE
+                 ("'First_'Controlling_'Parameter disallows returning a "
+                  & "non-class-wide interface type",
+                  E, Etype (E));
+            end if;
+
+         else
+            --  The type of the formals cannot be an interface type
+
+            if Present (First_Formal (E)) then
+               declare
+                  Formal     : Entity_Id := First_Formal (E);
+                  Has_Aspect : Boolean := False;
+
+               begin
+                  --  Check if some formal has the aspect
+
+                  while Present (Formal) loop
+                     if Is_Tagged_Type (Etype (Formal))
+                       and then
+                         Has_First_Controlling_Parameter_Aspect
+                           (Etype (Formal))
+                     then
+                        Has_Aspect := True;
+                     end if;
+
+                     Next_Formal (Formal);
+                  end loop;
+
+                  --  If the aspect is present then report the error
+
+                  if Has_Aspect then
+                     Formal := First_Formal (E);
+
+                     while Present (Formal) loop
+                        if Is_Interface (Etype (Formal))
+                          and then not Is_Class_Wide_Type (Etype (Formal))
+                        then
+                           Error_Msg_NE
+                             ("not a dispatching primitive of interface type&",
+                              E, Etype (Formal));
+                           Error_Msg_N
+                             ("\disallowed by 'First_'Controlling_'Parameter "
+                              & "aspect", E);
+                        end if;
+
+                        Next_Formal (Formal);
+                     end loop;
+                  end if;
+               end;
+            end if;
+
+            if Ekind (E) = E_Function
+              and then Is_Interface (Etype (E))
+              and then not Is_Class_Wide_Type (Etype (E))
+              and then Has_First_Controlling_Parameter_Aspect (Etype (E))
+            then
+               Error_Msg_NE
+                 ("not a dispatching primitive of interface type&",
+                  E, Etype (E));
+               Error_Msg_N
+                 ("\disallowed by 'First_'Controlling_'Parameter "
+                  & "aspect", E);
+            end if;
+         end if;
+      end if;
    end Freeze_Subprogram;
 
    ----------------------
@@ -10719,6 +11047,12 @@ package body Freeze is
          return;
       end if;
 
+      --  No warning if there is no default initialization
+
+      if No_Initialization (Declaration_Node (Ent)) then
+         return;
+      end if;
+
       --  We only give the warning for non-imported entities of a type for
       --  which a non-null base init proc is defined, or for objects of access
       --  types with implicit null initialization, or when Normalize_Scalars
@@ -10821,7 +11155,7 @@ package body Freeze is
                   then
                      Error_Msg_NE
                        ("\packed array component& " &
-                        "will be initialized to zero??",
+                        "will be initialized to zero?o?",
                         Nam, Comp);
                      exit;
                   else
@@ -10833,7 +11167,7 @@ package body Freeze is
 
          Error_Msg_N
            ("\use pragma Import for & to " &
-            "suppress initialization (RM B.1(24))??",
+            "suppress initialization (RM B.1(24))?o?",
             Nam);
       end if;
    end Warn_Overlay;

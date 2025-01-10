@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2024, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -275,6 +275,23 @@ package body Sinput is
       Build_Location_String (Buf, Loc);
       return +Buf;
    end Build_Location_String;
+
+   ---------------------
+   -- C_Source_Buffer --
+   ---------------------
+
+   function C_Source_Buffer (S : SFI) return C_Array is
+      Length : constant Integer :=
+        Integer (Source_Last (S) - Source_First (S));
+
+      Text : constant Source_Buffer_Ptr := Source_Text (S);
+
+      Pointer : constant access constant Character :=
+        (if Length = 0 then null else
+          Text (Text'First)'Access);
+   begin
+      return (Pointer, Length);
+   end C_Source_Buffer;
 
    -------------------
    -- Check_For_BOM --

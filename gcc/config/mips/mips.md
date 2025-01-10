@@ -1,5 +1,5 @@
 ;;  Mips.md	     Machine Description for MIPS based processors
-;;  Copyright (C) 1989-2024 Free Software Foundation, Inc.
+;;  Copyright (C) 1989-2025 Free Software Foundation, Inc.
 ;;  Contributed by   A. Lichnewsky, lich@inria.inria.fr
 ;;  Changes by       Michael Meissner, meissner@osf.org
 ;;  64-bit r4000 support by Ian Lance Taylor, ian@cygnus.com, and
@@ -992,6 +992,10 @@
 ;; This code iterator allows the three shift instructions to be generated
 ;; from the same template.
 (define_code_iterator any_shift [ashift ashiftrt lshiftrt])
+
+;; This code iterator allows the three bitwise instructions to be generated
+;; from the same template.
+(define_code_iterator any_bitwise [and ior xor])
 
 ;; This code iterator allows unsigned and signed division to be generated
 ;; from the same template.
@@ -7391,6 +7395,8 @@
       else
 	return "lw\t$0,%a0";
     }
+  if (operands[1] == const2_rtx)
+    operands[1] = const0_rtx;
   /* Loongson ext2 implementation pref instructions.  */
   if (TARGET_LOONGSON_EXT2)
     {

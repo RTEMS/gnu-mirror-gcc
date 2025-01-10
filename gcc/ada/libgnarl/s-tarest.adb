@@ -6,7 +6,7 @@
 --                                                                          --
 --                                  B o d y                                 --
 --                                                                          --
---         Copyright (C) 1999-2024, Free Software Foundation, Inc.          --
+--         Copyright (C) 1999-2025, Free Software Foundation, Inc.          --
 --                                                                          --
 -- GNARL is free software; you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -514,7 +514,8 @@ package body System.Tasking.Restricted.Stages is
 
       Initialize_ATCB
         (Self_ID, State, Discriminants, Self_ID, Elaborated, Base_Priority,
-         Base_CPU, null, Task_Info, Stack_Size, Created_Task, Success);
+         Base_CPU, CPU /= Unspecified_CPU, null, Task_Info, Stack_Size,
+         Created_Task, Success);
 
       --  If we do our job right then there should never be any failures, which
       --  was probably said about the Titanic; so just to be safe, let's retain

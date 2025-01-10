@@ -1,5 +1,5 @@
 /* Code for GIMPLE range op related routines.
-   Copyright (C) 2019-2024 Free Software Foundation, Inc.
+   Copyright (C) 2019-2025 Free Software Foundation, Inc.
    Contributed by Andrew MacLeod <amacleod@redhat.com>
    and Aldy Hernandez <aldyh@redhat.com>.
 
@@ -972,8 +972,10 @@ cfn_clz::fold_range (irange &r, tree type, const irange &lh,
     {
       // If CLZ_DEFINED_VALUE_AT_ZERO is 2 with VALUE of prec,
       // return [prec, prec] or [-1, -1], otherwise ignore the range.
-      if (maxi == prec || mini == -1)
-	mini = maxi;
+      if (maxi == prec)
+	mini = prec;
+      else if (mini == -1)
+	maxi = -1;
     }
   else if (mini >= 0)
     mini = newmini;

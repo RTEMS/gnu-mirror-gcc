@@ -1,5 +1,5 @@
-;; Predicate definitions for ATMEL AVR micro controllers.
-;; Copyright (C) 2006-2024 Free Software Foundation, Inc.
+;; Insn predicate definitions for AVR 8-bit microcontrollers.
+;; Copyright (C) 2006-2025 Free Software Foundation, Inc.
 ;;
 ;; This file is part of GCC.
 ;;
@@ -27,7 +27,7 @@
   (and (match_code "reg")
        (match_test "REGNO (op) >= 16 && REGNO (op) <= 31")))
 
-(define_predicate "scratch_or_d_register_operand"
+(define_predicate "scratch_or_dreg_operand"
   (ior (match_operand 0 "d_register_operand")
        (and (match_code ("scratch"))
             (match_operand 0 "scratch_operand"))))
@@ -89,6 +89,7 @@
 (define_predicate "nox_general_operand"
   (and (match_operand 0 "general_operand")
        (not (match_test "avr_load_libgcc_p (op)"))
+       (not (match_test "avr_mem_flashx_p (op)"))
        (not (match_test "avr_mem_memx_p (op)"))))
 
 ;; Return 1 if OP is the zero constant for MODE.
@@ -147,6 +148,11 @@
   (and (match_code "const_int")
        (match_test "IN_RANGE (INTVAL (op), 2, 7)")))
 
+;; Return true if OP is constant integer 1..3 for MODE.
+(define_predicate "const_1_to_3_operand"
+  (and (match_code "const_int")
+       (match_test "IN_RANGE (INTVAL (op), 1, 3)")))
+
 ;; Return 1 if OP is constant integer 1..6 for MODE.
 (define_predicate "const_1_to_6_operand"
   (and (match_code "const_int")
@@ -162,9 +168,20 @@
   (and (match_code "const_int")
        (match_test "IN_RANGE (INTVAL (op), -255, -1)")))
 
+;; Return true if OP is a CONST_INT in { -2, -1, 1, 2 }.
+(define_predicate "abs1_abs2_operand"
+  (and (match_code "const_int")
+       (match_test "INTVAL (op) != 0")
+       (match_test "IN_RANGE (INTVAL (op), -2, 2)")))
+
 ;; Returns true if OP is either the constant zero or a register.
 (define_predicate "reg_or_0_operand"
   (ior (match_operand 0 "register_operand")
+       (match_operand 0 "const0_operand")))
+
+;; Returns true if OP is either the constant zero or an upper register.
+(define_predicate "dreg_or_0_operand"
+  (ior (match_operand 0 "d_register_operand")
        (match_operand 0 "const0_operand")))
 
 ;; Returns 1 if OP is a SYMBOL_REF.
@@ -242,9 +259,29 @@
   (and (match_operand 0 "comparison_operator")
        (not (match_code "gt,gtu,le,leu"))))
 
+;; True for EQ, NE, GE, LT, GT, LE
+(define_predicate "signed_comparison_operator"
+  (match_code "eq,ne,ge,lt,gt,le"))
+
 ;; True for SIGN_EXTEND, ZERO_EXTEND.
 (define_predicate "extend_operator"
   (match_code "sign_extend,zero_extend"))
+
+;; True for 8-bit operations that set SREG.N and SREG.Z in a
+;; usable way:
+;; * OP0 is a QImode register, and
+;; * OP1 is a QImode register or CONST_INT, and
+;;
+;; the allowed operations is one of:
+;;
+;; * SHIFTs with a const_int offset in { 1, 2, 3 }.
+;; * MINUS and XOR with a register operand
+;; * IOR and AND with a register operand, or d-reg + const_int
+;; * PLUS with a register operand, or d-reg + const_int,
+;;   or a const_int in { -2, -1, 1, 2 }.  */
+(define_predicate "op8_ZN_operator"
+  (and (match_code "plus,minus,ashift,ashiftrt,lshiftrt,and,ior,xor")
+       (match_test "avr_op8_ZN_operator (op)")))
 
 ;; Return true if OP is a valid call operand.
 (define_predicate "call_insn_operand"
@@ -343,3 +380,7 @@
   (ior (match_code "const_fixed")
        (match_code "const_double")
        (match_operand 0 "immediate_operand")))
+
+(define_predicate "set_some_operation"
+  (and (match_code "parallel")
+       (match_test "avr_set_some_operation (op)")))

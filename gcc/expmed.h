@@ -1,5 +1,5 @@
 /* Target-dependent costs for expmed.cc.
-   Copyright (C) 1987-2024 Free Software Foundation, Inc.
+   Copyright (C) 1987-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -726,5 +726,6 @@ extern rtx expand_mult_highpart_adjust (scalar_int_mode, rtx, rtx, rtx,
 					rtx, int);
 extern rtx expmed_mult_highpart_optab (scalar_int_mode, rtx, rtx, rtx,
 				       int, int);
+extern rtx expand_rotate_as_vec_perm (machine_mode, rtx, rtx, rtx);
 
 #endif  // EXPMED_H

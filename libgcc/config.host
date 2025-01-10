@@ -1,5 +1,5 @@
 # libgcc host-specific configuration file.
-# Copyright (C) 1997-2024 Free Software Foundation, Inc.
+# Copyright (C) 1997-2025 Free Software Foundation, Inc.
 
 #This file is part of GCC.
 
@@ -51,8 +51,10 @@
 #			If either is set, EXTRA_PARTS and
 #			EXTRA_MULTILIB_PARTS inherited from the GCC
 #			subdirectory will be ignored.
-#  md_unwind_header	The name of a header file defining
-#			MD_FALLBACK_FRAME_STATE_FOR.
+#  md_unwind_def_header The name of a header file defining architecture
+#			-specific frame information types for unwinding.
+#  md_unwind_header	The name of a header file defining architecture
+#			-specific handlers used in the unwinder.
 #  sfp_machine_header	The name of a sfp-machine.h header file for soft-fp.
 #  			Defaults to "$cpu_type/sfp-machine.h" if it exists,
 #			no-sfp-machine.h otherwise.
@@ -72,6 +74,7 @@ extra_parts=
 tmake_file=
 tm_file=
 tm_define=
+md_unwind_def_header=no-unwind.h
 md_unwind_header=no-unwind.h
 unwind_header=unwind-generic.h
 
@@ -180,9 +183,6 @@ mips*-*-*)
 nds32*-*)
 	cpu_type=nds32
 	;;
-nios2*-*-*)
-	cpu_type=nios2
-	;;
 or1k*-*-*)
 	cpu_type=or1k
 	;;
@@ -236,19 +236,25 @@ case ${host} in
   esac
   tmake_file="$tmake_file t-slibgcc-darwin"
   case ${host} in
-    *-*-darwin1[89]* | *-*-darwin2* )
-      tmake_file="t-darwin-min-8 $tmake_file"
+    x86_64-*-darwin2[0-2]*)
+      tmake_file="t-darwin-min-11 t-darwin-libgccs1 $tmake_file"
+      ;;
+    *-*-darwin2*)
+      tmake_file="t-darwin-min-11 $tmake_file"
+      ;;
+    *-*-darwin1[89]*)
+      tmake_file="t-darwin-min-8 t-darwin-libgccs1 $tmake_file"
       ;;
     *-*-darwin9* | *-*-darwin1[0-7]*)
-      tmake_file="t-darwin-min-5 $tmake_file"
+      tmake_file="t-darwin-min-5 t-darwin-libgccs1 $tmake_file"
       ;;
     *-*-darwin[4-8]*)
-      tmake_file="t-darwin-min-1 $tmake_file"
+      tmake_file="t-darwin-min-1 t-darwin-libgccs1 $tmake_file"
       ;;
     *)
       # Fall back to configuring for the oldest system known to work with
       # all archs and the current sources.
-      tmake_file="t-darwin-min-5 $tmake_file"
+      tmake_file="t-darwin-min-5 t-darwin-libgccs1 $tmake_file"
       echo "Warning: libgcc configured to support macOS 10.5" 1>&2
       ;;
   esac
@@ -403,6 +409,7 @@ aarch64*-*-elf | aarch64*-*-rtems*)
 	tmake_file="${tmake_file} ${cpu_type}/t-lse t-slibgcc-libgcc"
 	tmake_file="${tmake_file} ${cpu_type}/t-softfp t-softfp t-crtfm"
 	tmake_file="${tmake_file} t-dfprules"
+	md_unwind_def_header=aarch64/aarch64-unwind-def.h
 	md_unwind_header=aarch64/aarch64-unwind.h
 	;;
 aarch64*-*-freebsd*)
@@ -411,6 +418,7 @@ aarch64*-*-freebsd*)
 	tmake_file="${tmake_file} ${cpu_type}/t-lse t-slibgcc-libgcc"
 	tmake_file="${tmake_file} ${cpu_type}/t-softfp t-softfp t-crtfm"
 	tmake_file="${tmake_file} t-dfprules"
+	md_unwind_def_header=aarch64/aarch64-unwind-def.h
 	md_unwind_header=aarch64/freebsd-unwind.h
 	;;
 aarch64*-*-netbsd*)
@@ -418,6 +426,7 @@ aarch64*-*-netbsd*)
 	tmake_file="${tmake_file} ${cpu_type}/t-aarch64"
 	tmake_file="${tmake_file} ${cpu_type}/t-softfp t-softfp t-crtfm"
 	tmake_file="${tmake_file} t-dfprules"
+	md_unwind_def_header=aarch64/aarch64-unwind-def.h
 	md_unwind_header=aarch64/aarch64-unwind.h
 	;;
 aarch64*-*-fuchsia*)
@@ -428,6 +437,7 @@ aarch64*-*-fuchsia*)
 	;;
 aarch64*-*-linux*)
 	extra_parts="$extra_parts crtfastmath.o"
+	md_unwind_def_header=aarch64/aarch64-unwind-def.h
 	md_unwind_header=aarch64/linux-unwind.h
 	tmake_file="${tmake_file} ${cpu_type}/t-aarch64"
 	tmake_file="${tmake_file} ${cpu_type}/t-lse t-slibgcc-libgcc"
@@ -437,6 +447,7 @@ aarch64*-*-linux*)
 	;;
 aarch64*-*-gnu*)
 	extra_parts="$extra_parts crtfastmath.o"
+	md_unwind_def_header=aarch64/aarch64-unwind-def.h
 	md_unwind_header=aarch64/gnu-unwind.h
 	tmake_file="${tmake_file} ${cpu_type}/t-aarch64"
 	tmake_file="${tmake_file} ${cpu_type}/t-lse t-slibgcc-libgcc"
@@ -446,6 +457,7 @@ aarch64*-*-gnu*)
 	;;
 aarch64*-*-vxworks7*)
 	extra_parts="$extra_parts crtfastmath.o"
+	md_unwind_def_header=aarch64/aarch64-unwind-def.h
 	md_unwind_header=aarch64/aarch64-unwind.h
 	tmake_file="${tmake_file} ${cpu_type}/t-aarch64"
 	tmake_file="${tmake_file} ${cpu_type}/t-lse"
@@ -464,6 +476,7 @@ aarch64-*-mingw*)
 	tmake_file="${tmake_file} ${cpu_type}/t-no-eh ${tmake_thr_file}"
 	tmake_file="${tmake_file} t-dfprules"
 	tmake_file="${tmake_file} ${cpu_type}/t-aarch64"
+	tmake_file="${tmake_file} ${cpu_type}/t-mingw"
 	tmake_file="${tmake_file} ${cpu_type}/t-lse"
 	tmake_file="${tmake_file} ${cpu_type}/t-softfp t-softfp t-crtfm"
 	;;
@@ -1183,15 +1196,6 @@ nds32*-elf*)
 		;;
 	esac
 	;;
-nios2-*-linux*)
-	tmake_file="$tmake_file nios2/t-nios2 nios2/t-linux t-libgcc-pic t-eh-dw2-dip t-slibgcc-libgcc"
-	tm_file="$tm_file nios2/elf-lib.h"
-	md_unwind_header=nios2/linux-unwind.h
-	;;
-nios2-*-*)
-	tmake_file="$tmake_file nios2/t-nios2 t-softfp-sfdf t-softfp-excl t-softfp"
-	extra_parts="$extra_parts crti.o crtn.o"
-	;;
 or1k-*-linux*)
 	tmake_file="$tmake_file or1k/t-or1k or1k/t-crtstuff"
 	tmake_file="$tmake_file t-softfp-sfdf t-softfp"
@@ -1399,7 +1403,7 @@ s390x-ibm-tpf*)
 	md_unwind_header=s390/tpf-unwind.h
 	;;
 sh-*-elf* | sh[12346l]*-*-elf*)
-	tmake_file="$tmake_file sh/t-sh t-crtstuff-pic t-fdpbit"
+	tmake_file="$tmake_file sh/t-sh t-crtstuff-pic t-softfp-sfdf t-softfp"
 	extra_parts="$extra_parts crt1.o crti.o crtn.o crtbeginS.o crtendS.o \
 		libic_invalidate_array_4-100.a \
 		libic_invalidate_array_4-200.a \

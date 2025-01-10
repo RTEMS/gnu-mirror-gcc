@@ -1,5 +1,5 @@
 /* Subroutines used for MIPS code generation.
-   Copyright (C) 1989-2024 Free Software Foundation, Inc.
+   Copyright (C) 1989-2025 Free Software Foundation, Inc.
    Contributed by A. Lichnewsky, lich@inria.inria.fr.
    Changes by Michael Meissner, meissner@osf.org.
    64-bit r4000 support by Ian Lance Taylor, ian@cygnus.com, and
@@ -2803,7 +2803,7 @@ mips_lwxs_address_p (rtx addr)
   return false;
 }
 
-/* Return true if ADDR matches the pattern for the L{B,H,W,D}{,U}X load 
+/* Return true if ADDR matches the pattern for the L{B,H,W,D}{,U}X load
    indexed address instruction.  Note that such addresses are
    not considered legitimate in the TARGET_LEGITIMATE_ADDRESS_P
    sense, because their use is so restricted.  */
@@ -4454,7 +4454,7 @@ mips_rtx_costs (rtx x, machine_mode mode, int outer_code,
 		    + set_src_cost (XEXP (XEXP (x, 1), 0), mode, speed));
 	  return true;
 	}
-	    
+
       /* Fall through.  */
 
     case IOR:
@@ -12545,7 +12545,7 @@ mips_output_probe_stack_range (rtx reg1, rtx reg2)
   /* Probe at TEST_ADDR, test if TEST_ADDR == LAST_ADDR and branch.  */
   xops[1] = reg2;
   strcpy (tmp, "%(%<bne\t%0,%1,");
-  output_asm_insn (strcat (tmp, &loop_lab[1]), xops); 
+  output_asm_insn (strcat (tmp, &loop_lab[1]), xops);
   if (TARGET_64BIT)
     output_asm_insn ("sd\t$0,0(%0)%)", xops);
   else
@@ -13729,7 +13729,7 @@ mips_memory_move_cost (machine_mode mode, reg_class_t rclass, bool in)
 {
   return (mips_cost->memory_latency
 	  + memory_move_secondary_cost (mode, rclass, in));
-} 
+}
 
 /* Implement TARGET_SECONDARY_MEMORY_NEEDED.
 
@@ -14997,7 +14997,7 @@ bool
 mips_fmadd_bypass (rtx_insn *out_insn, rtx_insn *in_insn)
 {
   int dst_reg, src_reg;
-  
+
   gcc_assert (get_attr_type (in_insn) == TYPE_FMADD);
   gcc_assert (get_attr_type (out_insn) == TYPE_FMADD);
 
@@ -22239,6 +22239,47 @@ mips_vectorize_vec_perm_const (machine_mode vmode, machine_mode op_mode,
   return ok;
 }
 
+/* Expand a vector reduction.  FN is the binary pattern to reduce;
+   DEST is the destination; IN is the input vector.  */
+
+void
+mips_expand_msa_reduc (rtx (*fn) (rtx, rtx, rtx), rtx dest, rtx in)
+{
+  rtx swap, vec = in;
+  machine_mode mode = GET_MODE (in);
+  unsigned int i, gelt;
+  const unsigned nelt = GET_MODE_BITSIZE (mode) / GET_MODE_UNIT_BITSIZE (mode);
+  unsigned char perm[MAX_VECT_LEN];
+
+  /* We have no SHF.d.  */
+  if (nelt == 2)
+    {
+      perm[0] = 2;
+      perm[1] = 3;
+      perm[2] = 0;
+      perm[3] = 1;
+      rtx rsi = simplify_gen_subreg (V4SImode, in, mode, 0);
+      swap = gen_reg_rtx (V4SImode);
+      mips_expand_vselect (swap, rsi, perm, 4);
+      emit_move_insn (dest, gen_rtx_SUBREG (mode, swap, 0));
+      emit_insn (fn (dest, dest, vec));
+      return;
+    }
+
+  for (gelt=1; gelt<=nelt/2; gelt *= 2)
+    {
+      for (i = 0; i<nelt; i++)
+	perm[i] = ((i/gelt)%2) ? (i-gelt) : (i+gelt);
+      if (gelt == nelt/2)
+	swap = dest;
+      else
+	swap = gen_reg_rtx (mode);
+      mips_expand_vselect (swap, vec, perm, nelt);
+      emit_insn (fn (swap, swap, vec));
+      vec = swap;
+    }
+}
+
 /* Implement TARGET_SCHED_REASSOCIATION_WIDTH.  */
 
 static int
@@ -23582,6 +23623,9 @@ mips_bit_clear_p (enum machine_mode mode, unsigned HOST_WIDE_INT m)
 
 #undef TARGET_C_MODE_FOR_FLOATING_TYPE
 #define TARGET_C_MODE_FOR_FLOATING_TYPE mips_c_mode_for_floating_type
+
+#undef TARGET_DOCUMENTATION_NAME
+#define TARGET_DOCUMENTATION_NAME "MIPS"
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

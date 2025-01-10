@@ -1,5 +1,5 @@
 /* Generate CodeView debugging info from the GCC DWARF.
-   Copyright (C) 2023 Free Software Foundation, Inc.
+   Copyright (C) 2023-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -44,6 +44,7 @@ along with GCC; see the file COPYING3.  If not see
 #define DEBUG_S_LINES		0xf2
 #define DEBUG_S_STRINGTABLE     0xf3
 #define DEBUG_S_FILECHKSMS      0xf4
+#define DEBUG_S_INLINEELINES	0xf6
 
 #define CHKSUM_TYPE_MD5		1
 
@@ -52,6 +53,8 @@ along with GCC; see the file COPYING3.  If not see
 
 #define CV_CFL_C		0x00
 #define CV_CFL_CXX		0x01
+
+#define CV_INLINEE_SOURCE_LINE_SIGNATURE	0x0
 
 #define FIRST_TYPE		0x1000
 
@@ -71,14 +74,20 @@ along with GCC; see the file COPYING3.  If not see
 
 enum cv_sym_type {
   S_END = 0x0006,
+  S_FRAMEPROC = 0x1012,
   S_BLOCK32 = 0x1103,
   S_REGISTER = 0x1106,
   S_LDATA32 = 0x110c,
   S_GDATA32 = 0x110d,
   S_REGREL32 = 0x1111,
   S_COMPILE3 = 0x113c,
+  S_LOCAL = 0x113e,
+  S_DEFRANGE_REGISTER = 0x1141,
+  S_DEFRANGE_REGISTER_REL = 0x1145,
   S_LPROC32_ID = 0x1146,
   S_GPROC32_ID = 0x1147,
+  S_INLINESITE = 0x114d,
+  S_INLINESITE_END = 0x114e,
   S_PROC_ID_END = 0x114f
 };
 
@@ -91,9 +100,12 @@ enum cv_leaf_type {
   LF_MODIFIER = 0x1001,
   LF_POINTER = 0x1002,
   LF_PROCEDURE = 0x1008,
+  LF_MFUNCTION = 0x1009,
   LF_ARGLIST = 0x1201,
   LF_FIELDLIST = 0x1203,
   LF_BITFIELD = 0x1205,
+  LF_METHODLIST = 0x1206,
+  LF_BCLASS = 0x1400,
   LF_INDEX = 0x1404,
   LF_ENUMERATE = 0x1502,
   LF_ARRAY = 0x1503,
@@ -102,7 +114,13 @@ enum cv_leaf_type {
   LF_UNION = 0x1506,
   LF_ENUM = 0x1507,
   LF_MEMBER = 0x150d,
+  LF_STMEMBER = 0x150e,
+  LF_METHOD = 0x150f,
+  LF_NESTTYPE = 0x1510,
+  LF_ONEMETHOD = 0x1511,
   LF_FUNC_ID = 0x1601,
+  LF_MFUNC_ID = 0x1602,
+  LF_STRING_ID = 0x1605,
   LF_CHAR = 0x8000,
   LF_SHORT = 0x8001,
   LF_USHORT = 0x8002,
@@ -1068,6 +1086,25 @@ enum cv_amd64_register {
   CV_AMD64_YMM15D3 = 687
 };
 
+/* This is enum BinaryAnnotationOpcode in Microsoft's cvinfo.h.  */
+
+enum binary_annotation_opcode {
+  ba_op_invalid,
+  ba_op_code_offset,
+  ba_op_change_code_offset_base,
+  ba_op_change_code_offset,
+  ba_op_change_code_length,
+  ba_op_change_file,
+  ba_op_change_line_offset,
+  ba_op_change_line_end_delta,
+  ba_op_change_range_kind,
+  ba_op_change_column_start,
+  ba_op_change_column_end_delta,
+  ba_op_change_code_offset_and_line_offset,
+  ba_op_change_code_length_and_code_offset,
+  ba_op_change_column_end
+};
+
 struct codeview_string
 {
   codeview_string *next;
@@ -1128,12 +1165,24 @@ struct codeview_line_block
   codeview_line *lines, *last_line;
 };
 
+struct codeview_inlinee_lines
+{
+  codeview_inlinee_lines *next;
+  uint32_t func_id;
+  uint32_t file_id;
+  uint32_t starting_line;
+};
+
 struct codeview_function
 {
   codeview_function *next;
+  codeview_function *htab_next;
   function *func;
   unsigned int end_label;
   codeview_line_block *blocks, *last_block;
+  codeview_function *parent;
+  unsigned int inline_block;
+  location_t inline_loc;
 };
 
 struct codeview_symbol
@@ -1213,7 +1262,42 @@ struct codeview_subtype
       codeview_integer offset;
       char *name;
     } lf_member;
+    struct
+    {
+      uint16_t attributes;
+      uint32_t type;
+      char *name;
+    } lf_static_member;
+    struct
+    {
+      uint16_t method_attribute;
+      uint32_t method_type;
+      char *name;
+    } lf_onemethod;
+    struct
+    {
+      uint16_t count;
+      uint32_t method_list;
+      char *name;
+    } lf_method;
+    struct
+    {
+      uint16_t attributes;
+      uint32_t base_class_type;
+      codeview_integer offset;
+    } lf_bclass;
+    struct
+    {
+      uint32_t type;
+      char *name;
+    } lf_nesttype;
   };
+};
+
+struct lf_methodlist_entry
+{
+  uint16_t method_attribute;
+  uint32_t method_type;
 };
 
 struct codeview_custom_type
@@ -1228,6 +1312,8 @@ struct codeview_custom_type
     {
       uint32_t base_type;
       uint32_t attributes;
+      uint32_t containing_class;
+      uint16_t ptr_to_mem_type;
     } lf_pointer;
     struct
     {
@@ -1289,6 +1375,33 @@ struct codeview_custom_type
       uint32_t function_type;
       char *name;
     } lf_func_id;
+    struct
+    {
+      uint32_t parent_type;
+      uint32_t function_type;
+      char *name;
+    } lf_mfunc_id;
+    struct
+    {
+      uint32_t substring;
+      char *string;
+    } lf_string_id;
+    struct
+    {
+      uint32_t return_type;
+      uint32_t containing_class_type;
+      uint32_t this_type;
+      uint8_t calling_convention;
+      uint8_t attributes;
+      uint16_t num_parameters;
+      uint32_t arglist;
+      int32_t this_adjustment;
+    } lf_mfunction;
+    struct
+    {
+      unsigned int count;
+      lf_methodlist_entry *entries;
+    } lf_methodlist;
   };
 };
 
@@ -1296,6 +1409,71 @@ struct codeview_deferred_type
 {
   struct codeview_deferred_type *next;
   dw_die_ref type;
+};
+
+struct string_id_hasher : nofree_ptr_hash <struct codeview_custom_type>
+{
+  typedef const char *compare_type;
+
+  static hashval_t hash (const codeview_custom_type *x)
+  {
+    return htab_hash_string (x->lf_string_id.string);
+  }
+
+  static bool equal (const codeview_custom_type *x, const char *y)
+  {
+    return !strcmp (x->lf_string_id.string, y);
+  }
+};
+
+struct codeview_method
+{
+  uint16_t attribute;
+  uint32_t type;
+  char *name;
+  unsigned int count;
+  struct codeview_method *next;
+  struct codeview_method *last;
+};
+
+struct method_hasher : nofree_ptr_hash <struct codeview_method>
+{
+  typedef const char *compare_type;
+
+  static hashval_t hash (const codeview_method *x)
+  {
+    return htab_hash_string (x->name);
+  }
+
+  static bool equal (const codeview_method *x, const char *y)
+  {
+    return !strcmp (x->name, y);
+  }
+};
+
+struct inlinee_lines_hasher : free_ptr_hash <struct codeview_inlinee_lines>
+{
+  typedef uint32_t compare_type;
+
+  static hashval_t hash (const codeview_inlinee_lines *il)
+  {
+    return il->func_id;
+  }
+
+  static bool equal (const codeview_inlinee_lines *il, uint32_t func_id)
+  {
+    return il->func_id == func_id;
+  }
+};
+
+struct cv_func_hasher : nofree_ptr_hash <struct codeview_function>
+{
+  typedef dw_die_ref compare_type;
+
+  static bool equal (const codeview_function *f, dw_die_ref die)
+  {
+    return lookup_decl_die (f->func->decl) == die;
+  }
 };
 
 static unsigned int line_label_num;
@@ -1306,15 +1484,99 @@ static unsigned int num_files;
 static uint32_t string_offset = 1;
 static hash_table<string_hasher> *strings_htab;
 static codeview_string *strings, *last_string;
-static codeview_function *funcs, *last_func;
+static codeview_function *funcs, *last_func, *cur_func;
 static const char* last_filename;
 static uint32_t last_file_id;
 static codeview_symbol *sym, *last_sym;
-static hash_table<die_hasher> *types_htab;
+static hash_table<die_hasher> *types_htab, *func_htab;
 static codeview_custom_type *custom_types, *last_custom_type;
 static codeview_deferred_type *deferred_types, *last_deferred_type;
+static hash_table<string_id_hasher> *string_id_htab;
+static hash_table<inlinee_lines_hasher> *inlinee_lines_htab;
+static hash_table<cv_func_hasher> *cv_func_htab;
 
 static uint32_t get_type_num (dw_die_ref type, bool in_struct, bool no_fwd_ref);
+static uint32_t get_type_num_subroutine_type (dw_die_ref type, bool in_struct,
+					      uint32_t containing_class_type,
+					      uint32_t this_type,
+					      int32_t this_adjustment);
+static void write_cv_padding (size_t padding);
+static void flush_deferred_types (void);
+static uint32_t get_func_id (dw_die_ref die);
+static void write_inlinesite_records (dw_die_ref func, dw_die_ref die);
+
+/* Return the file ID corresponding to a given source filename.  */
+
+static uint32_t
+get_file_id (const char *filename)
+{
+  codeview_source_file *sf = files;
+
+  if (filename == last_filename)
+    return last_file_id;
+
+  while (sf)
+    {
+      if (!strcmp (sf->filename, filename))
+	{
+	  uint32_t file_id;
+
+	  /* 0x18 is the size of the checksum entry for each file.
+	     0x6 bytes for the header, plus 0x10 bytes for the hash,
+	     then padded to a multiple of 4.  */
+
+	  file_id = sf->file_num * 0x18;
+	  last_filename = filename;
+	  last_file_id = file_id;
+
+	  return file_id;
+	}
+
+      sf = sf->next;
+    }
+
+  return 0;
+}
+
+/* Allocate and initialize a codeview_function struct.  */
+
+static codeview_function *
+new_codeview_function (void)
+{
+  codeview_function **slot;
+  dw_die_ref die;
+  codeview_function *f = (codeview_function *)
+			    xmalloc (sizeof (codeview_function));
+
+  f->next = NULL;
+  f->htab_next = NULL;
+  f->func = cfun;
+  f->end_label = 0;
+  f->blocks = f->last_block = NULL;
+  f->inline_block = 0;
+  f->inline_loc = 0;
+
+  if (!funcs)
+    funcs = f;
+  else
+    last_func->next = f;
+
+  last_func = f;
+
+  if (!cv_func_htab)
+    cv_func_htab = new hash_table<cv_func_hasher> (10);
+
+  die = lookup_decl_die (cfun->decl);
+
+  slot = cv_func_htab->find_slot_with_hash (die, htab_hash_pointer (die),
+					    INSERT);
+  if (*slot)
+    f->htab_next = *slot;
+
+  *slot = f;
+
+  return f;
+}
 
 /* Record new line number against the current function.  */
 
@@ -1322,52 +1584,21 @@ void
 codeview_source_line (unsigned int line_no, const char *filename)
 {
   codeview_line *l;
-  uint32_t file_id = last_file_id;
+  uint32_t file_id = get_file_id (filename);
   unsigned int label_num = ++line_label_num;
 
   targetm.asm_out.internal_label (asm_out_file, LINE_LABEL, label_num);
 
-  if (!last_func || last_func->func != cfun)
+  if (!cur_func || cur_func->func != cfun)
     {
-      codeview_function *f = (codeview_function *)
-				xmalloc (sizeof (codeview_function));
+      codeview_function *f = new_codeview_function ();
 
-      f->next = NULL;
-      f->func = cfun;
-      f->end_label = 0;
-      f->blocks = f->last_block = NULL;
+      f->parent = NULL;
 
-      if (!funcs)
-	funcs = f;
-      else
-	last_func->next = f;
-
-      last_func = f;
+      cur_func = f;
     }
 
-  if (filename != last_filename)
-    {
-      codeview_source_file *sf = files;
-
-      while (sf)
-	{
-	  if (!strcmp (sf->filename, filename))
-	    {
-	      /* 0x18 is the size of the checksum entry for each file.
-		 0x6 bytes for the header, plus 0x10 bytes for the hash,
-		 then padded to a multiple of 4.  */
-
-	      file_id = sf->file_num * 0x18;
-	      last_filename = filename;
-	      last_file_id = file_id;
-	      break;
-	    }
-
-	  sf = sf->next;
-	}
-    }
-
-  if (!last_func->last_block || last_func->last_block->file_id != file_id)
+  if (!cur_func->last_block || cur_func->last_block->file_id != file_id)
     {
       codeview_line_block *b;
 
@@ -1378,16 +1609,16 @@ codeview_source_line (unsigned int line_no, const char *filename)
       b->num_lines = 0;
       b->lines = b->last_line = NULL;
 
-      if (!last_func->blocks)
-	last_func->blocks = b;
+      if (!cur_func->blocks)
+	cur_func->blocks = b;
       else
-	last_func->last_block->next = b;
+	cur_func->last_block->next = b;
 
-      last_func->last_block = b;
+      cur_func->last_block = b;
     }
 
-  if (last_func->last_block->last_line
-    && last_func->last_block->last_line->line_no == line_no)
+  if (cur_func->last_block->last_line
+    && cur_func->last_block->last_line->line_no == line_no)
     return;
 
   l = (codeview_line *) xmalloc (sizeof (codeview_line));
@@ -1396,13 +1627,52 @@ codeview_source_line (unsigned int line_no, const char *filename)
   l->line_no = line_no;
   l->label_num = label_num;
 
-  if (!last_func->last_block->lines)
-    last_func->last_block->lines = l;
+  if (!cur_func->last_block->lines)
+    cur_func->last_block->lines = l;
   else
-    last_func->last_block->last_line->next = l;
+    cur_func->last_block->last_line->next = l;
 
-  last_func->last_block->last_line = l;
-  last_func->last_block->num_lines++;
+  cur_func->last_block->last_line = l;
+  cur_func->last_block->num_lines++;
+}
+
+/* We have encountered the beginning of a lexical block.  If this is actually
+   an inlined function, allocate a new codeview_function for this.  */
+
+void
+codeview_begin_block (unsigned int line ATTRIBUTE_UNUSED,
+		      unsigned int blocknum, tree block)
+{
+  if (inlined_function_outer_scope_p (block))
+    {
+      location_t locus = BLOCK_SOURCE_LOCATION (block);
+      expanded_location s = expand_location (locus);
+      codeview_function *f = new_codeview_function ();
+
+      codeview_source_line (s.line, s.file);
+
+      f->parent = cur_func;
+      f->inline_block = blocknum;
+      f->inline_loc = locus;
+
+      cur_func = f;
+    }
+}
+
+/* We have encountered the end of a lexical block.  If this is the end of an
+   inlined function, change cur_func back to its parent.  */
+
+void
+codeview_end_block (unsigned int line ATTRIBUTE_UNUSED, unsigned int blocknum)
+{
+  if (cur_func && cur_func->inline_block == blocknum)
+    {
+      /* If inlined function, add dummy source line at the end so we know how
+	 long the actual last line is.  */
+      codeview_source_line (0, "");
+
+      cur_func = cur_func->parent;
+    }
 }
 
 /* Adds string to the string table, returning its offset.  If already present,
@@ -1605,11 +1875,19 @@ static void
 write_line_numbers (void)
 {
   unsigned int func_num = 0;
+  codeview_function *f = funcs;
 
-  while (funcs)
+  while (f)
     {
-      codeview_function *next = funcs->next;
+      codeview_function *next_func = f->next;
       unsigned int first_label_num;
+      codeview_line_block *b = f->blocks;
+
+      if (f->inline_block != 0)
+	{
+	  f = next_func;
+	  continue;
+	}
 
       fputs (integer_asm_op (4, false), asm_out_file);
       fprint_whex (asm_out_file, DEBUG_S_LINES);
@@ -1634,26 +1912,27 @@ write_line_numbers (void)
       */
 
       asm_fprintf (asm_out_file, "\t.secrel32\t%L" LINE_LABEL "%u\n",
-		   funcs->blocks->lines->label_num);
+		   b->lines->label_num);
       asm_fprintf (asm_out_file, "\t.secidx\t%L" LINE_LABEL "%u\n",
-		   funcs->blocks->lines->label_num);
+		   b->lines->label_num);
 
       /* flags */
       fputs (integer_asm_op (2, false), asm_out_file);
       fprint_whex (asm_out_file, 0);
       putc ('\n', asm_out_file);
 
-      first_label_num = funcs->blocks->lines->label_num;
+      first_label_num = b->lines->label_num;
 
       /* length */
       fputs (integer_asm_op (4, false), asm_out_file);
       asm_fprintf (asm_out_file,
 		   "%L" END_FUNC_LABEL "%u - %L" LINE_LABEL "%u\n",
-		   funcs->end_label, first_label_num);
+		   f->end_label, first_label_num);
 
-      while (funcs->blocks)
+      while (b)
 	{
-	  codeview_line_block *next = funcs->blocks->next;
+	  codeview_line_block *next_block = b->next;
+	  codeview_line *l = b->lines;
 
 	  /* Next comes the blocks, each block being a part of a function
 	     within the same source file (struct cv_lines_block in binutils or
@@ -1669,23 +1948,23 @@ write_line_numbers (void)
 
 	  /* file ID */
 	  fputs (integer_asm_op (4, false), asm_out_file);
-	  fprint_whex (asm_out_file, funcs->blocks->file_id);
+	  fprint_whex (asm_out_file, b->file_id);
 	  putc ('\n', asm_out_file);
 
 	  /* number of lines */
 	  fputs (integer_asm_op (4, false), asm_out_file);
-	  fprint_whex (asm_out_file, funcs->blocks->num_lines);
+	  fprint_whex (asm_out_file, b->num_lines);
 	  putc ('\n', asm_out_file);
 
 	  /* length of code block: (num_lines * sizeof (struct cv_line)) +
 	     sizeof (struct cv_lines_block) */
 	  fputs (integer_asm_op (4, false), asm_out_file);
-	  fprint_whex (asm_out_file, (funcs->blocks->num_lines * 0x8) + 0xc);
+	  fprint_whex (asm_out_file, (b->num_lines * 0x8) + 0xc);
 	  putc ('\n', asm_out_file);
 
-	  while (funcs->blocks->lines)
+	  while (l)
 	    {
-	      codeview_line *next = funcs->blocks->lines->next;
+	      codeview_line *next_line = l->next;
 
 	      /* Finally comes the line number information (struct cv_line in
 		 binutils or CV_Line_t in Microsoft's cvinfo.h):
@@ -1703,31 +1982,85 @@ write_line_numbers (void)
 	      fputs (integer_asm_op (4, false), asm_out_file);
 	      asm_fprintf (asm_out_file,
 			   "%L" LINE_LABEL "%u - %L" LINE_LABEL "%u\n",
-			   funcs->blocks->lines->label_num, first_label_num);
+			   l->label_num, first_label_num);
 
 	      fputs (integer_asm_op (4, false), asm_out_file);
 	      fprint_whex (asm_out_file,
 			   0x80000000
-			   | (funcs->blocks->lines->line_no & 0xffffff));
+			   | (l->line_no & 0xffffff));
 	      putc ('\n', asm_out_file);
 
-	      free (funcs->blocks->lines);
-
-	      funcs->blocks->lines = next;
+	      l = next_line;
 	    }
 
-	  free (funcs->blocks);
-
-	  funcs->blocks = next;
+	  b = next_block;
 	}
-
-      free (funcs);
 
       asm_fprintf (asm_out_file, "%LLcv_lines%u_end:\n", func_num);
       func_num++;
 
-      funcs = next;
+      f = next_func;
     }
+}
+
+/* Write an entry in the S_INLINEELINES subsection of .debug$S.  */
+
+static int
+write_inlinee_lines_entry (codeview_inlinee_lines **slot,
+			   void *ctx ATTRIBUTE_UNUSED)
+{
+  codeview_inlinee_lines *il = *slot;
+
+  /* The inlinee lines data consists of a version uint32_t (0), followed by
+     an array of struct inlinee_source_line:
+
+      struct inlinee_source_line
+      {
+	  uint32_t function_id;
+	  uint32_t file_id;
+	  uint32_t line_no;
+      };
+
+    (see InlineeSourceLine in cvinfo.h)
+  */
+
+  fputs (integer_asm_op (4, false), asm_out_file);
+  fprint_whex (asm_out_file, il->func_id);
+  putc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (4, false), asm_out_file);
+  fprint_whex (asm_out_file, il->file_id);
+  putc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (4, false), asm_out_file);
+  fprint_whex (asm_out_file, il->starting_line);
+  putc ('\n', asm_out_file);
+
+  return 1;
+}
+
+/* Write the S_INLINEELINES subsection of .debug$S, which lists the filename
+   and line number for the start of each inlined function.  */
+
+static void
+write_inlinee_lines (void)
+{
+  fputs (integer_asm_op (4, false), asm_out_file);
+  fprint_whex (asm_out_file, DEBUG_S_INLINEELINES);
+  putc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (4, false), asm_out_file);
+  asm_fprintf (asm_out_file,
+	       "%LLcv_inlineelines_end - %LLcv_inlineelines_start\n");
+  asm_fprintf (asm_out_file, "%LLcv_inlineelines_start:\n");
+
+  fputs (integer_asm_op (4, false), asm_out_file);
+  fprint_whex (asm_out_file, CV_INLINEE_SOURCE_LINE_SIGNATURE);
+  putc ('\n', asm_out_file);
+
+  inlinee_lines_htab->traverse <void*, write_inlinee_lines_entry> (NULL);
+
+  asm_fprintf (asm_out_file, "%LLcv_inlineelines_end:\n");
 }
 
 /* Treat cold sections as separate functions, for the purposes of line
@@ -1738,29 +2071,20 @@ codeview_switch_text_section (void)
 {
   codeview_function *f;
 
-  if (last_func && last_func->end_label == 0)
+  if (cur_func && cur_func->end_label == 0)
     {
       unsigned int label_num = ++func_label_num;
 
       targetm.asm_out.internal_label (asm_out_file, END_FUNC_LABEL,
 				      label_num);
 
-      last_func->end_label = label_num;
+      cur_func->end_label = label_num;
     }
 
-  f = (codeview_function *) xmalloc (sizeof (codeview_function));
+  f = new_codeview_function ();
+  f->parent = cur_func ? cur_func->parent : NULL;
 
-  f->next = NULL;
-  f->func = cfun;
-  f->end_label = 0;
-  f->blocks = f->last_block = NULL;
-
-  if (!funcs)
-    funcs = f;
-  else
-    last_func->next = f;
-
-  last_func = f;
+  cur_func = f;
 }
 
 /* Mark the end of the current function.  */
@@ -1768,14 +2092,14 @@ codeview_switch_text_section (void)
 void
 codeview_end_epilogue (void)
 {
-  if (last_func && last_func->end_label == 0)
+  if (cur_func && cur_func->end_label == 0)
     {
       unsigned int label_num = ++func_label_num;
 
       targetm.asm_out.internal_label (asm_out_file, END_FUNC_LABEL,
 				      label_num);
 
-      last_func->end_label = label_num;
+      cur_func->end_label = label_num;
     }
 }
 
@@ -1944,6 +2268,56 @@ write_data_symbol (codeview_symbol *s)
 
 end:
   free (s->data_symbol.name);
+}
+
+/* Write an S_LOCAL symbol, representing an optimized variable.  This is then
+   followed by various S_DEFRANGE_* symbols, which describe how to find the
+   value of a variable and the range for which this is valid.  */
+
+static void
+write_s_local (dw_die_ref die)
+{
+  unsigned int label_num = ++sym_label_num;
+  const char *name = get_AT_string (die, DW_AT_name);
+  uint32_t type;
+
+  /* This is struct LOCALSYM in Microsoft's cvinfo.h:
+
+    struct LOCALSYM {
+      uint16_t reclen;
+      uint16_t rectyp;
+      uint32_t typind;
+      uint16_t flags;
+      char name[];
+    };
+  */
+
+  fputs (integer_asm_op (2, false), asm_out_file);
+  asm_fprintf (asm_out_file,
+	      "%L" SYMBOL_END_LABEL "%u - %L" SYMBOL_START_LABEL "%u\n",
+	      label_num, label_num);
+
+  targetm.asm_out.internal_label (asm_out_file, SYMBOL_START_LABEL, label_num);
+
+  fputs (integer_asm_op (2, false), asm_out_file);
+  fprint_whex (asm_out_file, S_LOCAL);
+  putc ('\n', asm_out_file);
+
+  type = get_type_num (get_AT_ref (die, DW_AT_type), false, false);
+
+  fputs (integer_asm_op (4, false), asm_out_file);
+  fprint_whex (asm_out_file, type);
+  putc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (2, false), asm_out_file);
+  fprint_whex (asm_out_file, 0);
+  putc ('\n', asm_out_file);
+
+  ASM_OUTPUT_ASCII (asm_out_file, name, strlen (name) + 1);
+
+  ASM_OUTPUT_ALIGN (asm_out_file, 2);
+
+  targetm.asm_out.internal_label (asm_out_file, SYMBOL_END_LABEL, label_num);
 }
 
 /* Write an S_LDATA32 symbol, representing a static variable within a function.
@@ -2278,6 +2652,302 @@ write_fbreg_variable (dw_die_ref die, dw_loc_descr_ref loc_ref,
   targetm.asm_out.internal_label (asm_out_file, SYMBOL_END_LABEL, label_num);
 }
 
+/* Write an S_DEFRANGE_REGISTER symbol, which describes a range for which an
+   S_LOCAL variable is held in a certain register.  */
+
+static void
+write_defrange_register (dw_loc_descr_ref expr, rtx range_start, rtx range_end)
+{
+  unsigned int label_num = ++sym_label_num;
+  uint16_t regno;
+
+  /* This is defrange_register in binutils and DEFRANGESYMREGISTER in
+     Microsoft's cvinfo.h:
+
+      struct lvar_addr_range
+      {
+	uint32_t offset;
+	uint16_t section;
+	uint16_t length;
+      } ATTRIBUTE_PACKED;
+
+      struct lvar_addr_gap {
+	uint16_t offset;
+	uint16_t length;
+      } ATTRIBUTE_PACKED;
+
+      struct defrange_register
+      {
+	uint16_t size;
+	uint16_t kind;
+	uint16_t reg;
+	uint16_t attributes;
+	struct lvar_addr_range range;
+	struct lvar_addr_gap gaps[];
+      } ATTRIBUTE_PACKED;
+  */
+
+  if (expr->dw_loc_opc == DW_OP_regx)
+    regno = dwarf_reg_to_cv (expr->dw_loc_oprnd1.v.val_int);
+  else
+    regno = dwarf_reg_to_cv (expr->dw_loc_opc - DW_OP_reg0);
+
+  if (regno == 0)
+    return;
+
+  fputs (integer_asm_op (2, false), asm_out_file);
+  asm_fprintf (asm_out_file,
+	      "%L" SYMBOL_END_LABEL "%u - %L" SYMBOL_START_LABEL "%u\n",
+	      label_num, label_num);
+
+  targetm.asm_out.internal_label (asm_out_file, SYMBOL_START_LABEL, label_num);
+
+  fputs (integer_asm_op (2, false), asm_out_file);
+  fprint_whex (asm_out_file, S_DEFRANGE_REGISTER);
+  putc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (2, false), asm_out_file);
+  fprint_whex (asm_out_file, regno);
+  putc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (2, false), asm_out_file);
+  fprint_whex (asm_out_file, 0);
+  putc ('\n', asm_out_file);
+
+  asm_fprintf (asm_out_file, "\t.secrel32 ");
+  output_addr_const (asm_out_file, range_start);
+  fputc ('\n', asm_out_file);
+
+  asm_fprintf (asm_out_file, "\t.secidx ");
+  output_addr_const (asm_out_file, range_start);
+  fputc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (2, false), asm_out_file);
+  output_addr_const (asm_out_file, range_end);
+  fputs (" - ", asm_out_file);
+  output_addr_const (asm_out_file, range_start);
+  putc ('\n', asm_out_file);
+
+  targetm.asm_out.internal_label (asm_out_file, SYMBOL_END_LABEL, label_num);
+}
+
+/* Write an S_DEFRANGE_REGISTER_REL symbol, which describes a range for which
+   an S_LOCAL variable is held in memory given by the value of a certain
+   register plus an offset.  */
+
+static void
+write_defrange_register_rel (dw_loc_descr_ref expr, dw_loc_descr_ref fbloc,
+			     rtx range_start, rtx range_end)
+{
+  unsigned int label_num = ++sym_label_num;
+  uint16_t regno;
+  int offset;
+
+  /* This is defrange_register_rel in binutils and DEFRANGESYMREGISTERREL in
+     Microsoft's cvinfo.h:
+
+      struct lvar_addr_range
+      {
+	uint32_t offset;
+	uint16_t section;
+	uint16_t length;
+      } ATTRIBUTE_PACKED;
+
+      struct lvar_addr_gap {
+	uint16_t offset;
+	uint16_t length;
+      } ATTRIBUTE_PACKED;
+
+      struct defrange_register_rel
+      {
+	uint16_t size;
+	uint16_t kind;
+	uint16_t reg;
+	uint16_t offset_parent;
+	uint32_t offset_register;
+	struct lvar_addr_range range;
+	struct lvar_addr_gap gaps[];
+      } ATTRIBUTE_PACKED;
+    */
+
+  if (!fbloc)
+    return;
+
+  if (fbloc->dw_loc_opc >= DW_OP_breg0 && fbloc->dw_loc_opc <= DW_OP_breg31)
+    {
+      regno = dwarf_reg_to_cv (fbloc->dw_loc_opc - DW_OP_breg0);
+      offset = fbloc->dw_loc_oprnd1.v.val_int;
+    }
+  else if (fbloc->dw_loc_opc == DW_OP_bregx)
+    {
+      regno = dwarf_reg_to_cv (fbloc->dw_loc_oprnd1.v.val_int);
+      offset = fbloc->dw_loc_oprnd2.v.val_int;
+    }
+  else
+    {
+      return;
+    }
+
+  if (expr->dw_loc_oprnd1.val_class != dw_val_class_unsigned_const)
+    return;
+
+  offset += expr->dw_loc_oprnd1.v.val_int;
+
+  fputs (integer_asm_op (2, false), asm_out_file);
+  asm_fprintf (asm_out_file,
+	      "%L" SYMBOL_END_LABEL "%u - %L" SYMBOL_START_LABEL "%u\n",
+	      label_num, label_num);
+
+  targetm.asm_out.internal_label (asm_out_file, SYMBOL_START_LABEL, label_num);
+
+  fputs (integer_asm_op (2, false), asm_out_file);
+  fprint_whex (asm_out_file, S_DEFRANGE_REGISTER_REL);
+  putc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (2, false), asm_out_file);
+  fprint_whex (asm_out_file, regno);
+  putc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (2, false), asm_out_file);
+  fprint_whex (asm_out_file, 0);
+  putc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (4, false), asm_out_file);
+  fprint_whex (asm_out_file, offset);
+  putc ('\n', asm_out_file);
+
+  asm_fprintf (asm_out_file, "\t.secrel32 ");
+  output_addr_const (asm_out_file, range_start);
+  fputc ('\n', asm_out_file);
+
+  asm_fprintf (asm_out_file, "\t.secidx ");
+  output_addr_const (asm_out_file, range_start);
+  fputc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (2, false), asm_out_file);
+  output_addr_const (asm_out_file, range_end);
+  fputs (" - ", asm_out_file);
+  output_addr_const (asm_out_file, range_start);
+  putc ('\n', asm_out_file);
+
+  targetm.asm_out.internal_label (asm_out_file, SYMBOL_END_LABEL, label_num);
+}
+
+/* Try to write an S_DEFRANGE_* symbol for the given DWARF location.  */
+
+static void
+write_optimized_local_variable_loc (dw_loc_descr_ref expr,
+				    dw_loc_descr_ref fbloc, rtx range_start,
+				    rtx range_end)
+{
+  if (expr->dw_loc_next)
+    return;
+
+  if (!range_start)
+    return;
+
+  if (!range_end)
+    return;
+
+  switch (expr->dw_loc_opc)
+    {
+    case DW_OP_reg0:
+    case DW_OP_reg1:
+    case DW_OP_reg2:
+    case DW_OP_reg3:
+    case DW_OP_reg4:
+    case DW_OP_reg5:
+    case DW_OP_reg6:
+    case DW_OP_reg7:
+    case DW_OP_reg8:
+    case DW_OP_reg9:
+    case DW_OP_reg10:
+    case DW_OP_reg11:
+    case DW_OP_reg12:
+    case DW_OP_reg13:
+    case DW_OP_reg14:
+    case DW_OP_reg15:
+    case DW_OP_reg16:
+    case DW_OP_reg17:
+    case DW_OP_reg18:
+    case DW_OP_reg19:
+    case DW_OP_reg20:
+    case DW_OP_reg21:
+    case DW_OP_reg22:
+    case DW_OP_reg23:
+    case DW_OP_reg24:
+    case DW_OP_reg25:
+    case DW_OP_reg26:
+    case DW_OP_reg27:
+    case DW_OP_reg28:
+    case DW_OP_reg29:
+    case DW_OP_reg30:
+    case DW_OP_reg31:
+    case DW_OP_regx:
+      write_defrange_register (expr, range_start, range_end);
+      break;
+
+    case DW_OP_fbreg:
+      write_defrange_register_rel (expr, fbloc, range_start, range_end);
+      break;
+
+    default:
+      break;
+    }
+}
+
+/* Write an optimized local variable, given by an S_LOCAL symbol followed by
+   any number of S_DEFRANGE_* symbols.  We can't mix and match optimized and
+   unoptimized variables in the same function, so even if it stays in the same
+   place for the whole block we need to write an S_LOCAL.  */
+
+static void
+write_optimized_local_variable (dw_die_ref die, dw_loc_descr_ref fbloc,
+				rtx block_start, rtx block_end)
+{
+  dw_attr_node *loc;
+  dw_loc_list_ref loc_list;
+
+  loc = get_AT (die, DW_AT_location);
+  if (!loc)
+    return;
+
+  switch (loc->dw_attr_val.val_class)
+    {
+    case dw_val_class_loc_list:
+      loc_list = loc->dw_attr_val.v.val_loc_list;
+
+      write_s_local (die);
+
+      while (loc_list)
+	{
+	  rtx range_start = NULL, range_end = NULL;
+
+	  if (loc_list->begin)
+	    range_start = gen_rtx_SYMBOL_REF (Pmode, loc_list->begin);
+
+	  if (loc_list->end)
+	    range_end = gen_rtx_SYMBOL_REF (Pmode, loc_list->end);
+
+	  write_optimized_local_variable_loc (loc_list->expr, fbloc,
+					      range_start, range_end);
+
+	  loc_list = loc_list->dw_loc_next;
+	}
+      break;
+
+    case dw_val_class_loc:
+      write_s_local (die);
+
+      write_optimized_local_variable_loc (loc->dw_attr_val.v.val_loc, fbloc,
+					  block_start, block_end);
+      break;
+
+    default:
+      break;
+    }
+}
+
 /* Write a symbol representing an unoptimized variable within a function, if
    we're able to translate the DIE's DW_AT_location into its CodeView
    equivalent.  */
@@ -2473,6 +3143,76 @@ write_s_end (void)
   targetm.asm_out.internal_label (asm_out_file, SYMBOL_END_LABEL, label_num);
 }
 
+/* Write the S_FRAMEPROC symbol, which is supposed to give information about
+   the function frame.  It doesn't seem to be really used in modern versions of
+   MSVC, which is why we zero-out everything here.  You still need to write it
+   though, otherwise windbg won't necessarily show all the local variables.  */
+
+static void
+write_s_frameproc (void)
+{
+  unsigned int label_num = ++sym_label_num;
+
+  /* This is struct FRAMEPROCSYM in Microsoft's cvinfo.h:
+
+      struct frameprocsym
+      {
+	uint16_t size;
+	uint16_t kind;
+	uint32_t frame_size;
+	uint32_t padding_size;
+	uint32_t padding_offset;
+	uint32_t saved_registers_size;
+	uint32_t exception_handler_offset;
+	uint16_t exception_handler_section;
+	uint32_t flags;
+      } ATTRIBUTE_PACKED;
+   */
+
+  fputs (integer_asm_op (2, false), asm_out_file);
+  asm_fprintf (asm_out_file,
+	       "%L" SYMBOL_END_LABEL "%u - %L" SYMBOL_START_LABEL "%u\n",
+	       label_num, label_num);
+
+  targetm.asm_out.internal_label (asm_out_file, SYMBOL_START_LABEL, label_num);
+
+  fputs (integer_asm_op (2, false), asm_out_file);
+  fprint_whex (asm_out_file, S_FRAMEPROC);
+  putc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (4, false), asm_out_file);
+  fprint_whex (asm_out_file, 0);
+  putc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (4, false), asm_out_file);
+  fprint_whex (asm_out_file, 0);
+  putc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (4, false), asm_out_file);
+  fprint_whex (asm_out_file, 0);
+  putc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (4, false), asm_out_file);
+  fprint_whex (asm_out_file, 0);
+  putc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (4, false), asm_out_file);
+  fprint_whex (asm_out_file, 0);
+  putc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (2, false), asm_out_file);
+  fprint_whex (asm_out_file, 0);
+  putc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (4, false), asm_out_file);
+  fprint_whex (asm_out_file, 0);
+  putc ('\n', asm_out_file);
+
+  ASM_OUTPUT_ALIGN (asm_out_file, 2);
+
+  targetm.asm_out.internal_label (asm_out_file, SYMBOL_END_LABEL, label_num);
+}
+
 /* Loop through the DIEs in an unoptimized function, writing out any variables
    or blocks that we encounter.  */
 
@@ -2514,6 +3254,392 @@ write_unoptimized_function_vars (dw_die_ref die, dw_loc_descr_ref fbloc)
 	break;
       }
   }
+  while (c != first_child);
+}
+
+/* Write the variables in an optimized function or block.  There's no S_BLOCK32s
+   here, with the range determining the lifetime of a variable.  Unfortunately
+   for us CodeView is much less expressive than DWARF when it comes to variable
+   locations, so some degree of "optimized out"s is inevitable.  */
+
+static void
+write_optimized_function_vars (dw_die_ref die, dw_loc_descr_ref fbloc,
+			       rtx block_start, rtx block_end)
+{
+  dw_die_ref first_child, c;
+
+  first_child = dw_get_die_child (die);
+
+  if (!first_child)
+    return;
+
+  c = first_child;
+  do
+  {
+    c = dw_get_die_sib (c);
+
+    switch (dw_get_die_tag (c))
+      {
+      case DW_TAG_formal_parameter:
+      case DW_TAG_variable:
+	write_optimized_local_variable (c, fbloc, block_start, block_end);
+	break;
+
+      case DW_TAG_lexical_block:
+	{
+	  dw_attr_node *loc_low, *loc_high;
+	  const char *label_low, *label_high;
+	  rtx rtx_low, rtx_high;
+
+	  loc_low = get_AT (die, DW_AT_low_pc);
+	  if (!loc_low)
+	    break;
+
+	  if (loc_low->dw_attr_val.val_class != dw_val_class_lbl_id)
+	    break;
+
+	  label_low = loc_low->dw_attr_val.v.val_lbl_id;
+	  if (!label_low)
+	    break;
+
+	  rtx_low = gen_rtx_SYMBOL_REF (Pmode, label_low);
+
+	  loc_high = get_AT (die, DW_AT_high_pc);
+	  if (!loc_high)
+	    break;
+
+	  if (loc_high->dw_attr_val.val_class != dw_val_class_high_pc)
+	    break;
+
+	  label_high = loc_high->dw_attr_val.v.val_lbl_id;
+	  if (!label_high)
+	    break;
+
+	  rtx_high = gen_rtx_SYMBOL_REF (Pmode, label_high);
+
+	  write_optimized_function_vars (c, fbloc, rtx_low, rtx_high);
+
+	  break;
+	}
+
+      default:
+	break;
+      }
+  }
+  while (c != first_child);
+}
+
+/* There's no way to mark the range of a static local variable in an optimized
+   function: there's no S_DEFRANGE_* symbol for this, and you can't have
+   S_BLOCK32 symbols.  So instead we have to loop through after the S_FRAMEPROC
+   has been written, and write the S_LDATA32s at the end.  */
+
+static void
+write_optimized_static_local_vars (dw_die_ref die)
+{
+  dw_die_ref first_child, c;
+
+  first_child = dw_get_die_child (die);
+
+  if (!first_child)
+    return;
+
+  c = first_child;
+  do
+  {
+    c = dw_get_die_sib (c);
+
+    switch (dw_get_die_tag (c))
+      {
+      case DW_TAG_variable:
+	{
+	  dw_attr_node *loc;
+	  dw_loc_descr_ref loc_ref;
+
+	  loc = get_AT (c, DW_AT_location);
+	  if (!loc)
+	    break;
+
+	  if (loc->dw_attr_val.val_class != dw_val_class_loc)
+	    break;
+
+	  loc_ref = loc->dw_attr_val.v.val_loc;
+	  if (!loc_ref)
+	    break;
+
+	  if (loc_ref->dw_loc_opc != DW_OP_addr)
+	    break;
+
+	  write_local_s_ldata32 (c, loc_ref);
+	  break;
+	}
+
+      case DW_TAG_lexical_block:
+	write_optimized_static_local_vars (c);
+	break;
+
+      default:
+	break;
+      }
+  }
+  while (c != first_child);
+}
+
+#ifdef HAVE_GAS_CV_UCOMP
+
+/* Given a DW_TAG_inlined_subroutine DIE within parent_func, return a pointer
+   to the corresponding codeview_function, which is used to map addresses
+   to line numbers.  */
+
+static codeview_function *
+find_line_function (dw_die_ref parent_func, dw_die_ref die)
+{
+  codeview_function **slot, *f;
+
+  if (!cv_func_htab)
+    return NULL;
+
+  slot = cv_func_htab->find_slot_with_hash (parent_func,
+					    htab_hash_pointer (parent_func),
+					    NO_INSERT);
+
+  if (!slot || !*slot)
+    return NULL;
+
+  f = *slot;
+
+  while (f)
+    {
+      expanded_location loc;
+      dwarf_file_data *call_file;
+
+      if (f->inline_block == 0)
+	{
+	  f = f->htab_next;
+	  continue;
+	}
+
+      loc = expand_location (f->inline_loc);
+
+      if ((unsigned) loc.line != get_AT_unsigned (die, DW_AT_call_line)
+	  || (unsigned) loc.column != get_AT_unsigned (die, DW_AT_call_column))
+	{
+	  f = f->htab_next;
+	  continue;
+	}
+
+      call_file = get_AT_file (die, DW_AT_call_file);
+
+      if (!call_file || strcmp (call_file->filename, loc.file))
+	{
+	  f = f->htab_next;
+	  continue;
+	}
+
+      return f;
+    }
+
+  return NULL;
+}
+
+/* Write the "binary annotations" for an S_INLINESITE symbol, which are how
+   CodeView represents line numbers within inlined functions.  This is
+   completely different to how line numbers are represented normally, and
+   requires assembler support for the .cv_ucomp and .cv_scomp pseudos.  */
+
+static void
+write_binary_annotations (codeview_function *line_func, uint32_t func_id)
+{
+  codeview_line_block *b;
+  codeview_inlinee_lines **slot, *il;
+  codeview_function *top_parent;
+  unsigned int line_no, label_num;
+
+  slot = inlinee_lines_htab->find_slot_with_hash (func_id, func_id, NO_INSERT);
+  if (!slot || !*slot)
+    return;
+
+  il = *slot;
+
+  line_no = il->starting_line;
+
+  top_parent = line_func;
+  while (top_parent->parent)
+    {
+      top_parent = top_parent->parent;
+    }
+
+  label_num = top_parent->blocks->lines->label_num;
+
+  b = line_func->blocks;
+  while (b)
+    {
+      codeview_line *l = b->lines;
+
+      while (l)
+	{
+	  if (!l->next && !b->next) /* last line (end of block) */
+	    {
+	      asm_fprintf (asm_out_file, "\t.cv_ucomp %u\n",
+		       ba_op_change_code_length);
+	      asm_fprintf (asm_out_file,
+		       "\t.cv_ucomp %L" LINE_LABEL "%u - %L" LINE_LABEL "%u\n",
+		       l->label_num, label_num);
+	    }
+	  else
+	    {
+	      if (l->line_no != line_no)
+		{
+		  asm_fprintf (asm_out_file, "\t.cv_ucomp %u\n",
+			       ba_op_change_line_offset);
+		  asm_fprintf (asm_out_file, "\t.cv_scomp %i\n",
+			       l->line_no - line_no);
+
+		  line_no = l->line_no;
+		}
+
+	      asm_fprintf (asm_out_file, "\t.cv_ucomp %u\n",
+			   ba_op_change_code_offset);
+	      asm_fprintf (asm_out_file,
+			"\t.cv_ucomp %L" LINE_LABEL "%u - %L" LINE_LABEL "%u\n",
+			l->label_num, label_num);
+	    }
+
+	  label_num = l->label_num;
+
+	  l = l->next;
+	}
+
+      b = b->next;
+    }
+}
+
+#endif
+
+/* Write an S_INLINESITE symbol, to record that a function has been inlined
+   inside another function.  */
+
+static void
+write_s_inlinesite (dw_die_ref parent_func, dw_die_ref die)
+{
+  unsigned int label_num = ++sym_label_num;
+  dw_die_ref func;
+  uint32_t func_id;
+  codeview_function *line_func;
+
+  func = get_AT_ref (die, DW_AT_abstract_origin);
+  if (!func)
+    return;
+
+  func_id = get_func_id (func);
+  if (func_id == 0)
+    return;
+
+  /* This is struct inline_site in binutils and INLINESITESYM in Microsoft's
+     cvinfo.h:
+
+      struct inline_site
+      {
+	uint16_t size;
+	uint16_t kind;
+	uint32_t parent;
+	uint32_t end;
+	uint32_t inlinee;
+	uint8_t binary_annotations[];
+      } ATTRIBUTE_PACKED;
+  */
+
+  fputs (integer_asm_op (2, false), asm_out_file);
+  asm_fprintf (asm_out_file,
+	       "%L" SYMBOL_END_LABEL "%u - %L" SYMBOL_START_LABEL "%u\n",
+	       label_num, label_num);
+
+  targetm.asm_out.internal_label (asm_out_file, SYMBOL_START_LABEL, label_num);
+
+  fputs (integer_asm_op (2, false), asm_out_file);
+  fprint_whex (asm_out_file, S_INLINESITE);
+  putc ('\n', asm_out_file);
+
+  /* parent, filled in by linker */
+  fputs (integer_asm_op (4, false), asm_out_file);
+  fprint_whex (asm_out_file, 0);
+  putc ('\n', asm_out_file);
+
+  /* end, filled in by linker */
+  fputs (integer_asm_op (4, false), asm_out_file);
+  fprint_whex (asm_out_file, 0);
+  putc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (4, false), asm_out_file);
+  fprint_whex (asm_out_file, func_id);
+  putc ('\n', asm_out_file);
+
+#ifdef HAVE_GAS_CV_UCOMP
+  line_func = find_line_function (parent_func, die);
+
+  if (line_func)
+    {
+      write_binary_annotations (line_func, func_id);
+      ASM_OUTPUT_ALIGN (asm_out_file, 2);
+    }
+#else
+  (void) line_func;
+#endif
+
+  targetm.asm_out.internal_label (asm_out_file, SYMBOL_END_LABEL, label_num);
+
+  write_inlinesite_records (parent_func, die);
+
+  /* Write S_INLINESITE_END symbol.  */
+
+  label_num = ++sym_label_num;
+
+  fputs (integer_asm_op (2, false), asm_out_file);
+  asm_fprintf (asm_out_file,
+	       "%L" SYMBOL_END_LABEL "%u - %L" SYMBOL_START_LABEL "%u\n",
+	       label_num, label_num);
+
+  targetm.asm_out.internal_label (asm_out_file, SYMBOL_START_LABEL, label_num);
+
+  fputs (integer_asm_op (2, false), asm_out_file);
+  fprint_whex (asm_out_file, S_INLINESITE_END);
+  putc ('\n', asm_out_file);
+
+  targetm.asm_out.internal_label (asm_out_file, SYMBOL_END_LABEL, label_num);
+}
+
+/* Loop through a function, and translate its DW_TAG_inlined_subroutine DIEs
+   into CodeView S_INLINESITE symbols.  */
+
+static void
+write_inlinesite_records (dw_die_ref func, dw_die_ref die)
+{
+  dw_die_ref first_child, c;
+
+  first_child = dw_get_die_child (die);
+
+  if (!first_child)
+    return;
+
+  c = first_child;
+  do
+    {
+      c = dw_get_die_sib (c);
+
+      switch (dw_get_die_tag (c))
+	{
+	case DW_TAG_lexical_block:
+	  write_inlinesite_records (func, c);
+	  break;
+
+	case DW_TAG_inlined_subroutine:
+	  write_s_inlinesite (func, c);
+	  break;
+
+	default:
+	  break;
+	}
+    }
   while (c != first_child);
 }
 
@@ -2643,12 +3769,25 @@ write_function (codeview_symbol *s)
 
   targetm.asm_out.internal_label (asm_out_file, SYMBOL_END_LABEL, label_num);
 
+  write_inlinesite_records (s->function.die, s->function.die);
+
   frame_base = get_AT (s->function.die, DW_AT_frame_base);
 
   if (frame_base && frame_base->dw_attr_val.val_class == dw_val_class_loc)
     fbloc = frame_base->dw_attr_val.v.val_loc;
 
-  write_unoptimized_function_vars (s->function.die, fbloc);
+  if (flag_var_tracking)
+    {
+      write_optimized_function_vars (s->function.die, fbloc, rtx_low,
+				     rtx_high);
+      write_s_frameproc ();
+      write_optimized_static_local_vars (s->function.die);
+    }
+  else
+    {
+      write_s_frameproc ();
+      write_unoptimized_function_vars (s->function.die, fbloc);
+    }
 
   /* Output the S_PROC_ID_END record.  */
 
@@ -2725,6 +3864,10 @@ write_lf_pointer (codeview_custom_type *t)
       uint16_t kind;
       uint32_t base_type;
       uint32_t attributes;
+      (following only if CV_PTR_MODE_PMEM or CV_PTR_MODE_PMFUNC in attributes)
+      uint32_t containing_class;
+      uint16_t ptr_to_mem_type;
+      uint16_t padding;
     } ATTRIBUTE_PACKED;
   */
 
@@ -2745,6 +3888,20 @@ write_lf_pointer (codeview_custom_type *t)
   fputs (integer_asm_op (4, false), asm_out_file);
   fprint_whex (asm_out_file, t->lf_pointer.attributes);
   putc ('\n', asm_out_file);
+
+  if ((t->lf_pointer.attributes & CV_PTR_MODE_MASK) == CV_PTR_MODE_PMEM
+      || (t->lf_pointer.attributes & CV_PTR_MODE_MASK) == CV_PTR_MODE_PMFUNC)
+    {
+      fputs (integer_asm_op (4, false), asm_out_file);
+      fprint_whex (asm_out_file, t->lf_pointer.containing_class);
+      putc ('\n', asm_out_file);
+
+      fputs (integer_asm_op (2, false), asm_out_file);
+      fprint_whex (asm_out_file, t->lf_pointer.ptr_to_mem_type);
+      putc ('\n', asm_out_file);
+
+      write_cv_padding (2);
+    }
 
   asm_fprintf (asm_out_file, "%LLcv_type%x_end:\n", t->num);
 }
@@ -3082,6 +4239,172 @@ write_lf_fieldlist (codeview_custom_type *t)
 	  fprint_whex (asm_out_file, v->lf_index.type_num);
 	  putc ('\n', asm_out_file);
 
+	  break;
+
+	case LF_STMEMBER:
+	  /* This is lf_static_member in binutils and lfSTMember in Microsoft's
+	     cvinfo.h:
+
+	    struct lf_static_member
+	    {
+	      uint16_t kind;
+	      uint16_t attributes;
+	      uint32_t type;
+	      char name[];
+	    } ATTRIBUTE_PACKED;
+	  */
+
+	  fputs (integer_asm_op (2, false), asm_out_file);
+	  fprint_whex (asm_out_file, LF_STMEMBER);
+	  putc ('\n', asm_out_file);
+
+	  fputs (integer_asm_op (2, false), asm_out_file);
+	  fprint_whex (asm_out_file, v->lf_static_member.attributes);
+	  putc ('\n', asm_out_file);
+
+	  fputs (integer_asm_op (4, false), asm_out_file);
+	  fprint_whex (asm_out_file, v->lf_static_member.type);
+	  putc ('\n', asm_out_file);
+
+	  name_len = strlen (v->lf_static_member.name) + 1;
+	  ASM_OUTPUT_ASCII (asm_out_file, v->lf_static_member.name, name_len);
+
+	  leaf_len = 8 + name_len;
+	  write_cv_padding (4 - (leaf_len % 4));
+
+	  free (v->lf_static_member.name);
+	  break;
+
+	case LF_ONEMETHOD:
+	  /* This is lf_onemethod in binutils and lfOneMethod in Microsoft's
+	     cvinfo.h:
+
+	    struct lf_onemethod
+	    {
+	      uint16_t kind;
+	      uint16_t method_attribute;
+	      uint32_t method_type;
+	      char name[];
+	    } ATTRIBUTE_PACKED;
+	  */
+
+	  fputs (integer_asm_op (2, false), asm_out_file);
+	  fprint_whex (asm_out_file, LF_ONEMETHOD);
+	  putc ('\n', asm_out_file);
+
+	  fputs (integer_asm_op (2, false), asm_out_file);
+	  fprint_whex (asm_out_file, v->lf_onemethod.method_attribute);
+	  putc ('\n', asm_out_file);
+
+	  fputs (integer_asm_op (4, false), asm_out_file);
+	  fprint_whex (asm_out_file, v->lf_onemethod.method_type);
+	  putc ('\n', asm_out_file);
+
+	  name_len = strlen (v->lf_onemethod.name) + 1;
+	  ASM_OUTPUT_ASCII (asm_out_file, v->lf_onemethod.name, name_len);
+
+	  leaf_len = 8 + name_len;
+	  write_cv_padding (4 - (leaf_len % 4));
+
+	  free (v->lf_onemethod.name);
+	  break;
+
+	case LF_METHOD:
+	  /* This is lf_method in binutils and lfMethod in Microsoft's
+	     cvinfo.h:
+
+	    struct lf_method
+	    {
+	      uint16_t kind;
+	      uint16_t count;
+	      uint32_t method_list;
+	      char name[];
+	    } ATTRIBUTE_PACKED;
+	  */
+
+	  fputs (integer_asm_op (2, false), asm_out_file);
+	  fprint_whex (asm_out_file, LF_METHOD);
+	  putc ('\n', asm_out_file);
+
+	  fputs (integer_asm_op (2, false), asm_out_file);
+	  fprint_whex (asm_out_file, v->lf_method.count);
+	  putc ('\n', asm_out_file);
+
+	  fputs (integer_asm_op (4, false), asm_out_file);
+	  fprint_whex (asm_out_file, v->lf_method.method_list);
+	  putc ('\n', asm_out_file);
+
+	  name_len = strlen (v->lf_method.name) + 1;
+	  ASM_OUTPUT_ASCII (asm_out_file, v->lf_method.name, name_len);
+
+	  leaf_len = 8 + name_len;
+	  write_cv_padding (4 - (leaf_len % 4));
+
+	  free (v->lf_method.name);
+	  break;
+
+	case LF_BCLASS:
+	  /* This is lf_bclass in binutils and lfBClass in Microsoft's
+	     cvinfo.h:
+
+	    struct lf_bclass
+	    {
+	      uint16_t kind;
+	      uint16_t attributes;
+	      uint32_t base_class_type;
+	      uint16_t offset;
+	    } ATTRIBUTE_PACKED;
+	  */
+
+	  fputs (integer_asm_op (2, false), asm_out_file);
+	  fprint_whex (asm_out_file, LF_BCLASS);
+	  putc ('\n', asm_out_file);
+
+	  fputs (integer_asm_op (2, false), asm_out_file);
+	  fprint_whex (asm_out_file, v->lf_bclass.attributes);
+	  putc ('\n', asm_out_file);
+
+	  fputs (integer_asm_op (4, false), asm_out_file);
+	  fprint_whex (asm_out_file, v->lf_bclass.base_class_type);
+	  putc ('\n', asm_out_file);
+
+	  leaf_len = 8 + write_cv_integer (&v->lf_bclass.offset);
+
+	  write_cv_padding (4 - (leaf_len % 4));
+	  break;
+
+	case LF_NESTTYPE:
+	  /* This is lf_nest_type in binutils and lfNestType in Microsoft's
+	     cvinfo.h:
+
+	    struct lf_nest_type
+	    {
+	      uint16_t kind;
+	      uint16_t padding;
+	      uint32_t type;
+	      char name[];
+	    } ATTRIBUTE_PACKED;
+	  */
+
+	  fputs (integer_asm_op (2, false), asm_out_file);
+	  fprint_whex (asm_out_file, LF_NESTTYPE);
+	  putc ('\n', asm_out_file);
+
+	  fputs (integer_asm_op (2, false), asm_out_file);
+	  fprint_whex (asm_out_file, 0);
+	  putc ('\n', asm_out_file);
+
+	  fputs (integer_asm_op (4, false), asm_out_file);
+	  fprint_whex (asm_out_file, v->lf_nesttype.type);
+	  putc ('\n', asm_out_file);
+
+	  name_len = strlen (v->lf_nesttype.name) + 1;
+	  ASM_OUTPUT_ASCII (asm_out_file, v->lf_nesttype.name, name_len);
+
+	  leaf_len = 8 + name_len;
+	  write_cv_padding (4 - (leaf_len % 4));
+
+	  free (v->lf_nesttype.name);
 	  break;
 
 	default:
@@ -3532,6 +4855,223 @@ write_lf_func_id (codeview_custom_type *t)
   asm_fprintf (asm_out_file, "%LLcv_type%x_end:\n", t->num);
 }
 
+/* Write an LF_MFUNC_ID type, which is the version of LF_FUNC_ID for struct
+   functions.  Instead of an LF_STRING_ID for the parent scope, we write the
+   type number of the parent struct.  */
+
+static void
+write_lf_mfunc_id (codeview_custom_type *t)
+{
+  size_t name_len;
+
+  /* This is lf_mfunc_id in binutils and lfMFuncId in Microsoft's cvinfo.h:
+
+    struct lf_mfunc_id
+    {
+      uint16_t size;
+      uint16_t kind;
+      uint32_t parent_type;
+      uint32_t function_type;
+      char name[];
+    } ATTRIBUTE_PACKED
+  */
+
+  fputs (integer_asm_op (2, false), asm_out_file);
+  asm_fprintf (asm_out_file, "%LLcv_type%x_end - %LLcv_type%x_start\n",
+	       t->num, t->num);
+
+  asm_fprintf (asm_out_file, "%LLcv_type%x_start:\n", t->num);
+
+  fputs (integer_asm_op (2, false), asm_out_file);
+  fprint_whex (asm_out_file, t->kind);
+  putc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (4, false), asm_out_file);
+  fprint_whex (asm_out_file, t->lf_mfunc_id.parent_type);
+  putc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (4, false), asm_out_file);
+  fprint_whex (asm_out_file, t->lf_mfunc_id.function_type);
+  putc ('\n', asm_out_file);
+
+  name_len = strlen (t->lf_mfunc_id.name) + 1;
+
+  ASM_OUTPUT_ASCII (asm_out_file, t->lf_mfunc_id.name, name_len);
+
+  write_cv_padding (4 - (name_len % 4));
+
+  free (t->lf_mfunc_id.name);
+
+  asm_fprintf (asm_out_file, "%LLcv_type%x_end:\n", t->num);
+}
+
+/* Write an LF_STRING_ID type, which provides a deduplicated string that other
+   types can reference.  */
+
+static void
+write_lf_string_id (codeview_custom_type *t)
+{
+  size_t string_len;
+
+  /* This is lf_string_id in binutils and lfStringId in Microsoft's cvinfo.h:
+
+    struct lf_string_id
+    {
+      uint16_t size;
+      uint16_t kind;
+      uint32_t substring;
+      char string[];
+    } ATTRIBUTE_PACKED;
+  */
+
+  fputs (integer_asm_op (2, false), asm_out_file);
+  asm_fprintf (asm_out_file, "%LLcv_type%x_end - %LLcv_type%x_start\n",
+	       t->num, t->num);
+
+  asm_fprintf (asm_out_file, "%LLcv_type%x_start:\n", t->num);
+
+  fputs (integer_asm_op (2, false), asm_out_file);
+  fprint_whex (asm_out_file, t->kind);
+  putc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (4, false), asm_out_file);
+  fprint_whex (asm_out_file, t->lf_string_id.substring);
+  putc ('\n', asm_out_file);
+
+  string_len = strlen (t->lf_string_id.string) + 1;
+
+  ASM_OUTPUT_ASCII (asm_out_file, t->lf_string_id.string, string_len);
+
+  write_cv_padding (4 - (string_len % 4));
+
+  free (t->lf_string_id.string);
+
+  asm_fprintf (asm_out_file, "%LLcv_type%x_end:\n", t->num);
+}
+
+/* Write an LF_MFUNCTION type, representing a member function.  This is the
+   struct-scoped equivalent of the LF_PROCEDURE type.  */
+
+static void
+write_lf_mfunction (codeview_custom_type *t)
+{
+  /* This is lf_mfunction in binutils and lfMFunc in Microsoft's cvinfo.h:
+
+    struct lf_mfunction
+    {
+      uint16_t size;
+      uint16_t kind;
+      uint32_t return_type;
+      uint32_t containing_class_type;
+      uint32_t this_type;
+      uint8_t calling_convention;
+      uint8_t attributes;
+      uint16_t num_parameters;
+      uint32_t arglist;
+      int32_t this_adjustment;
+    } ATTRIBUTE_PACKED;
+  */
+
+  fputs (integer_asm_op (2, false), asm_out_file);
+  asm_fprintf (asm_out_file, "%LLcv_type%x_end - %LLcv_type%x_start\n",
+	       t->num, t->num);
+
+  asm_fprintf (asm_out_file, "%LLcv_type%x_start:\n", t->num);
+
+  fputs (integer_asm_op (2, false), asm_out_file);
+  fprint_whex (asm_out_file, t->kind);
+  putc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (4, false), asm_out_file);
+  fprint_whex (asm_out_file, t->lf_mfunction.return_type);
+  putc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (4, false), asm_out_file);
+  fprint_whex (asm_out_file, t->lf_mfunction.containing_class_type);
+  putc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (4, false), asm_out_file);
+  fprint_whex (asm_out_file, t->lf_mfunction.this_type);
+  putc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (1, false), asm_out_file);
+  fprint_whex (asm_out_file, t->lf_mfunction.calling_convention);
+  putc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (1, false), asm_out_file);
+  fprint_whex (asm_out_file, t->lf_mfunction.attributes);
+  putc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (2, false), asm_out_file);
+  fprint_whex (asm_out_file, t->lf_mfunction.num_parameters);
+  putc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (4, false), asm_out_file);
+  fprint_whex (asm_out_file, t->lf_mfunction.arglist);
+  putc ('\n', asm_out_file);
+
+  fputs (integer_asm_op (4, false), asm_out_file);
+  fprint_whex (asm_out_file, t->lf_mfunction.this_adjustment);
+  putc ('\n', asm_out_file);
+
+  asm_fprintf (asm_out_file, "%LLcv_type%x_end:\n", t->num);
+}
+
+/* Write an LF_METHODLIST type, which is an array of type numbers for
+   LF_MFUNCTION types.  Overloaded functions are represented by a LF_METHOD
+   subtype in the field list, which points to a LF_METHODLIST type for the
+   function's various forms.  */
+
+static void
+write_lf_methodlist (codeview_custom_type *t)
+{
+  /* This is lf_methodlist in binutils and lMethodList in Microsoft's cvinfo.h:
+
+    struct lf_methodlist_entry
+    {
+      uint16_t method_attribute;
+      uint16_t padding;
+      uint32_t method_type;
+    } ATTRIBUTE_PACKED;
+
+    struct lf_methodlist
+    {
+      uint16_t size;
+      uint16_t kind;
+      struct lf_methodlist_entry entries[];
+    } ATTRIBUTE_PACKED;
+  */
+
+  fputs (integer_asm_op (2, false), asm_out_file);
+  asm_fprintf (asm_out_file, "%LLcv_type%x_end - %LLcv_type%x_start\n",
+	       t->num, t->num);
+
+  asm_fprintf (asm_out_file, "%LLcv_type%x_start:\n", t->num);
+
+  fputs (integer_asm_op (2, false), asm_out_file);
+  fprint_whex (asm_out_file, t->kind);
+  putc ('\n', asm_out_file);
+
+  for (unsigned int i = 0; i < t->lf_methodlist.count; i++)
+    {
+      fputs (integer_asm_op (2, false), asm_out_file);
+      fprint_whex (asm_out_file, t->lf_methodlist.entries[i].method_attribute);
+      putc ('\n', asm_out_file);
+
+      fputs (integer_asm_op (2, false), asm_out_file);
+      fprint_whex (asm_out_file, 0);
+      putc ('\n', asm_out_file);
+
+      fputs (integer_asm_op (4, false), asm_out_file);
+      fprint_whex (asm_out_file, t->lf_methodlist.entries[i].method_type);
+      putc ('\n', asm_out_file);
+    }
+
+  free (t->lf_methodlist.entries);
+
+  asm_fprintf (asm_out_file, "%LLcv_type%x_end:\n", t->num);
+}
+
 /* Write the .debug$T section, which contains all of our custom type
    definitions.  */
 
@@ -3595,6 +5135,22 @@ write_custom_types (void)
 	  write_lf_func_id (custom_types);
 	  break;
 
+	case LF_MFUNC_ID:
+	  write_lf_mfunc_id (custom_types);
+	  break;
+
+	case LF_STRING_ID:
+	  write_lf_string_id (custom_types);
+	  break;
+
+	case LF_MFUNCTION:
+	  write_lf_mfunction (custom_types);
+	  break;
+
+	case LF_METHODLIST:
+	  write_lf_methodlist (custom_types);
+	  break;
+
 	default:
 	  break;
 	}
@@ -3618,13 +5174,59 @@ codeview_debug_finish (void)
   write_strings_table ();
   write_source_files ();
   write_line_numbers ();
+
+  if (inlinee_lines_htab)
+    write_inlinee_lines ();
+
   write_codeview_symbols ();
+
+  /* If we reference a nested struct but not its parent, add_deferred_type
+     gets called if we create a forward reference for this, even though we've
+     already flushed this in codeview_debug_early_finish.  In this case we will
+     need to flush this list again.  */
+  flush_deferred_types ();
 
   if (custom_types)
     write_custom_types ();
 
+  while (funcs)
+    {
+      codeview_function *next_func = funcs->next;
+
+      while (funcs->blocks)
+	{
+	  codeview_line_block *next_block = funcs->blocks->next;
+
+	  while (funcs->blocks->lines)
+	    {
+	      codeview_line *next_line = funcs->blocks->lines->next;
+
+	      free (funcs->blocks->lines);
+	      funcs->blocks->lines = next_line;
+	    }
+
+	  free (funcs->blocks);
+	  funcs->blocks = next_block;
+	}
+
+      free (funcs);
+      funcs = next_func;
+    }
+
   if (types_htab)
     delete types_htab;
+
+  if (func_htab)
+    delete func_htab;
+
+  if (string_id_htab)
+    delete string_id_htab;
+
+  if (inlinee_lines_htab)
+    delete inlinee_lines_htab;
+
+  if (cv_func_htab)
+    delete cv_func_htab;
 }
 
 /* Translate a DWARF base type (DW_TAG_base_type) into its CodeView
@@ -3954,6 +5556,79 @@ get_type_num_volatile_type (dw_die_ref type, bool in_struct)
   return ct->num;
 }
 
+/* Return the name of a DIE, traversing its parents in order to construct a
+   C++-style name if necessary.  */
+static char *
+get_name (dw_die_ref die)
+{
+  dw_die_ref decl = get_AT_ref (die, DW_AT_specification);
+  dw_die_ref parent;
+  const char *name;
+  char *str;
+  size_t len;
+
+  static const char anon[] = "<unnamed-tag>";
+  static const char sep[] = "::";
+
+  if (decl)
+    die = decl;
+
+  name = get_AT_string (die, DW_AT_name);
+
+  if (!name)
+    return NULL;
+
+  parent = dw_get_die_parent (die);
+
+  if (!parent || dw_get_die_tag (parent) == DW_TAG_compile_unit)
+    return xstrdup (name);
+
+  len = strlen (name);
+  while (parent && dw_get_die_tag (parent) != DW_TAG_compile_unit)
+    {
+      const char *ns_name = get_AT_string (parent, DW_AT_name);
+
+      len += sizeof (sep) - 1;
+
+      if (ns_name)
+	len += strlen (ns_name);
+      else
+	len += sizeof (anon) - 1;
+
+      parent = dw_get_die_parent (parent);
+    }
+
+  str = (char *) xmalloc (len + 1);
+  str[len] = 0;
+
+  len -= strlen (name);
+  memcpy (str + len, name, strlen (name));
+
+  parent = dw_get_die_parent (die);
+  while (parent && dw_get_die_tag (parent) != DW_TAG_compile_unit)
+    {
+      const char *ns_name = get_AT_string (parent, DW_AT_name);
+
+      len -= sizeof (sep) - 1;
+      memcpy (str + len, sep, sizeof (sep) - 1);
+
+      if (ns_name)
+	{
+	  len -= strlen (ns_name);
+	  memcpy (str + len, ns_name, strlen (ns_name));
+	}
+      else
+	{
+	  len -= sizeof (anon) - 1;
+	  memcpy (str + len, anon, sizeof (anon) - 1);
+	}
+
+      parent = dw_get_die_parent (parent);
+    }
+
+  return str;
+}
+
 /* Add a forward declaration for an enum.  This is legal from C++11 onwards.  */
 
 static uint32_t
@@ -3971,7 +5646,7 @@ add_enum_forward_def (dw_die_ref type)
   ct->lf_enum.underlying_type = get_type_num (get_AT_ref (type, DW_AT_type),
 					      false, false);
   ct->lf_enum.fieldlist = 0;
-  ct->lf_enum.name = xstrdup (get_AT_string (type, DW_AT_name));
+  ct->lf_enum.name = get_name (type);
 
   add_custom_type (ct);
 
@@ -4131,7 +5806,7 @@ get_type_num_enumeration_type (dw_die_ref type, bool in_struct)
   ct->lf_enum.underlying_type = get_type_num (get_AT_ref (type, DW_AT_type),
 					      in_struct, false);
   ct->lf_enum.fieldlist = last_type;
-  ct->lf_enum.name = xstrdup (get_AT_string (type, DW_AT_name));
+  ct->lf_enum.name = get_name (type);
 
   add_custom_type (ct);
 
@@ -4218,7 +5893,7 @@ add_struct_forward_def (dw_die_ref type)
   ct->lf_structure.vshape = 0;
   ct->lf_structure.length.neg = false;
   ct->lf_structure.length.num = 0;
-  ct->lf_structure.name = xstrdup (get_AT_string (type, DW_AT_name));
+  ct->lf_structure.name = get_name (type);
 
   add_custom_type (ct);
 
@@ -4226,6 +5901,52 @@ add_struct_forward_def (dw_die_ref type)
     add_deferred_type (type);
 
   return ct->num;
+}
+
+/* Add a new subtype to an LF_FIELDLIST type, and handle overflows if
+   necessary.  */
+
+static void
+add_to_fieldlist (codeview_custom_type **ct, uint16_t *num_members,
+		  codeview_subtype *el, size_t el_len)
+{
+  /* Add an LF_INDEX subtype if everything's too big for one
+     LF_FIELDLIST.  */
+
+  if ((*ct)->lf_fieldlist.length + el_len > MAX_FIELDLIST_SIZE)
+    {
+      codeview_subtype *idx;
+      codeview_custom_type *ct2;
+
+      idx = (codeview_subtype *) xmalloc (sizeof (*idx));
+      idx->next = NULL;
+      idx->kind = LF_INDEX;
+      idx->lf_index.type_num = 0;
+
+      (*ct)->lf_fieldlist.last_subtype->next = idx;
+      (*ct)->lf_fieldlist.last_subtype = idx;
+
+      ct2 = (codeview_custom_type *)
+	xmalloc (sizeof (codeview_custom_type));
+
+      ct2->next = *ct;
+      ct2->kind = LF_FIELDLIST;
+      ct2->lf_fieldlist.length = 0;
+      ct2->lf_fieldlist.subtypes = NULL;
+      ct2->lf_fieldlist.last_subtype = NULL;
+
+      *ct = ct2;
+    }
+
+  (*ct)->lf_fieldlist.length += el_len;
+
+  if ((*ct)->lf_fieldlist.last_subtype)
+    (*ct)->lf_fieldlist.last_subtype->next = el;
+  else
+    (*ct)->lf_fieldlist.subtypes = el;
+
+  (*ct)->lf_fieldlist.last_subtype = el;
+  (*num_members)++;
 }
 
 /* Add an LF_BITFIELD type, returning its number.  DWARF represents bitfields
@@ -4255,6 +5976,337 @@ create_bitfield (dw_die_ref c)
   return ct->num;
 }
 
+/* Create an LF_MEMBER field list subtype for a struct member, returning its
+   pointer in el and its size in el_len.  */
+
+static void
+add_struct_member (dw_die_ref c, uint16_t accessibility,
+		   codeview_custom_type **ct, uint16_t *num_members,
+		   unsigned int base_offset)
+{
+  codeview_subtype *el;
+  size_t el_len;
+  dw_die_ref type = get_AT_ref (c, DW_AT_type);
+  unsigned int offset;
+
+  offset = base_offset + get_AT_unsigned (c, DW_AT_data_member_location);
+
+  /* If the data member is actually an anonymous struct, class, or union,
+     follow MSVC by flattening this into its parent.  */
+  if (!get_AT_string (c, DW_AT_name) && type
+      && (dw_get_die_tag (type) == DW_TAG_structure_type
+	  || dw_get_die_tag (type) == DW_TAG_class_type
+	  || dw_get_die_tag (type) == DW_TAG_union_type))
+    {
+      dw_die_ref c2, first_child;
+
+      first_child = dw_get_die_child (type);
+      c2 = first_child;
+
+      do
+	{
+	  c2 = dw_get_die_sib (c2);
+
+	  if (dw_get_die_tag (c2) == DW_TAG_member)
+	      add_struct_member (c2, accessibility, ct, num_members, offset);
+	}
+      while (c2 != first_child);
+
+      return;
+    }
+
+  el = (codeview_subtype *) xmalloc (sizeof (*el));
+  el->next = NULL;
+  el->kind = LF_MEMBER;
+  el->lf_member.attributes = accessibility;
+
+  if (get_AT (c, DW_AT_data_bit_offset))
+    el->lf_member.type = create_bitfield (c);
+  else
+    el->lf_member.type = get_type_num (type, true, false);
+
+  el->lf_member.offset.neg = false;
+  el->lf_member.offset.num = offset;
+
+  el_len = 11 + cv_integer_len (&el->lf_member.offset);
+
+  if (get_AT_string (c, DW_AT_name))
+    {
+      el->lf_member.name = xstrdup (get_AT_string (c, DW_AT_name));
+      el_len += strlen (el->lf_member.name);
+    }
+  else
+    {
+      el->lf_member.name = NULL;
+    }
+
+  if (el_len % 4)
+    el_len += 4 - (el_len % 4);
+
+  add_to_fieldlist (ct, num_members, el, el_len);
+}
+
+/* Create an LF_STMEMBER field list subtype for a static struct member,
+   returning its pointer in el and its size in el_len.  */
+
+static void
+add_struct_static_member (dw_die_ref c, uint16_t accessibility,
+			  codeview_custom_type **ct, uint16_t *num_members)
+{
+  codeview_subtype *el;
+  size_t el_len;
+
+  el = (codeview_subtype *) xmalloc (sizeof (*el));
+  el->next = NULL;
+  el->kind = LF_STMEMBER;
+  el->lf_static_member.attributes = accessibility;
+  el->lf_static_member.type = get_type_num (get_AT_ref (c, DW_AT_type),
+					    true, false);
+  el->lf_static_member.name = xstrdup (get_AT_string (c, DW_AT_name));
+
+  el_len = 9 + strlen (el->lf_static_member.name);
+
+  if (el_len % 4)
+    el_len += 4 - (el_len % 4);
+
+  add_to_fieldlist (ct, num_members, el, el_len);
+}
+
+/* Create a field list subtype for a struct function, returning its pointer in
+   el and its size in el_len.  If the function is not overloaded, create an
+   LF_ONEMETHOD subtype pointing to the LF_MFUNCTION.  Otherwise, add an
+   LF_METHODLIST type of the function's forms, and create an LF_METHOD subtype
+   pointing to this.  */
+
+static void
+add_struct_function (dw_die_ref c, hash_table<method_hasher> *method_htab,
+		     codeview_custom_type **ct, uint16_t *num_members)
+{
+  const char *name = get_AT_string (c, DW_AT_name);
+  codeview_method **slot, *meth;
+  codeview_subtype *el;
+  size_t el_len;
+
+  slot = method_htab->find_slot_with_hash (name, htab_hash_string (name),
+					   NO_INSERT);
+  if (!slot)
+    return;
+
+  meth = *slot;
+
+  el = (codeview_subtype *) xmalloc (sizeof (*el));
+  el->next = NULL;
+
+  if (meth->count == 1)
+    {
+      el->kind = LF_ONEMETHOD;
+      el->lf_onemethod.method_attribute = meth->attribute;
+      el->lf_onemethod.method_type = meth->type;
+      el->lf_onemethod.name = xstrdup (name);
+
+      el_len = 9 + strlen (el->lf_onemethod.name);
+    }
+  else
+    {
+      codeview_custom_type *ct;
+      lf_methodlist_entry *ent;
+
+      ct = (codeview_custom_type *) xmalloc (sizeof (codeview_custom_type));
+
+      ct->next = NULL;
+      ct->kind = LF_METHODLIST;
+      ct->lf_methodlist.count = meth->count;
+      ct->lf_methodlist.entries = (lf_methodlist_entry *)
+	xmalloc (meth->count * sizeof (lf_methodlist_entry));
+
+      ent = ct->lf_methodlist.entries;
+      for (codeview_method *m = meth; m; m = m->next)
+	{
+	  ent->method_attribute = m->attribute;
+	  ent->method_type = m->type;
+	  ent++;
+	}
+
+      add_custom_type (ct);
+
+      el->kind = LF_METHOD;
+      el->lf_method.count = meth->count;
+      el->lf_method.method_list = ct->num;
+      el->lf_method.name = xstrdup (name);
+
+      el_len = 9 + strlen (el->lf_method.name);
+    }
+
+  if (el_len % 4)
+    el_len += 4 - (el_len % 4);
+
+  add_to_fieldlist (ct, num_members, el, el_len);
+
+  method_htab->remove_elt_with_hash (name, htab_hash_string (name));
+
+  while (meth)
+    {
+      codeview_method *next = meth->next;
+
+      free (meth->name);
+      free (meth);
+      meth = next;
+    }
+}
+
+/* Create a field list subtype that records the base class that a struct
+   inherits from.  */
+
+static void
+add_struct_inheritance (dw_die_ref c, uint16_t accessibility,
+			codeview_custom_type **ct, uint16_t *num_members)
+{
+  codeview_subtype *el;
+  size_t el_len;
+
+  /* FIXME: if DW_AT_virtuality is DW_VIRTUALITY_virtual this is a virtual
+	    base class, and we should be issuing an LF_VBCLASS record
+	    instead.  */
+  if (get_AT_unsigned (c, DW_AT_virtuality) == DW_VIRTUALITY_virtual)
+    return;
+
+  el = (codeview_subtype *) xmalloc (sizeof (*el));
+  el->next = NULL;
+  el->kind = LF_BCLASS;
+  el->lf_bclass.attributes = accessibility;
+  el->lf_bclass.base_class_type = get_type_num (get_AT_ref (c, DW_AT_type),
+						   true, false);
+  el->lf_bclass.offset.neg = false;
+  el->lf_bclass.offset.num = get_AT_unsigned (c, DW_AT_data_member_location);
+
+  el_len = 10 + cv_integer_len (&el->lf_bclass.offset);
+
+  if (el_len % 4)
+    el_len += 4 - (el_len % 4);
+
+  add_to_fieldlist (ct, num_members, el, el_len);
+}
+
+/* Create a new LF_MFUNCTION type for a struct function, add it to the
+   types_htab hash table, and return its type number.  */
+
+static uint32_t
+get_mfunction_type (dw_die_ref c)
+{
+  uint32_t containing_class_type, this_type, mfunction_type;
+  dw_die_ref obj_pointer;
+  codeview_type **slot, *t;
+
+  containing_class_type = get_type_num (dw_get_die_parent (c), true, false);
+
+  obj_pointer = get_AT_ref (c, DW_AT_object_pointer);
+  if (obj_pointer && dw_get_die_tag (obj_pointer) == DW_TAG_formal_parameter)
+    {
+      this_type = get_type_num (get_AT_ref (obj_pointer, DW_AT_type),
+				true, false);
+    }
+  else
+    {
+      this_type = 0;
+    }
+
+  mfunction_type = get_type_num_subroutine_type (c, true, containing_class_type,
+						 this_type, 0);
+
+  slot = types_htab->find_slot_with_hash (c, htab_hash_pointer (c), INSERT);
+
+  t = (codeview_type *) xmalloc (sizeof (codeview_type));
+
+  t->die = c;
+  t->num = mfunction_type;
+  t->is_fwd_ref = false;
+
+  *slot = t;
+
+  return mfunction_type;
+}
+
+/* Translate a DWARF DW_AT_accessibility constant into its CodeView
+   equivalent.  If implicit, follow the C++ rules.  */
+
+static uint16_t
+get_accessibility (dw_die_ref c)
+{
+  switch (get_AT_unsigned (c, DW_AT_accessibility))
+    {
+    case DW_ACCESS_private:
+      return CV_ACCESS_PRIVATE;
+
+    case DW_ACCESS_protected:
+      return CV_ACCESS_PROTECTED;
+
+    case DW_ACCESS_public:
+      return CV_ACCESS_PUBLIC;
+
+    /* Members in a C++ struct or union are public by default, members
+      in a class are private.  */
+    default:
+      if (dw_get_die_tag (dw_get_die_parent (c)) == DW_TAG_class_type)
+	return CV_ACCESS_PRIVATE;
+      else
+	return CV_ACCESS_PUBLIC;
+    }
+}
+
+/* Returns true if the struct function pointed to by die is an instantiated
+   template function.  These are skipped in CodeView struct definitions, as
+   otherwise the same type might not be deduplicated across different TUs.  */
+
+static bool
+is_templated_func (dw_die_ref die)
+{
+  dw_die_ref c = dw_get_die_child (die);
+
+  if (!c)
+    return false;
+
+  do
+    {
+      c = dw_get_die_sib (c);
+
+      if (dw_get_die_tag (c) == DW_TAG_template_type_param)
+	return true;
+    }
+  while (c != dw_get_die_child (die));
+
+  return false;
+}
+
+/* Create a field list subtype that records that a struct has a nested type
+   contained within it.  */
+
+static void
+add_struct_nested_type (dw_die_ref c, codeview_custom_type **ct,
+			uint16_t *num_members)
+{
+  const char *name = get_AT_string (c, DW_AT_name);
+  codeview_subtype *el;
+  size_t name_len, el_len;
+
+  if (!name)
+    return;
+
+  name_len = strlen (name);
+
+  el = (codeview_subtype *) xmalloc (sizeof (*el));
+  el->next = NULL;
+  el->kind = LF_NESTTYPE;
+  el->lf_nesttype.type = get_type_num (c, true, false);
+  el->lf_nesttype.name = xstrdup (name);
+
+  el_len = 9 + name_len;
+
+  if (el_len % 4)
+    el_len += 4 - (el_len % 4);
+
+  add_to_fieldlist (ct, num_members, el, el_len);
+}
+
 /* Process a DW_TAG_structure_type, DW_TAG_class_type, or DW_TAG_union_type
    DIE, add an LF_FIELDLIST and an LF_STRUCTURE / LF_CLASS / LF_UNION type,
    and return the number of the latter.  */
@@ -4262,11 +6314,17 @@ create_bitfield (dw_die_ref c)
 static uint32_t
 get_type_num_struct (dw_die_ref type, bool in_struct, bool *is_fwd_ref)
 {
-  dw_die_ref first_child;
+  dw_die_ref parent, first_child;
   codeview_custom_type *ct;
   uint16_t num_members = 0;
   uint32_t last_type = 0;
-  const char *name;
+
+  parent = dw_get_die_parent(type);
+
+  if (parent && (dw_get_die_tag (parent) == DW_TAG_structure_type
+      || dw_get_die_tag (parent) == DW_TAG_class_type
+      || dw_get_die_tag (parent) == DW_TAG_union_type))
+    get_type_num (parent, true, false);
 
   if ((in_struct && get_AT_string (type, DW_AT_name))
       || get_AT_flag (type, DW_AT_declaration))
@@ -4294,112 +6352,112 @@ get_type_num_struct (dw_die_ref type, bool in_struct, bool *is_fwd_ref)
 
   if (first_child)
     {
+      hash_table<method_hasher> *method_htab = NULL;
       dw_die_ref c;
+
+      /* First, loop through and record any non-templated member functions.
+	 This is because overloaded and non-overloaded functions are expressed
+	 differently in CodeView, so we need to have a hash table on the name
+	 to know how to record it later on.  */
 
       c = first_child;
       do
 	{
-	  codeview_subtype *el;
-	  size_t el_len;
+	  c = dw_get_die_sib (c);
+
+	  if (dw_get_die_tag (c) == DW_TAG_subprogram)
+	    {
+	      const char *name = get_AT_string (c, DW_AT_name);
+	      codeview_method *meth, **slot;
+
+	      if (is_templated_func (c))
+		continue;
+
+	      if (!method_htab)
+		method_htab = new hash_table<method_hasher> (10);
+
+	      meth = (codeview_method *) xmalloc (sizeof (*meth));
+
+	      slot = method_htab->find_slot_with_hash (name,
+						       htab_hash_string (name),
+						       INSERT);
+
+	      meth->attribute = get_accessibility (c);
+
+	      if (!get_AT_ref (c, DW_AT_object_pointer))
+		meth->attribute |= CV_METHOD_STATIC;
+
+	      meth->type = get_mfunction_type (c);
+	      meth->next = NULL;
+
+	      if (*slot)
+		{
+		  if ((*slot)->last)
+		    (*slot)->last->next = meth;
+		  else
+		    (*slot)->next = meth;
+
+		  (*slot)->last = meth;
+		  (*slot)->count++;
+
+		  meth->name = NULL;
+		}
+	      else
+		{
+		  meth->name = xstrdup (name);
+		  meth->last = NULL;
+		  meth->count = 1;
+		  *slot = meth;
+		}
+	    }
+	}
+      while (c != first_child);
+
+      /* Now loop through again and record the actual members.  */
+
+      c = first_child;
+      do
+	{
+	  uint16_t accessibility;
 
 	  c = dw_get_die_sib (c);
 
-	  if (dw_get_die_tag (c) != DW_TAG_member)
-	    continue;
+	  accessibility = get_accessibility (c);
 
-	  el = (codeview_subtype *) xmalloc (sizeof (*el));
-	  el->next = NULL;
-	  el->kind = LF_MEMBER;
-
-	  switch (get_AT_unsigned (c, DW_AT_accessibility))
+	  switch (dw_get_die_tag (c))
 	    {
-	    case DW_ACCESS_private:
-	      el->lf_member.attributes = CV_ACCESS_PRIVATE;
+	    case DW_TAG_member:
+	      add_struct_member (c, accessibility, &ct, &num_members, 0);
 	      break;
 
-	    case DW_ACCESS_protected:
-	      el->lf_member.attributes = CV_ACCESS_PROTECTED;
+	    case DW_TAG_variable:
+	      add_struct_static_member (c, accessibility, &ct, &num_members);
 	      break;
 
-	    case DW_ACCESS_public:
-	      el->lf_member.attributes = CV_ACCESS_PUBLIC;
+	    case DW_TAG_subprogram:
+	      if (!is_templated_func (c))
+		add_struct_function (c, method_htab, &ct, &num_members);
 	      break;
 
-	    /* Members in a C++ struct or union are public by default, members
-	      in a class are private.  */
+	    case DW_TAG_inheritance:
+	      add_struct_inheritance (c, accessibility, &ct, &num_members);
+	      break;
+
+	    case DW_TAG_structure_type:
+	    case DW_TAG_class_type:
+	    case DW_TAG_union_type:
+	    case DW_TAG_enumeration_type:
+	      add_struct_nested_type (c, &ct, &num_members);
+	      break;
+
 	    default:
-	      if (dw_get_die_tag (type) == DW_TAG_class_type)
-		el->lf_member.attributes = CV_ACCESS_PRIVATE;
-	      else
-		el->lf_member.attributes = CV_ACCESS_PUBLIC;
 	      break;
 	    }
-
-	  if (get_AT (c, DW_AT_data_bit_offset))
-	    el->lf_member.type = create_bitfield (c);
-	  else
-	    el->lf_member.type = get_type_num (get_AT_ref (c, DW_AT_type),
-					       true, false);
-
-	  el->lf_member.offset.neg = false;
-	  el->lf_member.offset.num = get_AT_unsigned (c,
-						      DW_AT_data_member_location);
-
-	  el_len = 11;
-	  el_len += cv_integer_len (&el->lf_member.offset);
-
-	  if (get_AT_string (c, DW_AT_name))
-	    {
-	      el->lf_member.name = xstrdup (get_AT_string (c, DW_AT_name));
-	      el_len += strlen (el->lf_member.name);
-	    }
-	  else
-	    {
-	      el->lf_member.name = NULL;
-	    }
-
-	  if (el_len % 4)
-	    el_len += 4 - (el_len % 4);
-
-	  /* Add an LF_INDEX subtype if everything's too big for one
-	     LF_FIELDLIST.  */
-
-	  if (ct->lf_fieldlist.length + el_len > MAX_FIELDLIST_SIZE)
-	    {
-	      codeview_subtype *idx;
-	      codeview_custom_type *ct2;
-
-	      idx = (codeview_subtype *) xmalloc (sizeof (*idx));
-	      idx->next = NULL;
-	      idx->kind = LF_INDEX;
-	      idx->lf_index.type_num = 0;
-
-	      ct->lf_fieldlist.last_subtype->next = idx;
-	      ct->lf_fieldlist.last_subtype = idx;
-
-	      ct2 = (codeview_custom_type *)
-		xmalloc (sizeof (codeview_custom_type));
-
-	      ct2->next = ct;
-	      ct2->kind = LF_FIELDLIST;
-	      ct2->lf_fieldlist.length = 0;
-	      ct2->lf_fieldlist.subtypes = NULL;
-	      ct2->lf_fieldlist.last_subtype = NULL;
-
-	      ct = ct2;
-	    }
-
-	  ct->lf_fieldlist.length += el_len;
-
-	  if (ct->lf_fieldlist.last_subtype)
-	    ct->lf_fieldlist.last_subtype->next = el;
-	  else
-	    ct->lf_fieldlist.subtypes = el;
-
-	  ct->lf_fieldlist.last_subtype = el;
-	  num_members++;
 	}
       while (c != first_child);
+
+      if (method_htab)
+	delete method_htab;
     }
 
   while (ct)
@@ -4453,13 +6511,7 @@ get_type_num_struct (dw_die_ref type, bool in_struct, bool *is_fwd_ref)
   ct->lf_structure.vshape = 0;
   ct->lf_structure.length.neg = false;
   ct->lf_structure.length.num = get_AT_unsigned (type, DW_AT_byte_size);
-
-  name = get_AT_string (type, DW_AT_name);
-
-  if (name)
-    ct->lf_structure.name = xstrdup (name);
-  else
-    ct->lf_structure.name = NULL;
+  ct->lf_structure.name = get_name (type);
 
   add_custom_type (ct);
 
@@ -4467,10 +6519,13 @@ get_type_num_struct (dw_die_ref type, bool in_struct, bool *is_fwd_ref)
 }
 
 /* Process a DW_TAG_subroutine_type DIE, adding an LF_ARGLIST and an
-   LF_PROCEDURE type, and returning the number of the latter.  */
+   LF_PROCEDURE or LF_MFUNCTION type, and returning the number of the
+   latter.  */
 
 static uint32_t
-get_type_num_subroutine_type (dw_die_ref type, bool in_struct)
+get_type_num_subroutine_type (dw_die_ref type, bool in_struct,
+			      uint32_t containing_class_type,
+			      uint32_t this_type, int32_t this_adjustment)
 {
   codeview_custom_type *ct;
   uint32_t return_type, arglist_type;
@@ -4491,6 +6546,30 @@ get_type_num_subroutine_type (dw_die_ref type, bool in_struct)
       return_type = T_VOID;
     }
 
+  /* Handle pointer to member function.  */
+  if (containing_class_type == 0)
+    {
+      dw_die_ref obj_ptr = get_AT_ref (type, DW_AT_object_pointer);
+
+      if (obj_ptr)
+	{
+	  dw_die_ref obj_ptr_type = get_AT_ref (obj_ptr, DW_AT_type);
+
+	  if (obj_ptr_type
+	      && dw_get_die_tag (obj_ptr_type) == DW_TAG_pointer_type)
+	    {
+	      dw_die_ref cont_class = get_AT_ref (obj_ptr_type, DW_AT_type);
+
+	      if (dw_get_die_tag (cont_class) == DW_TAG_const_type)
+		cont_class = get_AT_ref (cont_class, DW_AT_type);
+
+	      containing_class_type = get_type_num (cont_class, in_struct,
+						    false);
+	      this_type = get_type_num (obj_ptr_type, in_struct, false);
+	    }
+	}
+    }
+
   /* Count the arguments.  */
 
   first_child = dw_get_die_child (type);
@@ -4507,6 +6586,10 @@ get_type_num_subroutine_type (dw_die_ref type, bool in_struct)
 
 	  if (dw_get_die_tag (c) != DW_TAG_formal_parameter
 	      && dw_get_die_tag (c) != DW_TAG_unspecified_parameters)
+	    continue;
+
+	  /* We ignore "this" params here.  */
+	  if (get_AT_flag (c, DW_AT_artificial) != 0)
 	    continue;
 
 	  num_args++;
@@ -4538,6 +6621,9 @@ get_type_num_subroutine_type (dw_die_ref type, bool in_struct)
 	{
 	  c = dw_get_die_sib (c);
 
+	  if (get_AT_flag (c, DW_AT_artificial) != 0)
+	    continue;
+
 	  switch (dw_get_die_tag (c))
 	    {
 	    case DW_TAG_formal_parameter:
@@ -4566,17 +6652,33 @@ get_type_num_subroutine_type (dw_die_ref type, bool in_struct)
 
   arglist_type = ct->num;
 
-  /* Finally, create an LF_PROCEDURE.  */
+  /* Finally, create an LF_PROCEDURE or LF_MFUNCTION type.  */
 
   ct = (codeview_custom_type *) xmalloc (sizeof (codeview_custom_type));
 
   ct->next = NULL;
-  ct->kind = LF_PROCEDURE;
-  ct->lf_procedure.return_type = return_type;
-  ct->lf_procedure.calling_convention = 0;
-  ct->lf_procedure.attributes = 0;
-  ct->lf_procedure.num_parameters = num_args;
-  ct->lf_procedure.arglist = arglist_type;
+
+  if (containing_class_type != 0)
+    {
+      ct->kind = LF_MFUNCTION;
+      ct->lf_mfunction.return_type = return_type;
+      ct->lf_mfunction.containing_class_type = containing_class_type;
+      ct->lf_mfunction.this_type = this_type;
+      ct->lf_mfunction.calling_convention = 0;
+      ct->lf_mfunction.attributes = 0;
+      ct->lf_mfunction.num_parameters = num_args;
+      ct->lf_mfunction.arglist = arglist_type;
+      ct->lf_mfunction.this_adjustment = this_adjustment;
+    }
+  else
+    {
+      ct->kind = LF_PROCEDURE;
+      ct->lf_procedure.return_type = return_type;
+      ct->lf_procedure.calling_convention = 0;
+      ct->lf_procedure.attributes = 0;
+      ct->lf_procedure.num_parameters = num_args;
+      ct->lf_procedure.arglist = arglist_type;
+    }
 
   add_custom_type (ct);
 
@@ -4703,6 +6805,84 @@ get_type_num_array_type (dw_die_ref type, bool in_struct)
   return element_type;
 }
 
+/* Translate a DW_TAG_ptr_to_member_type DIE, that is a pointer to member
+   function or field, into an LF_POINTER record.  */
+
+static uint32_t
+get_type_num_ptr_to_member_type (dw_die_ref type, bool in_struct)
+{
+  uint32_t base_type_num;
+  uint32_t containing_class;
+  dw_die_ref base_type;
+  codeview_custom_type *ct;
+
+  base_type = get_AT_ref (type, DW_AT_type);
+
+  base_type_num = get_type_num (base_type, in_struct, false);
+  if (base_type_num == 0)
+    return 0;
+
+  containing_class = get_type_num (get_AT_ref (type, DW_AT_containing_type),
+				   in_struct, false);
+
+  ct = (codeview_custom_type *) xmalloc (sizeof (codeview_custom_type));
+
+  ct->next = NULL;
+  ct->kind = LF_POINTER;
+  ct->lf_pointer.base_type = base_type_num;
+
+  if (TARGET_64BIT)
+    {
+      ct->lf_pointer.attributes = CV_PTR_64;
+      ct->lf_pointer.attributes |= 8 << 13;
+    }
+  else
+    {
+      ct->lf_pointer.attributes = CV_PTR_NEAR32;
+      ct->lf_pointer.attributes |= 4 << 13;
+    }
+
+  ct->lf_pointer.containing_class = containing_class;
+
+  if (base_type && dw_get_die_tag (base_type) == DW_TAG_subroutine_type)
+    {
+      ct->lf_pointer.attributes |= CV_PTR_MODE_PMFUNC;
+      ct->lf_pointer.ptr_to_mem_type = CV_PMTYPE_F_Single;
+    }
+  else
+    {
+      ct->lf_pointer.attributes |= CV_PTR_MODE_PMEM;
+      ct->lf_pointer.ptr_to_mem_type = CV_PMTYPE_D_Single;
+    }
+
+  add_custom_type (ct);
+
+  return ct->num;
+}
+
+/* Return the type number that corresponds to a DW_TAG_typedef DIE: either the
+   type number of the base type, or follow MSVC in having a special value
+   for the HRESULT used by COM.  */
+
+static uint32_t
+get_type_num_typedef (dw_die_ref type, bool in_struct)
+{
+  uint32_t num;
+
+  num = get_type_num (get_AT_ref (type, DW_AT_type), in_struct, false);
+
+  if (num == T_LONG)
+    {
+      const char *name = get_AT_string (type, DW_AT_name);
+
+      /* longs typedef'd as "HRESULT" get their own type */
+      if (name && !strcmp (name, "HRESULT"))
+	num = T_HRESULT;
+    }
+
+  return num;
+}
+
 /* Process a DIE representing a type definition, add a CodeView type if
    necessary, and return its number.  If it's something we can't handle, return
    0.  We keep a hash table so that we're not adding the same type multiple
@@ -4737,9 +6917,7 @@ get_type_num (dw_die_ref type, bool in_struct, bool no_fwd_ref)
       break;
 
     case DW_TAG_typedef:
-      /* FIXME - signed longs typedef'd as "HRESULT" should get their
-		 own type (T_HRESULT) */
-      num = get_type_num (get_AT_ref (type, DW_AT_type), in_struct, false);
+      num = get_type_num_typedef (type, in_struct);
       break;
 
     case DW_TAG_pointer_type:
@@ -4777,7 +6955,11 @@ get_type_num (dw_die_ref type, bool in_struct, bool no_fwd_ref)
       break;
 
     case DW_TAG_subroutine_type:
-      num = get_type_num_subroutine_type (type, in_struct);
+      num = get_type_num_subroutine_type (type, in_struct, 0, 0, 0);
+      break;
+
+    case DW_TAG_ptr_to_member_type:
+      num = get_type_num_ptr_to_member_type (type, in_struct);
       break;
 
     default:
@@ -4827,7 +7009,7 @@ add_variable (dw_die_ref die)
   s->kind = get_AT (die, DW_AT_external) ? S_GDATA32 : S_LDATA32;
   s->data_symbol.type = get_type_num (get_AT_ref (die, DW_AT_type), false,
 				      false);
-  s->data_symbol.name = xstrdup (name);
+  s->data_symbol.name = get_name (die);
   s->data_symbol.die = die;
 
   if (last_sym)
@@ -4838,35 +7020,199 @@ add_variable (dw_die_ref die)
   last_sym = s;
 }
 
+/* Return the type number of the LF_STRING_ID entry corresponding to the given
+   string, creating a new one if necessary.  */
+
+static uint32_t
+add_string_id (const char *s)
+{
+  codeview_custom_type **slot;
+  codeview_custom_type *ct;
+
+  if (!string_id_htab)
+    string_id_htab = new hash_table<string_id_hasher> (10);
+
+  slot = string_id_htab->find_slot_with_hash (s, htab_hash_string (s),
+					      INSERT);
+  if (*slot)
+    return (*slot)->num;
+
+  ct = (codeview_custom_type *) xmalloc (sizeof (codeview_custom_type));
+
+  ct->next = NULL;
+  ct->kind = LF_STRING_ID;
+  ct->lf_string_id.substring = 0;
+  ct->lf_string_id.string = xstrdup (s);
+
+  add_custom_type (ct);
+
+  *slot = ct;
+
+  return ct->num;
+}
+
+/* Return the type number of the LF_STRING_ID corresponding to the given DIE's
+   parent, or 0 if it is in the global scope.  */
+
+static uint32_t
+get_scope_string_id (dw_die_ref die)
+{
+  dw_die_ref decl = get_AT_ref (die, DW_AT_specification);
+  char *name;
+  uint32_t ret;
+
+  if (decl)
+    die = decl;
+
+  die = dw_get_die_parent (die);
+  if (!die)
+    return 0;
+
+  if (dw_get_die_tag (die) == DW_TAG_compile_unit)
+    return 0;
+
+  name = get_name (die);
+  if (!name)
+    return 0;
+
+  ret = add_string_id (name);
+  free (name);
+
+  return ret;
+}
+
+/* Add an LF_FUNC_ID type and return its number (see write_lf_func_id).  */
+
+static uint32_t
+add_lf_func_id (dw_die_ref die, const char *name)
+{
+  uint32_t function_type, scope_type;
+  codeview_custom_type *ct;
+
+  function_type = get_type_num_subroutine_type (die, false, 0, 0, 0);
+  scope_type = get_scope_string_id (die);
+
+  ct = (codeview_custom_type *) xmalloc (sizeof (codeview_custom_type));
+
+  ct->next = NULL;
+  ct->kind = LF_FUNC_ID;
+  ct->lf_func_id.parent_scope = scope_type;
+  ct->lf_func_id.function_type = function_type;
+  ct->lf_func_id.name = xstrdup (name);
+
+  add_custom_type (ct);
+
+  return ct->num;
+}
+
+/* Add an LF_MFUNC_ID type and return its number (see write_lf_mfunc_id).  */
+
+static uint32_t
+add_lf_mfunc_id (dw_die_ref die, const char *name)
+{
+  uint32_t function_type = 0, parent_type;
+  codeview_custom_type *ct;
+  dw_die_ref spec = get_AT_ref (die, DW_AT_specification);
+
+  parent_type = get_type_num (dw_get_die_parent (spec), false, false);
+
+  if (types_htab)
+    {
+      codeview_type **slot;
+
+      slot = types_htab->find_slot_with_hash (spec, htab_hash_pointer (spec),
+					      NO_INSERT);
+
+      if (slot && *slot)
+	function_type = (*slot)->num;
+    }
+
+  if (function_type == 0)
+    {
+      function_type = get_type_num_subroutine_type (die, false, parent_type,
+						    0, 0);
+    }
+
+  ct = (codeview_custom_type *) xmalloc (sizeof (codeview_custom_type));
+
+  ct->next = NULL;
+  ct->kind = LF_MFUNC_ID;
+  ct->lf_mfunc_id.parent_type = parent_type;
+  ct->lf_mfunc_id.function_type = function_type;
+  ct->lf_mfunc_id.name = xstrdup (name);
+
+  add_custom_type (ct);
+
+  return ct->num;
+}
+
+/* Generate a new LF_FUNC_ID or LF_MFUNC_ID type for a DW_TAG_subprogram DIE
+   and return its number, or return the existing type number if already
+   present.  */
+
+static uint32_t
+get_func_id (dw_die_ref die)
+{
+  const char *name = get_AT_string (die, DW_AT_name);
+  dw_die_ref spec = get_AT_ref (die, DW_AT_specification);
+  bool do_mfunc_id = false;
+  codeview_type **slot, *t;
+  uint32_t num;
+
+  if (!name)
+    return 0;
+
+  if (!func_htab)
+    func_htab = new hash_table<die_hasher> (10);
+
+  slot = func_htab->find_slot_with_hash (die, htab_hash_pointer (die), INSERT);
+
+  if (slot && *slot)
+    return (*slot)->num;
+
+  if (spec && dw_get_die_parent (spec))
+    {
+      switch (dw_get_die_tag (dw_get_die_parent (spec)))
+	{
+	case DW_TAG_class_type:
+	case DW_TAG_structure_type:
+	case DW_TAG_union_type:
+	  do_mfunc_id = true;
+	  break;
+
+	default:
+	  break;
+	}
+    }
+
+  if (do_mfunc_id)
+    num = add_lf_mfunc_id (die, name);
+  else
+    num = add_lf_func_id (die, name);
+
+  t = (codeview_type *) xmalloc (sizeof (codeview_type));
+
+  t->die = die;
+  t->num = num;
+  t->is_fwd_ref = false;
+
+  *slot = t;
+
+  return num;
+}
+
 /* Process a DW_TAG_subprogram DIE, and add an S_GPROC32_ID or S_LPROC32_ID
    symbol for this.  */
 
 static void
 add_function (dw_die_ref die)
 {
-  codeview_custom_type *ct;
-  const char *name = get_AT_string (die, DW_AT_name);
-  uint32_t function_type, func_id_type;
+  uint32_t func_id_type;
   codeview_symbol *s;
 
-  if (!name)
+  func_id_type = get_func_id (die);
+  if (func_id_type == 0)
     return;
-
-  /* Add an LF_FUNC_ID type for this function.  */
-
-  function_type = get_type_num_subroutine_type (die, false);
-
-  ct = (codeview_custom_type *) xmalloc (sizeof (codeview_custom_type));
-
-  ct->next = NULL;
-  ct->kind = LF_FUNC_ID;
-  ct->lf_func_id.parent_scope = 0;
-  ct->lf_func_id.function_type = function_type;
-  ct->lf_func_id.name = xstrdup (name);
-
-  add_custom_type (ct);
-
-  func_id_type = ct->num;
 
   /* Add an S_GPROC32_ID / S_LPROC32_ID symbol.  */
 
@@ -4879,7 +7225,7 @@ add_function (dw_die_ref die)
   s->function.next = 0;
   s->function.type = func_id_type;
   s->function.flags = 0;
-  s->function.name = xstrdup (name);
+  s->function.name = get_name (die);
   s->function.die = die;
 
   if (last_sym)
@@ -4888,6 +7234,50 @@ add_function (dw_die_ref die)
     sym = s;
 
   last_sym = s;
+}
+
+/* If we have encountered a new inlined function, add this to
+   inlinee_lines_htab so that it can be output to the S_INLINEELINES subsection
+   of .debug$S.  */
+
+void
+codeview_abstract_function (tree decl)
+{
+  codeview_inlinee_lines *il, **slot;
+  dw_die_ref die;
+  uint32_t func_id;
+  struct dwarf_file_data *file;
+
+  if (!DECL_DECLARED_INLINE_P (decl))
+    return;
+
+  die = lookup_decl_die (decl);
+  if (!die)
+    return;
+
+  func_id = get_func_id (die);
+  if (func_id == 0)
+    return;
+
+  file = get_AT_file (die, DW_AT_decl_file);
+  if (!file)
+    return;
+
+  if (!inlinee_lines_htab)
+    inlinee_lines_htab = new hash_table<inlinee_lines_hasher> (10);
+
+  slot = inlinee_lines_htab->find_slot_with_hash (func_id, func_id, INSERT);
+  if (*slot)
+    return;
+
+  il = (codeview_inlinee_lines *) xmalloc (sizeof (codeview_inlinee_lines));
+
+  il->next = NULL;
+  il->func_id = func_id;
+  il->file_id = get_file_id (file->filename);
+  il->starting_line = get_AT_unsigned (die, DW_AT_decl_line);
+
+  *slot = il;
 }
 
 /* Loop through the DIEs that have been output for our TU, and add CodeView

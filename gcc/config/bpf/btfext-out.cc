@@ -1,5 +1,5 @@
 /* BPF Compile Once - Run Everywhere (CO-RE) support.
-   Copyright (C) 2021-2024 Free Software Foundation, Inc.
+   Copyright (C) 2021-2025 Free Software Foundation, Inc.
 
    This file is part of GCC.
 
@@ -610,6 +610,9 @@ btf_ext_init (void)
 void
 btf_ext_output (void)
 {
+  if (!ctf_get_tu_ctfc ())
+    return;
+
   output_btfext_header ();
   output_btfext_func_info (btf_ext);
   if (TARGET_BPF_CORE)

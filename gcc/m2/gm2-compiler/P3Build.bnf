@@ -1,7 +1,7 @@
 --
 -- m2-3.bnf grammar and associated actions for pass 3.
 --
--- Copyright (C) 2001-2024 Free Software Foundation, Inc.
+-- Copyright (C) 2001-2025 Free Software Foundation, Inc.
 -- Contributed by Gaius Mulley <gaius.mulley@southwales.ac.uk>.
 --
 -- This file is part of GNU Modula-2.
@@ -23,7 +23,7 @@
 (* output from m2-3.bnf, automatically generated do not edit if these
    are the top two lines in the file.
 
-Copyright (C) 2001-2024 Free Software Foundation, Inc.
+Copyright (C) 2001-2025 Free Software Foundation, Inc.
 Contributed by Gaius Mulley <gaius.mulley@southwales.ac.uk>.
 
 This file is part of GNU Modula-2.
@@ -66,6 +66,7 @@ FROM M2Reserved IMPORT tokToTok, toktype,
 
 FROM M2Quads IMPORT PushT, PopT, PushTF, PopTF, PopNothing, Annotate,
                     PushTtok, PushTFtok, PopTtok, PopTFtok, OperandTok,
+                    DupFrame, Top,
                     BuildModuleStart,
                     StartBuildDefFile, StartBuildModFile,
                     EndBuildFile,
@@ -152,6 +153,7 @@ FROM P3SymBuild IMPORT P3StartBuildProgModule,
                        StartBuildProcedure,
                        BuildProcedureHeading,
                        EndBuildProcedure,
+                       EndBuildForward,
                        BuildVarAtAddress,
                        BuildConst,
                        BuildSubrange,
@@ -522,6 +524,7 @@ token   'EXIT'            exittok
 token   'EXPORT'          exporttok
 token   'FINALLY'         finallytok
 token   'FOR'             fortok
+token   'FORWARD'         forwardtok
 token   'FROM'            fromtok
 token   'IF'              iftok
 token   'IMPLEMENTATION'  implementationtok
@@ -1336,12 +1339,21 @@ WithStatement :=                                                           % VAR
                  "END"                                                     % EndBuildWith %
                =:
 
-ProcedureDeclaration := ProcedureHeading ";" ProcedureBlock                % BuildProcedureEnd ;
-                                                                             PushAutoOn %
+ProcedureDeclaration :=                                                    % VAR top: CARDINAL ; %
+                                                                           % top := Top () %
+                        ProcedureHeading ";" PostProcedureHeading          % Assert (top = Top ()) %
+                                                                  =:
 
-                        Ident                                              % EndBuildProcedure ;
+PostProcedureHeading := ProperProcedure | ForwardDeclaration =:
+
+ForwardDeclaration := "FORWARD"                                            % EndBuildForward %
+                    =:
+
+ProperProcedure := ProcedureBlock                                          % BuildProcedureEnd ;
+                                                                             PushAutoOn %
+                                   Ident                                   % EndBuildProcedure ;
                                                                              PopAuto %
-                      =:
+                                         =:
 
 DefineBuiltinProcedure := [ "__ATTRIBUTE__" "__BUILTIN__"
                             "(" "("                                        % PushAutoOff %

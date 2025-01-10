@@ -481,7 +481,8 @@ AC_SUBST(accel_dir_suffix)
 AC_SUBST(real_host_noncanonical)
 
 if test x"$enable_offload_targets" != x; then
-  extra_parts="${extra_parts} crtoffloadbegin.o crtoffloadend.o crtoffloadtable.o"
+  extra_parts="${extra_parts} crtoffloadbegin.o crtoffloadend.o"
+  extra_parts="${extra_parts} crtoffloadtable.o crtoffloadtableS.o"
 fi
 
 # Check if Solaris/x86 linker supports ZERO terminator unwind entries.
@@ -727,6 +728,7 @@ AC_SUBST(extra_parts)
 AC_SUBST(asm_hidden_op)
 AC_SUBST(enable_execute_stack)
 AC_SUBST(unwind_header)
+AC_SUBST(md_unwind_def_header)
 AC_SUBST(md_unwind_header)
 AC_SUBST(sfp_machine_header)
 AC_SUBST(thread_header)

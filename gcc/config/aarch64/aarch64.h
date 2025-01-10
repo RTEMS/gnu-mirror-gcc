@@ -1,5 +1,5 @@
 /* Machine description for AArch64 architecture.
-   Copyright (C) 2009-2024 Free Software Foundation, Inc.
+   Copyright (C) 2009-2025 Free Software Foundation, Inc.
    Contributed by ARM Ltd.
 
    This file is part of GCC.
@@ -96,6 +96,8 @@
 
 #define LONG_LONG_TYPE_SIZE	64
 
+#define WIDEST_HARDWARE_FP_SIZE	64
+
 /* This value is the amount of bytes a caller is allowed to drop the stack
    before probing has to be done for stack clash protection.  */
 #define STACK_CLASH_CALLER_GUARD 1024
@@ -119,24 +121,11 @@
    of LSE instructions.  */
 #define TARGET_OUTLINE_ATOMICS (aarch64_flag_outline_atomics)
 
-/* Align definitions of arrays, unions and structures so that
-   initializations and copies can be made more efficient.  This is not
-   ABI-changing, so it only affects places where we can see the
-   definition.  Increasing the alignment tends to introduce padding,
-   so don't do this when optimizing for size/conserving stack space.  */
-#define AARCH64_EXPAND_ALIGNMENT(COND, EXP, ALIGN)			\
-  (((COND) && ((ALIGN) < BITS_PER_WORD)					\
-    && (TREE_CODE (EXP) == ARRAY_TYPE					\
-	|| TREE_CODE (EXP) == UNION_TYPE				\
-	|| TREE_CODE (EXP) == RECORD_TYPE)) ? BITS_PER_WORD : (ALIGN))
+/* Align global data as an optimization.  */
+#define DATA_ALIGNMENT(EXP, ALIGN) aarch64_data_alignment (EXP, ALIGN)
 
-/* Align global data.  */
-#define DATA_ALIGNMENT(EXP, ALIGN)			\
-  AARCH64_EXPAND_ALIGNMENT (!optimize_size, EXP, ALIGN)
-
-/* Similarly, make sure that objects on the stack are sensibly aligned.  */
-#define LOCAL_ALIGNMENT(EXP, ALIGN)				\
-  AARCH64_EXPAND_ALIGNMENT (!flag_conserve_stack, EXP, ALIGN)
+/* Align stack data as an optimization.  */
+#define LOCAL_ALIGNMENT(EXP, ALIGN) aarch64_stack_alignment (EXP, ALIGN)
 
 #define STRUCTURE_SIZE_BOUNDARY		8
 
@@ -155,6 +144,16 @@
 #define PTRDIFF_TYPE	"long int"
 
 #define PCC_BITFIELD_TYPE_MATTERS	1
+
+/* Use the same RTL truth representation for vector elements as we do
+   for scalars.  This maintains the property that a comparison like
+   eq:V4SI is a composition of 4 individual eq:SIs, just like plus:V4SI
+   is a composition of 4 individual plus:SIs.
+
+   This means that Advanced SIMD comparisons are represented in RTL as
+   (neg (op ...)).  */
+
+#define VECTOR_STORE_FLAG_VALUE(MODE) CONST1_RTX (GET_MODE_INNER (MODE))
 
 #ifndef USED_FOR_TARGET
 
@@ -326,15 +325,24 @@ constexpr auto AARCH64_FL_DEFAULT_ISA_MODE ATTRIBUTE_UNUSED
 /* SVE2 SM4 instructions, enabled through +sve2-sm4.  */
 #define TARGET_SVE2_SM4 (AARCH64_HAVE_ISA (SVE2_SM4) && TARGET_NON_STREAMING)
 
-/* SME instructions, enabled through +sme.  Note that this does not
-   imply anything about the state of PSTATE.SM.  */
-#define TARGET_SME AARCH64_HAVE_ISA (SME)
+/* SVE2p1 instructions, enabled through +sve2p1.  */
+#define TARGET_SVE2p1 AARCH64_HAVE_ISA (SVE2p1)
 
-/* Same with streaming mode enabled.  */
-#define TARGET_STREAMING_SME (TARGET_STREAMING && TARGET_SME)
+/* SME instructions, enabled through +sme.  Note that this does not
+   imply anything about the state of PSTATE.SM; instructions that require
+   SME and streaming mode should use TARGET_STREAMING instead.  */
+#define TARGET_SME AARCH64_HAVE_ISA (SME)
 
 /* The FEAT_SME_I16I64 extension to SME, enabled through +sme-i16i64.  */
 #define TARGET_SME_I16I64 AARCH64_HAVE_ISA (SME_I16I64)
+
+/* The FEAT_SME_B16B16 extension to SME, enabled through +sme-b16b16.  */
+#define TARGET_STREAMING_SME_B16B16 \
+  (AARCH64_HAVE_ISA (SME_B16B16) && TARGET_STREAMING)
+
+/* The FEAT_SME_F16F16 extension to SME, enabled through +sme-f16f16.  */
+#define TARGET_STREAMING_SME_F16F16 \
+  (AARCH64_HAVE_ISA (SME_F16F16) && TARGET_STREAMING)
 
 /* The FEAT_SME_F64F64 extension to SME, enabled through +sme-f64f64.  */
 #define TARGET_SME_F64F64 AARCH64_HAVE_ISA (SME_F64F64)
@@ -344,6 +352,10 @@ constexpr auto AARCH64_FL_DEFAULT_ISA_MODE ATTRIBUTE_UNUSED
 
 /* Same with streaming mode enabled.  */
 #define TARGET_STREAMING_SME2 (TARGET_STREAMING && TARGET_SME2)
+
+#define TARGET_STREAMING_SME2p1 (TARGET_STREAMING && AARCH64_HAVE_ISA (SME2p1))
+
+#define TARGET_SME_B16B16 AARCH64_HAVE_ISA (SME_B16B16)
 
 /* ARMv8.3-A features.  */
 #define TARGET_ARMV8_3	AARCH64_HAVE_ISA (V8_3A)
@@ -457,6 +469,14 @@ constexpr auto AARCH64_FL_DEFAULT_ISA_MODE ATTRIBUTE_UNUSED
     enabled through +gcs.  */
 #define TARGET_GCS AARCH64_HAVE_ISA (GCS)
 
+/* Floating Point Absolute Maximum/Minimum extension instructions are
+   enabled through +faminmax.  */
+#define TARGET_FAMINMAX AARCH64_HAVE_ISA (FAMINMAX)
+#define TARGET_SVE_FAMINMAX (TARGET_SVE && TARGET_FAMINMAX)
+
+/* Lookup table (LUTI) extension instructions are enabled through +lut.  */
+#define TARGET_LUT AARCH64_HAVE_ISA (LUT)
+
 /* Prefer different predicate registers for the output of a predicated
    operation over re-using an existing input predicate.  */
 #define TARGET_SVE_PRED_CLOBBER (TARGET_SVE \
@@ -465,6 +485,55 @@ constexpr auto AARCH64_FL_DEFAULT_ISA_MODE ATTRIBUTE_UNUSED
 
 /* fp8 instructions are enabled through +fp8.  */
 #define TARGET_FP8 AARCH64_HAVE_ISA (FP8)
+
+/* Combinatorial tests.  */
+
+#define TARGET_SVE2_OR_SME2 \
+  ((TARGET_SVE2 || TARGET_STREAMING) \
+   && (TARGET_SME2 || TARGET_NON_STREAMING))
+
+/* There's no need to check TARGET_SME for streaming or streaming-compatible
+   functions, since streaming mode itself implies SME.  */
+#define TARGET_SVE2p1_OR_SME (TARGET_SVE2p1 || TARGET_STREAMING)
+
+#define TARGET_SVE2p1_OR_SME2 \
+  ((TARGET_SVE2p1 || TARGET_STREAMING) \
+   && (TARGET_SME2 || TARGET_NON_STREAMING))
+
+#define TARGET_SSVE_B16B16 \
+  (AARCH64_HAVE_ISA (SVE_B16B16) && TARGET_SVE2_OR_SME2)
+
+/* Some fp8 instructions require +fp8 and one of +sve2 or +sme2.  */
+#define TARGET_SSVE_FP8 (TARGET_FP8 \
+			 && (TARGET_SVE2 || TARGET_STREAMING) \
+			 && (TARGET_SME2 || TARGET_NON_STREAMING))
+
+/* fp8 multiply-accumulate instructions are enabled through +fp8fma.  */
+#define TARGET_FP8FMA AARCH64_HAVE_ISA (FP8FMA)
+
+/* SVE2 versions of fp8 multiply-accumulate instructions are enabled for
+   non-streaming mode by +fp8fma and for streaming mode by +ssve-fp8fma.  */
+#define TARGET_SSVE_FP8FMA \
+  (((TARGET_SVE2 && TARGET_FP8FMA) || TARGET_STREAMING) \
+   && (AARCH64_HAVE_ISA (SSVE_FP8FMA) || TARGET_NON_STREAMING))
+
+/* fp8 four way dot product enabled through +fp8dot4.  */
+#define TARGET_FP8DOT4 AARCH64_HAVE_ISA (FP8DOT4)
+
+/* Streaming versions of fp8 four way dot product instructions are enabled
+through +ssve-fp8dot4.  */
+#define TARGET_SSVE_FP8DOT4 ((\
+		(TARGET_SVE2 && TARGET_FP8DOT4) || TARGET_STREAMING) \
+		&& (AARCH64_HAVE_ISA(SSVE_FP8DOT4) || TARGET_NON_STREAMING))
+
+/* fp8 two way dot product enabled through +fp8dot2.  */
+#define TARGET_FP8DOT2 AARCH64_HAVE_ISA (FP8DOT2)
+
+/* Streaming versions of fp8 two way dot product instructions are enabled
+through +ssve-fp8dot2.  */
+#define TARGET_SSVE_FP8DOT2 ((\
+		(TARGET_SVE2 && TARGET_FP8DOT2) || TARGET_STREAMING) \
+		&& (AARCH64_HAVE_ISA(SSVE_FP8DOT2) || TARGET_NON_STREAMING))
 
 /* Standard register usage.  */
 
@@ -1114,6 +1183,7 @@ typedef struct
 {
   enum arm_pcs pcs_variant;
   aarch64_isa_mode isa_mode;
+  bool indirect_return;		/* Whether function is marked with indirect_return attribute.  */
   int aapcs_arg_processed;	/* No need to lay out this argument again.  */
   int aapcs_ncrn;		/* Next Core register number.  */
   int aapcs_nextncrn;		/* Next next core register number.  */
@@ -1280,6 +1350,13 @@ typedef struct
 #define CTZ_DEFINED_VALUE_AT_ZERO(MODE, VALUE) \
   ((VALUE) = GET_MODE_UNIT_BITSIZE (MODE), 2)
 
+/* Have space for both SP and GCSPR in the NONLOCAL case in
+   emit_stack_save as well as in __builtin_setjmp, __builtin_longjmp
+   and __builtin_nonlocal_goto.
+   Note: On ILP32 the documented buf size is not enough PR84150.  */
+#define STACK_SAVEAREA_MODE(LEVEL)			\
+  ((LEVEL) == SAVE_NONLOCAL ? E_CDImode : Pmode)
+
 #define INCOMING_RETURN_ADDR_RTX gen_rtx_REG (Pmode, LR_REGNUM)
 
 #define RETURN_ADDR_RTX aarch64_return_addr
@@ -1436,8 +1513,11 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
    " %{mcpu=*:-march=%:rewrite_mcpu(%{mcpu=*:%*})}"
 
 extern const char *aarch64_rewrite_mcpu (int argc, const char **argv);
-#define MCPU_TO_MARCH_SPEC_FUNCTIONS \
-  { "rewrite_mcpu", aarch64_rewrite_mcpu },
+extern const char *is_host_cpu_not_armv8_base (int argc, const char **argv);
+#define MCPU_TO_MARCH_SPEC_FUNCTIONS		       \
+  { "rewrite_mcpu",            aarch64_rewrite_mcpu }, \
+  { "is_local_not_armv8_base", is_host_cpu_not_armv8_base },
+
 
 #define ASM_CPU_SPEC \
    MCPU_TO_MARCH_SPEC
@@ -1446,6 +1526,11 @@ extern const char *aarch64_rewrite_mcpu (int argc, const char **argv);
   { "asm_cpu_spec",		ASM_CPU_SPEC }
 
 #define ASM_OUTPUT_POOL_EPILOGUE  aarch64_asm_output_pool_epilogue
+
+/* This type is the user-visible __mfp8, and a pointer to that type.  We
+   need it in many places in the backend.  Defined in aarch64-builtins.cc.  */
+extern GTY(()) tree aarch64_mfp8_type_node;
+extern GTY(()) tree aarch64_mfp8_ptr_type_node;
 
 /* This type is the user-visible __fp16, and a pointer to that type.  We
    need it in many places in the backend.  Defined in aarch64-builtins.cc.  */

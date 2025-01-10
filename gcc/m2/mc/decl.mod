@@ -1,6 +1,6 @@
 (* decl.mod declaration nodes used to create the AST.
 
-Copyright (C) 2015-2024 Free Software Foundation, Inc.
+Copyright (C) 2015-2025 Free Software Foundation, Inc.
 Contributed by Gaius Mulley <gaius@glam.ac.uk>.
 
 This file is part of GNU Modula-2.
@@ -94,7 +94,8 @@ TYPE
 	    nil, true, false,
             (* system types.  *)
    	    address, loc, byte, word,
-            csizet, cssizet,
+            csizet, cssizet, cofft,
+            cardinal64,
             (* base types.  *)
 	    char,
 	    cardinal, longcard, shortcard,
@@ -159,7 +160,9 @@ TYPE
                          byte,
 			 word,
                          csizet,
-                         cssizet         : |
+                         cssizet,
+                         cofft,
+                         cardinal64      : |
                          (* base types.  *)
 			 boolean,
  			 proc,
@@ -662,6 +665,7 @@ TYPE
        defT = RECORD
                  name             :  Name ;
                  source           :  Name ;
+                 unqualified,
 		 hasHidden,
                  forC             :  BOOLEAN ;
                  exported,
@@ -721,6 +725,8 @@ VAR
    globalGroup   : group ;    (* The global group of all alists.  *)
    outputFile    : File ;
    lang          : language ;
+   charStarN,
+   constCharStarN,
    bitsperunitN,
    bitsperwordN,
    bitspercharN,
@@ -735,6 +741,8 @@ VAR
    wordN,
    csizetN,
    cssizetN,
+   cofftN,
+   cardinal64N,
    adrN,
    sizeN,
    tsizeN,
@@ -1188,6 +1196,47 @@ END importEnumFields ;
 
 
 (*
+   checkGccType - check to see if node n is gcc tree or location_t
+                  and record its use in keyc.
+*)
+
+PROCEDURE checkGccType (n: node) ;
+BEGIN
+   IF getGccConfigSystem () AND (getScope (n) # NIL) AND
+      (getSymName (getScope (n)) = makeKey ('gcctypes'))
+   THEN
+      IF getSymName (n) = makeKey ('location_t')
+      THEN
+         keyc.useGccLocation
+      ELSIF getSymName (n) = makeKey ('tree')
+      THEN
+         keyc.useGccTree
+      END
+   END
+END checkGccType ;
+
+
+(*
+   checkCDataTypes - check to see if node n is CharStar or ConstCharStar
+                  and if necessary assign n to the global variable.
+*)
+
+PROCEDURE checkCDataTypes (n: node) ;
+BEGIN
+   IF (getScope (n) # NIL) AND (getSymName (getScope (n)) = makeKey ('CDataTypes'))
+   THEN
+      IF getSymName (n) = makeKey ('CharStar')
+      THEN
+         charStarN := n
+      ELSIF getSymName (n) = makeKey ('ConstCharStar')
+      THEN
+         constCharStarN := n
+      END
+   END
+END checkCDataTypes ;
+
+
+(*
    import - attempts to add node, n, into the scope of module, m.
             It might fail due to a name clash in which case the
             previous named symbol is returned.  On success, n,
@@ -1201,6 +1250,8 @@ VAR
 BEGIN
    assert (isDef (m) OR isModule (m) OR isImp (m)) ;
    name := getSymName (n) ;
+   checkGccType (n) ;
+   checkCDataTypes (n) ;
    r := lookupInScope (m, name) ;
    IF r=NIL
    THEN
@@ -1415,17 +1466,6 @@ END isAProcType ;
 
 
 (*
-   isProcedure - returns TRUE if, n, is a procedure.
-*)
-
-PROCEDURE isProcedure (n: node) : BOOLEAN ;
-BEGIN
-   assert (n # NIL) ;
-   RETURN n^.kind = procedure
-END isProcedure ;
-
-
-(*
    isPointer - returns TRUE if, n, is a pointer.
 *)
 
@@ -1563,6 +1603,7 @@ BEGIN
       defF.source := NulName ;
       defF.hasHidden := FALSE ;
       defF.forC := FALSE ;
+      defF.unqualified := FALSE ;
       defF.exported := InitIndex (1) ;
       defF.importedModules := InitIndex (1) ;
       defF.constFixup := initFixupInfo () ;
@@ -1651,6 +1692,33 @@ PROCEDURE isDefForC (n: node) : BOOLEAN ;
 BEGIN
    RETURN isDef (n) AND n^.defF.forC
 END isDefForC ;
+
+
+(*
+   putDefUnqualified - the definition module uses unqualified.
+*)
+
+PROCEDURE putDefUnqualified (n: node) ;
+BEGIN
+   assert (isDef (n)) ;
+   (* Currently (and this is a temporary development restriction to
+      reduce any search space for bugs) the only module which can be
+      export unqualified is gcctypes.  *)
+   IF n^.defF.name = makeKey ('gcctypes')
+   THEN
+      n^.defF.unqualified := TRUE
+   END
+END putDefUnqualified ;
+
+
+(*
+   isDefUnqualified - returns TRUE if the definition module uses unqualified.
+*)
+
+PROCEDURE isDefUnqualified (n: node) : BOOLEAN ;
+BEGIN
+   RETURN isDef (n) AND n^.defF.unqualified
+END isDefUnqualified ;
 
 
 (*
@@ -3555,7 +3623,7 @@ BEGIN
       THEN
          RETURN getNextFixup (impF.constFixup)
       ELSE
-         assert (isModule (currentModule))
+         assert (isModule (currentModule)) ;
          RETURN getNextFixup (moduleF.constFixup)
       END
    END
@@ -4304,6 +4372,9 @@ BEGIN
       word            :  RETURN makeKey ('WORD') |
       csizet          :  RETURN makeKey ('CSIZE_T') |
       cssizet         :  RETURN makeKey ('CSSIZE_T') |
+      cofft           :  RETURN makeKey ('COFF_T') |
+      cardinal64      :  RETURN makeKey ('CARDINAL64') |
+
       (* base types.  *)
       boolean         :  RETURN makeKey ('BOOLEAN') |
       proc            :  RETURN makeKey ('PROC') |
@@ -4914,6 +4985,8 @@ BEGIN
       word,
       csizet,
       cssizet,
+      cofft,
+      cardinal64,
       char,
       cardinal,
       longcard,
@@ -5052,6 +5125,8 @@ BEGIN
    word,
    csizet,
    cssizet,
+   cofft,
+   cardinal64,
    char,
    integer,
    longint,
@@ -5092,6 +5167,8 @@ BEGIN
       word            :  RETURN n |
       csizet          :  RETURN n |
       cssizet         :  RETURN n |
+      cofft           :  RETURN n |
+      cardinal64      :  RETURN n |
       (* base types.  *)
       boolean         :  RETURN n |
       proc            :  RETURN n |
@@ -5293,6 +5370,8 @@ BEGIN
       word            :  RETURN n |
       csizet          :  RETURN n |
       cssizet         :  RETURN n |
+      cofft           :  RETURN n |
+      cardinal64      :  RETURN n |
       (* base types.  *)
       boolean         :  RETURN n |
       proc            :  RETURN n |
@@ -5421,7 +5500,7 @@ END getExprType ;
 
 PROCEDURE skipType (n: node) : node ;
 BEGIN
-   WHILE (n#NIL) AND isType (n) DO
+   WHILE (n#NIL) AND isType (n) AND (NOT isCDataType (n)) DO
       IF getType (n) = NIL
       THEN
          (* this will occur if, n, is an opaque type.  *)
@@ -5464,7 +5543,9 @@ BEGIN
       byte,
       word,
       csizet,
-      cssizet         : RETURN systemN |
+      cssizet,
+      cofft,
+      cardinal64      : RETURN systemN |
       (* base types.  *)
       boolean,
       proc,
@@ -5720,7 +5801,7 @@ PROCEDURE getFQstring (n: node) : String ;
 VAR
    i, s: String ;
 BEGIN
-   IF getScope (n) = NIL
+   IF (getScope (n) = NIL) OR (isDefUnqualified (getScope (n)))
    THEN
       RETURN InitStringCharStar (keyToCharStar (getSymName (n)))
    ELSIF isQualifiedForced (n)
@@ -5728,7 +5809,7 @@ BEGIN
       i := InitStringCharStar (keyToCharStar (getSymName (n))) ;
       s := InitStringCharStar (keyToCharStar (getSymName (getScope (n)))) ;
       RETURN Sprintf2 (InitString ("%s_%s"), s, i)
-   ELSIF (NOT isExported (n)) OR getIgnoreFQ ()
+   ELSIF (NOT isExported (n)) OR getIgnoreFQ () OR (isDefUnqualified (getScope (n)))
    THEN
       RETURN InitStringCharStar (keyToCharStar (getSymName (n)))
    ELSE
@@ -5747,7 +5828,7 @@ PROCEDURE getFQDstring (n: node; scopes: BOOLEAN) : String ;
 VAR
    i, s: String ;
 BEGIN
-   IF getScope (n) = NIL
+   IF (getScope (n) = NIL) OR (isDefUnqualified (getScope (n)))
    THEN
       RETURN InitStringCharStar (keyToCharStar (getDName (n, scopes)))
    ELSIF isQualifiedForced (n)
@@ -5756,7 +5837,7 @@ BEGIN
       i := InitStringCharStar (keyToCharStar (getSymName (n))) ;
       s := InitStringCharStar (keyToCharStar (getSymName (getScope (n)))) ;
       RETURN Sprintf2 (InitString ("%s_%s"), s, i)
-   ELSIF (NOT isExported (n)) OR getIgnoreFQ ()
+   ELSIF (NOT isExported (n)) OR getIgnoreFQ () OR (isDefUnqualified (getScope (n)))
    THEN
       RETURN InitStringCharStar (keyToCharStar (getDName (n, scopes)))
    ELSE
@@ -6598,7 +6679,9 @@ BEGIN
       byte,
       word,
       csizet,
-      cssizet         :  doSystemC (p, n) |
+      cssizet,
+      cofft,
+      cardinal64      :  doSystemC (p, n) |
       type            :  doTypeNameC (p, n) |
       pointer         :  doTypeNameC (p, n)
 
@@ -8251,6 +8334,173 @@ END doTypeNameModifier ;
 
 
 (*
+   isGccType - return TRUE if n is tree or location_t.
+*)
+
+PROCEDURE isGccType (n: node) : BOOLEAN ;
+BEGIN
+   RETURN (getGccConfigSystem () AND
+           ((getSymName (n) = makeKey ('location_t')) OR
+            (getSymName (n) = makeKey ('tree'))))
+END isGccType ;
+
+
+(*
+   doGccType - record whether we are going to declare tree or location_t
+               so that the appropriate gcc header can be included instead.
+*)
+
+PROCEDURE doGccType (p: pretty; n: node) ;
+BEGIN
+   IF getGccConfigSystem ()
+   THEN
+      IF getSymName (n) = makeKey ('location_t')
+      THEN
+         outText (p, "/* Not going to declare ") ;
+         doTypeNameC (p, n) ;
+         outText (p, " as it is declared in the gcc header input.h.  */\n\n") ;
+         keyc.useGccLocation
+      ELSIF getSymName (n) = makeKey ('tree')
+      THEN
+         outText (p, "/* Not going to declare ") ;
+         doTypeNameC (p, n) ;
+         outText (p, " as it is declared in the gcc header tree.h.  */\n\n") ;
+         keyc.useGccTree
+      END
+   END
+END doGccType ;
+
+
+(*
+   isCDataType - return true if n is charStar or constCharStar.
+*)
+
+PROCEDURE isCDataType (n: node) : BOOLEAN ;
+BEGIN
+   RETURN (n # NIL) AND ((n = charStarN) OR (n = constCharStarN))
+END isCDataType ;
+
+
+(*
+   isCDataTypes - return TRUE if n is CharStar or ConstCharStar.
+*)
+
+PROCEDURE isCDataTypes (n: node) : BOOLEAN ;
+VAR
+   scope: node ;
+BEGIN
+   scope := getScope (n) ;
+   RETURN (scope # NIL) AND (getSymName (scope) = makeKey ('CDataTypes')) AND
+            ((getSymName (n) = makeKey ('CharStar')) OR
+             (getSymName (n) = makeKey ('ConstCharStar')))
+END isCDataTypes ;
+
+
+(*
+   doCDataTypes - if we are going to declare CharStar or ConstCharStar
+               then generate a comment instead.
+*)
+
+PROCEDURE doCDataTypes (p: pretty; n: node) ;
+BEGIN
+   IF isCDataTypes (n)
+   THEN
+      IF getSymName (n) = makeKey ('CharStar')
+      THEN
+         outText (p, "/* Not going to declare ") ;
+         doTypeNameC (p, n) ;
+         outText (p, " as it is a C type.  */\n\n") ;
+         charStarN := n
+      ELSIF getSymName (n) = makeKey ('ConstCharStar')
+      THEN
+         outText (p, "/* Not going to declare ") ;
+         doTypeNameC (p, n) ;
+         outText (p, " as it is a C type.  */\n\n") ;
+         constCharStarN := n
+      END
+   END
+END doCDataTypes ;
+
+
+(*
+   doCDataTypesC - generate the C representation of the CDataTypes data types.
+*)
+
+PROCEDURE doCDataTypesC (p: pretty; n: node) ;
+BEGIN
+   IF n = charStarN
+   THEN
+      outText (p, "char *") ;
+      setNeedSpace (p)
+   ELSIF n = constCharStarN
+   THEN
+      outText (p, "const char *") ;
+      setNeedSpace (p)
+   END
+END doCDataTypesC ;
+
+
+(*
+   doTypeOrPointer - only declare type or pointer n providing that
+                     the name is not location_t or tree and
+                     the --gccConfigSystem option is enabled.
+*)
+
+PROCEDURE doTypeOrPointer (p: pretty; n: node) ;
+VAR
+   m: node ;
+BEGIN
+   IF isGccType (n)
+   THEN
+      doGccType (p, n)
+   ELSIF isCDataTypes (n)
+   THEN
+      doCDataTypes (p, n)
+   ELSE
+      m := getType (n) ;
+      outText (p, "typedef") ; setNeedSpace (p) ;
+      doTypeC (p, m, m) ;
+      IF isType (m)
+      THEN
+         setNeedSpace (p)
+      END ;
+      doTypeNameC (p, n) ;
+      doTypeNameModifier (p, n) ;
+      outText (p, ";\n\n")
+   END
+END doTypeOrPointer ;
+
+
+(*
+   doTypedef - generate a typedef for n provuiding it is not
+*)
+
+PROCEDURE doTypedef (p: pretty; n: node) ;
+VAR
+   m: node ;
+BEGIN
+   IF isGccType (n)
+   THEN
+      doGccType (p, n)
+   ELSIF isCDataTypes (n)
+   THEN
+      doCDataTypes (p, n)
+   ELSE
+      m := getType (n) ;
+      outText (p, "typedef") ; setNeedSpace (p) ;
+      doTypeC (p, m, m) ;
+      IF isType (m)
+      THEN
+         setNeedSpace (p)
+      END ;
+      doTypeNameC (p, n) ;
+      doTypeNameModifier (p, n) ;
+      outText (p, ";\n\n")
+   END
+END doTypedef ;
+
+
+(*
    doTypesC -
 *)
 
@@ -8266,15 +8516,7 @@ BEGIN
          doProcTypeC (doP, n, m)
       ELSIF isType (m) OR isPointer (m)
       THEN
-         outText (doP, "typedef") ; setNeedSpace (doP) ;
-         doTypeC (doP, m, m) ;
-	 IF isType (m)
-         THEN
-            setNeedSpace (doP)
-         END ;
-         doTypeNameC (doP, n) ;
-         doTypeNameModifier (doP, n) ;
-         outText (doP, ";\n\n")
+         doTypeOrPointer (doP, n)
       ELSIF isEnumeration (m)
       THEN
          IF isDeclType (n)
@@ -8286,15 +8528,7 @@ BEGIN
             outText (doP, ";\n\n")
          END
       ELSE
-         outText (doP, "typedef") ; setNeedSpace (doP) ;
-         doTypeC (doP, m, m) ;
-	 IF isType (m)
-         THEN
-            setNeedSpace (doP)
-         END ;
-         doTypeNameC (doP, n) ;
-         doTypeNameModifier (doP, n) ;
-         outText (doP, ";\n\n")
+         doTypedef (doP, n)
       END
    END
 END doTypesC ;
@@ -8749,12 +8983,14 @@ PROCEDURE isSystem (n: node) : BOOLEAN ;
 BEGIN
    CASE n^.kind OF
 
-   address:  RETURN TRUE |
-   loc    :  RETURN TRUE |
-   byte   :  RETURN TRUE |
-   word   :  RETURN TRUE |
-   csizet :  RETURN TRUE |
-   cssizet:  RETURN TRUE
+   address,
+   loc,
+   byte,
+   word,
+   csizet,
+   cssizet,
+   cofft,
+   cardinal64: RETURN TRUE
 
    ELSE
       RETURN FALSE
@@ -8775,7 +9011,9 @@ BEGIN
    byte   :  outText (p, 'unsigned char') ; setNeedSpace (p) |
    word   :  outText (p, 'unsigned int') ; setNeedSpace (p) |
    csizet :  outText (p, 'size_t') ; setNeedSpace (p) ; keyc.useSize_t |
-   cssizet:  outText (p, 'ssize_t') ; setNeedSpace (p) ; keyc.useSSize_t
+   cssizet   :  outText (p, 'ssize_t') ; setNeedSpace (p) ; keyc.useSSize_t |
+   cofft     :  outText (p, 'off_t') ; setNeedSpace (p) |
+   cardinal64:  outText (p, 'uint64_t') ; setNeedSpace (p)
 
    END
 END doSystemC ;
@@ -9048,6 +9286,9 @@ BEGIN
    IF n=NIL
    THEN
       outText (p, "void")
+   ELSIF isCDataTypes (n)
+   THEN
+      doCDataTypesC (p, n)
    ELSIF isBase (n)
    THEN
       doBaseC (p, n)
@@ -9078,10 +9319,13 @@ BEGIN
    ELSIF isSet (n)
    THEN
       doSetC (p, n)
+   ELSIF isCDataTypes (n)
+   THEN
+      doCDataTypesC (p, n)
    ELSE
-      (* --fixme--  *)
-      print (p, "to do ...  typedef etc etc ") ; doFQNameC (p, n) ; print (p, ";\n") ;
-      HALT
+      metaError1 ('expecting a type symbol rather than a {%1DMd} {%1DMa}', n) ;
+      flushErrors ;
+      errorAbort0 ('terminating compilation')
    END
 END doTypeC ;
 
@@ -9132,6 +9376,14 @@ BEGIN
    IF n=NIL
    THEN
       outText (p, "void") ;
+      setNeedSpace (p)
+   ELSIF n = charStarN
+   THEN
+      outText (p, "char *") ;
+      setNeedSpace (p)
+   ELSIF n = constCharStarN
+   THEN
+      outText (p, "const char *") ;
       setNeedSpace (p)
    ELSIF isBase (n)
    THEN
@@ -11023,6 +11275,126 @@ END needsCast ;
 
 
 (*
+   castDestType - emit the destination type ft
+*)
+
+PROCEDURE castDestType (p: pretty; formal, ft: node) ;
+BEGIN
+   doTypeNameC (p, ft) ;
+   IF isVarParam (formal)
+   THEN
+      outText (p, '*')
+   END
+END castDestType ;
+
+
+(*
+   identifyPointer -
+*)
+
+PROCEDURE identifyPointer (type: node) : node ;
+BEGIN
+   IF isPointer (type)
+   THEN
+      IF skipType (getType (type)) = charN
+      THEN
+         RETURN charStarN
+      ELSIF (skipType (getType (type)) = byteN) OR
+            (skipType (getType (type)) = locN)
+      THEN
+         RETURN addressN
+      END
+   END ;
+   RETURN type
+END identifyPointer ;
+
+
+(*
+   castPointer - provides a six way cast between ADDRESS (ie void * ),
+                 char * and const char *.
+*)
+
+PROCEDURE castPointer (p: pretty; actual, formal, at, ft: node) : CARDINAL ;
+VAR
+   sat, sft: node ;
+   parenth : CARDINAL ;
+BEGIN
+   parenth := 0 ;
+   IF at # ft
+   THEN
+      sat := identifyPointer (skipType (at)) ;
+      sft := identifyPointer (skipType (ft)) ;
+      IF sat = addressN
+      THEN
+         IF sft = charStarN
+         THEN
+            outText (p, 'reinterpret_cast <') ;
+            castDestType (p, formal, ft) ;
+            outText (p, '>')
+         ELSIF sft = constCharStarN
+         THEN
+            outText (p, 'const_cast <') ;
+            castDestType (p, formal, ft) ;
+            outText (p, '> (static_cast <') ;
+            doTypeNameC (p, charStarN) ;
+            outText (p, '>') ;
+            INC (parenth)
+         ELSE
+            outText (p, 'reinterpret_cast <') ;
+            castDestType (p, formal, ft) ;
+            outText (p, '>')
+         END
+      ELSIF sat = charStarN
+      THEN
+         IF sft = addressN
+         THEN
+            outText (p, 'reinterpret_cast <') ;
+            castDestType (p, formal, ft) ;
+            outText (p, '>')
+         ELSIF sft = constCharStarN
+         THEN
+            outText (p, 'const_cast <') ;
+            castDestType (p, formal, ft) ;
+            outText (p, '>')
+         ELSE
+            outText (p, 'reinterpret_cast <') ;
+            castDestType (p, formal, ft) ;
+            outText (p, '>')
+         END
+      ELSIF sat = constCharStarN
+      THEN
+         IF sft = addressN
+         THEN
+            outText (p, 'static_cast <') ;
+            castDestType (p, formal, ft) ;
+            outText (p, '> (const_cast <') ;
+            doTypeNameC (p, charStarN) ;
+            outText (p, '>') ;
+            INC (parenth)
+         ELSIF sft = charStarN
+         THEN
+            outText (p, 'const_cast <') ;
+            castDestType (p, formal, ft) ;
+            outText (p, '>')
+         ELSE
+            outText (p, 'reinterpret_cast <') ;
+            castDestType (p, formal, ft) ;
+            outText (p, '>')
+         END
+      ELSE
+         outText (p, 'reinterpret_cast <') ;
+         castDestType (p, formal, ft) ;
+         outText (p, '>')
+      END ;
+      setNeedSpace (p) ;
+      outText (p, '(') ;
+      INC (parenth)
+   END ;
+   RETURN parenth
+END castPointer ;
+
+
+(*
    checkSystemCast - checks to see if we are passing to/from
                      a system generic type (WORD, BYTE, ADDRESS)
                      and if so emit a cast.  It returns the number of
@@ -11039,11 +11411,16 @@ BEGIN
    THEN
       IF lang = ansiCP
       THEN
-         IF isString (actual) AND (skipType (ft) = addressN)
+         IF isString (actual) AND isCDataType (skipType (ft))
+         THEN
+            (* Nothing to do.  *)
+            RETURN 0
+         ELSIF isString (actual) AND (skipType (ft) = addressN)
          THEN
             outText (p, "const_cast<void*> (static_cast<const void*> (") ;
 	    RETURN 2
-         ELSIF isPointer (skipType (ft)) OR (skipType (ft) = addressN)
+         ELSIF isPointer (skipType (ft)) OR (skipType (ft) = addressN) OR
+               isCDataType (skipType (ft))
          THEN
             IF actual = nilN
             THEN
@@ -11054,14 +11431,7 @@ BEGIN
                (* NULL is compatible with pointers/address.  *)
                RETURN 0
             ELSE
-               outText (p, 'reinterpret_cast<') ;
-               doTypeNameC (p, ft) ;
-               IF isVarParam (formal)
-               THEN
-                  outText (p, '*')
-               END ;
-               noSpace (p) ;
-               outText (p, '> (')
+               RETURN castPointer (p, actual, formal, at, ft)
             END
          ELSE
             outText (p, 'static_cast<') ;
@@ -13727,6 +14097,8 @@ BEGIN
       word,
       csizet,
       cssizet,
+      cofft,
+      cardinal64,
       (* base types.  *)
       boolean,
       char,
@@ -14594,6 +14966,8 @@ BEGIN
    word,
    csizet,
    cssizet,
+   cofft,
+   cardinal64,
    (* base types.  *)
    char,
    cardinal,
@@ -14732,6 +15106,8 @@ BEGIN
    word,
    csizet,
    cssizet,
+   cofft,
+   cardinal64,
    char,
    cardinal,
    longcard,
@@ -15961,10 +16337,12 @@ BEGIN
 
    address,
    loc,
-   byte   ,
-   word   ,
-   csizet ,
-   cssizet:  doNameM2 (p, n)
+   byte,
+   word,
+   csizet,
+   cssizet,
+   cofft,
+   cardinal64:  doNameM2 (p, n)
 
    END
 END doSystemM2 ;
@@ -17727,6 +18105,8 @@ BEGIN
    word,
    csizet,
    cssizet,
+   cofft,
+   cardinal64,
    (* base types.  *)
    boolean,
    proc,
@@ -17865,6 +18245,8 @@ BEGIN
    wordN := makeBase (word) ;
    csizetN := makeBase (csizet) ;
    cssizetN := makeBase (cssizet) ;
+   cofftN := makeBase (cofft) ;
+   cardinal64N := makeBase (cardinal64) ;
 
    adrN := makeBase (adr) ;
    tsizeN := makeBase (tsize) ;
@@ -17877,6 +18259,8 @@ BEGIN
    wordN := addToScope (wordN) ;
    csizetN := addToScope (csizetN) ;
    cssizetN := addToScope (cssizetN) ;
+   cofftN := addToScope (cofftN) ;
+   cardinal64N := addToScope (cardinal64N) ;
    adrN := addToScope (adrN) ;
    tsizeN := addToScope (tsizeN) ;
    throwN := addToScope (throwN) ;
@@ -17890,7 +18274,9 @@ BEGIN
    addDone (byteN) ;
    addDone (wordN) ;
    addDone (csizetN) ;
-   addDone (cssizetN)
+   addDone (cssizetN) ;
+   addDone (cofftN) ;
+   addDone (cardinal64N)
 END makeSystem ;
 
 
@@ -18062,6 +18448,22 @@ END makeBuiltins ;
 
 
 (*
+   makeCDataTypes - assign the charStarN and constCharStarN to NIL.
+*)
+
+PROCEDURE makeCDataTypes ;
+VAR
+   CdatatypesN: node ;
+BEGIN
+   CdatatypesN := lookupDef (makeKey ('CDataTypes')) ;
+   enterScope (CdatatypesN) ;
+   charStarN := makePointer (charN) ;
+   constCharStarN := makePointer (charN) ;
+   leaveScope
+END makeCDataTypes ;
+
+
+(*
    init -
 *)
 
@@ -18083,7 +18485,8 @@ BEGIN
    makeM2rts ;
    outputState := punct ;
    tempCount := 0 ;
-   mustVisitScope := FALSE
+   mustVisitScope := FALSE ;
+   makeCDataTypes
 END init ;
 
 

@@ -1,5 +1,5 @@
 ;; Predicate description for RISC-V target.
-;; Copyright (C) 2011-2024 Free Software Foundation, Inc.
+;; Copyright (C) 2011-2025 Free Software Foundation, Inc.
 ;; Contributed by Andrew Waterman (andrew@sifive.com).
 ;; Based on MIPS target for GNU compiler.
 ;;
@@ -329,7 +329,7 @@
 {
   enum riscv_symbol_type type;
   return (riscv_symbolic_constant_p (op, &type)
-	  && type == SYMBOL_GOT_DISP && !SYMBOL_REF_WEAK (op) && TARGET_PLT);
+	  && type == SYMBOL_GOT_DISP && !SYMBOL_REF_WEAK (op) && flag_plt);
 })
 
 (define_predicate "call_insn_operand"
@@ -527,6 +527,9 @@
 (define_predicate "autovec_else_operand"
   (ior (match_operand 0 "register_operand")
        (match_operand 0 "scratch_operand")))
+
+(define_predicate "maskload_else_operand"
+  (match_operand 0 "scratch_operand"))
 
 (define_predicate "vector_arith_operand"
   (ior (match_operand 0 "register_operand")

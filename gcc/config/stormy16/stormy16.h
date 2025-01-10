@@ -1,5 +1,5 @@
 /* Xstormy16 cpu description.
-   Copyright (C) 1997-2024 Free Software Foundation, Inc.
+   Copyright (C) 1997-2025 Free Software Foundation, Inc.
    Contributed by Red Hat, Inc.
 
    This file is part of GCC.
@@ -292,7 +292,7 @@ enum reg_class
 
 /* This declaration must be present, but it can be an abort if profiling is
    not implemented.  */
-     
+
 #define FUNCTION_PROFILER(FILE, LABELNO) xstormy16_function_profiler ()
 
 

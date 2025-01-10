@@ -1,6 +1,6 @@
 // <optional> -*- C++ -*-
 
-// Copyright (C) 2013-2024 Free Software Foundation, Inc.
+// Copyright (C) 2013-2025 Free Software Foundation, Inc.
 // Copyright The GNU Toolchain Authors.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
@@ -30,7 +30,9 @@
 #ifndef _GLIBCXX_OPTIONAL
 #define _GLIBCXX_OPTIONAL 1
 
+#ifdef _GLIBCXX_SYSHDR
 #pragma GCC system_header
+#endif
 
 #define __glibcxx_want_freestanding_optional
 #define __glibcxx_want_optional
@@ -742,9 +744,6 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 #endif // __cpp_concepts
 
   template<typename _Tp>
-  class optional;
-
-  template<typename _Tp>
     inline constexpr bool __is_optional_v = false;
   template<typename _Tp>
     inline constexpr bool __is_optional_v<optional<_Tp>> = true;
@@ -853,8 +852,6 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	using __not_self = __not_<is_same<optional, __remove_cvref_t<_Up>>>;
       template<typename _Up>
 	using __not_tag = __not_<is_same<in_place_t, __remove_cvref_t<_Up>>>;
-      template<typename _Up>
-	using __is_bool = is_same<remove_cv_t<_Up>, bool>;
       template<typename... _Cond>
 	using _Requires = enable_if_t<__and_v<_Cond...>, bool>;
 #endif
@@ -879,7 +876,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	: _Base(std::in_place, std::forward<_Up>(__t)) { }
 
       template<typename _Up>
-	requires (!is_same_v<optional, remove_cvref_t<_Up>>)
+	requires (!is_same_v<_Tp, _Up>)
 	  && is_constructible_v<_Tp, const _Up&>
 	  && __construct_from_contained_value<_Up>
 	constexpr explicit(!is_convertible_v<const _Up&, _Tp>)
@@ -891,7 +888,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	}
 
       template<typename _Up>
-	requires (!is_same_v<optional, remove_cvref_t<_Up>>)
+	requires (!is_same_v<_Tp, _Up>)
 	  && is_constructible_v<_Tp, _Up>
 	  && __construct_from_contained_value<_Up>
 	constexpr explicit(!is_convertible_v<_Up, _Tp>)
@@ -1046,7 +1043,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
       template<typename _Up>
 #ifdef _GLIBCXX_USE_CONSTRAINTS_FOR_OPTIONAL
-	requires (!is_same_v<optional, remove_cvref_t<_Up>>)
+	requires (!is_same_v<_Tp, _Up>)
 	  && is_constructible_v<_Tp, const _Up&>
 	  && is_assignable_v<_Tp&, const _Up&>
 	  && (!__converts_from_optional<_Tp, _Up>::value)
@@ -1080,7 +1077,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
       template<typename _Up>
 #ifdef _GLIBCXX_USE_CONSTRAINTS_FOR_OPTIONAL
-	requires (!is_same_v<optional, remove_cvref_t<_Up>>)
+	requires (!is_same_v<_Tp, _Up>)
 	  && is_constructible_v<_Tp, _Up>
 	  && is_assignable_v<_Tp&, _Up>
 	  && (!__converts_from_optional<_Tp, _Up>::value)
@@ -1584,9 +1581,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     { return !__rhs; }
 #endif // three-way-comparison
 
+#if __cpp_lib_concepts
   // _GLIBCXX_RESOLVE_LIB_DEFECTS
   // 4072. std::optional comparisons: constrain harder
-#if __cpp_lib_concepts
 # define _REQUIRES_NOT_OPTIONAL(T) requires (!__is_optional_v<T>)
 #else
 # define _REQUIRES_NOT_OPTIONAL(T)
@@ -1678,8 +1675,16 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     { return !__rhs || __lhs >= *__rhs; }
 
 #ifdef __cpp_lib_three_way_comparison
+  // _GLIBCXX_RESOLVE_LIB_DEFECTS
+  // 3746. optional's spaceship with U with a type derived from optional
+  // causes infinite constraint meta-recursion
+  template<typename _Tp>
+    concept __is_derived_from_optional = requires (const _Tp& __t) {
+      []<typename _Up>(const optional<_Up>&){ }(__t);
+    };
+
   template<typename _Tp, typename _Up>
-    requires (!__is_optional_v<_Up>)
+    requires (!__is_derived_from_optional<_Up>)
       && three_way_comparable_with<_Up, _Tp>
     constexpr compare_three_way_result_t<_Tp, _Up>
     operator<=> [[nodiscard]] (const optional<_Tp>& __x, const _Up& __v)
@@ -1727,10 +1732,17 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   // Hash.
 
-  template<typename _Tp, typename _Up = remove_const_t<_Tp>,
-	   bool = __poison_hash<_Up>::__enable_hash_call>
-    struct __optional_hash_call_base
+  template<typename _Tp, typename _Up = remove_const_t<_Tp>>
+    struct __optional_hash
+#if ! _GLIBCXX_INLINE_VERSION
+    : public __hash_empty_base<_Up>
+#endif
     {
+#if __cplusplus < 202002L
+      using result_type [[__deprecated__]] = size_t;
+      using argument_type [[__deprecated__]] = optional<_Tp>;
+#endif
+
       size_t
       operator()(const optional<_Tp>& __t) const
       noexcept(noexcept(hash<_Up>{}(*__t)))
@@ -1742,17 +1754,12 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       }
     };
 
-  template<typename _Tp, typename _Up>
-    struct __optional_hash_call_base<_Tp, _Up, false> {};
-
   template<typename _Tp>
     struct hash<optional<_Tp>>
-    : private __poison_hash<remove_const_t<_Tp>>,
-      public __optional_hash_call_base<_Tp>
-    {
-      using result_type [[__deprecated__]] = size_t;
-      using argument_type [[__deprecated__]] = optional<_Tp>;
-    };
+    : public __conditional_t<__is_hash_enabled_for<remove_const_t<_Tp>>,
+			     __optional_hash<_Tp>,
+			     __hash_not_enabled<_Tp>>
+    { };
 
   template<typename _Tp>
     struct __is_fast_hash<hash<optional<_Tp>>> : __is_fast_hash<hash<_Tp>>

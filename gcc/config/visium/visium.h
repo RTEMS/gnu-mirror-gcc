@@ -1,5 +1,5 @@
 /* Definitions of target machine for Visium.
-   Copyright (C) 2002-2024 Free Software Foundation, Inc.
+   Copyright (C) 2002-2025 Free Software Foundation, Inc.
    Contributed by C.Nettleton, J.P.Parkes and P.Garbett.
 
    This file is part of GCC.
@@ -119,7 +119,7 @@
    data area approach is no longer used, these pointers are no longer
    supported.
 
-   The macro and function pointers are described below. 
+   The macro and function pointers are described below.
 
    INIT_EXPANDERS:
 
@@ -1015,7 +1015,7 @@ struct visium_args
     A difficulty is setting the correct instruction parity at run time.
 
 
-    TRAMPOLINE_SIZE 
+    TRAMPOLINE_SIZE
     A C expression for the size in bytes of the trampoline, as an integer. */
 #define TRAMPOLINE_SIZE (visium_cpu == PROCESSOR_GR6 ? 24 : 20)
 

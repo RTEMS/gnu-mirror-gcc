@@ -1,7 +1,7 @@
 /* Language-independent diagnostic subroutines for the GNU Compiler
    Collection that are only for use in the compilers proper and not
    the driver or other programs.
-   Copyright (C) 1999-2024 Free Software Foundation, Inc.
+   Copyright (C) 1999-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -30,32 +30,33 @@ along with GCC; see the file COPYING3.  If not see
 #include "diagnostic-client-data-hooks.h"
 #include "langhooks.h"
 #include "intl.h"
+#include "diagnostic-format-text.h"
 
 /* Prints out, if necessary, the name of the current function
-   that caused an error.  Called from all error and warning functions.  */
+   that caused an error.  */
 void
-diagnostic_report_current_function (diagnostic_context *context,
+diagnostic_report_current_function (diagnostic_text_output_format &text_output,
 				    const diagnostic_info *diagnostic)
 {
   location_t loc = diagnostic_location (diagnostic);
-  diagnostic_report_current_module (context, loc);
-  lang_hooks.print_error_function (context, LOCATION_FILE (loc), diagnostic);
+  text_output.report_current_module (loc);
+  lang_hooks.print_error_function (text_output, LOCATION_FILE (loc), diagnostic);
 }
 
 static void
-default_tree_diagnostic_starter (diagnostic_context *context,
-				 const diagnostic_info *diagnostic)
+default_tree_diagnostic_text_starter (diagnostic_text_output_format &text_output,
+				      const diagnostic_info *diagnostic)
 {
-  diagnostic_report_current_function (context, diagnostic);
-  pp_set_prefix (context->printer, diagnostic_build_prefix (context,
-							    diagnostic));
+  pretty_printer *const pp = text_output.get_printer ();
+  diagnostic_report_current_function (text_output, diagnostic);
+  pp_set_prefix (pp, text_output.build_prefix (*diagnostic));
 }
 
 /* Default tree printer.   Handles declarations only.  */
 bool
 default_tree_printer (pretty_printer *pp, text_info *text, const char *spec,
 		      int precision, bool wide, bool set_locus, bool hash,
-		      bool *, const char **)
+		      bool *, pp_token_list &)
 {
   tree t;
 
@@ -176,9 +177,9 @@ set_inlining_locations (diagnostic_context *,
 void
 tree_diagnostics_defaults (diagnostic_context *context)
 {
-  diagnostic_starter (context) = default_tree_diagnostic_starter;
-  diagnostic_finalizer (context) = default_diagnostic_finalizer;
-  diagnostic_format_decoder (context) = default_tree_printer;
+  diagnostic_text_starter (context) = default_tree_diagnostic_text_starter;
+  diagnostic_text_finalizer (context) = default_diagnostic_text_finalizer;
+  context->set_format_decoder (default_tree_printer);
   context->set_set_locations_callback (set_inlining_locations);
   context->set_client_data_hooks (make_compiler_data_hooks ());
 }

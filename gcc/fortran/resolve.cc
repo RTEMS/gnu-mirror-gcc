@@ -1,5 +1,5 @@
 /* Perform type resolution on the various structures.
-   Copyright (C) 2001-2024 Free Software Foundation, Inc.
+   Copyright (C) 2001-2025 Free Software Foundation, Inc.
    Contributed by Andy Vaught
 
 This file is part of GCC.
@@ -85,6 +85,8 @@ static bitmap_obstack labels_obstack;
 /* True when simplifying a EXPR_VARIABLE argument to an inquiry function.  */
 static bool inquiry_argument = false;
 
+/* True when we are on left hand side in an assignment of a coarray.  */
+static bool caf_lhs = false;
 
 /* Is the symbol host associated?  */
 static bool
@@ -3227,6 +3229,24 @@ pure_stmt_function (gfc_expr *e, gfc_symbol *sym)
 static bool check_pure_function (gfc_expr *e)
 {
   const char *name = NULL;
+  code_stack *stack;
+  bool saw_block = false;
+
+  /* A BLOCK construct within a DO CONCURRENT construct leads to
+     gfc_do_concurrent_flag = 0 when the check for an impure function
+     occurs.  Check the stack to see if the source code has a nested
+     BLOCK construct.  */
+  for (stack = cs_base; stack; stack = stack->prev)
+    {
+      if (stack->current->op == EXEC_BLOCK) saw_block = true;
+      if (saw_block && stack->current->op == EXEC_DO_CONCURRENT)
+	{
+	  gfc_error ("Reference to impure function at %L inside a "
+		     "DO CONCURRENT", &e->where);
+	  return false;
+	}
+    }
+
   if (!gfc_pure_function (e, &name) && name)
     {
       if (forall_flag)
@@ -3585,8 +3605,26 @@ resolve_function (gfc_expr *expr)
 static bool
 pure_subroutine (gfc_symbol *sym, const char *name, locus *loc)
 {
+  code_stack *stack;
+  bool saw_block = false;
+
   if (gfc_pure (sym))
     return true;
+
+  /* A BLOCK construct within a DO CONCURRENT construct leads to
+     gfc_do_concurrent_flag = 0 when the check for an impure subroutine
+     occurs.  Check the stack to see if the source code has a nested
+     BLOCK construct.  */
+  for (stack = cs_base; stack; stack = stack->prev)
+    {
+      if (stack->current->op == EXEC_BLOCK) saw_block = true;
+      if (saw_block && stack->current->op == EXEC_DO_CONCURRENT)
+	{
+	  gfc_error ("Subroutine call at %L in a DO CONCURRENT block "
+		     "is not PURE", loc);
+	  return false;
+	}
+    }
 
   if (forall_flag)
     {
@@ -4208,6 +4246,13 @@ resolve_operator (gfc_expr *e)
 		     gfc_op2string (e->value.op.op));
 	  return false;
 	}
+      if (flag_unsigned && pedantic && e->ts.type == BT_UNSIGNED
+	  && e->value.op.op == INTRINSIC_UMINUS)
+	{
+	  gfc_error ("Negation of unsigned expression at %L not permitted ",
+		     &e->value.op.op1->where);
+	  return false;
+	}
       break;
     }
 
@@ -4245,22 +4290,48 @@ resolve_operator (gfc_expr *e)
     case INTRINSIC_UMINUS:
       if (op1->ts.type == BT_INTEGER
 	  || op1->ts.type == BT_REAL
-	  || op1->ts.type == BT_COMPLEX)
+	  || op1->ts.type == BT_COMPLEX
+	  || op1->ts.type == BT_UNSIGNED)
 	{
 	  e->ts = op1->ts;
 	  break;
 	}
 
       CHECK_INTERFACES
-      gfc_error ("Operand of unary numeric operator %<%s%> at %L is %s",
+      gfc_error ("Operand of unary numeric operator %qs at %L is %s",
 		 gfc_op2string (e->value.op.op), &e->where, gfc_typename (e));
       return false;
+
+    case INTRINSIC_POWER:
+
+      if (flag_unsigned)
+	{
+	  if (op1->ts.type == BT_UNSIGNED || op2->ts.type == BT_UNSIGNED)
+	    {
+	      CHECK_INTERFACES
+	      gfc_error ("Exponentiation not valid at %L for %s and %s",
+			 &e->where, gfc_typename (op1), gfc_typename (op2));
+	      return false;
+	    }
+	}
+      gcc_fallthrough ();
 
     case INTRINSIC_PLUS:
     case INTRINSIC_MINUS:
     case INTRINSIC_TIMES:
     case INTRINSIC_DIVIDE:
-    case INTRINSIC_POWER:
+
+      /* UNSIGNED cannot appear in a mixed expression without explicit
+	     conversion.  */
+      if (flag_unsigned &&  gfc_invalid_unsigned_ops (op1, op2))
+	{
+	  CHECK_INTERFACES
+	  gfc_error ("Operands of binary numeric operator %qs at %L are "
+		     "%s/%s", gfc_op2string (e->value.op.op), &e->where,
+		     gfc_typename (op1), gfc_typename (op2));
+	  return false;
+	}
+
       if (gfc_numeric_ts (&op1->ts) && gfc_numeric_ts (&op2->ts))
 	{
 	  /* Do not perform conversions if operands are not conformable as
@@ -4282,14 +4353,14 @@ resolve_operator (gfc_expr *e)
 	{
 	  CHECK_INTERFACES
 	  gfc_error ("Unexpected derived-type entities in binary intrinsic "
-		     "numeric operator %<%s%> at %L",
+		     "numeric operator %qs at %L",
 		     gfc_op2string (e->value.op.op), &e->where);
 	  return false;
 	}
       else
 	{
 	  CHECK_INTERFACES
-	  gfc_error ("Operands of binary numeric operator %<%s%> at %L are %s/%s",
+	  gfc_error ("Operands of binary numeric operator %qs at %L are %s/%s",
 		     gfc_op2string (e->value.op.op), &e->where, gfc_typename (op1),
 		     gfc_typename (op2));
 	  return false;
@@ -4348,7 +4419,7 @@ resolve_operator (gfc_expr *e)
 	}
 
       CHECK_INTERFACES
-      gfc_error ("Operands of logical operator %<%s%> at %L are %s/%s",
+      gfc_error ("Operands of logical operator %qs at %L are %s/%s",
 		 gfc_op2string (e->value.op.op), &e->where, gfc_typename (op1),
 		 gfc_typename (op2));
       return false;
@@ -4463,6 +4534,15 @@ resolve_operator (gfc_expr *e)
 	      return false;
 	    }
 
+	  if (flag_unsigned  && gfc_invalid_unsigned_ops (op1, op2))
+	    {
+	      CHECK_INTERFACES
+	      gfc_error ("Inconsistent types for operator at %L and %L: "
+			 "%s and %s", &op1->where, &op2->where,
+			 gfc_typename (op1), gfc_typename (op2));
+	      return false;
+	    }
+
 	  gfc_type_convert_binary (e, 1);
 
 	  e->ts.type = BT_LOGICAL;
@@ -4504,7 +4584,7 @@ resolve_operator (gfc_expr *e)
       else
 	{
 	  CHECK_INTERFACES
-	  gfc_error ("Operands of comparison operator %<%s%> at %L are %s/%s",
+	  gfc_error ("Operands of comparison operator %qs at %L are %s/%s",
 		     gfc_op2string (e->value.op.op), &e->where, gfc_typename (op1),
 		     gfc_typename (op2));
 	}
@@ -4519,22 +4599,22 @@ resolve_operator (gfc_expr *e)
 	  guessed = lookup_uop_fuzzy (name, e->value.op.uop->ns->uop_root);
 	  CHECK_INTERFACES
 	  if (guessed)
-	    gfc_error ("Unknown operator %<%s%> at %L; did you mean "
-			"%<%s%>?", name, &e->where, guessed);
+	    gfc_error ("Unknown operator %qs at %L; did you mean "
+			"%qs?", name, &e->where, guessed);
 	  else
-	    gfc_error ("Unknown operator %<%s%> at %L", name, &e->where);
+	    gfc_error ("Unknown operator %qs at %L", name, &e->where);
 	}
       else if (op2 == NULL)
 	{
 	  CHECK_INTERFACES
-	  gfc_error ("Operand of user operator %<%s%> at %L is %s",
+	  gfc_error ("Operand of user operator %qs at %L is %s",
 		  e->value.op.uop->name, &e->where, gfc_typename (op1));
 	}
       else
 	{
 	  e->value.op.uop->op->sym->attr.referenced = 1;
 	  CHECK_INTERFACES
-	  gfc_error ("Operands of user operator %<%s%> at %L are %s/%s",
+	  gfc_error ("Operands of user operator %qs at %L are %s/%s",
 		    e->value.op.uop->name, &e->where, gfc_typename (op1),
 		    gfc_typename (op2));
 	}
@@ -5155,13 +5235,15 @@ find_array_spec (gfc_expr *e)
       case REF_ARRAY:
 	if (as == NULL)
 	  {
-	    locus loc = ref->u.ar.where.lb ? ref->u.ar.where : e->where;
+	    locus loc = (GFC_LOCUS_IS_SET (ref->u.ar.where)
+			 ? ref->u.ar.where : e->where);
 	    gfc_error ("Invalid array reference of a non-array entity at %L",
 		       &loc);
 	    return false;
 	  }
 
 	ref->u.ar.as = as;
+	if (ref->u.ar.dimen == -1) ref->u.ar.dimen = as->rank;
 	as = NULL;
 	break;
 
@@ -5498,7 +5580,7 @@ gfc_resolve_ref (gfc_expr *expr)
 {
   int current_part_dimension, n_components, seen_part_dimension, dim;
   gfc_ref *ref, **prev, *array_ref;
-  bool equal_length;
+  bool equal_length, old_caf_lhs;
 
   for (ref = expr->ref; ref; ref = ref->next)
     if (ref->type == REF_ARRAY && ref->u.ar.as == NULL)
@@ -5508,13 +5590,18 @@ gfc_resolve_ref (gfc_expr *expr)
 	break;
       }
 
+  old_caf_lhs = caf_lhs;
+  caf_lhs = false;
   for (prev = &expr->ref; *prev != NULL;
        prev = *prev == NULL ? prev : &(*prev)->next)
     switch ((*prev)->type)
       {
       case REF_ARRAY:
 	if (!resolve_array_ref (&(*prev)->u.ar))
-	  return false;
+	  {
+	    caf_lhs = old_caf_lhs;
+	    return false;
+	  }
 	break;
 
       case REF_COMPONENT:
@@ -5524,7 +5611,10 @@ gfc_resolve_ref (gfc_expr *expr)
       case REF_SUBSTRING:
 	equal_length = false;
 	if (!gfc_resolve_substring (*prev, &equal_length))
-	  return false;
+	  {
+	    caf_lhs = old_caf_lhs;
+	    return false;
+	  }
 
 	if (expr->expr_type != EXPR_SUBSTRING && equal_length)
 	  {
@@ -5538,6 +5628,7 @@ gfc_resolve_ref (gfc_expr *expr)
 	  }
 	break;
       }
+  caf_lhs = old_caf_lhs;
 
   /* Check constraints on part references.  */
 
@@ -5766,7 +5857,8 @@ gfc_expression_rank (gfc_expr *e)
 	  break;
 	}
     }
-  if (last_arr_ref && last_arr_ref->u.ar.as)
+  if (last_arr_ref && last_arr_ref->u.ar.as
+      && last_arr_ref->u.ar.as->rank != -1)
     {
       for (i = last_arr_ref->u.ar.as->rank;
 	   i < last_arr_ref->u.ar.as->rank + last_arr_ref->u.ar.as->corank; ++i)
@@ -5812,11 +5904,627 @@ gfc_op_rank_conformable (gfc_expr *op1, gfc_expr *op2)
 	     || op1->corank == op2->corank);
 }
 
+static gfc_array_spec *
+get_arrayspec_from_expr (gfc_expr *expr)
+{
+  gfc_array_spec *src_as, *dst_as = NULL;
+  gfc_ref *ref;
+  gfc_array_ref mod_src_ar;
+  int dst_rank = 0;
+
+  if (expr->rank == 0)
+    return NULL;
+
+  /* Follow any component references.  */
+  if (expr->expr_type == EXPR_VARIABLE || expr->expr_type == EXPR_CONSTANT)
+    {
+      if (expr->symtree)
+	src_as = expr->symtree->n.sym->as;
+      else
+	src_as = NULL;
+
+      for (ref = expr->ref; ref; ref = ref->next)
+	{
+	  switch (ref->type)
+	    {
+	    case REF_COMPONENT:
+	      src_as = ref->u.c.component->as;
+	      continue;
+
+	    case REF_SUBSTRING:
+	    case REF_INQUIRY:
+	      continue;
+
+	    case REF_ARRAY:
+	      switch (ref->u.ar.type)
+		{
+		case AR_ELEMENT:
+		  src_as = NULL;
+		  break;
+		  case AR_SECTION: {
+		    if (!dst_as)
+		      dst_as = gfc_get_array_spec ();
+		    memset (&mod_src_ar, 0, sizeof (gfc_array_ref));
+		    mod_src_ar = ref->u.ar;
+		    for (int dim = 0; dim < src_as->rank; ++dim)
+		      {
+			switch (ref->u.ar.dimen_type[dim])
+			  {
+			  case DIMEN_ELEMENT:
+			    gfc_free_expr (mod_src_ar.start[dim]);
+			    mod_src_ar.start[dim] = NULL;
+			    break;
+			  case DIMEN_RANGE:
+			    dst_as->lower[dst_rank]
+			      = gfc_copy_expr (ref->u.ar.start[dim]);
+			    mod_src_ar.start[dst_rank]
+			      = gfc_copy_expr (ref->u.ar.start[dim]);
+			    if (ref->u.ar.end[dim])
+			      {
+				dst_as->upper[dst_rank]
+				  = gfc_copy_expr (ref->u.ar.end[dim]);
+				mod_src_ar.end[dst_rank] = ref->u.ar.end[dim];
+				mod_src_ar.stride[dst_rank]
+				  = ref->u.ar.stride[dim];
+			      }
+			    else
+			      dst_as->upper[dst_rank]
+				= gfc_copy_expr (ref->u.ar.as->upper[dim]);
+			    ++dst_rank;
+			    break;
+			  case DIMEN_STAR:
+			    dst_as->lower[dst_rank]
+			      = gfc_copy_expr (ref->u.ar.as->lower[dim]);
+			    mod_src_ar.start[dst_rank]
+			      = gfc_copy_expr (ref->u.ar.start[dim]);
+			    if (ref->u.ar.as->upper[dim])
+			      {
+				dst_as->upper[dst_rank]
+				  = gfc_copy_expr (ref->u.ar.as->upper[dim]);
+				mod_src_ar.end[dst_rank] = ref->u.ar.end[dim];
+				mod_src_ar.stride[dst_rank]
+				  = ref->u.ar.stride[dim];
+			      }
+			    ++dst_rank;
+			    break;
+			  case DIMEN_VECTOR:
+			    dst_as->lower[dst_rank]
+			      = gfc_get_constant_expr (BT_INTEGER,
+						       gfc_index_integer_kind,
+						       &expr->where);
+			    mpz_set_ui (dst_as->lower[dst_rank]->value.integer,
+					1);
+			    mod_src_ar.start[dst_rank]
+			      = gfc_copy_expr (ref->u.ar.start[dim]);
+			    dst_as->upper[dst_rank]
+			      = gfc_get_constant_expr (BT_INTEGER,
+						       gfc_index_integer_kind,
+						       &expr->where);
+			    mpz_set (dst_as->upper[dst_rank]->value.integer,
+				     ref->u.ar.start[dim]->shape[0]);
+			    ++dst_rank;
+			    break;
+			  case DIMEN_THIS_IMAGE:
+			  case DIMEN_UNKNOWN:
+			    gcc_unreachable ();
+			  }
+			if (ref->u.ar.dimen_type[dim] != DIMEN_ELEMENT)
+			  mod_src_ar.dimen_type[dst_rank]
+			    = ref->u.ar.dimen_type[dim];
+		      }
+		    dst_as->rank = dst_rank;
+		    dst_as->type = AS_EXPLICIT;
+		    ref->u.ar = mod_src_ar;
+		    ref->u.ar.dimen = dst_rank;
+		    break;
+
+		  case AR_UNKNOWN:
+		    src_as = NULL;
+		    break;
+
+		  case AR_FULL:
+		    dst_as = gfc_copy_array_spec (src_as);
+		    break;
+		  }
+		  break;
+		}
+	    }
+	}
+    }
+  else
+    src_as = NULL;
+
+  return dst_as;
+}
+
+static void
+remove_coarray_from_derived_type (gfc_symbol *base, gfc_namespace *ns,
+				  gfc_array_spec *src_as = NULL)
+{
+  gfc_symbol *derived;
+  gfc_symbol *src_derived = base->ts.u.derived;
+
+  if (!src_as)
+    src_as = src_derived->as;
+  gfc_get_symbol (src_derived->name, ns, &derived);
+  derived->attr.flavor = FL_DERIVED;
+  derived->attr.alloc_comp = src_derived->attr.alloc_comp;
+  if (src_as && src_as->rank != 0)
+    {
+      base->attr.dimension = 1;
+      base->as = gfc_copy_array_spec (src_as);
+      base->as->corank = 0;
+    }
+  for (gfc_component *p = NULL, *c = src_derived->components; c; c = c->next)
+    {
+      gfc_component *n = gfc_get_component ();
+      *n = *c;
+      if (n->as)
+	n->as = gfc_copy_array_spec (c->as);
+      n->backend_decl = NULL;
+      n->initializer = NULL;
+      n->param_list = NULL;
+      if (p)
+	p->next = n;
+      else
+	derived->components = n;
+
+      p = n;
+    }
+  gfc_set_sym_referenced (derived);
+  gfc_commit_symbol (derived);
+  base->ts.u.derived = derived;
+  gfc_commit_symbol (base);
+}
+
+static void
+convert_coarray_class_to_derived_type (gfc_symbol *base, gfc_namespace *ns)
+{
+  gfc_symbol *src_derived = CLASS_DATA (base)->ts.u.derived;
+  gfc_array_spec *src_as = CLASS_DATA (base)->as;
+  const bool attr_allocatable
+    = src_as && src_as->rank && src_as->type == AS_DEFERRED;
+
+  base->ts.type = BT_DERIVED;
+  base->ts.u.derived = src_derived;
+
+  remove_coarray_from_derived_type (base, ns, src_as);
+
+  base->attr.allocatable = attr_allocatable;
+  base->attr.pointer = 0; // Ensure, that it is no pointer.
+}
+
+static void
+split_expr_at_caf_ref (gfc_expr *expr, gfc_namespace *ns,
+		       gfc_expr **post_caf_ref_expr)
+{
+  gfc_ref *caf_ref = NULL;
+  gfc_symtree *st;
+  gfc_symbol *base;
+
+  gcc_assert (expr->expr_type == EXPR_VARIABLE);
+  if (!expr->symtree->n.sym->attr.codimension)
+    {
+      /* The coarray is in some component.  Find it.  */
+      caf_ref = expr->ref;
+      while (caf_ref)
+	{
+	  if (caf_ref->type == REF_COMPONENT
+	      && caf_ref->u.c.component->attr.codimension)
+	    break;
+	  caf_ref = caf_ref->next;
+	}
+    }
+
+  gcc_assert (!gfc_get_sym_tree (!caf_ref ? expr->symtree->name : "base", ns,
+				 &st, false));
+  st->n.sym->attr.flavor = FL_PARAMETER;
+  st->n.sym->attr.dummy = 1;
+  st->n.sym->attr.intent = INTENT_IN;
+  st->n.sym->ts = caf_ref ? caf_ref->u.c.sym->ts : expr->symtree->n.sym->ts;
+
+  *post_caf_ref_expr = gfc_get_variable_expr (st);
+  (*post_caf_ref_expr)->where = expr->where;
+  base = (*post_caf_ref_expr)->symtree->n.sym;
+
+  if (!caf_ref)
+    {
+      (*post_caf_ref_expr)->ref = gfc_copy_ref (expr->ref);
+      if (expr->symtree->n.sym->attr.dimension)
+	{
+	  base->as = gfc_copy_array_spec (expr->symtree->n.sym->as);
+	  base->as->corank = 0;
+	  base->attr.dimension = 1;
+	  base->attr.allocatable = expr->symtree->n.sym->attr.allocatable;
+	  base->attr.pointer = expr->symtree->n.sym->attr.pointer
+			       || expr->symtree->n.sym->attr.associate_var;
+	}
+    }
+  else
+    {
+      (*post_caf_ref_expr)->ref = gfc_copy_ref (caf_ref->next);
+      if (caf_ref->u.c.component->attr.dimension)
+	{
+	  base->as = gfc_copy_array_spec (caf_ref->u.c.component->as);
+	  base->as->corank = 0;
+	  base->attr.dimension = 1;
+	  base->attr.allocatable = caf_ref->u.c.component->attr.allocatable;
+	  base->attr.pointer = caf_ref->u.c.component->attr.pointer;
+	}
+      base->ts = caf_ref->u.c.component->ts;
+    }
+  (*post_caf_ref_expr)->ts = expr->ts;
+  if (base->ts.type == BT_CHARACTER)
+    {
+      base->ts.u.cl = gfc_get_charlen ();
+      *base->ts.u.cl = *(caf_ref ? caf_ref->u.c.component->ts.u.cl
+				 : expr->symtree->n.sym->ts.u.cl);
+      base->ts.deferred = 1;
+      base->ts.u.cl->length = nullptr;
+    }
+
+  if (base->ts.type == BT_DERIVED)
+    remove_coarray_from_derived_type (base, ns);
+  else if (base->ts.type == BT_CLASS)
+    convert_coarray_class_to_derived_type (base, ns);
+
+  gfc_expression_rank (expr);
+  gfc_expression_rank (*post_caf_ref_expr);
+}
+
+static void
+check_add_new_component (gfc_symbol *type, gfc_expr *e, gfc_symbol *get_data)
+{
+  if (e)
+    {
+      switch (e->expr_type)
+	{
+	case EXPR_CONSTANT:
+	case EXPR_NULL:
+	  break;
+	case EXPR_OP:
+	  check_add_new_component (type, e->value.op.op1, get_data);
+	  if (e->value.op.op2)
+	    check_add_new_component (type, e->value.op.op2, get_data);
+	  break;
+	case EXPR_COMPCALL:
+	  for (gfc_actual_arglist *actual = e->value.compcall.actual; actual;
+	       actual = actual->next)
+	    check_add_new_component (type, actual->expr, get_data);
+	  break;
+	case EXPR_FUNCTION:
+	  if (!e->symtree->n.sym->attr.pure
+	      && !e->symtree->n.sym->attr.elemental)
+	    {
+	      // Treat non-pure functions.
+	      gfc_error ("Sorry, not yet able to call a non-pure/non-elemental"
+			 " function %s in a coarray reference;  use a temporary"
+			 " for the function's result instead",
+			 e->symtree->n.sym->name);
+	    }
+	  for (gfc_actual_arglist *actual = e->value.function.actual; actual;
+	       actual = actual->next)
+	    check_add_new_component (type, actual->expr, get_data);
+	  break;
+	  case EXPR_VARIABLE: {
+	    gfc_component *comp;
+	    gfc_ref *ref;
+	    int old_rank = e->rank;
+
+	    /* Can't use gfc_find_component here, because type is not yet
+	       complete.  */
+	    comp = type->components;
+	    while (comp)
+	      {
+		if (strcmp (comp->name, e->symtree->name) == 0)
+		  break;
+		comp = comp->next;
+	      }
+	    if (!comp)
+	      {
+		gcc_assert (gfc_add_component (type, e->symtree->name, &comp));
+		/* Take a copy of e, before modifying it.  */
+		gfc_expr *init = gfc_copy_expr (e);
+		if (e->ref)
+		  {
+		    switch (e->ref->type)
+		      {
+		      case REF_ARRAY:
+			comp->as = get_arrayspec_from_expr (e);
+			comp->attr.dimension = e->ref->u.ar.dimen != 0;
+			comp->ts = e->ts;
+			break;
+		      case REF_COMPONENT:
+			comp->ts = e->ref->u.c.sym->ts;
+			break;
+		      default:
+			gcc_unreachable ();
+			break;
+		      }
+		  }
+		else
+		  comp->ts = e->ts;
+		comp->attr.access = ACCESS_PRIVATE;
+		comp->initializer = init;
+	      }
+	    else
+	      gcc_assert (comp->ts.type == e->ts.type
+			  && comp->ts.u.derived == e->ts.u.derived);
+
+	    ref = e->ref;
+	    e->ref = NULL;
+	    gcc_assert (gfc_find_component (get_data->ts.u.derived,
+					    e->symtree->name, false, true,
+					    &e->ref));
+	    e->symtree
+	      = gfc_find_symtree (get_data->ns->sym_root, get_data->name);
+	    e->ref->next = ref;
+	    gfc_free_shape (&e->shape, old_rank);
+	    gfc_expression_rank (e);
+	    break;
+	  }
+	case EXPR_ARRAY:
+	case EXPR_PPC:
+	case EXPR_STRUCTURE:
+	case EXPR_SUBSTRING:
+	  gcc_unreachable ();
+	default:;
+	}
+    }
+}
+
+static gfc_symbol *
+create_get_parameter_type (gfc_expr *expr, gfc_namespace *ns,
+			   gfc_symbol *get_data)
+{
+  static int type_cnt = 0;
+  char tname[GFC_MAX_SYMBOL_LEN + 1];
+  char *name;
+  gfc_symbol *type;
+
+  gcc_assert (expr->expr_type == EXPR_VARIABLE);
+
+  strcpy (tname, expr->symtree->name);
+  name = xasprintf ("@_rget_data_t_%s_%d", tname, ++type_cnt);
+  gfc_get_symbol (name, ns, &type);
+
+  type->attr.flavor = FL_DERIVED;
+  get_data->ts.u.derived = type;
+
+  for (gfc_ref *ref = expr->ref; ref; ref = ref->next)
+    {
+      if (ref->type == REF_ARRAY)
+	{
+	  gfc_array_ref *ar = &ref->u.ar;
+	  for (int i = 0; i < ar->dimen; ++i)
+	    {
+	      check_add_new_component (type, ar->start[i], get_data);
+	      check_add_new_component (type, ar->end[i], get_data);
+	      check_add_new_component (type, ar->stride[i], get_data);
+	    }
+	}
+    }
+
+  gfc_set_sym_referenced (type);
+  gfc_commit_symbol (type);
+  return type;
+}
+
+
+static gfc_expr *
+create_get_callback (gfc_expr *expr)
+{
+  static int cnt = 0;
+  gfc_namespace *ns;
+  gfc_symbol *extproc, *proc, *buffer, *free_buffer, *base, *get_data,
+    *old_buffer_data;
+  char tname[GFC_MAX_SYMBOL_LEN + 1];
+  char *name;
+  const char *mname;
+  gfc_expr *cb, *post_caf_ref_expr;
+  gfc_code *code;
+  int expr_rank = expr->rank;
+
+  /* Find the top-level namespace.  */
+  for (ns = gfc_current_ns; ns->parent; ns = ns->parent)
+    ;
+
+  if (expr->expr_type == EXPR_VARIABLE)
+    strcpy (tname, expr->symtree->name);
+  else
+    strcpy (tname, "dummy");
+  if (expr->symtree->n.sym->module)
+    mname = expr->symtree->n.sym->module;
+  else
+    mname = "main";
+  name = xasprintf ("_caf_rget_%s_%s_%d", mname, tname, ++cnt);
+  gfc_get_symbol (name, ns, &extproc);
+  gfc_set_sym_referenced (extproc);
+  ++extproc->refs;
+  gfc_commit_symbol (extproc);
+
+  /* Set up namespace.  */
+  gfc_namespace *sub_ns = gfc_get_namespace (ns, 0);
+  sub_ns->sibling = ns->contained;
+  ns->contained = sub_ns;
+  sub_ns->resolved = 1;
+  /* Set up procedure symbol.  */
+  gfc_find_symbol (name, sub_ns, 1, &proc);
+  sub_ns->proc_name = proc;
+  proc->attr.if_source = IFSRC_DECL;
+  proc->attr.access = ACCESS_PUBLIC;
+  gfc_add_subroutine (&proc->attr, name, NULL);
+  proc->attr.host_assoc = 1;
+  proc->attr.always_explicit = 1;
+  ++proc->refs;
+  gfc_commit_symbol (proc);
+  free (name);
+
+  split_expr_at_caf_ref (expr, sub_ns, &post_caf_ref_expr);
+
+  if (ns->proc_name->attr.flavor == FL_MODULE)
+    proc->module = ns->proc_name->name;
+  gfc_set_sym_referenced (proc);
+  /* Set up formal arguments.  */
+  gfc_formal_arglist **argptr = &proc->formal;
+#define ADD_ARG(name, nsym, stype, sintent) \
+  gfc_get_symbol (name, sub_ns, &nsym); \
+  nsym->ts.type = stype; \
+  nsym->attr.flavor = FL_PARAMETER; \
+  nsym->attr.dummy = 1; \
+  nsym->attr.intent = sintent; \
+  gfc_set_sym_referenced (nsym); \
+  *argptr = gfc_get_formal_arglist (); \
+  (*argptr)->sym = nsym; \
+  argptr = &(*argptr)->next
+
+  ADD_ARG ("buffer", buffer, expr->ts.type, INTENT_INOUT);
+  buffer->ts = expr->ts;
+  if (expr_rank)
+    {
+      buffer->as = gfc_get_array_spec ();
+      buffer->as->rank = expr_rank;
+      if (expr->shape)
+	{
+	  buffer->as->type = AS_EXPLICIT;
+	  for (int d = 0; d < expr_rank; ++d)
+	    {
+	      buffer->as->lower[d]
+		= gfc_get_constant_expr (BT_INTEGER, gfc_index_integer_kind,
+					 &gfc_current_locus);
+	      gfc_mpz_set_hwi (buffer->as->lower[d]->value.integer, 1);
+	      buffer->as->upper[d]
+		= gfc_get_constant_expr (BT_INTEGER, gfc_index_integer_kind,
+					 &gfc_current_locus);
+	      gfc_mpz_set_hwi (buffer->as->upper[d]->value.integer,
+			       gfc_mpz_get_hwi (expr->shape[d]));
+	    }
+	  buffer->attr.allocatable = 1;
+	}
+      else
+	{
+	  buffer->as->type = AS_DEFERRED;
+	  buffer->attr.allocatable = 1;
+	}
+      buffer->attr.dimension = 1;
+    }
+  else
+    buffer->attr.pointer = 1;
+  if (buffer->ts.type == BT_CHARACTER)
+    {
+      buffer->ts.u.cl = gfc_get_charlen ();
+      *buffer->ts.u.cl = *expr->ts.u.cl;
+      buffer->ts.deferred = 1;
+      buffer->ts.u.cl->length = nullptr;
+    }
+  gfc_commit_symbol (buffer);
+  ADD_ARG ("free_buffer", free_buffer, BT_LOGICAL, INTENT_OUT);
+  free_buffer->ts.kind = gfc_default_logical_kind;
+  gfc_commit_symbol (free_buffer);
+
+  // ADD_ARG (expr->symtree->name, base, BT_VOID, INTENT_IN);
+  base = post_caf_ref_expr->symtree->n.sym;
+  gfc_set_sym_referenced (base);
+  gfc_commit_symbol (base);
+  *argptr = gfc_get_formal_arglist ();
+  (*argptr)->sym = base;
+  argptr = &(*argptr)->next;
+
+  gfc_commit_symbol (base);
+  ADD_ARG ("get_data", get_data, BT_DERIVED, INTENT_IN);
+  gfc_commit_symbol (get_data);
+#undef ADD_ARG
+
+  /* Set up code.  */
+  if (expr->rank != 0)
+    {
+      /* Code: old_buffer_ptr = C_LOC (buffer);  */
+      code = sub_ns->code = gfc_get_code (EXEC_ASSIGN);
+      gfc_get_symbol ("old_buffer_data", sub_ns, &old_buffer_data);
+      old_buffer_data->ts.type = BT_VOID;
+      old_buffer_data->attr.flavor = FL_VARIABLE;
+      gfc_set_sym_referenced (old_buffer_data);
+      gfc_commit_symbol (old_buffer_data);
+      code->expr1 = gfc_lval_expr_from_sym (old_buffer_data);
+      code->expr2 = gfc_build_intrinsic_call (ns, GFC_ISYM_C_LOC, "C_LOC",
+					      gfc_current_locus, 1,
+					      gfc_lval_expr_from_sym (buffer));
+      code->next = gfc_get_code (EXEC_ASSIGN);
+      code = code->next;
+    }
+  else
+    code = sub_ns->code = gfc_get_code (EXEC_POINTER_ASSIGN);
+
+  /* Code: buffer = expr;  */
+  code->expr1 = gfc_lval_expr_from_sym (buffer);
+  code->expr2 = post_caf_ref_expr;
+  gfc_ref *ref = code->expr2->ref, **pref = &code->expr2->ref;
+  if (ref && ref->type == REF_ARRAY && ref->u.ar.codimen != 0)
+    {
+      if (ref->u.ar.dimen != 0)
+	{
+	  ref->u.ar.codimen = 0;
+	  pref = &ref->next;
+	  ref = ref->next;
+	}
+      else
+	{
+	  code->expr2->ref = ref->next;
+	  ref->next = NULL;
+	  gfc_free_ref_list (ref);
+	  ref = code->expr2->ref;
+	  pref = &code->expr2->ref;
+	}
+    }
+  if (ref && ref->type == REF_COMPONENT)
+    {
+      gfc_find_component (code->expr2->symtree->n.sym->ts.u.derived,
+			  ref->u.c.component->name, false, false, pref);
+      if (*pref != ref)
+	{
+	  (*pref)->next = ref->next;
+	  ref->next = NULL;
+	  gfc_free_ref_list (ref);
+	}
+    }
+  get_data->ts.u.derived
+    = create_get_parameter_type (code->expr2, ns, get_data);
+  if (code->expr2->rank == 0)
+    code->expr2 = gfc_build_intrinsic_call (ns, GFC_ISYM_C_LOC, "C_LOC",
+					    gfc_current_locus, 1, code->expr2);
+
+  /* Code: *free_buffer = old_buffer_ptr /= C_LOC (buffer); for rank != 0 or
+   *       *free_buffer = 0; for rank == 0.  */
+  code->next = gfc_get_code (EXEC_ASSIGN);
+  code = code->next;
+  code->expr1 = gfc_lval_expr_from_sym (free_buffer);
+  if (expr->rank != 0)
+    {
+      code->expr2 = gfc_get_operator_expr (
+	&gfc_current_locus, INTRINSIC_NE_OS,
+	gfc_lval_expr_from_sym (old_buffer_data),
+	gfc_build_intrinsic_call (ns, GFC_ISYM_C_LOC, "C_LOC",
+				  gfc_current_locus, 1,
+				  gfc_lval_expr_from_sym (buffer)));
+      code->expr2->ts.type = BT_LOGICAL;
+      code->expr2->ts.kind = gfc_default_logical_kind;
+    }
+  else
+    {
+      code->expr2 = gfc_get_logical_expr (gfc_default_logical_kind,
+					  &gfc_current_locus, false);
+    }
+
+  cb = gfc_lval_expr_from_sym (extproc);
+  cb->ts.interface = extproc;
+
+  return cb;
+}
 
 static void
 add_caf_get_intrinsic (gfc_expr *e)
 {
-  gfc_expr *wrapper, *tmp_expr;
+  gfc_expr *wrapper, *tmp_expr, *rget_expr, *rget_hash_expr;
   gfc_ref *ref;
   int n;
 
@@ -5832,8 +6540,18 @@ add_caf_get_intrinsic (gfc_expr *e)
 
   tmp_expr = XCNEW (gfc_expr);
   *tmp_expr = *e;
+  rget_expr = create_get_callback (tmp_expr);
+  rget_hash_expr = gfc_get_expr ();
+  rget_hash_expr->expr_type = EXPR_CONSTANT;
+  rget_hash_expr->ts.type = BT_INTEGER;
+  rget_hash_expr->ts.kind = gfc_default_integer_kind;
+  rget_hash_expr->where = tmp_expr->where;
+  mpz_init_set_ui (rget_hash_expr->value.integer,
+		   gfc_hash_value (rget_expr->symtree->n.sym));
   wrapper = gfc_build_intrinsic_call (gfc_current_ns, GFC_ISYM_CAF_GET,
-				      "caf_get", tmp_expr->where, 1, tmp_expr);
+				      "caf_get", tmp_expr->where, 3, tmp_expr,
+				      rget_hash_expr, rget_expr);
+  gfc_add_caf_accessor (rget_hash_expr, rget_expr);
   wrapper->ts = e->ts;
   wrapper->rank = e->rank;
   wrapper->corank = e->corank;
@@ -5842,21 +6560,6 @@ add_caf_get_intrinsic (gfc_expr *e)
   *e = *wrapper;
   free (wrapper);
 }
-
-
-static void
-remove_caf_get_intrinsic (gfc_expr *e)
-{
-  gcc_assert (e->expr_type == EXPR_FUNCTION && e->value.function.isym
-	      && e->value.function.isym->id == GFC_ISYM_CAF_GET);
-  gfc_expr *e2 = e->value.function.actual->expr;
-  e->value.function.actual->expr = NULL;
-  gfc_free_actual_arglist (e->value.function.actual);
-  gfc_free_shape (&e->shape, e->rank);
-  *e = *e2;
-  free (e2);
-}
-
 
 /* Resolve a variable expression.  */
 
@@ -5910,12 +6613,14 @@ resolve_variable (gfc_expr *e)
 	     && CLASS_DATA (sym)->as
 	     && CLASS_DATA (sym)->as->type == AS_ASSUMED_RANK)
 	    || (sym->ts.type != BT_CLASS && sym->as
-	        && sym->as->type == AS_ASSUMED_RANK))
-	   && !sym->attr.select_rank_temporary)
+		&& sym->as->type == AS_ASSUMED_RANK))
+	   && !sym->attr.select_rank_temporary
+	   && !(sym->assoc && sym->assoc->ar))
     {
       if (!actual_arg
 	  && !(cs_base && cs_base->current
-	       && cs_base->current->op == EXEC_SELECT_RANK))
+	       && (cs_base->current->op == EXEC_SELECT_RANK
+		   || sym->attr.target)))
 	{
 	  gfc_error ("Assumed-rank variable %s at %L may only be used as "
 		     "actual argument", sym->name, &e->where);
@@ -5959,6 +6664,7 @@ resolve_variable (gfc_expr *e)
 	&& CLASS_DATA (sym)->as->type == AS_ASSUMED_RANK)
        || (sym->ts.type != BT_CLASS && sym->as
 	   && sym->as->type == AS_ASSUMED_RANK))
+      && !(sym->assoc && sym->assoc->ar)
       && e->ref
       && !(e->ref->type == REF_ARRAY && e->ref->u.ar.type == AR_FULL
 	   && e->ref->next == NULL))
@@ -6075,6 +6781,7 @@ resolve_variable (gfc_expr *e)
       newref->type = REF_ARRAY;
       newref->u.ar.type = AR_FULL;
       newref->u.ar.dimen = 0;
+
       /* Because this is an associate var and the first ref either is a ref to
 	 the _data component or not, no traversal of the ref chain is
 	 needed.  The array ref needs to be inserted after the _data ref,
@@ -6103,6 +6810,15 @@ resolve_variable (gfc_expr *e)
 	  newref->next = ref;
 	  e->ref = newref;
 	}
+    }
+  else if (sym->assoc && sym->ts.type == BT_CHARACTER && sym->ts.deferred)
+    {
+      gfc_ref *ref;
+      for (ref = e->ref; ref; ref = ref->next)
+	if (ref->type == REF_SUBSTRING)
+	  break;
+      if (ref == NULL)
+	e->ts = sym->ts;
     }
 
   if (e->ref && !gfc_resolve_ref (e))
@@ -6190,13 +6906,18 @@ resolve_variable (gfc_expr *e)
 	t = false;
 
       if (sym->as)
-	for (n = 0; n < sym->as->rank; n++)
-	  {
-	     if (!gfc_resolve_expr (sym->as->lower[n]))
-	       t = false;
-	     if (!gfc_resolve_expr (sym->as->upper[n]))
-	       t = false;
-	  }
+	{
+	  bool old_caf_lhs = caf_lhs;
+	  caf_lhs = false;
+	  for (n = 0; n < sym->as->rank; n++)
+	    {
+	      if (!gfc_resolve_expr (sym->as->lower[n]))
+		t = false;
+	      if (!gfc_resolve_expr (sym->as->upper[n]))
+		t = false;
+	    }
+	  caf_lhs = old_caf_lhs;
+	}
       specification_expr = saved_specification_expr;
 
       if (t)
@@ -6271,7 +6992,8 @@ resolve_procedure:
   if (t)
     gfc_expression_rank (e);
 
-  if (t && flag_coarray == GFC_FCOARRAY_LIB && gfc_is_coindexed (e))
+  if (t && flag_coarray == GFC_FCOARRAY_LIB && !caf_lhs
+      && gfc_is_coindexed (e))
     add_caf_get_intrinsic (e);
 
   if (sym->attr.ext_attr & (1 << EXT_ATTR_DEPRECATED) && sym != sym->result)
@@ -9205,7 +9927,9 @@ resolve_select (gfc_code *code, bool select_type)
   type = case_expr->ts.type;
 
   /* F08:C830.  */
-  if (type != BT_LOGICAL && type != BT_INTEGER && type != BT_CHARACTER)
+  if (type != BT_LOGICAL && type != BT_INTEGER && type != BT_CHARACTER
+      && (!flag_unsigned || (flag_unsigned && type != BT_UNSIGNED)))
+
     {
       gfc_error ("Argument of SELECT statement at %L cannot be %s",
 		 &case_expr->where, gfc_typename (case_expr));
@@ -9514,6 +10238,22 @@ resolve_assoc_var (gfc_symbol* sym, bool resolve_target)
   if (resolve_target && !gfc_resolve_expr (target))
     return;
 
+  if (sym->assoc->ar)
+    {
+      int dim;
+      gfc_array_ref *ar = sym->assoc->ar;
+      for (dim = 0; dim < sym->assoc->ar->dimen; dim++)
+	{
+	  if (!(ar->start[dim] && gfc_resolve_expr (ar->start[dim])
+		&& ar->start[dim]->ts.type == BT_INTEGER)
+	      || !(ar->end[dim] && gfc_resolve_expr (ar->end[dim])
+		   && ar->end[dim]->ts.type == BT_INTEGER))
+	    gfc_error ("(F202y)Missing or invalid bound in ASSOCIATE rank "
+		       "remapping of associate name %s at %L",
+		       sym->name, &sym->declared_at);
+	}
+    }
+
   /* For variable targets, we get some attributes from the target.  */
   if (target->expr_type == EXPR_VARIABLE)
     {
@@ -9703,7 +10443,7 @@ resolve_assoc_var (gfc_symbol* sym, bool resolve_target)
   if (target->ts.type == BT_CLASS)
     gfc_fix_class_refs (target);
 
-  if ((target->rank != 0 || target->corank != 0)
+  if ((target->rank > 0 || target->corank > 0)
       && !sym->attr.select_rank_temporary)
     {
       gfc_array_spec *as;
@@ -9804,6 +10544,15 @@ resolve_assoc_var (gfc_symbol* sym, bool resolve_target)
   /* Fix up the type-spec for CHARACTER types.  */
   if (sym->ts.type == BT_CHARACTER && !sym->attr.select_type_temporary)
     {
+      gfc_ref *ref;
+      for (ref = target->ref; ref; ref = ref->next)
+	if (ref->type == REF_SUBSTRING
+	    && (ref->u.ss.start == NULL
+		|| ref->u.ss.start->expr_type != EXPR_CONSTANT
+		|| ref->u.ss.end == NULL
+		|| ref->u.ss.end->expr_type != EXPR_CONSTANT))
+	  break;
+
       if (!sym->ts.u.cl)
 	sym->ts.u.cl = target->ts.u.cl;
 
@@ -9822,9 +10571,10 @@ resolve_assoc_var (gfc_symbol* sym, bool resolve_target)
 		gfc_get_int_expr (gfc_charlen_int_kind, NULL,
 				  target->value.character.length);
 	}
-      else if ((!sym->ts.u.cl->length
-		|| sym->ts.u.cl->length->expr_type != EXPR_CONSTANT)
+      else if (((!sym->ts.u.cl->length
+		 || sym->ts.u.cl->length->expr_type != EXPR_CONSTANT)
 		&& target->expr_type != EXPR_VARIABLE)
+	       || ref)
 	{
 	  if (!sym->ts.deferred)
 	    {
@@ -9834,7 +10584,10 @@ resolve_assoc_var (gfc_symbol* sym, bool resolve_target)
 
 	  /* This is reset in trans-stmt.cc after the assignment
 	     of the target expression to the associate name.  */
-	  sym->attr.allocatable = 1;
+	  if (ref && sym->as)
+	    sym->attr.pointer = 1;
+	  else
+	    sym->attr.allocatable = 1;
 	}
     }
 
@@ -10781,15 +11534,9 @@ find_reachable_labels (gfc_code *block)
     }
 }
 
-
 static void
 resolve_lock_unlock_event (gfc_code *code)
 {
-  if (code->expr1->expr_type == EXPR_FUNCTION
-      && code->expr1->value.function.isym
-      && code->expr1->value.function.isym->id == GFC_ISYM_CAF_GET)
-    remove_caf_get_intrinsic (code->expr1);
-
   if ((code->op == EXEC_LOCK || code->op == EXEC_UNLOCK)
       && (code->expr1->ts.type != BT_DERIVED
 	  || code->expr1->expr_type != EXPR_VARIABLE
@@ -11441,8 +12188,9 @@ resolve_block_construct (gfc_code* code)
 {
   gfc_namespace *ns = code->ext.block.ns;
 
-  /* For an ASSOCIATE block, the associations (and their targets) are already
-     resolved during resolve_symbol. Resolve the BLOCK's namespace.  */
+  /* For an ASSOCIATE block, the associations (and their targets) will be
+     resolved by gfc_resolve_symbol, during resolution of the BLOCK's
+     namespace.  */
   gfc_resolve (ns);
 }
 
@@ -11529,6 +12277,7 @@ gfc_resolve_blocks (gfc_code *b, gfc_namespace *ns)
 	case EXEC_OMP_ALLOCATORS:
 	case EXEC_OMP_ASSUME:
 	case EXEC_OMP_CRITICAL:
+	case EXEC_OMP_DISPATCH:
 	case EXEC_OMP_DISTRIBUTE:
 	case EXEC_OMP_DISTRIBUTE_PARALLEL_DO:
 	case EXEC_OMP_DISTRIBUTE_PARALLEL_DO_SIMD:
@@ -11601,6 +12350,23 @@ gfc_resolve_blocks (gfc_code *b, gfc_namespace *ns)
     }
 }
 
+bool
+caf_possible_reallocate (gfc_expr *e)
+{
+  symbol_attribute caf_attr;
+  gfc_ref *last_arr_ref = nullptr;
+
+  caf_attr = gfc_caf_attr (e);
+  if (!caf_attr.codimension || !caf_attr.allocatable || !caf_attr.dimension)
+    return false;
+
+  /* Only full array refs can indicate a needed reallocation.  */
+  for (gfc_ref *ref = e->ref; ref; ref = ref->next)
+    if (ref->type == REF_ARRAY && ref->u.ar.dimen)
+      last_arr_ref = ref;
+
+  return last_arr_ref && last_arr_ref->u.ar.type == AR_FULL;
+}
 
 /* Does everything to resolve an ordinary assignment.  Returns true
    if this is an interface assignment.  */
@@ -11672,6 +12438,13 @@ resolve_ordinary_assign (gfc_code *code, gfc_namespace *ns)
 	 strings.  */
       gfc_error ("Cannot convert %s to %s at %L", gfc_typename (rhs),
 		 gfc_typename (lhs), &rhs->where);
+      return false;
+    }
+
+  if (flag_unsigned && gfc_invalid_unsigned_ops (lhs, rhs))
+    {
+      gfc_error ("Cannot assign %s to %s at %L", gfc_typename (rhs),
+		   gfc_typename (lhs), &rhs->where);
       return false;
     }
 
@@ -11843,44 +12616,7 @@ resolve_ordinary_assign (gfc_code *code, gfc_namespace *ns)
   if (lhs->ts.type == BT_CLASS && rhs->ts.type != BT_CLASS)
     gfc_find_vtab (&rhs->ts);
 
-  bool caf_convert_to_send = flag_coarray == GFC_FCOARRAY_LIB
-      && (lhs_coindexed
-	  || (code->expr2->expr_type == EXPR_FUNCTION
-	      && code->expr2->value.function.isym
-	      && code->expr2->value.function.isym->id == GFC_ISYM_CAF_GET
-	      && (code->expr1->rank == 0 || code->expr2->rank != 0)
-	      && !gfc_expr_attr (rhs).allocatable
-	      && !gfc_has_vector_subscript (rhs)));
-
-  gfc_check_assign (lhs, rhs, 1, !caf_convert_to_send);
-
-  /* Insert a GFC_ISYM_CAF_SEND intrinsic, when the LHS is a coindexed variable.
-     Additionally, insert this code when the RHS is a CAF as we then use the
-     GFC_ISYM_CAF_SEND intrinsic just to avoid a temporary; but do not do so if
-     the LHS is (re)allocatable or has a vector subscript.  If the LHS is a
-     noncoindexed array and the RHS is a coindexed scalar, use the normal code
-     path.  */
-  if (caf_convert_to_send)
-    {
-      if (code->expr2->expr_type == EXPR_FUNCTION
-	  && code->expr2->value.function.isym
-	  && code->expr2->value.function.isym->id == GFC_ISYM_CAF_GET)
-	remove_caf_get_intrinsic (code->expr2);
-      code->op = EXEC_CALL;
-      gfc_get_sym_tree (GFC_PREFIX ("caf_send"), ns, &code->symtree, true);
-      code->resolved_sym = code->symtree->n.sym;
-      code->resolved_sym->attr.flavor = FL_PROCEDURE;
-      code->resolved_sym->attr.intrinsic = 1;
-      code->resolved_sym->attr.subroutine = 1;
-      code->resolved_isym = gfc_intrinsic_subroutine_by_id (GFC_ISYM_CAF_SEND);
-      gfc_commit_symbol (code->resolved_sym);
-      code->ext.actual = gfc_get_actual_arglist ();
-      code->ext.actual->expr = lhs;
-      code->ext.actual->next = gfc_get_actual_arglist ();
-      code->ext.actual->next->expr = rhs;
-      code->expr1 = NULL;
-      code->expr2 = NULL;
-    }
+  gfc_check_assign (lhs, rhs, 1);
 
   return false;
 }
@@ -12288,6 +13024,11 @@ generate_component_assignments (gfc_code **code, gfc_namespace *ns)
     {
       /* Assign the rhs to the temporary.  */
       tmp_expr = get_temp_from_expr ((*code)->expr1, ns);
+      if (tmp_expr->symtree->n.sym->attr.pointer)
+	{
+	  tmp_expr->symtree->n.sym->attr.pointer = 0;
+	  tmp_expr->symtree->n.sym->attr.allocatable = 1;
+	}
       this_code = build_assignment (EXEC_ASSIGN,
 				    tmp_expr, (*code)->expr2,
 				    NULL, NULL, (*code)->loc);
@@ -12585,6 +13326,17 @@ resolve_ptr_fcn_assign (gfc_code **code, gfc_namespace *ns)
   tmp_ptr_expr->symtree->n.sym->attr.allocatable = 0;
   tmp_ptr_expr->where = (*code)->loc;
 
+  /* A new charlen is required to ensure that the variable string length
+     is different to that of the original lhs for deferred results.  */
+  if (s->result->ts.deferred && tmp_ptr_expr->ts.type == BT_CHARACTER)
+    {
+      tmp_ptr_expr->ts.u.cl = gfc_get_charlen();
+      tmp_ptr_expr->ts.deferred = 1;
+      tmp_ptr_expr->ts.u.cl->next = gfc_current_ns->cl_list;
+      gfc_current_ns->cl_list = tmp_ptr_expr->ts.u.cl;
+      tmp_ptr_expr->symtree->n.sym->ts.u.cl = tmp_ptr_expr->ts.u.cl;
+    }
+
   this_code = build_assignment (EXEC_ASSIGN,
 				tmp_ptr_expr, (*code)->expr2,
 				NULL, NULL, (*code)->loc);
@@ -12789,7 +13541,22 @@ gfc_resolve_code (gfc_code *code, gfc_namespace *ns)
 start:
       t = true;
       if (code->op != EXEC_COMPCALL && code->op != EXEC_CALL_PPC)
-	t = gfc_resolve_expr (code->expr1);
+	{
+	  switch (code->op)
+	    {
+	    case EXEC_ASSIGN:
+	    case EXEC_LOCK:
+	    case EXEC_UNLOCK:
+	    case EXEC_EVENT_POST:
+	    case EXEC_EVENT_WAIT:
+	      caf_lhs = gfc_is_coindexed (code->expr1);
+	      break;
+	    default:
+	      break;
+	    }
+	  t = gfc_resolve_expr (code->expr1);
+	  caf_lhs = false;
+	}
       forall_flag = forall_save;
       gfc_do_concurrent_flag = do_concurrent_save;
 
@@ -12910,15 +13677,34 @@ start:
 	  if (!t)
 	    break;
 
-	  if (code->expr1->ts.type == BT_CLASS)
-	   gfc_find_vtab (&code->expr2->ts);
+	  if (flag_coarray == GFC_FCOARRAY_LIB
+	      && (gfc_is_coindexed (code->expr1)
+		  || caf_possible_reallocate (code->expr1)))
+	    {
+	      /* Insert a GFC_ISYM_CAF_SEND intrinsic, when the LHS is a
+		 coindexed variable.  */
+	      code->op = EXEC_CALL;
+	      gfc_get_sym_tree (GFC_PREFIX ("caf_send"), ns, &code->symtree,
+				true);
+	      code->resolved_sym = code->symtree->n.sym;
+	      code->resolved_sym->attr.flavor = FL_PROCEDURE;
+	      code->resolved_sym->attr.intrinsic = 1;
+	      code->resolved_sym->attr.subroutine = 1;
+	      code->resolved_isym
+		= gfc_intrinsic_subroutine_by_id (GFC_ISYM_CAF_SEND);
+	      gfc_commit_symbol (code->resolved_sym);
+	      code->ext.actual = gfc_get_actual_arglist ();
+	      code->ext.actual->expr = code->expr1;
+	      code->ext.actual->next = gfc_get_actual_arglist ();
+	      code->ext.actual->next->expr = code->expr2;
 
-	  /* Remove a GFC_ISYM_CAF_GET inserted for a coindexed variable on
-	     the LHS.  */
-	  if (code->expr1->expr_type == EXPR_FUNCTION
-	      && code->expr1->value.function.isym
-	      && code->expr1->value.function.isym->id == GFC_ISYM_CAF_GET)
-	    remove_caf_get_intrinsic (code->expr1);
+	      code->expr1 = NULL;
+	      code->expr2 = NULL;
+	      break;
+	    }
+
+	  if (code->expr1->ts.type == BT_CLASS)
+	    gfc_find_vtab (&code->expr2->ts);
 
 	  /* If this is a pointer function in an lvalue variable context,
 	     the new code will have to be resolved afresh. This is also the
@@ -13212,6 +13998,7 @@ start:
 	case EXEC_OMP_CRITICAL:
 	case EXEC_OMP_FLUSH:
 	case EXEC_OMP_DEPOBJ:
+	case EXEC_OMP_DISPATCH:
 	case EXEC_OMP_DISTRIBUTE:
 	case EXEC_OMP_DISTRIBUTE_PARALLEL_DO:
 	case EXEC_OMP_DISTRIBUTE_PARALLEL_DO_SIMD:
@@ -13219,6 +14006,7 @@ start:
 	case EXEC_OMP_DO:
 	case EXEC_OMP_DO_SIMD:
 	case EXEC_OMP_ERROR:
+	case EXEC_OMP_INTEROP:
 	case EXEC_OMP_LOOP:
 	case EXEC_OMP_MASTER:
 	case EXEC_OMP_MASTER_TASKLOOP:
@@ -13914,8 +14702,8 @@ deferred_requirements (gfc_symbol *sym)
 static bool
 resolve_fl_variable (gfc_symbol *sym, int mp_flag)
 {
-  const char *auto_save_msg = "Automatic object %qs at %L cannot have the "
-			      "SAVE attribute";
+  const char *auto_save_msg = G_("Automatic object %qs at %L cannot have the "
+				 "SAVE attribute");
 
   if (!resolve_fl_var_and_proc (sym, mp_flag))
     return false;
@@ -15964,6 +16752,53 @@ resolve_fl_struct (gfc_symbol *sym)
   return true;
 }
 
+/* Figure if the derived type is using itself directly in one of its components
+   or through referencing other derived types.  The information is required to
+   generate the __deallocate and __final type bound procedures to ensure
+   freeing larger hierarchies of derived types with allocatable objects.  */
+
+static void
+resolve_cyclic_derived_type (gfc_symbol *derived)
+{
+  hash_set<gfc_symbol *> seen, to_examin;
+  gfc_component *c;
+  seen.add (derived);
+  to_examin.add (derived);
+  while (!to_examin.is_empty ())
+    {
+      gfc_symbol *cand = *to_examin.begin ();
+      to_examin.remove (cand);
+      for (c = cand->components; c; c = c->next)
+	if (c->ts.type == BT_DERIVED)
+	  {
+	    if (c->ts.u.derived == derived)
+	      {
+		derived->attr.recursive = 1;
+		return;
+	      }
+	    else if (!seen.contains (c->ts.u.derived))
+	      {
+		seen.add (c->ts.u.derived);
+		to_examin.add (c->ts.u.derived);
+	      }
+	  }
+	else if (c->ts.type == BT_CLASS)
+	  {
+	    if (!c->attr.class_ok)
+	      continue;
+	    if (CLASS_DATA (c)->ts.u.derived == derived)
+	      {
+		derived->attr.recursive = 1;
+		return;
+	      }
+	    else if (!seen.contains (CLASS_DATA (c)->ts.u.derived))
+	      {
+		seen.add (CLASS_DATA (c)->ts.u.derived);
+		to_examin.add (CLASS_DATA (c)->ts.u.derived);
+	      }
+	  }
+    }
+}
 
 /* Resolve the components of a derived type. This does not have to wait until
    resolution stage, but can be done as soon as the dt declaration has been
@@ -16003,6 +16838,11 @@ resolve_fl_derived0 (gfc_symbol *sym)
       return false;
     }
 
+  /* Resolving components below, may create vtabs for which the cyclic type
+     information needs to be present.  */
+  if (!sym->attr.vtype)
+    resolve_cyclic_derived_type (sym);
+
   c = (sym->attr.is_class) ? CLASS_DATA (sym->components)
 			   : sym->components;
 
@@ -16036,6 +16876,7 @@ resolve_fl_derived0 (gfc_symbol *sym)
 		token->attr.artificial = 1;
 		token->attr.caf_token = 1;
 	      }
+	    c->caf_token = token;
 	  }
     }
 
@@ -16075,7 +16916,6 @@ resolve_fl_derived0 (gfc_symbol *sym)
 
   return true;
 }
-
 
 /* The following procedure does the full resolution of a derived type,
    including resolution of all type-bound procedures (if present). In contrast
@@ -16151,9 +16991,9 @@ resolve_fl_derived (gfc_symbol *sym)
      being vtables or pdt templates. If this is not done class declarations
      in external procedures wind up with their own version and so SELECT TYPE
      fails because the vptrs do not have the same address.  */
-  if (gfc_option.allow_std & GFC_STD_F2003
-      && sym->ns->proc_name
-      && sym->ns->proc_name->attr.flavor == FL_MODULE
+  if (gfc_option.allow_std & GFC_STD_F2003 && sym->ns->proc_name
+      && (sym->ns->proc_name->attr.flavor == FL_MODULE
+	  || (sym->attr.recursive && sym->attr.alloc_comp))
       && sym->attr.access != ACCESS_PRIVATE
       && !(sym->attr.vtype || sym->attr.pdt_template))
     {
@@ -16676,7 +17516,9 @@ resolve_symbol (gfc_symbol *sym)
       if (as->type == AS_ASSUMED_RANK && !sym->attr.dummy
 	  && !sym->attr.select_type_temporary
 	  && !(cs_base && cs_base->current
-	       && cs_base->current->op == EXEC_SELECT_RANK))
+	       && (cs_base->current->op == EXEC_SELECT_RANK
+		   || ((gfc_option.allow_std & GFC_STD_F202Y)
+			&& cs_base->current->op == EXEC_BLOCK))))
 	{
 	  gfc_error ("Assumed-rank array at %L must be a dummy argument",
 		     &sym->declared_at);
@@ -17244,6 +18086,9 @@ resolve_symbol (gfc_symbol *sym)
 	/* Mark the result symbol to be referenced, when it has allocatable
 	   components.  */
 	sym->result->attr.referenced = 1;
+      else if (a->function && !a->pointer && !a->allocatable && sym->result)
+	/* Default initialization for function results.  */
+	apply_default_init (sym->result);
     }
 
   if (sym->ts.type == BT_CLASS && sym->ns == gfc_current_ns
@@ -18173,8 +19018,8 @@ resolve_equivalence (gfc_equiv *eq)
       /* Since the pair of objects is not of the same type, mixed or
 	 non-default sequences can be rejected.  */
 
-      msg = "Sequence %s with mixed components in EQUIVALENCE "
-	    "statement at %L with different type objects";
+      msg = G_("Sequence %s with mixed components in EQUIVALENCE "
+	       "statement at %L with different type objects");
       if ((object ==2
 	   && last_eq_type == SEQ_MIXED
 	   && last_where
@@ -18183,8 +19028,8 @@ resolve_equivalence (gfc_equiv *eq)
 	      && !gfc_notify_std (GFC_STD_GNU, msg, sym->name, &e->where)))
 	continue;
 
-      msg = "Non-default type object or sequence %s in EQUIVALENCE "
-	    "statement at %L with objects of different type";
+      msg = G_("Non-default type object or sequence %s in EQUIVALENCE "
+	       "statement at %L with objects of different type");
       if ((object ==2
 	   && last_eq_type == SEQ_NONDEFAULT
 	   && last_where
@@ -18193,15 +19038,15 @@ resolve_equivalence (gfc_equiv *eq)
 	      && !gfc_notify_std (GFC_STD_GNU, msg, sym->name, &e->where)))
 	continue;
 
-      msg ="Non-CHARACTER object %qs in default CHARACTER "
-	   "EQUIVALENCE statement at %L";
+      msg = G_("Non-CHARACTER object %qs in default CHARACTER "
+	       "EQUIVALENCE statement at %L");
       if (last_eq_type == SEQ_CHARACTER
 	  && eq_type != SEQ_CHARACTER
 	  && !gfc_notify_std (GFC_STD_GNU, msg, sym->name, &e->where))
 		continue;
 
-      msg ="Non-NUMERIC object %qs in default NUMERIC "
-	   "EQUIVALENCE statement at %L";
+      msg = G_("Non-NUMERIC object %qs in default NUMERIC "
+	       "EQUIVALENCE statement at %L");
       if (last_eq_type == SEQ_NUMERIC
 	  && eq_type != SEQ_NUMERIC
 	  && !gfc_notify_std (GFC_STD_GNU, msg, sym->name, &e->where))
@@ -18548,7 +19393,7 @@ resolve_types (gfc_namespace *ns)
 
   gfc_traverse_ns (ns, gfc_verify_DTIO_procedures);
 
-  gfc_resolve_omp_declare_simd (ns);
+  gfc_resolve_omp_declare (ns);
 
   gfc_resolve_omp_udrs (ns->omp_udr_root);
 

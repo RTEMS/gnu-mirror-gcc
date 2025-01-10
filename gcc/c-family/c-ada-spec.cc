@@ -1,6 +1,6 @@
 /* Print GENERIC declaration (functions, variables, types) trees coming from
    the C and C++ front-ends as well as macros in Ada syntax.
-   Copyright (C) 2010-2024 Free Software Foundation, Inc.
+   Copyright (C) 2010-2025 Free Software Foundation, Inc.
    Adapted from tree-pretty-print.cc by Arnaud Charlet  <charlet@adacore.com>
 
 This file is part of GCC.
@@ -2485,13 +2485,13 @@ dump_ada_node (pretty_printer *pp, tree node, tree type, int spc,
 	      pp_minus (pp);
 	      val = -val;
 	    }
-	  sprintf (pp_buffer (pp)->digit_buffer,
+	  sprintf (pp_buffer (pp)->m_digit_buffer,
 		   "16#%" HOST_WIDE_INT_PRINT "x",
 		   val.elt (val.get_len () - 1));
 	  for (i = val.get_len () - 2; i >= 0; i--)
-	    sprintf (pp_buffer (pp)->digit_buffer,
+	    sprintf (pp_buffer (pp)->m_digit_buffer,
 		     HOST_WIDE_INT_PRINT_PADDED_HEX, val.elt (i));
-	  pp_string (pp, pp_buffer (pp)->digit_buffer);
+	  pp_string (pp, pp_buffer (pp)->m_digit_buffer);
 	}
       break;
 
@@ -3287,7 +3287,7 @@ dump_ada_declaration (pretty_printer *pp, tree t, tree type, int spc)
 	    }
 	}
 
-      TREE_VISITED (t) = 1; 
+      TREE_VISITED (t) = 1;
       if (is_interface)
 	{
 	  pp_string (pp, "limited interface  -- ");

@@ -1,6 +1,6 @@
 // Pointer Traits -*- C++ -*-
 
-// Copyright (C) 2011-2024 Free Software Foundation, Inc.
+// Copyright (C) 2011-2025 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -211,6 +211,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       return __ptr;
     }
 
+  // This should only be used for pointer-like types (e.g. allocator pointers)
+  // and (in C++20 and later) for types satisfying std::contiguous_iterator.
+  // It should not be used for arbitrary random access iterators, because
+  // they might not be contiguous iterators (e.g. deque::iterator isn't).
   template<typename _Ptr>
     constexpr typename std::pointer_traits<_Ptr>::element_type*
     __to_address(const _Ptr& __ptr)

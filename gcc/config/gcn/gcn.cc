@@ -1,4 +1,4 @@
-/* Copyright (C) 2016-2024 Free Software Foundation, Inc.
+/* Copyright (C) 2016-2025 Free Software Foundation, Inc.
 
    This file is free software; you can redistribute it and/or modify it under
    the terms of the GNU General Public License as published by the Free
@@ -68,12 +68,12 @@ static bool ext_gcn_constants_init = 0;
 
 /* Holds the ISA variant, derived from the command line parameters.  */
 
-enum gcn_isa gcn_isa = ISA_GCN3;	/* Default to GCN3.  */
+enum gcn_isa gcn_isa = ISA_GCN5;	/* Default to GCN5.  */
 
 /* Reserve this much space for LDS (for propagating variables from
    worker-single mode to worker-partitioned mode), per workgroup.  Global
    analysis could calculate an exact bound, but we don't do that yet.
- 
+
    We want to permit full occupancy, so size accordingly.  */
 
 /* Use this as a default, but allow it to grow if the user requests a large
@@ -98,6 +98,15 @@ static hash_map<tree, int> lds_allocs;
 #define MAX_NORMAL_VGPR_COUNT	24
 #define MAX_NORMAL_AVGPR_COUNT	24
 
+/* Import all the data from gcn-devices.def.
+   The PROCESSOR_GFXnnn should be indices for this table.  */
+const struct gcn_device_def gcn_devices[] = {
+#define GCN_DEVICE(name, NAME, ELF, ISA, XNACK, SRAMECC, WAVE64, CU, VGPRS, GEN_VER,ARCH_FAM) \
+    {PROCESSOR_ ## NAME, #name, #NAME, ISA, XNACK, SRAMECC, WAVE64, CU, VGPRS, \
+     GEN_VER, #ARCH_FAM},
+#include "gcn-devices.def"
+};
+
 /* }}}  */
 /* {{{ Initialization and options.  */
 
@@ -118,7 +127,7 @@ gcn_init_machine_status (void)
 }
 
 /* Implement TARGET_OPTION_OVERRIDE.
- 
+
    Override option settings where defaults are variable, or we have specific
    needs to consider.  */
 
@@ -133,18 +142,8 @@ gcn_option_override (void)
   if (!flag_pic)
     flag_pic = flag_pie;
 
-  gcn_isa = (gcn_arch == PROCESSOR_FIJI ? ISA_GCN3
-      : gcn_arch == PROCESSOR_VEGA10 ? ISA_GCN5
-      : gcn_arch == PROCESSOR_VEGA20 ? ISA_GCN5
-      : gcn_arch == PROCESSOR_GFX908 ? ISA_CDNA1
-      : gcn_arch == PROCESSOR_GFX90a ? ISA_CDNA2
-      : gcn_arch == PROCESSOR_GFX90c ? ISA_GCN5
-      : gcn_arch == PROCESSOR_GFX1030 ? ISA_RDNA2
-      : gcn_arch == PROCESSOR_GFX1036 ? ISA_RDNA2
-      : gcn_arch == PROCESSOR_GFX1100 ? ISA_RDNA3
-      : gcn_arch == PROCESSOR_GFX1103 ? ISA_RDNA3
-      : ISA_UNKNOWN);
-  gcc_assert (gcn_isa != ISA_UNKNOWN);
+  gcc_assert (gcn_arch >= 0 && gcn_arch < PROCESSOR_COUNT);
+  gcn_isa = gcn_devices[gcn_arch].isa;
 
   /* Reserve 1Kb (somewhat arbitrarily) of LDS space for reduction results and
      worker broadcasts.  */
@@ -164,23 +163,14 @@ gcn_option_override (void)
 	acc_lds_size = 32768;
     }
 
-  /* gfx803 "Fiji", gfx1030 and gfx1100 do not support XNACK.  */
-  if (gcn_arch == PROCESSOR_FIJI
-      || gcn_arch == PROCESSOR_GFX1030
-      || gcn_arch == PROCESSOR_GFX1036
-      || gcn_arch == PROCESSOR_GFX1100
-      || gcn_arch == PROCESSOR_GFX1103)
+  /* gfx1030 and gfx1100 do not support XNACK.  */
+  if (gcn_devices[gcn_arch].xnack_default == HSACO_ATTR_UNSUPPORTED)
     {
       if (flag_xnack == HSACO_ATTR_ON)
 	error ("%<-mxnack=on%> is incompatible with %<-march=%s%>",
-	       (gcn_arch == PROCESSOR_FIJI ? "fiji"
-		: gcn_arch == PROCESSOR_GFX1030 ? "gfx1030"
-		: gcn_arch == PROCESSOR_GFX1036 ? "gfx1036"
-		: gcn_arch == PROCESSOR_GFX1100 ? "gfx1100"
-		: gcn_arch == PROCESSOR_GFX1103 ? "gfx1103"
-		: NULL));
-      /* Allow HSACO_ATTR_ANY silently because that's the default.  */
-      flag_xnack = HSACO_ATTR_OFF;
+	       gcn_devices[gcn_arch].name);
+      /* Allow HSACO_ATTR_ANY silently.  */
+      flag_xnack = HSACO_ATTR_UNSUPPORTED;
     }
 
   /* There's no need for XNACK on devices without USM, and there are register
@@ -188,24 +178,10 @@ gcn_option_override (void)
      available.
      FIXME: can the regalloc mean the default can be really "any"?  */
   if (flag_xnack == HSACO_ATTR_DEFAULT)
-    switch (gcn_arch)
-      {
-      case PROCESSOR_FIJI:
-      case PROCESSOR_VEGA10:
-      case PROCESSOR_VEGA20:
-      case PROCESSOR_GFX908:
-	flag_xnack = HSACO_ATTR_OFF;
-	break;
-      case PROCESSOR_GFX90a:
-      case PROCESSOR_GFX90c:
-	flag_xnack = HSACO_ATTR_ANY;
-	break;
-      default:
-	gcc_unreachable ();
-      }
+    flag_xnack = gcn_devices[gcn_arch].xnack_default;
 
   if (flag_sram_ecc == HSACO_ATTR_DEFAULT)
-    flag_sram_ecc = HSACO_ATTR_ANY;
+    flag_sram_ecc = gcn_devices[gcn_arch].sramecc_default;
 }
 
 /* }}}  */
@@ -270,7 +246,7 @@ static const long default_requested_args
 
 /* Extract parameter settings from __attribute__((amdgpu_hsa_kernel ())).
    This function also sets the default values for some arguments.
- 
+
    Return true on success, with ARGS populated.  */
 
 static bool
@@ -367,7 +343,7 @@ gcn_parse_amdgpu_hsa_kernel_attribute (struct gcn_kernel_args *args,
 }
 
 /* Referenced by TARGET_ATTRIBUTE_TABLE.
- 
+
    Validates target specific attributes.  */
 
 static tree
@@ -397,7 +373,7 @@ gcn_handle_amdgpu_hsa_kernel_attribute (tree *node, tree name,
 }
 
 /* Implement TARGET_ATTRIBUTE_TABLE.
- 
+
    Create target-specific __attribute__ types.  */
 
 TARGET_GNU_ATTRIBUTES (gcn_attribute_table, {
@@ -515,7 +491,7 @@ VnMODE (int n, machine_mode mode)
 }
 
 /* Implement TARGET_CLASS_MAX_NREGS.
- 
+
    Return the number of hard registers needed to hold a value of MODE in
    a register of class RCLASS.  */
 
@@ -550,7 +526,7 @@ gcn_class_max_nregs (reg_class_t rclass, machine_mode mode)
 }
 
 /* Implement TARGET_HARD_REGNO_NREGS.
-   
+
    Return the number of hard registers needed to hold a value of MODE in
    REGNO.  */
 
@@ -561,7 +537,7 @@ gcn_hard_regno_nregs (unsigned int regno, machine_mode mode)
 }
 
 /* Implement TARGET_HARD_REGNO_MODE_OK.
-   
+
    Return true if REGNO can hold value in MODE.  */
 
 bool
@@ -642,7 +618,7 @@ gcn_hard_regno_mode_ok (unsigned int regno, machine_mode mode)
 }
 
 /* Implement REGNO_REG_CLASS via gcn.h.
-   
+
    Return smallest class containing REGNO.  */
 
 enum reg_class
@@ -677,7 +653,7 @@ gcn_regno_reg_class (int regno)
 }
 
 /* Implement TARGET_CAN_CHANGE_MODE_CLASS.
-   
+
    GCC assumes that lowpart contains first part of value as stored in memory.
    This is not the case for vector registers.  */
 
@@ -709,7 +685,7 @@ gcn_can_change_mode_class (machine_mode from, machine_mode to,
 }
 
 /* Implement TARGET_SMALL_REGISTER_CLASSES_FOR_MODE_P.
-   
+
    When this hook returns true for MODE, the compiler allows
    registers explicitly used in the rtl to be used as spill registers
    but prevents the compiler from extending the lifetime of these
@@ -723,7 +699,7 @@ gcn_small_register_classes_for_mode_p (machine_mode mode)
 }
 
 /* Implement TARGET_CLASS_LIKELY_SPILLED_P.
- 
+
    Returns true if pseudos that have been assigned to registers of class RCLASS
    would likely be spilled because registers of RCLASS are needed for spill
    registers.  */
@@ -736,7 +712,7 @@ gcn_class_likely_spilled_p (reg_class_t rclass)
 }
 
 /* Implement TARGET_MODES_TIEABLE_P.
- 
+
    Returns true if a value of MODE1 is accessible in MODE2 without
    copying.  */
 
@@ -758,7 +734,7 @@ gcn_modes_tieable_p (machine_mode mode1, machine_mode mode2)
 }
 
 /* Implement TARGET_TRULY_NOOP_TRUNCATION.
- 
+
    Returns true if it is safe to “convert” a value of INPREC bits to one of
    OUTPREC bits (where OUTPREC is smaller than INPREC) by merely operating on
    it as if it had only OUTPREC bits.  */
@@ -845,7 +821,7 @@ gcn_can_split_p (machine_mode, rtx op)
 }
 
 /* Implement TARGET_SPILL_CLASS.
-   
+
    Return class of registers which could be used for pseudo of MODE
    and of class RCLASS for spilling instead of memory.  Return NO_REGS
    if it is not possible or non-profitable.  */
@@ -861,7 +837,7 @@ gcn_spill_class (reg_class_t c, machine_mode /*mode */ )
 }
 
 /* Implement TARGET_IRA_CHANGE_PSEUDO_ALLOCNO_CLASS.
-   
+
    Change allocno class for given pseudo from allocno and best class
    calculated by IRA.  */
 
@@ -1156,7 +1132,7 @@ gcn_constant64_p (rtx x)
 }
 
 /* Implement TARGET_LEGITIMATE_CONSTANT_P.
- 
+
    Returns true if X is a legitimate constant for a MODE immediate operand.  */
 
 bool
@@ -1199,7 +1175,7 @@ gcn_vec_constant (machine_mode mode, int a)
   if (FLOAT_MODE_P (innermode))
     {
       REAL_VALUE_TYPE rv;
-      real_from_integer (&rv, NULL, a, SIGNED);
+      real_from_integer (&rv, VOIDmode, a, SIGNED);
       tem = const_double_from_real_value (rv, innermode);
     }
   else
@@ -1249,7 +1225,7 @@ gcn_gen_undef (machine_mode mode)
     GEN_VNM        - create accessor functions for all sizes of all modes
     GEN_VN_NOEXEC  - for insns without "_exec" variants
     GEN_VNM_NOEXEC - likewise
- 
+
     E.g.  add<mode>3
       GEN_VNM (add, 3, A(rtx dest, rtx s1, rtx s2), A(dest, s1, s2)
 
@@ -1532,8 +1508,7 @@ gcn_flat_address_p (rtx x, machine_mode mode)
   if (!vec_mode && gcn_vec_address_register_p (x, DImode, false))
     return true;
 
-  if (TARGET_FLAT_OFFSETS
-      && GET_CODE (x) == PLUS
+  if (GET_CODE (x) == PLUS
       && gcn_vec_address_register_p (XEXP (x, 0), DImode, false)
       && CONST_INT_P (XEXP (x, 1)))
     return true;
@@ -1631,7 +1606,7 @@ gcn_global_address_p (rtx addr)
 }
 
 /* Implement TARGET_ADDR_SPACE_LEGITIMATE_ADDRESS_P.
-   
+
    Recognizes RTL expressions that are valid memory addresses for an
    instruction.  The MODE argument is the machine mode for the MEM
    expression that wants to use this address.
@@ -1644,10 +1619,6 @@ static bool
 gcn_addr_space_legitimate_address_p (machine_mode mode, rtx x, bool strict,
 				     addr_space_t as, code_helper = ERROR_MARK)
 {
-  /* All vector instructions need to work on addresses in registers.  */
-  if (!TARGET_FLAT_OFFSETS && (vgpr_vector_mode_p (mode) && !REG_P (x)))
-    return false;
-
   if (AS_SCALAR_FLAT_P (as))
     {
       if (mode == QImode || mode == HImode)
@@ -1693,15 +1664,13 @@ gcn_addr_space_legitimate_address_p (machine_mode mode, rtx x, bool strict,
     return gcn_address_register_p (x, SImode, strict);
   else if (AS_FLAT_P (as) || AS_FLAT_SCRATCH_P (as))
     {
-      if (!TARGET_FLAT_OFFSETS || GET_CODE (x) == REG)
+      if (GET_CODE (x) == REG)
        return ((GET_MODE_CLASS (mode) == MODE_VECTOR_INT
 		|| GET_MODE_CLASS (mode) == MODE_VECTOR_FLOAT)
 	       ? gcn_address_register_p (x, DImode, strict)
 	       : gcn_vec_address_register_p (x, DImode, strict));
       else
 	{
-	  gcc_assert (TARGET_FLAT_OFFSETS);
-
 	  if (GET_CODE (x) == PLUS)
 	    {
 	      rtx x1 = XEXP (x, 1);
@@ -1725,8 +1694,6 @@ gcn_addr_space_legitimate_address_p (machine_mode mode, rtx x, bool strict,
     }
   else if (AS_GLOBAL_P (as))
     {
-      gcc_assert (TARGET_FLAT_OFFSETS);
-
       if (GET_CODE (x) == REG)
        return (gcn_address_register_p (x, DImode, strict)
 	       || (!VECTOR_MODE_P (mode)
@@ -1819,7 +1786,7 @@ gcn_addr_space_legitimate_address_p (machine_mode mode, rtx x, bool strict,
 }
 
 /* Implement TARGET_ADDR_SPACE_POINTER_MODE.
-   
+
    Return the appropriate mode for a named address pointer.  */
 
 static scalar_int_mode
@@ -1842,7 +1809,7 @@ gcn_addr_space_pointer_mode (addr_space_t addrspace)
 }
 
 /* Implement TARGET_ADDR_SPACE_ADDRESS_MODE.
-   
+
    Return the appropriate mode for a named address space address.  */
 
 static scalar_int_mode
@@ -1852,7 +1819,7 @@ gcn_addr_space_address_mode (addr_space_t addrspace)
 }
 
 /* Implement TARGET_ADDR_SPACE_SUBSET_P.
-   
+
    Determine if one named address space is a subset of another.  */
 
 static bool
@@ -1930,7 +1897,7 @@ gcn_addr_space_debug (addr_space_t as)
 
 
 /* Implement REGNO_MODE_CODE_OK_FOR_BASE_P via gcn.h
-   
+
    Retun true if REGNO is OK for memory adressing.  */
 
 bool
@@ -1963,7 +1930,7 @@ gcn_regno_mode_code_ok_for_base_p (int regno,
 }
 
 /* Implement MODE_CODE_BASE_REG_CLASS via gcn.h.
-   
+
    Return a suitable register class for memory addressing.  */
 
 reg_class
@@ -1994,7 +1961,7 @@ gcn_mode_code_base_reg_class (machine_mode mode, addr_space_t as, int oc,
 }
 
 /* Implement REGNO_OK_FOR_INDEX_P via gcn.h.
-   
+
    Return true if REGNO is OK for index of memory addressing.  */
 
 bool
@@ -2203,7 +2170,7 @@ gcn_addr_space_legitimize_address (rtx x, rtx old, machine_mode mode,
     case ADDR_SPACE_FLAT:
     case ADDR_SPACE_FLAT_SCRATCH:
     case ADDR_SPACE_GLOBAL:
-      return !TARGET_FLAT_OFFSETS ? force_reg (DImode, x) : x;
+      return x;
     case ADDR_SPACE_LDS:
     case ADDR_SPACE_GDS:
       /* FIXME: LDS support offsets, handle them!.  */
@@ -2240,13 +2207,6 @@ gcn_expand_scalar_to_vector_address (machine_mode mode, rtx exec, rtx mem,
   gcc_assert (MEM_P (mem));
   rtx mem_base = XEXP (mem, 0);
   rtx mem_index = NULL_RTX;
-
-  if (!TARGET_FLAT_OFFSETS)
-    {
-      /* gcn_addr_space_legitimize_address should have put the address in a
-         register.  If not, it is too late to do anything about it.  */
-      gcc_assert (REG_P (mem_base));
-    }
 
   if (GET_CODE (mem_base) == PLUS)
     {
@@ -2669,7 +2629,7 @@ gcn_valid_move_p (machine_mode mode, rtx dest, rtx src)
 /* {{{ Functions and ABI.  */
 
 /* Implement TARGET_FUNCTION_VALUE.
-   
+
    Define how to find the value returned by a function.
    The register location is always the same, but the mode depends on
    VALTYPE.  */
@@ -2688,7 +2648,7 @@ gcn_function_value (const_tree valtype, const_tree, bool)
 }
 
 /* Implement TARGET_FUNCTION_VALUE_REGNO_P.
-   
+
    Return true if N is a possible register number for the function return
    value.  */
 
@@ -2734,7 +2694,7 @@ gcn_strict_argument_naming (cumulative_args_t cum_v)
 }
 
 /* Implement TARGET_PRETEND_OUTGOING_VARARGS_NAMED.
- 
+
    See comment on gcn_strict_argument_naming.  */
 
 static bool
@@ -2744,7 +2704,7 @@ gcn_pretend_outgoing_varargs_named (cumulative_args_t cum_v)
 }
 
 /* Implement TARGET_FUNCTION_ARG.
- 
+
    Return an RTX indicating whether a function argument is passed in a register
    and if so, which register.  */
 
@@ -2806,7 +2766,7 @@ gcn_function_arg (cumulative_args_t cum_v, const function_arg_info &arg)
 }
 
 /* Implement TARGET_FUNCTION_ARG_ADVANCE.
- 
+
    Updates the summarizer variable pointed to by CUM_V to advance past an
    argument in the argument list.  */
 
@@ -2844,7 +2804,7 @@ gcn_function_arg_advance (cumulative_args_t cum_v,
 }
 
 /* Implement TARGET_ARG_PARTIAL_BYTES.
- 
+
    Returns the number of bytes at the beginning of an argument that must be put
    in registers.  The value must be zero for arguments that are passed entirely
    in registers or that are entirely pushed on the stack.  */
@@ -2896,7 +2856,7 @@ gcn_detect_incoming_pointer_arg (tree fndecl)
 }
 
 /* Implement INIT_CUMULATIVE_ARGS, via gcn.h.
-   
+
    Initialize a variable CUM of type CUMULATIVE_ARGS for a call to a function
    whose data type is FNTYPE.  For a library call, FNTYPE is 0.  */
 
@@ -2973,7 +2933,7 @@ gcn_return_in_memory (const_tree type, const_tree ARG_UNUSED (fntype))
 }
 
 /* Implement TARGET_PROMOTE_FUNCTION_MODE.
- 
+
    Return the mode to use for outgoing function arguments.  */
 
 machine_mode
@@ -2989,7 +2949,7 @@ gcn_promote_function_mode (const_tree ARG_UNUSED (type), machine_mode mode,
 }
 
 /* Implement TARGET_GIMPLIFY_VA_ARG_EXPR.
-   
+
    Derived from hppa_gimplify_va_arg_expr.  The generic routine doesn't handle
    ARGS_GROW_DOWNWARDS.  */
 
@@ -3050,27 +3010,7 @@ gcn_omp_device_kind_arch_isa (enum omp_device_kind_arch_isa trait,
     case omp_device_arch:
       return strcmp (name, "amdgcn") == 0 || strcmp (name, "gcn") == 0;
     case omp_device_isa:
-      if (strcmp (name, "fiji") == 0 || strcmp (name, "gfx803") == 0)
-	return gcn_arch == PROCESSOR_FIJI;
-      if (strcmp (name, "gfx900") == 0)
-	return gcn_arch == PROCESSOR_VEGA10;
-      if (strcmp (name, "gfx906") == 0)
-	return gcn_arch == PROCESSOR_VEGA20;
-      if (strcmp (name, "gfx908") == 0)
-	return gcn_arch == PROCESSOR_GFX908;
-      if (strcmp (name, "gfx90a") == 0)
-	return gcn_arch == PROCESSOR_GFX90a;
-      if (strcmp (name, "gfx90c") == 0)
-	return gcn_arch == PROCESSOR_GFX90c;
-      if (strcmp (name, "gfx1030") == 0)
-	return gcn_arch == PROCESSOR_GFX1030;
-      if (strcmp (name, "gfx1036") == 0)
-	return gcn_arch == PROCESSOR_GFX1036;
-      if (strcmp (name, "gfx1100") == 0)
-	return gcn_arch == PROCESSOR_GFX1100;
-      if (strcmp (name, "gfx1103") == 0)
-	return gcn_arch == PROCESSOR_GFX1103;
-      return 0;
+      return strcmp (name, gcn_devices[gcn_arch].name) == 0;
     default:
       gcc_unreachable ();
     }
@@ -3114,7 +3054,7 @@ gcn_compute_frame_offsets (void)
 
 /* Insert code into the prologue or epilogue to store or load any
    callee-save register to/from the stack.
- 
+
    Helper function for gcn_expand_prologue and gcn_expand_epilogue.  */
 
 static void
@@ -3562,17 +3502,6 @@ gcn_expand_prologue ()
   /* Ensure that the scheduler doesn't do anything unexpected.  */
   emit_insn (gen_blockage ());
 
-  if (TARGET_M0_LDS_LIMIT)
-  {
-    /* m0 is initialized for the usual LDS DS and FLAT memory case.
-       The low-part is the address of the topmost addressable byte, which is
-       size-1.  The high-part is an offset and should be zero.  */
-    emit_move_insn (gen_rtx_REG (SImode, M0_REG),
-	gen_int_mode (LDS_SIZE, SImode));
-
-    emit_insn (gen_prologue_use (gen_rtx_REG (SImode, M0_REG)));
-  }
-
   if (cfun && cfun->machine && !cfun->machine->normal_function && flag_openmp)
     {
       /* OpenMP kernels have an implicit call to gomp_gcn_enter_kernel.  */
@@ -3682,10 +3611,10 @@ gcn_frame_pointer_rqd (void)
 }
 
 /* Implement TARGET_CAN_ELIMINATE.
- 
+
    Return true if the compiler is allowed to try to replace register number
    FROM_REG with register number TO_REG.
- 
+
    FIXME: is the default "true" not enough? Should this be a negative set?  */
 
 bool
@@ -3696,7 +3625,7 @@ gcn_can_eliminate_p (int /*from_reg */ , int to_reg)
 }
 
 /* Implement INITIAL_ELIMINATION_OFFSET.
- 
+
    Returns the initial difference between the specified pair of registers, in
    terms of stack position.  */
 
@@ -3763,7 +3692,7 @@ gcn_hard_regno_rename_ok (unsigned int from_reg, unsigned int to_reg)
 }
 
 /* Implement HARD_REGNO_CALLER_SAVE_MODE.
- 
+
    Which mode is required for saving NREGS of a pseudo-register in
    call-clobbered hard register REGNO.  */
 
@@ -3872,7 +3801,7 @@ gcn_expand_divmod_libfunc (rtx libfunc, machine_mode mode, rtx op0, rtx op1,
 /* {{{ Miscellaneous.  */
 
 /* Implement TARGET_CANNOT_COPY_INSN_P.
- 
+
    Return true if INSN must not be duplicated.  */
 
 static bool
@@ -3964,7 +3893,7 @@ gcn_emutls_var_init (tree, tree decl, tree)
 /* {{{ Costs.  */
 
 /* Implement TARGET_RTX_COSTS.
-   
+
    Compute a (partial) cost for rtx X.  Return true if the complete
    cost has been computed, and false if subexpressions should be
    scanned.  In either case, *TOTAL contains the cost result.  */
@@ -4001,7 +3930,7 @@ gcn_rtx_costs (rtx x, machine_mode, int, int, int *total, bool)
 }
 
 /* Implement TARGET_MEMORY_MOVE_COST.
-   
+
    Return the cost of moving data of mode M between a
    register and memory.  A value of 2 is the default; this cost is
    relative to those in `REGISTER_MOVE_COST'.
@@ -4063,7 +3992,7 @@ gcn_memory_move_cost (machine_mode mode, reg_class_t regclass, bool in)
 }
 
 /* Implement TARGET_REGISTER_MOVE_COST.
-   
+
    Return the cost of moving data from a register in class CLASS1 to
    one in class CLASS2.  Base value is 2.  */
 
@@ -4186,7 +4115,7 @@ struct gcn_builtin_description gcn_builtins[] = {
 static GTY(()) tree gcn_builtin_decls[GCN_BUILTIN_MAX];
 
 /* Implement TARGET_BUILTIN_DECL.
-   
+
    Return the GCN builtin for CODE.  */
 
 tree
@@ -4238,7 +4167,7 @@ gcn_init_builtin_types (void)
 }
 
 /* Implement TARGET_INIT_BUILTINS.
-   
+
    Set up all builtin functions for this target.  */
 
 static void
@@ -4526,7 +4455,7 @@ gcn_init_libfuncs (void)
 /* Expand the CMP_SWAP GCN builtins.  We have our own versions that do
    not require taking the address of any object, other than the memory
    cell being operated on.
- 
+
    Helper function for gcn_expand_builtin_1.  */
 
 static rtx
@@ -5030,7 +4959,7 @@ gcn_expand_builtin_binop (tree exp, rtx target, rtx /*subtarget */ ,
 }
 
 /* Implement TARGET_EXPAND_BUILTIN.
-   
+
    Expand an expression EXP that calls a built-in function, with result going
    to TARGET if that's convenient (and in mode MODE if that's convenient).
    SUBTARGET may be used as the target for computing one of EXP's operands.
@@ -5070,7 +4999,7 @@ gcn_vectorize_get_mask_mode (machine_mode)
 
 /* Return an RTX that references a vector with the i-th lane containing
    PERM[i]*4.
- 
+
    Helper function for gcn_vectorize_vec_perm_const.  */
 
 static rtx
@@ -5107,9 +5036,9 @@ gcn_make_vec_perm_address (unsigned int *perm, int nelt)
 }
 
 /* Implement TARGET_VECTORIZE_VEC_PERM_CONST.
- 
+
    Return true if permutation with SEL is possible.
-   
+
    If DST/SRC0/SRC1 are non-null, emit the instructions to perform the
    permutations.  */
 
@@ -5200,7 +5129,7 @@ gcn_vectorize_vec_perm_const (machine_mode vmode, machine_mode op_mode,
 }
 
 /* Implements TARGET_VECTOR_MODE_SUPPORTED_P.
- 
+
    Return nonzero if vector MODE is supported with at least move
    instructions.  */
 
@@ -5597,8 +5526,7 @@ gcn_expand_reduc_scalar (machine_mode mode, rtx src, int unspec)
 		    || unspec == UNSPEC_UMAX_DPP_SHR);
   bool use_plus_carry = unspec == UNSPEC_PLUS_DPP_SHR
 			&& GET_MODE_CLASS (mode) == MODE_VECTOR_INT
-			/* FIXME: why GCN3?  */
-			&& (TARGET_GCN3 || scalar_mode == DImode);
+			&& scalar_mode == DImode;
 
   if (use_plus_carry)
     unspec = UNSPEC_PLUS_CARRY_DPP_SHR;
@@ -5725,7 +5653,8 @@ gcn_simd_clone_adjust (struct cgraph_node *ARG_UNUSED (node))
 /* Implement TARGET_SIMD_CLONE_USABLE.  */
 
 static int
-gcn_simd_clone_usable (struct cgraph_node *ARG_UNUSED (node))
+gcn_simd_clone_usable (struct cgraph_node *ARG_UNUSED (node),
+		       machine_mode ARG_UNUSED (vector_mode))
 {
   /* We don't need to do anything here because
      gcn_simd_clone_compute_vecsize_and_simdlen currently only returns one
@@ -6195,7 +6124,7 @@ gcn_md_reorg (void)
   CLEAR_REG_SET (&live);
 
   /* "Manually Inserted Wait States (NOPs)."
-   
+
      GCN hardware detects most kinds of register dependencies, but there
      are some exceptions documented in the ISA manual.  This pass
      detects the missed cases, and inserts the documented number of NOPs
@@ -6506,7 +6435,7 @@ gcn_fork_join (gcall *call, const int dims[], bool is_fork)
 
 /* Implement ???????
    FIXME make this a real hook.
- 
+
    Adjust FNDECL such that options inherited from the host compiler
    are made appropriate for the accelerator compiler.  */
 
@@ -6569,7 +6498,7 @@ gcn_shared_mem_layout (unsigned HOST_WIDE_INT *lo,
 /* {{{ ASM Output.  */
 
 /*  Implement TARGET_ASM_FILE_START.
- 
+
     Print assembler file header text.  */
 
 static void
@@ -6579,68 +6508,20 @@ output_file_start (void)
      configuration.  */
   const char *xnack = (flag_xnack == HSACO_ATTR_ON ? ":xnack+"
 		       : flag_xnack == HSACO_ATTR_OFF ? ":xnack-"
-		       : "");
+		       : "" /* Unsupported or "any".  */);
   const char *sram_ecc = (flag_sram_ecc == HSACO_ATTR_ON ? ":sramecc+"
 			  : flag_sram_ecc == HSACO_ATTR_OFF ? ":sramecc-"
-			  : "");
-
-  const char *cpu;
-  switch (gcn_arch)
-    {
-    case PROCESSOR_FIJI:
-      cpu = "gfx803";
-      xnack = "";
-      sram_ecc = "";
-      break;
-    case PROCESSOR_VEGA10:
-      cpu = "gfx900";
-      sram_ecc = "";
-      break;
-    case PROCESSOR_VEGA20:
-      cpu = "gfx906";
-      sram_ecc = "";
-      break;
-    case PROCESSOR_GFX908:
-      cpu = "gfx908";
-      break;
-    case PROCESSOR_GFX90a:
-      cpu = "gfx90a";
-      break;
-    case PROCESSOR_GFX90c:
-      cpu = "gfx90c";
-      sram_ecc = "";
-      break;
-    case PROCESSOR_GFX1030:
-      cpu = "gfx1030";
-      xnack = "";
-      sram_ecc = "";
-      break;
-    case PROCESSOR_GFX1036:
-      cpu = "gfx1036";
-      xnack = "";
-      sram_ecc = "";
-      break;
-    case PROCESSOR_GFX1100:
-      cpu = "gfx1100";
-      xnack = "";
-      sram_ecc = "";
-      break;
-    case PROCESSOR_GFX1103:
-      cpu = "gfx1103";
-      xnack = "";
-      sram_ecc = "";
-      break;
-    default: gcc_unreachable ();
-    }
+			  : "" /* Unsupported or "any".  */);
+  const char *cpu = gcn_devices[gcn_arch].name;
 
   fprintf(asm_out_file, "\t.amdgcn_target \"amdgcn-unknown-amdhsa--%s%s%s\"\n",
 	  cpu, sram_ecc, xnack);
 }
 
 /* Implement ASM_DECLARE_FUNCTION_NAME via gcn-hsa.h.
-   
+
    Print the initial definition of a function name.
- 
+
    For GCN kernel entry points this includes all the HSA meta-data, special
    alignment constraints that don't apply to regular functions, and magic
    comments that pass information to mkoffload.  */
@@ -6778,11 +6659,13 @@ gcn_hsa_declare_function_name (FILE *file, const char *name,
   if (!TARGET_ARCHITECTED_FLAT_SCRATCH)
     fprintf (file,
 	   "\t  .amdhsa_reserve_flat_scratch\t0\n");
-  if (gcn_arch == PROCESSOR_GFX90a)
+  if (TARGET_AVGPR_COMBINED)
     fprintf (file,
-	     "\t  .amdhsa_accum_offset\t%i\n"
-	     "\t  .amdhsa_tg_split\t0\n",
+	     "\t  .amdhsa_accum_offset\t%i\n",
 	     vgpr); /* The AGPRs come after the VGPRs.  */
+  if (TARGET_TGSPLIT)
+    fprintf (file,
+	     "\t  .amdhsa_tg_split\t0\n");
   fputs ("\t.end_amdhsa_kernel\n", file);
 
 #if 1
@@ -6813,7 +6696,7 @@ gcn_hsa_declare_function_name (FILE *file, const char *name,
 	   (TARGET_WAVE64_COMPAT
 	    ? " ; wavefrontsize64 counts double on SIMD32"
 	    : ""));
-  if (gcn_arch == PROCESSOR_GFX90a || gcn_arch == PROCESSOR_GFX908)
+  if (TARGET_AVGPRS)
     fprintf (file, "            .agpr_count: %i\n", avgpr);
   fputs ("        .end_amdgpu_metadata\n", file);
 #endif
@@ -6855,7 +6738,7 @@ gcn_asm_select_section (tree exp, int reloc, unsigned HOST_WIDE_INT align)
 }
 
 /* Implement TARGET_ASM_FUNCTION_PROLOGUE.
- 
+
    Emits custom text into the assembler file at the head of each function.  */
 
 static void
@@ -7019,7 +6902,7 @@ gcn_asm_output_symbol_ref (FILE *file, rtx x)
 }
 
 /* Implement TARGET_CONSTANT_ALIGNMENT.
- 
+
    Returns the alignment in bits of a constant that is being placed in memory.
    CONSTANT is the constant and BASIC_ALIGN is the alignment that the object
    would ordinarily have.  */
@@ -7070,15 +6953,10 @@ print_operand_address (FILE *file, rtx mem)
       if (GET_CODE (addr) == REG)
 	print_reg (file, addr);
       else
-	{
-	  gcc_assert (TARGET_FLAT_OFFSETS);
-	  print_reg (file, XEXP (addr, 0));
-	}
+	print_reg (file, XEXP (addr, 0));
     }
   else if (AS_GLOBAL_P (as))
     {
-      gcc_assert (TARGET_GLOBAL_ADDRSPACE);
-
       rtx base = addr;
       rtx vgpr_offset = NULL_RTX;
 
@@ -7190,7 +7068,6 @@ print_operand_address (FILE *file, rtx mem)
    E - print conditional code for v_cmp (eq_u64/ne_u64...)
    A - print address in formatting suitable for given address space.
    O - print offset:n for data share operations.
-   ^ - print "_co" suffix for GCN5 mnemonics
    g - print "glc", if appropriate for given MEM
    L - print low-part of a multi-reg value
    H - print second part of a multi-reg value (high-part of 2-reg value)
@@ -7439,8 +7316,6 @@ print_operand (FILE *file, rtx x, int code)
 	rtx x0 = XEXP (x, 0);
 	if (AS_GLOBAL_P (MEM_ADDR_SPACE (x)))
 	  {
-	    gcc_assert (TARGET_GLOBAL_ADDRSPACE);
-
 	    fprintf (file, ", ");
 
 	    rtx base = x0;
@@ -7809,10 +7684,6 @@ print_operand (FILE *file, rtx x, int code)
       else
 	output_addr_const (file, x);
       return;
-    case '^':
-      if (TARGET_EXPLICIT_CARRY)
-	fputs ("_co", file);
-      return;
     case 'g':
       gcc_assert (xcode == MEM);
       if (MEM_VOLATILE_P (x))
@@ -7825,7 +7696,7 @@ print_operand (FILE *file, rtx x, int code)
 }
 
 /* Implement DEBUGGER_REGNO macro.
- 
+
    Return the DWARF register number that corresponds to the GCC internal
    REGNO.  */
 
@@ -7864,7 +7735,7 @@ gcn_dwarf_register_number (unsigned int regno)
 }
 
 /* Implement TARGET_DWARF_REGISTER_SPAN.
- 
+
    DImode and Vector DImode require additional registers.  */
 
 static rtx
@@ -8064,6 +7935,9 @@ gcn_dwarf_register_span (rtx rtl)
   gcn_vector_alignment_reachable
 #undef  TARGET_VECTOR_MODE_SUPPORTED_P
 #define TARGET_VECTOR_MODE_SUPPORTED_P gcn_vector_mode_supported_p
+
+#undef TARGET_DOCUMENTATION_NAME
+#define TARGET_DOCUMENTATION_NAME "AMD GCN"
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

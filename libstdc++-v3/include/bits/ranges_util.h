@@ -1,6 +1,6 @@
 // Utilities for representing and manipulating ranges -*- C++ -*-
 
-// Copyright (C) 2019-2024 Free Software Foundation, Inc.
+// Copyright (C) 2019-2025 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -439,8 +439,11 @@ namespace ranges
 	     __detail::__make_unsigned_like_t<range_difference_t<_Rng>>)
       -> subrange<iterator_t<_Rng>, sentinel_t<_Rng>, subrange_kind::sized>;
 
+  // _GLIBCXX_RESOLVE_LIB_DEFECTS
+  // 3589. The const lvalue reference overload of get for subrange does not
+  // constrain I to be copyable when N == 0
   template<size_t _Num, class _It, class _Sent, subrange_kind _Kind>
-    requires (_Num < 2)
+    requires ((_Num == 0 && copyable<_It>) || _Num == 1)
     constexpr auto
     get(const subrange<_It, _Sent, _Kind>& __r)
     {
@@ -487,8 +490,9 @@ namespace ranges
 {
   struct __find_fn
   {
-    template<input_iterator _Iter, sentinel_for<_Iter> _Sent, typename _Tp,
-	     typename _Proj = identity>
+    template<input_iterator _Iter, sentinel_for<_Iter> _Sent,
+	     typename _Proj = identity,
+	     typename _Tp _GLIBCXX26_RANGE_ALGO_DEF_VAL_T(_Iter, _Proj)>
       requires indirect_binary_predicate<ranges::equal_to,
 					 projected<_Iter, _Proj>, const _Tp*>
       constexpr _Iter
@@ -521,7 +525,9 @@ namespace ranges
 	return __first;
       }
 
-    template<input_range _Range, typename _Tp, typename _Proj = identity>
+    template<input_range _Range, typename _Proj = identity,
+	     typename _Tp
+	     _GLIBCXX26_RANGE_ALGO_DEF_VAL_T(iterator_t<_Range>, _Proj)>
       requires indirect_binary_predicate<ranges::equal_to,
 					 projected<iterator_t<_Range>, _Proj>,
 					 const _Tp*>
@@ -751,11 +757,11 @@ namespace ranges
 	auto __result = *__first;
 	while (++__first != __last)
 	  {
-	    auto __tmp = *__first;
+	    auto&& __tmp = *__first;
 	    if (std::__invoke(__comp,
 			      std::__invoke(__proj, __tmp),
 			      std::__invoke(__proj, __result)))
-	      __result = std::move(__tmp);
+	      __result = std::forward<decltype(__tmp)>(__tmp);
 	  }
 	return __result;
       }

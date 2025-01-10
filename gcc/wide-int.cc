@@ -1,5 +1,5 @@
 /* Operations with very long integers.
-   Copyright (C) 2012-2024 Free Software Foundation, Inc.
+   Copyright (C) 2012-2025 Free Software Foundation, Inc.
    Contributed by Kenneth Zadeck <zadeck@naturalbridge.com>
 
 This file is part of GCC.
@@ -1313,7 +1313,7 @@ wi_pack (HOST_WIDE_INT *result,
 }
 
 /* Multiply Op1 by Op2.  If HIGH is set, only the upper half of the
-   result is returned.  
+   result is returned.
 
    If HIGH is not set, throw away the upper half after the check is
    made to see if it overflows.  Unfortunately there is no better way

@@ -1,5 +1,5 @@
 /* Read and annotate call graph profile from the auto profile data file.
-   Copyright (C) 2014-2024 Free Software Foundation, Inc.
+   Copyright (C) 2014-2025 Free Software Foundation, Inc.
    Contributed by Dehao Chen (dehao@google.com)
 
 This file is part of GCC.
@@ -473,7 +473,7 @@ string_table::get_index (const char *name) const
   return iter->second;
 }
 
-/* Return the index of a given function DECL. Return -1 if DECL is not 
+/* Return the index of a given function DECL. Return -1 if DECL is not
    found in string table.  */
 
 int

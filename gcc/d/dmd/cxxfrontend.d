@@ -13,6 +13,7 @@ module dmd.cxxfrontend;
 import dmd.aggregate : AggregateDeclaration;
 import dmd.arraytypes;
 import dmd.astenums;
+import dmd.attrib;
 import dmd.common.outbuffer : OutBuffer;
 import dmd.denum : EnumDeclaration;
 import dmd.dmodule /*: Module*/;
@@ -33,6 +34,15 @@ import dmd.statement : Statement, AsmStatement, GccAsmStatement;
 
 // NB: At some point in the future, we can switch to shortened function syntax.
 extern (C++, "dmd"):
+
+/***********************************************************
+ * atrtibsem.d
+ */
+Expressions* getAttributes(UserAttributeDeclaration a)
+{
+    import dmd.attribsem;
+    return dmd.attribsem.getAttributes(a);
+}
 
 /***********************************************************
  * cppmangle.d
@@ -253,6 +263,18 @@ bool functionSemantic3(FuncDeclaration fd)
 {
     import dmd.funcsem;
     return dmd.funcsem.functionSemantic3(fd);
+}
+
+MATCH leastAsSpecialized(FuncDeclaration fd, FuncDeclaration g, Identifiers* names)
+{
+    import dmd.funcsem;
+    return dmd.funcsem.leastAsSpecialized(fd, g, names);
+}
+
+PURE isPure(FuncDeclaration fd)
+{
+    import dmd.funcsem;
+    return dmd.funcsem.isPure(fd);
 }
 
 /***********************************************************
@@ -609,6 +631,24 @@ Type referenceTo(Type type)
 {
     import dmd.typesem;
     return dmd.typesem.referenceTo(type);
+}
+
+uinteger_t size(Type type)
+{
+    import dmd.typesem;
+    return dmd.typesem.size(type);
+}
+
+uinteger_t size(Type type, const ref Loc loc)
+{
+    import dmd.typesem;
+    return dmd.typesem.size(type, loc);
+}
+
+MATCH implicitConvTo(Type from, Type to)
+{
+    import dmd.dcast;
+    return dmd.dcast.implicitConvTo(from, to);
 }
 
 /***********************************************************

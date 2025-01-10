@@ -1,6 +1,6 @@
 /* Target support for C++ classes on Windows.
    Contributed by Danny Smith (dannysmith@users.sourceforge.net)
-   Copyright (C) 2005-2024 Free Software Foundation, Inc.
+   Copyright (C) 2005-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -45,8 +45,8 @@ i386_pe_type_dllimport_p (tree decl)
 	  || DECL_TEMPLATE_INSTANTIATION (decl)
 	  || DECL_ARTIFICIAL (decl)))
     return false;
-  
-  /* Overrides of the class dllimport decls by out-of-class definitions are 
+
+  /* Overrides of the class dllimport decls by out-of-class definitions are
      handled by tree.cc:merge_dllimport_decl_attributes.   */
   return true;
 }
@@ -73,16 +73,16 @@ i386_pe_type_dllexport_p (tree decl)
   return true;
 }
 
-static inline void maybe_add_dllimport (tree decl) 
+static inline void maybe_add_dllimport (tree decl)
 {
   if (i386_pe_type_dllimport_p (decl))
     DECL_DLLIMPORT_P (decl) = 1;
 }
 
-static inline void maybe_add_dllexport (tree decl) 
+static inline void maybe_add_dllexport (tree decl)
 {
   if (i386_pe_type_dllexport_p (decl))
-    {   
+    {
       tree decl_attrs = DECL_ATTRIBUTES (decl);
       if (lookup_attribute ("dllexport", decl_attrs) != NULL_TREE)
 	/* Already done.  */
@@ -98,8 +98,8 @@ i386_pe_adjust_class_at_definition (tree t)
   tree member;
 
   gcc_assert (CLASS_TYPE_P (t));
- 
- 
+
+
   if (lookup_attribute ("dllexport", TYPE_ATTRIBUTES (t)) != NULL_TREE)
     {
       tree tmv = TYPE_MAIN_VARIANT (t);
@@ -124,7 +124,7 @@ i386_pe_adjust_class_at_definition (tree t)
 	  {
 	    tree thunk;
 	    maybe_add_dllexport (member);
-	  
+
 	    /* Also add the attribute to its thunks.  */
 	    for (thunk = DECL_THUNKS (member); thunk;
 		 thunk = TREE_CHAIN (thunk))
@@ -156,13 +156,13 @@ i386_pe_adjust_class_at_definition (tree t)
 	  {
 	    tree thunk;
 	    maybe_add_dllimport (member);
-	  
+
 	    /* Also add the attribute to its thunks.  */
 	    for (thunk = DECL_THUNKS (member); thunk;
 		 thunk = DECL_CHAIN (thunk))
 	      maybe_add_dllimport (thunk);
 	  }
- 
+
       /* Check vtables  */
       for (member = CLASSTYPE_VTABLES (t);
 	   member;  member = DECL_CHAIN (member))
@@ -172,6 +172,6 @@ i386_pe_adjust_class_at_definition (tree t)
       /* We leave typeinfo tables alone.  We can't mark TI objects as
 	dllimport, since the address of a secondary VTT may be needed
 	for static initialization of a primary VTT.  VTT's  of
-	dllimport'd classes should always be link-once COMDAT.  */ 
+	dllimport'd classes should always be link-once COMDAT.  */
     }
 }

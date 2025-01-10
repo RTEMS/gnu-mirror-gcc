@@ -1,5 +1,5 @@
 /* Definitions of target machine for GNU compiler.  MIPS version.
-   Copyright (C) 1989-2024 Free Software Foundation, Inc.
+   Copyright (C) 1989-2025 Free Software Foundation, Inc.
    Contributed by A. Lichnewsky (lich@inria.inria.fr).
    Changed by Michael Meissner	(meissner@osf.org).
    64-bit r4000 support by Ian Lance Taylor (ian@cygnus.com) and
@@ -1759,7 +1759,7 @@ FP_ASM_SPEC "\
    optimised to use word loads. */
 #define LOCAL_ALIGNMENT(TYPE, ALIGN) \
   DATA_ALIGNMENT (TYPE, ALIGN)
-  
+
 #define PAD_VARARGS_DOWN \
   (targetm.calls.function_arg_padding (TYPE_MODE (type), type) == PAD_DOWNWARD)
 

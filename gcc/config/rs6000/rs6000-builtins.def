@@ -1,5 +1,5 @@
 ; Built-in functions for PowerPC.
-; Copyright (C) 2020-2024 Free Software Foundation, Inc.
+; Copyright (C) 2020-2025 Free Software Foundation, Inc.
 ; Contributed by Bill Schmidt, IBM <wschmidt@linux.ibm.com>
 ;
 ; This file is part of GCC.
@@ -2012,7 +2012,7 @@
     VADDUDM addv2di3 {}
 
   const vsq __builtin_altivec_vadduqm (vsq, vsq);
-    VADDUQM altivec_vadduqm {}
+    VADDUQM addv1ti3 {}
 
   const vsll __builtin_altivec_vbpermq (vsc, vsc);
     VBPERMQ altivec_vbpermq {}
@@ -2150,7 +2150,7 @@
     VSUBUDM subv2di3 {}
 
   const vsq __builtin_altivec_vsubuqm (vsq, vsq);
-    VSUBUQM altivec_vsubuqm {}
+    VSUBUQM subv1ti3 {}
 
   const vsll __builtin_altivec_vupkhsw (vsi);
     VUPKHSW altivec_vupkhsw {}

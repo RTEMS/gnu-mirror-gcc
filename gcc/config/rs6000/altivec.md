@@ -1,5 +1,5 @@
 ;; AltiVec patterns.
-;; Copyright (C) 2002-2024 Free Software Foundation, Inc.
+;; Copyright (C) 2002-2025 Free Software Foundation, Inc.
 ;; Contributed by Aldy Hernandez (aldy@quesejoda.com)
 
 ;; This file is part of GCC.
@@ -170,6 +170,7 @@
    UNSPEC_VSTRIL
    UNSPEC_SLDB
    UNSPEC_SRDB
+   UNSPEC_VECTOR_SHIFT
 ])
 
 (define_c_enum "unspecv"
@@ -226,8 +227,7 @@
 (define_mode_attr VI_unit [(V16QI "VECTOR_UNIT_ALTIVEC_P (V16QImode)")
 			   (V8HI "VECTOR_UNIT_ALTIVEC_P (V8HImode)")
 			   (V4SI "VECTOR_UNIT_ALTIVEC_P (V4SImode)")
-			   (V2DI "VECTOR_UNIT_P8_VECTOR_P (V2DImode)")
-			   (V1TI "VECTOR_UNIT_ALTIVEC_P (V1TImode)")])
+			   (V2DI "VECTOR_UNIT_P8_VECTOR_P (V2DImode)")])
 
 ;; Vector pack/unpack
 (define_mode_iterator VP [V2DI V4SI V8HI])
@@ -2176,6 +2176,56 @@
   "vsro %0,%1,%2"
   [(set_attr "type" "vecperm")])
 
+;; Optimize V2DI shifts by constants.  This relies on the shift instructions
+;; only looking at the bits needed to do the shift.  This means we can use
+;; VSPLTISW or XXSPLTIB to load up the constant, and not worry about the bits
+;; that the vector shift instructions will not use.
+(define_mode_iterator VSHIFT_MODE	[(V4SI "TARGET_P9_VECTOR")
+					 (V2DI "TARGET_P8_VECTOR")])
+
+(define_code_iterator vshift_code	[ashift ashiftrt lshiftrt])
+(define_code_attr vshift_attr		[(ashift   "ashift")
+					 (ashiftrt "ashiftrt")
+					 (lshiftrt "lshiftrt")])
+
+(define_insn_and_split "*altivec_<mode>_<vshift_attr>_const"
+  [(set (match_operand:VSHIFT_MODE 0 "register_operand" "=v")
+	(vshift_code:VSHIFT_MODE
+	 (match_operand:VSHIFT_MODE 1 "register_operand" "v")
+	 (match_operand:VSHIFT_MODE 2 "vector_shift_constant" "")))
+   (clobber (match_scratch:VSHIFT_MODE 3 "=&v"))]
+  "((<MODE>mode == V2DImode && TARGET_P8_VECTOR)
+    || (<MODE>mode == V4SImode && TARGET_P9_VECTOR))"
+  "#"
+  "&& 1"
+  [(set (match_dup 3)
+	(unspec:VSHIFT_MODE [(match_dup 4)] UNSPEC_VECTOR_SHIFT))
+   (set (match_dup 0)
+	(vshift_code:VSHIFT_MODE (match_dup 1)
+				 (match_dup 3)))]
+{
+  if (GET_CODE (operands[3]) == SCRATCH)
+    operands[3] = gen_reg_rtx (<MODE>mode);
+
+  operands[4] = GET_CODE (operands[2]) == CONST_VECTOR
+		? CONST_VECTOR_ELT (operands[2], 0)
+		: XEXP (operands[2], 0);
+})
+
+(define_insn "*altivec_<mode>_shift_const"
+  [(set (match_operand:VSHIFT_MODE 0 "register_operand" "=v")
+	(unspec:VSHIFT_MODE [(match_operand 1 "const_int_operand" "n")]
+			    UNSPEC_VECTOR_SHIFT))]
+  "TARGET_P8_VECTOR"
+{
+  if (UINTVAL (operands[1]) <= 15)
+    return "vspltisw %0,%1";
+  else if (TARGET_P9_VECTOR)
+    return "xxspltib %x0,%1";
+  else
+    gcc_unreachable ();
+})
+
 (define_insn "altivec_vsum4ubs"
   [(set (match_operand:V4SI 0 "register_operand" "=v")
         (unspec:V4SI [(match_operand:V16QI 1 "register_operand" "v")
@@ -3698,7 +3748,7 @@
     }
 })
 
-(define_expand "udot_prod<mode>"
+(define_expand "udot_prodv4si<mode>"
   [(set (match_operand:V4SI 0 "register_operand" "=v")
         (plus:V4SI (match_operand:V4SI 3 "register_operand" "v")
                    (unspec:V4SI [(match_operand:VIshort 1 "register_operand" "v")  
@@ -3710,7 +3760,7 @@
   DONE;
 })
 
-(define_expand "sdot_prodv8hi"
+(define_expand "sdot_prodv4siv8hi"
   [(set (match_operand:V4SI 0 "register_operand" "=v")
         (plus:V4SI (match_operand:V4SI 3 "register_operand" "v")
                    (unspec:V4SI [(match_operand:V8HI 1 "register_operand" "v")
@@ -4376,7 +4426,7 @@
 ;; ISA 2.07 128-bit binary support to target the VMX/altivec registers without
 ;; having to worry about the register allocator deciding GPRs are better.
 
-(define_insn "altivec_vadduqm"
+(define_insn "addv1ti3"
   [(set (match_operand:V1TI 0 "register_operand" "=v")
 	(plus:V1TI (match_operand:V1TI 1 "register_operand" "v")
 		   (match_operand:V1TI 2 "register_operand" "v")))]
@@ -4393,7 +4443,7 @@
   "vaddcuq %0,%1,%2"
   [(set_attr "type" "vecsimple")])
 
-(define_insn "altivec_vsubuqm"
+(define_insn "subv1ti3"
   [(set (match_operand:V1TI 0 "register_operand" "=v")
 	(minus:V1TI (match_operand:V1TI 1 "register_operand" "v")
 		    (match_operand:V1TI 2 "register_operand" "v")))]

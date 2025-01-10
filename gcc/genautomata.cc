@@ -1,5 +1,5 @@
 /* Pipeline hazard description translator.
-   Copyright (C) 2000-2024 Free Software Foundation, Inc.
+   Copyright (C) 2000-2025 Free Software Foundation, Inc.
 
    Written by Vladimir Makarov <vmakarov@redhat.com>
 
@@ -8348,7 +8348,8 @@ output_default_latencies (void)
 	if ((col = (col+1) % 8) == 0)
 	  fputs ("\n     ", output_file);
 	decl = description->decls[i];
-	gcc_assert (j++ == DECL_INSN_RESERV (decl)->insn_num);
+	gcc_assert (j == DECL_INSN_RESERV (decl)->insn_num);
+	++j;
 	fprintf (output_file, "% 4d,",
 		 DECL_INSN_RESERV (decl)->default_latency);
       }

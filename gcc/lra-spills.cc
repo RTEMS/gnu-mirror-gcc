@@ -1,5 +1,5 @@
 /* Change pseudos by memory.
-   Copyright (C) 2010-2024 Free Software Foundation, Inc.
+   Copyright (C) 2010-2025 Free Software Foundation, Inc.
    Contributed by Vladimir Makarov <vmakarov@redhat.com>.
 
 This file is part of GCC.
@@ -416,7 +416,7 @@ remove_pseudos (rtx *loc, rtx_insn *insn)
   const char *fmt;
   enum rtx_code code;
   bool res = false;
-  
+
   if (*loc == NULL_RTX)
     return res;
   code = GET_CODE (*loc);
@@ -507,7 +507,7 @@ spill_pseudos (void)
       FOR_BB_INSNS_SAFE (bb, insn, curr)
 	{
 	  bool removed_pseudo_p = false;
-	  
+
 	  if (bitmap_bit_p (changed_insns, INSN_UID (insn)))
 	    {
 	      rtx *link_loc, link;
@@ -537,6 +537,11 @@ spill_pseudos (void)
 		      break;
 		    }
 		}
+	      if (GET_CODE (PATTERN (insn)) == CLOBBER)
+		/* This is a CLOBBER insn with pseudo spilled to memory.
+		   Mark it for removing it later together with LRA temporary
+		   CLOBBER insns.  */
+		LRA_TEMP_CLOBBER_P (PATTERN (insn)) = 1;
 	      if (lra_dump_file != NULL)
 		fprintf (lra_dump_file,
 			 "Changing spilled pseudos to memory in insn #%u\n",
@@ -589,8 +594,9 @@ lra_need_for_scratch_reg_p (void)
 bool
 lra_need_for_spills_p (void)
 {
-  int i; max_regno = max_reg_num ();
+  int i;
 
+  max_regno = max_reg_num ();
   for (i = FIRST_PSEUDO_REGISTER; i < max_regno; i++)
     if (lra_reg_info[i].nrefs != 0 && lra_get_regno_hard_regno (i) < 0
 	&& ! ira_former_scratch_p (i))
@@ -768,7 +774,7 @@ lra_final_code_change (void)
 	      delete_insn (insn);
 	      continue;
 	    }
-	
+
 	  lra_insn_recog_data_t id = lra_get_insn_recog_data (insn);
 	  struct lra_insn_reg *reg;
 
@@ -776,7 +782,7 @@ lra_final_code_change (void)
 	    if (reg->regno >= FIRST_PSEUDO_REGISTER
 		&& lra_reg_info [reg->regno].nrefs == 0)
 	      break;
-	  
+
 	  if (reg != NULL)
 	    {
 	      /* Pseudos still can be in debug insns in some very rare
@@ -793,7 +799,7 @@ lra_final_code_change (void)
 	      delete_insn (insn);
 	      continue;
 	    }
-	  
+
 	  struct lra_static_insn_data *static_id = id->insn_static_data;
 	  bool insn_change_p = false;
 

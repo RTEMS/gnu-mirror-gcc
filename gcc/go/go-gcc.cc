@@ -1,5 +1,5 @@
 // go-gcc.cc -- Go frontend to gcc IR.
-// Copyright (C) 2011-2024 Free Software Foundation, Inc.
+// Copyright (C) 2011-2025 Free Software Foundation, Inc.
 // Contributed by Ian Lance Taylor, Google.
 
 // This file is part of GCC.
@@ -2833,7 +2833,7 @@ Gcc_backend::global_variable_set_init(Bvariable* var, Bexpression* expr)
 
 Bvariable*
 Gcc_backend::local_variable(Bfunction* function, const std::string& name,
-			    Btype* btype, Bvariable* decl_var, 
+			    Btype* btype, Bvariable* decl_var,
 			    unsigned int flags, Location location)
 {
   tree type_tree = btype->get_tree();

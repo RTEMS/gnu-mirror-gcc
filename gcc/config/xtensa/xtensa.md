@@ -1,5 +1,5 @@
 ;; GCC machine description for Tensilica's Xtensa architecture.
-;; Copyright (C) 2001-2024 Free Software Foundation, Inc.
+;; Copyright (C) 2001-2025 Free Software Foundation, Inc.
 ;; Contributed by Bob Wilson (bwilson@tensilica.com) at Tensilica.
 
 ;; This file is part of GCC.
@@ -1109,17 +1109,17 @@
 		      (const_int 6)))])
 
 (define_insn_and_split "*extzvsi-1bit_addsubx"
-  [(set (match_operand:SI 0 "register_operand" "=a")
+  [(set (match_operand:SI 0 "register_operand" "=&a")
 	(match_operator:SI 5 "addsub_operator"
 		[(and:SI (match_operator:SI 6 "logical_shift_operator"
-				[(match_operand:SI 1 "register_operand" "r")
+				[(match_operand:SI 1 "register_operand" "r0")
 				 (match_operand:SI 3 "const_int_operand" "i")])
 			 (match_operand:SI 4 "const_int_operand" "i"))
 		 (match_operand:SI 2 "register_operand" "r")]))]
   "TARGET_ADDX
    && IN_RANGE (exact_log2 (INTVAL (operands[4])), 1, 3)"
   "#"
-  "&& 1"
+  "&& reload_completed"
   [(set (match_dup 0)
 	(zero_extract:SI (match_dup 1)
 			 (const_int 1)
@@ -1279,15 +1279,13 @@
 })
 
 (define_insn "movsi_internal"
-  [(set (match_operand:SI 0 "nonimmed_operand" "=D,D,D,a,U,D,R,R,a,q,a,a,W,a,*a,*A")
-	(match_operand:SI 1 "move_operand" "M,D,d,U,r,R,D,d,r,r,I,Y,i,T,*A,*r"))]
+  [(set (match_operand:SI 0 "nonimmed_operand" "=D,D,D,D,R,R,a,q,a,a,W,a,a,U,*a,*A")
+	(match_operand:SI 1 "move_operand" "M,D,d,R,D,d,r,r,I,Y,i,T,U,r,*A,*r"))]
   "xtensa_valid_move (SImode, operands)"
   "@
    movi.n\t%0, %x1
    mov.n\t%0, %1
    mov.n\t%0, %1
-   %v1l32i\t%0, %1
-   %v0s32i\t%1, %0
    %v1l32i.n\t%0, %1
    %v0s32i.n\t%1, %0
    %v0s32i.n\t%1, %0
@@ -1297,11 +1295,13 @@
    movi\t%0, %1
    const16\t%0, %t1\;const16\t%0, %b1
    %v1l32r\t%0, %1
+   %v1l32i\t%0, %1
+   %v0s32i\t%1, %0
    rsr\t%0, ACCLO
    wsr\t%1, ACCLO"
-  [(set_attr "type"	"move,move,move,load,store,load,store,store,move,move,move,move,move,load,rsr,wsr")
+  [(set_attr "type"	"move,move,move,load,store,store,move,move,move,move,move,load,load,store,rsr,wsr")
    (set_attr "mode"	"SI")
-   (set_attr "length"	"2,2,2,3,3,2,2,2,3,3,3,3,6,3,3,3")])
+   (set_attr "length"	"2,2,2,2,2,2,3,3,3,3,6,3,3,3,3,3")])
 
 (define_split
   [(set (match_operand:SHI 0 "register_operand")

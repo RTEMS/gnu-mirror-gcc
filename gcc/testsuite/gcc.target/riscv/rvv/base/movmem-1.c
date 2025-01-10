@@ -1,4 +1,4 @@
-/* { dg-do compile } */
+/* { dg-do compile { target { ! riscv_abi_e } } } */
 /* { dg-add-options riscv_v } */
 /* { dg-additional-options "-O3 -mrvv-max-lmul=dynamic" } */
 /* { dg-final { check-function-bodies "**" "" } } */
@@ -7,13 +7,14 @@
 
 /* Tiny memmoves should not be vectorised.
 ** f1:
-**  li\s+a2,\d+
-**  tail\s+memmove
+**  lbu\s+[ta][0-7],0\(a1\)
+**  sb\s+[ta][0-7],0\(a0\)
+**  ret
 */
 char *
 f1 (char *a, char const *b)
 {
-  return __builtin_memmove (a, b, MIN_VECTOR_BYTES - 1);
+  return __builtin_memmove (a, b, 1);
 }
 
 /* Vectorise+inline minimum vector register width with LMUL=1

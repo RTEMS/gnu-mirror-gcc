@@ -1,4 +1,4 @@
-/* Copyright (C) 2020-2024 Free Software Foundation, Inc.
+/* Copyright (C) 2020-2025 Free Software Foundation, Inc.
    Contributed by Jakub Jelinek <jakub@redhat.com>.
 
    This file is part of the GNU Offloading and Multi Processing Library
@@ -101,6 +101,15 @@ GOMP_is_alloc (void *ptr)
 #define omp_max_predefined_alloc omp_thread_mem_alloc
 #define ompx_gnu_min_predefined_alloc ompx_gnu_pinned_mem_alloc
 #define ompx_gnu_max_predefined_alloc ompx_gnu_pinned_mem_alloc
+
+_Static_assert (GOMP_OMP_PREDEF_ALLOC_MAX == omp_thread_mem_alloc,
+		"GOMP_OMP_PREDEF_ALLOC_MAX == omp_thread_mem_alloc");
+_Static_assert (GOMP_OMPX_PREDEF_ALLOC_MIN == ompx_gnu_min_predefined_alloc,
+		"GOMP_OMP_PREDEF_ALLOC_MAX == omp_thread_mem_alloc");
+_Static_assert (GOMP_OMPX_PREDEF_ALLOC_MAX == ompx_gnu_max_predefined_alloc,
+		"GOMP_OMP_PREDEF_ALLOC_MAX == omp_thread_mem_alloc");
+_Static_assert (GOMP_OMP_PREDEF_ALLOC_THREADS == omp_thread_mem_alloc,
+		"GOMP_OMP_PREDEF_ALLOC_THREADS == omp_thread_mem_alloc");
 
 /* These macros may be overridden in config/<target>/allocator.c.
    The defaults (no override) are to return NULL for pinned memory requests

@@ -1,5 +1,5 @@
 /* Parser for GIMPLE.
-   Copyright (C) 2016-2024 Free Software Foundation, Inc.
+   Copyright (C) 2016-2025 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -133,11 +133,21 @@ c_parser_gimple_parse_bb_spec (tree val, int *index)
 {
   if (!startswith (IDENTIFIER_POINTER (val), "__BB"))
     return false;
-  for (const char *p = IDENTIFIER_POINTER (val) + 4; *p; ++p)
-    if (!ISDIGIT (*p))
-      return false;
-  *index = atoi (IDENTIFIER_POINTER (val) + 4);
-  return *index > 0;
+
+  const char *bb = IDENTIFIER_POINTER (val) + 4;
+  if (! ISDIGIT (*bb))
+    return false;
+
+  char *pend;
+  errno = 0;
+  const unsigned long number = strtoul (bb, &pend, 10);
+  if (errno == ERANGE
+      || *pend != '\0'
+      || number > INT_MAX)
+    return false;
+
+  *index = number;
+  return true;
 }
 
 /* See if VAL is an identifier matching __BB<num> and return <num>
@@ -664,6 +674,16 @@ c_parser_gimple_compound_statement (gimple_parser &parser, gimple_seq *seq)
 	    break;
 	  }
 
+	case CPP_CLOSE_PAREN:
+	case CPP_CLOSE_SQUARE:
+	  /* Avoid infinite loop in error recovery:
+	     c_parser_skip_until_found stops at a closing nesting
+	     delimiter without consuming it, but here we need to consume
+	     it to proceed further.  */
+	  c_parser_error (parser, "expected statement");
+	  c_parser_consume_token (parser);
+	break;
+
 	default:
 expr_stmt:
 	  c_parser_gimple_statement (parser, seq);
@@ -699,7 +719,7 @@ expr_stmt:
 
    gimple-assign-statement:
      gimple-unary-expression = gimple-assign-rhs
- 
+
    gimple-assign-rhs:
      gimple-cast-expression
      gimple-unary-expression
@@ -879,11 +899,9 @@ c_parser_gimple_statement (gimple_parser &parser, gimple_seq *seq)
   if (lhs.value != error_mark_node
       && rhs.value != error_mark_node)
     {
-      /* If we parsed a comparison or an identifier and the next token
-	 is a '?' then parse a conditional expression.  */
-      if ((COMPARISON_CLASS_P (rhs.value)
-	   || SSA_VAR_P (rhs.value))
-	  && c_parser_next_token_is (parser, CPP_QUERY))
+      /* If we parsed an identifier and the next token  is a '?' then parse
+	 a conditional expression.  */
+      if (SSA_VAR_P (rhs.value) && c_parser_next_token_is (parser, CPP_QUERY))
 	{
 	  struct c_expr trueval, falseval;
 	  c_parser_consume_token (parser);
@@ -1323,7 +1341,7 @@ c_parser_parse_ssa_name_id (tree id, unsigned *version, unsigned *ver_offset)
 /* Get at the actual SSA name ID with VERSION starting at VER_OFFSET.
    TYPE is the type if the SSA name is being declared.  */
 
-static tree 
+static tree
 c_parser_parse_ssa_name (gimple_parser &parser,
 			 tree id, tree type, unsigned version,
 			 unsigned ver_offset)
@@ -1340,7 +1358,7 @@ c_parser_parse_ssa_name (gimple_parser &parser,
 	{
 	  if (! type)
 	    {
-	      c_parser_error (parser, "SSA name undeclared"); 
+	      c_parser_error (parser, "SSA name undeclared");
 	      return error_mark_node;
 	    }
 	  name = make_ssa_name_fn (cfun, type, NULL, version);
@@ -1362,7 +1380,7 @@ c_parser_parse_ssa_name (gimple_parser &parser,
 	  XDELETEVEC (var_name);
 	  if (! parent || parent == error_mark_node)
 	    {
-	      c_parser_error (parser, "base variable or SSA name undeclared"); 
+	      c_parser_error (parser, "base variable or SSA name undeclared");
 	      return error_mark_node;
 	    }
 	  if (!(VAR_P (parent)
@@ -2200,7 +2218,12 @@ c_parser_gimple_declaration (gimple_parser &parser)
 				    specs->typespec_kind != ctsk_none,
 				    C_DTR_NORMAL, &dummy);
 
-  if (c_parser_next_token_is (parser, CPP_SEMICOLON))
+  if (!c_parser_next_token_is (parser, CPP_SEMICOLON))
+    {
+      c_parser_error (parser, "expected %<;%>");
+      return;
+    }
+  if (declarator)
     {
       /* Handle SSA name decls specially, they do not go into the identifier
          table but we simply build the SSA name for later lookup.  */
@@ -2244,11 +2267,6 @@ c_parser_gimple_declaration (gimple_parser &parser)
 	    finish_decl (decl, UNKNOWN_LOCATION, NULL_TREE, NULL_TREE,
 			 NULL_TREE);
 	}
-    }
-  else
-    {
-      c_parser_error (parser, "expected %<;%>");
-      return;
     }
 }
 
