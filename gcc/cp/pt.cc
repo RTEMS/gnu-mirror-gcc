@@ -23651,12 +23651,14 @@ type_unification_real (tree tparms,
 		    /* We replaced all the tparms, substitute again out of
 		       template context.  */
 		    substed = NULL_TREE;
+		  else
+		    processing_template_decl = 1;
 		}
 	      if (!substed)
 		substed = tsubst_template_arg (arg, full_targs, complain,
 					       NULL_TREE);
 
-	      if (!uses_template_parms (substed))
+	      if (!processing_template_decl || !uses_template_parms (substed))
 		arg = convert_template_argument (parm, substed, full_targs,
 						 complain, i, NULL_TREE);
 	      else if (saw_undeduced == 1)
@@ -23797,6 +23799,8 @@ resolve_overloaded_unification (tree tparms,
     for (lkp_iterator iter (arg); iter; ++iter)
       {
 	tree fn = *iter;
+	if (flag_noexcept_type)
+	  maybe_instantiate_noexcept (fn, tf_none);
 	if (try_one_overload (tparms, targs, tempargs, parm, TREE_TYPE (fn),
 			      strict, sub_strict, addr_p, explain_p)
 	    && (!goodfn || !decls_match (goodfn, fn)))
@@ -28700,9 +28704,15 @@ type_dependent_expression_p (tree expression)
 
       if (TREE_CODE (expression) == TEMPLATE_ID_EXPR)
 	{
-	  if (any_dependent_template_arguments_p
-	      (TREE_OPERAND (expression, 1)))
+	  tree args = TREE_OPERAND (expression, 1);
+	  if (any_dependent_template_arguments_p (args))
 	    return true;
+	  /* Arguments of a function template-id aren't necessarily coerced
+	     yet so we must conservatively assume that the address (and not
+	     just value) of the argument matters as per [temp.dep.temp]/3.  */
+	  for (tree arg : tree_vec_range (args))
+	    if (has_value_dependent_address (arg))
+	      return true;
 	  expression = TREE_OPERAND (expression, 0);
 	  if (identifier_p (expression))
 	    return true;

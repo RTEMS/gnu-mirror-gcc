@@ -4588,7 +4588,7 @@
    && REGNO (operands[0]) != REGNO (operands[3])
    && REGNO (operands[1]) != REGNO (operands[3])
    && base14_operand (operands[2], E_SImode)"
-  [(set (match_dup 3) (mem:SF (plus:DI (match_dup 1) (match_dup 2))))
+  [(set (match_dup 3) (mem:SF (plus:SI (match_dup 1) (match_dup 2))))
    (set (match_dup 0) (plus:SI (match_dup 1) (match_dup 2)))]
   "")
 
@@ -4604,7 +4604,7 @@
    && GENERAL_REGNO_P (REGNO (operands[3]))
    && REGNO (operands[0]) == REGNO (operands[3])
    && base14_operand (operands[2], E_SImode)"
-  [(set (match_dup 3) (mem:SF (plus:DI (match_dup 1) (match_dup 2))))]
+  [(set (match_dup 3) (mem:SF (plus:SI (match_dup 1) (match_dup 2))))]
   "")
 
 (define_peephole2
@@ -5018,7 +5018,7 @@
 
 (define_insn "fix_truncsfsi2"
   [(set (match_operand:SI 0 "register_operand" "=f")
-	(fix:SI (fix:SF (match_operand:SF 1 "register_operand" "f"))))]
+	(fix:SI (match_operand:SF 1 "register_operand" "f")))]
   "! TARGET_SOFT_FLOAT"
   "{fcnvfxt,sgl,sgl|fcnv,t,sgl,w} %1,%0"
   [(set_attr "type" "fpalu")
@@ -5026,7 +5026,7 @@
 
 (define_insn "fix_truncdfsi2"
   [(set (match_operand:SI 0 "register_operand" "=f")
-	(fix:SI (fix:DF (match_operand:DF 1 "register_operand" "f"))))]
+	(fix:SI (match_operand:DF 1 "register_operand" "f")))]
   "! TARGET_SOFT_FLOAT"
   "{fcnvfxt,dbl,sgl|fcnv,t,dbl,w} %1,%0"
   [(set_attr "type" "fpalu")
@@ -5034,7 +5034,7 @@
 
 (define_insn "fix_truncsfdi2"
   [(set (match_operand:DI 0 "register_operand" "=f")
-	(fix:DI (fix:SF (match_operand:SF 1 "register_operand" "f"))))]
+	(fix:DI (match_operand:SF 1 "register_operand" "f")))]
   "TARGET_PA_11 && ! TARGET_SOFT_FLOAT"
   "{fcnvfxt,sgl,dbl|fcnv,t,sgl,dw} %1,%0"
   [(set_attr "type" "fpalu")
@@ -5042,7 +5042,7 @@
 
 (define_insn "fix_truncdfdi2"
   [(set (match_operand:DI 0 "register_operand" "=f")
-	(fix:DI (fix:DF (match_operand:DF 1 "register_operand" "f"))))]
+	(fix:DI (match_operand:DF 1 "register_operand" "f")))]
   "TARGET_PA_11 && ! TARGET_SOFT_FLOAT"
   "{fcnvfxt,dbl,dbl|fcnv,t,dbl,dw} %1,%0"
   [(set_attr "type" "fpalu")
@@ -5082,7 +5082,7 @@
 
 (define_insn "fixuns_truncsfsi2"
   [(set (match_operand:SI 0 "register_operand" "=f")
-	(unsigned_fix:SI (fix:SF (match_operand:SF 1 "register_operand" "f"))))]
+	(unsigned_fix:SI (match_operand:SF 1 "register_operand" "f")))]
   "! TARGET_SOFT_FLOAT && TARGET_PA_20"
   "fcnv,t,sgl,uw %1,%0"
   [(set_attr "type" "fpalu")
@@ -5090,7 +5090,7 @@
 
 (define_insn "fixuns_truncdfsi2"
   [(set (match_operand:SI 0 "register_operand" "=f")
-	(unsigned_fix:SI (fix:DF (match_operand:DF 1 "register_operand" "f"))))]
+	(unsigned_fix:SI (match_operand:DF 1 "register_operand" "f")))]
   "! TARGET_SOFT_FLOAT && TARGET_PA_20"
   "fcnv,t,dbl,uw %1,%0"
   [(set_attr "type" "fpalu")
@@ -5098,7 +5098,7 @@
 
 (define_insn "fixuns_truncsfdi2"
   [(set (match_operand:DI 0 "register_operand" "=f")
-	(unsigned_fix:DI (fix:SF (match_operand:SF 1 "register_operand" "f"))))]
+	(unsigned_fix:DI (match_operand:SF 1 "register_operand" "f")))]
   "! TARGET_SOFT_FLOAT && TARGET_PA_20"
   "fcnv,t,sgl,udw %1,%0"
   [(set_attr "type" "fpalu")
@@ -5106,7 +5106,7 @@
 
 (define_insn "fixuns_truncdfdi2"
   [(set (match_operand:DI 0 "register_operand" "=f")
-	(unsigned_fix:DI (fix:DF (match_operand:DF 1 "register_operand" "f"))))]
+	(unsigned_fix:DI (match_operand:DF 1 "register_operand" "f")))]
   "! TARGET_SOFT_FLOAT && TARGET_PA_20"
   "fcnv,t,dbl,udw %1,%0"
   [(set_attr "type" "fpalu")
@@ -9561,7 +9561,7 @@ add,l %2,%3,%3\;bv,n %%r0(%3)"
 	  (pc)))
    (set (match_dup 0)
 	(plus:SI (match_dup 0) (match_dup 1)))
-   (clobber (match_scratch:SI 4 "=X,r,r"))]
+   (clobber (match_scratch:SI 4 "=X,r,&r"))]
   ""
   "* return pa_output_dbra (operands, insn, which_alternative); "
 ;; Do not expect to understand this the first time through.

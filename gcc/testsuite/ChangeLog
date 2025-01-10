@@ -1,3 +1,1244 @@
+2025-01-09  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2025-01-09  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/118060
+	* g++.dg/cpp2a/concepts-requires40.C: New test.
+
+2025-01-09  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2025-01-09  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/117925
+	* g++.dg/template/non-dependent35.C: New test.
+
+2025-01-09  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2025-01-09  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/117792
+	* g++.dg/cpp1z/nontype7.C: New test.
+
+2025-01-09  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	Backported from master:
+	2025-01-09  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	* gcc.target/arm/memset-inline-8.c: Use -Os and prefix assembler
+	instructions with a tab to improve test stability.
+	* gcc.target/arm/memset-inline-8-exe.c: Use -Os.
+
+2025-01-09  Marek Polacek  <polacek@redhat.com>
+
+	Backported from master:
+	2024-12-17  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/117985
+	* g++.dg/cpp0x/initlist-array23.C: New test.
+	* g++.dg/cpp0x/initlist-array24.C: New test.
+
+2025-01-09  Marek Polacek  <polacek@redhat.com>
+
+	Backported from master:
+	2024-07-01  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/115430
+	* g++.dg/cpp0x/noexcept41.C: Remove dg-error.
+	* g++.dg/overload/addr3.C: New test.
+
+2025-01-09  Marek Polacek  <polacek@redhat.com>
+
+	Backported from master:
+	2024-09-04  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/113108
+	* g++.dg/cpp1z/noexcept-type28.C: New test.
+
+2025-01-09  Marek Polacek  <polacek@redhat.com>
+
+	Backported from master:
+	2024-09-27  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/102594
+	* g++.dg/cpp1z/decomp61.C: New test.
+
+2025-01-09  Marek Polacek  <polacek@redhat.com>
+
+	Backported from master:
+	2024-09-10  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/116369
+	* g++.dg/tree-ssa/initlist-opt7.C: New test.
+
+2025-01-09  Marek Polacek  <polacek@redhat.com>
+
+	Backported from master:
+	2024-08-19  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/115657
+	* g++.dg/cpp1y/constexpr-recursion2.C: New test.
+	* g++.dg/template/conv21.C: New test.
+
+2025-01-09  Marek Polacek  <polacek@redhat.com>
+
+	Backported from master:
+	2024-05-15  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/114854
+	* g++.dg/cpp1y/nsdmi-aggr22.C: New test.
+
+2025-01-09  Marek Polacek  <polacek@redhat.com>
+
+	Backported from master:
+	2024-09-30  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/109859
+	* g++.dg/cpp2a/concepts-defarg3.C: New test.
+	* g++.dg/cpp2a/lambda-targ8.C: New test.
+
+2025-01-09  Christophe Lyon  <christophe.lyon@linaro.org>
+
+	Backported from master:
+	2024-12-13  Christophe Lyon  <christophe.lyon@linaro.org>
+		    Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/114801
+	* gcc.target/arm/mve/pr108443.c: Update predicate constant.
+	* gcc.target/arm/mve/pr108443-run.c: Likewise.
+	* gcc.target/arm/mve/pr114801.c: New test.
+
+2025-01-09  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2025-01-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/117825
+	* g++.dg/warn/pr117825.C: New test.
+
+2025-01-09  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-12-17  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/116108
+	* g++.dg/cpp1z/class-deduction117.C: New test.
+
+2025-01-09  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-12-14  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/118024
+	* gcc.dg/pr118024.c: New test.
+
+2025-01-09  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-12-13  Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/117095
+	* gcc.c-torture/execute/pr117095.c: New test.
+
+2025-01-09  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-12-11  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/117614
+	* g++.dg/cpp2a/constexpr-union8.C: New test.
+
+2025-01-09  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-12-05  Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/113994
+	PR rtl-optimization/116799
+	* gcc.c-torture/execute/pr116799.c: New test.
+	* g++.dg/torture/pr113994.C: New test.
+
+2025-01-09  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-11-28  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/117802
+	* gcc.dg/builtin-iseqsig-1.c: New test.
+	* gcc.dg/bitint-118.c: New test.
+
+2025-01-09  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-11-27  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/117745
+	* gcc.dg/pr117745.c: New test.
+
+2025-01-09  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-11-26  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/102674
+	* gcc.dg/dfp/pr102674.c: New test.
+
+2025-01-09  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-11-26  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/43374
+	* gcc.dg/dfp/pr43374.c: New test.
+
+2025-01-09  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-11-22  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/117641
+	* gcc.dg/bitint-117.c: New test.
+
+2025-01-09  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-11-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/117641
+	* gcc.dg/bitint-115.c: New test.
+
+2025-01-09  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-11-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/117458
+	* gcc.dg/bitint-116.c: New test.
+
+2025-01-09  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-11-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/117459
+	* gcc.dg/torture/bitint-74.c: New test.
+
+2025-01-09  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-11-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/117317
+	* g++.dg/cpp2a/pr117317-1.C: New test.
+	* g++.dg/cpp2a/pr117317-2.C: New test.
+
+2025-01-09  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-11-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/117439
+	* g++.dg/opt/pr117439.C: New test.
+
+2024-12-23  Christophe Lyon  <christophe.lyon@linaro.org>
+
+	Revert:
+	2024-12-23  Christophe Lyon  <christophe.lyon@linaro.org>
+		    Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/114801
+	* gcc.target/arm/mve/pr108443.c: Update predicate constant.
+	* gcc.target/arm/mve/pr108443-run.c: Likewise.
+	* gcc.target/arm/mve/pr114801.c: New test.
+
+2024-12-22  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	Backported from master:
+	2024-12-22  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	PR testsuite/103298
+	* gcc.target/arm/pr43920-2.c: Change to assembler pattern
+	"(cmp|mov|orr|and)(eq|ne)" for the check. Remove size check.
+
+2024-12-22  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2024-12-12  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/117797
+	* gfortran.dg/pr117797.f90: New test.
+
+2024-12-19  Christophe Lyon  <christophe.lyon@linaro.org>
+
+	Backported from master:
+	2024-12-13  Christophe Lyon  <christophe.lyon@linaro.org>
+		    Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/114801
+	* gcc.target/arm/mve/pr108443.c: Update predicate constant.
+	* gcc.target/arm/mve/pr108443-run.c: Likewise.
+	* gcc.target/arm/mve/pr114801.c: New test.
+
+2024-12-19  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	Backported from master:
+	2024-12-19  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	* gcc.target/arm/memset-inline-4.c: Only check assembler output.
+	* gcc.target/arm/memset-inline-5.c: Likewise.
+	* gcc.target/arm/memset-inline-6.c: Likewise.
+	* gcc.target/arm/memset-inline-8.c: Likewise.
+	* gcc.target/arm/memset-inline-9.c: Likewise.
+	* gcc.target/arm/memset-inline-4-exe.c: New test.
+	* gcc.target/arm/memset-inline-5-exe.c: Likewise.
+	* gcc.target/arm/memset-inline-6-exe.c: Likewise.
+	* gcc.target/arm/memset-inline-8-exe.c: Likewise.
+	* gcc.target/arm/memset-inline-9-exe.c: Likewise.
+
+2024-12-18  Wilco Dijkstra  <wilco.dijkstra@arm.com>
+
+	Backported from master:
+	2024-12-10  Wilco Dijkstra  <wilco.dijkstra@arm.com>
+
+	PR target/117675
+	* gcc.target/arm/pr117675.c: Add new test.
+
+2024-12-17  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	Backported from master:
+	2024-12-17  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	* g++.dg/torture/pr81812.C: Add xfail for thumb1.
+
+2024-12-17  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2024-12-15  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/117897
+	* gfortran.dg/finalize_59.f90: New test.
+
+2024-12-15  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/117730
+	PR fortran/84674
+	* gfortran.dg/pr117730_a.f90: New test.
+	* gfortran.dg/pr117730_b.f90: New test.
+	* gfortran.dg/pr84674.f90: New test.
+
+2024-12-14  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	Backported from master:
+	2024-12-10  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/117120
+	* gm2/pim/pass/forloopnulchar.mod: New test.
+	* gm2/pim/pass/nulcharcase.mod: New test.
+	* gm2/pim/pass/nulcharvar.mod: New test.
+
+2024-12-13  Marek Polacek  <polacek@redhat.com>
+
+	Backported from master:
+	2024-12-10  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/117880
+	* g++.dg/warn/Wduplicated-branches8.C: New test.
+
+2024-12-13  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	Backported from master:
+	2024-12-09  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/115328
+	* gm2/pim/fail/forward.mod: Move to...
+	* gm2/pim/pass/forward.mod: ...here.
+
+2024-12-12  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gnat.dg/matrix1.adb: New test.
+
+2024-12-12  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	Backported from master:
+	2024-12-12  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	* gcc.target/arm/thumb-ifcvt.c: Use -mtune=cortex-m4.
+
+2024-12-12  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	Backported from master:
+	2024-12-12  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	* gcc.target/arm/thumb2-slow-flash-data-3.c: Added argument to
+	fn1 to avoid compile error.
+
+2024-12-11  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+
+	Backported from master:
+	2024-12-10  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+
+	PR fortran/117819
+	* gfortran.dg/pr117819.f90: New test.
+
+2024-12-09  Juergen Christ  <jchrist@linux.ibm.com>
+
+	Backported from master:
+	2024-12-09  Juergen Christ  <jchrist@linux.ibm.com>
+
+	* gcc.target/s390/ccusage.c: New test.
+
+2024-12-09  Simon Martin  <simon@nasilyan.com>
+
+	Backported from master:
+	2024-12-09  Simon Martin  <simon@nasilyan.com>
+
+	PR c++/117845
+	* g++.dg/asan/pr117845-2.C: New test.
+	* g++.dg/asan/pr117845.C: New test.
+
+2024-12-08  Uros Bizjak  <ubizjak@gmail.com>
+
+	Backported from master:
+	2024-12-06  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/117926
+	* gcc.target/i386/pr117926.c: New test.
+
+2024-12-07  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	Backported from master:
+	2024-12-07  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/117948
+	* gm2/pim/fail/forward.mod: New test.
+
+2024-12-06  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+
+	Backported from master:
+	2024-12-04  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+
+	PR fortran/117820
+	* gfortran.dg/pr117820.f90: New test.
+
+2024-12-06  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	Backported from master:
+	2024-12-05  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/117904
+	* gm2/iso/pass/forloopbyconst.mod: New test.
+
+2024-12-06  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2024-11-28  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/117791
+	* gfortran.dg/bounds_check_array_io.f90: New test.
+
+2024-12-05  Simon Martin  <simon@nasilyan.com>
+
+	Backported from master:
+	2024-12-04  Simon Martin  <simon@nasilyan.com>
+
+	PR c++/117615
+	* g++.dg/cpp2a/constexpr-virtual22.C: New test.
+
+2024-12-04  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	Backported from master:
+	2024-11-18  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/117660
+	* gm2/iso/fail/arraymismatch.mod: New test.
+
+2024-12-04  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	Backported from master:
+	2024-11-18  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/117371
+	* gm2/iso/fail/forloopbyzero.mod: New test.
+
+2024-12-04  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	Backported from master:
+	2024-11-15  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/117371
+	* gm2/iso/fail/forloopbyvar.mod: New test.
+	* gm2/iso/fail/forloopbyvar4.mod: New test.
+	* gm2/iso/fail/forloopbyvar5.mod: New test.
+	* gm2/iso/pass/forloopbyvar3.mod: New test.
+
+2024-12-03  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	Backported from master:
+	2024-11-11  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* gm2/iso/fail/badexpression3.mod: New test.
+	* gm2/iso/fail/badparam4.def: New test.
+	* gm2/iso/fail/badparam4.mod: New test.
+
+2024-12-03  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	Backported from master:
+	2024-10-19  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/115328
+	* gm2/iso/fail/badparam.def: New test.
+	* gm2/iso/fail/badparam.mod: New test.
+	* gm2/iso/fail/badparam2.def: New test.
+	* gm2/iso/fail/badparam2.mod: New test.
+	* gm2/iso/fail/badparam3.def: New test.
+	* gm2/iso/fail/badparam3.mod: New test.
+	* gm2/iso/fail/badparamarray.def: New test.
+	* gm2/iso/fail/badparamarray.mod: New test.
+	* gm2/iso/fail/simpledef1.def: New test.
+	* gm2/iso/fail/simpledef1.mod: New test.
+	* gm2/iso/fail/simpleforward.mod: New test.
+	* gm2/iso/fail/simpleforward2.mod: New test.
+	* gm2/iso/fail/simpleforward3.mod: New test.
+	* gm2/iso/fail/simpleforward4.mod: New test.
+	* gm2/iso/fail/simpleforward5.mod: New test.
+	* gm2/iso/fail/simpleforward7.mod: New test.
+	* gm2/iso/pass/simpleforward.mod: New test.
+	* gm2/iso/pass/simpleforward6.mod: New test.
+
+2024-12-02  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2024-11-26  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/117774
+	* gfortran.dg/assumed_rank_25.f90: New test.
+
+2024-12-01  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	Backported from master:
+	2024-09-20  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	* gm2/iso/fail/testarrayunbounded2.mod: New test.
+	* gm2/iso/fail/testarrayunbounded3.mod: New test.
+	* gm2/iso/fail/testarrayunbounded4.mod: New test.
+	* gm2/iso/fail/testarrayunbounded5.mod: New test.
+	* gm2/iso/fail/testarrayunbounded6.mod: New test.
+	* gm2/iso/pass/testarrayunbounded.mod: New test.
+
+2024-11-30  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2024-11-13  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/105054
+	* gfortran.dg/ptr_func_assign_6.f08: New test.
+
+2024-11-29  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-11-18  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/117594
+	* gcc.dg/vect/pr117594.c: New testcase.
+
+2024-11-29  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-11-20  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/117574
+	* gcc.dg/torture/pr117574-1.c: New testcase.
+
+2024-11-29  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-11-05  Richard Biener  <rguenther@suse.de>
+
+	PR middle-end/117433
+	* gcc.dg/pr117433.c: New testcase.
+
+2024-11-29  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-11-12  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/117417
+	* gcc.dg/torture/pr117417.c: New testcase.
+
+2024-11-29  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-10-29  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/117333
+	* gcc.dg/torture/pr117333.c: New testcase.
+
+2024-11-29  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-10-28  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/117307
+	* gcc.dg/vect/pr117307.c: New testcase.
+
+2024-11-29  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2024-10-22  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/117254
+	* gcc.dg/pr117254.c: New testcase.
+
+2024-11-28  Martin Jambor  <mjambor@suse.cz>
+
+	Backported from master:
+	2024-10-23  Martin Jambor  <mjambor@suse.cz>
+
+	PR tree-optimization/117142
+	* gcc.dg/tree-ssa/pr117142.c: New test.
+
+2024-11-28  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	Backported from master:
+	2024-11-25  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	PR target/117105
+	* gcc.target/i386/pr117105.c: New test.
+
+2024-11-28  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	Backported from master:
+	2024-05-10  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	PR target/114942
+	* gcc.target/i386/pr114942.c: New.
+
+2024-11-27  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2024-11-26  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/117763
+	* gfortran.dg/pr117763.f90: New test.
+
+2024-11-26  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	Backported from master:
+	2024-08-16  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/116378
+	* gm2/extensions/run/pass/testopen.mod: Add third argument
+	for open.
+	* gm2/isolib/run/pass/openlibc.mod: Ditto.
+	* gm2/pim/run/pass/testaddr3.mod: Ditto.
+
+2024-11-26  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	* gcc.target/arm/epilog-1.c: Corrected armv8.1.m-main asm.
+
+2024-11-26  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	Backported from master:
+	2024-07-28  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/115823
+	* gm2/builtins/run/pass/testisnormal.mod: Change to an
+	implementation module.
+	* gm2/builtins/run/pass/testisnormal.def: New test.
+	* gm2/builtins/run/pass/testsinl.def: New test.
+	* gm2/builtins/run/pass/testsinl.mod: New test.
+
+2024-11-26  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	Backported from master:
+	2024-07-23  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/116048
+	* gm2/errors/fail/errors-fail.exp: Remove -Wstudents
+	and add -Wuninit-variable-checking=all.
+	Replace gm2_init_pim with gm2_init_iso.
+	* gm2/errors/fail/testfio.mod: Modify test code to
+	provoke an error in the first basic block.
+	* gm2/errors/fail/testparam.mod: Ditto.
+	* gm2/errors/fail/array1.mod: Ditto.
+	* gm2/errors/fail/badtype.mod: New test.
+	* gm2/errors/fail/badvar.mod: New test.
+
+2024-11-26  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	Backported from master:
+	2024-07-16  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/115957
+	* gm2/errors/fail/badconst.mod: New test.
+	* gm2/pim/fail/tinyadr.mod: New test.
+
+2024-11-25  Lewis Hyatt  <lhyatt@gmail.com>
+
+	PR preprocessor/117118
+	* c-c++-common/raw-string-directive-3.c: New test.
+	* c-c++-common/raw-string-directive-4.c: New test.
+
+2024-11-24  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/84869
+	* gfortran.dg/pr84869.f90: Comment out test of component refs.
+
+2024-11-23  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2024-11-11  Tomas Trnka  <trnka@scm.com>
+		    Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/116388
+	* gfortran.dg/finalize_58.f90: New test.
+
+2024-11-23  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2024-11-11  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/109345
+	* gfortran.dg/character_workout_1.f90: Cut trailing whitespace.
+	* gfortran.dg/pr109345.f90: New test.
+
+2024-11-23  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	Backported from master:
+	2024-07-10  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/115823
+	* gm2/builtins/run/pass/testalloa.mod: New test.
+
+2024-11-22  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	Backported from master:
+	2024-06-25  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/115536
+	* gm2/iso/const/pass/constbool4.mod: New test.
+	* gm2/iso/const/pass/constbool5.mod: New test.
+	* gm2/iso/run/pass/condtest2.mod: New test.
+	* gm2/iso/run/pass/condtest3.mod: New test.
+	* gm2/iso/run/pass/condtest4.mod: New test.
+	* gm2/iso/run/pass/condtest5.mod: New test.
+	* gm2/iso/run/pass/constbool4.mod: New test.
+
+2024-11-22  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2024-11-14  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/104819
+	* gfortran.dg/null_actual_6.f90: New test.
+
+2024-11-22  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	Backported from master:
+	2024-06-11  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/114529
+	* gm2/base-lang/pass/SYSTEM.def: New test.
+	* gm2/base-lang/pass/base-lang-test.sh: New test.
+	* gm2/base-lang/pass/globalproctype.def: New test.
+	* gm2/base-lang/pass/globalproctype.mod: New test.
+	* gm2/base-lang/pass/globalvar.def: New test.
+	* gm2/base-lang/pass/globalvar.mod: New test.
+	* gm2/base-lang/pass/globalvarassign.def: New test.
+	* gm2/base-lang/pass/globalvarassign.mod: New test.
+	* gm2/base-lang/pass/localproctype.def: New test.
+	* gm2/base-lang/pass/localproctype.mod: New test.
+	* gm2/base-lang/pass/localvar.def: New test.
+	* gm2/base-lang/pass/localvar.mod: New test.
+	* gm2/base-lang/pass/localvarassign.def: New test.
+	* gm2/base-lang/pass/localvarassign.mod: New test.
+	* gm2/base-lang/pass/opaquefield.def: New test.
+	* gm2/base-lang/pass/opaquefield.mod: New test.
+	* gm2/base-lang/pass/opaquenew.def: New test.
+	* gm2/base-lang/pass/opaquenew.mod: New test.
+	* gm2/base-lang/pass/opaqueparam.def: New test.
+	* gm2/base-lang/pass/opaqueparam.mod: New test.
+	* gm2/base-lang/pass/opaquestr.def: New test.
+	* gm2/base-lang/pass/opaqueuse.def: New test.
+	* gm2/base-lang/pass/opaqueuse.mod: New test.
+	* gm2/base-lang/pass/opaqueusestr.def: New test.
+	* gm2/base-lang/pass/opaqueusestr.mod: New test.
+	* gm2/base-lang/pass/opaquevariant.def: New test.
+	* gm2/base-lang/pass/opaquevariant.mod: New test.
+	* gm2/base-lang/pass/opaquevarparam.def: New test.
+	* gm2/base-lang/pass/opaquevarparam.mod: New test.
+	* gm2/base-lang/pass/simplelist.def: New test.
+	* gm2/base-lang/pass/simplelist.mod: New test.
+	* gm2/base-lang/pass/simplelistiter.def: New test.
+	* gm2/base-lang/pass/simplelistiter.mod: New test.
+	* gm2/base-lang/pass/simpleopaque.def: New test.
+	* gm2/base-lang/pass/simpleopaque.mod: New test.
+	* gm2/base-lang/pass/straddress.def: New test.
+	* gm2/base-lang/pass/straddress.mod: New test.
+	* gm2/base-lang/pass/straddressexport.def: New test.
+	* gm2/base-lang/pass/straddressexport.mod: New test.
+	* gm2/base-lang/pass/unboundedarray.def: New test.
+	* gm2/base-lang/pass/unboundedarray.mod: New test.
+
+2024-11-22  Xi Ruoyao  <xry111@xry111.site>
+
+	Backported from master:
+	2024-11-22  Xi Ruoyao  <xry111@xry111.site>
+
+	* gcc.target/loongarch/vector/lsx/lsx-builtin.c (__lsx_vorn_v):
+	Change arguments and return value to v16u8.
+	* gcc.target/loongarch/vector/lasx/lasx-builtin.c
+	(__lasx_xvorn_v): Change arguments and return value to v32u8.
+
+2024-11-20  David Malcolm  <dmalcolm@redhat.com>
+
+	Backported from master:
+	2024-09-09  David Malcolm  <dmalcolm@redhat.com>
+
+	PR other/116603
+	* lib/sarif-schema-2.1.0.json: Update with copy downloaded from
+	https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json
+
+2024-11-20  David Malcolm  <dmalcolm@redhat.com>
+
+	Backported from master:
+	2024-07-04  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/115724
+	* c-c++-common/analyzer/error-pr115724.c: New test.
+
+2024-11-20  David Malcolm  <dmalcolm@redhat.com>
+
+	Backported from master:
+	2024-06-26  David Malcolm  <dmalcolm@redhat.com>
+
+	PR testsuite/109360
+	* lib/scansarif.exp (verify-sarif-file): Use check-jsonschema
+	rather than jsonschema, updating the invocation accordingly.
+	* lib/target-supports.exp (check_effective_target_jsonschema): Convert
+	to...
+	(check_effective_target_check_jsonschema): ...this.
+
+2024-11-20  David Malcolm  <dmalcolm@redhat.com>
+
+	Backported from master:
+	2024-06-21  David Malcolm  <dmalcolm@redhat.com>
+
+	PR testsuite/109360
+	* lib/sarif-schema-2.1.0.json: New file, downloaded from
+	https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/schemas/sarif-schema-2.1.0.json
+	Licensing information can be seen at
+	https://github.com/oasis-tcs/sarif-spec/issues/583
+	which states "They are free to incorporate it into their
+	implementation. No need for special permission or paperwork from
+	OASIS."
+	* lib/scansarif.exp (verify-sarif-file): If "jsonschema" is
+	available, use it to verify that the .sarif file complies with the
+	SARIF schema.
+	* lib/target-supports.exp (check_effective_target_jsonschema):
+	New.
+
+2024-11-20  David Malcolm  <dmalcolm@redhat.com>
+
+	Backported from master:
+	2024-05-03  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/111475
+	* c-c++-common/analyzer/fd-glibc-byte-stream-socket.c: Add
+	-fno-exceptions for now.
+	* c-c++-common/analyzer/fd-manpage-getaddrinfo-client.c: Likewise.
+	* c-c++-common/analyzer/fd-mappage-getaddrinfo-server.c: Rename to...
+	* c-c++-common/analyzer/fd-manpage-getaddrinfo-server.c: ...this, and
+	add -fno-exceptions for now.
+	* c-c++-common/analyzer/fd-socket-meaning.c: Add -fno-exceptions
+	for now.
+	* c-c++-common/analyzer/fd-symbolic-socket.c: Likewise.
+	* c-c++-common/analyzer/flexible-array-member-1.c: Use regexp to
+	handle C vs C++ differences in spelling of function name, which
+	could have a "std::" prefix on some targets.
+	* c-c++-common/analyzer/pr106539.c: Likewise.
+	* c-c++-common/analyzer/malloc-ipa-8-unchecked.c: Move back to...
+	* gcc.dg/analyzer/malloc-ipa-8-unchecked.c: ...here, dropping
+	attempt to generalize output for C vs C++.
+	* c-c++-common/analyzer/signal-4a.c: Move back to...
+	* gcc.dg/analyzer/signal-4a.c: ...here, dropping attempt to
+	generalize output for C vs C++.
+	* c-c++-common/analyzer/signal-4b.c: Move back to...
+	* gcc.dg/analyzer/signal-4b.c: ...here, dropping attempt to
+	generalize output for C vs C++.
+
+2024-11-20  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	Backported from master:
+	2024-05-29  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/115276
+	* gm2/isolib/run/pass/testinittm.mod: New test.
+
+2024-11-19  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	Backported from master:
+	2024-05-21  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/115164
+	* gm2/isolib/run/pass/testlowread.mod: New test.
+	* gm2/isolib/run/pass/testwritereal.mod: New test.
+
+2024-11-19  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	Backported from master:
+	2024-05-15  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/115057
+	* gm2/isolib/run/pass/testrestline.mod: New test.
+	* gm2/isolib/run/pass/testrestline2.mod: New test.
+	* gm2/isolib/run/pass/testrestline3.mod: New test.
+
+2024-11-18  Uros Bizjak  <ubizjak@gmail.com>
+
+	Backported from master:
+	2024-11-18  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/117357
+	* gcc.target/i386/pr117357.c: New test.
+
+2024-11-18  Andre Vieira  <andre.simoesdiasvieira@arm.com>
+
+	Backported from master:
+	2024-10-14  Andre Vieira  <andre.simoesdiasvieira@arm.com>
+		    Andrew Pinski  <quic_apinski@quicinc.com>
+
+	* gcc.dg/vect/pr116997.c: New test.
+
+2024-11-18  Hu, Lin1  <lin1.hu@intel.com>
+
+	Backported from master:
+	2024-11-13  Hu, Lin1  <lin1.hu@intel.com>
+
+	PR target/117418
+	* gcc.target/i386/pr117418-1.c: New test.
+
+2024-11-14  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2024-11-03  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/115700
+	* gfortran.dg/associate_69.f90: Remove the test that produces a
+	variable string length because the optimized count depends on
+	the platform. This is tested in associate_70.f90.
+
+2024-11-14  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2024-11-01  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/115700
+	* gfortran.dg/associate_69.f90: Activate commented out tests.
+	* gfortran.dg/associate_70.f90: Test correct functioning of
+	references in associate_69.f90 tests.
+
+2024-11-14  Paul Thomas  <pault@gcc.gnu.org>
+
+	Backported from master:
+	2024-10-31  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/115700
+	* gfortran.dg/associate_70.f90: New test.
+
+2024-11-12  Andrew Carlotti  <andrew.carlotti@arm.com>
+
+	PR tree-optimization/112376
+	* gcc.dg/tree-ssa/ssa-dom-thread-7.c: Update expectation.
+
+2024-11-09  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	Backported from master:
+	2024-11-09  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	PR target/117408
+	* gcc.target/arm/mve/pr117408-1.c: New test.
+	* gcc.target/arm/mve/pr117408-2.c: Likewise.
+
+2024-11-08  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2024-11-07  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.target/aarch64/sme2/acle-asm/bfmlslb_f32.c: Replace bfmla*
+	with bfmls*
+
+2024-11-08  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2024-11-07  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.target/aarch64/sme2/acle-asm/psel_lane_b16.c: Move to...
+	* gcc.target/aarch64/sme/acle-asm/psel_lane_b16.c: ...here.
+	* gcc.target/aarch64/sme2/acle-asm/psel_lane_b32.c: Move to...
+	* gcc.target/aarch64/sme/acle-asm/psel_lane_b32.c: ...here.
+	* gcc.target/aarch64/sme2/acle-asm/psel_lane_b64.c: Move to...
+	* gcc.target/aarch64/sme/acle-asm/psel_lane_b64.c: ...here.
+	* gcc.target/aarch64/sme2/acle-asm/psel_lane_b8.c: Move to...
+	* gcc.target/aarch64/sme/acle-asm/psel_lane_b8.c: ...here.
+	* gcc.target/aarch64/sme2/acle-asm/psel_lane_c16.c: Move to...
+	* gcc.target/aarch64/sme/acle-asm/psel_lane_c16.c: ...here.
+	* gcc.target/aarch64/sme2/acle-asm/psel_lane_c32.c: Move to...
+	* gcc.target/aarch64/sme/acle-asm/psel_lane_c32.c: ...here.
+	* gcc.target/aarch64/sme2/acle-asm/psel_lane_c64.c: Move to...
+	* gcc.target/aarch64/sme/acle-asm/psel_lane_c64.c: ...here.
+	* gcc.target/aarch64/sme2/acle-asm/psel_lane_c8.c: Move to...
+	* gcc.target/aarch64/sme/acle-asm/psel_lane_c8.c: ...here.
+
+2024-11-08  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2024-11-07  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.target/aarch64/sme/clamp_3.c: Force sme2
+	* gcc.target/aarch64/sme/clamp_4.c: Likewise.
+	* gcc.target/aarch64/sme/clamp_5.c: New test.
+
+2024-11-08  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2024-10-14  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR target/116999
+	PR target/117045
+	* gcc.target/aarch64/sve/acle/general/whilele_5.c: Fix bogus
+	expected result.
+	* gcc.target/aarch64/sve/acle/general/whilele_11.c: New test.
+	* gcc.target/aarch64/sve/acle/general/whilele_12.c: Likewise.
+
+2024-11-08  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2024-10-09  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR target/116629
+	* gcc.target/aarch64/sve/acle/general/pr106326_2.c: New test.
+
+2024-11-08  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2024-08-15  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR target/116371
+	* gcc.target/aarch64/sme2/acle-asm/pext_c16.c,
+	gcc.target/aarch64/sme2/acle-asm/pext_c16_x2.c,
+	gcc.target/aarch64/sme2/acle-asm/pext_c32.c,
+	gcc.target/aarch64/sme2/acle-asm/pext_c32_x2.c,
+	gcc.target/aarch64/sme2/acle-asm/pext_c64.c,
+	gcc.target/aarch64/sme2/acle-asm/pext_c64_x2.c,
+	gcc.target/aarch64/sme2/acle-asm/pext_c8.c,
+	gcc.target/aarch64/sme2/acle-asm/pext_c8_x2.c: Replace with...
+	* gcc.target/aarch64/sme2/acle-asm/pext_lane_c16.c,
+	gcc.target/aarch64/sme2/acle-asm/pext_lane_c16_x2.c,
+	gcc.target/aarch64/sme2/acle-asm/pext_lane_c32.c,
+	gcc.target/aarch64/sme2/acle-asm/pext_lane_c32_x2.c,
+	gcc.target/aarch64/sme2/acle-asm/pext_lane_c64.c,
+	gcc.target/aarch64/sme2/acle-asm/pext_lane_c64_x2.c,
+	gcc.target/aarch64/sme2/acle-asm/pext_lane_c8.c,
+	gcc.target/aarch64/sme2/acle-asm/pext_lane_c8_x2.c: ...these new tests,
+	testing for svpext_lane instead of svpext.
+
+2024-11-08  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	Backported from master:
+	2024-11-08  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	* gcc.target/arm/epilog-1.c: Use check-function-bodies.
+
+2024-11-08  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	Backported from master:
+	2024-11-08  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+		    Richard Earnshaw  <rearnsha@arm.com>
+
+	* gcc.target/arm/pr68620.c: Use effective-target
+	arm_libc_fp_abi.
+	* lib/target-supports.exp: Define effective-target
+	arm_libc_fp_abi.
+
+2024-11-08  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	Backported from master:
+	2024-11-08  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	* gcc.target/arm/pr40457-2.c: Add vst1.32 as an allowed
+	instruction.
+
+2024-11-08  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	Backported from master:
+	2024-11-08  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	* g++.dg/vect/pr84556.cc: Change from "dg-do run" with selector
+	to instead use dg-require-effective-target with the same
+	selector.
+
+2024-11-08  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	Backported from master:
+	2024-11-08  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	* g++.target/arm/mve/general-c++/nomve_fp_1.c: Use
+	effective-target arm_fp.
+
+2024-11-07  Hu, Lin1  <lin1.hu@intel.com>
+
+	Backported from master:
+	2024-11-07  Hu, Lin1  <lin1.hu@intel.com>
+
+	* gcc.target/i386/pr117304-1.c: Modify regexp.
+
+2024-11-07  Hu, Lin1  <lin1.hu@intel.com>
+
+	Backported from master:
+	2024-11-06  Hu, Lin1  <lin1.hu@intel.com>
+
+	PR target/117304
+	* gcc.target/i386/pr117304-1.c: New test.
+
+2024-11-06  Tamar Christina  <tamar.christina@arm.com>
+
+	Backported from master:
+	2024-10-14  Tamar Christina  <tamar.christina@arm.com>
+
+	PR target/116371
+	* gcc.target/aarch64/sme2/acle-asm/psel_b16.c,
+	gcc.target/aarch64/sme2/acle-asm/psel_b32.c,
+	gcc.target/aarch64/sme2/acle-asm/psel_b64.c,
+	gcc.target/aarch64/sme2/acle-asm/psel_b8.c,
+	gcc.target/aarch64/sme2/acle-asm/psel_c16.c,
+	gcc.target/aarch64/sme2/acle-asm/psel_c32.c,
+	gcc.target/aarch64/sme2/acle-asm/psel_c64.c,
+	gcc.target/aarch64/sme2/acle-asm/psel_c8.c: Renamed to....
+	* gcc.target/aarch64/sme2/acle-asm/psel_lane_b16.c,
+	gcc.target/aarch64/sme2/acle-asm/psel_lane_b32.c,
+	gcc.target/aarch64/sme2/acle-asm/psel_lane_b64.c,
+	gcc.target/aarch64/sme2/acle-asm/psel_lane_b8.c,
+	gcc.target/aarch64/sme2/acle-asm/psel_lane_c16.c,
+	gcc.target/aarch64/sme2/acle-asm/psel_lane_c32.c,
+	gcc.target/aarch64/sme2/acle-asm/psel_lane_c64.c,
+	gcc.target/aarch64/sme2/acle-asm/psel_lane_c8.c: ... These.
+
+2024-11-06  Simon Martin  <simon@nasilyan.com>
+
+	Backported from master:
+	2024-11-05  Simon Martin  <simon@nasilyan.com>
+
+	PR c++/117158
+	* g++.dg/cpp1z/eval-order13.C: New test.
+	* g++.dg/parse/crash77.C: New test.
+
+2024-11-05  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/101463
+	* g++.dg/cpp1z/nontype6.C: New test.
+	* g++.dg/cpp1z/nontype6a.C: New test.
+
+2024-11-05  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	Backported from master:
+	2024-11-05  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	* gcc.target/arm/pr68620.c: Use effective-target arm_neon.
+	* gcc.target/arm/pr78041.c: Use effective-target arm_arch_v7a.
+
+2024-11-05  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	Backported from master:
+	2024-11-05  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	* gcc.target/arm/pr98636.c: Use effective-target
+	arm_fp16_alternative.
+
+2024-11-05  Jason Merrill  <jason@redhat.com>
+
+	Backported from master:
+	2024-11-05  Jason Merrill  <jason@redhat.com>
+
+	PR c++/116634
+	* g++.dg/diagnostic/aggr-init1.C: Expect warning with -fpermissive.
+	* g++.dg/init/array62.C: Adjust diagnostic.
+	* g++.dg/init/array63.C: Adjust diagnostic.
+	* g++.dg/init/array64.C: Adjust diagnostic.
+
+2024-11-05  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/115070
+	PR fortran/115348
+	* gfortran.dg/ieee/pr115070.f90: New test.
+	* gfortran.dg/pr115348.f90: New test.
+
+2024-11-04  Andrew MacLeod  <amacleod@redhat.com>
+
+	PR tree-optimization/117398
+	* gcc.dg/pr117398.c: New.
+
+2024-11-04  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	* gcc.target/arm/memset-inline-4.c: Use effective-target
+	arm_neon_hw.
+	* gcc.target/arm/memset-inline-5.c: Likewise.
+	* gcc.target/arm/memset-inline-6.c: Likewise.
+
+2024-11-04  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	Backported from master:
+	2024-11-04  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	* gcc.target/arm/pr51534.c: Ensure -mfloat-abi=hard is used.
+
+2024-11-04  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	Backported from master:
+	2024-11-04  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	* gcc.target/arm/acle/data-intrinsics-assembly.c: Use
+	effective-target arm_arch_v6_arm.
+
+2024-11-04  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	Backported from master:
+	2024-11-04  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	* gcc.target/arm/vect-early-break-cbranch.c: Ignore exact
+	branch.
+
+2024-11-04  Andrew MacLeod  <amacleod@redhat.com>
+
+	* g++.dg/cpp23/attr-assume-opt.C (f2b): Alternate flow test.
+
+2024-11-04  Andrew MacLeod  <amacleod@redhat.com>
+
+	PR tree-optimization/117287
+	* g++.dg/cpp23/pr117287-attr.C: New.
+
+2024-11-04  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-10-31  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/117354
+	* gcc.dg/bitint-113.c: New test.
+
+2024-11-04  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-10-30  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/117296
+	* gcc.target/i386/pr117296.c: New test.
+
+2024-11-04  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gnat.dg/specs/array7.ads: New test.
+
 2024-11-01  Haochen Jiang  <haochen.jiang@intel.com>
 
 	* gcc.target/i386/cmpccxadd-1b.c: New test.

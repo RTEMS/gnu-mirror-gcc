@@ -1,3 +1,73 @@
+2025-01-06  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* exp_aggr.adb (Two_Pass_Aggregate_Expansion): Use the base type of
+	the index type to find the type used to compute the length.
+
+2025-01-05  Estevan Castilho (Tevo)  <estevan.cps@gmail.com>
+
+	* libgnarl/s-taprop__dummy.adb: Remove use clause for
+	System.Parameters.
+	(Unlock): Remove Global_Lock formal parameter.
+	(Write_Lock): Likewise.
+
+2024-12-16  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gcc-interface/trans.cc (get_atomic_access): Deal specifically with
+	nodes that are both Atomic and Volatile_Full_Access in Ada 2012.
+
+2024-12-12  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR ada/117996
+	* libgnat/a-ngrear.adb (Jacobi): Remove default value for
+	Compute_Vectors formal parameter.
+	(Sort_Eigensystem): Add Compute_Vectors formal parameter.  Do not
+	modify the Vectors if Compute_Vectors is False.
+	(Eigensystem): Pass True as Compute_Vectors to Sort_Eigensystem.
+	(Eigenvalues): Pass False as Compute_Vectors to Sort_Eigensystem.
+
+2024-11-26  Arsen Arsenović  <arsen@aarsen.me>
+
+	Backported from master:
+	2024-08-19  Arsen Arsenović  <arsen@aarsen.me>
+
+	PR ada/115917
+	* gnatvsn.ads: Add note about the duplication of this value in
+	version.c.
+	* version.c (VER_LEN_MAX): Define to the same value as
+	Gnatvsn.Ver_Len_Max.
+	(gnat_version_string): Use VER_LEN_MAX as bound.
+
+2024-11-12  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR ada/117328
+	* exp_aggr.adb (Two_Pass_Aggregate_Expansion): Use a type sized
+	from the index type to compute the length.  Simplify and remove
+	useless calls to New_Copy_Tree for this computation.
+
+2024-11-12  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR ada/113868
+	* par-ch6.adb (P_Subprogram) <Scan_Body_Or_Expression_Function>:
+	Add delta aggregate alongside the other forms of aggregates.
+
+2024-11-04  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR ada/113036
+	* freeze.adb (Freeze_Expression): Deal with freezing actions coming
+	from within nested internal loops present in spec expressions.
+
+2024-11-04  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* freeze.adb (Freeze_Expression): Also attach pending freeze nodes
+	to the parent in the case of an internal block in a spec expression.
+
+2024-11-04  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* checks.adb (Selected_Length_Checks.Get_E_Length): For a
+	component of a record with discriminants and if the expression is
+	a selected component, try to build an actual subtype from its
+	prefix instead of from the discriminal.
+
 2024-10-25  Eric Botcazou  <ebotcazou@adacore.com>
 
 	PR ada/116551

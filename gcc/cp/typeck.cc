@@ -4073,7 +4073,8 @@ cp_build_array_ref (location_t loc, tree array, tree idx,
     tree ar = cp_default_conversion (array, complain);
     tree ind = cp_default_conversion (idx, complain);
 
-    if (!first && flag_strong_eval_order == 2 && TREE_SIDE_EFFECTS (ind))
+    if (!processing_template_decl
+	&& !first && flag_strong_eval_order == 2 && TREE_SIDE_EFFECTS (ind))
       ar = first = save_expr (ar);
 
     /* Put the integer in IND to simplify error checking.  */
@@ -4468,8 +4469,10 @@ cp_build_function_call_vec (tree function, vec<tree, va_gc> **params,
 
   /* Check for errors in format strings and inappropriately
      null parameters.  */
-  bool warned_p = check_function_arguments (input_location, fndecl, fntype,
-					    nargs, argarray, NULL);
+  bool warned_p
+    = ((complain & tf_warning)
+       && check_function_arguments (input_location, fndecl, fntype,
+				    nargs, argarray, NULL));
 
   ret = build_cxx_call (function, nargs, argarray, complain, orig_fndecl);
 
@@ -8166,6 +8169,8 @@ cp_build_compound_expr (tree lhs, tree rhs, tsubst_flags_t complain)
       return rhs;
     }
 
+  rhs = resolve_nondeduced_context (rhs, complain);
+
   if (type_unknown_p (rhs))
     {
       if (complain & tf_error)
@@ -8173,7 +8178,7 @@ cp_build_compound_expr (tree lhs, tree rhs, tsubst_flags_t complain)
 		  "no context to resolve type of %qE", rhs);
       return error_mark_node;
     }
-  
+
   tree ret = build2 (COMPOUND_EXPR, TREE_TYPE (rhs), lhs, rhs);
   if (eptype)
     ret = build1 (EXCESS_PRECISION_EXPR, eptype, ret);

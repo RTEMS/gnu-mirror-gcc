@@ -1,3 +1,538 @@
+2025-01-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-12-10  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/memory_resource.h (polymoprhic_allocator): Use
+	feature test macro for P0339R6 features.
+
+2025-01-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-08-23  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/alloc_traits.h: Improve doxygen docs for
+	allocator_traits specializations.
+	* include/bits/memory_resource.h: Likewise.
+
+2025-01-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-06-21  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/memory_resource.h (polymorphic_allocator::destroy):
+	Remove deprecated attribute.
+
+2025-01-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-05-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/89624
+	* include/bits/atomic_base.h (memory_order): Use int as
+	underlying type.
+	* testsuite/29_atomics/atomic/89624.cc: New test.
+
+2025-01-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-12-12  Jonathan Wakely  <jwakely@redhat.com>
+
+	* src/c++17/fs_dir.cc: Fix typo in comment.
+
+2025-01-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-12-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/ostream (println): Pass stream's locale to
+	std::format, as per LWG 4088.
+	* testsuite/27_io/basic_ostream/print/1.cc: Check std::println
+	with custom locale. Remove unused brit_punc class.
+
+2025-01-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-10-30  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/manual/using_exceptions.xml: Fix typos and grammatical
+	errors.
+	* doc/html/manual/using_exceptions.html: Regenerate.
+
+2025-01-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-05-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/manual/strings.xml: Clarify that GCC 4.5 added
+	std::string::shrink_to_fit.
+	* doc/html/manual/strings.html: Regenerate.
+
+2025-01-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-11-27  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/c++config (__glibcxx_assert): Remove useless
+	__builtin_expect from constexpr-only assertion. Improve
+	comments.
+
+2025-01-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-12-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/108236
+	* include/pstl/glue_numeric_impl.h (exclusive_scan): Pass __init
+	as rvalue.
+	* include/pstl/numeric_impl.h (__brick_transform_scan): Do not
+	write through __result until after reading through __first. Move
+	__init into return value.
+	(__pattern_transform_scan): Pass __init as rvalue.
+	* include/std/numeric (exclusive_scan): Move construct instead
+	of copy constructing.
+	* testsuite/26_numerics/exclusive_scan/2.cc: New test.
+	* testsuite/26_numerics/pstl/numeric_ops/108236.cc: New test.
+
+2025-01-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-12-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/117962
+	* include/debug/safe_container.h: Make allocator-extended move
+	constructor a no-op during constant evaluation.
+
+2025-01-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-12-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/109517
+	PR libstdc++/109976
+	* include/debug/helper_functions.h (__valid_range_aux): Treat
+	all input iterator ranges as valid during constant evaluation.
+
+2025-01-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-12-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/106212
+	* include/std/array (operator==): Use std::__equal_aux1 instead
+	of std::equal.
+	* testsuite/23_containers/array/comparison_operators/106212.cc:
+	New test.
+
+2025-01-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-12-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/117966
+	* include/std/span (span(T (&)[N])): Do not delegate to
+	constructor that performs redundant checks.
+	(span(array<T, N>&), span(const array<T, N>&)): Likewise.
+	(span(Range&&), span(const span<T, N>&)): Likewise.
+	* testsuite/23_containers/span/117966.cc: New test.
+
+2025-01-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-12-17  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/118035
+	* include/bits/deque.tcc (_M_range_insert_aux): Return
+	immediately if inserting an empty range.
+	* testsuite/23_containers/deque/modifiers/insert/118035.cc: New
+	test.
+
+2025-01-09  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-12-13  Patrick Palka  <ppalka@redhat.com>
+
+	PR libstdc++/112349
+	* include/bits/ranges_algo.h (__min_fn::operator()): Turn local
+	object __tmp into a reference.
+	* include/bits/ranges_util.h (__max_fn::operator()): Likewise.
+	* testsuite/25_algorithms/max/constrained.cc (test04): New test.
+	* testsuite/25_algorithms/min/constrained.cc (test04): New test.
+
+2025-01-09  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-11-14  Patrick Palka  <ppalka@redhat.com>
+
+	* include/std/ranges (keys_view): Adjust as per LWG 3563.
+	(values_view): Likewise.
+	* testsuite/std/ranges/adaptors/elements.cc (test08): New test.
+
+2025-01-09  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2024-10-29  Patrick Palka  <ppalka@redhat.com>
+
+	PR libstdc++/112641
+	* include/std/ranges (drop_view::begin): Reimplement const
+	overload so that it's O(1) always.
+	* testsuite/std/ranges/adaptors/drop.cc (test10): New test.
+
+2025-01-09  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	Backported from master:
+	2024-08-17  Gerald Pfeifer  <gerald@pfeifer.com>
+
+	* doc/xml/manual/abi.xml: Update reference to
+	gcc.gnu.org/onlinedocs.
+	* doc/xml/manual/concurrency_extensions.xml (interface): Ditto.
+	* doc/xml/manual/extensions.xml: Ditto.
+	* doc/xml/manual/parallel_mode.xml: Ditto.
+	* doc/xml/manual/shared_ptr.xml: Ditto.
+	* doc/xml/manual/using_exceptions.xml: Ditto. And change GNU GCC
+	to GCC.
+	* doc/html/index.html: Regenerate.
+	* doc/html/manual/abi.html: Ditto.
+	* doc/html/manual/ext_concurrency_impl.html: Ditto.
+	* doc/html/manual/ext_demangling.html: Ditto.
+	* doc/html/manual/memory.html: Ditto.
+	* doc/html/manual/parallel_mode_design.html: Ditto.
+	* doc/html/manual/parallel_mode_using.html: Ditto.
+	* doc/html/manual/using_exceptions.html: Ditto.
+
+2025-01-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2025-01-08  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/118093
+	* include/bits/atomic_futex.h (_M_load_and_test_until_impl):
+	Return false for times before the epoch.
+	* src/c++11/futex.cc (_M_futex_wait_until): Extend check for
+	negative times to check for subsecond times. Add unlikely
+	attribute.
+	(_M_futex_wait_until_steady): Likewise.
+	* testsuite/30_threads/future/members/118093.cc: New test.
+
+2025-01-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2025-01-08  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/move.h (forward, move, move_if_noexcept, addressof):
+	Add @since to Doxygen comments.
+	(forward_like): Add Doxygen comment.
+
+2025-01-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2025-01-08  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/manual/evolution.xml: Replace invalid <variable>
+	elements with <varname>.
+	* doc/html/*: Regenerate.
+
+2024-12-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-12-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/format: Fix typo in Doxygen comment.
+
+2024-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-09-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/stl_vector.h (operator<=>): Use constexpr
+	instead of _GLIBCXX20_CONSTEXPR macro.
+
+2024-12-02  Jason Merrill  <jason@redhat.com>
+
+	Backported from master:
+	2024-08-28  Jason Merrill  <jason@redhat.com>
+
+	* include/std/istream: Add cast to avoid -Wsign-compare.
+	* include/std/stacktrace: Likewise.
+
+2024-12-02  Jason Merrill  <jason@redhat.com>
+
+	Backported from master:
+	2024-08-28  Jason Merrill  <jason@redhat.com>
+
+	* testsuite/20_util/default_delete/void_neg.cc: Fix regexp quoting.
+
+2024-12-02  Jason Merrill  <jason@redhat.com>
+
+	Backported from master:
+	2024-08-28  Jason Merrill  <jason@redhat.com>
+
+	* include/std/coroutine (coroutine_handle): Use nullptr instead of
+	0 as initializer for _M_fr_ptr.
+
+2024-12-02  Jason Merrill  <jason@redhat.com>
+
+	Backported from master:
+	2024-08-28  Jason Merrill  <jason@redhat.com>
+
+	* include/decimal/decimal.h (_DEFINE_DECIMAL_BINARY_OP_WITH_INT):
+	Remove redundant semicolons.
+
+2024-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-08-28  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/experimental/io_context: Remove name of unused
+	parameter.
+	* include/experimental/socket: Add [[maybe_unused]] attribute.
+
+2024-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-09-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	* src/c++11/cxx11-ios_failure.cc (__iosfail_type_info): Unhide
+	the three-arg overload of __do_upcast.
+
+2024-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-09-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	* libsupc++/exception_ptr.h (__exception_ptr::_M_safe_bool_dummy):
+	Remove __attribute__((const)) from function returning void.
+
+2024-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-08-28  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/ranges (to): Remove unused typedef.
+
+2024-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-11-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/hashtable.h (_M_insert_unique_node): Improve
+	comment.
+
+2024-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-11-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/ranges_util.h (subrange::begin): Fix constraint,
+	as per LWG 3589.
+	* testsuite/std/ranges/subrange/lwg3589.cc: New test.
+
+2024-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-11-01  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/unordered_map.h: Check __glibcxx_node_extract and
+	__glibcxx_unordered_map_try_emplace instead of __cplusplus.
+	* include/bits/unordered_set.h: Check __glibcxx_node_extract
+	instead of __cplusplus.
+
+2024-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-10-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/cpp_type_traits.h (__is_byte<byte>): Guard with
+	__glibcxx_byte macro instead of checking __cplusplus.
+
+2024-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-11-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/ranges_algo.h (__is_permutation_fn::operator()):
+	Short-circuit for sized ranges with different sizes, as per LWG
+	3560.
+	* include/bits/ranges_algobase.h (__equal_fn::operator()):
+	Likewise.
+	* include/bits/stl_algo.h (__is_permutation): Use if-constexpr
+	for random access iterator branches.
+	* include/bits/stl_algobase.h (__equal4): Likewise.
+	* testsuite/25_algorithms/equal/lwg3560.cc: New test.
+	* testsuite/25_algorithms/is_permutation/lwg3560.cc: New test.
+
+2024-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-10-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/106676
+	* include/bits/iterator_concepts.h (__cpp17_fwd_iterator): Use
+	is_reference instead of is_value_reference.
+	rvalue references.
+	* include/std/ranges (transform_view:__iter_cat::_S_iter_cat):
+	Likewise.
+	(zip_transform_view::__iter_cat::_S_iter_cat): Likewise.
+	(adjacent_transform_view::__iter_cat::_S_iter_cat): Likewise.
+	(join_with_view::__iter_cat::_S_iter_cat): Likewise.
+	* testsuite/std/ranges/adaptors/transform.cc: Check
+	iterator_category when the transformation function returns an
+	rvalue reference type.
+
+2024-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-09-27  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/basic_string.tcc (resize_for_overwrite): Fix
+	-Wsign-compare warning.
+	* include/bits/cow_string.h (resize_for_overwrite): Likewise.
+
+2024-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-10-27  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/stl_bvector.h (emplace_back, emplace): Forward
+	parameter pack to preserve value category.
+	* testsuite/23_containers/vector/bool/emplace_rvalue.cc: New
+	test.
+
+2024-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-11-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/hashtable.h: Fix spelling in comment.
+
+2024-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-11-01  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/hashtable.h: Improve comments.
+
+2024-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-11-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/117560
+	* include/bits/fs_dir.h (enable_borrowed_range, enable_view):
+	Define specializations for directory iterators, as per LWG 3480.
+	* testsuite/27_io/filesystem/iterators/lwg3480.cc: New test.
+
+2024-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-11-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/util/testsuite_performance.h (time_counter): Add
+	comment about times.
+	(time_counter::system_time): Use correct split value.
+
+2024-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-11-13  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/util/testsuite_performance.h: Use
+	__gnu_cxx::__is_single_threaded instead of __gthread_active_p().
+
+2024-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-11-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/stl_iterator.h (operator+): Add constraint to
+	move_iterator operator.
+	* testsuite/24_iterators/move_iterator/rel_ops_c++20.cc:
+
+2024-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-11-28  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/117822
+	* include/std/stacktrace (stacktrace(stacktrace&&, const A&)):
+	Fix typo in qualified-id for is_always_equal trait.
+	* testsuite/19_diagnostics/stacktrace/stacktrace.cc: Test
+	allocator-extended constructors and allocator propagation.
+
+2024-12-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-09-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/stacktrace (basic_stacktrace::_Impl::_M_allocate):
+	Do not assume allocators only throw std::bad_alloc.
+
+2024-11-12  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/unicode.h (_Utf_iterator::_M_read_utf16): Add
+	parentheses.
+
+2024-11-12  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/117520
+	* include/std/text_encoding (aliases_view:_Iterator::operator+=):
+	Fix typos that caused == to be used instead of =.
+	(aliases_view::_Iterator): Fix friend declaration.
+	* testsuite/std/text_encoding/members.cc: Adjust expected
+	behaviour of invalid subscript. Add tests for other erroneous
+	operations on iterators.
+
+2024-11-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-11-08  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/hashtable_policy.h (_Insert_base::try_emplace):
+	Do not define for C++11 and C++14.
+	* include/debug/map.h (try_emplace): Use feature test macro.
+	* include/debug/unordered_map (try_emplace): Likewise.
+	* testsuite/17_intro/names.cc: Define try_emplace before C++17.
+
+2024-11-04  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-11-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR libstdc++/117406
+	* testsuite/26_numerics/headers/cmath/117406.cc: Use
+	std::numeric_limits<int>::max() instead of INT_MAX.
+
+2024-11-04  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-11-02  Jakub Jelinek  <jakub@redhat.com>
+
+	PR libstdc++/117406
+	* include/c_global/cmath (std::ilogb(_Float16), std::llrint(_Float16),
+	std::llround(_Float16), std::lrint(_Float16), std::lround(_Float16)):
+	Don't cast __builtin_* return to _Float16.
+	(std::ilogb(__gnu_cxx::__bfloat16_t),
+	std::llrint(__gnu_cxx::__bfloat16_t),
+	std::llround(__gnu_cxx::__bfloat16_t),
+	std::lrint(__gnu_cxx::__bfloat16_t),
+	std::lround(__gnu_cxx::__bfloat16_t)): Don't cast __builtin_* return to
+	__gnu_cxx::__bfloat16_t.
+	* testsuite/26_numerics/headers/cmath/117406.cc: New test.
+
+2024-11-04  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2024-10-29  Jakub Jelinek  <jakub@redhat.com>
+
+	PR libstdc++/117321
+	* include/c_global/cmath (nextafter(_Float16, _Float16)): Use
+	if consteval rather than if (std::__is_constant_evaluated()) around
+	the __builtin_nextafterf16 call.
+	(nextafter(__gnu_cxx::__bfloat16_t, __gnu_cxx::__bfloat16_t)): Use
+	if consteval rather than if (std::__is_constant_evaluated()) around
+	the __builtin_nextafterf16b call.
+	* testsuite/26_numerics/headers/cmath/117321.cc: New test.
+
 2024-10-22  Patrick Palka  <ppalka@redhat.com>
 
 	Backported from master:
