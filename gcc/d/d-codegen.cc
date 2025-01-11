@@ -972,15 +972,15 @@ lower_struct_comparison (tree_code code, StructDeclaration *sd,
 	  /* Compare inner data structures.  */
 	  tcmp = lower_struct_comparison (code, ts->sym, t1ref, t2ref);
 	}
-      else if (type->ty != TY::Tvector && type->isintegral ())
+      else if (type->ty != TY::Tvector && type->isIntegral ())
 	{
 	  /* Integer comparison, no special handling required.  */
 	  tcmp = build_boolop (code, t1ref, t2ref);
 	}
-      else if (type->ty != TY::Tvector && type->isfloating ())
+      else if (type->ty != TY::Tvector && type->isFloating ())
 	{
 	  /* Floating-point comparison, don't compare padding in type.  */
-	  if (!type->iscomplex ())
+	  if (!type->isComplex ())
 	    tcmp = build_float_identity (code, t1ref, t2ref);
 	  else
 	    {
@@ -2119,7 +2119,7 @@ call_side_effect_free_p (FuncDeclaration *func, Type *type)
 
       /* Must be a `nothrow' function.  */
       TypeFunction *tf = func->type->toTypeFunction ();
-      if (!tf->isnothrow ())
+      if (!tf->isNothrow ())
 	return false;
 
       /* Return type can't be `void' or `noreturn', as that implies all work is
@@ -2137,7 +2137,7 @@ call_side_effect_free_p (FuncDeclaration *func, Type *type)
       TypeFunction *tf = get_function_type (type);
 
       /* Must be a `nothrow` function type.  */
-      if (tf == NULL || !tf->isnothrow ())
+      if (tf == NULL || !tf->isNothrow ())
 	return false;
 
       /* Return type can't be `void' or `noreturn', as that implies all work is
@@ -2915,7 +2915,7 @@ get_frameinfo (FuncDeclaration *fd)
          symbols, give it a decent error for now.  */
       if (requiresClosure != fd->requiresClosure
 	  && (fd->nrvo_var || !global.params.useGC))
-	fd->checkClosure ();
+	dmd::checkClosure (fd);
 
       /* Set-up a closure frame, this will be allocated on the heap.  */
       FRAMEINFO_CREATES_FRAME (ffi) = 1;

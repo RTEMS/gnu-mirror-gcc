@@ -361,13 +361,13 @@ constexpr auto AARCH64_FL_DEFAULT_ISA_MODE ATTRIBUTE_UNUSED
 #define TARGET_ARMV8_3	AARCH64_HAVE_ISA (V8_3A)
 
 /* Javascript conversion instruction from Armv8.3-a.  */
-#define TARGET_JSCVT	(TARGET_FLOAT && TARGET_ARMV8_3)
+#define TARGET_JSCVT	AARCH64_HAVE_ISA (JSCVT)
 
 /* Armv8.3-a Complex number extension to AdvSIMD extensions.  */
-#define TARGET_COMPLEX (TARGET_SIMD && TARGET_ARMV8_3)
+#define TARGET_COMPLEX AARCH64_HAVE_ISA (FCMA)
 
 /* Floating-point rounding instructions from Armv8.5-a.  */
-#define TARGET_FRINT (AARCH64_HAVE_ISA (V8_5A) && TARGET_FLOAT)
+#define TARGET_FRINT AARCH64_HAVE_ISA (FRINTTS)
 
 /* TME instructions are enabled.  */
 #define TARGET_TME AARCH64_HAVE_ISA (TME)
@@ -427,7 +427,7 @@ constexpr auto AARCH64_FL_DEFAULT_ISA_MODE ATTRIBUTE_UNUSED
 
 /* The RCPC2 extensions from Armv8.4-a that allow immediate offsets to LDAPR
    and sign-extending versions.*/
-#define TARGET_RCPC2 ((AARCH64_HAVE_ISA (V8_4A) && TARGET_RCPC) || TARGET_RCPC3)
+#define TARGET_RCPC2 AARCH64_HAVE_ISA (RCPC2)
 
 /* RCPC3 (Release Consistency) extensions, optional from Armv8.2-a.  */
 #define TARGET_RCPC3 AARCH64_HAVE_ISA (RCPC3)
@@ -1651,6 +1651,10 @@ enum class aarch64_tristate_mode : int { NO, YES, MAYBE };
 #define NUM_MODES_FOR_MODE_SWITCHING \
   { int (aarch64_tristate_mode::MAYBE), \
     int (aarch64_local_sme_state::ANY) }
+
+/* Zero terminated list of regnos for which hardreg PRE should be
+   applied.  */
+#define HARDREG_PRE_REGNOS { FPM_REGNUM, 0 }
 
 #endif
 

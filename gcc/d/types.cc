@@ -481,7 +481,7 @@ layout_aggregate_members (Dsymbols *members, tree context, bool inherited_p)
       AttribDeclaration *attrib = sym->isAttribDeclaration ();
       if (attrib != NULL)
 	{
-	  Dsymbols *decls = attrib->include (NULL);
+	  Dsymbols *decls = dmd::include (attrib, NULL);
 	  if (decls != NULL)
 	    {
 	      fields += layout_aggregate_members (decls, context, inherited_p);
@@ -892,7 +892,7 @@ public:
 
   void visit (TypeSArray *t) final override
   {
-    if (t->dim->isConst () && t->dim->type->isintegral ())
+    if (t->dim->isConst () && t->dim->type->isIntegral ())
       {
 	uinteger_t size = t->dim->toUInteger ();
 	t->ctype = make_array_type (t->next, size);
@@ -975,7 +975,7 @@ public:
     if (t->next != NULL)
       {
 	fntype = build_ctype (t->next);
-	if (t->isref ())
+	if (t->isRef ())
 	  fntype = build_reference_type (fntype);
       }
     else

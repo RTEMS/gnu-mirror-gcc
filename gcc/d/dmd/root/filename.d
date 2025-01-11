@@ -277,7 +277,7 @@ nothrow:
      * Returns:
      *  the slice
      */
-    extern (D) static const(char)[] sansExt(const char[] filename)
+    extern (D) static const(char)[] sansExt(const char[] filename) @safe
     {
         auto e = ext(filename);
         size_t length = e.length;
@@ -591,13 +591,13 @@ nothrow:
     /***************************
      * Free returned value with FileName::free()
      */
-    extern (C++) static const(char)* defaultExt(const(char)* name, const(char)* ext)
+    extern (C++) static const(char)* defaultExt(const(char)* name, const(char)* ext) pure
     {
         return defaultExt(name.toDString, ext.toDString).ptr;
     }
 
     /// Ditto
-    extern (D) static const(char)[] defaultExt(const char[] name, const char[] ext)
+    extern (D) static const(char)[] defaultExt(const char[] name, const char[] ext) pure
     {
         auto e = FileName.ext(name);
         if (e.length) // it already has an extension
@@ -615,13 +615,13 @@ nothrow:
     /***************************
      * Free returned value with FileName::free()
      */
-    extern (C++) static const(char)* forceExt(const(char)* name, const(char)* ext)
+    extern (C++) static const(char)* forceExt(const(char)* name, const(char)* ext) pure
     {
         return forceExt(name.toDString, ext.toDString).ptr;
     }
 
     /// Ditto
-    extern (D) static const(char)[] forceExt(const char[] name, const char[] ext)
+    extern (D) static const(char)[] forceExt(const char[] name, const char[] ext) pure
     {
         if (auto e = FileName.ext(name))
             return addExt(name[0 .. $ - e.length - 1], ext);
@@ -1101,7 +1101,7 @@ nothrow:
         return str.ptr;
     }
 
-    const(char)[] toString() const pure nothrow @nogc @trusted
+    const(char)[] toString() const pure nothrow @nogc @safe
     {
         return str;
     }

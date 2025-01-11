@@ -662,7 +662,7 @@ public:
     this->layout_string (ed->toPrettyChars ());
 
     /* Default initializer for enum.  */
-    if (ed->members && !d->tinfo->isZeroInit ())
+    if (ed->members && !dmd::isZeroInit (d->tinfo))
       {
 	tree length = size_int (dmd::size (ed->type));
 	tree ptr = build_address (enum_initializer_decl (ed));
@@ -1415,7 +1415,7 @@ check_typeinfo_type (const Loc &loc, Scope *sc, Expression *expr)
     {
       /* Even when compiling without RTTI we should still be able to evaluate
 	 TypeInfo at compile-time, just not at run-time.  */
-      if (!sc || !(sc->flags & unsigned(SCOPE::ctfe)))
+      if (!sc || !sc->ctfe ())
 	{
 	  static int warned = 0;
 
@@ -1540,12 +1540,10 @@ get_cpp_typeinfo_decl (ClassDeclaration *decl)
   return decl->cpp_type_info_ptr_sym;
 }
 
-/* Get the exact TypeInfo for TYPE, if it doesn't exist, create it.
-   When GENERATE is true, push the TypeInfo as a member of MOD so that it will
-   get code generation. */
+/* Get the exact TypeInfo for TYPE, if it doesn't exist, create it.  */
 
 void
-create_typeinfo (Type *type, Module *mod, bool generate)
+create_typeinfo (Type *type, Module *mod)
 {
   if (!Type::dtypeinfo)
     create_frontend_tinfo_types ();
@@ -1703,7 +1701,7 @@ create_typeinfo (Type *type, Module *mod, bool generate)
 
       /* If this has a custom implementation in rt/typeinfo, then
 	 do not generate a COMDAT for it.  */
-      if (generate && !builtin_typeinfo_p (t))
+      if (!builtin_typeinfo_p (t))
 	{
 	  /* Find module that will go all the way to an object file.  */
 	  if (mod)

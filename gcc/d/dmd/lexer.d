@@ -53,6 +53,7 @@ struct CompileEnv
     const(char)[] timestamp; /// __TIMESTAMP__
 
     bool previewIn;          /// `in` means `[ref] scope const`, accepts rvalues
+    bool transitionIn;       /// `-transition=in` is active, `in` parameters are listed
     bool ddocOutput;         /// collect embedded documentation comments
     bool masm;               /// use MASM inline asm syntax
 
@@ -499,7 +500,7 @@ class Lexer
                     clexerCharConstant(*t, c);
                     return;
                 }
-                else if (p[1] == '\"')  // C wide string literal
+                if (p[1] == '\"')  // C wide string literal
                 {
                     const c = *p;
                     ++p;
@@ -509,7 +510,7 @@ class Lexer
                                 'd';
                     return;
                 }
-                else if (p[1] == '8' && p[2] == '\"') // C UTF-8 string literal
+                if (p[1] == '8' && p[2] == '\"') // C UTF-8 string literal
                 {
                     p += 2;
                     escapeStringConstant(t);
@@ -542,14 +543,13 @@ class Lexer
                     delimitedStringConstant(t);
                     return;
                 }
-                else if (p[1] == '{')
+                if (p[1] == '{')
                 {
                     p++;
                     tokenStringConstant(t);
                     return;
                 }
-                else
-                    goto case_ident;
+                goto case_ident;
             case 'i':
                 if (Ccompile)
                     goto case_ident;
@@ -559,20 +559,19 @@ class Lexer
                     escapeStringConstant(t, true);
                     return;
                 }
-                else if (p[1] == '`')
+                if (p[1] == '`')
                 {
                     p++; // skip the i
                     wysiwygStringConstant(t, true);
                     return;
                 }
-                else if (p[1] == 'q' && p[2] == '{')
+                if (p[1] == 'q' && p[2] == '{')
                 {
                     p += 2; // skip the i and q
                     tokenStringConstant(t, true);
                     return;
                 }
-                else
-                    goto case_ident;
+                goto case_ident;
             case '"':
                 escapeStringConstant(t);
                 return;
@@ -894,7 +893,7 @@ class Lexer
                         t.value = TOK.comment;
                         return;
                     }
-                    else if (doDocComment && t.ptr[2] == '*' && p - 4 != t.ptr)
+                    if (doDocComment && t.ptr[2] == '*' && p - 4 != t.ptr)
                     {
                         // if /** but not /**/
                         getDocComment(t, lastLine == startLoc.linnum, startLoc.linnum - lastDocLine > 1);

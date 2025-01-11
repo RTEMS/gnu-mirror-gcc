@@ -114,6 +114,7 @@ extern (C++) struct Target
     /// Architecture name
     const(char)[] architectureName;
     CPU cpu;                // CPU instruction set to target
+    bool isAArch64;         // generate 64 bit Arm code
     bool isX86_64;          // generate 64 bit code for x86_64; true by default for 64 bit dmd
     bool isX86;             // generate 32 bit Intel x86 code
     bool isLP64;            // pointers are 64 bits
@@ -300,6 +301,8 @@ extern (C++) struct Target
  */
 struct TargetC
 {
+    import dmd.declaration : BitFieldDeclaration;
+
     enum Runtime : ubyte
     {
         Unspecified,
@@ -330,6 +333,14 @@ struct TargetC
     ubyte wchar_tsize;        /// size of a C `wchar_t` type
     Runtime runtime;          /// vendor of the C runtime to link against
     BitFieldStyle bitFieldStyle; /// different C compilers do it differently
+
+    /**
+     * Indicates whether the specified bit-field contributes to the alignment
+     * of the containing aggregate.
+     * E.g., (not all) ARM ABIs do NOT ignore anonymous (incl. 0-length)
+     * bit-fields.
+     */
+    extern (C++) bool contributesToAggregateAlignment(BitFieldDeclaration bfd);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

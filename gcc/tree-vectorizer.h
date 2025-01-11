@@ -1278,6 +1278,11 @@ public:
   poly_uint64 target_alignment;
   /* If true the alignment of base_decl needs to be increased.  */
   bool base_misaligned;
+
+  /* Set by early break vectorization when this DR needs peeling for alignment
+     for correctness.  */
+  bool need_peeling_for_alignment;
+
   tree base_decl;
 
   /* Stores current vectorized loop's offset.  To be added to the DR's
@@ -2338,7 +2343,7 @@ extern bool supportable_narrowing_operation (code_helper, tree, tree,
 					     vec<tree> *);
 extern bool supportable_indirect_convert_operation (code_helper,
 						    tree, tree,
-						    vec<std::pair<tree, tree_code> > *,
+						    vec<std::pair<tree, tree_code> > &,
 						    tree = NULL_TREE);
 extern int compare_step_with_zero (vec_info *, stmt_vec_info);
 

@@ -29,15 +29,14 @@ import dmd.dcast;
 import dmd.dclass;
 import dmd.declaration;
 import dmd.delegatize;
-import dmd.dinterpret;
 import dmd.dmodule;
 import dmd.dscope;
 import dmd.dstruct;
 import dmd.dsymbol;
 import dmd.dtemplate;
-import dmd.errors;
 import dmd.escape;
 import dmd.expression;
+import dmd.funcsem : overloadApply;
 import dmd.globals;
 import dmd.hdrgen;
 import dmd.id;
@@ -46,17 +45,12 @@ import dmd.init;
 import dmd.location;
 import dmd.mtype;
 import dmd.objc;
-import dmd.root.aav;
 import dmd.common.outbuffer;
 import dmd.rootobject;
 import dmd.root.string;
 import dmd.root.stringtable;
-import dmd.semantic2;
-import dmd.semantic3;
-import dmd.statement_rewrite_walker;
 import dmd.statement;
 import dmd.tokens;
-import dmd.typesem;
 import dmd.visitor;
 
 version (IN_GCC) {}
@@ -119,9 +113,8 @@ private struct FUNCFLAG
     bool safetyInprocess;    /// working on determining safety
     bool nothrowInprocess;   /// working on determining nothrow
     bool nogcInprocess;      /// working on determining @nogc
-    bool returnInprocess;    /// working on inferring 'return' for parameters
+    bool scopeInprocess;     /// infer `return` and `scope` for parameters
     bool inlineScanned;      /// function has been scanned for inline possibilities
-    bool inferScope;         /// infer 'scope' for parameters
     bool hasCatches;         /// function has try-catch statements
     bool skipCodegen;        /// do not generate code for this function.
     bool printf;             /// is a printf-like function
@@ -144,6 +137,10 @@ private struct FUNCFLAG
     bool computedEscapingSiblings; /// `hasEscapingSiblings` has been computed
     bool dllImport;          /// __declspec(dllimport)
     bool dllExport;          /// __declspec(dllexport)
+
+    bool hasReturnExp;         /// Has return exp; statement
+    bool hasInlineAsm;         /// Has asm{} statement
+    bool hasMultipleReturnExp; /// Has multiple return exp; statements
 }
 
 /***********************************************************
@@ -165,15 +162,12 @@ extern (C++) struct Ensure
      */
     static Ensures* arraySyntaxCopy(Ensures* a)
     {
-        Ensures* b = null;
-        if (a)
-        {
-            b = a.copy();
-            foreach (i, e; *a)
-            {
-                (*b)[i] = e.syntaxCopy();
-            }
-        }
+        if (!a)
+            return null;
+
+        Ensures* b = a.copy();
+        foreach (i, e; *a)
+            (*b)[i] = e.syntaxCopy();
         return b;
     }
 
@@ -243,13 +237,6 @@ extern (C++) class FuncDeclaration : Declaration
     StorageClass storage_class2;        /// storage class for template onemember's
 
     // Things that should really go into Scope
-
-    /// 1 if there's a return exp; statement
-    /// 2 if there's a throw statement
-    /// 4 if there's an assert(0)
-    /// 8 if there's inline asm
-    /// 16 if there are multiple return statements
-    int hasReturnExp;
 
     VarDeclaration nrvo_var;            /// variable to replace with shidden
     Symbol* shidden;                    /// hidden pointer passed to function
@@ -387,40 +374,38 @@ extern (C++) class FuncDeclaration : Declaration
         if (this == o)
             return true;
 
-        if (auto s = isDsymbol(o))
-        {
-            auto fd1 = this;
-            auto fd2 = s.isFuncDeclaration();
-            if (!fd2)
-                return false;
+        auto s = isDsymbol(o);
+        if (!s)
+            return false;
 
-            auto fa1 = fd1.isFuncAliasDeclaration();
-            auto faf1 = fa1 ? fa1.toAliasFunc() : fd1;
+        auto fd1 = this;
+        auto fd2 = s.isFuncDeclaration();
+        if (!fd2)
+            return false;
 
-            auto fa2 = fd2.isFuncAliasDeclaration();
-            auto faf2 = fa2 ? fa2.toAliasFunc() : fd2;
+        auto fa1 = fd1.isFuncAliasDeclaration();
+        auto faf1 = fa1 ? fa1.toAliasFunc() : fd1;
 
-            if (fa1 && fa2)
-            {
-                return faf1.equals(faf2) && fa1.hasOverloads == fa2.hasOverloads;
-            }
+        auto fa2 = fd2.isFuncAliasDeclaration();
+        auto faf2 = fa2 ? fa2.toAliasFunc() : fd2;
 
-            bool b1 = fa1 !is null;
-            if (b1 && faf1.isUnique() && !fa1.hasOverloads)
-                b1 = false;
+        if (fa1 && fa2)
+            return faf1.equals(faf2) && fa1.hasOverloads == fa2.hasOverloads;
 
-            bool b2 = fa2 !is null;
-            if (b2 && faf2.isUnique() && !fa2.hasOverloads)
-                b2 = false;
+        bool b1 = fa1 !is null;
+        if (b1 && faf1.isUnique() && !fa1.hasOverloads)
+            b1 = false;
 
-            if (b1 != b2)
-                return false;
+        bool b2 = fa2 !is null;
+        if (b2 && faf2.isUnique() && !fa2.hasOverloads)
+            b2 = false;
 
-            return faf1.toParent().equals(faf2.toParent()) &&
-                   faf1.ident.equals(faf2.ident) &&
-                   faf1.type.equals(faf2.type);
-        }
-        return false;
+        if (b1 != b2)
+            return false;
+
+        return faf1.toParent().equals(faf2.toParent()) &&
+               faf1.ident.equals(faf2.ident) &&
+               faf1.type.equals(faf2.type);
     }
 
     /****************************************************
@@ -431,8 +416,7 @@ extern (C++) class FuncDeclaration : Declaration
     {
         //printf("FuncDeclaration::overloadInsert(s = %s) this = %s\n", s.toChars(), toChars());
         assert(s != this);
-        AliasDeclaration ad = s.isAliasDeclaration();
-        if (ad)
+        if (AliasDeclaration ad = s.isAliasDeclaration())
         {
             if (overnext)
                 return overnext.overloadInsert(ad);
@@ -459,26 +443,6 @@ extern (C++) class FuncDeclaration : Declaration
         if (!fd)
             return false;
 
-        version (none)
-        {
-            /* Disable this check because:
-             *  const void foo();
-             * semantic() isn't run yet on foo(), so the const hasn't been
-             * applied yet.
-             */
-            if (type)
-            {
-                printf("type = %s\n", type.toChars());
-                printf("fd.type = %s\n", fd.type.toChars());
-            }
-            // fd.type can be NULL for overloaded constructors
-            if (type && fd.type && fd.type.covariant(type) && fd.type.mod == type.mod && !isFuncAliasDeclaration())
-            {
-                //printf("\tfalse: conflict %s\n", kind());
-                return false;
-            }
-        }
-
         if (overnext)
         {
             td = overnext.isTemplateDeclaration();
@@ -501,8 +465,7 @@ extern (C++) class FuncDeclaration : Declaration
         while (f && f.overnext)
         {
             //printf("f.overnext = %p %s\n", f.overnext, f.overnext.toChars());
-            TemplateDeclaration td = f.overnext.isTemplateDeclaration();
-            if (td)
+            if (TemplateDeclaration td = f.overnext.isTemplateDeclaration())
                 return td;
             f = f.overnext.isFuncDeclaration();
         }
@@ -705,172 +668,17 @@ extern (C++) class FuncDeclaration : Declaration
         return false;
     }
 
-    /*****************************************
-     * Initialize for inferring the attributes of this function.
-     */
-    final void initInferAttributes()
-    {
-        //printf("initInferAttributes() for %s (%s)\n", toPrettyChars(), ident.toChars());
-        TypeFunction tf = type.toTypeFunction();
-        if (tf.purity == PURE.impure) // purity not specified
-            purityInprocess = true;
-
-        if (tf.trust == TRUST.default_)
-            safetyInprocess = true;
-
-        if (!tf.isnothrow)
-            nothrowInprocess = true;
-
-        if (!tf.isnogc)
-            nogcInprocess = true;
-
-        if (!isVirtual() || this.isIntroducing())
-            returnInprocess = true;
-
-        // Initialize for inferring STC.scope_
-        inferScope = true;
-    }
-
-    extern (D) final uint flags()
+    extern (D) final uint saveFlags()
     {
         return bitFields;
     }
 
-    extern (D) final uint flags(uint f)
+    extern (D) final uint restoreFlags(uint f)
     {
         bitFields = f;
         return bitFields;
     }
 
-    final bool isSafe()
-    {
-        if (safetyInprocess)
-            setUnsafe();
-        return type.toTypeFunction().trust == TRUST.safe;
-    }
-
-    extern (D) final bool isSafeBypassingInference()
-    {
-        return !(safetyInprocess) && isSafe();
-    }
-
-    final bool isTrusted()
-    {
-        if (safetyInprocess)
-            setUnsafe();
-        return type.toTypeFunction().trust == TRUST.trusted;
-    }
-
-    /**************************************
-     * The function is doing something unsafe, so mark it as unsafe.
-     *
-     * Params:
-     *   gag = surpress error message (used in escape.d)
-     *   loc = location of error
-     *   fmt = printf-style format string
-     *   arg0  = (optional) argument for first %s format specifier
-     *   arg1  = (optional) argument for second %s format specifier
-     *   arg2  = (optional) argument for third %s format specifier
-     * Returns: whether there's a safe error
-     */
-    extern (D) final bool setUnsafe(
-        bool gag = false, Loc loc = Loc.init, const(char)* fmt = null,
-        RootObject arg0 = null, RootObject arg1 = null, RootObject arg2 = null)
-    {
-        if (safetyInprocess)
-        {
-            safetyInprocess = false;
-            type.toTypeFunction().trust = TRUST.system;
-            if (fmt || arg0)
-                safetyViolation = new AttributeViolation(loc, fmt, arg0, arg1, arg2);
-
-            if (fes)
-                fes.func.setUnsafe();
-        }
-        else if (isSafe())
-        {
-            if (!gag && fmt)
-                .error(loc, fmt, arg0 ? arg0.toChars() : "", arg1 ? arg1.toChars() : "", arg2 ? arg2.toChars() : "");
-
-            return true;
-        }
-        return false;
-    }
-
-    /**************************************
-     * The function is calling `@system` function `f`, so mark it as unsafe.
-     *
-     * Params:
-     *   f = function being called (needed for diagnostic of inferred functions)
-     * Returns: whether there's a safe error
-     */
-    extern (D) final bool setUnsafeCall(FuncDeclaration f)
-    {
-        return setUnsafe(false, f.loc, null, f, null);
-    }
-
-    final bool isNogc()
-    {
-        //printf("isNogc() %s, inprocess: %d\n", toChars(), !!(flags & FUNCFLAG.nogcInprocess));
-        if (nogcInprocess)
-            setGC(loc, null);
-        return type.toTypeFunction().isnogc;
-    }
-
-    extern (D) final bool isNogcBypassingInference()
-    {
-        return !nogcInprocess && isNogc();
-    }
-
-    /**************************************
-     * The function is doing something that may allocate with the GC,
-     * so mark it as not nogc (not no-how).
-     *
-     * Params:
-     *     loc = location of impure action
-     *     fmt = format string for error message. Must include "%s `%s`" for the function kind and name.
-     *     arg0 = (optional) argument to format string
-     *
-     * Returns:
-     *      true if function is marked as @nogc, meaning a user error occurred
-     */
-    extern (D) final bool setGC(Loc loc, const(char)* fmt, RootObject arg0 = null)
-    {
-        //printf("setGC() %s\n", toChars());
-        if (nogcInprocess && semanticRun < PASS.semantic3 && _scope)
-        {
-            this.semantic2(_scope);
-            this.semantic3(_scope);
-        }
-
-        if (nogcInprocess)
-        {
-            nogcInprocess = false;
-            if (fmt)
-                nogcViolation = new AttributeViolation(loc, fmt, this, arg0); // action that requires GC
-            else if (arg0)
-                nogcViolation = new AttributeViolation(loc, fmt, arg0); // call to non-@nogc function
-
-            type.toTypeFunction().isnogc = false;
-            if (fes)
-                fes.func.setGC(Loc.init, null, null);
-        }
-        else if (isNogc())
-            return true;
-        return false;
-    }
-
-    /**************************************
-     * The function calls non-`@nogc` function f, mark it as not nogc.
-     * Params:
-     *     f = function being called
-     * Returns:
-     *      true if function is marked as @nogc, meaning a user error occurred
-     */
-    extern (D) final bool setGCCall(FuncDeclaration f)
-    {
-        return setGC(loc, null, f);
-    }
 
     /**************************************
      * The function is doing something that may throw an exception, register that in case nothrow is being inferred
@@ -897,18 +705,6 @@ extern (C++) class FuncDeclaration : Declaration
     extern (D) final void setThrowCall(Loc loc, FuncDeclaration f)
     {
         return setThrow(loc, null, f);
-    }
-
-    extern (D) final void printGCUsage(const ref Loc loc, const(char)* warn)
-    {
-        if (!global.params.v.gc)
-            return;
-
-        Module m = getModule();
-        if (m && m.isRoot() && !inUnittest())
-        {
-            message(loc, "vgc: %s", warn);
-        }
     }
 
     /****************************************
@@ -1154,75 +950,6 @@ extern (C++) class FuncDeclaration : Declaration
     }
 
     /***********************************************
-     * Check that the function contains any closure.
-     * If it's @nogc, report suitable errors.
-     * This is mostly consistent with FuncDeclaration::needsClosure().
-     *
-     * Returns:
-     *      true if any errors occur.
-     */
-    extern (C++) final bool checkClosure()
-    {
-        //printf("checkClosure() %s\n", toPrettyChars());
-        if (!needsClosure())
-            return false;
-
-        if (setGC(loc, "%s `%s` is `@nogc` yet allocates closure for `%s()` with the GC", this))
-        {
-            .error(loc, "%s `%s` is `@nogc` yet allocates closure for `%s()` with the GC", kind, toPrettyChars, toChars());
-            if (global.gag)     // need not report supplemental errors
-                return true;
-        }
-        else if (!global.params.useGC)
-        {
-            .error(loc, "%s `%s` is `-betterC` yet allocates closure for `%s()` with the GC", kind, toPrettyChars, toChars());
-            if (global.gag)     // need not report supplemental errors
-                return true;
-        }
-        else
-        {
-            printGCUsage(loc, "using closure causes GC allocation");
-            return false;
-        }
-
-        FuncDeclarations a;
-        foreach (v; closureVars)
-        {
-            foreach (f; v.nestedrefs)
-            {
-                assert(f !is this);
-
-            LcheckAncestorsOfANestedRef:
-                for (Dsymbol s = f; s && s !is this; s = s.toParentP(this))
-                {
-                    auto fx = s.isFuncDeclaration();
-                    if (!fx)
-                        continue;
-                    if (fx.isThis() ||
-                        fx.tookAddressOf ||
-                        checkEscapingSiblings(fx, this))
-                    {
-                        foreach (f2; a)
-                        {
-                            if (f2 == f)
-                                break LcheckAncestorsOfANestedRef;
-                        }
-                        a.push(f);
-                        .errorSupplemental(f.loc, "%s `%s` closes over variable `%s`",
-                            f.kind, f.toPrettyChars(), v.toChars());
-                        if (v.ident != Id.This)
-                            .errorSupplemental(v.loc, "`%s` declared here", v.toChars());
-
-                        break LcheckAncestorsOfANestedRef;
-                    }
-                }
-            }
-        }
-
-        return true;
-    }
-
-    /***********************************************
      * Determine if function's variables are referenced by a function
      * nested within it.
      */
@@ -1262,8 +989,7 @@ extern (C++) class FuncDeclaration : Declaration
     {
         if (type)
         {
-            TypeFunction fdtype = type.isTypeFunction();
-            if (fdtype) // Could also be TypeError
+            if (TypeFunction fdtype = type.isTypeFunction()) // Could also be TypeError
                 return fdtype.parameterList;
         }
 
@@ -1324,118 +1050,6 @@ extern (C++) class FuncDeclaration : Declaration
     {
         v.visit(this);
     }
-}
-
-/***************************************************
- * Visit each overloaded function/template in turn, and call dg(s) on it.
- * Exit when no more, or dg(s) returns nonzero.
- *
- * Params:
- *  fstart = symbol to start from
- *  dg = the delegate to be called on the overload
- *  sc = context used to check if symbol is accessible (and therefore visible),
- *       can be null
- *
- * Returns:
- *      ==0     continue
- *      !=0     done (and the return value from the last dg() call)
- */
-extern (D) int overloadApply(Dsymbol fstart, scope int delegate(Dsymbol) dg, Scope* sc = null)
-{
-    Dsymbols visited;
-
-    int overloadApplyRecurse(Dsymbol fstart, scope int delegate(Dsymbol) dg, Scope* sc)
-    {
-        // Detect cyclic calls.
-        if (visited.contains(fstart))
-            return 0;
-        visited.push(fstart);
-
-        Dsymbol next;
-        for (auto d = fstart; d; d = next)
-        {
-            import dmd.access : checkSymbolAccess;
-            if (auto od = d.isOverDeclaration())
-            {
-                /* The scope is needed here to check whether a function in
-                   an overload set was added by means of a private alias (or a
-                   selective import). If the scope where the alias is created
-                   is imported somewhere, the overload set is visible, but the private
-                   alias is not.
-                */
-                if (sc)
-                {
-                    if (checkSymbolAccess(sc, od))
-                    {
-                        if (int r = overloadApplyRecurse(od.aliassym, dg, sc))
-                            return r;
-                    }
-                }
-                else if (int r = overloadApplyRecurse(od.aliassym, dg, sc))
-                    return r;
-                next = od.overnext;
-            }
-            else if (auto fa = d.isFuncAliasDeclaration())
-            {
-                if (fa.hasOverloads)
-                {
-                    if (int r = overloadApplyRecurse(fa.funcalias, dg, sc))
-                        return r;
-                }
-                else if (auto fd = fa.toAliasFunc())
-                {
-                    if (int r = dg(fd))
-                        return r;
-                }
-                else
-                {
-                    .error(d.loc, "%s `%s` is aliased to a function", d.kind, d.toPrettyChars);
-                    break;
-                }
-                next = fa.overnext;
-            }
-            else if (auto ad = d.isAliasDeclaration())
-            {
-                if (sc)
-                {
-                    if (checkSymbolAccess(sc, ad))
-                        next = ad.toAlias();
-                }
-                else
-                   next = ad.toAlias();
-                if (next == ad)
-                    break;
-                if (next == fstart)
-                    break;
-            }
-            else if (auto td = d.isTemplateDeclaration())
-            {
-                if (int r = dg(td))
-                    return r;
-                next = td.overnext;
-            }
-            else if (auto fd = d.isFuncDeclaration())
-            {
-                if (int r = dg(fd))
-                    return r;
-                next = fd.overnext;
-            }
-            else if (auto os = d.isOverloadSet())
-            {
-                foreach (ds; os.a)
-                    if (int r = dg(ds))
-                        return r;
-            }
-            else
-            {
-                .error(d.loc, "%s `%s` is aliased to a function", d.kind, d.toPrettyChars);
-                break;
-                // BUG: should print error message?
-            }
-        }
-        return 0;
-    }
-    return overloadApplyRecurse(fstart, dg, sc);
 }
 
 /**
@@ -1551,7 +1165,7 @@ private void markAsNeedingClosure(Dsymbol f, FuncDeclaration outerFunc)
  * Returns:
  *      true if any closures were needed
  */
-private bool checkEscapingSiblings(FuncDeclaration f, FuncDeclaration outerFunc, void* p = null)
+bool checkEscapingSiblings(FuncDeclaration f, FuncDeclaration outerFunc, void* p = null)
 {
     static struct PrevSibling
     {
@@ -1677,7 +1291,7 @@ extern (C++) final class FuncLiteralDeclaration : FuncDeclaration
         this.fes = fes;
         // Always infer scope for function literals
         // See https://issues.dlang.org/show_bug.cgi?id=20362
-        this.inferScope = true;
+        this.scopeInprocess = true;
         //printf("FuncLiteralDeclaration() id = '%s', type = '%s'\n", this.ident.toChars(), type.toChars());
     }
 
@@ -1732,8 +1346,7 @@ extern (C++) final class FuncLiteralDeclaration : FuncDeclaration
     {
         if (parent)
         {
-            TemplateInstance ti = parent.isTemplateInstance();
-            if (ti)
+            if (TemplateInstance ti = parent.isTemplateInstance())
                 return ti.tempdecl.toPrettyChars(QualifyTypes);
         }
         return Dsymbol.toPrettyChars(QualifyTypes);
@@ -2268,69 +1881,4 @@ struct AttributeViolation
     RootObject arg1 = null;
     /// ditto
     RootObject arg2 = null;
-}
-
-/// Print the reason why `fd` was inferred `@system` as a supplemental error
-/// Params:
-///   fd = function to check
-///   maxDepth = up to how many functions deep to report errors
-///   deprecation = print deprecations instead of errors
-///   stc = storage class of attribute to check
-void errorSupplementalInferredAttr(FuncDeclaration fd, int maxDepth, bool deprecation, STC stc)
-{
-    auto errorFunc = deprecation ? &deprecationSupplemental : &errorSupplemental;
-
-    AttributeViolation* s;
-    const(char)* attr;
-    if (stc & STC.safe)
-    {
-        s = fd.safetyViolation;
-        attr = "@safe";
-    }
-    else if (stc & STC.pure_)
-    {
-        s = fd.pureViolation;
-        attr = "pure";
-    }
-    else if (stc & STC.nothrow_)
-    {
-        s = fd.nothrowViolation;
-        attr = "nothrow";
-    }
-    else if (stc & STC.nogc)
-    {
-        s = fd.nogcViolation;
-        attr = "@nogc";
-    }
-
-    if (s)
-    {
-        if (s.fmtStr)
-        {
-            errorFunc(s.loc, deprecation ?
-                "which wouldn't be `%s` because of:" :
-                "which wasn't inferred `%s` because of:", attr);
-            if (stc == STC.nogc || stc == STC.pure_)
-            {
-                auto f = (cast(Dsymbol) s.arg0).isFuncDeclaration();
-                errorFunc(s.loc, s.fmtStr, f.kind(), f.toPrettyChars(), s.arg1 ? s.arg1.toChars() : "");
-            }
-            else
-            {
-                errorFunc(s.loc, s.fmtStr,
-                    s.arg0 ? s.arg0.toChars() : "", s.arg1 ? s.arg1.toChars() : "", s.arg2 ? s.arg2.toChars() : "");
-            }
-        }
-        else if (auto sa = s.arg0.isDsymbol())
-        {
-            if (FuncDeclaration fd2 = sa.isFuncDeclaration())
-            {
-                if (maxDepth > 0)
-                {
-                    errorFunc(s.loc, "which calls `%s`", fd2.toPrettyChars());
-                    errorSupplementalInferredAttr(fd2, maxDepth - 1, deprecation, stc);
-                }
-            }
-        }
-    }
 }

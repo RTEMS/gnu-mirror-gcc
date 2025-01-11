@@ -25,8 +25,8 @@ struct TB {
   unsigned char s;
 } __attribute__ ((packed, aligned (4), scalar_storage_order ("big-endian")));
 
-#define vc 0xaa
-#define vi 0x12345678
+#define vc (unsigned char)0xaa
+#define vi (unsigned int)0x12345678
 
 struct TL vL = { vc, vi, vc, vi, vc, vi, vc };
 struct TB vB = { vc, vi, vc, vi, vc, vi, vc };
@@ -58,7 +58,7 @@ int main () {
   return 0;
 }
 
-/* { dg-final { scan-tree-dump-times "BIT_FIELD_REF" 8 "optimized" } } */
+/* { dg-final { scan-tree-dump-times "BIT_FIELD_REF" 8 "optimized" { target { ! { avr-*-* pru-*-* } } } } } */
 /* { dg-final { scan-assembler-not "cmpb" { target { i*86-*-* || x86_64-*-* } } } } */
 /* { dg-final { scan-assembler-times "cmpl" 8 { target { i*86-*-* || x86_64-*-* } } } } */
 /* { dg-final { scan-assembler-times "cmpw" 8 { target { powerpc*-*-* || rs6000-*-* } } } } */

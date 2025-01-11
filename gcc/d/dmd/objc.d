@@ -22,7 +22,6 @@ import dmd.cond;
 import dmd.dclass;
 import dmd.declaration;
 import dmd.denum;
-import dmd.dmangle;
 import dmd.dmodule;
 import dmd.dscope;
 import dmd.dstruct;
@@ -38,6 +37,7 @@ import dmd.hdrgen;
 import dmd.id;
 import dmd.identifier;
 import dmd.location;
+import dmd.mangle;
 import dmd.mtype;
 import dmd.root.array;
 import dmd.common.outbuffer;
@@ -100,7 +100,7 @@ struct ObjcSelector
         const id = fdecl.ident.toString();
         const nparams = ftype.parameterList.length;
         // Special case: property setter
-        if (ftype.isproperty && nparams == 1)
+        if (ftype.isProperty && nparams == 1)
         {
             // rewrite "identifier" as "setIdentifier"
             char firstChar = id[0];

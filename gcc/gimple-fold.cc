@@ -7519,8 +7519,9 @@ gimple_binop_def_p (enum tree_code code, tree t, tree op[2])
 
    *XOR_P is to be FALSE if EXP might be a XOR used in a compare, in which
    case, if XOR_CMP_OP is a zero constant, it will be overridden with *PEXP,
-   *XOR_P will be set to TRUE, and the left-hand operand of the XOR will be
-   decoded.  If *XOR_P is TRUE, XOR_CMP_OP is supposed to be NULL, and then the
+   *XOR_P will be set to TRUE, *XOR_PAND_MASK will be copied from *PAND_MASK,
+   and the left-hand operand of the XOR will be decoded.  If *XOR_P is TRUE,
+   XOR_CMP_OP and XOR_PAND_MASK are supposed to be NULL, and then the
    right-hand operand of the XOR will be decoded.
 
    *LOAD is set to the load stmt of the innermost reference, if any,
@@ -7537,7 +7538,7 @@ decode_field_reference (tree *pexp, HOST_WIDE_INT *pbitsize,
 			HOST_WIDE_INT *pbitpos,
 			bool *punsignedp, bool *preversep, bool *pvolatilep,
 			wide_int *pand_mask, bool *psignbit,
-			bool *xor_p, tree *xor_cmp_op,
+			bool *xor_p, tree *xor_cmp_op, wide_int *xor_pand_mask,
 			gimple **load, location_t loc[4])
 {
   tree exp = *pexp;
@@ -7547,6 +7548,7 @@ decode_field_reference (tree *pexp, HOST_WIDE_INT *pbitsize,
   int shiftrt = 0;
   tree res_ops[2];
   machine_mode mode;
+  bool convert_before_shift = false;
 
   *load = NULL;
   *psignbit = false;
@@ -7575,7 +7577,7 @@ decode_field_reference (tree *pexp, HOST_WIDE_INT *pbitsize,
   /* Recognize and save a masking operation.  Combine it with an
      incoming mask.  */
   if (pand_mask && gimple_binop_def_p (BIT_AND_EXPR, exp, res_ops)
-      && uniform_integer_cst_p (res_ops[1]))
+      && TREE_CODE (res_ops[1]) == INTEGER_CST)
     {
       loc[1] = gimple_location (SSA_NAME_DEF_STMT (exp));
       exp = res_ops[0];
@@ -7598,15 +7600,14 @@ decode_field_reference (tree *pexp, HOST_WIDE_INT *pbitsize,
     and_mask = *pand_mask;
 
   /* Turn (a ^ b) [!]= 0 into a [!]= b.  */
-  if (xor_p && gimple_binop_def_p (BIT_XOR_EXPR, exp, res_ops)
-      && uniform_integer_cst_p (res_ops[1]))
+  if (xor_p && gimple_binop_def_p (BIT_XOR_EXPR, exp, res_ops))
     {
       /* No location recorded for this one, it's entirely subsumed by the
 	 compare.  */
       if (*xor_p)
 	{
 	  exp = res_ops[1];
-	  gcc_checking_assert (!xor_cmp_op);
+	  gcc_checking_assert (!xor_cmp_op && !xor_pand_mask);
 	}
       else if (!xor_cmp_op)
 	/* Not much we can do when xor appears in the right-hand compare
@@ -7617,6 +7618,7 @@ decode_field_reference (tree *pexp, HOST_WIDE_INT *pbitsize,
 	  *xor_p = true;
 	  exp = res_ops[0];
 	  *xor_cmp_op = *pexp;
+	  *xor_pand_mask = *pand_mask;
 	}
     }
 
@@ -7630,7 +7632,7 @@ decode_field_reference (tree *pexp, HOST_WIDE_INT *pbitsize,
 
   /* Take note of shifts.  */
   if (gimple_binop_def_p (RSHIFT_EXPR, exp, res_ops)
-      && uniform_integer_cst_p (res_ops[1]))
+      && TREE_CODE (res_ops[1]) == INTEGER_CST)
     {
       loc[2] = gimple_location (SSA_NAME_DEF_STMT (exp));
       exp = res_ops[0];
@@ -7651,6 +7653,12 @@ decode_field_reference (tree *pexp, HOST_WIDE_INT *pbitsize,
       if (*load)
 	loc[3] = gimple_location (*load);
       exp = res_ops[0];
+      /* This looks backwards, but we're going back the def chain, so if we
+	 find the conversion here, after finding a shift, that's because the
+	 convert appears before the shift, and we should thus adjust the bit
+	 pos and size because of the shift after adjusting it due to type
+	 conversion.  */
+      convert_before_shift = true;
     }
 
   /* Identify the load, if there is one.  */
@@ -7693,6 +7701,15 @@ decode_field_reference (tree *pexp, HOST_WIDE_INT *pbitsize,
   *pvolatilep = volatilep;
 
   /* Adjust shifts...  */
+  if (convert_before_shift
+      && outer_type && *pbitsize > TYPE_PRECISION (outer_type))
+    {
+      HOST_WIDE_INT excess = *pbitsize - TYPE_PRECISION (outer_type);
+      if (*preversep ? !BYTES_BIG_ENDIAN : BYTES_BIG_ENDIAN)
+	*pbitpos += excess;
+      *pbitsize -= excess;
+    }
+
   if (shiftrt)
     {
       if (!*preversep ? !BYTES_BIG_ENDIAN : BYTES_BIG_ENDIAN)
@@ -7701,7 +7718,8 @@ decode_field_reference (tree *pexp, HOST_WIDE_INT *pbitsize,
     }
 
   /* ... and bit position.  */
-  if (outer_type && *pbitsize > TYPE_PRECISION (outer_type))
+  if (!convert_before_shift
+      && outer_type && *pbitsize > TYPE_PRECISION (outer_type))
     {
       HOST_WIDE_INT excess = *pbitsize - TYPE_PRECISION (outer_type);
       if (*preversep ? !BYTES_BIG_ENDIAN : BYTES_BIG_ENDIAN)
@@ -8074,7 +8092,7 @@ fold_truth_andor_for_ifcombine (enum tree_code code, tree truth_type,
   else if ((lcode == LT_EXPR || lcode == GE_EXPR)
 	   && INTEGRAL_TYPE_P (TREE_TYPE (ll_arg))
 	   && TYPE_UNSIGNED (TREE_TYPE (ll_arg))
-	   && uniform_integer_cst_p (lr_arg)
+	   && TREE_CODE (lr_arg) == INTEGER_CST
 	   && wi::popcount (wi::to_wide (lr_arg)) == 1)
     {
       ll_and_mask = ~(wi::to_wide (lr_arg) - 1);
@@ -8086,7 +8104,7 @@ fold_truth_andor_for_ifcombine (enum tree_code code, tree truth_type,
   else if ((lcode == LE_EXPR || lcode == GT_EXPR)
 	   && INTEGRAL_TYPE_P (TREE_TYPE (ll_arg))
 	   && TYPE_UNSIGNED (TREE_TYPE (ll_arg))
-	   && uniform_integer_cst_p (lr_arg)
+	   && TREE_CODE (lr_arg) == INTEGER_CST
 	   && wi::popcount (wi::to_wide (lr_arg) + 1) == 1)
     {
       ll_and_mask = ~wi::to_wide (lr_arg);
@@ -8105,7 +8123,7 @@ fold_truth_andor_for_ifcombine (enum tree_code code, tree truth_type,
   else if ((rcode == LT_EXPR || rcode == GE_EXPR)
 	   && INTEGRAL_TYPE_P (TREE_TYPE (rl_arg))
 	   && TYPE_UNSIGNED (TREE_TYPE (rl_arg))
-	   && uniform_integer_cst_p (rr_arg)
+	   && TREE_CODE (rr_arg) == INTEGER_CST
 	   && wi::popcount (wi::to_wide (rr_arg)) == 1)
     {
       rl_and_mask = ~(wi::to_wide (rr_arg) - 1);
@@ -8115,7 +8133,7 @@ fold_truth_andor_for_ifcombine (enum tree_code code, tree truth_type,
   else if ((rcode == LE_EXPR || rcode == GT_EXPR)
 	   && INTEGRAL_TYPE_P (TREE_TYPE (rl_arg))
 	   && TYPE_UNSIGNED (TREE_TYPE (rl_arg))
-	   && uniform_integer_cst_p (rr_arg)
+	   && TREE_CODE (rr_arg) == INTEGER_CST
 	   && wi::popcount (wi::to_wide (rr_arg) + 1) == 1)
     {
       rl_and_mask = ~wi::to_wide (rr_arg);
@@ -8135,19 +8153,21 @@ fold_truth_andor_for_ifcombine (enum tree_code code, tree truth_type,
   bool l_xor = false, r_xor = false;
   ll_inner = decode_field_reference (&ll_arg, &ll_bitsize, &ll_bitpos,
 				     &ll_unsignedp, &ll_reversep, &volatilep,
-				     &ll_and_mask, &ll_signbit, &l_xor, &lr_arg,
+				     &ll_and_mask, &ll_signbit,
+				     &l_xor, &lr_arg, &lr_and_mask,
 				     &ll_load, ll_loc);
   lr_inner = decode_field_reference (&lr_arg, &lr_bitsize, &lr_bitpos,
 				     &lr_unsignedp, &lr_reversep, &volatilep,
-				     &lr_and_mask, &lr_signbit, &l_xor, 0,
+				     &lr_and_mask, &lr_signbit, &l_xor, 0, 0,
 				     &lr_load, lr_loc);
   rl_inner = decode_field_reference (&rl_arg, &rl_bitsize, &rl_bitpos,
 				     &rl_unsignedp, &rl_reversep, &volatilep,
-				     &rl_and_mask, &rl_signbit, &r_xor, &rr_arg,
+				     &rl_and_mask, &rl_signbit,
+				     &r_xor, &rr_arg, &rr_and_mask,
 				     &rl_load, rl_loc);
   rr_inner = decode_field_reference (&rr_arg, &rr_bitsize, &rr_bitpos,
 				     &rr_unsignedp, &rr_reversep, &volatilep,
-				     &rr_and_mask, &rr_signbit, &r_xor, 0,
+				     &rr_and_mask, &rr_signbit, &r_xor, 0, 0,
 				     &rr_load, rr_loc);
 
   /* It must be true that the inner operation on the lhs of each
@@ -8372,25 +8392,51 @@ fold_truth_andor_for_ifcombine (enum tree_code code, tree truth_type,
   HOST_WIDE_INT ll_align = TYPE_ALIGN (TREE_TYPE (ll_inner));
   poly_uint64 ll_end_region = 0;
   if (TYPE_SIZE (TREE_TYPE (ll_inner))
-      && uniform_integer_cst_p (TYPE_SIZE (TREE_TYPE (ll_inner))))
+      && tree_fits_poly_uint64_p (TYPE_SIZE (TREE_TYPE (ll_inner))))
     ll_end_region = tree_to_poly_uint64 (TYPE_SIZE (TREE_TYPE (ll_inner)));
   if (get_best_mode (end_bit - first_bit, first_bit, 0, ll_end_region,
 		     ll_align, BITS_PER_WORD, volatilep, &lnmode))
     l_split_load = false;
+  /* ??? If ll and rl share the same load, reuse that?
+     See PR 118206 -> gcc.dg/field-merge-18.c  */
   else
     {
       /* Consider the possibility of recombining loads if any of the
 	 fields straddles across an alignment boundary, so that either
-	 part can be loaded along with the other field.  */
+	 part can be loaded along with the other field.  Since we
+	 limit access modes to BITS_PER_WORD, don't exceed that,
+	 otherwise on a 32-bit host and a 64-bit-aligned data
+	 structure, we'll fail the above for a field that straddles
+	 across two words, and would fail here for not even trying to
+	 split it at between 32-bit words.  */
       HOST_WIDE_INT boundary = compute_split_boundary_from_align
-	(ll_align, ll_bitpos, ll_bitsize, rl_bitpos, rl_bitsize);
+	(MIN (ll_align, BITS_PER_WORD),
+	 ll_bitpos, ll_bitsize, rl_bitpos, rl_bitsize);
 
       if (boundary < 0
 	  || !get_best_mode (boundary - first_bit, first_bit, 0, ll_end_region,
 			     ll_align, BITS_PER_WORD, volatilep, &lnmode)
 	  || !get_best_mode (end_bit - boundary, boundary, 0, ll_end_region,
 			     ll_align, BITS_PER_WORD, volatilep, &lnmode2))
-	return 0;
+	{
+	  if (ll_align <= BITS_PER_WORD)
+	    return 0;
+
+	  /* As a last resort, try double-word access modes.  This
+	     enables us to deal with misaligned double-word fields
+	     that straddle across 3 separate words.  */
+	  boundary = compute_split_boundary_from_align
+	    (MIN (ll_align, 2 * BITS_PER_WORD),
+	     ll_bitpos, ll_bitsize, rl_bitpos, rl_bitsize);
+	  if (boundary < 0
+	      || !get_best_mode (boundary - first_bit, first_bit,
+				 0, ll_end_region, ll_align, 2 * BITS_PER_WORD,
+				 volatilep, &lnmode)
+	      || !get_best_mode (end_bit - boundary, boundary,
+				 0, ll_end_region, ll_align, 2 * BITS_PER_WORD,
+				 volatilep, &lnmode2))
+	    return 0;
+	}
 
       /* If we can't have a single load, but can with two, figure out whether
 	 the two compares can be separated, i.e., whether the entirety of the
@@ -8539,7 +8585,7 @@ fold_truth_andor_for_ifcombine (enum tree_code code, tree truth_type,
       HOST_WIDE_INT lr_align = TYPE_ALIGN (TREE_TYPE (lr_inner));
       poly_uint64 lr_end_region = 0;
       if (TYPE_SIZE (TREE_TYPE (lr_inner))
-	  && uniform_integer_cst_p (TYPE_SIZE (TREE_TYPE (lr_inner))))
+	  && tree_fits_poly_uint64_p (TYPE_SIZE (TREE_TYPE (lr_inner))))
 	lr_end_region = tree_to_poly_uint64 (TYPE_SIZE (TREE_TYPE (lr_inner)));
       if (!get_best_mode (end_bit - first_bit, first_bit, 0, lr_end_region,
 			  lr_align, BITS_PER_WORD, volatilep, &rnmode))
@@ -8598,7 +8644,7 @@ fold_truth_andor_for_ifcombine (enum tree_code code, tree truth_type,
 			  xlr_bitpos);
       else
 	lr_mask = wi::shifted_mask (xlr_bitpos, lr_bitsize, false, rnprec);
-      if (rl_and_mask.get_precision ())
+      if (rr_and_mask.get_precision ())
 	rr_mask = wi::lshift (wide_int::from (rr_and_mask, rnprec, UNSIGNED),
 			      xrr_bitpos);
       else
@@ -8733,11 +8779,11 @@ fold_truth_andor_for_ifcombine (enum tree_code code, tree truth_type,
       /* Apply masks.  */
       for (int j = 0; j < 2; j++)
 	if (mask[j] != wi::mask (0, true, mask[j].get_precision ()))
-	  op[j] = build2_loc (locs[j][2], BIT_AND_EXPR, type,
-			      op[j], wide_int_to_tree (type, mask[j]));
+	  op[j] = fold_build2_loc (locs[j][2], BIT_AND_EXPR, type,
+				   op[j], wide_int_to_tree (type, mask[j]));
 
-      cmp[i] = build2_loc (i ? rloc : lloc, wanted_code, truth_type,
-			   op[0], op[1]);
+      cmp[i] = fold_build2_loc (i ? rloc : lloc, wanted_code, truth_type,
+				op[0], op[1]);
     }
 
   /* Reorder the compares if needed.  */
@@ -8749,7 +8795,15 @@ fold_truth_andor_for_ifcombine (enum tree_code code, tree truth_type,
   if (parts == 1)
     result = cmp[0];
   else if (!separatep || !maybe_separate)
-    result = build2_loc (rloc, orig_code, truth_type, cmp[0], cmp[1]);
+    {
+      /* Only fold if any of the cmp is known, otherwise we may lose the
+	 sequence point, and that may prevent further optimizations.  */
+      if (TREE_CODE (cmp[0]) == INTEGER_CST
+	  || TREE_CODE (cmp[1]) == INTEGER_CST)
+	result = fold_build2_loc (rloc, orig_code, truth_type, cmp[0], cmp[1]);
+      else
+	result = build2_loc (rloc, orig_code, truth_type, cmp[0], cmp[1]);
+    }
   else
     {
       result = cmp[0];

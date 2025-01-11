@@ -2929,6 +2929,10 @@ struct post_process_data {
   tree decl;
   location_t start_locus;
   location_t end_locus;
+  bool returns_value;
+  bool returns_null;
+  bool returns_abnormally;
+  bool infinite_loop;
 };
 
 /* Tree stream reader.  Note that reading a stream doesn't mark the
@@ -4072,7 +4076,8 @@ static unsigned lazy_hard_limit; /* Hard limit on open modules.  */
    pass, but ICBW.  */
 #define LAZY_HEADROOM 15 /* File descriptor headroom.  */
 
-/* Vector of module state.  Indexed by OWNER.  Has at least 2 slots.  */
+/* Vector of module state.  Indexed by OWNER.  Index 0 is reserved for the
+   current TU; imports start at 1.  */
 static GTY(()) vec<module_state *, va_gc> *modules;
 
 /* Hash of module state, findable by {name, parent}. */
@@ -5635,6 +5640,7 @@ trees_out::core_bools (tree t, bits_out& bits)
 
       WB (t->function_decl.has_debug_args_flag);
       WB (t->function_decl.versioned_function);
+      WB (t->function_decl.replaceable_operator);
 
       /* decl_type is a (misnamed) 2 bit discriminator.	 */
       unsigned kind = t->function_decl.decl_type;
@@ -5791,6 +5797,7 @@ trees_in::core_bools (tree t, bits_in& bits)
 
       RB (t->function_decl.has_debug_args_flag);
       RB (t->function_decl.versioned_function);
+      RB (t->function_decl.replaceable_operator);
 
       /* decl_type is a (misnamed) 2 bit discriminator.	 */
       unsigned kind = 0;
@@ -6313,7 +6320,11 @@ trees_out::core_vals (tree t)
     case VAR_DECL:
       if (DECL_CONTEXT (t)
 	  && TREE_CODE (DECL_CONTEXT (t)) != FUNCTION_DECL)
-	break;
+	{
+	  if (DECL_HAS_VALUE_EXPR_P (t))
+	    WT (DECL_VALUE_EXPR (t));
+	  break;
+	}
       /* FALLTHROUGH  */
 
     case RESULT_DECL:
@@ -6843,7 +6854,14 @@ trees_in::core_vals (tree t)
     case VAR_DECL:
       if (DECL_CONTEXT (t)
 	  && TREE_CODE (DECL_CONTEXT (t)) != FUNCTION_DECL)
-	break;
+	{
+	  if (DECL_HAS_VALUE_EXPR_P (t))
+	    {
+	      tree val = tree_node ();
+	      SET_DECL_VALUE_EXPR (t, val);
+	    }
+	  break;
+	}
       /* FALLTHROUGH  */
 
     case RESULT_DECL:
@@ -8619,6 +8637,10 @@ trees_in::decl_value ()
 	  TYPE_STUB_DECL (type) = stub_decl ? stub_decl : inner;
 	  if (stub_decl)
 	    TREE_TYPE (stub_decl) = type;
+
+	  /* Handle separate declarations with different attributes.  */
+	  tree &eattr = TYPE_ATTRIBUTES (TREE_TYPE (existing));
+	  eattr = merge_attributes (eattr, TYPE_ATTRIBUTES (type));
 	}
 
       if (inner_tag)
@@ -9167,7 +9189,10 @@ trees_out::type_node (tree type)
 	  tree_node (raises);
 	}
 
-      tree_node (TYPE_ATTRIBUTES (type));
+      /* build_type_attribute_variant creates a new TYPE_MAIN_VARIANT, so
+	 variants should all have the same set of attributes.  */
+      gcc_checking_assert (TYPE_ATTRIBUTES (type)
+			   == TYPE_ATTRIBUTES (TYPE_MAIN_VARIANT (type)));
 
       if (streaming_p ())
 	{
@@ -9383,6 +9408,8 @@ trees_out::type_node (tree type)
 	}
       break;
     }
+
+  tree_node (TYPE_ATTRIBUTES (type));
 
   /* We may have met the type during emitting the above.  */
   if (ref_node (type) != WK_none)
@@ -10068,6 +10095,13 @@ trees_in::tree_node (bool is_use)
 	    break;
 	  }
 
+	/* In the exporting TU, a derived type with attributes was built by
+	   build_type_attribute_variant as a distinct copy, with itself as
+	   TYPE_MAIN_VARIANT.  We repeat that on import to get the version
+	   without attributes as TYPE_CANONICAL.  */
+	if (tree attribs = tree_node ())
+	  res = cp_build_type_attribute_variant (res, attribs);
+
 	int tag = i ();
 	if (!tag)
 	  {
@@ -10110,9 +10144,6 @@ trees_in::tree_node (bool is_use)
 	    res = build_aligned_type (res, (1u << flags) >> 1);
 	    TYPE_USER_ALIGN (res) = true;
 	  }
-
-	if (tree attribs = tree_node ())
-	  res = cp_build_type_attribute_variant (res, attribs);
 
 	int quals = i ();
 	if (quals >= 0 && !get_overrun ())
@@ -10982,6 +11013,12 @@ trees_out::get_merge_kind (tree decl, depset *dep)
 		&& DECL_UNINSTANTIATED_TEMPLATE_FRIEND_P (decl))
 	      {
 		mk = MK_local_friend;
+		break;
+	      }
+
+	    if (DECL_DECOMPOSITION_P (decl))
+	      {
+		mk = MK_unique;
 		break;
 	      }
 
@@ -12263,10 +12300,16 @@ trees_out::write_function_def (tree decl)
     {
       unsigned flags = 0;
 
+      flags |= 1 * DECL_NOT_REALLY_EXTERN (decl);
       if (f)
-	flags |= 2;
-      if (DECL_NOT_REALLY_EXTERN (decl))
-	flags |= 1;
+	{
+	  flags |= 2;
+	  /* These flags are needed in tsubst_lambda_expr.  */
+	  flags |= 4 * f->language->returns_value;
+	  flags |= 8 * f->language->returns_null;
+	  flags |= 16 * f->language->returns_abnormally;
+	  flags |= 32 * f->language->infinite_loop;
+	}
 
       u (flags);
     }
@@ -12314,6 +12357,10 @@ trees_in::read_function_def (tree decl, tree maybe_template)
     {
       pdata.start_locus = state->read_location (*this);
       pdata.end_locus = state->read_location (*this);
+      pdata.returns_value = flags & 4;
+      pdata.returns_null = flags & 8;
+      pdata.returns_abnormally = flags & 16;
+      pdata.infinite_loop = flags & 32;
     }
 
   if (get_overrun ())
@@ -16232,6 +16279,10 @@ module_state::read_cluster (unsigned snum)
       cfun->language->base.x_stmt_tree.stmts_are_full_exprs_p = 1;
       cfun->function_start_locus = pdata.start_locus;
       cfun->function_end_locus = pdata.end_locus;
+      cfun->language->returns_value = pdata.returns_value;
+      cfun->language->returns_null = pdata.returns_null;
+      cfun->language->returns_abnormally = pdata.returns_abnormally;
+      cfun->language->infinite_loop = pdata.infinite_loop;
 
       if (abstract)
 	;
@@ -19928,6 +19979,9 @@ get_originating_module (tree decl, bool for_mangle)
   gcc_checking_assert (!for_mangle || !(*modules)[mod]->is_header ());
   return mod;
 }
+
+/* DECL is imported, return which module imported it.
+   If FLEXIBLE, return -1 if not found, otherwise checking ICE.  */
 
 unsigned
 get_importing_module (tree decl, bool flexible)
