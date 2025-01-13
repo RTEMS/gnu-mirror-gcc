@@ -1,3 +1,101 @@
+2025-01-12  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	* gdc.dg/asm3.d: Adjust test.
+	* gdc.dg/torture/pr96435.d: Adjust test.
+
+2025-01-12  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	* gdc.dg/copy1.d: New test.
+
+2025-01-12  David Malcolm  <dmalcolm@redhat.com>
+
+	PR c/118112
+	* gcc.dg/too-few-arguments.c: New test.
+	* gcc.dg/too-many-arguments.c: New test.
+
+2025-01-12  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/115788
+	* gfortran.dg/ieee/out_of_range.f90: New test.
+	* gfortran.dg/out_of_range_1.f90: New test.
+	* gfortran.dg/out_of_range_2.f90: New test.
+	* gfortran.dg/out_of_range_3.f90: New test.
+
+2025-01-12  Maciej W. Rozycki  <macro@orcam.me.uk>
+
+	* gcc.target/alpha/memcpy-hi-unaligned-dst.c: New file.
+
+2025-01-12  Maciej W. Rozycki  <macro@orcam.me.uk>
+
+	* gcc.target/alpha/memcpy-si-aligned.c: New file.
+	* gcc.target/alpha/memcpy-si-unaligned.c: New file.
+	* gcc.target/alpha/memcpy-si-unaligned-dst.c: New file.
+	* gcc.target/alpha/memcpy-si-unaligned-src.c: New file.
+	* gcc.target/alpha/memcpy-si-unaligned-src-bwx.c: New file.
+
+2025-01-12  Maciej W. Rozycki  <macro@orcam.me.uk>
+
+	* gcc.target/alpha/target-bwx-1.c: New file.
+	* gcc.target/alpha/target-bwx-2.c: New file.
+	* gcc.target/alpha/target-bwx-3.c: New file.
+	* gcc.target/alpha/target-bwx-4.c: New file.
+	* gcc.target/alpha/target-cix-1.c: New file.
+	* gcc.target/alpha/target-cix-2.c: New file.
+	* gcc.target/alpha/target-cix-3.c: New file.
+	* gcc.target/alpha/target-cix-4.c: New file.
+	* gcc.target/alpha/target-fix-1.c: New file.
+	* gcc.target/alpha/target-fix-2.c: New file.
+	* gcc.target/alpha/target-fix-3.c: New file.
+	* gcc.target/alpha/target-fix-4.c: New file.
+	* gcc.target/alpha/target-max-1.c: New file.
+	* gcc.target/alpha/target-max-2.c: New file.
+	* gcc.target/alpha/target-max-3.c: New file.
+	* gcc.target/alpha/target-max-4.c: New file.
+
+2025-01-11  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/114630
+	* g++.dg/modules/pr114630.h: New test.
+	* g++.dg/modules/pr114630_a.C: New test.
+	* g++.dg/modules/pr114630_b.C: New test.
+	* g++.dg/modules/pr114630_c.C: New test.
+
+2025-01-11  Tobias Burnus  <tburnus@baylibre.com>
+
+	* gfortran.dg/goacc/routine-external-level-of-parallelism-2.f: Update
+	xfail'ed 'dg-bogus' for the better 'declared here' location.
+	* gfortran.dg/gomp/dispatch-11.f90: New test.
+	* gfortran.dg/gomp/dispatch-12.f90: New test.
+
+2025-01-11  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/108434
+	* gfortran.dg/pr108434.f90 : Add tests from comment 1.
+
+2025-01-11  Jason Merrill  <jason@redhat.com>
+
+	* g++.dg/modules/attrib-2_a.C: New test.
+	* g++.dg/modules/attrib-2_b.C: New test.
+
+2025-01-11  Jason Merrill  <jason@redhat.com>
+
+	* g++.dg/modules/attrib-1_a.C: New test.
+	* g++.dg/modules/attrib-1_b.C: New test.
+
+2025-01-11  mengqinggang  <mengqinggang@loongson.cn>
+
+	* gcc.target/loongarch/imm-load.c: Not generate ">>".
+
+2025-01-11  Andrew MacLeod  <amacleod@redhat.com>
+
+	PR tree-optimization/88575
+	* gcc.dg/tree-ssa/minmax-27.c: Disable VRP.
+	* gcc.dg/tree-ssa/minmax-27e.c: New.
+	* gcc.dg/tree-ssa/minmax-27f.c: New.
+	* gcc.dg/tree-ssa/minmax-28.c: Disable VRP.
+	* gcc.dg/tree-ssa/minmax-28e.c: New.
+	* gcc.dg/tree-ssa/minmax-28f.c: New.
+
 2025-01-10  Alex Coplan  <alex.coplan@arm.com>
 
 	PR tree-optimization/118211

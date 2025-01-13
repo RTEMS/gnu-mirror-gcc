@@ -146,23 +146,7 @@ private
     // POSIX API declarations.
     version (Posix)
     {
-        version (Darwin)
-        {
-            extern(C) char*** _NSGetEnviron() nothrow;
-            const(char**) getEnvironPtr() @trusted
-            {
-                return *_NSGetEnviron;
-            }
-        }
-        else
-        {
-            // Made available by the C runtime:
-            extern(C) extern __gshared const char** environ;
-            const(char**) getEnvironPtr() @trusted
-            {
-                return environ;
-            }
-        }
+        import core.sys.posix.unistd : getEnvironPtr = environ;
 
         @system unittest
         {
@@ -1221,7 +1205,7 @@ private Pid spawnProcessPosix(scope const(char[])[] args,
             }
 
             // Execute program.
-            core.sys.posix.unistd.execve(argz[0], argz.ptr, envz);
+            core.sys.posix.unistd.execve(argz[0], argz.ptr, envz is null ? getEnvironPtr : envz);
 
             // If execution fails, exit as quickly as possible.
             abortOnError(forkPipeOut, InternalError.exec, .errno);
@@ -1527,7 +1511,7 @@ private Pid spawnProcessWin(scope const(char)[] commandLine,
 // on the form "name=value", optionally adding those of the current process'
 // environment strings that are not present in childEnv.  If the parent's
 // environment should be inherited without modification, this function
-// returns environ directly.
+// returns null.
 version (Posix)
 private const(char*)* createEnv(const string[string] childEnv,
                                 bool mergeWithParentEnv)
@@ -1537,7 +1521,7 @@ private const(char*)* createEnv(const string[string] childEnv,
     auto environ = getEnvironPtr;
     if (mergeWithParentEnv)
     {
-        if (childEnv.length == 0) return environ;
+        if (childEnv.length == 0) return null;
         while (environ[parentEnvLength] != null) ++parentEnvLength;
     }
 
@@ -1567,16 +1551,7 @@ version (Posix) @system unittest
     assert(e1 != null && *e1 == null);
 
     auto e2 = createEnv(null, true);
-    assert(e2 != null);
-    int i = 0;
-    auto environ = getEnvironPtr;
-    for (; environ[i] != null; ++i)
-    {
-        assert(e2[i] != null);
-        import core.stdc.string : strcmp;
-        assert(strcmp(e2[i], environ[i]) == 0);
-    }
-    assert(e2[i] == null);
+    assert(e2 == null);
 
     auto e3 = createEnv(["foo" : "bar", "hello" : "world"], false);
     assert(e3 != null && e3[0] != null && e3[1] != null && e3[2] == null);
@@ -2815,6 +2790,10 @@ void kill(Pid pid, int codeOrSignal)
     else version (Posix)
     {
         import core.sys.posix.signal : kill;
+        if (pid.osHandle == Pid.invalid)
+            throw new ProcessException("Pid is invalid");
+        if (pid.osHandle == Pid.terminated)
+            throw new ProcessException("Pid is already terminated");
         if (kill(pid.osHandle, codeOrSignal) == -1)
             throw ProcessException.newFromErrno();
     }
@@ -2856,7 +2835,7 @@ void kill(Pid pid, int codeOrSignal)
     do { s = tryWait(pid); } while (!s.terminated);
     version (Windows)    assert(s.status == 123);
     else version (Posix) assert(s.status == -SIGKILL);
-    assertThrown!ProcessException(kill(pid));
+    assertThrown!ProcessException(kill(pid)); // Already terminated
 }
 
 @system unittest // wait() and kill() detached process
@@ -4631,11 +4610,12 @@ else version (Posix)
         if (childpid == 0)
         {
             // Trusted because args and all entries are always zero-terminated
-            (() @trusted =>
-                core.sys.posix.unistd.execvp(args[0], &args[0]) ||
-                perror(args[0]) // failed to execute
-            )();
-            return;
+            (() @trusted {
+                core.sys.posix.unistd.execvp(args[0], &args[0]);
+                perror(args[0]);
+                core.sys.posix.unistd._exit(1);
+            })();
+            assert(0, "Child failed to exec");
         }
         if (browser)
             // Trusted because it's allocated via strdup above

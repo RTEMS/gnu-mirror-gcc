@@ -1592,7 +1592,7 @@ Expressions* resolveStructLiteralNamedArgs(StructDeclaration sd, Type t, Scope* 
                     (vd.offset & (target.ptrsize - 1))))
             {
                 if (sc.setUnsafe(false, argLoc,
-                    "field `%s.%s` cannot assign to misaligned pointers in `@safe` code", sd, vd))
+                    "field `%s.%s` assigning to misaligned pointers", sd, vd))
                 {
                     errors = true;
                     elems[fieldi] = ErrorExp.get(); // for better diagnostics on multiple errors
@@ -1630,7 +1630,7 @@ Expressions* resolveStructLiteralNamedArgs(StructDeclaration sd, Type t, Scope* 
             continue;
         }
 
-        elems[fieldi] = doCopyOrMove(sc, ex);
+        elems[fieldi] = doCopyOrMove(sc, ex, null, false);
         ++fieldi;
     }
     if (errors)

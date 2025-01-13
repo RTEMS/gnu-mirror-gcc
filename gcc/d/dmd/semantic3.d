@@ -298,6 +298,7 @@ private extern(C++) final class Semantic3Visitor : Visitor
             return;
         funcdecl.semanticRun = PASS.semantic3;
         funcdecl.hasSemantic3Errors = false;
+        funcdecl.saferD = sc.previews.safer;
 
         if (!funcdecl.type || funcdecl.type.ty != Tfunction)
             return;
@@ -940,7 +941,7 @@ private extern(C++) final class Semantic3Visitor : Visitor
                              * If NRVO is not possible, all returned lvalues should call their postblits.
                              */
                             if (!funcdecl.isNRVO())
-                                exp = doCopyOrMove(sc2, exp, f.next);
+                                exp = doCopyOrMove(sc2, exp, f.next, true, true);
 
                             if (tret.hasPointers())
                                 checkReturnEscape(*sc2, exp, false);
@@ -975,7 +976,7 @@ private extern(C++) final class Semantic3Visitor : Visitor
                 sc2 = sc2.pop();
             }
 
-            if (global.params.inclusiveInContracts)
+            if (sc.previews.inclusiveInContracts)
             {
                 funcdecl.frequire = funcdecl.mergeFrequireInclusivePreview(
                     funcdecl.frequire, funcdecl.fdrequireParams);
@@ -1393,7 +1394,7 @@ private extern(C++) final class Semantic3Visitor : Visitor
         }
 
         // Do live analysis
-        if (global.params.useDIP1021 && funcdecl.fbody && funcdecl.type.ty != Terror &&
+        if (sc.previews.dip1021 && funcdecl.fbody && funcdecl.type.ty != Terror &&
             funcdecl.type.isTypeFunction().isLive)
         {
             oblive(funcdecl);

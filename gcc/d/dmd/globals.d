@@ -82,6 +82,13 @@ enum CLIIdentifierTable : ubyte
     All      = 4, /// The least restrictive set of all other tables
 }
 
+/// Specifies the mode for error printing
+enum ErrorPrintMode : ubyte
+{
+    simpleError,      // Print errors without squiggles and carets
+    printErrorContext, // Print errors with context (source line and caret)
+}
+
 extern(C++) struct Output
 {
     bool doOutput;      // Output is enabled
@@ -126,10 +133,10 @@ extern(C++) struct Verbose
     bool complex = true;    // identify complex/imaginary type usage
     bool vin;               // identify 'in' parameters
     bool showGaggedErrors;  // print gagged errors anyway
-    bool printErrorContext; // print errors with the error context (the error line in the source file)
     bool logo;              // print compiler logo
     bool color;             // use ANSI colors in console output
     bool cov;               // generate code coverage data
+    ErrorPrintMode errorPrintMode; // enum for error printing mode
     MessageStyle messageStyle = MessageStyle.digitalmars; // style of file/line annotations on messages
     uint errorLimit = 20;
     uint errorSupplementLimit = 6;      // Limit the number of supplemental messages for each error (0 means unlimited)
@@ -188,6 +195,8 @@ extern (C++) struct Param
                                  // https://gist.github.com/andralex/e5405a5d773f07f73196c05f8339435a
                                  // https://digitalmars.com/d/archives/digitalmars/D/Binding_rvalues_to_ref_parameters_redux_325087.html
                                  // Implementation: https://github.com/dlang/dmd/pull/9817
+    FeatureState safer;          // safer by default (more @safe checks in unattributed code)
+                                 // https://github.com/WalterBright/documents/blob/38f0a846726b571f8108f6e63e5e217b91421c86/safer.md
     FeatureState noSharedAccess; // read/write access to shared memory objects
     bool previewIn;              // `in` means `[ref] scope const`, accepts rvalues
     bool inclusiveInContracts;   // 'in' contracts of overridden methods must be a superset of parent contract
@@ -391,6 +400,7 @@ extern (C++) struct Global
             params.v.color = detectTerminal();
         }
 
+        params.v.errorPrintMode = ErrorPrintMode.printErrorContext; // Enable error context globally by default
         compileEnv.versionNumber = parseVersionNumber(versionString());
 
         /* Initialize date, time, and timestamp
@@ -465,6 +475,17 @@ extern (C++) struct Global
                 break;
         }
         return major * 1000 + minor;
+    }
+
+    /**
+     * Indicate to stateful error sinks that no more errors can be produced.
+     * This is to support error sinks that collect information to produce a
+     * single (say) report.
+     */
+    extern(C++) void plugErrorSinks()
+    {
+        global.errorSink.plugSink();
+        global.errorSinkNull.plugSink();
     }
 
     /**

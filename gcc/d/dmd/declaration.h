@@ -632,6 +632,8 @@ public:
     bool nothrowInprocess(bool v);
     bool nogcInprocess() const;
     bool nogcInprocess(bool v);
+    bool saferD() const;
+    bool saferD(bool v);
     bool scopeInprocess() const;
     bool scopeInprocess(bool v);
     bool inlineScanned() const;
@@ -782,6 +784,7 @@ class CtorDeclaration final : public FuncDeclaration
 {
 public:
     d_bool isCpCtor;
+    d_bool isMoveCtor;
     CtorDeclaration *syntaxCopy(Dsymbol *) override;
     const char *kind() const override;
     const char *toChars() const override;

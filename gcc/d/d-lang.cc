@@ -563,6 +563,7 @@ d_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
       global.params.previewIn = value;
       global.params.fix16997 = value;
       global.params.noSharedAccess = FeatureState::enabled;
+      global.params.safer = FeatureState::enabled;
       global.params.rvalueRefParam = FeatureState::enabled;
       global.params.inclusiveInContracts = value;
       global.params.systemVariables = FeatureState::enabled;
@@ -611,6 +612,10 @@ d_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
 
     case OPT_fpreview_nosharedaccess:
       global.params.noSharedAccess = FeatureState::enabled;
+      break;
+
+    case OPT_fpreview_safer:
+      global.params.safer = FeatureState::enabled;
       break;
 
     case OPT_fpreview_rvaluerefparam:
@@ -920,7 +925,8 @@ d_post_options (const char ** fn)
     global.params.v.errorLimit = flag_max_errors;
 
   global.params.v.showColumns = flag_show_column;
-  global.params.v.printErrorContext = flag_diagnostics_show_caret;
+  global.params.v.errorPrintMode = flag_diagnostics_show_caret
+    ? ErrorPrintMode::printErrorContext : ErrorPrintMode::simpleError;
 
   /* Keep the front-end location type in sync with params.  */
   Loc::set (global.params.v.showColumns, global.params.v.messageStyle);

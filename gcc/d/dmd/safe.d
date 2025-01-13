@@ -17,16 +17,18 @@ import core.stdc.stdio;
 
 import dmd.aggregate;
 import dmd.astenums;
+import dmd.common.outbuffer;
 import dmd.dcast : implicitConvTo;
 import dmd.dclass;
 import dmd.declaration;
 import dmd.dscope;
+import dmd.dsymbol;
 import dmd.dsymbolsem : determineSize;
 import dmd.errors;
 import dmd.expression;
 import dmd.func;
 import dmd.funcsem : isRootTraitsCompilesScope;
-import dmd.globals : FeatureState;
+import dmd.globals : FeatureState, global;
 import dmd.id;
 import dmd.identifier;
 import dmd.location;
@@ -66,11 +68,10 @@ bool checkUnsafeAccess(Scope* sc, Expression e, bool readonly, bool printmsg)
     if (!ad)
         return false;
 
-    import dmd.globals : global;
     if (v.isSystem())
     {
-        if (sc.setUnsafePreview(global.params.systemVariables, !printmsg, e.loc,
-            "cannot access `@system` field `%s.%s` in `@safe` code", ad, v))
+        if (sc.setUnsafePreview(sc.previews.systemVariables, !printmsg, e.loc,
+            "accessing `@system` field `%s.%s`", ad, v))
             return true;
     }
 
@@ -90,7 +91,7 @@ bool checkUnsafeAccess(Scope* sc, Expression e, bool readonly, bool printmsg)
         if (v.overlapped)
         {
             if (sc.func.isSafeBypassingInference() && sc.setUnsafe(!printmsg, e.loc,
-                "field `%s.%s` cannot access pointers in `@safe` code that overlap other fields", ad, v))
+                "accessing overlapped field `%s.%s` with pointers", ad, v))
             {
                 return true;
             }
@@ -103,7 +104,7 @@ bool checkUnsafeAccess(Scope* sc, Expression e, bool readonly, bool printmsg)
                 // To turn into an error, remove `isSafeBypassingInference` check in the
                 // above if statement and remove the else branch
                 sc.setUnsafePreview(FeatureState.default_, !printmsg, e.loc,
-                    "field `%s.%s` cannot access pointers in `@safe` code that overlap other fields", ad, v);
+                    "accessing overlapped field `%s.%s` with pointers", ad, v);
             }
         }
     }
@@ -113,7 +114,7 @@ bool checkUnsafeAccess(Scope* sc, Expression e, bool readonly, bool printmsg)
         if (v.overlapped)
         {
             if (sc.setUnsafe(!printmsg, e.loc,
-                "field `%s.%s` cannot access structs with invariants in `@safe` code that overlap other fields",
+                "accessing overlapped field `%s.%s` with a structs invariant",
                 ad, v))
                 return true;
         }
@@ -124,7 +125,7 @@ bool checkUnsafeAccess(Scope* sc, Expression e, bool readonly, bool printmsg)
     // Should probably be turned into an error in a new edition
     if (v.type.hasUnsafeBitpatterns() && v.overlapped && sc.setUnsafePreview(
         FeatureState.default_, !printmsg, e.loc,
-        "cannot access overlapped field `%s.%s` with unsafe bit patterns in `@safe` code", ad, v)
+        "accessing overlapped field `%s.%s` with unsafe bit patterns", ad, v)
     )
     {
         return true;
@@ -139,7 +140,7 @@ bool checkUnsafeAccess(Scope* sc, Expression e, bool readonly, bool printmsg)
              (v.offset & (target.ptrsize - 1)))
         {
             if (sc.setUnsafe(!printmsg, e.loc,
-                "field `%s.%s` cannot modify misaligned pointers in `@safe` code", ad, v))
+                "modifying misaligned pointers through field `%s.%s`", ad, v))
                 return true;
         }
     }
@@ -147,7 +148,7 @@ bool checkUnsafeAccess(Scope* sc, Expression e, bool readonly, bool printmsg)
     if (v.overlapUnsafe)
     {
         if (sc.setUnsafe(!printmsg, e.loc,
-            "field `%s.%s` cannot modify fields in `@safe` code that overlap fields with other storage classes",
+            "modifying field `%s.%s` which overlaps with fields with other storage classes",
             ad, v))
         {
             return true;
@@ -179,6 +180,10 @@ bool isSafeCast(Expression e, Type tfrom, Type tto, ref string msg)
 
     auto tfromb = tfrom.toBasetype();
     auto ttob = tto.toBasetype();
+
+    // Casting to void* is always safe, https://github.com/dlang/dmd/issues/20514
+    if (ttob.isTypePointer() && ttob.nextOf().toBasetype().ty == Tvoid)
+        return true;
 
     if (ttob.ty == Tclass && tfromb.ty == Tclass)
     {
@@ -309,17 +314,26 @@ bool checkUnsafeDotExp(Scope* sc, Expression e, Identifier id, int flag)
     if (!(flag & DotExpFlag.noDeref)) // this use is attempting a dereference
     {
         if (id == Id.ptr)
-            return sc.setUnsafe(false, e.loc, "`%s.ptr` cannot be used in `@safe` code, use `&%s[0]` instead", e, e);
+            return sc.setUnsafe(false, e.loc, "using `%s.ptr` (instead of `&%s[0])`", e, e);
         else
-            return sc.setUnsafe(false, e.loc, "`%s.%s` cannot be used in `@safe` code", e, id);
+            return sc.setUnsafe(false, e.loc, "using `%s.%s`", e, id);
     }
     return false;
+}
+
+/**************************************
+ * Safer D adds safety checks to functions with the default
+ * trust setting.
+ */
+bool isSaferD(FuncDeclaration fd)
+{
+    return fd.type.toTypeFunction().trust == TRUST.default_ && fd.saferD;
 }
 
 bool isSafe(FuncDeclaration fd)
 {
     if (fd.safetyInprocess)
-        fd.setUnsafe();
+        setFunctionToUnsafe(fd);
     return fd.type.toTypeFunction().trust == TRUST.safe;
 }
 
@@ -331,47 +345,80 @@ extern (D) bool isSafeBypassingInference(FuncDeclaration fd)
 bool isTrusted(FuncDeclaration fd)
 {
     if (fd.safetyInprocess)
-        fd.setUnsafe();
+        setFunctionToUnsafe(fd);
     return fd.type.toTypeFunction().trust == TRUST.trusted;
 }
 
-/**************************************
- * The function is doing something unsafe, so mark it as unsafe.
- *
+/*****************************************************
+ * Report safety violation for function `fd`, or squirrel away
+ * error message in fd.safetyViolation if needed later.
+ * Call when `fd` was just inferred to be @system OR
+ * `fd` was @safe and an tried something unsafe.
  * Params:
- *   fd  = func declaration to set unsafe
- *   gag = surpress error message (used in escape.d)
- *   loc = location of error
- *   fmt = printf-style format string
+ *   fd    = function we're gonna rat on
+ *   gag   = suppress error message (used in escape.d)
+ *   loc   = location of error
+ *   format = printf-style format string
  *   arg0  = (optional) argument for first %s format specifier
  *   arg1  = (optional) argument for second %s format specifier
  *   arg2  = (optional) argument for third %s format specifier
- * Returns: whether there's a safe error
  */
-extern (D) bool setUnsafe(
-    FuncDeclaration fd,
-    bool gag = false, Loc loc = Loc.init, const(char)* fmt = null,
-    RootObject arg0 = null, RootObject arg1 = null, RootObject arg2 = null)
+extern (D) void reportSafeError(FuncDeclaration fd, bool gag, Loc loc,
+    const(char)* format = null, RootObject arg0 = null, RootObject arg1 = null, RootObject arg2 = null)
+{
+    if (fd.type.toTypeFunction().trust == TRUST.system) // function was just inferred to be @system
+    {
+        if (format)
+            fd.safetyViolation = new AttributeViolation(loc, format, arg0, arg1, arg2);
+        else if (arg0)
+        {
+            if (FuncDeclaration fd2 = (cast(Dsymbol) arg0).isFuncDeclaration())
+            {
+                fd.safetyViolation = new AttributeViolation(loc, fd2); // call to non-@nogc function
+            }
+        }
+    }
+    else if (fd.isSafe() || fd.isSaferD())
+    {
+        if (!gag && format)
+        {
+            OutBuffer buf;
+            buf.printf(format, arg0 ? arg0.toChars() : "", arg1 ? arg1.toChars() : "", arg2 ? arg2.toChars() : "");
+            if (fd.isSafe())
+                buf.writestring(" is not allowed in a `@safe` function");
+            else
+                buf.writestring(" is not allowed in a function with default safety with `-preview=safer`");
+            .error(loc, buf.extractChars());
+        }
+    }
+}
+
+
+/**********************************************
+ * Function is doing something unsafe. If inference
+ * is in process, commit the function to be @system.
+ * Params:
+ *      fd = the naughty function
+ * Returns:
+ *      true if this is a safe function and so an error OR is inferred to be @system,
+ *      false otherwise.
+ */
+extern (D) bool setFunctionToUnsafe(FuncDeclaration fd)
 {
     if (fd.safetyInprocess)
     {
         fd.safetyInprocess = false;
         fd.type.toTypeFunction().trust = TRUST.system;
-        if (fmt || arg0)
-            fd.safetyViolation = new AttributeViolation(loc, fmt, arg0, arg1, arg2);
 
         if (fd.fes)
-            fd.fes.func.setUnsafe();
-    }
-    else if (fd.isSafe())
-    {
-        if (!gag && fmt)
-            .error(loc, fmt, arg0 ? arg0.toChars() : "", arg1 ? arg1.toChars() : "", arg2 ? arg2.toChars() : "");
-
+            setFunctionToUnsafe(fd.fes.func);
         return true;
     }
+    else if (fd.isSafe() || fd.isSaferD())
+        return true;
     return false;
 }
+
 
 /**************************************
  * The function is calling `@system` function `f`, so mark it as unsafe.
@@ -383,7 +430,12 @@ extern (D) bool setUnsafe(
  */
 extern (D) bool setUnsafeCall(FuncDeclaration fd, FuncDeclaration f)
 {
-    return fd.setUnsafe(false, f.loc, null, f, null);
+    if (setFunctionToUnsafe(fd))
+    {
+        reportSafeError(fd, false, f.loc, null, f, null);
+        return fd.isSafe();
+    }
+    return false;
 }
 
 /**************************************
@@ -394,14 +446,14 @@ extern (D) bool setUnsafeCall(FuncDeclaration fd, FuncDeclaration f)
  *   sc = scope that the unsafe statement / expression is in
  *   gag = surpress error message (used in escape.d)
  *   loc = location of error
- *   fmt = printf-style format string
+ *   format = printf-style format string
  *   arg0  = (optional) argument for first %s format specifier
  *   arg1  = (optional) argument for second %s format specifier
  *   arg2  = (optional) argument for third %s format specifier
- * Returns: whether there's a safe error
+ * Returns: whether there is a safe error
  */
 bool setUnsafe(Scope* sc,
-    bool gag = false, Loc loc = Loc.init, const(char)* fmt = null,
+    bool gag = false, Loc loc = Loc.init, const(char)* format = null,
     RootObject arg0 = null, RootObject arg1 = null, RootObject arg2 = null)
 {
     if (sc.intypeof)
@@ -416,7 +468,11 @@ bool setUnsafe(Scope* sc,
         {
             if (sc.varDecl.storage_class & STC.safe)
             {
-                .error(loc, fmt, arg0 ? arg0.toChars() : "", arg1 ? arg1.toChars() : "", arg2 ? arg2.toChars() : "");
+                OutBuffer buf;
+                buf.printf(format, arg0 ? arg0.toChars() : "", arg1 ? arg1.toChars() : "", arg2 ? arg2.toChars() : "");
+                buf.printf(" can't initialize `@safe` variable `%s`", sc.varDecl.toChars());
+                .error(loc, buf.extractChars());
+
                 return true;
             }
             else if (!(sc.varDecl.storage_class & STC.trusted))
@@ -435,13 +491,24 @@ bool setUnsafe(Scope* sc,
         {
             // Message wil be gagged, but still call error() to update global.errors and for
             // -verrors=spec
-            .error(loc, fmt, arg0 ? arg0.toChars() : "", arg1 ? arg1.toChars() : "", arg2 ? arg2.toChars() : "");
+            OutBuffer buf;
+            buf.printf(format, arg0 ? arg0.toChars() : "", arg1 ? arg1.toChars() : "", arg2 ? arg2.toChars() : "");
+            buf.writestring(" is not allowed in a `@safe` function");
+            .error(loc, buf.extractChars());
             return true;
         }
         return false;
     }
 
-    return sc.func.setUnsafe(gag, loc, fmt, arg0, arg1, arg2);
+    if (setFunctionToUnsafe(sc.func))
+    {
+        if (format || arg0)
+        {
+            reportSafeError(sc.func, gag, loc, format, arg0, arg1, arg2);
+        }
+        return sc.func.isSafe(); // it is only an error if in an @safe function
+    }
+    return false;
 }
 
 /***************************************
@@ -459,23 +526,24 @@ bool setUnsafe(Scope* sc,
  *   fs = feature state from the preview flag
  *   gag = surpress error message
  *   loc = location of error
- *   msg = printf-style format string
+ *   format = printf-style format string
  *   arg0  = (optional) argument for first %s format specifier
  *   arg1  = (optional) argument for second %s format specifier
  *   arg2  = (optional) argument for third %s format specifier
  * Returns: whether an actual safe error (not deprecation) occured
  */
-bool setUnsafePreview(Scope* sc, FeatureState fs, bool gag, Loc loc, const(char)* msg,
+bool setUnsafePreview(Scope* sc, FeatureState fs, bool gag, Loc loc, const(char)* format,
     RootObject arg0 = null, RootObject arg1 = null, RootObject arg2 = null)
 {
-    //printf("setUnsafePreview() fs:%d %s\n", fs, msg);
+    //printf("setUnsafePreview() fs:%d %s\n", fs, fmt);
+    assert(format);
     with (FeatureState) final switch (fs)
     {
       case disabled:
         return false;
 
       case enabled:
-        return sc.setUnsafe(gag, loc, msg, arg0, arg1, arg2);
+        return sc.setUnsafe(gag, loc, format, arg0, arg1, arg2);
 
       case default_:
         if (!sc.func)
@@ -484,13 +552,16 @@ bool setUnsafePreview(Scope* sc, FeatureState fs, bool gag, Loc loc, const(char)
         {
             if (!gag && !sc.isDeprecated())
             {
-                deprecation(loc, msg, arg0 ? arg0.toChars() : "", arg1 ? arg1.toChars() : "", arg2 ? arg2.toChars() : "");
+                OutBuffer buf;
+                buf.printf(format, arg0 ? arg0.toChars() : "", arg1 ? arg1.toChars() : "", arg2 ? arg2.toChars() : "");
+                buf.writestring(" will become `@system` in a future release");
+                deprecation(loc, buf.extractChars());
             }
         }
         else if (!sc.func.safetyViolation)
         {
             import dmd.func : AttributeViolation;
-            sc.func.safetyViolation = new AttributeViolation(loc, msg, arg0, arg1, arg2);
+            sc.func.safetyViolation = new AttributeViolation(loc, format, arg0, arg1, arg2);
         }
         return false;
     }

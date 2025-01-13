@@ -681,6 +681,7 @@ extern (D) bool checkComplexTransition(Type type, const ref Loc loc, Scope* sc)
  * 'args' are being matched to function type 'tf'
  * Determine match level.
  * Params:
+ *      fd = function being called, if a symbol
  *      tf = function type
  *      tthis = type of `this` pointer, null if not member function
  *      argumentList = arguments to function call
@@ -690,9 +691,10 @@ extern (D) bool checkComplexTransition(Type type, const ref Loc loc, Scope* sc)
  * Returns:
  *      MATCHxxxx
  */
-extern (D) MATCH callMatch(TypeFunction tf, Type tthis, ArgumentList argumentList, int flag = 0, void delegate(const(char)*) scope errorHelper = null, Scope* sc = null)
+extern (D) MATCH callMatch(FuncDeclaration fd, TypeFunction tf, Type tthis, ArgumentList argumentList,
+        int flag = 0, void delegate(const(char)*) scope errorHelper = null, Scope* sc = null)
 {
-    //printf("TypeFunction::callMatch() %s\n", tf.toChars());
+    //printf("callMatch() fd: %s, tf: %s\n", fd ? fd.ident.toChars() : "null", toChars(tf));
     MATCH match = MATCH.exact; // assume exact match
     ubyte wildmatch = 0;
 
@@ -753,13 +755,14 @@ extern (D) MATCH callMatch(TypeFunction tf, Type tthis, ArgumentList argumentLis
     }
     const(char)* failMessage;
     const(char)** pMessage = errorHelper ? &failMessage : null;
-    auto resolvedArgs = tf.resolveNamedArgs(argumentList, pMessage);
+    OutBuffer buf;
+    auto resolvedArgs = tf.resolveNamedArgs(argumentList, errorHelper ? &buf : null);
     Expression[] args;
     if (!resolvedArgs)
     {
-        if (failMessage)
+        if (buf.length)
         {
-            errorHelper(failMessage);
+            errorHelper(buf.peekChars());
             return MATCH.nomatch;
         }
 
@@ -819,7 +822,12 @@ extern (D) MATCH callMatch(TypeFunction tf, Type tthis, ArgumentList argumentLis
             Expression arg = args[u];
             if (!arg)
                 continue; // default argument
-            m = argumentMatchParameter(tf, p, arg, wildmatch, flag, sc, pMessage);
+            m = argumentMatchParameter(fd, tf, p, arg, wildmatch, flag, sc, pMessage);
+            if (failMessage)
+            {
+                buf.reset();
+                buf.writestring(failMessage);
+            }
         }
         else if (p.defaultArg)
             continue;
@@ -846,15 +854,17 @@ extern (D) MATCH callMatch(TypeFunction tf, Type tthis, ArgumentList argumentLis
                     errorHelper(failMessage);
                 return MATCH.nomatch;
             }
-            if (pMessage && u >= args.length)
-                *pMessage = tf.getMatchError("missing argument for parameter #%d: `%s`",
-                    u + 1, parameterToChars(p, tf, false));
-            // If an error happened previously, `pMessage` was already filled
-            else if (pMessage && !*pMessage)
-                *pMessage = tf.getParamError(args[u], p);
-
             if (errorHelper)
-                errorHelper(*pMessage);
+            {
+                if (u >= args.length)
+                    TypeFunction.getMatchError(buf, "missing argument for parameter #%d: `%s`",
+                        u + 1, parameterToChars(p, tf, false));
+                // If an error happened previously, `pMessage` was already filled
+                else if (buf.length == 0)
+                    buf.writestring(tf.getParamError(args[u], p));
+
+                errorHelper(buf.peekChars());
+            }
             return MATCH.nomatch;
         }
         if (m < match)
@@ -864,7 +874,9 @@ extern (D) MATCH callMatch(TypeFunction tf, Type tthis, ArgumentList argumentLis
     if (errorHelper && !parameterList.varargs && args.length > nparams)
     {
         // all parameters had a match, but there are surplus args
-        errorHelper(tf.getMatchError("expected %d argument(s), not %d", nparams, args.length));
+        OutBuffer buf2;
+        TypeFunction.getMatchError(buf2, "expected %d argument(s), not %d", nparams, args.length);
+        errorHelper(buf2.extractChars());
         return MATCH.nomatch;
     }
     //printf("match = %d\n", match);
@@ -877,14 +889,15 @@ extern (D) MATCH callMatch(TypeFunction tf, Type tthis, ArgumentList argumentLis
  *
  * This is done by seeing if a call to the copy constructor can be made:
  * ```
- * typeof(tprm) __copytmp;
- * copytmp.__copyCtor(arg);
+ * typeof(tprm) __copytemp;
+ * copytemp.__copyCtor(arg);
  * ```
  */
 private extern(D) bool isCopyConstructorCallable (StructDeclaration argStruct,
     Expression arg, Type tprm, Scope* sc, const(char)** pMessage)
 {
-    auto tmp = new VarDeclaration(arg.loc, tprm, Identifier.generateId("__copytmp"), null);
+    //printf("isCopyConstructorCallable() argStruct: %s arg: %s tprm: %s\n", argStruct.toChars(), toChars(arg), toChars(tprm));
+    auto tmp = new VarDeclaration(arg.loc, tprm, Identifier.generateId("__copytemp"), null);
     tmp.storage_class = STC.rvalue | STC.temp | STC.ctfe;
     tmp.dsymbolSemantic(sc);
     Expression ve = new VarExp(arg.loc, tmp);
@@ -970,25 +983,28 @@ private extern(D) bool isCopyConstructorCallable (StructDeclaration argStruct,
  *
  * This function is called by `TypeFunction.callMatch` while iterating over
  * the list of parameter. Here we check if `arg` is a match for `p`,
- * which is mostly about checking if `arg.type` converts to `p`'s type
+ * which is mostly about checking if `arg.type` converts to type of `p`
  * and some check about value reference.
  *
  * Params:
+ *   fd = the function being called if symbol, null if not
  *   tf = The `TypeFunction`, only used for error reporting
  *   p = The parameter of `tf` being matched
  *   arg = Argument being passed (bound) to `p`
  *   wildmatch = Wild (`inout`) matching level, derived from the full argument list
- *   flag = A non-zero value means we're doing a partial ordering check
+ *   flag = A non-zero value means we are doing a partial ordering check
  *          (no value semantic check)
  *   sc = Scope we are in
  *   pMessage = A buffer to write the error in, or `null`
  *
  * Returns: Whether `trailingArgs` match `p`.
  */
-private extern(D) MATCH argumentMatchParameter (TypeFunction tf, Parameter p,
+private extern(D) MATCH argumentMatchParameter (FuncDeclaration fd, TypeFunction tf, Parameter p,
     Expression arg, ubyte wildmatch, int flag, Scope* sc, const(char)** pMessage)
 {
-    //printf("arg: %s, type: %s\n", arg.toChars(), arg.type.toChars());
+    static if (0)
+    printf("argumentMatchParameter() sc: %p, fd: %s, tf: %s, p: %s, arg: %s, arg.type: %s\n",
+        sc, fd ? fd.ident.toChars() : "null", tf.toChars(), parameterToChars(p, tf, false), arg.toChars(), arg.type.toChars());
     MATCH m;
     Type targ = arg.type;
     Type tprm = wildmatch ? p.type.substWildTo(wildmatch) : p.type;
@@ -1003,18 +1019,47 @@ private extern(D) MATCH argumentMatchParameter (TypeFunction tf, Parameter p,
     else
     {
         const isRef = p.isReference();
-        StructDeclaration argStruct, prmStruct;
 
-        // first look for a copy constructor
-        if (arg.isLvalue() && !isRef && targ.ty == Tstruct && tprm.ty == Tstruct)
+        StructDeclaration argStruct, prmStruct;
+        if (targ.ty == Tstruct && tprm.ty == Tstruct)
         {
             // if the argument and the parameter are of the same unqualified struct type
             argStruct = (cast(TypeStruct)targ).sym;
             prmStruct = (cast(TypeStruct)tprm).sym;
+
+            /* if both a copy constructor and move constructor exist, then match
+             * the lvalue to the copy constructor only and the rvalue to the move constructor
+             * only
+             */
+            if (argStruct == prmStruct && fd)
+            {
+                if (auto cfd = fd.isCtorDeclaration())
+                {
+                    /* Get struct that constructor is making
+                     */
+
+                    auto t1 = cfd.type.toBasetype();
+                    auto t2 = t1.nextOf();
+                    auto t3 = t2.isTypeStruct();
+                    if (t3)
+                    {
+                    auto ctorStruct = t3.sym;
+//                    StructDeclaration ctorStruct = cfd.type.toBasetype().nextOf().isTypeStruct().sym;
+
+                    if (prmStruct == ctorStruct && ctorStruct.hasCopyCtor && ctorStruct.hasMoveCtor)
+                    {
+                        if (cfd.isCpCtor && !arg.isLvalue())
+                            return MATCH.nomatch;       // copy constructor is only for lvalues
+                        else if (cfd.isMoveCtor && arg.isLvalue())
+                            return MATCH.nomatch;       // move constructor is only for rvalues
+                    }
+                    }
+                }
+            }
         }
 
         // check if the copy constructor may be called to copy the argument
-        if (argStruct && argStruct == prmStruct && argStruct.hasCopyCtor)
+        if (arg.isLvalue() && !isRef && argStruct && argStruct == prmStruct && argStruct.hasCopyCtor)
         {
             if (!isCopyConstructorCallable(argStruct, arg, tprm, sc, pMessage))
                 return MATCH.nomatch;
@@ -1077,7 +1122,7 @@ private extern(D) MATCH argumentMatchParameter (TypeFunction tf, Parameter p,
             // Need to make this a rvalue through a temporary
             m = MATCH.convert;
         }
-        else if (global.params.rvalueRefParam != FeatureState.enabled ||
+        else if (!(sc && sc.previews.rvalueRefParam) ||
                  p.storageClass & STC.out_ ||
                  !arg.type.isCopyable())  // can't copy to temp for ref parameter
         {
@@ -1174,8 +1219,12 @@ private extern(D) MATCH matchTypeSafeVarArgs(TypeFunction tf, Parameter p,
         if (sz != trailingArgs.length)
         {
             if (pMessage)
-                *pMessage = tf.getMatchError("expected %llu variadic argument(s), not %zu",
+            {
+                OutBuffer buf;
+                TypeFunction.getMatchError(buf, "expected %llu variadic argument(s), not %zu",
                     sz, trailingArgs.length);
+                *pMessage = buf.extractChars();
+            }
             return MATCH.nomatch;
         }
         goto case Tarray;
@@ -2286,8 +2335,7 @@ Type typeSemantic(Type type, const ref Loc loc, Scope* sc)
 
             // default arg must be an lvalue
             if (isRefOrOut && !isAuto &&
-                !(fparam.storageClass & STC.constscoperef) &&
-                global.params.rvalueRefParam != FeatureState.enabled)
+                !(fparam.storageClass & STC.constscoperef) && !sc.previews.rvalueRefParam)
                 e = e.toLvalue(sc, "create default argument for `ref` / `out` parameter from");
 
             fparam.defaultArg = e;
@@ -4413,6 +4461,10 @@ void resolve(Type mt, const ref Loc loc, Scope* sc, out Expression pe, out Type 
  */
 Expression dotExp(Type mt, Scope* sc, Expression e, Identifier ident, DotExpFlag flag)
 {
+    enum LOGDOTEXP = false;
+    if (LOGDOTEXP)
+        printf("dotExp()\n");
+
     Expression visitType(Type mt)
     {
         VarDeclaration v = null;
@@ -5033,8 +5085,41 @@ Expression dotExp(Type mt, Scope* sc, Expression e, Identifier ident, DotExpFlag
             return noMember(mt, sc, e, ident, flag);
         }
         // check before alias resolution; the alias itself might be deprecated!
-        if (s.isAliasDeclaration)
+        if (auto ad = s.isAliasDeclaration)
+        {
             s.checkDeprecated(e.loc, sc);
+
+            // Fix for https://github.com/dlang/dmd/issues/20610
+            if (ad.originalType)
+            {
+                if (auto tid = ad.originalType.isTypeIdentifier())
+                {
+                    if (tid.idents.length)
+                    {
+                        static if (0)
+                        {
+                            printf("TypeStruct::dotExp(e = '%s', ident = '%s')\n", e.toChars(), ident.toChars());
+                            printf("AliasDeclaration: %s\n", ad.toChars());
+                            if (ad.aliassym)
+                                printf("aliassym: %s\n", ad.aliassym.toChars());
+                            printf("tid type: %s\n", toChars(tid));
+                        }
+                        /* Rewrite e.s as e.(tid.ident).(tid.idents)
+                         */
+                        Expression die = new DotIdExp(e.loc, e, tid.ident);
+                        foreach (id; tid.idents) // maybe use typeToExpressionHelper()
+                            die = new DotIdExp(e.loc, die, cast(Identifier)id);
+                        /* Ambiguous syntax, only way to disambiguate it to try it
+                         */
+                        die = dmd.expressionsem.trySemantic(die, sc);
+                        if (die && die.isDotVarExp())   // shrink wrap around DotVarExp()
+                        {
+                            return die;
+                        }
+                    }
+                }
+            }
+        }
         s = s.toAlias();
 
         if (auto em = s.isEnumMember())
@@ -6025,7 +6110,7 @@ Dsymbol toDsymbol(Type type, Scope* sc)
 
     Dsymbol visitIdentifier(TypeIdentifier type)
     {
-        //printf("TypeIdentifier::toDsymbol('%s')\n", toChars());
+        //printf("TypeIdentifier::toDsymbol('%s')\n", toChars(type));
         if (!sc)
             return null;
 
@@ -6037,7 +6122,6 @@ Dsymbol toDsymbol(Type type, Scope* sc)
             s = t.toDsymbol(sc);
         if (e)
             s = getDsymbol(e);
-
         return s;
     }
 

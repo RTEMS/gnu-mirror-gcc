@@ -491,7 +491,7 @@ MATCH implicitConvTo(Expression e, Type t)
         case Tint16:
             if (ty == Tuns64 && value & ~0x7FFFU)
                 return MATCH.nomatch;
-            else if (cast(short)value != value)
+            if (cast(short)value != value)
                 return MATCH.nomatch;
             break;
 
@@ -2335,7 +2335,7 @@ Expression castTo(Expression e, Scope* sc, Type t, Type att = null)
         Type tb = t.toBasetype();
         Type typeb = e.type.toBasetype();
 
-        if (e.hexString && !e.committed)
+        if (e.hexString && !e.committed && tb.nextOf().isIntegral)
         {
             const szx = cast(ubyte) tb.nextOf().size();
             if (szx != se.sz && (e.len % szx) == 0)
@@ -3261,7 +3261,7 @@ Expression scaleFactor(BinExp be, Scope* sc)
     if (eoff.op == EXP.int64 && eoff.toInteger() == 0)
     {
     }
-    else if (sc.setUnsafe(false, be.loc, "pointer arithmetic not allowed in @safe functions"))
+    else if (sc.setUnsafe(false, be.loc, "pointer arithmetic"))
     {
         return ErrorExp.get();
     }

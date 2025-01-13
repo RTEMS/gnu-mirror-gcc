@@ -1,3 +1,64 @@
+2025-01-12  Maciej W. Rozycki  <macro@orcam.me.uk>
+
+	* config/alpha/alpha.cc (alpha_expand_block_move): Use a HImode
+	subreg of a DImode register to hold data from an aligned HImode
+	load.
+
+2025-01-12  Maciej W. Rozycki  <macro@orcam.me.uk>
+
+	* config/alpha/alpha.cc (alpha_expand_block_move): Merge loaded
+	data from pairs of SImode registers into single DImode registers
+	if to be used with unaligned stores.
+
+2025-01-12  Maciej W. Rozycki  <macro@orcam.me.uk>
+
+	* config/alpha/alpha.cc (alpha_option_override): Ignore CPU
+	flags corresponding to features the enabling or disabling of
+	which has been requested with an individual feature option.
+
+2025-01-12  Maciej W. Rozycki  <macro@orcam.me.uk>
+
+	PR middle-end/64242
+	* config/alpha/alpha.md (`builtin_longjmp'): Restore frame
+	pointer last.  Add frame clobber and schedule blockage.
+
+2025-01-12  Maciej W. Rozycki  <macro@orcam.me.uk>
+
+	* config/alpha/alpha.md (builtin_longjmp): Add memory clobbers.
+
+2025-01-12  Richard Biener  <rguenther@suse.de>
+
+	* tree-vect-slp.cc (vect_analyze_slp): Release saved_stmts
+	vector.
+	(vect_build_slp_tree_2): Release new_oprnds_info when not
+	used.
+	(vect_analyze_slp): Release root_stmts when gcond SLP
+	build fails.
+
+2025-01-12  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	PR middle-end/118411
+	* final.cc (get_attr_length_1): Handle asm for CALL_INSN
+	and JUMP_INSNs.
+
+2025-01-11  mengqinggang  <mengqinggang@loongson.cn>
+
+	* config/loongarch/lasx.md: Use new loongarch_output_move.
+	* config/loongarch/loongarch-protos.h (loongarch_output_move):
+	Change parameters from (rtx, rtx) to (rtx *).
+	* config/loongarch/loongarch.cc (loongarch_output_move):
+	Generate final immediate for lu12i.w and lu52i.d.
+	* config/loongarch/loongarch.md:
+	Generate final immediate for lu32i.d and lu52i.d.
+	* config/loongarch/lsx.md: Use new loongarch_output_move.
+
+2025-01-11  Andrew MacLeod  <amacleod@redhat.com>
+
+	PR tree-optimization/88575
+	* vr-values.cc (simplify_using_ranges::fold_cond_with_ops): Query
+	relation between op0 and op1 and utilize it.
+	(simplify_using_ranges::simplify): Do not eliminate float checks.
+
 2025-01-10  Alex Coplan  <alex.coplan@arm.com>
 
 	PR tree-optimization/118211

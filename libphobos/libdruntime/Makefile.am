@@ -188,6 +188,7 @@ DRUNTIME_DSOURCES = core/atomic.d core/attribute.d core/bitop.d \
 	core/internal/container/treap.d core/internal/convert.d \
 	core/internal/dassert.d core/internal/destruction.d \
 	core/internal/entrypoint.d core/internal/gc/bits.d \
+	core/internal/gc/blkcache.d core/internal/gc/blockmeta.d \
 	core/internal/gc/impl/conservative/gc.d \
 	core/internal/gc/impl/manual/gc.d core/internal/gc/impl/proto/gc.d \
 	core/internal/gc/os.d core/internal/gc/pooltable.d \
@@ -209,7 +210,8 @@ DRUNTIME_DSOURCES = core/atomic.d core/attribute.d core/bitop.d \
 	core/sync/barrier.d core/sync/condition.d core/sync/config.d \
 	core/sync/event.d core/sync/exception.d core/sync/mutex.d \
 	core/sync/package.d core/sync/rwmutex.d core/sync/semaphore.d \
-	core/thread/context.d core/thread/fiber.d core/thread/osthread.d \
+	core/thread/context.d core/thread/fiber/base.d \
+	core/thread/fiber/package.d core/thread/osthread.d \
 	core/thread/package.d core/thread/threadbase.d \
 	core/thread/threadgroup.d core/thread/types.d core/time.d \
 	core/vararg.d core/volatile.d etc/valgrind/valgrind.d gcc/attribute.d \

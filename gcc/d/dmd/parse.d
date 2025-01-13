@@ -932,22 +932,14 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
                 {
                     const attrLoc = token.loc;
 
-                    nextToken();
-
-                    AST.Expression e = null; // default
-                    if (token.value == TOK.leftParenthesis)
-                    {
-                        nextToken();
-                        e = parseAssignExp();
-                        check(TOK.rightParenthesis);
-                    }
+                    AST.Expression e = parseAlign();
 
                     if (pAttrs.setAlignment)
                     {
                         if (e)
                             error("redundant alignment attribute `align(%s)`", e.toChars());
                         else
-                            error("redundant alignment attribute `align`");
+                            error("redundant alignment attribute `align(default)`");
                     }
 
                     pAttrs.setAlignment = true;
@@ -4371,14 +4363,8 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
                 }
             case TOK.align_:
                 {
-                    nextToken();
                     setAlignment = true;
-                    if (token.value == TOK.leftParenthesis)
-                    {
-                        nextToken();
-                        ealign = parseExpression();
-                        check(TOK.rightParenthesis);
-                    }
+                    ealign = parseAlign();
                     continue;
                 }
             default:
@@ -4388,6 +4374,27 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
         }
     }
 
+    /**
+     * Parse `align` or `align(n)`
+     * Returns:
+     *  expression `n` if it is present, or `null` otherwise.
+     */
+    private AST.Expression parseAlign()
+    {
+        assert(token.value == TOK.align_);
+        AST.Expression e = null;
+        nextToken();
+        if (token.value == TOK.leftParenthesis)
+        {
+            nextToken();
+            if (token.value == TOK.default_)
+                nextToken();
+            else
+                e = parseAssignExp();
+            check(TOK.rightParenthesis);
+        }
+        return e;
+    }
     /**********************************
      * Parse Declarations.
      * These can be:
@@ -5252,7 +5259,10 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
                 error("missing `do { ... }` after `in` or `out`");
             const returnloc = token.loc;
             nextToken();
-            f.fbody = new AST.ReturnStatement(returnloc, parseExpression());
+            if (f.isCtorDeclaration)
+                f.fbody = new AST.ExpStatement(returnloc, parseExpression());
+            else
+                f.fbody = new AST.ReturnStatement(returnloc, parseExpression());
             f.endloc = token.loc;
             check(TOK.semicolon);
             break;
@@ -5673,7 +5683,7 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
     }
 
     /***
-     * Parse an assignment condition for if or while statements.
+     * Parse an assignment condition for `if`, `switch` or `while` statements.
      *
      * Returns:
      *      The variable that is declared inside the condition
@@ -5877,6 +5887,7 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
         case TOK.moduleString:
         case TOK.functionString:
         case TOK.prettyFunction:
+        case TOK.rvalue:
         Lexp:
             {
                 AST.Expression exp = parseExpression();
@@ -6812,7 +6823,6 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
             {
                 case TOK.identifier:
                 {
-
                     if (commaExpected)
                         error("comma expected separating field initializers");
                     const t = peek(&token);
@@ -6846,6 +6856,20 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
                 default:
                     if (commaExpected)
                         error("comma expected separating field initializers");
+                    const t = peek(&token);
+                    if (t.value == TOK.colon)
+                    {
+                        error("incorrect syntax for associative array, expected `[]`, found `{}`");
+                        while (token.value != TOK.rightCurly && token.value != TOK.endOfFile)
+                        {
+                            nextToken();
+                        }
+                        if (token.value == TOK.rightCurly)
+                        {
+                            nextToken();
+                        }
+                        break;
+                    }
                     auto value = parseInitializer();
                     _is.addInit(null, value);
                     commaExpected = true;
@@ -8410,6 +8434,15 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
                 e = new AST.TypeidExp(loc, o);
                 break;
             }
+        case TOK.rvalue:
+            {
+                nextToken();
+                check(TOK.leftParenthesis, "`__rvalue`");
+                e = parseAssignExp();
+                e.rvalue = true;
+                check(TOK.rightParenthesis);
+                break;
+            }
         case TOK.traits:
             {
                 /* __traits(identifier, args...)
@@ -8647,7 +8680,7 @@ class Parser(AST, Lexer = dmd.lexer.Lexer) : Lexer
             error("expression expected, not `%s`", token.toChars());
         Lerr:
             // Anything for e, as long as it's not NULL
-            e = new AST.IntegerExp(loc, 0, AST.Type.tint32);
+            e = AST.ErrorExp.get();
             nextToken();
             break;
         }

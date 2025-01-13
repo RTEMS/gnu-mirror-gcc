@@ -7,6 +7,14 @@
       integer, parameter :: n = 100
       integer :: a(n), i, j
       external :: gangr, workerr, vectorr, seqr
+! { dg-note "routine 'gangr' declared here" "" { target { ! offloading_enabled } } .-1 }
+! { dg-note "routine 'gangr_' declared here" "" { target offloading_enabled } .-2 }
+! { dg-note "routine 'workerr' declared here" "" { target { ! offloading_enabled } } .-3 }
+! { dg-note "routine 'workerr_' declared here" "" { target offloading_enabled } .-4 }
+! { dg-note "routine 'vectorr' declared here" "" { target { ! offloading_enabled } } .-5 }
+! { dg-note "routine 'vectorr_' declared here" "" { target offloading_enabled } .-6 }
+!TODO See PR101551 for 'offloading_enabled' differences.
+
 !$acc routine (gangr) gang
 !$acc routine (workerr) worker
 !$acc routine (vectorr) vector
@@ -22,8 +30,6 @@
 ! { dg-warning "insufficient partitioning available to parallelize loop" "" { target *-*-* } .-1 }
          do j = 1, n
             call workerr (a, n) ! { dg-message "optimized: assigned OpenACC worker vector loop parallelism" }
-! { dg-bogus "note: routine 'workerr' declared here" "TODO1" { xfail { ! offloading_enabled } } .-1 }
-! { dg-bogus "note: routine 'workerr_' declared here" "TODO2" { xfail offloading_enabled } .-2 }
          end do
       end do
 !$acc end parallel loop
@@ -36,8 +42,6 @@
          do j = 1, n
             call gangr (a, n) ! { dg-message "optimized: assigned OpenACC worker vector loop parallelism" }
 ! { dg-error "routine call uses same OpenACC parallelism as containing loop" "" { target *-*-* } .-1 }
-! { dg-bogus "note: routine 'gangr' declared here" "TODO1" { xfail { ! offloading_enabled } } .-2 }
-! { dg-bogus "note: routine 'gangr_' declared here" "TODO2" { xfail offloading_enabled } .-3 }
          end do
       end do
 !$acc end parallel loop
@@ -162,8 +166,6 @@
 !$acc parallel loop ! { dg-message "optimized: assigned OpenACC gang worker loop parallelism" }
       do i = 1, n
          call vectorr (a, n) ! { dg-message "optimized: assigned OpenACC vector loop parallelism" }
-! { dg-bogus "note: routine 'vectorr' declared here" "TODO1" { xfail { ! offloading_enabled } } .-1 }
-! { dg-bogus "note: routine 'vectorr_' declared here" "TODO2" { xfail offloading_enabled } .-2 }
       end do
 !$acc end parallel loop
 
@@ -199,6 +201,14 @@
       integer, parameter :: n = 100
       integer :: a(n), i, j
       integer, external :: gangf, workerf, vectorf, seqf
+! { dg-note "routine 'gangf' declared here" "" { target { ! offloading_enabled } } .-1 }
+! { dg-note "routine 'gangf_' declared here" "" { target offloading_enabled } .-2 }
+! { dg-note "routine 'workerf' declared here" "" { target { ! offloading_enabled } } .-3 }
+! { dg-note "routine 'workerf_' declared here" "" { target offloading_enabled } .-4 }
+! { dg-note "routine 'vectorf' declared here" "" { target { ! offloading_enabled } } .-5 }
+! { dg-note "routine 'vectorf_' declared here" "" { target offloading_enabled } .-6 }
+!TODO See PR101551 for 'offloading_enabled' differences.
+
 !$acc routine (gangf) gang
 !$acc routine (workerf) worker
 !$acc routine (vectorf) vector
@@ -214,8 +224,6 @@
 ! { dg-warning "insufficient partitioning available to parallelize loop" "" { target *-*-* } .-1 }
          do j = 1, n
             a(i) = workerf (a, n) ! { dg-message "optimized: assigned OpenACC worker vector loop parallelism" }
-! { dg-bogus "note: routine 'workerf' declared here" "TODO1" { xfail { ! offloading_enabled } } .-1 }
-! { dg-bogus "note: routine 'workerf_' declared here" "TODO2" { xfail offloading_enabled } .-2 }
          end do
       end do
 !$acc end parallel loop
@@ -228,9 +236,7 @@
          do j = 1, n
             a(i) = gangf (a, n) ! { dg-message "optimized: assigned OpenACC worker vector loop parallelism" }
 ! { dg-error "routine call uses same OpenACC parallelism as containing loop" "" { target *-*-* } .-1 }
-! { dg-bogus "note: routine 'gangf' declared here" "TODO1" { xfail { ! offloading_enabled } } .-2 }
-! { dg-bogus "note: routine 'gangf_' declared here" "TODO2" { xfail offloading_enabled } .-3 }
-         end do
+        end do
       end do
 !$acc end parallel loop
 
@@ -354,8 +360,6 @@
 !$acc parallel loop ! { dg-message "optimized: assigned OpenACC gang worker loop parallelism" }
       do i = 1, n
          a(i) = vectorf (a, n) ! { dg-message "optimized: assigned OpenACC vector loop parallelism" }
-! { dg-bogus "note: routine 'vectorf' declared here" "TODO1" { xfail { ! offloading_enabled } } .-1 }
-! { dg-bogus "note: routine 'vectorf_' declared here" "TODO2" { xfail offloading_enabled } .-2 }
       end do
 !$acc end parallel loop
 

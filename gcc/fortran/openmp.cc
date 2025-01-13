@@ -408,7 +408,8 @@ gfc_match_omp_variable_list (const char *str, gfc_omp_namelist **list,
 			     bool allow_sections = false,
 			     bool allow_derived = false,
 			     bool *has_all_memory = NULL,
-			     bool reject_common_vars = false)
+			     bool reject_common_vars = false,
+			     bool reverse_order = false)
 {
   gfc_omp_namelist *head, *tail, *p;
   locus old_loc, cur_loc;
@@ -492,15 +493,20 @@ gfc_match_omp_variable_list (const char *str, gfc_omp_namelist **list,
 	  p = gfc_get_omp_namelist ();
 	  if (head == NULL)
 	    head = tail = p;
+	  else if (reverse_order)
+	    {
+	      p->next = head;
+	      head = p;
+	    }
 	  else
 	    {
 	      tail->next = p;
 	      tail = tail->next;
 	    }
-	  tail->sym = sym;
-	  tail->expr = expr;
-	  tail->where = gfc_get_location_range (NULL, 0, &cur_loc, 1,
-						&gfc_current_locus);
+	  p->sym = sym;
+	  p->expr = expr;
+	  p->where = gfc_get_location_range (NULL, 0, &cur_loc, 1,
+					     &gfc_current_locus);
 	  if (reject_common_vars && sym->attr.in_common)
 	    {
 	      gcc_assert (allow_common);
@@ -540,13 +546,18 @@ gfc_match_omp_variable_list (const char *str, gfc_omp_namelist **list,
 	  p = gfc_get_omp_namelist ();
 	  if (head == NULL)
 	    head = tail = p;
+	  else if (reverse_order)
+	    {
+	      p->next = head;
+	      head = p;
+	    }
 	  else
 	    {
 	      tail->next = p;
 	      tail = tail->next;
 	    }
-	  tail->sym = sym;
-	  tail->where = cur_loc;
+	  p->sym = sym;
+	  p->where = cur_loc;
 	}
 
     next_item:
@@ -1128,6 +1139,7 @@ enum omp_mask2
   OMP_CLAUSE_USE,  /* OpenMP 5.1.  */
   OMP_CLAUSE_NOVARIANTS, /* OpenMP 5.1  */
   OMP_CLAUSE_NOCONTEXT, /* OpenMP 5.1  */
+  OMP_CLAUSE_INTEROP, /* OpenMP 5.1  */
   /* This must come last.  */
   OMP_MASK2_LAST
 };
@@ -3255,6 +3267,21 @@ gfc_match_omp_clauses (gfc_omp_clauses **cp, const omp_mask mask,
 		continue;
 	      goto error;
 	    }
+	  if ((mask & OMP_CLAUSE_INTEROP)
+	      && (m = gfc_match_dupl_check (!c->lists[OMP_LIST_INTEROP],
+					    "interop", true)) != MATCH_NO)
+	    {
+	      /* Note: the interop objects are saved in reverse order to match
+		 the order in C/C++.  */
+	      if (m == MATCH_YES
+		  && (gfc_match_omp_variable_list ("",
+						   &c->lists[OMP_LIST_INTEROP],
+						   false, NULL, NULL, false,
+						   false, NULL, false, true)
+		      == MATCH_YES))
+		continue;
+	      goto error;
+	    }
 	  if ((mask & OMP_CLAUSE_IS_DEVICE_PTR)
 	      && gfc_match_omp_variable_list
 		   ("is_device_ptr (",
@@ -5019,7 +5046,7 @@ cleanup:
 #define OMP_DISPATCH_CLAUSES                                                   \
   (omp_mask (OMP_CLAUSE_DEVICE) | OMP_CLAUSE_DEPEND | OMP_CLAUSE_NOVARIANTS    \
    | OMP_CLAUSE_NOCONTEXT | OMP_CLAUSE_IS_DEVICE_PTR | OMP_CLAUSE_NOWAIT       \
-   | OMP_CLAUSE_HAS_DEVICE_ADDR)
+   | OMP_CLAUSE_HAS_DEVICE_ADDR | OMP_CLAUSE_INTEROP)
 
 
 static match
@@ -6532,7 +6559,6 @@ gfc_match_omp_context_selector_specification (gfc_omp_declare_variant *odv)
 match
 gfc_match_omp_declare_variant (void)
 {
-  bool first_p = true;
   char buf[GFC_MAX_SYMBOL_LEN + 1];
 
   if (gfc_match (" (") != MATCH_YES)
@@ -6590,11 +6616,15 @@ gfc_match_omp_declare_variant (void)
       return MATCH_ERROR;
     }
 
-  bool has_match = false, has_adjust_args = false;
+  bool has_match = false, has_adjust_args = false, error_p = false;
   locus adjust_args_loc;
 
   for (;;)
     {
+      gfc_gobble_whitespace ();
+      gfc_match_char (',');
+      gfc_gobble_whitespace ();
+
       enum clause
       {
 	match,
@@ -6610,13 +6640,9 @@ gfc_match_omp_declare_variant (void)
 	}
       else
 	{
-	  if (first_p)
-	    {
-	      gfc_error ("expected %<match%> or %<adjust_args%> at %C");
-	      return MATCH_ERROR;
-	    }
-	  else
-	    break;
+	  if (gfc_match_omp_eos () != MATCH_YES)
+	    error_p = true;
+	  break;
 	}
 
       if (gfc_match (" (") != MATCH_YES)
@@ -6662,8 +6688,12 @@ gfc_match_omp_declare_variant (void)
 	    for (gfc_omp_namelist *n = *head; n != NULL; n = n->next)
 	      n->u.need_device_ptr = true;
 	}
+    }
 
-      first_p = false;
+  if (error_p || (!has_match && !has_adjust_args))
+    {
+      gfc_error ("expected %<match%> or %<adjust_args%> at %C");
+      return MATCH_ERROR;
     }
 
   if (has_adjust_args && !has_match)
@@ -8128,7 +8158,7 @@ resolve_omp_clauses (gfc_code *code, gfc_omp_clauses *omp_clauses,
 	"DEVICE_RESIDENT", "LINK", "USE_DEVICE",
 	"CACHE", "IS_DEVICE_PTR", "USE_DEVICE_PTR", "USE_DEVICE_ADDR",
 	"NONTEMPORAL", "ALLOCATE", "HAS_DEVICE_ADDR", "ENTER",
-	"USES_ALLOCATORS", "INIT", "USE", "DESTROY", "ADJUST_ARGS" };
+	"USES_ALLOCATORS", "INIT", "USE", "DESTROY", "INTEROP", "ADJUST_ARGS" };
   STATIC_ASSERT (ARRAY_SIZE (clause_names) == OMP_LIST_NUM);
 
   if (omp_clauses == NULL)
@@ -8455,6 +8485,7 @@ resolve_omp_clauses (gfc_code *code, gfc_omp_clauses *omp_clauses,
 	&& list != OMP_LIST_DEPEND
 	&& list != OMP_LIST_FROM
 	&& list != OMP_LIST_TO
+	&& list != OMP_LIST_INTEROP
 	&& (list != OMP_LIST_REDUCTION || !openacc)
 	&& list != OMP_LIST_ALLOCATE)
       for (n = omp_clauses->lists[list]; n; n = n->next)
@@ -8553,8 +8584,8 @@ resolve_omp_clauses (gfc_code *code, gfc_omp_clauses *omp_clauses,
 	    break;
 	  }
     }
-  if (code && code->op == EXEC_OMP_INTEROP)
-    for (list = OMP_LIST_INIT; list <= OMP_LIST_DESTROY; list++)
+  if (code && (code->op == EXEC_OMP_INTEROP || code->op == EXEC_OMP_DISPATCH))
+    for (list = OMP_LIST_INIT; list <= OMP_LIST_INTEROP; list++)
       for (n = omp_clauses->lists[list]; n; n = n->next)
 	{
 	  if (n->sym->ts.type != BT_INTEGER
@@ -8564,7 +8595,8 @@ resolve_omp_clauses (gfc_code *code, gfc_omp_clauses *omp_clauses,
 	    gfc_error ("%qs at %L in %qs clause must be a scalar integer "
 		       "variable of %<omp_interop_kind%> kind", n->sym->name,
 		       &n->where, clause_names[list]);
-	  if (list != OMP_LIST_USE && n->sym->attr.intent == INTENT_IN)
+	  if (list != OMP_LIST_USE && list != OMP_LIST_INTEROP
+	      && n->sym->attr.intent == INTENT_IN)
 	    gfc_error ("%qs at %L in %qs clause must be definable",
 		       n->sym->name, &n->where, clause_names[list]);
 	}

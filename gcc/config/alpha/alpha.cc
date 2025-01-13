@@ -460,8 +460,9 @@ alpha_option_override (void)
 	    line_size = cpu_table[i].line_size;
 	    l1_size = cpu_table[i].l1_size;
 	    l2_size = cpu_table[i].l2_size;
-	    target_flags &= ~ (MASK_BWX | MASK_MAX | MASK_FIX | MASK_CIX);
-	    target_flags |= cpu_table[i].flags;
+	    target_flags &= ~((MASK_BWX | MASK_MAX | MASK_FIX | MASK_CIX)
+			      & ~target_flags_explicit);
+	    target_flags |= cpu_table[i].flags & ~target_flags_explicit;
 	    break;
 	  }
       if (i == ct_size)
@@ -3930,14 +3931,44 @@ alpha_expand_block_move (rtx operands[])
     {
       words = bytes / 4;
 
-      for (i = 0; i < words; ++i)
-	data_regs[nregs + i] = gen_reg_rtx (SImode);
+      /* Load an even quantity of SImode data pieces only.  */
+      unsigned int hwords = words / 2;
+      for (i = 0; i / 2 < hwords; ++i)
+	{
+	  data_regs[nregs + i] = gen_reg_rtx (SImode);
+	  emit_move_insn (data_regs[nregs + i],
+			  adjust_address (orig_src, SImode, ofs + i * 4));
+	}
 
-      for (i = 0; i < words; ++i)
-	emit_move_insn (data_regs[nregs + i],
-			adjust_address (orig_src, SImode, ofs + i * 4));
+      /* If we'll be using unaligned stores, merge data from pairs
+	 of SImode registers into DImode registers so that we can
+	 store it more efficiently via quadword unaligned stores.  */
+      unsigned int j;
+      if (dst_align < 32)
+	for (i = 0, j = 0; i < words / 2; ++i, j = i * 2)
+	  {
+	    rtx hi = expand_simple_binop (DImode, ASHIFT,
+					  data_regs[nregs + j + 1],
+					  GEN_INT (32), NULL_RTX,
+					  1, OPTAB_WIDEN);
+	    data_regs[nregs + i] = expand_simple_binop (DImode, IOR, hi,
+							data_regs[nregs + j],
+							NULL_RTX,
+							1, OPTAB_WIDEN);
+	  }
+      else
+	j = i;
 
-      nregs += words;
+      /* Take care of any remaining odd trailing SImode data piece.  */
+      if (j < words)
+	{
+	  data_regs[nregs + i] = gen_reg_rtx (SImode);
+	  emit_move_insn (data_regs[nregs + i],
+			  adjust_address (orig_src, SImode, ofs + j * 4));
+	  ++i;
+	}
+
+      nregs += i;
       bytes -= words * 4;
       ofs += words * 4;
     }
@@ -3968,14 +3999,19 @@ alpha_expand_block_move (rtx operands[])
   if (bytes >= 2)
     {
       if (src_align >= 16)
-	{
-	  do {
-	    data_regs[nregs++] = tmp = gen_reg_rtx (HImode);
-	    emit_move_insn (tmp, adjust_address (orig_src, HImode, ofs));
+	do
+	  {
+	    tmp = gen_reg_rtx (DImode);
+	    emit_move_insn (tmp,
+			    expand_simple_unop (DImode, SET,
+						adjust_address (orig_src,
+								HImode, ofs),
+						NULL_RTX, 1));
+	    data_regs[nregs++] = gen_rtx_SUBREG (HImode, tmp, 0);
 	    bytes -= 2;
 	    ofs += 2;
-	  } while (bytes >= 2);
-	}
+	  }
+	while (bytes >= 2);
       else if (! TARGET_BWX)
 	{
 	  data_regs[nregs++] = tmp = gen_reg_rtx (HImode);
@@ -4056,13 +4092,12 @@ alpha_expand_block_move (rtx operands[])
     }
 
   /* Due to the above, this won't be aligned.  */
-  /* ??? If we have more than one of these, consider constructing full
-     words in registers and using alpha_expand_unaligned_store_words.  */
   while (i < nregs && GET_MODE (data_regs[i]) == SImode)
     {
       alpha_expand_unaligned_store (orig_dst, data_regs[i], 4, ofs);
       ofs += 4;
       i++;
+      gcc_assert (i == nregs || GET_MODE (data_regs[i]) != SImode);
     }
 
   if (dst_align >= 16)
