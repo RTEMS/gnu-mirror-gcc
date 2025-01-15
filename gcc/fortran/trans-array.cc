@@ -8989,6 +8989,26 @@ is_explicit_coarray (gfc_expr *expr)
   return cas && cas->cotype == AS_EXPLICIT;
 }
 
+
+static void
+copy_descriptor (stmtblock_t *block, tree dest, tree src,
+		 gfc_expr *src_expr, bool subref)
+{
+  /* Copy the descriptor for pointer assignments.  */
+  gfc_add_modify (block, dest, src);
+
+  /* Add any offsets from subreferences.  */
+  gfc_get_dataptr_offset (block, dest, src, NULL_TREE, subref, src_expr);
+
+  /* ....and set the span field.  */
+  tree tmp;
+  if (src_expr->ts.type == BT_CHARACTER)
+    tmp = gfc_conv_descriptor_span_get (src);
+  else
+    tmp = gfc_get_array_span (src, src_expr);
+  gfc_conv_descriptor_span_set (block, dest, tmp);
+}
+
 /* Convert an array for passing as an actual argument.  Expressions and
    vector subscripts are evaluated and stored in a temporary, which is then
    passed.  For whole arrays the descriptor is passed.  For array sections
@@ -9123,21 +9143,8 @@ gfc_conv_expr_descriptor (gfc_se *se, gfc_expr *expr)
       if (full && !transposed_dims (ss))
 	{
 	  if (se->direct_byref && !se->byref_noassign)
-	    {
-	      /* Copy the descriptor for pointer assignments.  */
-	      gfc_add_modify (&se->pre, se->expr, desc);
-
-	      /* Add any offsets from subreferences.  */
-	      gfc_get_dataptr_offset (&se->pre, se->expr, desc, NULL_TREE,
-				      subref_array_target, expr);
-
-	      /* ....and set the span field.  */
-	      if (ss_info->expr->ts.type == BT_CHARACTER)
-		tmp = gfc_conv_descriptor_span_get (desc);
-	      else
-		tmp = gfc_get_array_span (desc, expr);
-	      gfc_conv_descriptor_span_set (&se->pre, se->expr, tmp);
-	    }
+	    copy_descriptor (&se->pre, se->expr, desc, expr,
+			     subref_array_target);
 	  else if (se->want_pointer)
 	    {
 	      /* We pass full arrays directly.  This means that pointers and
