@@ -2615,6 +2615,52 @@
 
 ; Miscellaneous P9 functions
 [power9]
+
+  signed int __builtin_isfinite_sp (float);
+    VEC_ISFINITESP isfinitesf2 {}
+
+  signed int __builtin_isfinite_dp (double);
+    VEC_ISFINITEDP isfinitedf2 {}
+
+  signed int __builtin_isfinite_qp (_Float128);
+    VEC_ISFINITEQP isfinitekf2 {}
+
+  signed int __builtin_isinf_sp (float);
+    VEC_ISINFSP isinfsf2 {}
+
+  signed int __builtin_isinf_dp (double);
+    VEC_ISINFDP isinfdf2 {}
+
+  signed int __builtin_isinf_qp (_Float128);
+    VEC_ISINFQP isinfkf2 {}
+
+  signed int __builtin_isnan_sp (float);
+    VEC_ISNANSP isnansf2 {}
+
+  signed int __builtin_isnan_dp (double);
+    VEC_ISNANDP isnandf2 {}
+
+  signed int __builtin_isnan_qp (_Float128);
+    VEC_ISNANQP isnankf2 {}
+
+  signed int __builtin_issignaling_sp (float);
+    VEC_ISSIGNALINGSP issignalingsf2 {}
+
+  signed int __builtin_issignaling_dp (double);
+    VEC_ISSIGNALINGDP issignalingdf2 {}
+
+  signed int __builtin_issignaling_qp (_Float128);
+    VEC_ISSIGNALINGQP issignalingkf2 {}
+
+  signed int __builtin_isinf_sign_sp (float);
+    VEC_ISINFSGNSP isinfsgnsf2 {}
+
+  signed int __builtin_isinf_sign_dp (double);
+    VEC_ISINFSGNDP isinfsgndf2 {}
+
+  signed int __builtin_isinf_sign_qp (_Float128);
+    VEC_ISINFSGNQP isinfsgnkf2 {}
+
   signed long __builtin_darn ();
     DARN darn_64_di {32bit}
 
@@ -2665,7 +2711,7 @@
     LXVL lxvl {}
 
   const signed long long __builtin_vsx_scalar_extract_sig (double);
-    VSESDP xsxsigdp {}
+    VSESDP xsxsigdp_df {}
 
   const double __builtin_vsx_scalar_insert_exp (unsigned long long, \
                                                 unsigned long long);

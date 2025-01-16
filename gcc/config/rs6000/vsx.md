@@ -369,6 +369,7 @@
    UNSPEC_XXSPLTI32DX
    UNSPEC_XXBLEND
    UNSPEC_XXPERMX
+   UNSPEC_MFVSRD
   ])
 
 (define_int_iterator XVCVBF16	[UNSPEC_VSX_XVCVSPBF16
@@ -5221,9 +5222,9 @@
   [(set_attr "type" "vecmove")])
 
 ;; VSX Scalar Extract Significand Double-Precision
-(define_insn "xsxsigdp"
+(define_insn "xsxsigdp_<mode>"
   [(set (match_operand:DI 0 "register_operand" "=r")
-	(unspec:DI [(match_operand:DF 1 "vsx_register_operand" "wa")]
+	(unspec:DI [(match_operand:FL_CONV 1 "vsx_register_operand" "wa")]
 	 UNSPEC_VSX_SXSIG))]
   "TARGET_P9_VECTOR && TARGET_POWERPC64"
   "xsxsigdp %0,%x1"
@@ -5373,6 +5374,32 @@
   DONE;
 })
 
+(define_expand "isinfsgn<mode>2"
+  [(use (match_operand:SI 0 "gpc_reg_operand"))
+   (use (match_operand:IEEE_FP 1 "vsx_register_operand"))]
+  "TARGET_P9_VECTOR
+   && (!FLOAT128_IEEE_P (<MODE>mode) || TARGET_FLOAT128_HW)"
+{
+  int mask_pos = VSX_TEST_DATA_CLASS_POS_INF;
+  int mask_neg = VSX_TEST_DATA_CLASS_NEG_INF;
+  rtx tmp = gen_reg_rtx (SImode);
+  rtx is_pos = gen_reg_rtx (SImode);
+  rtx is_neg = gen_reg_rtx (SImode);
+
+  /* Set is_pos to 1 if operand is +infinity, zero otherwise.
+     Set is_net to 1 if operand is 1infinity, zero otherwise.  */
+  emit_insn (gen_xststdc_<mode> (is_pos, operands[1],
+                                 GEN_INT (mask_pos)));
+  emit_insn (gen_xststdc_<mode> (is_neg, operands[1],
+                                 GEN_INT (mask_neg)));
+
+  /* Generate result, +1 if +infinity, -1 if -infinity, 0 otherwise.
+     Result = is_pos | ( is_neg * -1)  */
+  emit_insn (gen_mulsi3 (tmp, is_neg, GEN_INT (-1)));
+  emit_insn (gen_iorsi3 (operands[0], is_pos, tmp));
+  DONE;
+})
+
 (define_expand "isfinite<mode>2"
   [(use (match_operand:SI 0 "gpc_reg_operand"))
    (use (match_operand:IEEE_FP 1 "<fp_register_op>"))]
@@ -5388,6 +5415,126 @@
   DONE;
 })
 
+(define_insn "mfvsrd<mode>_to_di"
+  [(set (match_operand:DI  0 "gpc_reg_operand" "=r")
+        (unspec:DI [(match_operand:IEEE_FP 1 "vsx_register_operand" "wa")]
+         UNSPEC_MFVSRD))]
+  "TARGET_POWERPC64 && TARGET_DIRECT_MOVE"
+  "mfvsrd %0,%x1"
+  [(set_attr "type" "mfvsr")])
+
+(define_expand "isnan<mode>2"
+  [(use (match_operand:SI 0 "gpc_reg_operand"))
+   (use (match_operand:IEEE_FP 1 "vsx_register_operand"))]
+  "TARGET_P9_VECTOR"
+{
+  /* Test if the operand is a NaN.  Return 1 if it is, zero otherwise.
+
+     The xststdc instruction returns true if the operand is either a NaN or
+     SNaN.  Need to explicitly check the operand bit pattern to determine if
+     it is a NaN or SNaN.  This is done by masking off the top fractional bit.
+     If the bit is a 1 than the operand is a NaN, if it is a 0, the operand is
+     a SNaN.  */
+
+  rtx op1 = operands[1];
+
+/* The single precision floating point value is actually stored in the
+     registers in double precision floating point format. So, we handle it
+     the same as a DF value.  */
+  int mask = VSX_TEST_DATA_CLASS_NAN;
+  unsigned long long NaN_bit;             /* Mask for top fractional bit */
+  unsigned long long shift_bit_to_lsb;    /* Shift top fractional bit to lsb */
+
+  if (<MODE>mode == SFmode || <MODE>mode == DFmode)
+    {
+       NaN_bit = 0x0008000000000000;
+       shift_bit_to_lsb = 51;
+    }
+  else
+    {
+       NaN_bit = 0x0000800000000000;
+       shift_bit_to_lsb = 47;
+    }
+
+  rtx tmp = gen_reg_rtx (SImode);
+  rtx tmp_and = gen_reg_rtx (DImode);
+  rtx tmp_shift = gen_reg_rtx (DImode);
+
+  /* Move floaating point mantissa value from fp register to gpr.  */
+  rtx operand1 = gen_reg_rtx (DImode);
+//  emit_insn (gen_mfvsrd<mode>_to_di (operand1, op1));
+  emit_insn (gen_xsxsigdp_<mode> (operand1, operands[1]));
+
+  /* Get most significant fraction bit, it  will be a one if the operand is a
+     NaN.  */
+  emit_insn (gen_anddi3 (tmp_and, operand1, GEN_INT (NaN_bit)));
+  emit_insn (gen_lshrdi3 (tmp_shift, tmp_and, GEN_INT (shift_bit_to_lsb)));
+
+  emit_insn (gen_xststdc_<mode> (tmp, op1, GEN_INT (mask)));
+
+  /* If tmp and tmp_shift_si are both 1 then the value is NaN.  Note, the
+     value in tmp will be 0 or 1 so it will effectively mask off just the
+     least significant bit in tmp_shift if tmp is a 1.  */
+  rtx tmp_shift_si = gen_lowpart (SImode, tmp_shift);
+  emit_insn (gen_andsi3 (operands[0], tmp, tmp_shift_si));
+
+  DONE;
+})
+
+(define_expand "issignaling<mode>2"
+  [(use (match_operand:SI 0 "gpc_reg_operand"))
+   (use (match_operand:IEEE_FP 1 "vsx_register_operand"))]
+  "TARGET_P9_VECTOR"
+{
+  /* Test if the operand is a SNaN.  Return 1 if it is, zero otherwise.
+
+     The xststdc instruction returns true if the operand is either a NaN or
+     SNaN.  Need to explicitly check the operand bit pattern to determine if
+     it is a NaN or SNaN.  This is done by masking off the top fractional bit.
+     If the bit is a 1 than the operand is a NaN, if it is a 0, the operand is
+     a SNaN.  */
+
+  /* The single precision floating point value is actually stored in the
+     registers in double precision floating point format. So, we handle it
+     the same as a DF value.  */
+  int mask = VSX_TEST_DATA_CLASS_NAN;
+  unsigned long long NaN_bit;             /* Mask for top fractional bit */
+  unsigned long long shift_bit_to_lsb;    /* Shift top fractional bit to lsb */
+
+  if (<MODE>mode == SFmode || <MODE>mode == DFmode)
+    {
+       NaN_bit = 0x0008000000000000;
+       shift_bit_to_lsb = 51;
+    }
+  else
+    {
+       NaN_bit = 0x0000800000000000;
+       shift_bit_to_lsb = 47;
+    }
+
+  rtx tmp = gen_reg_rtx (SImode);
+  rtx tmp_and = gen_reg_rtx (DImode);
+  rtx tmp_shift = gen_reg_rtx (DImode);
+
+  /* Move floaating point mantissa value from fp register to gpr.  */
+  rtx operand1 = gen_reg_rtx (DImode);
+//  emit_insn (gen_mfvsrd<mode>_to_di (operand1, operands[1]));
+  emit_insn (gen_xsxsigdp_<mode> (operand1, operands[1]));
+
+  /* Get most significant fraction bit, it will be a zero if the operand is a
+     SNaN, complement it, and move to lease significant bit position.  */
+  emit_insn (gen_anddi3 (tmp_and, operand1, GEN_INT (NaN_bit)));
+  emit_insn (gen_one_cmpldi2 (tmp_and, tmp_and));
+  emit_insn (gen_lshrdi3 (tmp_shift, tmp_and, GEN_INT (shift_bit_to_lsb)));
+
+  emit_insn (gen_xststdc_<mode> (tmp, operands[1], GEN_INT (mask)));
+
+  /* If tmp and tmp_shift_si are both 1 then the value is NaN. */
+  rtx tmp_shift_si = gen_lowpart (SImode, tmp_shift);
+  emit_insn (gen_andsi3 (operands[0], tmp, tmp_shift_si));
+
+  DONE;
+})
 (define_expand "isnormal<mode>2"
   [(use (match_operand:SI 0 "gpc_reg_operand"))
    (use (match_operand:IEEE_FP 1 "<fp_register_op>"))]

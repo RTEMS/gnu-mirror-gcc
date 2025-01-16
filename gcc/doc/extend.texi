@@ -23310,6 +23310,18 @@ bool scalar_test_data_class (__ieee128 source, const int condition);
 bool scalar_test_neg (float source);
 bool scalar_test_neg (double source);
 bool scalar_test_neg (__ieee128 source);
+
+signed int __builtin_isinf (float);
+signed int __builtin_isinf (double);
+signed int __builtin_isinf (_Float128);
+
+signed int __builtin_isinf_sign (float);
+signed int __builtin_isinf_sign (double);
+signed int __builtin_isinf_sign (_Float128);
+
+signed int __builtin_isfinite (float);
+signed int __builtin_isfinite (double);
+signed int __builtin_isfinite (_Float128);
 @end smallexample
 
 The @code{scalar_extract_exp} with a 64-bit source argument
@@ -23390,6 +23402,13 @@ following:
 
 The @code{scalar_test_neg} built-in function returns 1 if its
 @code{source} argument holds a negative value, 0 otherwise.
+
+The @code{__builtin_isinf}, @code{builtin_isinf} built-in functions return 1 if
+its argument is positive or negative infinity, 0 otherwise.
+
+The @code{__builtin_isinf_sign} returns +1 if
+its argument is positive infinity, -1 if it argument is negative infinity,
+0 otherwise.
 
 The following built-in functions are also available for the PowerPC family
 of processors, starting with ISA 3.0 or later

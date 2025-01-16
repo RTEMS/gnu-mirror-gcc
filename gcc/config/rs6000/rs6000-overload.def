@@ -4622,6 +4622,46 @@
   unsigned int __builtin_vec_scalar_test_neg (_Float128);
     VSTDCNQP
 
+[VEC_ISFINITE, __builtin_isfinite, __builtin_vec_isfinite]
+  signed int __builtin_vec_isfinite (float);
+    VEC_ISFINITESP
+  signed int __builtin_vec_isfinite (double);
+    VEC_ISFINITEDP
+  signed int __builtin_vec_isfinite (_Float128);
+    VEC_ISFINITEQP
+
+[VEC_ISINF, __builtin_isinf, __builtin_vec_isinf]
+  signed int __builtin_vec_isinf (float);
+    VEC_ISINFSP
+  signed int __builtin_vec_isinf (double);
+    VEC_ISINFDP
+  signed int __builtin_vec_isinf (_Float128);
+    VEC_ISINFQP
+
+[VEC_ISNAN, __builtin_isnan, __builtin_vec_isnan]
+  signed int __builtin_vec_isnan (float);
+    VEC_ISNANSP
+  signed int __builtin_vec_isnan (double);
+    VEC_ISNANDP
+  signed int __builtin_vec_isnan (_Float128);
+    VEC_ISNANQP
+
+[VEC_ISSIGNALING, __builtin_issignaling, __builtin_vec_issignaling]
+  signed int __builtin_vec_issignaling (float);
+    VEC_ISSIGNALINGSP
+  signed int __builtin_vec_issignaling (double);
+    VEC_ISSIGNALINGDP
+  signed int __builtin_vec_issignaling (_Float128);
+    VEC_ISSIGNALINGQP
+
+[VEC_ISINFSGN, __builtin_isinf_sign, __builtin_vec_isinf_sign]
+  signed int __builtin_vec_isinf_sign (float);
+    VEC_ISINFSGNSP
+  signed int __builtin_vec_isinf_sign (double);
+    VEC_ISINFSGNDP
+  signed int __builtin_vec_isinf_sign (_Float128);
+    VEC_ISINFSGNQP
+
 [VEC_VTDC, vec_test_data_class, __builtin_vec_test_data_class]
   vbi __builtin_vec_test_data_class (vf, const int);
     VTDCSP
