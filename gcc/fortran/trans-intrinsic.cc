@@ -10513,11 +10513,8 @@ conv_isocbinding_subroutine (gfc_code *code)
   gfc_se se;
   gfc_se cptrse;
   gfc_se fptrse;
-  gfc_se shapese;
-  gfc_ss *shape_ss;
-  tree desc, dim, tmp, stride, offset;
-  stmtblock_t body, block;
-  gfc_loopinfo loop;
+  tree desc;
+  stmtblock_t block;
   gfc_actual_arglist *arg = code->ext.actual;
 
   gfc_init_se (&se, NULL);
@@ -10555,74 +10552,11 @@ conv_isocbinding_subroutine (gfc_code *code)
   gfc_add_block_to_block (&block, &fptrse.pre);
   desc = fptrse.expr;
 
-  /* Set the span field.  */
-  tmp = TYPE_SIZE_UNIT (gfc_get_element_type (TREE_TYPE (desc)));
-  tmp = fold_convert (gfc_array_index_type, tmp);
-  gfc_conv_descriptor_span_set (&block, desc, tmp);
+  gfc_set_descriptor_with_shape (&block, desc, cptrse.expr,
+				 arg->next->next->expr,
+				 &arg->next->expr->where);
 
-  /* Set data value, dtype, and offset.  */
-  tmp = GFC_TYPE_ARRAY_DATAPTR_TYPE (TREE_TYPE (desc));
-  gfc_conv_descriptor_data_set (&block, desc, fold_convert (tmp, cptrse.expr));
-  gfc_add_modify (&block, gfc_conv_descriptor_dtype (desc),
-		  gfc_get_dtype (TREE_TYPE (desc)));
-
-  /* Start scalarization of the bounds, using the shape argument.  */
-
-  shape_ss = gfc_walk_expr (arg->next->next->expr);
-  gcc_assert (shape_ss != gfc_ss_terminator);
-  gfc_init_se (&shapese, NULL);
-
-  gfc_init_loopinfo (&loop);
-  gfc_add_ss_to_loop (&loop, shape_ss);
-  gfc_conv_ss_startstride (&loop);
-  gfc_conv_loop_setup (&loop, &arg->next->expr->where);
-  gfc_mark_ss_chain_used (shape_ss, 1);
-
-  gfc_copy_loopinfo_to_se (&shapese, &loop);
-  shapese.ss = shape_ss;
-
-  stride = gfc_create_var (gfc_array_index_type, "stride");
-  offset = gfc_create_var (gfc_array_index_type, "offset");
-  gfc_add_modify (&block, stride, gfc_index_one_node);
-  gfc_add_modify (&block, offset, gfc_index_zero_node);
-
-  /* Loop body.  */
-  gfc_start_scalarized_body (&loop, &body);
-
-  dim = fold_build2_loc (input_location, MINUS_EXPR, gfc_array_index_type,
-			     loop.loopvar[0], loop.from[0]);
-
-  /* Set bounds and stride.  */
-  gfc_conv_descriptor_lbound_set (&body, desc, dim, gfc_index_one_node);
-  gfc_conv_descriptor_stride_set (&body, desc, dim, stride);
-
-  gfc_conv_expr (&shapese, arg->next->next->expr);
-  gfc_add_block_to_block (&body, &shapese.pre);
-  gfc_conv_descriptor_ubound_set (&body, desc, dim, shapese.expr);
-  gfc_add_block_to_block (&body, &shapese.post);
-
-  /* Calculate offset.  */
-  gfc_add_modify (&body, offset,
-		  fold_build2_loc (input_location, PLUS_EXPR,
-				   gfc_array_index_type, offset, stride));
-  /* Update stride.  */
-  gfc_add_modify (&body, stride,
-		  fold_build2_loc (input_location, MULT_EXPR,
-				   gfc_array_index_type, stride,
-				   fold_convert (gfc_array_index_type,
-						 shapese.expr)));
-  /* Finish scalarization loop.  */
-  gfc_trans_scalarizing_loops (&loop, &body);
-  gfc_add_block_to_block (&block, &loop.pre);
-  gfc_add_block_to_block (&block, &loop.post);
   gfc_add_block_to_block (&block, &fptrse.post);
-  gfc_cleanup_loop (&loop);
-
-  gfc_add_modify (&block, offset,
-		  fold_build1_loc (input_location, NEGATE_EXPR,
-				   gfc_array_index_type, offset));
-  gfc_conv_descriptor_offset_set (&block, desc, offset);
-
   gfc_add_expr_to_block (&se.pre, gfc_finish_block (&block));
   gfc_add_block_to_block (&se.pre, &se.post);
   return gfc_finish_block (&se.pre);
