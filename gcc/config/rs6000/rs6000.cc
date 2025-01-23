@@ -15362,13 +15362,20 @@ rs6000_print_patchable_function_entry (FILE *file,
 enum rtx_code
 rs6000_reverse_condition (machine_mode mode, enum rtx_code code)
 {
-  /* Reversal of FP compares takes care -- an ordered compare
-     becomes an unordered compare and vice versa.  */
+  /* Reversal of FP compares takes care -- Do not allow an ordered compare to
+     become an unordered compare if signaling NaNs are possible, since the
+     unordered compare may trap.  This happens on power9 when ?: is converted
+     into a cmove.  The xscmp{eq,gt,ge}{dp,qp} instructions will trap on a
+     signalling NaN.  */
   if (mode == CCFPmode
-      && (!flag_finite_math_only
-	  || code == UNLT || code == UNLE || code == UNGT || code == UNGE
+      && (code == UNLT || code == UNLE || code == UNGT || code == UNGE
 	  || code == UNEQ || code == LTGT))
-    return reverse_condition_maybe_unordered (code);
+    {
+      if (!flag_finite_math_only || flag_signaling_nans)
+	return UNKNOWN;
+
+      return reverse_condition_maybe_unordered (code);
+    }
   else
     return reverse_condition (code);
 }
@@ -16439,6 +16446,24 @@ rs6000_maybe_emit_fp_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
   if (!can_create_pseudo_p ())
     return 0;
 
+  /* Don't optimize comparisons with explicit unordered support (like
+     isgreater), since the fpmask VSX instructions can generate an error with a
+     signaling NaN.  */
+  if (!flag_finite_math_only || flag_signaling_nans)
+    switch (code)
+      {
+      case LTGT:
+      case UNGE:
+      case UNGT:
+      case UNEQ:
+      case UNLE:
+      case UNLT:
+	return false;
+
+      default:
+	break;
+      }
+
   /* We allow the comparison to be either SFmode/DFmode and the true/false
      condition to be either SFmode/DFmode.  I.e. we allow:
 
@@ -16550,6 +16575,25 @@ rs6000_emit_cmove (rtx dest, rtx op, rtx true_cond, rtx false_cond)
     return false;
   if (GET_MODE (false_cond) != result_mode)
     return false;
+
+  /* Don't allow optimizing comparisons with explicit unordered support (like
+     isgreater), since the fpmask VSX instructions can generate an error with a
+     signaling NaN.  */
+  if (FLOAT_MODE_P (compare_mode)
+      && (!flag_finite_math_only || flag_signaling_nans))
+    switch (code)
+      {
+      case LTGT:
+      case UNGE:
+      case UNGT:
+      case UNEQ:
+      case UNLE:
+      case UNLT:
+	return false;
+
+      default:
+	break;
+      }
 
   /* See if we can use the "C" minimum, "C" maximum, and compare and set mask
      instructions.  */
