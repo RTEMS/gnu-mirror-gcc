@@ -1,3 +1,18 @@
+==================== Branch work191-bugs, patch #210 ====================
+
+Fix PR 118541, do not generate unordered fp cmoves.
+
+2025-01-23  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/118541
+	* config/rs6000/rs6000.cc (rs6000_reverse_condition): Do not allow
+	unordered floating point comparisons to be reversed if signaling NaNs
+	are a possibility.
+	(rs6000_maybe_emit_fp_cmove): Likewise.
+	(rs6000_emit_cmove): Likewise.
+
 ==================== Branch work191-bugs, patch #202 ====================
 
 PR target/108958 -- use mtvsrdd to zero extend GPR DImode to VSX TImode
