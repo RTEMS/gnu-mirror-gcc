@@ -15360,31 +15360,17 @@ rs6000_print_patchable_function_entry (FILE *file,
 }
 
 enum rtx_code
-rs6000_reverse_condition (machine_mode mode,
-			  enum rtx_code code,
-			  enum rev_cond_type type)
+rs6000_reverse_condition (machine_mode mode, enum rtx_code code)
 {
   /* Reversal of FP compares takes care -- an ordered compare
-     becomes an unordered compare and vice versa.
-
-     However, this is not safe for ordered comparisons (i.e. for isgreater,
-     etc.)  starting with the power9 because ifcvt.cc will want to create a
-     floating point conditional move, and the x{s,v}cmp{eq,gt,ge}{dp,qp}
-     instructions will trap if one of the arguments is a signalling NaN.  */
-
-  if (mode == CCFPmode)
-    {
-      if (code == UNLT || code == UNLE || code == UNGT || code == UNGE
-	  || code == UNEQ || code == LTGT)
-	return (type == REV_COND_MAYBE_CMOVE
-		? UNKNOWN
-		: reverse_condition_maybe_unordered (code));
-
-      if (!flag_finite_math_only)
-	return reverse_condition_maybe_unordered (code);
-    }
-
-  return reverse_condition (code);
+     becomes an unordered compare and vice versa.  */
+  if (mode == CCFPmode
+      && (!flag_finite_math_only
+	  || code == UNLT || code == UNLE || code == UNGT || code == UNGE
+	  || code == UNEQ || code == LTGT))
+    return reverse_condition_maybe_unordered (code);
+  else
+    return reverse_condition (code);
 }
 
 /* Check if C (as 64bit integer) can be rotated to a constant which constains
@@ -15997,8 +15983,7 @@ rs6000_emit_sCOND (machine_mode mode, rtx operands[])
 
       cc_mode = GET_MODE (XEXP (condition_rtx, 0));
 
-      rev_cond_rtx = gen_rtx_fmt_ee (rs6000_reverse_condition (cc_mode, cond_code,
-							       REV_COND_NOT_CMOVE),
+      rev_cond_rtx = gen_rtx_fmt_ee (rs6000_reverse_condition (cc_mode, cond_code),
 				     SImode, XEXP (condition_rtx, 0), const0_rtx);
       not_op = gen_rtx_COMPARE (CCEQmode, rev_cond_rtx, const0_rtx);
       emit_insn (gen_rtx_SET (not_result, not_op));
