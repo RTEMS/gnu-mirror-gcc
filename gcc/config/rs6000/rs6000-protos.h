@@ -114,8 +114,15 @@ extern const char *rs6000_sibcall_template (rtx *, unsigned int);
 extern const char *rs6000_indirect_call_template (rtx *, unsigned int);
 extern const char *rs6000_indirect_sibcall_template (rtx *, unsigned int);
 extern const char *rs6000_pltseq_template (rtx *, int);
+
+enum reverse_cond_type {
+  REVERSE_COND_NO_CMOVE,
+  REVERSE_COND_MAYBE_CMOVE
+};
+
 extern enum rtx_code rs6000_reverse_condition (machine_mode,
-					       enum rtx_code);
+					       enum rtx_code,
+					       enum reverse_cond_type);
 extern rtx rs6000_emit_eqne (machine_mode, rtx, rtx, rtx);
 extern rtx rs6000_emit_fp_cror (rtx_code, machine_mode, rtx);
 extern void rs6000_emit_sCOND (machine_mode, rtx[]);
