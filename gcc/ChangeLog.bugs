@@ -1,4 +1,4 @@
-==================== Branch work191-bugs, patch #211 ====================
+==================== Branch work191-bugs, patch #212 ====================
 
 Fix PR 118541, do not generate unordered fp cmoves.
 
@@ -13,13 +13,15 @@ gcc/
 	ordered comparisons to be reversed for floating point cmoves.
 	(rs6000_emit_sCOND): Adjust rs6000_reverse_condition call.
 	* config/rs6000/rs6000.h (REVERSE_CONDITION): Likewise.
-	* config/rs6000/rs6000.md (reverse_branch_comparison): Likewise.
+	* config/rs6000/rs6000.md (reverse_branch_comparison): Name insn.
+	Adjust rs6000_reverse_condition call.
 
 gcc/testsuite/
 
 	PR target/118541
 	* gcc.target/powerpc/pr118541.c: New test.
 
+==================== Branch work191-bugs, patch #211 was reverted ====================
 ==================== Branch work191-bugs, patch #210 was reverted ====================
 
 ==================== Branch work191-bugs, patch #202 ====================
