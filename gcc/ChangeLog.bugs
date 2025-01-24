@@ -2,16 +2,20 @@
 
 Fix PR 118541, do not generate unordered fp cmoves.
 
-2025-01-23  Michael Meissner  <meissner@linux.ibm.com>
+2025-01-24  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
 	PR target/118541
+	* config/rs6000/rs6000-protos.h (rs6000_reverse_condition): Add
+	argument.
 	* config/rs6000/rs6000.cc (rs6000_reverse_condition): Do not allow
-	unordered floating point comparisons to be reversed if signaling NaNs
-	are a possibility.
-	(rs6000_maybe_emit_fp_cmove): Likewise.
-	(rs6000_emit_cmove): Likewise.
+	ordered comparisons to be reversed for floating point cmoves.
+	(rs6000_emit_sCOND): Adjust rs6000_reverse_condition call.
+	* config/rs6000/rs6000.h (REVERSE_CONDITION): Likewise.
+	* config/rs6000/rs6000.md (reverse_branch_comparison): Likewise.
+
+==================== Branch work191-bugs, patch #210 was reverted ====================
 
 ==================== Branch work191-bugs, patch #202 ====================
 
