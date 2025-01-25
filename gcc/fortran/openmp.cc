@@ -1620,7 +1620,7 @@ gfc_omp_absent_contains_clause (gfc_omp_assumptions **assume, bool is_absent)
 	  || kind == GFC_OMP_DIR_META)
 	{
 	  gfc_error ("Invalid %qs directive at %L in %s clause: declarative, "
-		     "informational and meta directives not permitted",
+		     "informational, and meta directives not permitted",
 		     gfc_ascii_statement (st, true), &old_loc,
 		     is_absent ? "ABSENT" : "CONTAINS");
 	  return MATCH_ERROR;
@@ -8171,7 +8171,7 @@ resolve_omp_clauses (gfc_code *code, gfc_omp_clauses *omp_clauses,
     gfc_error ("ORDERED clause parameter is less than COLLAPSE at %L",
 	       &code->loc);
   if (omp_clauses->order_concurrent && omp_clauses->ordered)
-    gfc_error ("ORDER clause must not be used together ORDERED at %L",
+    gfc_error ("ORDER clause must not be used together with ORDERED at %L",
 	       &code->loc);
   if (omp_clauses->if_expr)
     {

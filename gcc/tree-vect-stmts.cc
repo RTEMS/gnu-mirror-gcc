@@ -2198,14 +2198,20 @@ get_group_load_store_type (vec_info *vinfo, stmt_vec_info stmt_info,
 			       " non-consecutive accesses\n");
 	      return false;
 	    }
+
+	  unsigned HOST_WIDE_INT dr_size
+	    = vect_get_scalar_dr_size (first_dr_info);
+	  poly_int64 off = 0;
+	  if (*memory_access_type == VMAT_CONTIGUOUS_REVERSE)
+	    off = (TYPE_VECTOR_SUBPARTS (vectype) - 1) * -dr_size;
+
 	  /* An overrun is fine if the trailing elements are smaller
 	     than the alignment boundary B.  Every vector access will
 	     be a multiple of B and so we are guaranteed to access a
 	     non-gap element in the same B-sized block.  */
 	  if (overrun_p
 	      && gap < (vect_known_alignment_in_bytes (first_dr_info,
-						       vectype)
-			/ vect_get_scalar_dr_size (first_dr_info)))
+						       vectype, off) / dr_size))
 	    overrun_p = false;
 
 	  /* When we have a contiguous access across loop iterations
@@ -2216,20 +2222,21 @@ get_group_load_store_type (vec_info *vinfo, stmt_vec_info stmt_info,
 
 	     If there is a combination of the access not covering the full
 	     vector and a gap recorded then we may need to peel twice.  */
+	  bool large_vector_overrun_p = false;
 	  if (loop_vinfo
 	      && (*memory_access_type == VMAT_CONTIGUOUS
 		  || *memory_access_type == VMAT_CONTIGUOUS_REVERSE)
 	      && SLP_TREE_LOAD_PERMUTATION (slp_node).exists ()
 	      && !multiple_p (group_size * LOOP_VINFO_VECT_FACTOR (loop_vinfo),
 			      nunits))
-	    overrun_p = true;
+	    large_vector_overrun_p = overrun_p = true;
 
 	  /* If the gap splits the vector in half and the target
 	     can do half-vector operations avoid the epilogue peeling
 	     by simply loading half of the vector only.  Usually
 	     the construction with an upper zero half will be elided.  */
 	  dr_alignment_support alss;
-	  int misalign = dr_misalignment (first_dr_info, vectype);
+	  int misalign = dr_misalignment (first_dr_info, vectype, off);
 	  tree half_vtype;
 	  poly_uint64 remain;
 	  unsigned HOST_WIDE_INT tem, num;
@@ -2273,7 +2280,8 @@ get_group_load_store_type (vec_info *vinfo, stmt_vec_info stmt_info,
 		 access and that is sufficiently small to be covered
 		 by the single scalar iteration.  */
 	      unsigned HOST_WIDE_INT cnunits, cvf, cremain, cpart_size;
-	      if (!nunits.is_constant (&cnunits)
+	      if (masked_p
+		  || !nunits.is_constant (&cnunits)
 		  || !LOOP_VINFO_VECT_FACTOR (loop_vinfo).is_constant (&cvf)
 		  || (((cremain = (group_size * cvf - gap) % cnunits), true)
 		      && ((cpart_size = (1 << ceil_log2 (cremain))), true)
@@ -2282,9 +2290,11 @@ get_group_load_store_type (vec_info *vinfo, stmt_vec_info stmt_info,
 			       (vectype, cnunits / cpart_size,
 				&half_vtype) == NULL_TREE)))
 		{
-		  /* If all fails we can still resort to niter masking, so
-		     enforce the use of partial vectors.  */
-		  if (LOOP_VINFO_CAN_USE_PARTIAL_VECTORS_P (loop_vinfo))
+		  /* If all fails we can still resort to niter masking unless
+		     the vectors used are too big, so enforce the use of
+		     partial vectors.  */
+		  if (LOOP_VINFO_CAN_USE_PARTIAL_VECTORS_P (loop_vinfo)
+		      && !large_vector_overrun_p)
 		    {
 		      if (dump_enabled_p ())
 			dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
@@ -2301,6 +2311,16 @@ get_group_load_store_type (vec_info *vinfo, stmt_vec_info stmt_info,
 					 "access\n");
 		      return false;
 		    }
+		}
+	      else if (large_vector_overrun_p)
+		{
+		  if (dump_enabled_p ())
+		    dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+				     "can't operate on partial vectors because "
+				     "only unmasked loads handle access "
+				     "shortening required because of gaps at "
+				     "the end of the access\n");
+		  LOOP_VINFO_CAN_USE_PARTIAL_VECTORS_P (loop_vinfo) = false;
 		}
 	    }
 	}
@@ -4547,14 +4567,9 @@ vectorizable_simd_clone_call (vec_info *vinfo, stmt_vec_info stmt_info,
 	    case SIMD_CLONE_ARG_TYPE_MASK:
 	      if (loop_vinfo
 		  && LOOP_VINFO_CAN_USE_PARTIAL_VECTORS_P (loop_vinfo))
-		{
-		  unsigned nmasks
-		    = exact_div (ncopies * bestn->simdclone->simdlen,
-				 TYPE_VECTOR_SUBPARTS (vectype)).to_constant ();
-		  vect_record_loop_mask (loop_vinfo,
-					 &LOOP_VINFO_MASKS (loop_vinfo),
-					 nmasks, vectype, op);
-		}
+		vect_record_loop_mask (loop_vinfo,
+				       &LOOP_VINFO_MASKS (loop_vinfo),
+				       ncopies, vectype, op);
 
 	      break;
 	    }
@@ -8630,7 +8645,7 @@ vectorizable_store (vec_info *vinfo,
       gimple_stmt_iterator incr_gsi;
       bool insert_after;
       gimple *incr;
-      tree offvar;
+      tree offvar = NULL_TREE;
       tree ivstep;
       tree running_off;
       tree stride_base, stride_step, alias_off;
@@ -10588,7 +10603,7 @@ vectorizable_load (vec_info *vinfo,
     {
       gimple_stmt_iterator incr_gsi;
       bool insert_after;
-      tree offvar;
+      tree offvar = NULL_TREE;
       tree ivstep;
       tree running_off;
       vec<constructor_elt, va_gc> *v = NULL;
@@ -11982,8 +11997,14 @@ vectorizable_load (vec_info *vinfo,
 		    tree ltype = vectype;
 		    tree new_vtype = NULL_TREE;
 		    unsigned HOST_WIDE_INT gap = DR_GROUP_GAP (first_stmt_info);
+		    unsigned HOST_WIDE_INT dr_size
+		      = vect_get_scalar_dr_size (first_dr_info);
+		    poly_int64 off = 0;
+		    if (memory_access_type == VMAT_CONTIGUOUS_REVERSE)
+		      off = (TYPE_VECTOR_SUBPARTS (vectype) - 1) * -dr_size;
 		    unsigned int vect_align
-		      = vect_known_alignment_in_bytes (first_dr_info, vectype);
+		      = vect_known_alignment_in_bytes (first_dr_info, vectype,
+						       off);
 		    /* Try to use a single smaller load when we are about
 		       to load excess elements compared to the unrolled
 		       scalar loop.  */
@@ -12004,9 +12025,7 @@ vectorizable_load (vec_info *vinfo,
 			     scalar loop.  */
 			  ;
 			else if (known_gt (vect_align,
-					   ((nunits - remain)
-					    * vect_get_scalar_dr_size
-						(first_dr_info))))
+					   ((nunits - remain) * dr_size)))
 			  /* Aligned access to the gap area when there's
 			     at least one element in it is OK.  */
 			  ;
@@ -12662,8 +12681,9 @@ vectorizable_condition (vec_info *vinfo,
 
   masked = !COMPARISON_CLASS_P (cond_expr);
   vec_cmp_type = truth_type_for (comp_vectype);
-
-  if (vec_cmp_type == NULL_TREE)
+  if (vec_cmp_type == NULL_TREE
+      || maybe_ne (TYPE_VECTOR_SUBPARTS (vectype),
+		   TYPE_VECTOR_SUBPARTS (vec_cmp_type)))
     return false;
 
   cond_code = TREE_CODE (cond_expr);

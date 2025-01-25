@@ -698,10 +698,13 @@ compute_field_expr (tree node, unsigned int *accessors,
 			      access_node, false, callback);
       return n;
 
+    case VAR_DECL:
+      accessors[0] = 0;
+      return 1;
+
     case ADDR_EXPR:
     case CALL_EXPR:
     case SSA_NAME:
-    case VAR_DECL:
     case PARM_DECL:
       return 0;
     default:
@@ -1822,6 +1825,7 @@ make_gimple_core_safe_access_index (tree *tp,
 
       tree lhs;
       if (!wi->is_lhs
+	  && gimple_code (wi->stmt) != GIMPLE_CALL
 	  && (lhs = gimple_get_lhs (wi->stmt)) != NULL_TREE)
 	core_mark_as_access_index (lhs);
     }

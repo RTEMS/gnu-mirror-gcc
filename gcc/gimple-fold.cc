@@ -7510,18 +7510,17 @@ gimple_binop_def_p (enum tree_code code, tree t, tree op[2])
    *PREVERSEP is set to the storage order of the field.
 
    *PAND_MASK is set to the mask found in a BIT_AND_EXPR, if any.  If
-   PAND_MASK *is NULL, BIT_AND_EXPR is not recognized.  If *PAND_MASK
-   is initially set to a mask with nonzero precision, that mask is
+   *PAND_MASK is initially set to a mask with nonzero precision, that mask is
    combined with the found mask, or adjusted in precision to match.
 
    *PSIGNBIT is set to TRUE if, before clipping to *PBITSIZE, the mask
    encompassed bits that corresponded to extensions of the sign bit.
 
-   *XOR_P is to be FALSE if EXP might be a XOR used in a compare, in which
-   case, if XOR_CMP_OP is a zero constant, it will be overridden with *PEXP,
-   *XOR_P will be set to TRUE, *XOR_PAND_MASK will be copied from *PAND_MASK,
-   and the left-hand operand of the XOR will be decoded.  If *XOR_P is TRUE,
-   XOR_CMP_OP and XOR_PAND_MASK are supposed to be NULL, and then the
+   *PXORP is to be FALSE if EXP might be a XOR used in a compare, in which
+   case, if PXOR_CMP_OP is a zero constant, it will be overridden with *PEXP,
+   *PXORP will be set to TRUE, *PXOR_AND_MASK will be copied from *PAND_MASK,
+   and the left-hand operand of the XOR will be decoded.  If *PXORP is TRUE,
+   PXOR_CMP_OP and PXOR_AND_MASK are supposed to be NULL, and then the
    right-hand operand of the XOR will be decoded.
 
    *LOAD is set to the load stmt of the innermost reference, if any,
@@ -7538,8 +7537,8 @@ decode_field_reference (tree *pexp, HOST_WIDE_INT *pbitsize,
 			HOST_WIDE_INT *pbitpos,
 			bool *punsignedp, bool *preversep, bool *pvolatilep,
 			wide_int *pand_mask, bool *psignbit,
-			bool *xor_p, tree *xor_cmp_op, wide_int *xor_pand_mask,
-			gimple **load, location_t loc[4])
+			bool *pxorp, tree *pxor_cmp_op, wide_int *pxor_and_mask,
+			gimple **pload, location_t loc[4])
 {
   tree exp = *pexp;
   tree outer_type = 0;
@@ -7549,9 +7548,11 @@ decode_field_reference (tree *pexp, HOST_WIDE_INT *pbitsize,
   tree res_ops[2];
   machine_mode mode;
   bool convert_before_shift = false;
-
-  *load = NULL;
-  *psignbit = false;
+  bool signbit = false;
+  bool xorp = false;
+  tree xor_cmp_op;
+  wide_int xor_and_mask;
+  gimple *load = NULL;
 
   /* All the optimizations using this function assume integer fields.
      There are problems with FP fields since the type_for_size call
@@ -7576,7 +7577,7 @@ decode_field_reference (tree *pexp, HOST_WIDE_INT *pbitsize,
 
   /* Recognize and save a masking operation.  Combine it with an
      incoming mask.  */
-  if (pand_mask && gimple_binop_def_p (BIT_AND_EXPR, exp, res_ops)
+  if (gimple_binop_def_p (BIT_AND_EXPR, exp, res_ops)
       && TREE_CODE (res_ops[1]) == INTEGER_CST)
     {
       loc[1] = gimple_location (SSA_NAME_DEF_STMT (exp));
@@ -7596,29 +7597,29 @@ decode_field_reference (tree *pexp, HOST_WIDE_INT *pbitsize,
 	    and_mask &= wide_int::from (*pand_mask, prec_op, UNSIGNED);
 	}
     }
-  else if (pand_mask)
+  else
     and_mask = *pand_mask;
 
   /* Turn (a ^ b) [!]= 0 into a [!]= b.  */
-  if (xor_p && gimple_binop_def_p (BIT_XOR_EXPR, exp, res_ops))
+  if (pxorp && gimple_binop_def_p (BIT_XOR_EXPR, exp, res_ops))
     {
       /* No location recorded for this one, it's entirely subsumed by the
 	 compare.  */
-      if (*xor_p)
+      if (*pxorp)
 	{
 	  exp = res_ops[1];
-	  gcc_checking_assert (!xor_cmp_op && !xor_pand_mask);
+	  gcc_checking_assert (!pxor_cmp_op && !pxor_and_mask);
 	}
-      else if (!xor_cmp_op)
+      else if (!pxor_cmp_op)
 	/* Not much we can do when xor appears in the right-hand compare
 	   operand.  */
 	return NULL_TREE;
-      else if (integer_zerop (*xor_cmp_op))
+      else if (integer_zerop (*pxor_cmp_op))
 	{
-	  *xor_p = true;
+	  xorp = true;
 	  exp = res_ops[0];
-	  *xor_cmp_op = *pexp;
-	  *xor_pand_mask = *pand_mask;
+	  xor_cmp_op = *pexp;
+	  xor_and_mask = *pand_mask;
 	}
     }
 
@@ -7646,12 +7647,12 @@ decode_field_reference (tree *pexp, HOST_WIDE_INT *pbitsize,
   /* Yet another chance to drop conversions.  This one is allowed to
      match a converting load, subsuming the load identification block
      below.  */
-  if (!outer_type && gimple_convert_def_p (exp, res_ops, load))
+  if (!outer_type && gimple_convert_def_p (exp, res_ops, &load))
     {
       outer_type = TREE_TYPE (exp);
       loc[0] = gimple_location (SSA_NAME_DEF_STMT (exp));
-      if (*load)
-	loc[3] = gimple_location (*load);
+      if (load)
+	loc[3] = gimple_location (load);
       exp = res_ops[0];
       /* This looks backwards, but we're going back the def chain, so if we
 	 find the conversion here, after finding a shift, that's because the
@@ -7662,14 +7663,13 @@ decode_field_reference (tree *pexp, HOST_WIDE_INT *pbitsize,
     }
 
   /* Identify the load, if there is one.  */
-  if (!(*load) && TREE_CODE (exp) == SSA_NAME
-      && !SSA_NAME_IS_DEFAULT_DEF (exp))
+  if (!load && TREE_CODE (exp) == SSA_NAME && !SSA_NAME_IS_DEFAULT_DEF (exp))
     {
       gimple *def = SSA_NAME_DEF_STMT (exp);
       if (gimple_assign_load_p (def))
 	{
 	  loc[3] = gimple_location (def);
-	  *load = def;
+	  load = def;
 	  exp = gimple_assign_rhs1 (def);
 	}
     }
@@ -7694,63 +7694,77 @@ decode_field_reference (tree *pexp, HOST_WIDE_INT *pbitsize,
 	  && !type_has_mode_precision_p (TREE_TYPE (inner))))
     return NULL_TREE;
 
+  /* Adjust shifts...  */
+  if (convert_before_shift
+      && outer_type && bs > TYPE_PRECISION (outer_type))
+    {
+      HOST_WIDE_INT excess = bs - TYPE_PRECISION (outer_type);
+      if (reversep ? !BYTES_BIG_ENDIAN : BYTES_BIG_ENDIAN)
+	bp += excess;
+      bs -= excess;
+    }
+
+  if (shiftrt)
+    {
+      /* Punt if we're shifting by more than the loaded bitfield (after
+	 adjustment), or if there's a shift after a change of signedness, punt.
+	 When comparing this field with a constant, we'll check that the
+	 constant is a proper sign- or zero-extension (depending on signedness)
+	 of a value that would fit in the selected portion of the bitfield.  A
+	 shift after a change of signedness would make the extension
+	 non-uniform, and we can't deal with that (yet ???).  See
+	 gcc.dg/field-merge-22.c for a test that would go wrong.  */
+      if (bs <= shiftrt
+	  || (convert_before_shift
+	      && outer_type && unsignedp != TYPE_UNSIGNED (outer_type)))
+	return NULL_TREE;
+      if (!reversep ? !BYTES_BIG_ENDIAN : BYTES_BIG_ENDIAN)
+	bp += shiftrt;
+      bs -= shiftrt;
+    }
+
+  /* ... and bit position.  */
+  if (!convert_before_shift
+      && outer_type && bs > TYPE_PRECISION (outer_type))
+    {
+      HOST_WIDE_INT excess = bs - TYPE_PRECISION (outer_type);
+      if (reversep ? !BYTES_BIG_ENDIAN : BYTES_BIG_ENDIAN)
+	bp += excess;
+      bs -= excess;
+    }
+
+  /* If the number of bits in the reference is the same as the bitsize of
+     the outer type, then the outer type gives the signedness. Otherwise
+     (in case of a small bitfield) the signedness is unchanged.  */
+  if (outer_type && bs == TYPE_PRECISION (outer_type))
+    unsignedp = TYPE_UNSIGNED (outer_type);
+
+  /* Make the mask the expected width.  */
+  if (and_mask.get_precision () != 0)
+    {
+      /* If the AND_MASK encompasses bits that would be extensions of
+	 the sign bit, set SIGNBIT.  */
+      if (!unsignedp
+	  && and_mask.get_precision () > bs
+	  && (and_mask & wi::mask (bs, true, and_mask.get_precision ())) != 0)
+	signbit = true;
+      and_mask = wide_int::from (and_mask, bs, UNSIGNED);
+    }
+
+  *pexp = exp;
+  *pload = load;
   *pbitsize = bs;
   *pbitpos = bp;
   *punsignedp = unsignedp;
   *preversep = reversep;
   *pvolatilep = volatilep;
-
-  /* Adjust shifts...  */
-  if (convert_before_shift
-      && outer_type && *pbitsize > TYPE_PRECISION (outer_type))
+  *psignbit = signbit;
+  *pand_mask = and_mask;
+  if (xorp)
     {
-      HOST_WIDE_INT excess = *pbitsize - TYPE_PRECISION (outer_type);
-      if (*preversep ? !BYTES_BIG_ENDIAN : BYTES_BIG_ENDIAN)
-	*pbitpos += excess;
-      *pbitsize -= excess;
-    }
-
-  if (shiftrt)
-    {
-      if (!*preversep ? !BYTES_BIG_ENDIAN : BYTES_BIG_ENDIAN)
-	*pbitpos += shiftrt;
-      *pbitsize -= shiftrt;
-    }
-
-  /* ... and bit position.  */
-  if (!convert_before_shift
-      && outer_type && *pbitsize > TYPE_PRECISION (outer_type))
-    {
-      HOST_WIDE_INT excess = *pbitsize - TYPE_PRECISION (outer_type);
-      if (*preversep ? !BYTES_BIG_ENDIAN : BYTES_BIG_ENDIAN)
-	*pbitpos += excess;
-      *pbitsize -= excess;
-    }
-
-  *pexp = exp;
-
-  /* If the number of bits in the reference is the same as the bitsize of
-     the outer type, then the outer type gives the signedness. Otherwise
-     (in case of a small bitfield) the signedness is unchanged.  */
-  if (outer_type && *pbitsize == TYPE_PRECISION (outer_type))
-    *punsignedp = TYPE_UNSIGNED (outer_type);
-
-  if (pand_mask)
-    {
-      /* Make the mask the expected width.  */
-      if (and_mask.get_precision () != 0)
-	{
-	  /* If the AND_MASK encompasses bits that would be extensions of
-	     the sign bit, set *PSIGNBIT.  */
-	  if (!unsignedp
-	      && and_mask.get_precision () > *pbitsize
-	      && (and_mask
-		  & wi::mask (*pbitsize, true, and_mask.get_precision ())) != 0)
-	    *psignbit = true;
-	  and_mask = wide_int::from (and_mask, *pbitsize, UNSIGNED);
-	}
-
-      *pand_mask = and_mask;
+      *pxorp = xorp;
+      *pxor_cmp_op = xor_cmp_op;
+      *pxor_and_mask = xor_and_mask;
     }
 
   return inner;
@@ -7845,6 +7859,11 @@ make_bit_field_load (location_t loc, tree inner, tree orig_inner, tree type,
       gimple *new_stmt = gsi_stmt (i);
       if (gimple_has_mem_ops (new_stmt))
 	gimple_set_vuse (new_stmt, reaching_vuse);
+      gcc_checking_assert (! (gimple_assign_load_p (point)
+			      && gimple_assign_load_p (new_stmt))
+			   || (tree_could_trap_p (gimple_assign_rhs1 (point))
+			       == tree_could_trap_p (gimple_assign_rhs1
+						     (new_stmt))));
     }
 
   gimple_stmt_iterator gsi = gsi_for_stmt (point);
@@ -8076,8 +8095,9 @@ fold_truth_andor_for_ifcombine (enum tree_code code, tree truth_type,
       return 0;
     }
 
-  /* Prepare to turn compares of signed quantities with zero into
-     sign-bit tests.  */
+  /* Prepare to turn compares of signed quantities with zero into sign-bit
+     tests.  We need not worry about *_reversep here for these compare
+     rewrites: loads will have already been reversed before compares.  */
   bool lsignbit = false, rsignbit = false;
   if ((lcode == LT_EXPR || lcode == GE_EXPR)
       && integer_zerop (lr_arg)
@@ -8156,19 +8176,27 @@ fold_truth_andor_for_ifcombine (enum tree_code code, tree truth_type,
 				     &ll_and_mask, &ll_signbit,
 				     &l_xor, &lr_arg, &lr_and_mask,
 				     &ll_load, ll_loc);
+  if (!ll_inner)
+    return 0;
   lr_inner = decode_field_reference (&lr_arg, &lr_bitsize, &lr_bitpos,
 				     &lr_unsignedp, &lr_reversep, &volatilep,
 				     &lr_and_mask, &lr_signbit, &l_xor, 0, 0,
 				     &lr_load, lr_loc);
+  if (!lr_inner)
+    return 0;
   rl_inner = decode_field_reference (&rl_arg, &rl_bitsize, &rl_bitpos,
 				     &rl_unsignedp, &rl_reversep, &volatilep,
 				     &rl_and_mask, &rl_signbit,
 				     &r_xor, &rr_arg, &rr_and_mask,
 				     &rl_load, rl_loc);
+  if (!rl_inner)
+    return 0;
   rr_inner = decode_field_reference (&rr_arg, &rr_bitsize, &rr_bitpos,
 				     &rr_unsignedp, &rr_reversep, &volatilep,
 				     &rr_and_mask, &rr_signbit, &r_xor, 0, 0,
 				     &rr_load, rr_loc);
+  if (!rr_inner)
+    return 0;
 
   /* It must be true that the inner operation on the lhs of each
      comparison must be the same if we are to be able to do anything.
@@ -8176,16 +8204,14 @@ fold_truth_andor_for_ifcombine (enum tree_code code, tree truth_type,
      the rhs's.  If one is a load and the other isn't, we have to be
      conservative and avoid the optimization, otherwise we could get
      SRAed fields wrong.  */
-  if (volatilep
-      || ll_reversep != rl_reversep
-      || ll_inner == 0 || rl_inner == 0)
+  if (volatilep)
     return 0;
 
-  if (! operand_equal_p (ll_inner, rl_inner, 0))
+  if (ll_reversep != rl_reversep
+      || ! operand_equal_p (ll_inner, rl_inner, 0))
     {
       /* Try swapping the operands.  */
       if (ll_reversep != rr_reversep
-	  || !rr_inner
 	  || !operand_equal_p (ll_inner, rr_inner, 0))
 	return 0;
 
@@ -8254,7 +8280,6 @@ fold_truth_andor_for_ifcombine (enum tree_code code, tree truth_type,
       lr_reversep = ll_reversep;
     }
   else if (lr_reversep != rr_reversep
-	   || lr_inner == 0 || rr_inner == 0
 	   || ! operand_equal_p (lr_inner, rr_inner, 0)
 	   || ((lr_load && rr_load)
 	       ? gimple_vuse (lr_load) != gimple_vuse (rr_load)
@@ -8508,17 +8533,41 @@ fold_truth_andor_for_ifcombine (enum tree_code code, tree truth_type,
   else
     rl_mask = wi::shifted_mask (xrl_bitpos, rl_bitsize, false, lnprec);
 
+  /* When we set l_const, we also set r_const.  */
+  gcc_checking_assert (!l_const.get_precision () == !r_const.get_precision ());
+
   /* Adjust right-hand constants in both original comparisons to match width
      and bit position.  */
   if (l_const.get_precision ())
     {
+      /* Before clipping upper bits of the right-hand operand of the compare,
+	 check that they're sign or zero extensions, depending on how the
+	 left-hand operand would be extended.  If it is unsigned, or if there's
+	 a mask that zeroes out extension bits, whether because we've checked
+	 for upper bits in the mask and did not set ll_signbit, or because the
+	 sign bit itself is masked out, check that the right-hand operand is
+	 zero-extended.  */
+      bool l_non_ext_bits = false;
+      if (ll_bitsize < lr_bitsize)
+	{
+	  wide_int zext = wi::zext (l_const, ll_bitsize);
+	  if ((ll_unsignedp
+	       || (ll_and_mask.get_precision ()
+		   && (!ll_signbit
+		       || ((ll_and_mask & wi::mask (ll_bitsize - 1, true, ll_bitsize))
+			   == 0)))
+	       ? zext : wi::sext (l_const, ll_bitsize)) == l_const)
+	    l_const = zext;
+	  else
+	    l_non_ext_bits = true;
+	}
       /* We're doing bitwise equality tests, so don't bother with sign
 	 extensions.  */
       l_const = wide_int::from (l_const, lnprec, UNSIGNED);
       if (ll_and_mask.get_precision ())
 	l_const &= wide_int::from (ll_and_mask, lnprec, UNSIGNED);
       l_const <<= xll_bitpos;
-      if ((l_const & ~ll_mask) != 0)
+      if (l_non_ext_bits || (l_const & ~ll_mask) != 0)
 	{
 	  warning_at (lloc, OPT_Wtautological_compare,
 		      "comparison is always %d", wanted_code == NE_EXPR);
@@ -8526,15 +8575,28 @@ fold_truth_andor_for_ifcombine (enum tree_code code, tree truth_type,
 	  return constant_boolean_node (wanted_code == NE_EXPR, truth_type);
 	}
 
-      /* When we set l_const, we also set r_const, so we need not test it
-	 again.  */
-      gcc_checking_assert (r_const.get_precision ());
-
+      /* Before clipping upper bits of the right-hand operand of the compare,
+	 check that they're sign or zero extensions, depending on how the
+	 left-hand operand would be extended.  */
+      bool r_non_ext_bits = false;
+      if (rl_bitsize < rr_bitsize)
+	{
+	  wide_int zext = wi::zext (r_const, rl_bitsize);
+	  if ((rl_unsignedp
+	       || (rl_and_mask.get_precision ()
+		   && (!rl_signbit
+		       || ((rl_and_mask & wi::mask (rl_bitsize - 1, true, rl_bitsize))
+			   == 0)))
+	       ? zext : wi::sext (r_const, rl_bitsize)) == r_const)
+	    r_const = zext;
+	  else
+	    r_non_ext_bits = true;
+	}
       r_const = wide_int::from (r_const, lnprec, UNSIGNED);
       if (rl_and_mask.get_precision ())
 	r_const &= wide_int::from (rl_and_mask, lnprec, UNSIGNED);
       r_const <<= xrl_bitpos;
-      if ((r_const & ~rl_mask) != 0)
+      if (r_non_ext_bits || (r_const & ~rl_mask) != 0)
 	{
 	  warning_at (rloc, OPT_Wtautological_compare,
 		      "comparison is always %d", wanted_code == NE_EXPR);

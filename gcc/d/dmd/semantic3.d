@@ -1333,7 +1333,7 @@ private extern(C++) final class Semantic3Visitor : Visitor
                 // Don't allow D `immutable` and `shared` types to be interfaced with C++
                 if (type.isImmutable() || type.isShared())
                     return true;
-                else if (Type cpptype = target.cpp.parameterType(type))
+                if (Type cpptype = target.cpp.parameterType(type))
                     type = cpptype;
 
                 if (origType is null)
@@ -1699,7 +1699,7 @@ extern (D) bool checkClosure(FuncDeclaration fd)
     if (!fd.needsClosure())
         return false;
 
-    if (fd.setGC(fd.loc, "%s `%s` is `@nogc` yet allocates closure for `%s()` with the GC", fd))
+    if (fd.setGC(fd.loc, "allocating a closure for `%s()`", fd))
     {
         .error(fd.loc, "%s `%s` is `@nogc` yet allocates closure for `%s()` with the GC", fd.kind, fd.toPrettyChars(), fd.toChars());
         if (global.gag)     // need not report supplemental errors

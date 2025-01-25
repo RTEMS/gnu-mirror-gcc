@@ -118,10 +118,9 @@ private bool isNeedThisScope(Scope* sc, Declaration d)
         {
             if (ad2 == ad)
                 return false;
-            else if (ad2.isNested())
+            if (ad2.isNested())
                 continue;
-            else
-                return true;
+            return true;
         }
         if (FuncDeclaration f = s.isFuncDeclaration())
         {
@@ -1521,7 +1520,7 @@ Expression resolvePropertiesOnly(Scope* sc, Expression e1)
     }
     else if (auto oe = e1.isOverExp())
         return handleOverloadSet(oe.vars);
-    else if (auto dti = e1.isDotTemplateInstanceExp())
+    if (auto dti = e1.isDotTemplateInstanceExp())
     {
         if (dti.ti.tempdecl)
             if (auto td = dti.ti.tempdecl.isTemplateDeclaration())
@@ -1529,7 +1528,7 @@ Expression resolvePropertiesOnly(Scope* sc, Expression e1)
     }
     else if (auto dte = e1.isDotTemplateExp())
         return handleTemplateDecl(dte.td);
-    else if (auto se = e1.isScopeExp())
+    if (auto se = e1.isScopeExp())
     {
         Dsymbol s = se.sds;
         TemplateInstance ti = s.isTemplateInstance();
@@ -1539,7 +1538,7 @@ Expression resolvePropertiesOnly(Scope* sc, Expression e1)
     }
     else if (auto et = e1.isTemplateExp())
         return handleTemplateDecl(et.td);
-    else if (e1.isDotVarExp() && e1.type.isTypeFunction())
+    if (e1.isDotVarExp() && e1.type.isTypeFunction())
     {
         DotVarExp dve = e1.isDotVarExp();
         return handleFuncDecl(dve.var.isFuncDeclaration());
@@ -2074,7 +2073,7 @@ public void errorSupplementalInferredAttr(FuncDeclaration fd, int maxDepth, bool
     auto errorFunc = deprecation ? &eSink.deprecationSupplemental : &eSink.errorSupplemental;
 
     AttributeViolation* s;
-    const(char)* attr;
+    string attr;
     if (stc & STC.safe)
     {
         s = fd.safetyViolation;
@@ -2099,21 +2098,9 @@ public void errorSupplementalInferredAttr(FuncDeclaration fd, int maxDepth, bool
     if (!s)
         return;
 
-    if (s.format)
+    if (s.action.length > 0)
     {
-        errorFunc(s.loc, deprecation ?
-            "which wouldn't be `%s` because of:" :
-            "which wasn't inferred `%s` because of:", attr);
-        if (stc == STC.nogc || stc == STC.pure_)
-        {
-            auto f = (cast(Dsymbol) s.arg0).isFuncDeclaration();
-            errorFunc(s.loc, s.format, f.kind(), f.toPrettyChars(), s.arg1 ? s.arg1.toChars() : "");
-        }
-        else
-        {
-            errorFunc(s.loc, s.format,
-                s.arg0 ? s.arg0.toChars() : "", s.arg1 ? s.arg1.toChars() : "", s.arg2 ? s.arg2.toChars() : "");
-        }
+        errorFunc(s.loc, "and %.*s makes it fail to infer `%.*s`", s.action.fTuple.expand, attr.fTuple.expand);
     }
     else if (s.fd)
     {
@@ -2177,7 +2164,7 @@ private bool checkPurity(VarDeclaration v, const ref Loc loc, Scope* sc)
         if (v.ident == Id.gate)
             return false;
 
-        if (checkImpure(sc, loc, "`pure` %s `%s` cannot access mutable static data `%s`", v))
+        if (checkImpure(sc, loc, "accessing mutable static data `%s`", v))
         {
             error(loc, "`pure` %s `%s` cannot access mutable static data `%s`",
                 sc.func.kind(), sc.func.toPrettyChars(), v.toChars());
@@ -6163,7 +6150,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 if (sd.ctor)
                 {
                     auto ctor = sd.ctor.isCtorDeclaration();
-                    if (ctor && ctor.isCpCtor && ctor.isGenerated())
+                    if (ctor && (ctor.isCpCtor || ctor.isMoveCtor) && ctor.isGenerated())
                         sd.ctor = null;
                 }
 
@@ -6711,20 +6698,20 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             else if (sc.func && sc.intypeof != 1 && !(sc.ctfe || sc.debug_))
             {
                 bool err = false;
-                if (!tf.purity && sc.func.setImpure(exp.loc, "`pure` %s `%s` cannot call impure `%s`", exp.e1))
+                if (!tf.purity && sc.func.setImpure(exp.loc, "calling impure `%s`", exp.e1))
                 {
                     error(exp.loc, "`pure` %s `%s` cannot call impure %s `%s`",
                         sc.func.kind(), sc.func.toPrettyChars(), p, exp.e1.toChars());
                     err = true;
                 }
-                if (!tf.isNogc && sc.func.setGC(exp.loc, "`@nogc` %s `%s` cannot call non-@nogc `%s`", exp.e1))
+                if (!tf.isNogc && sc.func.setGC(exp.loc, "calling non-@nogc `%s`", exp.e1))
                 {
                     error(exp.loc, "`@nogc` %s `%s` cannot call non-@nogc %s `%s`",
                         sc.func.kind(), sc.func.toPrettyChars(), p, exp.e1.toChars());
                     err = true;
                 }
                 if (tf.trust <= TRUST.system && sc.setUnsafe(true, exp.loc,
-                    "`@safe` function `%s` cannot call `@system` `%s`", sc.func, exp.e1))
+                    "calling `@system` `%s`", exp.e1))
                 {
                     error(exp.loc, "`@safe` %s `%s` cannot call `@system` %s `%s`",
                         sc.func.kind(), sc.func.toPrettyChars(), p, exp.e1.toChars());
@@ -7262,7 +7249,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 return no();
             if (e.tok2 == TOK.package_ && p.isModule()) // Note that isModule() will return null for package modules because they're not actually instances of Module.
                 return no();
-            else if(e.tok2 == TOK.module_ && !(p.isModule() || p.isPackageMod()))
+            if (e.tok2 == TOK.module_ && !(p.isModule() || p.isPackageMod()))
                 return no();
             tded = e.targ;
             return yes();
@@ -17036,6 +17023,7 @@ bool checkDisabled(Declaration d, Loc loc, Scope* sc, bool isAliasedDeclaration 
 
     if (auto ctor = d.isCtorDeclaration())
     {
+        //printf("checkDisabled() %s %s\n", ctor.toPrettyChars(), toChars(ctor.type));
         if (ctor.isCpCtor && ctor.isGenerated())
         {
             .error(loc, "generating an `inout` copy constructor for `struct %s` failed, therefore instances of it are uncopyable", d.parent.toPrettyChars());

@@ -3570,7 +3570,7 @@ finish_this_expr (void)
 
 tree
 finish_pseudo_destructor_expr (tree object, tree scope, tree destructor,
-			       location_t loc)
+			       location_t loc, tsubst_flags_t complain)
 {
   if (object == error_mark_node || destructor == error_mark_node)
     return error_mark_node;
@@ -3581,16 +3581,18 @@ finish_pseudo_destructor_expr (tree object, tree scope, tree destructor,
     {
       if (scope == error_mark_node)
 	{
-	  error_at (loc, "invalid qualifying scope in pseudo-destructor name");
+	  if (complain & tf_error)
+	    error_at (loc, "invalid qualifying scope in pseudo-destructor name");
 	  return error_mark_node;
 	}
       if (is_auto (destructor))
 	destructor = TREE_TYPE (object);
       if (scope && TYPE_P (scope) && !check_dtor_name (scope, destructor))
 	{
-	  error_at (loc,
-		    "qualified type %qT does not match destructor name ~%qT",
-		    scope, destructor);
+	  if (complain & tf_error)
+	    error_at (loc,
+		      "qualified type %qT does not match destructor name ~%qT",
+		      scope, destructor);
 	  return error_mark_node;
 	}
 
@@ -3611,7 +3613,8 @@ finish_pseudo_destructor_expr (tree object, tree scope, tree destructor,
       if (!same_type_ignoring_top_level_qualifiers_p (TREE_TYPE (object),
 						      destructor))
 	{
-	  error_at (loc, "%qE is not of type %qT", object, destructor);
+	  if (complain & tf_error)
+	    error_at (loc, "%qE is not of type %qT", object, destructor);
 	  return error_mark_node;
 	}
     }
@@ -3751,7 +3754,7 @@ finish_compound_literal (tree type, tree compound_literal,
       else if (cxx_dialect < cxx23)
 	pedwarn (input_location, OPT_Wc__23_extensions,
 		 "%<auto{x}%> only available with "
-		 "%<-std=c++2b%> or %<-std=gnu++2b%>");
+		 "%<-std=c++23%> or %<-std=gnu++23%>");
       type = do_auto_deduction (type, compound_literal, type, complain,
 				adc_variable_type);
       if (type == error_mark_node)
@@ -4673,7 +4676,8 @@ finish_id_expression_1 (tree id_expression,
       if (TREE_CODE (decl) == PARM_DECL
 	  && DECL_CONTEXT (decl) == NULL_TREE
 	  && !cp_unevaluated_operand
-	  && !processing_contract_condition)
+	  && !processing_contract_condition
+	  && !processing_omp_trait_property_expr)
 	{
 	  *error_msg = G_("use of parameter outside function body");
 	  return error_mark_node;

@@ -4261,8 +4261,7 @@ add_list_candidates (tree fns, tree first_arg,
   vec_alloc (new_args, nart + CONSTRUCTOR_NELTS (init_list));
   for (unsigned i = 0; i < nart; ++i)
     new_args->quick_push ((*args)[i]);
-  for (unsigned i = 0; i < CONSTRUCTOR_NELTS (init_list); ++i)
-    new_args->quick_push (CONSTRUCTOR_ELT (init_list, i)->value);
+  new_args = append_ctor_to_tree_vector (new_args, init_list);
 
   /* We aren't looking for list-ctors anymore.  */
   flags &= ~LOOKUP_LIST_ONLY;
@@ -4331,6 +4330,20 @@ has_non_trivial_temporaries (tree expr)
   return false;
 }
 
+/* Return number of initialized elements in CTOR.  */
+
+unsigned HOST_WIDE_INT
+count_ctor_elements (tree ctor)
+{
+  unsigned HOST_WIDE_INT len = 0;
+  for (constructor_elt &e: CONSTRUCTOR_ELTS (ctor))
+    if (TREE_CODE (e.value) == RAW_DATA_CST)
+      len += RAW_DATA_LENGTH (e.value);
+    else
+      ++len;
+  return len;
+}
+
 /* We're initializing an array of ELTTYPE from INIT.  If it seems useful,
    return INIT as an array (of its own type) so the caller can initialize the
    target array in a loop.  */
@@ -4392,7 +4405,8 @@ maybe_init_list_as_array (tree elttype, tree init)
   if (!is_xible (INIT_EXPR, elttype, copy_argtypes))
     return NULL_TREE;
 
-  tree arr = build_array_of_n_type (init_elttype, CONSTRUCTOR_NELTS (init));
+  unsigned HOST_WIDE_INT len = count_ctor_elements (init);
+  tree arr = build_array_of_n_type (init_elttype, len);
   arr = finish_compound_literal (arr, init, tf_none);
   DECL_MERGEABLE (TARGET_EXPR_SLOT (arr)) = true;
   return arr;
@@ -8801,27 +8815,111 @@ convert_like_internal (conversion *convs, tree expr, tree fn, int argnum,
       {
 	/* Conversion to std::initializer_list<T>.  */
 	tree elttype = TREE_VEC_ELT (CLASSTYPE_TI_ARGS (totype), 0);
-	unsigned len = CONSTRUCTOR_NELTS (expr);
+	unsigned HOST_WIDE_INT len = CONSTRUCTOR_NELTS (expr);
 	tree array;
 
 	if (tree init = maybe_init_list_as_array (elttype, expr))
 	  {
-	    elttype = cp_build_qualified_type
-	      (elttype, cp_type_quals (elttype) | TYPE_QUAL_CONST);
-	    array = build_array_of_n_type (elttype, len);
+	    elttype
+	      = cp_build_qualified_type (elttype, (cp_type_quals (elttype)
+						   | TYPE_QUAL_CONST));
+	    tree index_type = TYPE_DOMAIN (TREE_TYPE (init));
+	    array = build_cplus_array_type (elttype, index_type);
+	    len = TREE_INT_CST_LOW (TYPE_MAX_VALUE (index_type)) + 1;
 	    array = build_vec_init_expr (array, init, complain);
 	    array = get_target_expr (array);
 	    array = cp_build_addr_expr (array, complain);
 	  }
 	else if (len)
 	  {
-	    tree val; unsigned ix;
-
+	    tree val;
+	    unsigned ix;
 	    tree new_ctor = build_constructor (init_list_type_node, NULL);
 
 	    /* Convert all the elements.  */
 	    FOR_EACH_CONSTRUCTOR_VALUE (CONSTRUCTOR_ELTS (expr), ix, val)
 	      {
+		if (TREE_CODE (val) == RAW_DATA_CST)
+		  {
+		    tree elt_type;
+		    conversion *next;
+		    /* For conversion to initializer_list<unsigned char> or
+		       initializer_list<char> or initializer_list<signed char>
+		       we can optimize and keep RAW_DATA_CST with adjusted
+		       type if we report narrowing errors if needed, for
+		       others this converts each element separately.  */
+		    if (convs->u.list[ix]->kind == ck_std
+			&& (elt_type = convs->u.list[ix]->type)
+			&& (TREE_CODE (elt_type) == INTEGER_TYPE
+			    || is_byte_access_type (elt_type))
+			&& TYPE_PRECISION (elt_type) == CHAR_BIT
+			&& (next = next_conversion (convs->u.list[ix]))
+			&& next->kind == ck_identity)
+		      {
+			if (!TYPE_UNSIGNED (elt_type)
+			    /* For RAW_DATA_CST, TREE_TYPE (val) can be
+			       either integer_type_node (when it has been
+			       created by the lexer from CPP_EMBED) or
+			       after digestion/conversion some integral
+			       type with CHAR_BIT precision.  For int with
+			       precision higher than CHAR_BIT or unsigned char
+			       diagnose narrowing conversions from
+			       that int/unsigned char to signed char if any
+			       byte has most significant bit set.  */
+			    && (TYPE_UNSIGNED (TREE_TYPE (val))
+				|| (TYPE_PRECISION (TREE_TYPE (val))
+				    > CHAR_BIT)))
+			  for (int i = 0; i < RAW_DATA_LENGTH (val); ++i)
+			    {
+			      if (RAW_DATA_SCHAR_ELT (val, i) >= 0)
+				continue;
+			      else if (complain & tf_error)
+				{
+				  location_t loc
+				    = cp_expr_loc_or_input_loc (val);
+				  int savederrorcount = errorcount;
+				  permerror_opt (loc, OPT_Wnarrowing,
+						 "narrowing conversion of "
+						 "%qd from %qH to %qI",
+						 RAW_DATA_UCHAR_ELT (val, i),
+						 TREE_TYPE (val), elt_type);
+				  if (errorcount != savederrorcount)
+				    return error_mark_node;
+				}
+			      else
+				return error_mark_node;
+			    }
+			tree sub = copy_node (val);
+			TREE_TYPE (sub) = elt_type;
+			CONSTRUCTOR_APPEND_ELT (CONSTRUCTOR_ELTS (new_ctor),
+						NULL_TREE, sub);
+		      }
+		    else
+		      {
+			for (int i = 0; i < RAW_DATA_LENGTH (val); ++i)
+			  {
+			    tree elt
+			      = build_int_cst (TREE_TYPE (val),
+					       RAW_DATA_UCHAR_ELT (val, i));
+			    tree sub
+			      = convert_like (convs->u.list[ix], elt,
+					      fn, argnum, false, false,
+					      /*nested_p=*/true, complain);
+			    if (sub == error_mark_node)
+			      return sub;
+			    if (!check_narrowing (TREE_TYPE (sub), elt,
+						  complain))
+			      return error_mark_node;
+			    tree nc = new_ctor;
+			    CONSTRUCTOR_APPEND_ELT (CONSTRUCTOR_ELTS (nc),
+						    NULL_TREE, sub);
+			    if (!TREE_CONSTANT (sub))
+			      TREE_CONSTANT (new_ctor) = false;
+			  }
+		      }
+		    len += RAW_DATA_LENGTH (val) - 1;
+		    continue;
+		  }
 		tree sub = convert_like (convs->u.list[ix], val, fn,
 					 argnum, false, false,
 					 /*nested_p=*/true, complain);
@@ -8836,8 +8934,9 @@ convert_like_internal (conversion *convs, tree expr, tree fn, int argnum,
 		  TREE_CONSTANT (new_ctor) = false;
 	      }
 	    /* Build up the array.  */
-	    elttype = cp_build_qualified_type
-	      (elttype, cp_type_quals (elttype) | TYPE_QUAL_CONST);
+	    elttype
+	      = cp_build_qualified_type (elttype, (cp_type_quals (elttype)
+						   | TYPE_QUAL_CONST));
 	    array = build_array_of_n_type (elttype, len);
 	    array = finish_compound_literal (array, new_ctor, complain);
 	    /* This is dubious now, should be blessed by P2752.  */

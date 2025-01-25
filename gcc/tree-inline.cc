@@ -1160,6 +1160,13 @@ remap_gimple_op_r (tree *tp, int *walk_subtrees, void *data)
 
 	  *walk_subtrees = 0;
 	}
+      else if (TREE_CODE (*tp) == OMP_NEXT_VARIANT)
+	{
+	  /* Neither operand is interesting, and walking the selector
+	     causes problems because it's not an expression.  */
+	  gcc_assert (TREE_CODE (TREE_OPERAND (*tp, 0)) == INTEGER_CST);
+	  *walk_subtrees = 0;
+	}
     }
 
   /* Update the TREE_BLOCK for the cloned expr.  */
@@ -5041,8 +5048,8 @@ expand_call_inline (basic_block bb, gimple *stmt, copy_body_data *id,
   if (src_properties != prop_mask)
     dst_cfun->curr_properties &= src_properties | ~prop_mask;
   dst_cfun->calls_eh_return |= id->src_cfun->calls_eh_return;
-  id->dst_node->calls_declare_variant_alt
-    |= id->src_node->calls_declare_variant_alt;
+  id->dst_node->has_omp_variant_constructs
+    |= id->src_node->has_omp_variant_constructs;
 
   gcc_assert (!id->src_cfun->after_inlining);
 
@@ -5423,6 +5430,7 @@ static void
 fold_marked_statements (int first, hash_set<gimple *> *statements)
 {
   auto_bitmap to_purge;
+  auto_bitmap to_purge_abnormal;
 
   auto_vec<edge, 20> stack (n_basic_blocks_for_fn (cfun) + 2);
   auto_sbitmap visited (last_basic_block_for_fn (cfun));
@@ -5449,8 +5457,16 @@ fold_marked_statements (int first, hash_set<gimple *> *statements)
 	      continue;
 
 	    gimple *old_stmt = gsi_stmt (gsi);
-	    tree old_decl = (is_gimple_call (old_stmt)
-			     ? gimple_call_fndecl (old_stmt) : 0);
+	    bool can_make_abnormal_goto = false;
+	    tree old_decl = NULL_TREE;
+
+	    if (is_gimple_call (old_stmt))
+	      {
+		old_decl = gimple_call_fndecl (old_stmt);
+		if (stmt_can_make_abnormal_goto (old_stmt))
+		  can_make_abnormal_goto = true;
+	      }
+
 	    if (old_decl && fndecl_built_in_p (old_decl))
 	      {
 		/* Folding builtins can create multiple instructions,
@@ -5466,6 +5482,8 @@ fold_marked_statements (int first, hash_set<gimple *> *statements)
 		      {
 			cgraph_update_edges_for_call_stmt (old_stmt,
 							   old_decl, NULL);
+			if (can_make_abnormal_goto)
+			  bitmap_set_bit (to_purge_abnormal, dest->index);
 			break;
 		      }
 		    if (gsi_end_p (i2))
@@ -5494,6 +5512,9 @@ fold_marked_statements (int first, hash_set<gimple *> *statements)
 			    if (maybe_clean_or_replace_eh_stmt (old_stmt,
 								new_stmt))
 			      bitmap_set_bit (to_purge, dest->index);
+			    if (can_make_abnormal_goto
+				&& !stmt_can_make_abnormal_goto (new_stmt))
+			      bitmap_set_bit (to_purge_abnormal, dest->index);
 			    break;
 			  }
 			gsi_next (&i2);
@@ -5514,6 +5535,9 @@ fold_marked_statements (int first, hash_set<gimple *> *statements)
 
 		if (maybe_clean_or_replace_eh_stmt (old_stmt, new_stmt))
 		  bitmap_set_bit (to_purge, dest->index);
+		if (can_make_abnormal_goto
+		    && !stmt_can_make_abnormal_goto (new_stmt))
+		  bitmap_set_bit (to_purge_abnormal, dest->index);
 	      }
 	  }
 
@@ -5535,6 +5559,7 @@ fold_marked_statements (int first, hash_set<gimple *> *statements)
     }
 
   gimple_purge_all_dead_eh_edges (to_purge);
+  gimple_purge_all_dead_abnormal_call_edges (to_purge_abnormal);
 }
 
 /* Expand calls to inline functions in the body of FN.  */
@@ -6343,8 +6368,8 @@ tree_function_versioning (tree old_decl, tree new_decl,
   DECL_ARGUMENTS (new_decl) = DECL_ARGUMENTS (old_decl);
   initialize_cfun (new_decl, old_decl,
 		   new_entry ? new_entry->count : old_entry_block->count);
-  new_version_node->calls_declare_variant_alt
-    = old_version_node->calls_declare_variant_alt;
+  new_version_node->has_omp_variant_constructs
+    = old_version_node->has_omp_variant_constructs;
   if (DECL_STRUCT_FUNCTION (new_decl)->gimple_df)
     DECL_STRUCT_FUNCTION (new_decl)->gimple_df->ipa_pta
       = id.src_cfun->gimple_df->ipa_pta;

@@ -1,3 +1,75 @@
+2025-01-23  Jan Hubicka  <jh@suse.cz>
+
+	PR target/80813
+	* include/bits/stl_bvector.h (vector<bool, _Alloc>::operator []): Do
+	not use iterators.
+
+2025-01-20  Giuseppe D'Angelo  <giuseppe.dangelo@kdab.com>
+
+	PR libstdc++/118185
+	PR libstdc++/100249
+	* include/bits/ranges_algo.h (__clamp_fn): Correctly forward the
+	projected value to the comparator.
+	* testsuite/25_algorithms/clamp/118185.cc: New test.
+
+2025-01-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/99995
+	* include/Makefile.am: Add new header.
+	* include/Makefile.in: Regenerate.
+	* include/bits/unique_ptr.h: Include bits/ostream.h instead of
+	ostream.
+	* include/std/ostream: Include new header.
+	* include/bits/ostream.h: New file.
+
+2025-01-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/118158
+	* src/c++17/fs_ops.cc (fs::equivalent): Remove error reporting
+	for is_other(s1) && is_other(s2) case, as per LWG 2937.
+	* testsuite/27_io/filesystem/operations/pr118158.cc: New test.
+
+2025-01-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/stl_map.h: Check __glibcxx_node_extract instead
+	of __cplusplus.
+	* include/bits/stl_multimap.h: Likewise.
+	* include/bits/stl_multiset.h: Likewise.
+	* include/bits/stl_set.h: Likewise.
+	* include/bits/stl_tree.h: Likewise.
+
+2025-01-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/27_io/ios_base/types/openmode/case_label.cc: Use
+	standard feature test macro not internal one.
+
+2025-01-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/23_containers/set/requirements/explicit_instantiation/alloc_ptr.cc:
+	Guard node extraction checks with feature test macro. Remove
+	calls to non-existent range members.
+	* testsuite/23_containers/forward_list/requirements/explicit_instantiation/alloc_ptr.cc:
+	Use standard macro not internal one.
+	* testsuite/23_containers/list/requirements/explicit_instantiation/alloc_ptr.cc:
+	Likewise.
+
+2025-01-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/109849
+	* include/bits/vector.tcc (vector::_M_range_insert): Fix
+	reversed args in length calculation.
+
+2025-01-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/28_regex/traits/char/transform_primary.cc: Fix
+	subclause numbering in references to the standard.
+
+2025-01-15  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/118387
+	* testsuite/25_algorithms/default_template_value.cc
+	(Input::operator<=>): Use auto as return type rather than bool.
+
 2025-01-12  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
 
 	* testsuite/27_io/print/1.cc: Allow both LF and CRLF in test.

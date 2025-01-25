@@ -5476,12 +5476,8 @@ c_decl_attributes (tree *node, tree attributes, int flags)
 	attributes = tree_cons (get_identifier ("omp declare target implicit"),
 				NULL_TREE, attributes);
       else
-	{
-	  attributes = tree_cons (get_identifier ("omp declare target"),
-				  NULL_TREE, attributes);
-	  attributes = tree_cons (get_identifier ("omp declare target block"),
-				  NULL_TREE, attributes);
-	}
+	attributes = tree_cons (get_identifier ("omp declare target"),
+				NULL_TREE, attributes);
       if (TREE_CODE (*node) == FUNCTION_DECL)
 	{
 	  int device_type
@@ -11808,6 +11804,8 @@ names_builtin_p (const char *name)
     case RID_CHOOSE_EXPR:
     case RID_OFFSETOF:
     case RID_TYPES_COMPATIBLE_P:
+    case RID_C23_VA_START:
+    case RID_VA_ARG:
       return 1;
     default:
       break;

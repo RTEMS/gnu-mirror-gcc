@@ -827,7 +827,8 @@ Objective-C and Objective-C++ Dialects}.
 -moverride=@var{string}  -mverbose-cost-dump
 -mstack-protector-guard=@var{guard} -mstack-protector-guard-reg=@var{sysreg}
 -mstack-protector-guard-offset=@var{offset} -mtrack-speculation
--moutline-atomics -mearly-ldp-fusion -mlate-ldp-fusion}
+-moutline-atomics -mearly-ldp-fusion -mlate-ldp-fusion
+-Wexperimental-fmv-target}
 
 @emph{Adapteva Epiphany Options} (@ref{Adapteva Epiphany Options})
 @gccoptlist{-mhalf-reg-file  -mprefer-short-insn-regs
@@ -1412,7 +1413,8 @@ See RS/6000 and PowerPC Options.
 -munaligned-doubles  -mno-unaligned-doubles
 -muser-mode  -mno-user-mode
 -mv8plus  -mno-v8plus  -mvis  -mno-vis
--mvis2  -mno-vis2  -mvis3  -mno-vis3
+-mvis2  -mno-vis2
+-mvis3  -mno-vis3  -mvis3b  -mno-vis3b
 -mvis4  -mno-vis4  -mvis4b  -mno-vis4b
 -mcbcond  -mno-cbcond  -mfmaf  -mno-fmaf  -mfsmuld  -mno-fsmuld
 -mpopc  -mno-popc  -msubxc  -mno-subxc
@@ -3017,6 +3019,9 @@ that have additional context.
 
 Version 19, which first appeard in G++ 14, fixes manglings of structured
 bindings to include ABI tags.
+
+Version 20, which first appeared in G++ 15, fixes manglings of lambdas
+in static data member initializers.
 
 See also @option{-Wabi}.
 
@@ -21472,6 +21477,8 @@ The default depends on the specific target configuration.  Note that
 the LP64 and ILP32 ABIs are not link-compatible; you must compile your
 entire program with the same ABI, and link with a compatible set of libraries.
 
+The @samp{ilp32} model is deprecated.
+
 @opindex mbig-endian
 @item -mbig-endian
 Generate big-endian code.  This is the default when GCC is configured for an
@@ -21662,9 +21669,10 @@ and the features that they enable by default:
 @item @samp{armv8.9-a} @tab Armv8.9-a @tab @samp{armv8.8-a}
 @item @samp{armv9-a} @tab Armv9-A @tab @samp{armv8.5-a}, @samp{+sve}, @samp{+sve2}
 @item @samp{armv9.1-a} @tab Armv9.1-A @tab @samp{armv9-a}, @samp{+bf16}, @samp{+i8mm}
-@item @samp{armv9.2-a} @tab Armv9.2-A @tab @samp{armv9.1-a}
+@item @samp{armv9.2-a} @tab Armv9.2-A @tab @samp{armv9.1-a}, @samp{+wfxt}, @samp{+xs}
 @item @samp{armv9.3-a} @tab Armv9.3-A @tab @samp{armv9.2-a}, @samp{+mops}
 @item @samp{armv9.4-a} @tab Armv9.4-A @tab @samp{armv9.3-a}
+@item @samp{armv9.5-a} @tab Armv9.4-A @tab @samp{armv9.4-a}, @samp{cpa}, @samp{+faminmax}, @samp{+lut}
 @item @samp{armv8-r} @tab Armv8-R @tab @samp{armv8-r}
 @end multitable
 
@@ -21878,6 +21886,14 @@ hardware SVE vector lengths.
 
 The default is @samp{-msve-vector-bits=scalable}, which produces
 vector-length agnostic code.
+
+@opindex Wexperimental-fmv-target
+@opindex Wno-experimental-fmv-target
+@item -Wexperimental-fmv-target
+Warn about use of experimental Function Multi Versioning.
+The Arm C Language Extension specification for Function Multi Versioning
+is beta and subject to change. Any usage of FMV is caveated that future
+behavior change and incompatibility is likely.
 @end table
 
 @subsubsection @option{-march} and @option{-mcpu} Feature Modifiers
@@ -22069,6 +22085,8 @@ extension in streaming mode.
 Enable the Floating Point Absolute Maximum/Minimum extension.
 @item lut
 Enable the Lookup Table extension.
+@item cpa
+Enable the Checked Pointer Arithmetic instructions.
 @item sve-b16b16
 Enable the SVE non-widening brain floating-point (@code{bf16}) extension.
 This only has an effect when @code{sve2} or @code{sme2} are also enabled.
@@ -24421,8 +24439,8 @@ This optimization is turned on per default for @option{-O2} and higher,
 including @option{-Os} but excluding @option{-Oz}.
 Splitting of shifts with a constant offset that is
 a multiple of 8 is controlled by @option{-mfuse-move}.
-@opindex msplit-ldst
 
+@opindex msplit-ldst
 @item -msplit-ldst
 Split multi-byte loads and stores into several byte loads and stores.
 This optimization is turned on per default for @option{-O2} and higher.
@@ -33841,6 +33859,18 @@ default is @option{-mvis3} when targeting a cpu that supports such
 instructions, such as niagara-3 and later.  Setting @option{-mvis3}
 also sets @option{-mvis2} and @option{-mvis}.
 
+@opindex mvis3b
+@opindex mno-vis3b
+@item -mvis3b
+@itemx -mno-vis3b
+With @option{-mvis3b}, GCC generates code that takes advantage of
+version 3.0 of the UltraSPARC Visual Instruction Set extensions, plus
+the additional VIS instructions introduced in the Oracle SPARC
+Architecture 2011. The default is @option{-mvis3b} when targeting
+a cpu that supports such instructions, such as niagara-7 and later.
+Setting @option{-mvis3b} also sets @option{-mvis3}, @option{-mvis2}
+and @option{-mvis}.
+
 @opindex mvis4
 @opindex mno-vis4
 @item -mvis4
@@ -33849,7 +33879,8 @@ With @option{-mvis4}, GCC generates code that takes advantage of
 version 4.0 of the UltraSPARC Visual Instruction Set extensions.  The
 default is @option{-mvis4} when targeting a cpu that supports such
 instructions, such as niagara-7 and later.  Setting @option{-mvis4}
-also sets @option{-mvis3}, @option{-mvis2} and @option{-mvis}.
+also sets @option{-mvis3b}, @option{-mvis3}, @option{-mvis2} and
+@option{-mvis}.
 
 @opindex mvis4b
 @opindex mno-vis4b
@@ -33860,8 +33891,8 @@ version 4.0 of the UltraSPARC Visual Instruction Set extensions, plus
 the additional VIS instructions introduced in the Oracle SPARC
 Architecture 2017.  The default is @option{-mvis4b} when targeting a
 cpu that supports such instructions, such as m8 and later.  Setting
-@option{-mvis4b} also sets @option{-mvis4}, @option{-mvis3},
-@option{-mvis2} and @option{-mvis}.
+@option{-mvis4b} also sets @option{-mvis4}, @option{-mvis3b},
+@option{-mvis3}, @option{-mvis2} and @option{-mvis}.
 
 @opindex mcbcond
 @opindex mno-cbcond

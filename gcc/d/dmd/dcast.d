@@ -474,7 +474,7 @@ MATCH implicitConvTo(Expression e, Type t)
         case Tint8:
             if (ty == Tuns64 && value & ~0x7FU)
                 return MATCH.nomatch;
-            else if (cast(byte)value != value)
+            if (cast(byte)value != value)
                 return MATCH.nomatch;
             break;
 
@@ -1499,12 +1499,11 @@ MATCH implicitConvTo(Type from, Type to)
         {
             if (from.mod == to.mod)
                 return MATCH.exact;
-            else if (MODimplicitConv(from.mod, to.mod))
+            if (MODimplicitConv(from.mod, to.mod))
                 return MATCH.constant;
-            else if (!((from.mod ^ to.mod) & MODFlags.shared_)) // for wild matching
+            if (!((from.mod ^ to.mod) & MODFlags.shared_)) // for wild matching
                 return MATCH.constant;
-            else
-                return MATCH.convert;
+            return MATCH.convert;
         }
 
         if (from.ty == Tvoid || to.ty == Tvoid)
@@ -2923,7 +2922,10 @@ Expression castTo(Expression e, Scope* sc, Type t, Type att = null)
         {
             printf("DelegateExp::castTo(this=%s, type=%s, t=%s)\n", e.toChars(), e.type.toChars(), t.toChars());
         }
-        static immutable msg = "cannot form delegate due to covariant return type";
+        void errorCovariantReturnType()
+        {
+            error(e.loc, "cannot form delegate due to covariant return type");
+        }
 
         Type tb = t.toBasetype();
         Type typeb = e.type.toBasetype();
@@ -2933,7 +2935,7 @@ Expression castTo(Expression e, Scope* sc, Type t, Type att = null)
             int offset;
             e.func.tookAddressOf++;
             if (e.func.tintro && e.func.tintro.nextOf().isBaseOf(e.func.type.nextOf(), &offset) && offset)
-                error(e.loc, "%s", msg.ptr);
+                errorCovariantReturnType();
             auto result = e.copy();
             result.type = t;
             return result;
@@ -2948,7 +2950,7 @@ Expression castTo(Expression e, Scope* sc, Type t, Type att = null)
                 {
                     int offset;
                     if (f.tintro && f.tintro.nextOf().isBaseOf(f.type.nextOf(), &offset) && offset)
-                        error(e.loc, "%s", msg.ptr);
+                        errorCovariantReturnType();
                     if (f != e.func)    // if address not already marked as taken
                         f.tookAddressOf++;
                     auto result = new DelegateExp(e.loc, e.e1, f, false, e.vthis2);
@@ -2956,7 +2958,7 @@ Expression castTo(Expression e, Scope* sc, Type t, Type att = null)
                     return result;
                 }
                 if (e.func.tintro)
-                    error(e.loc, "%s", msg.ptr);
+                    errorCovariantReturnType();
             }
         }
 
@@ -4150,9 +4152,9 @@ Expression typeCombine(BinExp be, Scope* sc)
         // struct+struct, and class+class are errors
         if (t1.ty == Tstruct && t2.ty == Tstruct)
             return errorReturn();
-        else if (t1.ty == Tclass && t2.ty == Tclass)
+        if (t1.ty == Tclass && t2.ty == Tclass)
             return errorReturn();
-        else if (t1.ty == Taarray && t2.ty == Taarray)
+        if (t1.ty == Taarray && t2.ty == Taarray)
             return errorReturn();
     }
 
@@ -4399,10 +4401,9 @@ IntRange getIntRange(Expression e)
         VarDeclaration vd = e.var.isVarDeclaration();
         if (vd && vd.range)
             return vd.range._cast(e.type);
-        else if (vd && vd._init && !vd.type.isMutable() && (ie = vd.getConstInitializer()) !is null)
+        if (vd && vd._init && !vd.type.isMutable() && (ie = vd.getConstInitializer()) !is null)
             return getIntRange(ie);
-        else
-            return visit(e);
+        return visit(e);
     }
 
     IntRange visitComma(CommaExp e)

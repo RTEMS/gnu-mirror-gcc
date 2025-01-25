@@ -1,3 +1,116 @@
+2025-01-23  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/118613
+	* trans-intrinsic.cc (gfc_conv_intrinsic_minmaxval): Adjust algorithm
+	for inlined version of MINLOC and MAXLOC so that arguments are only
+	evaluted once, and create temporaries where necessary.  Document
+	change of algorithm.
+
+2025-01-23  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/96087
+	* trans-decl.cc (gfc_get_symbol_decl): If a dummy is missing a
+	backend decl, it is likely that it has come from a module proc
+	interface. Look for the formal symbol by name in the containing
+	proc and use its backend decl.
+	* trans-expr.cc (gfc_apply_interface_mapping_to_expr): For the
+	same reason, match the name, rather than the symbol address to
+	perform the mapping.
+
+2025-01-20  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/107122
+	* openmp.cc (resolve_omp_clauses): Add 'with' to error message text.
+
+2025-01-20  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/81978
+	* trans-array.cc (gfc_conv_array_parameter): Do not copy back data
+	if actual array parameter has the PARAMETER attribute.
+	* trans-expr.cc (gfc_conv_subref_array_arg): Likewise.
+
+2025-01-16  Tobias Burnus  <tburnus@baylibre.com>
+
+	PR fortran/118321
+	* trans-openmp.cc (gfc_trans_omp_declare_variant): Honor hidden
+	arguments for append_arg's need_device_ptr.
+
+2025-01-16  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/118359
+	* dump-parse-tree.cc (show_external_symbol): New function.
+	(write_type): Add prototype, put in restrictions on what not to dump.
+	(has_cfi_cdesc): New function.
+	(need_iso_fortran_binding): New function.
+	(gfc_dump_c_prototypes): Adjust to take only a file output.  Add
+	"#include <ISO_Fortran_binding.h" if CFI_cdesc_t is found.
+	Traverse global namespaces to dump types and the globalsymol list
+	to dump external symbols.
+	(gfc_dump_external_c_prototypes): Traverse global namespaces.
+	(get_c_type_name): Handle CFI_cdesc_t.
+	(write_proc): Also pass array spec to get_c_type_name.
+	* gfortran.h (gfc_dump_c_prototypes): Adjust prototype.
+	* parse.cc (gfc_parse_file): Adjust call to gfc_dump_c_prototypes.
+
+2025-01-16  Sandra Loosemore  <sloosemore@baylibre.com>
+
+	* openmp.cc (gfc_omp_absent_contains_clause): Use an Oxford comma
+	in the message.
+
+2025-01-16  Tobias Burnus  <tburnus@baylibre.com>
+
+	PR fortran/118441
+	* trans-intrinsic.cc (gfc_get_symbol_for_expr): Use
+	gfc_new_charlen for character-returning functions.
+
+2025-01-15  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/71884
+	* resolve.cc (resolve_allocate_expr): Reject intrinsic NULL as
+	source-expr.
+
+2025-01-14  Sandra Loosemore  <sloosemore@baylibre.com>
+	    Kwok Cheung Yeung  <kcy@codesourcery.com>
+	    Sandra Loosemore  <sandra@codesourcery.com>
+	    Marcel Vollweiler  <marcel@codesourcery.com>
+
+	PR middle-end/114596
+	PR middle-end/112779
+	PR middle-end/113904
+	* trans-openmp.cc (gfc_trans_omp_declare_variant): Update for changes
+	to omp-general.h interfaces.
+
+2025-01-14  Anuj Mohite  <anujmohite001@gmail.com>
+
+	* dump-parse-tree.cc (show_code_node):  Updated to use
+	c->ext.concur.forall_iterator instead of c->ext.forall_iterator.
+	* frontend-passes.cc (index_interchange): Updated to
+	use c->ext.concur.forall_iterator instead of c->ext.forall_iterator.
+	(gfc_code_walker): Likewise.
+	* gfortran.h (enum locality_type): Added new enum for locality types
+	in DO CONCURRENT constructs.
+	* match.cc (match_simple_forall): Updated to use
+	new_st.ext.concur.forall_iterator instead of new_st.ext.forall_iterator.
+	(gfc_match_forall): Likewise.
+	(gfc_match_do):  Implemented support for matching DO CONCURRENT locality
+	specifiers (LOCAL, LOCAL_INIT, SHARED, DEFAULT(NONE), and REDUCE).
+	* parse.cc (parse_do_block): Updated to use
+	new_st.ext.concur.forall_iterator instead of new_st.ext.forall_iterator.
+	* resolve.cc (struct check_default_none_data): Added struct
+	check_default_none_data.
+	(do_concur_locality_specs_f2023): New function to check compliance
+	with F2023's C1133 constraint for DO CONCURRENT.
+	(check_default_none_expr): New function to check DEFAULT(NONE)
+	compliance.
+	(resolve_locality_spec): New function to resolve locality specs.
+	(gfc_count_forall_iterators): Updated to use
+	code->ext.concur.forall_iterator.
+	(gfc_resolve_forall): Updated to use code->ext.concur.forall_iterator.
+	* st.cc (gfc_free_statement): Updated to free locality specifications
+	and use p->ext.concur.forall_iterator.
+	* trans-stmt.cc (gfc_trans_forall_1): Updated to use
+	code->ext.concur.forall_iterator.
+
 2025-01-13  Thomas Koenig  <tkoenig@gcc.gnu.org>
 
 	* dump-parse-tree.cc (show_attr): Fix typos for in_equivalence.

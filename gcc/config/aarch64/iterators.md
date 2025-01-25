@@ -95,6 +95,10 @@
 ;; integer modes; 64-bit scalar integer mode.
 (define_mode_iterator VSDQ_I_DI [V8QI V16QI V4HI V8HI V2SI V4SI V2DI DI])
 
+;; Advanced SIMD and scalar, 64 & 128-bit container; 8 and 16-bit scalar
+;; integer modes.
+(define_mode_iterator VSDQ_I_QI_HI [VDQ_I HI QI])
+
 ;; Double vector modes.
 (define_mode_iterator VD [V8QI V4HI V4HF V2SI V2SF V4BF])
 
@@ -552,6 +556,12 @@
 ;; Fully-packed SVE vector modes that have 32-bit or smaller elements.
 (define_mode_iterator SVE_FULL_BHS [VNx16QI VNx8HI VNx4SI
 				    VNx8BF VNx8HF VNx4SF])
+
+;; Fully-packed SVE vector byte modes that have 16-bit or smaller elements.
+(define_mode_iterator SVE_FULL_BH [VNx16QI VNx8HI VNx8HF VNx8BF])
+
+;; Pairs of fully-packed SVE vector modes (half word only)
+(define_mode_iterator SVE_FULL_Hx2 [VNx16HI VNx16HF VNx16BF])
 
 ;; Fully-packed SVE vector modes that have 32-bit elements.
 (define_mode_iterator SVE_FULL_S [VNx4SI VNx4SF])
@@ -1186,6 +1196,7 @@
     UNSPEC_UZPQ2
     UNSPEC_ZIPQ1
     UNSPEC_ZIPQ2
+    UNSPEC_SVE_LUTI
 
     ;; All used in aarch64-sme.md
     UNSPEC_SME_ADD
@@ -3329,8 +3340,8 @@
 
 (define_int_iterator SVE_COND_FP_BINARY
   [UNSPEC_COND_FADD
-   (UNSPEC_COND_FAMAX "TARGET_SVE_FAMINMAX")
-   (UNSPEC_COND_FAMIN "TARGET_SVE_FAMINMAX")
+   (UNSPEC_COND_FAMAX "TARGET_FAMINMAX && TARGET_SVE2_OR_SME2")
+   (UNSPEC_COND_FAMIN "TARGET_FAMINMAX && TARGET_SVE2_OR_SME2")
    UNSPEC_COND_FDIV
    UNSPEC_COND_FMAX
    UNSPEC_COND_FMAXNM
@@ -3370,8 +3381,8 @@
 					    UNSPEC_COND_SMIN])
 
 (define_int_iterator SVE_COND_FP_BINARY_REG
-  [(UNSPEC_COND_FAMAX "TARGET_SVE_FAMINMAX")
-   (UNSPEC_COND_FAMIN "TARGET_SVE_FAMINMAX")
+  [(UNSPEC_COND_FAMAX "TARGET_FAMINMAX && TARGET_SVE2_OR_SME2")
+   (UNSPEC_COND_FAMIN "TARGET_FAMINMAX && TARGET_SVE2_OR_SME2")
    UNSPEC_COND_FDIV
    UNSPEC_COND_FMULX])
 

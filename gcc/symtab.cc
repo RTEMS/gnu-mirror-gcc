@@ -578,7 +578,7 @@ symtab_node::get_dump_name (bool asm_name_p) const
   unsigned l = strlen (fname);
 
   char *s = (char *)ggc_internal_cleared_alloc (l + EXTRA);
-  snprintf (s, l + EXTRA, "%s/%d", fname, order);
+  snprintf (s, l + EXTRA, "%s/%d", fname, m_uid);
 
   return s;
 }
@@ -2160,7 +2160,7 @@ symtab_node::get_partitioning_class (void)
   if (DECL_ABSTRACT_P (decl))
     return SYMBOL_EXTERNAL;
 
-  if (cnode && (cnode->inlined_to || cnode->declare_variant_alt))
+  if (cnode && cnode->inlined_to)
     return SYMBOL_DUPLICATE;
 
   /* Transparent aliases are always duplicated.  */

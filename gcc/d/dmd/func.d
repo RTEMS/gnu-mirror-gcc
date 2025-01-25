@@ -691,14 +691,13 @@ extern (C++) class FuncDeclaration : Declaration
      * Params:
      *     loc = location of action
      *     format = format string for error message
-     *     arg0 = (optional) argument to format string
+     *     args = arguments to format string
      */
-    extern (D) final void setThrow(Loc loc, const(char)* format, RootObject arg0 = null)
+    extern (D) final void setThrow(Loc loc, const(char)* format, RootObject[] args...)
     {
         if (nothrowInprocess && !nothrowViolation)
         {
-            assert(format);
-            nothrowViolation = new AttributeViolation(loc, format, arg0); // action that requires GC
+            nothrowViolation = new AttributeViolation(loc, format, args); // action that requires GC
         }
     }
 
@@ -1373,11 +1372,9 @@ extern (C++) final class CtorDeclaration : FuncDeclaration
 {
     bool isCpCtor;    // copy constructor
     bool isMoveCtor;  // move constructor (aka rvalue constructor)
-    extern (D) this(const ref Loc loc, const ref Loc endloc, StorageClass stc, Type type, bool isCpCtor = false, bool isMoveCtor = false)
+    extern (D) this(const ref Loc loc, const ref Loc endloc, StorageClass stc, Type type)
     {
         super(loc, endloc, Id.ctor, stc, type);
-        this.isCpCtor = isCpCtor;
-        this.isMoveCtor = isMoveCtor;
         //printf("CtorDeclaration(loc = %s) %s %p\n", loc.toChars(), toChars(), this);
     }
 
@@ -1875,11 +1872,10 @@ extern (C++) final class NewDeclaration : FuncDeclaration
 /// Stores a reason why a function failed to infer a function attribute like `@safe` or `pure`
 ///
 /// Has two modes:
-/// - a regular safety error, stored in (fmtStr, arg0, arg1)
+/// - a regular safety error, stored in `action`
 /// - a call to a function without the attribute, which is a special case, because in that case,
 ///   that function might recursively also have a `AttributeViolation`. This way, in case
 ///   of a big call stack, the error can go down all the way to the root cause.
-///   The `FunctionDeclaration` is then stored in `arg0` and `fmtStr` must be `null`.
 struct AttributeViolation
 {
     Loc loc;               /// location of error
@@ -1888,20 +1884,21 @@ struct AttributeViolation
 
     // -- OR --
 
-    const(char)* format;   /// printf-style format string
-    RootObject arg0;       /// Arguments for up to two `%s` format specifiers in format string
-    RootObject arg1;       /// ditto
-    RootObject arg2;       /// ditto
+    string action;   /// Action that made the attribute fail to get inferred
 
     this(ref Loc loc, FuncDeclaration fd) { this.loc = loc; this.fd = fd; }
 
-    this(ref Loc loc, const(char)* format, RootObject arg0 = null, RootObject arg1 = null, RootObject arg2 = null)
+    this(ref Loc loc, const(char)* fmt, RootObject[] args)
     {
-        assert(format);
         this.loc = loc;
-        this.format = format;
-        this.arg0 = arg0;
-        this.arg1 = arg1;
-        this.arg2 = arg2;
+        assert(args.length <= 4); // expand if necessary
+        OutBuffer buf;
+        buf.printf(fmt,
+            args.length > 0 && args[0] ? args[0].toChars() : "",
+            args.length > 1 && args[1] ? args[1].toChars() : "",
+            args.length > 2 && args[2] ? args[2].toChars() : "",
+            args.length > 3 && args[3] ? args[3].toChars() : "",
+        );
+        this.action = buf.extractSlice();
     }
 }

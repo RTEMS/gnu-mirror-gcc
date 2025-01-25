@@ -1190,6 +1190,8 @@ extern vec<tree, va_gc> *make_tree_vector (void);
 extern void release_tree_vector (vec<tree, va_gc> *);
 extern vec<tree, va_gc> *make_tree_vector_single (tree);
 extern vec<tree, va_gc> *make_tree_vector_from_list (tree);
+extern vec<tree, va_gc> *append_ctor_to_tree_vector (vec<tree, va_gc> *,
+						     tree);
 extern vec<tree, va_gc> *make_tree_vector_from_ctor (tree);
 extern vec<tree, va_gc> *make_tree_vector_copy (const vec<tree, va_gc> *);
 
@@ -1413,7 +1415,8 @@ enum c_omp_directive_kind {
   C_OMP_DIR_CONSTRUCT,
   C_OMP_DIR_DECLARATIVE,
   C_OMP_DIR_UTILITY,
-  C_OMP_DIR_INFORMATIONAL
+  C_OMP_DIR_INFORMATIONAL,
+  C_OMP_DIR_META
 };
 
 struct c_omp_directive {
@@ -1427,6 +1430,7 @@ extern const struct c_omp_directive c_omp_directives[];
 extern const struct c_omp_directive *c_omp_categorize_directive (const char *,
 								 const char *,
 								 const char *);
+extern tree c_omp_expand_variant_construct (vec<struct omp_variant> &);
 
 /* Return next tree in the chain for chain_next walking of tree nodes.  */
 inline tree

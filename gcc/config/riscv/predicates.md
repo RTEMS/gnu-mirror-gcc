@@ -423,11 +423,11 @@
 (define_predicate "consecutive_bits_operand"
   (match_code "const_int")
 {
-	unsigned HOST_WIDE_INT val = UINTVAL (op);
-	if (exact_log2 ((val >> ctz_hwi (val)) + 1) < 0)
-	        return false;
+  unsigned HOST_WIDE_INT val = UINTVAL (op);
+  if (exact_log2 ((val >> ctz_hwi (val)) + 1) <= 0)
+    return false;
 
-	return true;
+  return true;
 })
 
 (define_predicate "const_two_s12"
@@ -679,3 +679,9 @@
   return (riscv_symbolic_constant_p (op, &type)
          && type == SYMBOL_PCREL);
 })
+
+;; Shadow stack operands only allow x1, x5 registers
+(define_predicate "x1x5_operand"
+  (and (match_operand 0 "register_operand")
+       (match_test "REGNO (op) == RETURN_ADDR_REGNUM
+		    || REGNO (op) == T0_REGNUM")))

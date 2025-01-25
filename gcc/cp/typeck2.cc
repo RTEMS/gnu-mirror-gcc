@@ -655,6 +655,11 @@ split_nonconstant_init_1 (tree dest, tree init, bool last,
 			  && make_safe_copy_elision (sub, value))
 			goto build_init;
 
+		      if (TREE_CODE (value) == TARGET_EXPR)
+			/* We have to add this constructor, so we will not
+			   elide.  */
+			TARGET_EXPR_ELIDING_P (value) = false;
+
 		      tree name = (DECL_FIELD_IS_BASE (field_index)
 				   ? base_ctor_identifier
 				   : complete_ctor_identifier);
@@ -1568,10 +1573,10 @@ massage_init_elt (tree type, tree init, int nested, int flags,
     new_flags |= LOOKUP_AGGREGATE_PAREN_INIT;
   init = digest_init_r (type, init, nested ? 2 : 1, new_flags, complain);
   /* When we defer constant folding within a statement, we may want to
-     defer this folding as well.  Don't call this on CONSTRUCTORs because
-     their elements have already been folded, and we must avoid folding
-     the result of get_nsdmi.  */
-  if (TREE_CODE (init) != CONSTRUCTOR)
+     defer this folding as well.  Don't call this on CONSTRUCTORs in
+     a template because their elements have already been folded, and
+     we must avoid folding the result of get_nsdmi.  */
+  if (!(processing_template_decl && TREE_CODE (init) == CONSTRUCTOR))
     {
       tree t = fold_non_dependent_init (init, complain);
       if (TREE_CONSTANT (t))
@@ -2507,7 +2512,7 @@ build_functional_cast_1 (location_t loc, tree exp, tree parms,
 	  else if (cxx_dialect < cxx23)
 	    pedwarn (loc, OPT_Wc__23_extensions,
 		     "%<auto(x)%> only available with "
-		     "%<-std=c++2b%> or %<-std=gnu++2b%>");
+		     "%<-std=c++23%> or %<-std=gnu++23%>");
 	}
       else
 	{

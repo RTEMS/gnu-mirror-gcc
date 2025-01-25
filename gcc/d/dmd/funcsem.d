@@ -1103,7 +1103,7 @@ Ldone:
         {
             printedMain = true;
             auto name = mod.srcfile.toChars();
-            auto path = FileName.searchPath(global.path, name, true);
+            auto path = FileName.searchPath(global.importPaths, name, true);
             message("entry     %-10s\t%s", type, path ? path : name);
         }
     }
@@ -1536,7 +1536,7 @@ FuncDeclaration resolveFuncCall(const ref Loc loc, Scope* sc, Dsymbol s,
 
     version (none)
     {
-        printf("resolveFuncCall('%s')\n", s.toChars());
+        printf("resolveFuncCall() %s)\n", s.toChars());
         if (tthis)
             printf("\tthis: %s\n", tthis.toChars());
         if (fargs)
@@ -1548,7 +1548,6 @@ FuncDeclaration resolveFuncCall(const ref Loc loc, Scope* sc, Dsymbol s,
                 printf("\t%s: %s\n", arg.toChars(), arg.type.toChars());
             }
         }
-        printf("\tfnames: %s\n", fnames ? fnames.toChars() : "null");
     }
 
     if (tiargs && arrayObjectIsError(*tiargs))
@@ -2270,6 +2269,9 @@ int getLevelAndCheck(FuncDeclaration fd, const ref Loc loc, Scope* sc, FuncDecla
 /**********************************
  * Decide if attributes for this function can be inferred from examining
  * the function body.
+ * Params:
+ *      fd = function to infer attributes for
+ *      sc = context
  * Returns:
  *  true if can
  */
@@ -2291,7 +2293,8 @@ bool canInferAttributes(FuncDeclaration fd, Scope* sc)
         (!fd.isMember() || sc.func.isSafeBypassingInference() && !fd.isInstantiated()))
         return true;
     if (fd.isFuncLiteralDeclaration() ||               // externs are not possible with literals
-        (fd.storage_class & STC.inference) ||           // do attribute inference
+        (fd.storage_class & STC.inference) ||          // do attribute inference
+        fd.isGenerated ||                              // compiler generated function
         (fd.inferRetType && !fd.isCtorDeclaration()))
         return true;
     if (fd.isInstantiated())
@@ -2994,7 +2997,7 @@ extern (D) bool checkNRVO(FuncDeclaration fd)
             auto v = ve.var.isVarDeclaration();
             if (!v || v.isReference())
                 return false;
-            else if (fd.nrvo_var is null)
+            if (fd.nrvo_var is null)
             {
                 // Variables in the data segment (e.g. globals, TLS or not),
                 // parameters and closure variables cannot be NRVOed.
@@ -3029,21 +3032,21 @@ extern (D) bool checkNRVO(FuncDeclaration fd)
  * Params:
  *     fd = function declaration to mark
  *     loc = location of impure action
- *     fmt = format string for error message. Must include "%s `%s`" for the function kind and name.
- *     arg0 = (optional) argument to format string
+ *     fmt = format string for error message
+ *     args = argument to format string
  *
  * Returns: `true` if there's a purity error
  */
-extern (D) bool setImpure(FuncDeclaration fd, Loc loc = Loc.init, const(char)* fmt = null, RootObject arg0 = null)
+extern (D) bool setImpure(FuncDeclaration fd, Loc loc, const(char)* fmt, RootObject[] args...)
 {
     if (fd.purityInprocess)
     {
         fd.purityInprocess = false;
         if (fmt)
-            fd.pureViolation = new AttributeViolation(loc, fmt, fd, arg0); // impure action
-        else if (arg0)
+            fd.pureViolation = new AttributeViolation(loc, fmt, args); // impure action
+        else if (args.length > 0)
         {
-            if (auto sa = arg0.isDsymbol())
+            if (auto sa = args[0].isDsymbol())
             {
                 if (FuncDeclaration fd2 = sa.isFuncDeclaration())
                 {
@@ -3053,7 +3056,7 @@ extern (D) bool setImpure(FuncDeclaration fd, Loc loc = Loc.init, const(char)* f
         }
 
         if (fd.fes)
-            fd.fes.func.setImpure(loc, fmt, arg0);
+            fd.fes.func.setImpure(loc, fmt, args);
     }
     else if (fd.isPure())
         return true;
@@ -3067,7 +3070,7 @@ PURE isPure(FuncDeclaration fd)
 
     TypeFunction tf = fd.type.toTypeFunction();
     if (fd.purityInprocess)
-        fd.setImpure();
+        fd.setImpure(Loc.initial, null);
     if (tf.purity == PURE.fwdref)
         tf.purityLevel();
     PURE purity = tf.purity;

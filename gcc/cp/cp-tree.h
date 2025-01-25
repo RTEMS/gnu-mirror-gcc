@@ -1562,7 +1562,8 @@ enum cp_lambda_default_capture_mode_type {
   (((struct tree_lambda_expr *)LAMBDA_EXPR_CHECK (NODE))->locus)
 
 /* The mangling scope for the lambda: FUNCTION_DECL, PARM_DECL, VAR_DECL,
-   FIELD_DECL or NULL_TREE.  If this is NULL_TREE, we have no linkage.  */
+   FIELD_DECL, TYPE_DECL, or NULL_TREE.  If this is NULL_TREE, we have no
+   linkage.  */
 #define LAMBDA_EXPR_EXTRA_SCOPE(NODE) \
   (((struct tree_lambda_expr *)LAMBDA_EXPR_CHECK (NODE))->extra_scope)
 
@@ -1950,6 +1951,7 @@ struct GTY(()) saved_scope {
   int suppress_location_wrappers;
   BOOL_BITFIELD x_processing_explicit_instantiation : 1;
   BOOL_BITFIELD need_pop_function_context : 1;
+  BOOL_BITFIELD x_processing_omp_trait_property_expr : 1;
 
   /* Nonzero if we are parsing the discarded statement of a constexpr
      if-statement.  */
@@ -2021,6 +2023,7 @@ extern GTY(()) struct saved_scope *scope_chain;
 #define processing_template_decl scope_chain->x_processing_template_decl
 #define processing_specialization scope_chain->x_processing_specialization
 #define processing_explicit_instantiation scope_chain->x_processing_explicit_instantiation
+#define processing_omp_trait_property_expr scope_chain->x_processing_omp_trait_property_expr
 
 /* Nonzero if we are parsing the conditional expression of a contract
    condition. These expressions appear outside the paramter list (like a
@@ -6316,9 +6319,14 @@ enum auto_deduction_context
 
    STF_STRIP_DEPENDENT: allow the stripping of aliases with dependent
        template parameters, relying on code elsewhere to report any
-       appropriate diagnostics.  */
+       appropriate diagnostics.
+
+   STF_KEEP_INJ_CLASS_NAME: don't strip injected-class-name typedefs
+       because we're dealing with a non-coerced template argument.
+*/
 const unsigned int STF_USER_VISIBLE = 1U;
 const unsigned int STF_STRIP_DEPENDENT = 1U << 1;
+const unsigned int STF_KEEP_INJ_CLASS_NAME = 1U << 2;
 
 /* Returns the TEMPLATE_DECL associated to a TEMPLATE_TEMPLATE_PARM
    node.  */
@@ -6815,6 +6823,7 @@ extern tree type_decays_to			(tree);
 extern tree extract_call_expr			(tree);
 extern tree build_trivial_dtor_call		(tree, bool = false);
 extern tristate ref_conv_binds_to_temporary	(tree, tree, bool = false);
+extern unsigned HOST_WIDE_INT count_ctor_elements (tree);
 extern tree build_user_type_conversion		(tree, tree, int,
 						 tsubst_flags_t);
 extern tree build_new_function_call		(tree, vec<tree, va_gc> **,
@@ -7224,6 +7233,9 @@ extern tree grokfield (const cp_declarator *, cp_decl_specifier_seq *,
 		       tree, bool, tree, tree);
 extern tree grokbitfield (const cp_declarator *, cp_decl_specifier_seq *,
 			  tree, tree, tree);
+extern tree start_initialized_static_member	(const cp_declarator *,
+						 cp_decl_specifier_seq *, tree);
+extern void finish_initialized_static_member	(tree, tree, tree);
 extern tree splice_template_attributes		(tree *, tree);
 extern bool any_dependent_type_attributes_p	(tree);
 extern tree cp_reconstruct_complex_type		(tree, tree);
@@ -7972,7 +7984,7 @@ extern tree lookup_and_finish_template_variable (tree, tree, tsubst_flags_t = tf
 extern tree finish_template_variable		(tree, tsubst_flags_t = tf_warning_or_error);
 extern cp_expr finish_increment_expr		(cp_expr, enum tree_code);
 extern tree finish_this_expr			(void);
-extern tree finish_pseudo_destructor_expr       (tree, tree, tree, location_t);
+extern tree finish_pseudo_destructor_expr       (tree, tree, tree, location_t, tsubst_flags_t);
 extern cp_expr finish_unary_op_expr		(location_t, enum tree_code, cp_expr,
 						 tsubst_flags_t);
 /* Whether this call to finish_compound_literal represents a C++11 functional
@@ -8086,7 +8098,7 @@ extern void maybe_generic_this_capture		(tree, tree);
 extern tree maybe_resolve_dummy			(tree, bool);
 extern tree current_nonlambda_function		(void);
 extern tree nonlambda_method_basetype		(void);
-extern tree current_nonlambda_scope		(void);
+extern tree current_nonlambda_scope		(bool = false);
 extern tree current_lambda_expr			(void);
 extern bool generic_lambda_fn_p			(tree);
 extern tree do_dependent_capture		(tree, bool = false);
@@ -8179,7 +8191,7 @@ extern tree build_aggr_init_expr		(tree, tree);
 extern tree get_target_expr			(tree,
 						 tsubst_flags_t = tf_warning_or_error);
 extern tree build_cplus_array_type		(tree, tree, int is_dep = -1);
-extern tree build_array_of_n_type		(tree, int);
+extern tree build_array_of_n_type		(tree, unsigned HOST_WIDE_INT);
 extern bool array_of_runtime_bound_p		(tree);
 extern bool vla_type_p				(tree);
 extern tree build_array_copy			(tree);
@@ -8677,7 +8689,8 @@ struct diagnosing_failed_constraint
 extern cp_expr finish_constraint_or_expr	(location_t, cp_expr, cp_expr);
 extern cp_expr finish_constraint_and_expr	(location_t, cp_expr, cp_expr);
 extern cp_expr finish_constraint_primary_expr	(cp_expr);
-extern tree finish_concept_definition		(cp_expr, tree, tree);
+extern tree start_concept_definition		(cp_expr);
+extern tree finish_concept_definition		(tree, tree, tree);
 extern tree combine_constraint_expressions      (tree, tree);
 extern tree append_constraint			(tree, tree);
 extern tree get_constraints                     (const_tree);

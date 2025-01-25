@@ -122,7 +122,7 @@ ensure_literal_type_for_constexpr_object (tree decl)
 		  error_at (DECL_SOURCE_LOCATION (decl),
 			    "variable %qD of non-literal type %qT in "
 			    "%<constexpr%> function only available with "
-			    "%<-std=c++2b%> or %<-std=gnu++2b%>", decl, type);
+			    "%<-std=c++23%> or %<-std=gnu++23%>", decl, type);
 		  explain_non_literal_class (type);
 		  decl = error_mark_node;
 		}
@@ -3392,7 +3392,12 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
 		&& CLASS_TYPE_P (TREE_TYPE (res))
 		&& !is_empty_class (TREE_TYPE (res)))
 	      if (replace_decl (&result, res, ctx->object))
-		cacheable = false;
+		{
+		  cacheable = false;
+		  result = cxx_eval_constant_expression (ctx, result, lval,
+							 non_constant_p,
+							 overflow_p);
+		}
 
 	  /* Only cache a permitted result of a constant expression.  */
 	  if (cacheable && !reduced_constant_expression_p (result))
@@ -4150,12 +4155,17 @@ find_array_ctor_elt (tree ary, tree dindex, bool insert)
       else if (TREE_CODE (cindex) == INTEGER_CST
 	       && compare_tree_int (cindex, end - 1) == 0)
 	{
-	  if (i < end)
-	    return i;
 	  tree value = (*elts)[end - 1].value;
-	  if (TREE_CODE (value) == RAW_DATA_CST
-	      && wi::to_offset (dindex) < (wi::to_offset (cindex)
-					   + RAW_DATA_LENGTH (value)))
+	  if (i < end)
+	    {
+	      if (i == end - 1 && TREE_CODE (value) == RAW_DATA_CST)
+		begin = end - 1;
+	      else
+		return i;
+	    }
+	  else if (TREE_CODE (value) == RAW_DATA_CST
+		   && wi::to_offset (dindex) < (wi::to_offset (cindex)
+						+ RAW_DATA_LENGTH (value)))
 	    begin = end - 1;
 	  else
 	    begin = end;
@@ -8973,6 +8983,11 @@ cxx_eval_outermost_constant_expr (tree t, bool allow_non_constant,
   r = cxx_eval_constant_expression (&ctx, r, vc_prvalue,
 				    &non_constant_p, &overflow_p);
 
+  /* If we got a non-simple TARGET_EXPR, the initializer was a sequence
+     of statements, and the result ought to be stored in ctx.ctor.  */
+  if (r == void_node && !constexpr_dtor && ctx.ctor)
+    r = ctx.ctor;
+
   if (!constexpr_dtor)
     verify_constant (r, allow_non_constant, &non_constant_p, &overflow_p);
   else
@@ -9079,6 +9094,16 @@ cxx_eval_outermost_constant_expr (tree t, bool allow_non_constant,
     r = mark_non_constant (r);
   else if (non_constant_p)
     return t;
+
+  /* Check we are not trying to return the wrong type.  */
+  if (!same_type_ignoring_top_level_qualifiers_p (type, TREE_TYPE (r)))
+    {
+      /* If so, this is not a constant expression.  */
+      if (!allow_non_constant)
+	error ("%qE is not a constant expression because it initializes "
+	       "a %qT rather than %qT", t, TREE_TYPE (t), type);
+      return t;
+    }
 
   if (should_unshare)
     r = unshare_expr (r);
@@ -10736,8 +10761,8 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
 	return true;
       else if (flags & tf_error)
 	constexpr_error (loc, fundef_p, "label definition in %<constexpr%> "
-			 "function only available with %<-std=c++2b%> or "
-			 "%<-std=gnu++2b%>");
+			 "function only available with %<-std=c++23%> or "
+			 "%<-std=gnu++23%>");
       return false;
 
     case ANNOTATE_EXPR:
