@@ -1,3 +1,120 @@
+2025-01-29  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/118655
+	* semantics.cc (trait_expr_value) <case CPTK_IS_BOUNDED_ARRAY>: Return
+	false for zero-sized arrays.
+
+2025-01-28  Jason Merrill  <jason@redhat.com>
+
+	PR c++/118285
+	* constexpr.cc (cxx_eval_vec_init_1): Build INIT_EXPR for
+	initializing a class.
+
+2025-01-28  Jason Merrill  <jason@redhat.com>
+
+	PR c++/118673
+	* call.cc (maybe_init_list_as_array): Check for lvalue
+	initializers.
+	* cp-tree.h (enum cp_lvalue_kind_flags): Add clk_mergeable.
+	* tree.cc (lvalue_kind): Return it.
+	(non_mergeable_glvalue_p): New.
+	(test_lvalue_kind): Adjust.
+
+2025-01-28  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/117855
+	* cp-tree.h (DECL_FRIEND_CONTEXT): Exclude deduction guides.
+
+2025-01-27  Jason Merrill  <jason@redhat.com>
+
+	PR c++/118632
+	* pt.cc (unify): Only strip conversion if deducible_expression.
+
+2025-01-27  Simon Martin  <simon@nasilyan.com>
+
+	PR c++/114292
+	* pt.cc (for_each_template_parm_r) <INTEGER_TYPE>: Remove case
+	now handled by cp_walk_subtrees.
+	* tree.cc (cp_walk_subtrees): Walk the type of DECL_EXPR
+	declarations, as well as the TYPE_{MIN,MAX}_VALUE of
+	INTEGER_TYPEs.
+
+2025-01-27  John David Anglin  <danglin@gcc.gnu.org>
+
+	* module.cc: Test HAVE_MUNMAP and HAVE_MSYNC instead of
+	_POSIX_MAPPED_FILES > 0.
+
+2025-01-27  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/115769
+	* module.cc (module_state::write_inits): Verify
+	STATIC_INIT_DECOMP_{,NON}BASE_P flags and stream changes in those
+	out.
+	(module_state::read_inits): Stream those flags in.
+
+2025-01-27  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/115769
+	* cp-tree.h (STATIC_INIT_DECOMP_BASE_P): Define.
+	(STATIC_INIT_DECOMP_NONBASE_P): Define.
+	* decl.cc (cp_finish_decl): Mark nodes in {static,tls}_aggregates
+	emitted for namespace scope structured bindings with
+	STATIC_INIT_DECOMP_{,NON}BASE_P flags when needed.
+	* decl2.cc (decomp_handle_one_var, decomp_finalize_var_list): New
+	functions.
+	(emit_partial_init_fini_fn): Use them.
+	(prune_vars_needing_no_initialization): Assert
+	STATIC_INIT_DECOMP_*BASE_P is not set on DECL_EXTERNAL vars to be
+	pruned out.
+	(partition_vars_for_init_fini): Use same priority for
+	consecutive STATIC_INIT_DECOMP_*BASE_P vars and propagate
+	those flags to new TREE_LISTs when possible.  Formatting fix.
+	(handle_tls_init): Use decomp_handle_one_var and
+	decomp_finalize_var_list functions.
+
+2025-01-25  Simon Martin  <simon@nasilyan.com>
+
+	PR c++/118239
+	* constexpr.cc (cx_check_missing_mem_inits): Don't skip fields
+	with DECL_FIELD_IS_BASE.
+
+2025-01-25  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/117827
+	* init.cc (build_new_1): Pass address of a make_tree_vector ()
+	initialized gc tree vector to build_vec_init and append
+	build_disable_temp_cleanup to init_expr from it.
+
+2025-01-25  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/116568
+	* module.cc (trees_out::get_merge_kind): Treat all lambdas
+	without a mangling scope as un-mergeable.
+
+2025-01-25  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/116568
+	* cp-tree.h (finish_concept_definition): Adjust parameters.
+	(start_concept_definition): Declare.
+	* module.cc (depset::hash::is_tu_local_entity): Use
+	LAMBDA_EXPR_EXTRA_SCOPE to detect TU-local lambdas.
+	* parser.cc (cp_parser_concept_definition): Start a lambda scope
+	for concept definitions.
+	* pt.cc (tsubst_lambda_expr): Namespace-scope lambdas may now
+	have extra scope.
+	(finish_concept_definition): Split into...
+	(start_concept_definition): ...this new function.
+
+2025-01-25  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/118245
+	* cp-tree.h (LAMBDA_EXPR_EXTRA_SCOPE): Adjust comment.
+	* parser.cc (cp_parser_class_head): Start (and do not finish)
+	lambda scope for all valid types.
+	(cp_parser_class_specifier): Finish lambda scope after parsing
+	members instead.
+	* pt.cc (instantiate_class_template): Add lambda scoping.
+
 2025-01-24  Marek Polacek  <polacek@redhat.com>
 
 	PR c++/117153
