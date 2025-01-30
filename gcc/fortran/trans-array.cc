@@ -1466,6 +1466,26 @@ gfc_conv_shift_descriptor_subarray (stmtblock_t *block, tree desc,
 }
 
 
+int
+gfc_descriptor_rank (tree descriptor)
+{
+  if (TREE_TYPE (descriptor) != NULL_TREE)
+    return GFC_TYPE_ARRAY_RANK (TREE_TYPE (descriptor));
+
+  tree dim = gfc_get_descriptor_dimension (descriptor);
+  tree dim_type = TREE_TYPE (dim);
+  gcc_assert (TREE_CODE (dim_type) == ARRAY_TYPE);
+  tree idx_type = TYPE_DOMAIN (dim_type);
+  gcc_assert (TREE_CODE (idx_type) == INTEGER_TYPE);
+  gcc_assert (integer_zerop (TYPE_MIN_VALUE (idx_type)));
+  tree idx_max = TYPE_MAX_VALUE (idx_type);
+  if (idx_max == NULL_TREE)
+    return GFC_MAX_DIMENSIONS;
+  wide_int max = wi::to_wide (idx_max);
+  return max.to_shwi () + 1;
+}
+
+
 void
 gfc_conv_remap_descriptor (stmtblock_t *block, tree dest, tree src,
 			   int src_rank, const gfc_array_spec &as)
@@ -1834,26 +1854,6 @@ gfc_set_descriptor_from_scalar (stmtblock_t *block, tree desc, tree scalar,
 
   gfc_conv_descriptor_data_set (block, desc, tmp);
 }
-
-int
-gfc_descriptor_rank (tree descriptor)
-{
-  if (TREE_TYPE (descriptor) != NULL_TREE)
-    return GFC_TYPE_ARRAY_RANK (TREE_TYPE (descriptor));
-
-  tree dim = gfc_get_descriptor_dimension (descriptor);
-  tree dim_type = TREE_TYPE (dim);
-  gcc_assert (TREE_CODE (dim_type) == ARRAY_TYPE);
-  tree idx_type = TYPE_DOMAIN (dim_type);
-  gcc_assert (TREE_CODE (idx_type) == INTEGER_TYPE);
-  gcc_assert (integer_zerop (TYPE_MIN_VALUE (idx_type)));
-  tree idx_max = TYPE_MAX_VALUE (idx_type);
-  if (idx_max == NULL_TREE)
-    return GFC_MAX_DIMENSIONS;
-  wide_int max = wi::to_wide (idx_max);
-  return max.to_shwi () + 1;
-}
-
 
 void
 gfc_copy_sequence_descriptor (stmtblock_t &block, tree lhs_desc, tree rhs_desc,
