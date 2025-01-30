@@ -193,14 +193,6 @@ set_descriptor_from_scalar (stmtblock_t *block, tree desc, tree scalar,
 
   gfc_conv_descriptor_span_set (block, desc, integer_zero_node);
 
-  if (CONSTANT_CLASS_P (scalar))
-    {
-      tree tmp;
-      tmp = gfc_create_var (TREE_TYPE (scalar), "scalar");
-      gfc_add_modify (block, tmp, scalar);
-      scalar = tmp;
-    }
-
   tree tmp;
   if (is_class)
     tmp = gfc_class_data_get (scalar);
