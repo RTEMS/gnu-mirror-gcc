@@ -1772,13 +1772,34 @@ gfc_set_descriptor_with_shape (stmtblock_t *block, tree desc,
   gfc_conv_descriptor_offset_set (block, desc, offset);
 }
 
+/* Convert a scalar to an array descriptor. To be used for assumed-rank
+   arrays.  */
+
+tree
+gfc_get_scalar_to_descriptor_type (tree scalar, symbol_attribute attr)
+{
+  enum gfc_array_kind akind;
+
+  if (attr.pointer)
+    akind = GFC_ARRAY_POINTER_CONT;
+  else if (attr.allocatable)
+    akind = GFC_ARRAY_ALLOCATABLE;
+  else
+    akind = GFC_ARRAY_ASSUMED_SHAPE_CONT;
+
+  if (POINTER_TYPE_P (TREE_TYPE (scalar)))
+    scalar = TREE_TYPE (scalar);
+  return gfc_get_array_type_bounds (TREE_TYPE (scalar), 0, 0, NULL, NULL, 1,
+				    akind, !(attr.pointer || attr.target));
+}
+
 
 void
 gfc_set_descriptor_from_scalar (stmtblock_t *block, tree desc, tree scalar,
 				symbol_attribute scalar_attr, bool is_class,
 				tree cond_optional)
 {
-  tree type = get_scalar_to_descriptor_type (scalar, scalar_attr);
+  tree type = gfc_get_scalar_to_descriptor_type (scalar, scalar_attr);
   if (POINTER_TYPE_P (type))
     type = TREE_TYPE (type);
 
