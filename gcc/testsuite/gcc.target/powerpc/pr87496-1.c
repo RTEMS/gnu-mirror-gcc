@@ -2,7 +2,7 @@
 /* { dg-do compile { target { powerpc*-*-* && lp64 } } } */
 /* { dg-skip-if "" { powerpc*-*-darwin* } } */
 /* { dg-require-effective-target longdouble128 } */
-/* { dg-options "-O2 -mdejagnu-cpu=power7 -mabi=ieeelongdouble -mno-popcntd -Wno-psabi" } */
+/* { dg-options "-O2 -mdejagnu-cpu=power6 -mabi=ieeelongdouble -Wno-psabi" } */
 
 int i;
 
