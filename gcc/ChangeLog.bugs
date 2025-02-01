@@ -1,4 +1,276 @@
+==================== Branch work192-bugs, patch #210 ====================
+
+Fix PR 118541, do not generate unordered fp cmoves for IEEE compares.
+
+In bug PR target/118541 on power9, power10, and power11 systems, for the
+function:
+
+        extern double __ieee754_acos (double);
+
+        double
+        __acospi (double x)
+        {
+          double ret = __ieee754_acos (x) / 3.14;
+          return __builtin_isgreater (ret, 1.0) ? 1.0 : ret;
+        }
+
+GCC currently generates the following code:
+
+        Power9                          Power10 and Power11
+        ======                          ===================
+        bl __ieee754_acos               bl __ieee754_acos@notoc
+        nop                             plfd 0,.LC0@pcrel
+        addis 9,2,.LC2@toc@ha           xxspltidp 12,1065353216
+        addi 1,1,32                     addi 1,1,32
+        lfd 0,.LC2@toc@l(9)             ld 0,16(1)
+        addis 9,2,.LC0@toc@ha           fdiv 0,1,0
+        ld 0,16(1)                      mtlr 0
+        lfd 12,.LC0@toc@l(9)            xscmpgtdp 1,0,12
+        fdiv 0,1,0                      xxsel 1,0,12,1
+        mtlr 0                          blr
+        xscmpgtdp 1,0,12
+        xxsel 1,0,12,1
+        blr
+
+This is because ifcvt.c optimizes the conditional floating point move to use the
+XSCMPGTDP instruction.
+
+However, the XSCMPGTDP instruction will generate an interrupt if one of the
+arguments is a signalling NaN and signalling NaNs can generate an interrupt.
+The IEEE comparison functions (isgreater, etc.) require that the comparison not
+raise an interrupt.
+
+The following patch changes the PowerPC back end so that ifcvt.c will not change
+the if/then test and move into a conditional move if the comparison is one of
+the comparisons that do not raise an error with signalling NaNs and -Ofast is
+not used.  If a normal comparison is used or -Ofast is used, GCC will continue
+to generate XSCMPGTDP and XXSEL.
+
+For the following code:
+
+        double
+        ordered_compare (double a, double b, double c, double d)
+        {
+          return __builtin_isgreater (a, b) ? c : d;
+        }
+
+        /* Verify normal > does generate xscmpgtdp.  */
+
+        double
+        normal_compare (double a, double b, double c, double d)
+        {
+          return a > b ? c : d;
+        }
+
+with the following patch, GCC generates the following for power9, power10, and
+power11:
+
+        ordered_compare:
+                fcmpu 0,1,2
+                fmr 1,4
+                bnglr 0
+                fmr 1,3
+                blr
+
+        normal_compare:
+                xscmpgtdp 1,1,2
+                xxsel 1,4,3,1
+                blr
+
+I have built bootstrap compilers on big endian power9 systems and little endian
+power9/power10 systems and there were no regressions.  Can I check this patch
+into the GCC trunk, and after a waiting period, can I check this into the active
+older branches?
+
+2025-01-31  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/118541
+	* config/rs6000/rs6000-protos.h (REVERSE_COND_ORDERED_OK): New macro.
+	(REVERSE_COND_NO_ORDERED): Likewise.
+	(rs6000_reverse_condition): Add argument.
+	* config/rs6000/rs6000.cc (rs6000_reverse_condition): Do not allow
+	ordered comparisons to be reversed for floating point cmoves.
+	(rs6000_emit_sCOND): Adjust rs6000_reverse_condition call.
+	* config/rs6000/rs6000.h (REVERSE_CONDITION): Likewise.
+	* config/rs6000/rs6000.md (reverse_branch_comparison): Name insn.
+	Adjust rs6000_reverse_condition call.
+
+gcc/testsuite/
+
+	PR target/118541
+	* gcc.target/powerpc/pr118541.c: New test.
+
+==================== Branch work192-bugs, patch #202 ====================
+
+PR target/108958 -- use mtvsrdd to zero extend GPR DImode to VSX TImode
+
+Previously GCC would zero externd a DImode GPR value to TImode by first zero
+extending the DImode value into a GPR TImode value, and then do a MTVSRDD to
+move this value to a VSX register.
+
+This patch does the move directly, since if the middle argument to MTVSRDD is 0,
+it does the zero extend.
+
+If the DImode value is already in a vector register, it does a XXSPLTIB and
+XXPERMDI to get the value into the bottom 64-bits of the register.
+
+I have built GCC with the patches in this patch set applied on both little and
+big endian PowerPC systems and there were no regressions.  Can I apply this
+patch to GCC 15?
+
+2025-01-31  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/108598
+	* gcc/config/rs6000/rs6000.md (zero_extendditi2): New insn.
+
+gcc/testsuite/
+
+	PR target/108598
+	* gcc.target/powerpc/pr108958.c: New test.
+
+==================== Branch work192-bugs, patch #201 ====================
+
+Add power9 and power10 float to logical optimizations.
+
+I was answering an email from a co-worker and I pointed him to work I had done
+for the Power8 era that optimizes the 32-bit float math library in Glibc.  In
+doing so, I discovered with the Power9 and later computers, this optimization
+is no longer taking place.
+
+The glibc 32-bit floating point math functions have code that looks like:
+
+	union u {
+	  float f;
+	  uint32_t u32;
+	};
+
+	float
+	math_foo (float x, unsigned int mask)
+	{
+	  union u arg;
+	  float x2;
+
+	  arg.f = x;
+	  arg.u32 &= mask;
+
+	  x2 = arg.f;
+	  /* ... */
+	}
+
+On power8 with the optimization it generates:
+
+        xscvdpspn 0,1
+        sldi 9,4,32
+        mtvsrd 32,9
+        xxland 1,0,32
+        xscvspdpn 1,1
+
+I.e., it converts the SFmode to the memory format (instead of the DFmode that
+is used within the register), converts the mask so that it is in the vector
+register in the upper 32-bits, and does a XXLAND (i.e. there is only one direct
+move from GPR to vector register).  Then after doing this, it converts the
+upper 32-bits back to DFmode.
+
+If the XSCVSPDN instruction took the value in the normal 32-bit scalar in a
+vector register, we wouldn't have needed the SLDI of the mask.
+
+On power9/power10/power11 it currently generates:
+
+        xscvdpspn 0,1
+        mfvsrwz 2,0
+        and 2,2,4
+        mtvsrws 1,2
+        xscvspdpn 1,1
+        blr
+
+I.e convert to SFmode representation, move the value to a GPR, do an AND
+operation, move the 32-bit value with a splat, and then convert it back to
+DFmode format.
+
+With this patch, it now generates:
+
+        xscvdpspn 0,1
+        mtvsrwz 32,2
+        xxland 32,0,32
+        xxspltw 1,32,1
+        xscvspdpn 1,1
+        blr
+
+I.e. convert to SFmode representation, move the mask to the vector register, do
+the operation using XXLAND.  Splat the value to get the value in the correct
+location, and then convert back to DFmode.
+
+I have built GCC with the patches in this patch set applied on both little and
+big endian PowerPC systems and there were no regressions.  Can I apply this
+patch to GCC 15?
+
+2025-01-31  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/117487
+	* config/rs6000/vsx.md (SFmode logical peephoole): Update comments in
+	the original code that supports power8.  Add a new define_peephole2 to
+	do the optimization on power9/power10.
+
+==================== Branch work192-bugs, patch #200 ====================
+
+PR 99293: Optimize splat of a V2DF/V2DI extract with constant element
+
+We had optimizations for splat of a vector extract for the other vector
+types, but we missed having one for V2DI and V2DF.  This patch adds a
+combiner insn to do this optimization.
+
+In looking at the source, we had similar optimizations for V4SI and V4SF
+extract and splats, but we missed doing V2DI/V2DF.
+
+Without the patch for the code:
+
+	vector long long splat_dup_l_0 (vector long long v)
+	{
+	  return __builtin_vec_splats (__builtin_vec_extract (v, 0));
+	}
+
+the compiler generates (on a little endian power9):
+
+	splat_dup_l_0:
+		mfvsrld 9,34
+	        mtvsrdd 34,9,9
+		blr
+
+Now it generates:
+
+	splat_dup_l_0:
+		xxpermdi 34,34,34,3
+	        blr
+
+2025-01-31  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/99293
+	* config/rs6000/vsx.md (vsx_splat_extract_<mode>): New insn.
+
+gcc/testsuite/
+
+	PR target/99293
+	* gcc.target/powerpc/builtins-1.c: Adjust insn count.
+	* gcc.target/powerpc/pr99293.c: New test.
+
 ==================== Branch work192-bugs, baseline ====================
+
+Add ChangeLog.bugs and update REVISION.
+
+2025-01-31  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	* ChangeLog.bugs: New file for branch.
+	* REVISION: Update.
 
 2025-01-31   Michael Meissner  <meissner@linux.ibm.com>
 
