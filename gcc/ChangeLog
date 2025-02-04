@@ -1,3 +1,132 @@
+2025-02-03  Uros Bizjak  <ubizjak@gmail.com>
+
+	* config/i386/i386.md (*sibcall_pop_memory):
+	Disable for TARGET_INDIRECT_BRANCH_REGISTER
+	* config/i386/predicates.md (call_insn_operand): Enable when
+	"satisfies_constraint_Bw (op)" is true, instead of open-coding
+	constraint here.
+	(sibcall_insn_operand): Ditto with "satisfies_constraint_Bs (op)"
+
+2025-02-03  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* config/aarch64/aarch64.cc (aarch64_choose_vector_init_constant):
+	New function, split out from...
+	(aarch64_expand_vector_init_fallback): ...here.  Use a bit-
+	reversed increment to find a constant index.  Add support for
+	stepped constants.
+
+2025-02-03  John David Anglin  <danglin@gcc.gnu.org>
+
+	PR rtl-optimization/117248
+	* config/pa/predicates.md (r25_operand): New predicate.
+	(r26_operand): Likewise.
+	* config/pa/pa.md: Use match_operand for r25 and r26 hard
+	register operands in mult, div, udiv, mod and umod millicode
+	patterns.
+
+2025-02-03  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/118717
+	* tree-ssa-phiopt.cc (cond_if_else_store_replacement_1):
+	Do not common stores referencing abnormal SSA names.
+	* tree-ssa-sink.cc (sink_common_stores_to_bb): Likewise.
+
+2025-02-03  Andi Kleen  <ak@gcc.gnu.org>
+
+	* input.cc (check_line): New.
+	(test_replacement): New function to test line caching.
+	(input_cc_tests): Call test_replacement
+
+2025-02-03  Andi Kleen  <ak@gcc.gnu.org>
+
+	PR preprocessor/118168
+	* input.cc (file_cache_slot::get_next_line): Implement
+	dynamic sizing of m_line_record based on input length.
+	* params.opt: (param_file_cache_lines): Set to 0 to size
+	dynamically.
+
+2025-02-03  Andi Kleen  <ak@gcc.gnu.org>
+
+	PR preprocessor/118168
+	* input.cc (total_lines_num): Remove.
+	(file_cache_slot::evict): Ditto.
+	(file_cache_slot::create): Ditto.
+	(file_cache_slot::set_content): Ditto.
+	(file_cache_slot::file_cache_slot): Ditto.
+	(file_cache_slot::dump): Ditto.
+
+2025-02-03  Andi Kleen  <ak@gcc.gnu.org>
+
+	PR preprocessor/118168
+	* input.cc (file_cache_slot::get_next_line): Use new algorithm
+	to maintain
+	(file_cache_slot::read_line_num): Use binary search for lookup.
+
+2025-02-03  Andi Kleen  <ak@gcc.gnu.org>
+
+	PR preprocessor/118168
+	* input.cc (file_cache::tune): New function.
+	* input.h (class file_cache): Make tunables non const.
+	* params.opt: Add new tunables.
+	* toplev.cc (toplev::main): Initialize input buffer context
+	tunables.
+
+2025-02-02  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/117411
+	* doc/gm2.texi (Exception handling): New section.
+	(The ISO system module): Add description of COFF_T.
+	(Assembler language): Tidy up last sentance.
+
+2025-02-02  Lewis Hyatt  <lhyatt@gmail.com>
+
+	PR middle-end/115913
+	* optc-save-gen.awk (cl_optimization_compare): Skip options with
+	CL_WARNING flag.
+
+2025-02-01  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR target/118713
+	* config/i386/i386-expand.cc (ix86_expand_call): Change "if
+	(TARGET_X32 ...)" back to "else if (TARGET_X32 ...)".
+
+2025-02-01  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR target/118713
+	* config/i386/constraints.md (Bs): Always disable if
+	TARGET_INDIRECT_BRANCH_REGISTER is true.
+	(Bw): Likewise.
+	* config/i386/i386-expand.cc (ix86_expand_call): Force indirect
+	call via register for x32 GOT slot call if
+	TARGET_INDIRECT_BRANCH_REGISTER is true.
+	* config/i386/i386-protos.h (ix86_nopic_noplt_attribute_p): New.
+	* config/i386/i386.cc (ix86_nopic_noplt_attribute_p): Make it
+	global.
+	* config/i386/i386.md (*call_got_x32): Disable indirect call via
+	memory for TARGET_INDIRECT_BRANCH_REGISTER.
+	(*call_value_got_x32): Likewise.
+	(*sibcall_value_pop_memory): Likewise.
+	* config/i386/predicates.md (constant_call_address_operand):
+	Return false if both TARGET_INDIRECT_BRANCH_REGISTER and
+	ix86_nopic_noplt_attribute_p are true.
+
+2025-02-01  David Malcolm  <dmalcolm@redhat.com>
+
+	* libsarifreplay.cc (sarif_replayer::handle_run_obj): Pass run to
+	handle_result_obj.
+	(sarif_replayer::handle_result_obj): Add run_obj param and pass it
+	to handle_location_object and handle_thread_flow_object.
+	(sarif_replayer::handle_thread_flow_object): Add run_obj param and
+	pass it to handle_thread_flow_location_object.
+	(sarif_replayer::handle_thread_flow_location_object): Add run_obj
+	param and pass it to handle_location_object.
+	(sarif_replayer::handle_location_object): Add run_obj param and
+	pass it to handle_logical_location_object.
+	(sarif_replayer::handle_logical_location_object): Add run_obj
+	param.  If the run_obj is non-null and has "logicalLocations",
+	then use these "cached" logical locations if we see an "index"
+	property, as per §3.33.3
+
 2025-02-01  Jeff Law  <jlaw@ventanamicro.com>
 
 	PR tree-optimization/114277
