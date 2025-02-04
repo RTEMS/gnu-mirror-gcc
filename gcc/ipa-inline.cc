@@ -371,10 +371,10 @@ can_inline_edge_p (struct cgraph_edge *e, bool report,
 {
   gcc_checking_assert (e->inline_failed);
 
-  if(e->callback) {
-    fprintf(stderr, "skipping inline - callback\n");
+  /* Always skip inlining callback edges, they need to be treated as
+     speculative edges in this regard. */
+  if(e->callback)
     return false;
-  }
 
   if (cgraph_inline_failed_type (e->inline_failed) == CIF_FINAL_ERROR)
     {

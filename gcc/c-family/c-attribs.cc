@@ -48,6 +48,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimplify.h"
 #include "tree-pretty-print.h"
 #include "gcc-rich-location.h"
+#include "attr-callback.h"
 
 static tree handle_packed_attribute (tree *, tree, tree, int, bool *);
 static tree handle_nocommon_attribute (tree *, tree, tree, int, bool *);
@@ -188,7 +189,6 @@ static tree handle_retain_attribute (tree *, tree, tree, int, bool *);
 static tree handle_fd_arg_attribute (tree *, tree, tree, int, bool *);
 static tree handle_flag_enum_attribute (tree *, tree, tree, int, bool *);
 static tree handle_null_terminated_string_arg_attribute (tree *, tree, tree, int, bool *);
-static tree handle_callback_attribute (tree *, tree, tree, int, bool *);
 
 /* Helper to define attribute exclusions.  */
 #define ATTR_EXCL(name, function, type, variable)	\
@@ -5190,39 +5190,6 @@ get_argument (tree fndecl, unsigned argno)
     if (i++ == argno)
       return arg;
 
-  return NULL_TREE;
-}
-
-static tree
-handle_callback_attribute (tree *node, tree name, tree args,
-			   int ARG_UNUSED (flags),
-			   bool ARG_UNUSED (*no_add_attrs))
-{
-  tree decl = *node;
-  if (TREE_CODE (decl) != FUNCTION_DECL)
-    {
-      error_at (DECL_SOURCE_LOCATION (decl),
-		"%qE attribute can only be used on functions", name);
-    }
-  tree callback_fn_idx_node = args;
-  for (int i = 0; i < 3;
-       i++, callback_fn_idx_node = TREE_VALUE (callback_fn_idx_node))
-    ;
-  int callback_fn_idx = TREE_INT_CST_LOW (callback_fn_idx_node) - 1;
-  if (callback_fn_idx < 0)
-    error_at (DECL_SOURCE_LOCATION (decl),
-	      "callback function position out of range");
-  //
-  //  tree cfn = get_argument (decl, callback_fn_idx);
-  //  if (cfn == NULL_TREE)
-  //    error_at(DECL_SOURCE_LOCATION(decl), "couldnt retrieve callback function
-  //    from arguments");
-  //
-  //  if (TREE_CODE(cfn) != ADDR_EXPR || TREE_CODE(TREE_OPERAND(cfn, 0)) !=
-  //  FUNCTION_DECL)
-  //    error_at(DECL_SOURCE_LOCATION(decl), "argument no. %d is not a fndecl",
-  //    callback_fn_idx);
-  //
   return NULL_TREE;
 }
 

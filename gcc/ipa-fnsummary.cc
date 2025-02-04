@@ -3080,7 +3080,7 @@ analyze_function_body (struct cgraph_node *node, bool early)
 	      es->call_stmt_time = this_time;
 	      es->loop_depth = bb_loop_depth (bb);
 	      edge_set_predicate (edge, &bb_predicate);
-	      if (edge->speculative || edge->callback)
+	      if (edge->speculative)
 		{
 		  cgraph_edge *indirect
 			= edge->speculative_call_indirect_edge ();
@@ -3102,6 +3102,16 @@ analyze_function_body (struct cgraph_node *node, bool early)
 		      ipa_call_summaries->duplicate (edge, direct,
 						     es, es3);
 		    }
+		}
+
+	      /* Treat callback edges the same way
+		 we treat speculative edges. */
+	      if (edge->callback)
+		{
+		  cgraph_edge *parent = edge->get_callback_parent_edge ();
+		  ipa_call_summary *es2
+		    = ipa_call_summaries->get_create (parent);
+		  ipa_call_summaries->duplicate (edge, parent, es, es2);
 		}
 	    }
 
@@ -3480,22 +3490,20 @@ compute_fn_summary (struct cgraph_node *node, bool early)
 
   /* Code above should compute exactly the same result as
      ipa_update_overall_fn_summary except for case when speculative
-     edges are present since these are accounted to size but not
+     or callback edges are present since these are accounted to size but not
      self_size. Do not compare time since different order the roundoff
      errors result in slight changes.  */
   ipa_update_overall_fn_summary (node);
   if (flag_checking)
     {
       for (e = node->indirect_calls; e; e = e->next_callee)
-       if (e->speculative)
-	 break;
+	if (e->speculative)
+	  break;
 
       if (!e)
-	{
-	  for (e = node->callees; e; e = e->next_callee)
-	    if (e->callback)
-	      break;
-	}
+	for (e = node->callees; e; e = e->next_callee)
+	  if (e->callback)
+	    break;
       gcc_assert (e || size_info->size == size_info->self_size);
     }
 }

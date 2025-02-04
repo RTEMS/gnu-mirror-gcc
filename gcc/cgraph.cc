@@ -69,6 +69,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-nested.h"
 #include "symtab-thunks.h"
 #include "symtab-clones.h"
+#include "attr-callback.h"
 
 /* FIXME: Only for PROP_loops, but cgraph shouldn't have to know about this.  */
 #include "tree-pass.h"
@@ -838,24 +839,22 @@ cgraph_edge::set_call_stmt (cgraph_edge *e, gcall *new_stmt,
       return e_indirect ? indirect : direct;
     }
 
-  if (update_speculative && (e->callback || e->has_callback)
-      /* If we are about to resolve the speculation by calling make_direct
-	 below, do not bother going over all the speculative edges now.  */
-  )
+  /* Callback edges also need their call stmts changed.
+     We can use the same flag as for speculative edges. */
+  if (update_speculative && (e->callback || e->has_callback))
     {
-      fprintf (stderr, "set_call_stmt callback\n");
-      cgraph_edge *direct, *next;
+      cgraph_edge *current, *next;
 
-      direct = e;
-
-      gcall *old_stmt = direct->call_stmt;
-      for (cgraph_edge *d = direct; d; d = next)
+      current = e;
+      gcall *old_stmt = current->call_stmt;
+      for (cgraph_edge *d = current; d; d = next)
 	{
 	  next = d->next_callee;
 	  for (; next; next = next->next_callee)
 	    {
-	      if ((next->callback || next->has_callback)
-		  && old_stmt == next->call_stmt)
+	      /* has_callback doesn't need to checked, as their
+		 call statements wouldn't match */
+	      if (next->callback && old_stmt == next->call_stmt)
 		break;
 	    }
 	  cgraph_edge *d2 = set_call_stmt (d, new_stmt, false);
@@ -908,7 +907,7 @@ symbol_table::create_edge (cgraph_node *caller, cgraph_node *callee,
 	 construction of call stmt hashtable.  */
       cgraph_edge *e;
       gcc_checking_assert (!(e = caller->get_edge (call_stmt))
-			   || e->speculative || e->has_callback);
+			   || e->speculative || e->has_callback || e->callback);
 
       gcc_assert (is_gimple_call (call_stmt));
     }
@@ -1162,6 +1161,17 @@ cgraph_edge::make_speculative (cgraph_node *n2, profile_count direct_count,
   return e2;
 }
 
+/* Turn edge into a callback edge calling N2. Callback edges
+   never get turned into actual calls, they are just used
+   as clues and allow for optimizing functions which do not
+   have any callsites during compile time, e.g. functions
+   passed to standard library functions.
+
+   The edge will be attached to the same call statement as
+   it's parent, which is the instance this method is called on.
+
+   Return the resulting callback edge.  */
+
 cgraph_edge *
 cgraph_edge::make_callback (cgraph_node *n2)
 {
@@ -1184,20 +1194,23 @@ cgraph_edge::make_callback (cgraph_node *n2)
   return e2;
 }
 
+/* Returns the parent edge of a callback edge on which
+   it is called on or NULL when no such edge can be found.
+
+   An edge is taken to be a parent if it has it's has_callback
+   flag set and the edges share their call statements. */
+
 cgraph_edge *
 cgraph_edge::get_callback_parent_edge ()
 {
   gcc_checking_assert (callback);
   cgraph_edge *e;
-  fprintf (stderr, "get parent: %s -> %s\n", caller->name (), callee->name ());
   for (e = caller->callees; e; e = e->next_callee)
     {
-      fprintf (stderr, "get parent for loop: %s -> %s\n", caller->name (),
-	       callee->name ());
       if (e->has_callback && e->call_stmt == call_stmt)
-	return e;
+	break;
     }
-  gcc_unreachable ();
+  return e;
 }
 
 /* Speculative call consists of an indirect edge and one or more
@@ -1554,22 +1567,18 @@ cgraph_edge::redirect_call_stmt_to_callee (cgraph_edge *e,
 	}
     }
 
-  if (e->has_callback)
-    {
-      debug_gimple_stmt (e->call_stmt);
-      fprintf (stderr, "gimple pointer: %p\n", (void *) e->call_stmt);
-    }
-
   if (e->indirect_unknown_callee || decl == e->callee->decl)
     return e->call_stmt;
 
+  /* When redirecting a callback edge, all we need to do is replace
+     the original address with the address of the function we are
+     redirecting to. */
   if (e->callback)
     {
-      fprintf (stderr, "redirecting to %s\n", e->callee->name ());
-      fprintf (stderr, "gimple pointer before: %p\n", (void *) e->call_stmt);
-      gimple_call_set_arg (e->call_stmt, 0, build_addr(e->callee->decl));
-      debug_gimple_stmt (e->call_stmt);
-      fprintf (stderr, "gimple pointer after: %p\n", (void *) e->call_stmt);
+      int fn_idx
+	= callback_fetch_fn_position (e->call_stmt, DECL_ATTRIBUTES (decl),
+				      e->callee->decl);
+      gimple_call_set_arg (e->call_stmt, fn_idx, build_addr (e->callee->decl));
       return e->call_stmt;
     }
 
@@ -3069,7 +3078,15 @@ cgraph_edge::cannot_lead_to_return_p (void)
 bool
 cgraph_edge::maybe_hot_p (void)
 {
-  if (callback) return true;
+  /* A callback edge is considered hot when it's parent edge
+     is hot*/
+  if (callback)
+    {
+      cgraph_edge *parent = get_callback_parent_edge ();
+      bool ret = parent->maybe_hot_p ();
+      ret = true;
+      return ret;
+    }
   if (!maybe_hot_count_p (NULL, count.ipa ()))
     return false;
   if (caller->frequency == NODE_FREQUENCY_UNLIKELY_EXECUTED
@@ -3943,7 +3960,10 @@ cgraph_node::verify_node (void)
 			    }
 			  if (!e->indirect_unknown_callee)
 			    {
-			      if (!e->callback && e->verify_corresponds_to_fndecl (decl))
+			      /* Callback edges violate this assertion
+				 in the same way speculative edges do. */
+			      if (!e->callback
+				  && e->verify_corresponds_to_fndecl (decl))
 				{
 				  error ("edge points to wrong declaration:");
 				  debug_tree (e->callee->decl);
@@ -3985,6 +4005,45 @@ cgraph_node::verify_node (void)
 
       for (e = callees; e; e = e->next_callee)
 	{
+	  if (e->callback && e->has_callback)
+	    {
+	      error ("edge has both callback and has_callback set");
+	      error_found = true;
+	    }
+
+	  if (e->callback)
+	    {
+	      if (!e->get_callback_parent_edge ())
+		{
+		  error ("callback edge %s->%s has no parent",
+			 identifier_to_locale (e->caller->name ()),
+			 identifier_to_locale (e->callee->name ()));
+		  error_found = true;
+		}
+	    }
+
+	  if (e->has_callback)
+	    {
+	      int ncallbacks = 0;
+	      int nfound_edges = 0;
+	      for (tree cb = lookup_attribute ("callback", DECL_ATTRIBUTES (
+							     e->callee->decl));
+		   cb; cb = lookup_attribute ("callback", TREE_CHAIN (cb)),
+			ncallbacks++)
+		;
+	      for (cgraph_edge *cbe = callees; cbe; cbe = cbe->next_callee)
+		if (cbe->callback && cbe->call_stmt == e->call_stmt)
+		  nfound_edges++;
+	      if (ncallbacks != nfound_edges)
+		{
+		  error ("callback edge %s->%s child edge count mismach, "
+			 "expected %d, found %d",
+			 identifier_to_locale (e->caller->name ()),
+			 identifier_to_locale (e->callee->name ()), ncallbacks,
+			 nfound_edges);
+		}
+	    }
+
 	  if (!e->aux && !e->speculative && !e->callback && !e->has_callback)
 	    {
 	      error ("edge %s->%s has no corresponding call_stmt",

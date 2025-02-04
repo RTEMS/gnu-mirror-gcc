@@ -1735,11 +1735,17 @@ public:
   cgraph_edge *make_speculative (cgraph_node *n2, profile_count direct_count,
 				 unsigned int speculative_id = 0);
 
-  /* TODO DOCS */
+  /* Turns edge into a callback edge, representing an indirect call to n2
+     passed to a function by argument. Sets has_callback flag of the original
+     edge. Both edges are attached to the same call statement. Returns created
+     callback edge. */
   cgraph_edge *make_callback (cgraph_node *n2);
 
-  /* TODO DOCS */
-  cgraph_edge *get_callback_parent_edge();
+  /* Returns the parent edge of a callback edge or NULL, if such edge
+     cannot be found. An edge is considered a parent, if it has it's
+     has_callback flag set and shares it's call statement with the edge
+     this method is caled on. */
+  cgraph_edge *get_callback_parent_edge ();
 
   /* Speculative call consists of an indirect edge and one or more
      direct edge+ref pairs.  Speculative will expand to the following sequence:
@@ -1772,10 +1778,6 @@ public:
      target2.  */
   cgraph_edge *next_speculative_call_target ()
   {
-    if (callback)
-      {
-	return NULL;
-      }
     cgraph_edge *e = this;
     gcc_checking_assert (speculative && callee);
 
@@ -1790,29 +1792,16 @@ public:
      indirect call edge in the speculative call sequence.  */
   cgraph_edge *speculative_call_indirect_edge ()
   {
-    gcc_checking_assert (speculative || callback);
+    gcc_checking_assert (speculative);
     if (!callee)
       return this;
-    
-    cgraph_edge * e2 = NULL;
-    for (e2 = caller->indirect_calls;
-	 e2; e2 = e2->next_callee)
-      if (e2->speculative
-	  && call_stmt == e2->call_stmt
-	  && lto_stmt_uid == e2->lto_stmt_uid)
-	return e2;
 
-    if (!e2 && callback)
-      {
-	for (e2 = caller->callees; e2; e2 = e2->next_callee)
-	  {
-	    if (e2->has_callback && call_stmt == e2->call_stmt)
-	      {
-		return e2;
-	      }
-	  }
-      }
-          gcc_unreachable();
+    cgraph_edge *e2;
+    for (e2 = caller->indirect_calls; e2; e2 = e2->next_callee)
+      if (e2->speculative && call_stmt == e2->call_stmt
+	  && lto_stmt_uid == e2->lto_stmt_uid)
+	break;
+    return e2;
   }
 
   /* When called on any edge in speculative call and when given any target
@@ -1975,9 +1964,18 @@ public:
      Optimizers may later redirect direct call to clone, so 1) and 3)
      do not need to necessarily agree with destination.  */
   unsigned int speculative : 1;
-  /* TODO DOCS */
+  /* Edges with CALLBACK flag represent indirect calls to functions passed
+     to their callers by argument. This is useful in cases, where the body
+     of these caller functions is not known, e. g. qsort in glibc or
+     GOMP_parallel in libgomp. These edges are never made into real calls,
+     but are used instead to optimize these callback functions and later replace
+     their addresses with their optimized versions. Edges with this flag set
+     share their call statement with their parent edge. */
   unsigned int callback : 1;
-  /* TODO DOCS */
+  /* Edges with this flag set have one or more child callabck edges. They share
+     their call statements with this edge. This flag represents the fact that
+     the callee of this edge takes a function and it's parameters by argument
+     and calls it at a later time. */
   unsigned int has_callback : 1;
   /* Set to true when caller is a constructor or destructor of polymorphic
      type.  */

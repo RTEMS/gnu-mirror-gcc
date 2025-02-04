@@ -2905,6 +2905,43 @@ declares that @code{my_alloc1} returns 16-byte aligned pointers and
 that @code{my_alloc2} returns a pointer whose value modulo 32 is equal
 to 8.
 
+@cindex @code{callback} function attribute
+@item callback (@var{function-pos}, @var{...})
+The @code{callback} attribute specifies that a function takes a pointer to
+a callback function as one of it's parameters and passes it some of it's own
+parameters. For example:
+
+@smallexample
+void foo(void (*fn)(int*), int *data) __attribute__((callback(1, 2)));
+@end smallexample
+
+where body of @code{foo} looks something like:
+
+@smallexample
+void foo(void (*fn)(int*), int *data)
+@{
+  ...
+  fn(data);
+  ...
+@}
+@end smallexample
+
+This is particuarly useful for cases, where body of functions with callbacks
+is unknown at compile-time. Using this attribute allows GCC to perform
+optimizations on the callback function, namely constant propagation.
+The parameter @var{function-pos} specifies the position of the pointer
+to the callback function. All indices start from 1. This parameter should be
+followed by @var{n} positions of arguments passed to the callback function
+(where @var{n} is the number of arguments the callback function takes) in order
+in which they are passed. Value 0 should be used in places where the position
+for a given argument is unknown or the value is not passed through the caller.
+When used with non-static C++ methods, all indices should start at 2, since the
+first argument is implicit @code{this}.
+
+In the example above, function @code{foo} takes it's callback function as it's
+first argument and passes it it's second argument, so the correct values of
+parameters are 1 and 2.
+
 @cindex @code{cold} function attribute
 @item cold
 The @code{cold} attribute on functions is used to inform the compiler that

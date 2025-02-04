@@ -1004,13 +1004,6 @@ void ipa_set_node_agg_value_chain (struct cgraph_node *node,
 void ipcp_transformation_initialize (void);
 void ipcp_free_transformation_sum (void);
 
-
-struct GTY(()) cb_arg_info {
-    int idx;
-    bool is_data_arg;
-};
-
-
 /* ipa_edge_args stores information related to a callsite and particularly its
    arguments.  It can be accessed by the IPA_EDGE_REF macro.  */
 
@@ -1019,7 +1012,7 @@ class GTY((for_user)) ipa_edge_args
  public:
 
   /* Default constructor.  */
-  ipa_edge_args () : jump_functions (NULL), polymorphic_call_contexts (NULL), callback_args(NULL)
+  ipa_edge_args () : jump_functions (NULL), polymorphic_call_contexts (NULL)
     {}
 
   /* Destructor.  */
@@ -1031,14 +1024,12 @@ class GTY((for_user)) ipa_edge_args
 	vec_free (jf->agg.items);
       vec_free (jump_functions);
       vec_free (polymorphic_call_contexts);
-      vec_free (callback_args);
     }
 
   /* Vectors of the callsite's jump function and polymorphic context
      information of each parameter.  */
   vec<ipa_jump_func, va_gc> *jump_functions;
   vec<ipa_polymorphic_call_context, va_gc> *polymorphic_call_contexts;
-  vec<cb_arg_info, va_gc> *callback_args;
 };
 
 /* ipa_edge_args access functions.  Please use these to access fields that
