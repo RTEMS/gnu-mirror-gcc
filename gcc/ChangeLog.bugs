@@ -1,6 +1,8 @@
-==================== Branch work192-bugs, patch #211 ====================
+==================== Branch work192-bugs, patch #214 ====================
 
 Fix PR 118541, do not generate unordered fp cmoves for IEEE compares.
+
+This is version 2 of the patch.
 
 In bug PR target/118541 on power9, power10, and power11 systems, for the
 function:
@@ -77,6 +79,16 @@ power11:
                 xxsel 1,4,3,1
                 blr
 
+Changes from the V1 patch:
+
+1: I added a test in invert_fpmask_comparison_operator to not allow UNLE and
+UNLT unless fast math is in force.  Both invert_fpmask_comparison_operator and
+fpmask_comparison_operator are used to form floating point conditional moves on
+Power9 and beyond.
+
+2: I reworked rs6000_reverse_condition to be a bit clearer when we are rejecting
+reversing IEEE comparisons that guarantee they don't trap.
+
 I have built bootstrap compilers on big endian power9 systems and little endian
 power9/power10 systems and there were no regressions.  Can I check this patch
 into the GCC trunk, and after a waiting period, can I check this into the active
@@ -104,6 +116,7 @@ gcc/testsuite/
 	PR target/118541
 	* gcc.target/powerpc/pr118541.c: New test.
 
+==================== Branch work192-bugs, patch #213 was reverted ====================
 ==================== Branch work192-bugs, patch #212 was reverted ====================
 ==================== Branch work192-bugs, patch #211 was reverted ====================
 ==================== Branch work192-bugs, patch #210 was reverted ====================
