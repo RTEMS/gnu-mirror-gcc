@@ -1593,6 +1593,23 @@ conv_shift_descriptor (stmtblock_t *block, tree desc, int rank,
 }
 
 
+class conditional_lb
+{
+  tree cond;
+public:
+  conditional_lb (tree arg_cond)
+    : cond (arg_cond) { }
+
+  tree lower_bound (tree src, int n) const {
+    tree lbound = gfc_conv_descriptor_lbound_get (src, gfc_rank_cst[n]);
+    lbound = fold_build3_loc (input_location, COND_EXPR,
+			      gfc_array_index_type, cond,
+			      gfc_index_one_node, lbound);
+    return lbound;
+  }
+};
+
+
 static void
 gfc_conv_shift_descriptor (stmtblock_t *block, tree dest, tree src,
 			   int rank, const conditional_lb &lb)
@@ -1610,7 +1627,7 @@ gfc_conv_shift_descriptor (stmtblock_t *block, tree dest, tree src,
       lbound = lb.lower_bound (dest, n);
       lbound = gfc_evaluate_now (lbound, block);
 
-      conv_shift_descriptor_lbound (block, src, dest, dim, lbound, offset_var);
+      conv_shift_descriptor_lbound (block, src, dest, n, lbound, offset_var);
     }
 
   gfc_conv_descriptor_offset_set (block, dest, offset_var);
@@ -1884,23 +1901,6 @@ gfc_conv_remap_descriptor (stmtblock_t *block, tree dest, tree src,
 
   gfc_conv_remap_descriptor (block, dest, src, src_rank, as);
 }
-
-
-class conditional_lb
-{
-  tree cond;
-public:
-  conditional_lb (tree arg_cond)
-    : cond (arg_cond) { }
-
-  tree lower_bound (tree src, int n) const {
-    tree lbound = gfc_conv_descriptor_lbound_get (src, gfc_rank_cst[n]);
-    lbound = fold_build3_loc (input_location, COND_EXPR,
-			      gfc_array_index_type, cond,
-			      gfc_index_one_node, lbound);
-    return lbound;
-  }
-};
 
 
 void
