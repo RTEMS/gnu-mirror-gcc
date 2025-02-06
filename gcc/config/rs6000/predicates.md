@@ -1465,13 +1465,9 @@
 
 ;; Return 1 if OP is a comparison operator suitable for vector/scalar
 ;; comparisons that generate a 0/-1 mask (i.e. the inverse of
-;; fpmask_comparison_operator).  Do not allow UNLT and UNLE unless fast math is
-;; used since the power9 compare and mask instructions will raise an exception
-;; if one of the arguments is a signalling NaN.
+;; fpmask_comparison_operator).
 (define_predicate "invert_fpmask_comparison_operator"
-  (ior (match_code "ne")
-       (and (match_code "unlt,unle")
-	    (match_test "!HONOR_NANS (DFmode)"))))
+  (match_code "ne,unlt,unle"))
 
 ;; Return 1 if OP is a comparison operation suitable for integer vector/scalar
 ;; comparisons that generate a -1/0 mask.
