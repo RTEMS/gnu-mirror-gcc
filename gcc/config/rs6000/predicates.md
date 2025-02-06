@@ -1467,7 +1467,9 @@
 ;; comparisons that generate a 0/-1 mask (i.e. the inverse of
 ;; fpmask_comparison_operator).
 (define_predicate "invert_fpmask_comparison_operator"
-  (match_code "ne,unlt,unle"))
+  (ior (match_code "ne")
+       (and (match_code "unlt,unle")
+	    (match_test "!HONOR_NANS (DFmode) || !TARGET_P9_VECTOR"))))
 
 ;; Return 1 if OP is a comparison operation suitable for integer vector/scalar
 ;; comparisons that generate a -1/0 mask.
