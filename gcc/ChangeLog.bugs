@@ -82,11 +82,13 @@ power9/power10 systems and there were no regressions.  Can I check this patch
 into the GCC trunk, and after a waiting period, can I check this into the active
 older branches?
 
-2025-02-03  Michael Meissner  <meissner@linux.ibm.com>
+2025-02-06  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
 	PR target/118541
+	* config/rs6000/predicates.md (invert_fpmask_comparison_operator): Do
+	not allow UNLT and UNLE unless -ffast-math.
 	* config/rs6000/rs6000-protos.h (REVERSE_COND_ORDERED_OK): New macro.
 	(REVERSE_COND_NO_ORDERED): Likewise.
 	(rs6000_reverse_condition): Add argument.
@@ -102,6 +104,8 @@ gcc/testsuite/
 	PR target/118541
 	* gcc.target/powerpc/pr118541.c: New test.
 
+==================== Branch work192-bugs, patch #212 was reverted ====================
+==================== Branch work192-bugs, patch #211 was reverted ====================
 ==================== Branch work192-bugs, patch #210 was reverted ====================
 
 ==================== Branch work192-bugs, patch #202 ====================
