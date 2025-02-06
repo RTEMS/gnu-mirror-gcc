@@ -1,4 +1,4 @@
-==================== Branch work192-bugs, patch #214 ====================
+==================== Branch work192-bugs, patch #215 ====================
 
 Fix PR 118541, do not generate unordered fp cmoves for IEEE compares.
 
@@ -116,6 +116,7 @@ gcc/testsuite/
 	PR target/118541
 	* gcc.target/powerpc/pr118541.c: New test.
 
+==================== Branch work192-bugs, patch #214 was reverted ====================
 ==================== Branch work192-bugs, patch #213 was reverted ====================
 ==================== Branch work192-bugs, patch #212 was reverted ====================
 ==================== Branch work192-bugs, patch #211 was reverted ====================
