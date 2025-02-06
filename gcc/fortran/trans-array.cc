@@ -1617,7 +1617,7 @@ gfc_conv_shift_descriptor (stmtblock_t *block, tree dest, tree src,
   tree tmp = gfc_conv_descriptor_data_get (src);
   gfc_conv_descriptor_data_set (block, dest, tmp);
 
-  tree offset_var = gfc_create_var (TREE_TYPE (tmp), "offset");
+  tree offset_var = gfc_create_var (gfc_array_index_type, "offset");
   gfc_add_modify (block, offset_var, gfc_index_zero_node);
 
   for (int n = 0 ; n < rank; n++)
