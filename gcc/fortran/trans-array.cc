@@ -1556,7 +1556,7 @@ conv_shift_descriptor_lbound (stmtblock_t* block, tree from_desc, tree to_desc, 
 			       ubound, diff);
 
   set_bounds_update_offset (block, to_desc, dim, new_lbound, tmp1, stride, diff,
-			    offset, nullptr, from_desc != to_desc);
+			    offset, nullptr, from_desc == to_desc);
 }
 
 
