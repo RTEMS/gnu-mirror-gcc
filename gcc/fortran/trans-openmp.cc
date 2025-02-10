@@ -189,7 +189,7 @@ gfc_omp_array_size (tree decl, gimple_seq *pre_p)
   size = fold_convert (size_type_node, size);
   tree elemsz = gfc_get_element_type (TREE_TYPE (decl));
   if (TREE_CODE (elemsz) == ARRAY_TYPE && TYPE_STRING_FLAG (elemsz))
-    elemsz = gfc_conv_descriptor_elem_len (decl);
+    elemsz = gfc_conv_descriptor_elem_len_get (decl);
   else
     elemsz = TYPE_SIZE_UNIT (elemsz);
   size = fold_build2 (MULT_EXPR, size_type_node, size, elemsz);
