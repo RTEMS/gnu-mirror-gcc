@@ -1317,8 +1317,8 @@ conv_expr_ref_to_caf_ref (stmtblock_t *block, gfc_expr *expr)
 	    {
 	      tree arr_desc_token_offset;
 	      /* Get the token field from the descriptor.  */
-	      arr_desc_token_offset = TREE_OPERAND (
-		    gfc_conv_descriptor_token (ref->u.c.component->backend_decl), 1);
+	      tree descriptor = ref->u.c.component->backend_decl;
+	      arr_desc_token_offset = gfc_conv_descriptor_token_field (descriptor);
 	      arr_desc_token_offset
 		  = compute_component_offset (arr_desc_token_offset,
 					      TREE_TYPE (tmp));
@@ -2016,12 +2016,11 @@ conv_caf_send (gfc_code *code) {
 	 has the wrong type if component references are done.  */
       lhs_type = gfc_typenode_for_spec (&lhs_expr->ts);
       tmp = build_fold_indirect_ref_loc (input_location, lhs_se.expr);
-      gfc_add_modify (&lhs_se.pre, gfc_conv_descriptor_dtype (tmp),
-		      gfc_get_dtype_rank_type (
-			gfc_has_vector_subscript (lhs_expr)
-			? gfc_find_array_ref (lhs_expr)->dimen
-			: lhs_expr->rank,
-		      lhs_type));
+      int rank = gfc_has_vector_subscript (lhs_expr)
+		 ? gfc_find_array_ref (lhs_expr)->dimen
+		 : lhs_expr->rank;
+      tree dtype_value = gfc_get_dtype_rank_type (rank, lhs_type);
+      gfc_conv_descriptor_dtype_set (&lhs_se.pre, tmp, dtype_value);
     }
   else
     {
@@ -2048,10 +2047,10 @@ conv_caf_send (gfc_code *code) {
 	     that has the wrong type if component references are done.  */
 	  lhs_type = gfc_typenode_for_spec (&lhs_expr->ts);
 	  tmp = build_fold_indirect_ref_loc (input_location, lhs_se.expr);
-	  gfc_add_modify (&lhs_se.pre, gfc_conv_descriptor_dtype (tmp),
-			  gfc_get_dtype_rank_type (has_vector ? ar2.dimen
-							      : lhs_expr->rank,
-						   lhs_type));
+	  tree dtype_value = gfc_get_dtype_rank_type (has_vector ? ar2.dimen
+								 : lhs_expr->rank,
+						      lhs_type);
+	  gfc_conv_descriptor_dtype_set (&lhs_se.pre, tmp, dtype_value);
 	  if (has_tmp_lhs_array)
 	    {
 	      vec = conv_caf_vector_subscript (&block, lhs_se.expr, &ar2);
@@ -2228,12 +2227,11 @@ conv_caf_send (gfc_code *code) {
 	 has the wrong type if component references are done.  */
       tmp2 = gfc_typenode_for_spec (&rhs_expr->ts);
       tmp = build_fold_indirect_ref_loc (input_location, rhs_se.expr);
-      gfc_add_modify (&rhs_se.pre, gfc_conv_descriptor_dtype (tmp),
-		      gfc_get_dtype_rank_type (
-			gfc_has_vector_subscript (rhs_expr)
-			? gfc_find_array_ref (rhs_expr)->dimen
-			: rhs_expr->rank,
-		      tmp2));
+      int rank = gfc_has_vector_subscript (rhs_expr)
+		 ? gfc_find_array_ref (rhs_expr)->dimen
+		 : rhs_expr->rank;
+      tree dtype_value = gfc_get_dtype_rank_type (rank, tmp2);
+      gfc_conv_descriptor_dtype_set (&rhs_se.pre, tmp, dtype_value);
     }
   else
     {
@@ -2258,11 +2256,10 @@ conv_caf_send (gfc_code *code) {
          has the wrong type if component references are done.  */
       tmp = build_fold_indirect_ref_loc (input_location, rhs_se.expr);
       tmp2 = gfc_typenode_for_spec (&rhs_expr->ts);
-      gfc_add_modify (&rhs_se.pre, gfc_conv_descriptor_dtype (tmp),
-                      gfc_get_dtype_rank_type (has_vector ? ar2.dimen
-							  : rhs_expr->rank,
-		      tmp2));
-      if (has_vector)
+      int rank = has_vector ? ar2.dimen : rhs_expr->rank;
+      tree dtype_value = gfc_get_dtype_rank_type (rank, tmp2);
+      gfc_conv_descriptor_dtype_set (&rhs_se.pre, tmp, dtype_value);
+       if (has_vector)
 	{
 	  rhs_vec = conv_caf_vector_subscript (&block, rhs_se.expr, &ar2);
 	  *ar = ar2;
@@ -2869,7 +2866,7 @@ gfc_conv_intrinsic_rank (gfc_se *se, gfc_expr *expr)
   gfc_add_block_to_block (&se->pre, &argse.pre);
   gfc_add_block_to_block (&se->post, &argse.post);
 
-  se->expr = gfc_conv_descriptor_rank (argse.expr);
+  se->expr = gfc_conv_descriptor_rank_get (argse.expr);
   se->expr = fold_convert (gfc_get_int_type (gfc_default_integer_kind),
 			   se->expr);
 }
@@ -3038,7 +3035,7 @@ gfc_conv_intrinsic_bound (gfc_se * se, gfc_expr * expr, enum gfc_isym_id op)
           cond = fold_build2_loc (input_location, LT_EXPR, logical_type_node,
 				  bound, build_int_cst (TREE_TYPE (bound), 0));
 	  if (as && as->type == AS_ASSUMED_RANK)
-	    tmp = gfc_conv_descriptor_rank (desc);
+	    tmp = gfc_conv_descriptor_rank_get (desc);
 	  else
 	    tmp = gfc_rank_cst[GFC_TYPE_ARRAY_RANK (TREE_TYPE (desc))];
           tmp = fold_build2_loc (input_location, GE_EXPR, logical_type_node,
@@ -3133,7 +3130,7 @@ gfc_conv_intrinsic_bound (gfc_se * se, gfc_expr * expr, enum gfc_isym_id op)
 	{
 	  tree minus_one = build_int_cst (gfc_array_index_type, -1);
 	  tree rank = fold_convert (gfc_array_index_type,
-				    gfc_conv_descriptor_rank (desc));
+				    gfc_conv_descriptor_rank_get (desc));
 	  rank = fold_build2_loc (input_location, PLUS_EXPR,
 				  gfc_array_index_type, rank, minus_one);
 
@@ -8739,7 +8736,6 @@ gfc_conv_intrinsic_sizeof (gfc_se *se, gfc_expr *expr)
   tree lower;
   tree upper;
   tree byte_size;
-  tree field;
   int n;
 
   gfc_init_se (&argse, NULL);
@@ -8763,12 +8759,7 @@ gfc_conv_intrinsic_sizeof (gfc_se *se, gfc_expr *expr)
       if (POINTER_TYPE_P (TREE_TYPE (tmp)))
 	tmp = build_fold_indirect_ref_loc (input_location, tmp);
 
-      tmp = gfc_conv_descriptor_dtype (tmp);
-      field = gfc_advance_chain (TYPE_FIELDS (get_dtype_type_node ()),
-				 GFC_DTYPE_ELEM_LEN);
-      tmp = fold_build3_loc (input_location, COMPONENT_REF, TREE_TYPE (field),
-			     tmp, field, NULL_TREE);
-
+      tmp = gfc_conv_descriptor_elem_len_get (tmp);
       byte_size = fold_convert (gfc_array_index_type, tmp);
     }
   else if (arg->ts.type == BT_CLASS)
@@ -8832,7 +8823,7 @@ gfc_conv_intrinsic_sizeof (gfc_se *se, gfc_expr *expr)
           stmtblock_t body;
 
 	  tmp = fold_convert (gfc_array_index_type,
-			      gfc_conv_descriptor_rank (argse.expr));
+			      gfc_conv_descriptor_rank_get (argse.expr));
 	  loop_var = gfc_create_var (gfc_array_index_type, "i");
 	  gfc_add_modify (&argse.pre, loop_var, gfc_index_zero_node);
           exit_label = gfc_build_label_decl (NULL_TREE);
@@ -9698,7 +9689,7 @@ gfc_conv_associated (gfc_se *se, gfc_expr *expr)
 	  gfc_conv_expr_lhs (&arg1se, arg1->expr);
 	  if (arg1->expr->rank == -1)
 	    {
-	      tmp = gfc_conv_descriptor_rank (arg1se.expr);
+	      tmp = gfc_conv_descriptor_rank_get (arg1se.expr);
 	      tmp = fold_build2_loc (input_location, MINUS_EXPR,
 				     TREE_TYPE (tmp), tmp,
 				     build_int_cst (TREE_TYPE (tmp), 1));

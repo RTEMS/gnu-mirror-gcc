@@ -5137,9 +5137,7 @@ gfc_trans_deferred_vars (gfc_symbol * proc_sym, gfc_wrapped_block * block)
 		      se.descriptor_only = 1;
 		      gfc_conv_expr (&se, e);
 		      descriptor = se.expr;
-		      se.expr = gfc_conv_descriptor_data_addr (se.expr);
-		      se.expr = build_fold_indirect_ref_loc (input_location,
-							     se.expr);
+		      se.expr = gfc_conv_descriptor_data_get (se.expr);
 		    }
 		  gfc_free_expr (e);
 
@@ -7390,7 +7388,7 @@ gfc_conv_cfi_to_gfc (stmtblock_t *init, stmtblock_t *finally,
       /* memcpy (lhs + idx*elem_len, rhs + shift, elem_len)  */
       tree elem_len;
       if (GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (gfc_desc)))
-	elem_len = gfc_conv_descriptor_elem_len (gfc_desc);
+	elem_len = gfc_conv_descriptor_elem_len_get (gfc_desc);
       else
 	elem_len = gfc_get_cfi_desc_elem_len (cfi);
       lhs = fold_build2_loc (input_location, MULT_EXPR, size_type_node,
@@ -7528,7 +7526,7 @@ done:
 	  /* memcpy (lhs + shift, rhs + idx*elem_len, elem_len) */
 	  tree elem_len;
 	  if (GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (gfc_desc)))
-	    elem_len = gfc_conv_descriptor_elem_len (gfc_desc);
+	    elem_len = gfc_conv_descriptor_elem_len_get (gfc_desc);
 	  else
 	    elem_len = gfc_get_cfi_desc_elem_len (cfi);
 	  rhs = fold_build2_loc (input_location, MULT_EXPR, size_type_node,
