@@ -842,8 +842,8 @@ gfc_class_array_data_assign (stmtblock_t *block, tree lhs_desc, tree rhs_desc,
 	}
     }
 
-  tmp = gfc_conv_descriptor_dimensions_get (lhs_desc, type);
-  gfc_conv_descriptor_dimensions_set (block, rhs_desc, tmp);
+  tmp = gfc_conv_descriptor_dimensions_get (rhs_desc, type);
+  gfc_conv_descriptor_dimensions_set (block, lhs_desc, tmp);
 }
 
 /* Takes a derived type expression and returns the address of a temporary
