@@ -4025,6 +4025,19 @@ gfc_conv_expr_op (gfc_se * se, gfc_expr * expr)
 
   if (lop)
     {
+      // Inhibit overeager optimization of Cray pointer comparisons (PR106692).
+      if (expr->value.op.op1->expr_type == EXPR_VARIABLE
+	  && expr->value.op.op1->ts.type == BT_INTEGER
+	  && expr->value.op.op1->symtree
+	  && expr->value.op.op1->symtree->n.sym->attr.cray_pointer)
+	TREE_THIS_VOLATILE (lse.expr) = 1;
+
+      if (expr->value.op.op2->expr_type == EXPR_VARIABLE
+	  && expr->value.op.op2->ts.type == BT_INTEGER
+	  && expr->value.op.op2->symtree
+	  && expr->value.op.op2->symtree->n.sym->attr.cray_pointer)
+	TREE_THIS_VOLATILE (rse.expr) = 1;
+
       /* The result of logical ops is always logical_type_node.  */
       tmp = fold_build2_loc (input_location, code, logical_type_node,
 			     lse.expr, rse.expr);
@@ -5015,6 +5028,7 @@ gfc_conv_subref_array_arg (gfc_se *se, gfc_expr * expr, int g77,
   gfc_se work_se;
   gfc_se *parmse;
   bool pass_optional;
+  bool readonly;
 
   pass_optional = fsym && fsym->attr.optional && sym && sym->attr.optional;
 
@@ -5231,8 +5245,14 @@ gfc_conv_subref_array_arg (gfc_se *se, gfc_expr * expr, int g77,
 
   /* Wrap the whole thing up by adding the second loop to the post-block
      and following it by the post-block of the first loop.  In this way,
-     if the temporary needs freeing, it is done after use!  */
-  if (intent != INTENT_IN)
+     if the temporary needs freeing, it is done after use!
+     If input expr is read-only, e.g. a PARAMETER array, copying back
+     modified values is undefined behavior.  */
+  readonly = (expr->expr_type == EXPR_VARIABLE
+	      && expr->symtree
+	      && expr->symtree->n.sym->attr.flavor == FL_PARAMETER);
+
+  if ((intent != INTENT_IN) && !readonly)
     {
       gfc_add_block_to_block (&parmse->post, &loop2.pre);
       gfc_add_block_to_block (&parmse->post, &loop2.post);
@@ -7233,6 +7253,9 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
 		  for (ref = e->ref; ref->next; ref = ref->next)
 		    {
 		      if (ref->next->type == REF_INQUIRY)
+			break;
+		      if (ref->type == REF_ARRAY
+			  && ref->u.ar.type != AR_ELEMENT)
 			break;
 		    };
 		  if (ref->u.ar.type == AR_FULL

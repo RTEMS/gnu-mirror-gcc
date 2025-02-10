@@ -1,3 +1,88 @@
+2025-01-29  Marek Polacek  <polacek@redhat.com>
+
+	Backported from master:
+	2025-01-14  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/118047
+	PR c++/118355
+	* typeck2.cc (massage_init_elt): Call fold_non_dependent_init
+	unless for a CONSTRUCTOR in a template.
+
+2025-01-28  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2025-01-28  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/117855
+	* cp-tree.h (DECL_FRIEND_CONTEXT): Exclude deduction guides.
+
+2025-01-27  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2025-01-16  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/107522
+	* constraint.cc (get_normalized_constraints_from_decl): Use the
+	most general template for an explicit specialization of a
+	member template.
+
+2025-01-24  Marek Polacek  <polacek@redhat.com>
+
+	Backported from master:
+	2025-01-24  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/117153
+	* decl2.cc (build_anon_union_vars): Use FIELD for the second operand
+	of a COMPONENT_REF.
+
+2025-01-21  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/118509
+	* typeck.cc (get_member_function_from_ptrfunc): Wrap force_target_expr
+	with save_expr.
+
+2025-01-21  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	Backported from master:
+	2025-01-17  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/118049
+	* module.cc (trees_in::is_matching_decl): Propagate
+	FNDECL_USED_AUTO as well.
+
+2025-01-19  Simon Martin  <simon@nasilyan.com>
+
+	Backported from master:
+	2025-01-17  Simon Martin  <simon@nasilyan.com>
+
+	PR c++/118255
+	* name-lookup.cc (pushdecl): Don't call check_template_shadow
+	for hidden bindings.
+
+2025-01-17  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	Backported from master:
+	2025-01-17  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/118147
+	* parser.cc (cp_parser_cache_defarg): Don't error when
+	CPP_PRAGMA_EOL.
+
+2025-01-17  Simon Martin  <simon@nasilyan.com>
+
+	Backported from master:
+	2025-01-16  Simon Martin  <simon@nasilyan.com>
+
+	PR c++/117775
+	* decl.cc (fold_sizeof_expr): Make sure the folded result has
+	type size_type_node.
+
+2025-01-11  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/114630
+	* module.cc (trees_in::core_vals) <BLOCK>: Chain a new node if
+	DECL_CHAIN already is set.
+
 2025-01-09  Patrick Palka  <ppalka@redhat.com>
 
 	Backported from master:
