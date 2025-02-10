@@ -13664,12 +13664,7 @@ gfc_alloc_allocatable_for_assignment (gfc_loopinfo *loop,
   size2 = gfc_index_one_node;
   for (n = 0; n < expr2->rank; n++)
     {
-      tmp = fold_build2_loc (input_location, MINUS_EXPR,
-			     gfc_array_index_type,
-			     loop->to[n], loop->from[n]);
-      tmp = fold_build2_loc (input_location, PLUS_EXPR,
-			     gfc_array_index_type,
-			     tmp, gfc_index_one_node);
+      tmp = gfc_conv_array_extent_dim (loop->from[n], loop->to[n], NULL);
       size2 = fold_build2_loc (input_location, MULT_EXPR,
 			       gfc_array_index_type,
 			       tmp, size2);
@@ -13697,12 +13692,7 @@ gfc_alloc_allocatable_for_assignment (gfc_loopinfo *loop,
 
   for (n = 0; n < expr2->rank; n++)
     {
-      tmp = fold_build2_loc (input_location, MINUS_EXPR,
-			     gfc_array_index_type,
-			     loop->to[n], loop->from[n]);
-      tmp = fold_build2_loc (input_location, PLUS_EXPR,
-			     gfc_array_index_type,
-			     tmp, gfc_index_one_node);
+      tmp = gfc_conv_array_extent_dim (loop->from[n], loop->to[n], NULL);
 
       lbound = gfc_index_one_node;
       ubound = tmp;
@@ -13750,7 +13740,8 @@ gfc_alloc_allocatable_for_assignment (gfc_loopinfo *loop,
   gfc_conv_descriptor_offset_set (&fblock, desc, offset);
   if (linfo->saved_offset
       && VAR_P (linfo->saved_offset))
-    gfc_add_modify (&fblock, linfo->saved_offset, tmp);
+    gfc_add_modify (&fblock, linfo->saved_offset,
+		    gfc_conv_descriptor_offset_get (desc));
 
   /* Now set the deltas for the lhs.  */
   for (n = 0; n < expr1->rank; n++)
