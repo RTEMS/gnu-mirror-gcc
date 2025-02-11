@@ -258,6 +258,14 @@ get_field (tree desc, unsigned field_idx)
   tree field = gfc_advance_chain (TYPE_FIELDS (type), field_idx);
   gcc_assert (field != NULL_TREE);
 
+  return field;
+}
+
+tree
+get_component (tree desc, unsigned field_idx)
+{
+  tree field = get_field (desc, field_idx);
+
   return fold_build3_loc (input_location, COMPONENT_REF, TREE_TYPE (field),
 			  desc, field, NULL_TREE);
 }
@@ -265,7 +273,7 @@ get_field (tree desc, unsigned field_idx)
 tree
 get_data (tree desc)
 {
-  return get_field (desc, DATA_FIELD);
+  return get_component (desc, DATA_FIELD);
 }
 
 tree
@@ -296,7 +304,7 @@ conv_data_addr (tree desc)
 tree
 get_offset (tree desc)
 {
-  tree field = get_field (desc, OFFSET_FIELD);
+  tree field = get_component (desc, OFFSET_FIELD);
   gcc_assert (TREE_TYPE (field) == gfc_array_index_type);
   return field;
 }
@@ -317,7 +325,7 @@ conv_offset_set (stmtblock_t *block, tree desc, tree value)
 tree
 get_dtype (tree desc)
 {
-  tree field = get_field (desc, DTYPE_FIELD);
+  tree field = get_component (desc, DTYPE_FIELD);
   gcc_assert (TREE_TYPE (field) == get_dtype_type_node ());
   return field;
 }
@@ -338,7 +346,7 @@ conv_dtype_set (stmtblock_t *block, tree desc, tree val)
 tree
 get_span (tree desc)
 {
-  tree field = get_field (desc, SPAN_FIELD);
+  tree field = get_component (desc, SPAN_FIELD);
   gcc_assert (TREE_TYPE (field) == gfc_array_index_type);
   return field;
 }
@@ -513,7 +521,7 @@ conv_type_set (stmtblock_t *block, tree desc, tree value)
 tree
 get_dimensions (tree desc)
 {
-  tree field = get_field (desc, DIMENSION_FIELD);
+  tree field = get_component (desc, DIMENSION_FIELD);
   gcc_assert (TREE_CODE (TREE_TYPE (field)) == ARRAY_TYPE
 	      && TREE_CODE (TREE_TYPE (TREE_TYPE (field))) == RECORD_TYPE);
   return field;
@@ -574,10 +582,17 @@ conv_dimension_set (stmtblock_t *block, tree desc, tree dim, tree value)
 
 
 tree
+get_token_field (tree desc)
+{
+  gcc_assert (flag_coarray == GFC_FCOARRAY_LIB);
+  return get_field (desc, CAF_TOKEN_FIELD);
+}
+
+tree
 get_token (tree desc)
 {
   gcc_assert (flag_coarray == GFC_FCOARRAY_LIB);
-  tree field = get_field (desc, CAF_TOKEN_FIELD);
+  tree field = get_component (desc, CAF_TOKEN_FIELD);
   /* Should be a restricted pointer - except in the finalization wrapper.  */
   gcc_assert (TREE_TYPE (field) == prvoid_type_node
 	      || TREE_TYPE (field) == pvoid_type_node);
@@ -859,6 +874,12 @@ tree
 gfc_conv_descriptor_token_get (tree desc)
 {
   return gfc_descriptor::conv_token_get (desc);
+}
+
+tree
+gfc_conv_descriptor_token_field (tree desc)
+{
+  return gfc_descriptor::get_token_field (desc);
 }
 
 void

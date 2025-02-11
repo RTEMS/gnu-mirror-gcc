@@ -1318,9 +1318,7 @@ conv_expr_ref_to_caf_ref (stmtblock_t *block, gfc_expr *expr)
 	      tree arr_desc_token_offset;
 	      /* Get the token field from the descriptor.  */
 	      tree descriptor = ref->u.c.component->backend_decl;
-	      tree desc_token = gfc_conv_descriptor_token_get (descriptor);
-	      gcc_assert (TREE_CODE (desc_token) == COMPONENT_REF);
-	      arr_desc_token_offset = TREE_OPERAND (desc_token, 1);
+	      arr_desc_token_offset = gfc_conv_descriptor_token_field (descriptor);
 	      arr_desc_token_offset
 		  = compute_component_offset (arr_desc_token_offset,
 					      TREE_TYPE (tmp));
