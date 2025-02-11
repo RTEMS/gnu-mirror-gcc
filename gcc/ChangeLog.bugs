@@ -1,4 +1,4 @@
-==================== Branch work193-bugs, patch #210 ====================
+==================== Branch work193-bugs, patch #211 ====================
 
 Fix PR 118541, do not generate unordered fp cmoves for IEEE compares.
 
@@ -84,15 +84,14 @@ power9/power10 systems and there were no regressions.  Can I check this patch
 into the GCC trunk, and after a waiting period, can I check this into the active
 older branches?
 
-2025-02-10  Michael Meissner  <meissner@linux.ibm.com>
+2025-02-11  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
 	PR target/118541
 	* config/rs6000/predicates.md (invert_fpmask_comparison_operator): Do
-	not allow UNLT and UNLE unless -ffast-math or not power9.
-	* config/rs6000/rs6000-protos.h (enum reverse_condition_t): New
-	enumeration.
+	not allow UNLT and UNLE unless -ffast-math.
+	* config/rs6000/rs6000-protos.h (enum reverse_cond_t): New enumeration.
 	(rs6000_reverse_condition): Add argument.
 	* config/rs6000/rs6000.cc (rs6000_reverse_condition): Do not allow
 	ordered comparisons to be reversed for floating point conditional moves,
@@ -109,6 +108,8 @@ gcc/testsuite/
 	* gcc.target/powerpc/pr118541-2.c: Likewise.
 	* gcc.target/powerpc/pr118541-3.c: Likewise.
 	* gcc.target/powerpc/pr118541-4.c: Likewise.
+
+==================== Branch work193-bugs, patch #210 was reverted ====================
 
 ==================== Branch work193-bugs, patch #202 ====================
 
