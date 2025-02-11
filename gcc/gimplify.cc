@@ -6838,6 +6838,12 @@ gimplify_modify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
   gcc_assert (TREE_CODE (*expr_p) == MODIFY_EXPR
 	      || TREE_CODE (*expr_p) == INIT_EXPR);
 
+  if (TREE_CODE (*to_p) == NON_LVALUE_EXPR)
+    {
+      error ("non-lvalue %qE used as lhs", *to_p);
+      return GS_ERROR;
+    }
+
   /* Trying to simplify a clobber using normal logic doesn't work,
      so handle it here.  */
   if (TREE_CLOBBER_P (*from_p))
