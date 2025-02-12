@@ -1,8 +1,22 @@
-==================== Branch work193-bugs, patch #211 ====================
+==================== Branch work193-bugs, patch #212 ====================
 
 Fix PR 118541, do not generate unordered fp cmoves for IEEE compares.
 
 This is version 3 of the patch.
+
+In version 3, I made the following changes:
+
+    1:	The new argument to rs6000_reverse_condition that says whether we should
+	allow ordered floating point compares to be reversed is now an
+	enumeration instead of a boolean.
+
+    2:	I tried to make the code in rs6000_reverse_condition clearer.
+
+    3:	I added checks in invert_fpmask_comparison_operator to prevent ordered
+	floating point compares from being reversed unless -ffast-math.
+
+    4:	I split the test cases into 4 separate tests (ordered vs. unordered
+	compare and -O2 vs. -Ofast).
 
 In bug PR target/118541 on power9, power10, and power11 systems, for the
 function:
@@ -84,7 +98,7 @@ power9/power10 systems and there were no regressions.  Can I check this patch
 into the GCC trunk, and after a waiting period, can I check this into the active
 older branches?
 
-2025-02-11  Michael Meissner  <meissner@linux.ibm.com>
+2025-02-12  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -109,6 +123,7 @@ gcc/testsuite/
 	* gcc.target/powerpc/pr118541-3.c: Likewise.
 	* gcc.target/powerpc/pr118541-4.c: Likewise.
 
+==================== Branch work193-bugs, patch #211 was reverted ====================
 ==================== Branch work193-bugs, patch #210 was reverted ====================
 
 ==================== Branch work193-bugs, patch #202 ====================
