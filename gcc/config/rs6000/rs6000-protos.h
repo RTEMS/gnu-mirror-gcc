@@ -114,8 +114,23 @@ extern const char *rs6000_sibcall_template (rtx *, unsigned int);
 extern const char *rs6000_indirect_call_template (rtx *, unsigned int);
 extern const char *rs6000_indirect_sibcall_template (rtx *, unsigned int);
 extern const char *rs6000_pltseq_template (rtx *, int);
+
+/* Whether we can reverse the sense of an ordered (UNLT, UNLE, UNGT, UNGE,
+   UNEQ, or LTGT) comairson.  If we are doing floating point conditional moves
+   on power9 and above, we cannot convert an ordered comparison to unordered,
+   since the instructions (XSCMP{EQ,GT,GE}DP) that are used for conditional
+   moves can trap if an argument is a signalling NaN.  However for normal jumps
+   we can reverse a comparison since we only use unordered compare instructions
+   which do not trap on signalling NaNs.  */
+
+enum reverse_cond_t {
+  REVERSE_COND_ORDERED_OK,
+  REVERSE_COND_NO_ORDERED
+};
+
 extern enum rtx_code rs6000_reverse_condition (machine_mode,
-					       enum rtx_code);
+					       enum rtx_code,
+					       enum reverse_cond_t);
 extern rtx rs6000_emit_eqne (machine_mode, rtx, rtx, rtx);
 extern rtx rs6000_emit_fp_cror (rtx_code, machine_mode, rtx);
 extern void rs6000_emit_sCOND (machine_mode, rtx[]);
