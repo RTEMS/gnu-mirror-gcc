@@ -6840,7 +6840,7 @@ gimplify_modify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
 
   if (TREE_CODE (*to_p) == NON_LVALUE_EXPR)
     {
-      error ("non-lvalue %qE used as lhs", *to_p);
+      error ("non-lvalue used as lhs in %qD", *expr_p);
       return GS_ERROR;
     }
 
