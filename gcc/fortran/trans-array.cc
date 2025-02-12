@@ -3646,9 +3646,6 @@ set_temporary_descriptor (stmtblock_t *block, tree desc, tree class_src,
       gfc_conv_descriptor_rank_set (block, desc, rank);
     }
 
-  /* Set the span.  */
-  gfc_conv_descriptor_span_set (block, desc, elemsize);
-  
   if (!callee_allocated)
     {
       for (n = 0; n < rank; n++)
@@ -3664,6 +3661,8 @@ set_temporary_descriptor (stmtblock_t *block, tree desc, tree class_src,
 	}
     }
 
+  gfc_conv_descriptor_span_set (block, desc, elemsize);
+  
   gfc_conv_descriptor_data_set (block, desc, data_ptr);
 
   /* The offset is zero because we create temporaries with a zero
