@@ -3839,7 +3839,6 @@ gfc_trans_create_temp_array (stmtblock_t * pre, stmtblock_t * post, gfc_ss * ss,
       || (fcn_ss && fcn_ss->info && fcn_ss->info->class_container))
     {
       tree class_data;
-      tree dtype;
       gfc_expr *expr1 = fcn_ss ? fcn_ss->info->expr : NULL;
 
       /* Pick out these transformational functions because they change the rank
@@ -3894,15 +3893,7 @@ gfc_trans_create_temp_array (stmtblock_t * pre, stmtblock_t * post, gfc_ss * ss,
       class_data = gfc_class_data_get (tmp);
 
       if (rank_changer)
-	{
-	  /* Take the dtype from the class expression.  */
-	  dtype = gfc_conv_descriptor_dtype_get (gfc_class_data_get (class_expr));
-	  gfc_conv_descriptor_dtype_set (pre, desc, dtype);
-
-	  /* These transformational functions change the rank.  */
-	  gfc_conv_descriptor_rank_set (pre, desc, ss->loop->dimen);
-	  fcn_ss->info->class_container = NULL_TREE;
-	}
+	fcn_ss->info->class_container = NULL_TREE;
 
       /* Assign the new descriptor to the _data field. This allows the
 	 vptr _copy to be used for scalarized assignment since the class
@@ -3913,12 +3904,6 @@ gfc_trans_create_temp_array (stmtblock_t * pre, stmtblock_t * post, gfc_ss * ss,
 
       /* Point desc to the class _data field.  */
       desc = class_data;
-    }
-  else
-    {
-      /* Fill in the array dtype.  */
-      gfc_conv_descriptor_dtype_set (pre, desc,
-				     gfc_get_dtype (TREE_TYPE (desc)));
     }
 
   info->descriptor = desc;
@@ -4006,10 +3991,6 @@ gfc_trans_create_temp_array (stmtblock_t * pre, stmtblock_t * post, gfc_ss * ss,
       nelem = size;
       size = NULL_TREE;
     }
-
-  /* Set the span.  */
-  tmp = fold_convert (gfc_array_index_type, elemsize);
-  gfc_conv_descriptor_span_set (pre, desc, tmp);
 
   tree data_ptr = gfc_trans_allocate_array_storage (pre, post, info, size,
 						    nelem, initial, dynamic,
