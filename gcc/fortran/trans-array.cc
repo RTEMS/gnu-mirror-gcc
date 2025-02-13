@@ -3621,10 +3621,9 @@ set_temporary_descriptor (stmtblock_t *block, tree desc, tree class_src,
 			  tree stride[GFC_MAX_DIMENSIONS], int rank,
 			  bool callee_allocated, bool rank_changer)
 {
-  tree class_expr = NULL_TREE;
   int n;
 
-  if (!class_expr)
+  if (!class_src)
     {
       /* Fill in the array dtype.  */
       gfc_conv_descriptor_dtype_set (block, desc,
