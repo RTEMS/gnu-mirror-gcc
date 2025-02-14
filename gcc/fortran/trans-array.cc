@@ -8167,7 +8167,7 @@ late_set_loop_bounds (gfc_loopinfo *loop)
     }
 
   for (loop = loop->nested; loop; loop = loop->next)
-    set_loop_bounds (loop);
+    late_set_loop_bounds (loop);
 }
 
 
