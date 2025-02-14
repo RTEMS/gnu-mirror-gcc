@@ -8144,22 +8144,24 @@ late_set_loop_bounds (gfc_loopinfo *loop)
 
   for (n = 0; n < loop->dimen; n++)
     {
-      /* We should have found the scalarization loop specifier.  If not,
-	 that's bad news.  */
-      gcc_assert (loopspec[n]);
-
-      info = &loopspec[n]->info->data.array;
-      dim = loopspec[n]->dim[n];
-
       /* Set the extents of this range.  */
-      if ((loop->from[n] == NULL_TREE
-	   || loop->to[n] == NULL_TREE)
-	  && loopspec[n]->info->type == GFC_SS_FUNCTION
-	  && info->start[dim]
-	  && info->end[dim])
+      if (loop->from[n] == NULL_TREE
+	  || loop->to[n] == NULL_TREE)
 	{
-	  loop->from[n] = info->start[dim];
-	  loop->to[n] = info->end[dim];
+	  /* We should have found the scalarization loop specifier.  If not,
+	     that's bad news.  */
+	  gcc_assert (loopspec[n]);
+
+	  info = &loopspec[n]->info->data.array;
+	  dim = loopspec[n]->dim[n];
+
+	  if (loopspec[n]->info->type == GFC_SS_FUNCTION
+	      && info->start[dim]
+	      && info->end[dim])
+	    {
+	      loop->from[n] = info->start[dim];
+	      loop->to[n] = info->end[dim];
+	    }
 	}
     }
 
