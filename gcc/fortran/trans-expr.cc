@@ -5473,16 +5473,6 @@ gfc_conv_subref_array_arg (gfc_se *se, gfc_expr * expr, int g77,
   /* Translate the expression.  */
   gfc_conv_expr (&rse, expr);
 
-  /* Reset the offset for the function call since the loop
-     is zero based on the data pointer.  Note that the temp
-     comes first in the loop chain since it is added second.  */
-  if (gfc_is_class_array_function (expr))
-    {
-      tmp = loop.ss->loop_chain->info->data.array.descriptor;
-      gfc_conv_descriptor_offset_set (&loop.pre, tmp,
-				      gfc_index_zero_node);
-    }
-
   gfc_conv_tmp_array_ref (&lse);
 
   if (intent != INTENT_OUT)
