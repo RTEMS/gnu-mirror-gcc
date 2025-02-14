@@ -7445,7 +7445,8 @@ done:
 	      int dim = ss->dim[n];
 
 	      info->start[dim]  = gfc_index_zero_node;
-	      info->end[dim]    = gfc_index_zero_node;
+	      if (ss_info->type != GFC_SS_FUNCTION)
+		info->end[dim]    = gfc_index_zero_node;
 	      info->stride[dim] = gfc_index_one_node;
 	    }
 	  break;
