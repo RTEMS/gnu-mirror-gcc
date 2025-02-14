@@ -8683,9 +8683,8 @@ retrieve_last_ref (gfc_ref **ref_in, gfc_ref **prev_ref_in)
 bool
 gfc_array_allocate (gfc_se * se, gfc_expr * expr, tree status, tree errmsg,
 		    tree errlen, tree label_finish, tree expr3_elem_size,
-		    tree *nelems, gfc_expr *expr3, tree e3_arr_desc,
-		    bool e3_has_nodescriptor, gfc_omp_namelist *omp_alloc,
-		    bool explicit_ts)
+		    gfc_expr *expr3, tree e3_arr_desc, bool e3_has_nodescriptor,
+		    gfc_omp_namelist *omp_alloc, bool explicit_ts)
 {
   tree tmp;
   tree pointer;
@@ -8822,7 +8821,6 @@ gfc_array_allocate (gfc_se * se, gfc_expr * expr, tree status, tree errmsg,
 				     expr3_elem_size, expr3, e3_arr_desc,
 				     e3_has_nodescriptor, expr, element_size,
 				     explicit_ts, &empty_array_cond);
-  *nelems = count;
 
   tree size = get_array_memory_size (element_size, count, empty_array_cond,
 				     &se->pre, &overflow);

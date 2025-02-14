@@ -21,7 +21,7 @@ along with GCC; see the file COPYING3.  If not see
 /* Generate code to initialize and allocate an array.  Statements are added to
    se, which should contain an expression for the array descriptor.  */
 bool gfc_array_allocate (gfc_se *, gfc_expr *, tree, tree, tree, tree,
-			 tree, tree *, gfc_expr *, tree, bool,
+			 tree, gfc_expr *, tree, bool,
 			 gfc_omp_namelist *, bool);
 
 /* Allow the bounds of a loop to be set from a callee's array spec.  */
