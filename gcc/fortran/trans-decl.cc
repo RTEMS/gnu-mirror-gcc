@@ -2100,12 +2100,10 @@ gfc_get_symbol_decl (gfc_symbol * sym)
      Marking this as artificial means that OpenMP will treat this as
      predetermined shared.  */
 
-  bool def_init = startswith (sym->name, "__def_init");
-
-  if (sym->attr.vtab || def_init)
+  if (sym->attr.vtab || startswith (sym->name, "__def_init"))
     {
       DECL_ARTIFICIAL (decl) = 1;
-      if (def_init && sym->value)
+      if (sym->attr.vtab || sym->value)
 	TREE_READONLY (decl) = 1;
     }
 
