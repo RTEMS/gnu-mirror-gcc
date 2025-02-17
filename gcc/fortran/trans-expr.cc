@@ -12644,26 +12644,30 @@ gfc_trans_assignment_1 (gfc_expr * expr1, gfc_expr * expr2, bool init_flag,
 	{
 	  realloc_lhs_warning (expr1->ts.type, true, &expr1->where);
 	  ompws_flags &= ~OMPWS_SCALARIZER_WS;
+	  stmtblock_t reallocation_block;
+	  gfc_init_block (&reallocation_block);
 	  reallocation = gfc_alloc_allocatable_for_assignment (&loop, expr1, expr2);
-	}
+	  gfc_add_expr_to_block (&reallocation_block, reallocation);
 
-      for (gfc_ss *s = loop.ss; s != gfc_ss_terminator; s = s->loop_chain)
-	{
-	  if (!s->is_alloc_lhs)
-	    continue;
-
-	  gcc_assert (s->info->type == GFC_SS_SECTION);
-	  gfc_array_info *info = &s->info->data.array;
-	  info->offset = gfc_evaluate_now (info->offset, &loop.pre);
-	  info->saved_offset = info->offset;
-	  for (int i = 0; i < s->dimen; i++)
+	  for (gfc_ss *s = loop.ss; s != gfc_ss_terminator; s = s->loop_chain)
 	    {
-	      int dim = s->dim[i];
-	      info->start[dim] = gfc_evaluate_now (info->start[dim], &loop.pre);
-	      info->end[dim] = gfc_evaluate_now (info->end[dim], &loop.pre);
-	      info->stride[dim] = gfc_evaluate_now (info->stride[dim], &loop.pre);
-	      info->delta[dim] = gfc_evaluate_now (info->delta[dim], &loop.pre);
+	      if (!s->is_alloc_lhs)
+		continue;
+
+	      gcc_assert (s->info->type == GFC_SS_SECTION);
+	      gfc_array_info *info = &s->info->data.array;
+	      info->offset = gfc_evaluate_now (info->offset, &reallocation_block);
+	      info->saved_offset = info->offset;
+	      for (int i = 0; i < s->dimen; i++)
+		{
+		  int dim = s->dim[i];
+		  info->start[dim] = gfc_evaluate_now (info->start[dim], &reallocation_block);
+		  info->end[dim] = gfc_evaluate_now (info->end[dim], &reallocation_block);
+		  info->stride[dim] = gfc_evaluate_now (info->stride[dim], &reallocation_block);
+		  info->delta[dim] = gfc_evaluate_now (info->delta[dim], &reallocation_block);
+		}
 	    }
+	  reallocation = gfc_finish_block (&reallocation_block);
 	}
 
       /* Start the scalarized loop body.  */
@@ -12971,11 +12975,11 @@ gfc_trans_assignment_1 (gfc_expr * expr1, gfc_expr * expr2, bool init_flag,
 	  gfc_add_expr_to_block (&body, tmp);
 	}
 
-      if (maybe_workshare)
-	ompws_flags &= ~OMPWS_SCALARIZER_BODY;
-
       if (reallocation != NULL_TREE)
 	gfc_add_expr_to_block (&loop.code[loop.dimen - 1], reallocation);
+
+      if (maybe_workshare)
+	ompws_flags &= ~OMPWS_SCALARIZER_BODY;
 
       /* Generate the copying loops.  */
       gfc_trans_scalarizing_loops (&loop, &body);
