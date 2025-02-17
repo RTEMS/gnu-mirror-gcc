@@ -1736,9 +1736,6 @@ trans_associate_var (gfc_symbol *sym, gfc_wrapped_block *block)
   bool class_target;
   bool unlimited;
   tree desc;
-  tree offset;
-  tree dim;
-  int n;
   tree charlen;
   bool need_len_assign;
   bool whole_array = true;
