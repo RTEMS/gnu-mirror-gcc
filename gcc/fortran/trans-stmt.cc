@@ -2012,16 +2012,6 @@ trans_associate_var (gfc_symbol *sym, gfc_wrapped_block *block)
 	  gfc_conv_shift_descriptor (&se.pre, desc, e->rank);
 	}
 
-      /* If this is a subreference array pointer associate name use the
-	 associate variable element size for the value of 'span'.  */
-      if (sym->attr.subref_array_pointer && !se.direct_byref)
-	{
-	  gcc_assert (e->expr_type == EXPR_VARIABLE);
-	  tmp = gfc_get_array_span (se.expr, e);
-
-	  gfc_conv_descriptor_span_set (&se.pre, desc, tmp);
-	}
-
       if (e->expr_type == EXPR_FUNCTION
 	  && sym->ts.type == BT_DERIVED
 	  && sym->ts.u.derived
