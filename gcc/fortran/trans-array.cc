@@ -5731,12 +5731,15 @@ gfc_conv_ss_descriptor (stmtblock_t * block, gfc_ss * ss, int base)
 		&& DECL_P (TREE_OPERAND (tmp, 0)))
 	    || (GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (se.expr))
 		&& TREE_CODE (se.expr) == COMPONENT_REF
-		&& GFC_CLASS_TYPE_P (TREE_TYPE (TREE_OPERAND (se.expr, 0))))))
+		&& GFC_CLASS_TYPE_P (TREE_TYPE (TREE_OPERAND (se.expr, 0)))))
+	  && !ss->is_alloc_lhs)
 	tmp = gfc_evaluate_now (tmp, block);
       info->data = tmp;
 
       tmp = gfc_conv_array_offset (se.expr);
-      info->offset = gfc_evaluate_now (tmp, block);
+      if (!ss->is_alloc_lhs)
+	tmp = gfc_evaluate_now (tmp, block);
+      info->offset = tmp;
 
       /* Make absolutely sure that the saved_offset is indeed saved
 	 so that the variable is still accessible after the loops
@@ -8294,7 +8297,10 @@ gfc_set_delta (gfc_loopinfo *loop)
 				     gfc_array_index_type,
 				     info->start[dim], tmp);
 
-	      info->delta[dim] = gfc_evaluate_now (tmp, &outer_loop->pre);
+	      if (ss->is_alloc_lhs)
+		info->delta[dim] = tmp;
+	      else 
+		info->delta[dim] = gfc_evaluate_now (tmp, &outer_loop->pre);
 	    }
 	}
     }
@@ -13579,6 +13585,52 @@ concat_str_length (gfc_expr* expr)
 }
 
 
+static void
+update_reallocated_descriptor (stmtblock_t *block, gfc_loopinfo *loop)
+{
+  for (gfc_ss *s = loop->ss; s != gfc_ss_terminator; s = s->loop_chain)
+    {
+      if (!s->is_alloc_lhs)
+	continue;
+
+      gcc_assert (s->info->type == GFC_SS_SECTION);
+      gfc_array_info *info = &s->info->data.array;
+      tree desc = info->descriptor;
+
+#define UPDATE_VALUE(field, value) \
+	      do \
+		{ \
+		  if ((field) && VAR_P ((field))) \
+		    { \
+		      tree val = (value); \
+		      gfc_add_modify (block, (field), val); \
+		    } \
+		  else \
+		    (field) = gfc_evaluate_now ((field), block); \
+		} \
+	      while (0)
+
+      UPDATE_VALUE (info->data, gfc_conv_descriptor_data_get (desc));
+      UPDATE_VALUE (info->offset, gfc_conv_descriptor_offset_get (desc));
+      info->saved_offset = info->offset;
+      for (int i = 0; i < s->dimen; i++)
+	{
+	  int dim = s->dim[i];
+	  tree tree_dim = gfc_rank_cst[dim]; 
+	  UPDATE_VALUE (info->start[dim],
+			gfc_conv_descriptor_lbound_get (desc, tree_dim));
+	  UPDATE_VALUE (info->end[dim],
+			gfc_conv_descriptor_ubound_get (desc, tree_dim));
+	  UPDATE_VALUE (info->stride[dim],
+			gfc_conv_descriptor_stride_get (desc, tree_dim));
+	  info->delta[dim] = gfc_evaluate_now (info->delta[dim], block);
+	}
+
+#undef UPDATE_VALUE
+    }
+}
+
+
 /* Allocate the lhs of an assignment to an allocatable array, otherwise
    reallocate it.  */
 
@@ -13671,7 +13723,7 @@ gfc_alloc_allocatable_for_assignment (gfc_loopinfo *loop,
       && !expr2->value.function.isym)
     expr2->ts.u.cl->backend_decl = rss->info->string_length;
 
-  gfc_start_block (&fblock);
+  gfc_init_block (&fblock);
 
   /* Since the lhs is allocatable, this must be a descriptor type.
      Get the data and array size.  */
@@ -13943,10 +13995,6 @@ gfc_alloc_allocatable_for_assignment (gfc_loopinfo *loop,
      the array offset is saved and the info.offset is used for a
      running offset.  Use the saved_offset instead.  */
   gfc_conv_descriptor_offset_set (&fblock, desc, offset);
-  if (linfo->saved_offset
-      && VAR_P (linfo->saved_offset))
-    gfc_add_modify (&fblock, linfo->saved_offset,
-		    gfc_conv_descriptor_offset_get (desc));
 
   /* Now set the deltas for the lhs.  */
   for (n = 0; n < expr1->rank; n++)
@@ -13956,8 +14004,6 @@ gfc_alloc_allocatable_for_assignment (gfc_loopinfo *loop,
       tmp = fold_build2_loc (input_location, MINUS_EXPR,
 			     gfc_array_index_type, tmp,
 			     loop->from[dim]);
-      if (linfo->delta[dim] && VAR_P (linfo->delta[dim]))
-	gfc_add_modify (&fblock, linfo->delta[dim], tmp);
     }
 
   /* Take into account _len of unlimited polymorphic entities, so that span
@@ -14178,16 +14224,11 @@ gfc_alloc_allocatable_for_assignment (gfc_loopinfo *loop,
   tmp = build3_v (COND_EXPR, cond_null, alloc_expr, realloc_expr);
   gfc_add_expr_to_block (&fblock, tmp);
 
-  /* Make sure that the scalarizer data pointer is updated.  */
-  if (linfo->data && VAR_P (linfo->data))
-    {
-      tmp = gfc_conv_descriptor_data_get (desc);
-      gfc_add_modify (&fblock, linfo->data, tmp);
-    }
-
   /* Add the label for same shape lhs and rhs.  */
   tmp = build1_v (LABEL_EXPR, jump_label2);
   gfc_add_expr_to_block (&fblock, tmp);
+
+  update_reallocated_descriptor (&fblock, loop);
 
   return gfc_finish_block (&fblock);
 }
