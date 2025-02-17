@@ -7020,12 +7020,11 @@ gfc_trans_scalarized_loop_boundary (gfc_loopinfo * loop, stmtblock_t * body)
 
 static void
 evaluate_bound (stmtblock_t *block, tree *bounds, gfc_expr ** values,
-		tree desc, int dim, bool lbound, bool deferred)
+		tree desc, int dim, bool lbound, bool deferred, bool save_value)
 {
   gfc_se se;
   gfc_expr * input_val = values[dim];
   tree *output = &bounds[dim];
-
 
   if (input_val)
     {
@@ -7052,7 +7051,8 @@ evaluate_bound (stmtblock_t *block, tree *bounds, gfc_expr ** values,
       *output = lbound ? gfc_conv_array_lbound (desc, dim) :
 			 gfc_conv_array_ubound (desc, dim);
     }
-  *output = gfc_evaluate_now (*output, block);
+  if (save_value)
+    *output = gfc_evaluate_now (*output, block);
 }
 
 
@@ -7085,18 +7085,18 @@ gfc_conv_section_startstride (stmtblock_t * block, gfc_ss * ss, int dim)
 	      || ar->dimen_type[dim] == DIMEN_THIS_IMAGE);
   desc = info->descriptor;
   stride = ar->stride[dim];
-
+  bool save_value = !ss->is_alloc_lhs;
 
   /* Calculate the start of the range.  For vector subscripts this will
      be the range of the vector.  */
   evaluate_bound (block, info->start, ar->start, desc, dim, true,
-		  ar->as->type == AS_DEFERRED);
+		  ar->as->type == AS_DEFERRED, save_value);
 
   /* Similarly calculate the end.  Although this is not used in the
      scalarizer, it is needed when checking bounds and where the end
      is an expression with side-effects.  */
   evaluate_bound (block, info->end, ar->end, desc, dim, false,
-		  ar->as->type == AS_DEFERRED);
+		  ar->as->type == AS_DEFERRED, save_value);
 
 
   /* Calculate the stride.  */
@@ -7107,7 +7107,11 @@ gfc_conv_section_startstride (stmtblock_t * block, gfc_ss * ss, int dim)
       gfc_init_se (&se, NULL);
       gfc_conv_expr_type (&se, stride, gfc_array_index_type);
       gfc_add_block_to_block (block, &se.pre);
-      info->stride[dim] = gfc_evaluate_now (se.expr, block);
+      tree value = se.expr;
+      if (save_value)
+	info->stride[dim] = gfc_evaluate_now (value, block);
+      else
+	info->stride[dim] = value;
     }
 }
 
@@ -9068,8 +9072,6 @@ gfc_array_allocate (gfc_se * se, gfc_expr * expr, tree status, tree errmsg,
   else
       gfc_add_expr_to_block (&se->pre, set_descriptor);
 
-  expr->symtree->n.sym->allocated_in_scope = 1;
-
   return true;
 }
 
@@ -10896,7 +10898,7 @@ gfc_conv_expr_descriptor (gfc_se *se, gfc_expr *expr)
 	  gcc_assert (n == codim - 1);
 	  evaluate_bound (&loop.pre, info->start, ar->start,
 			  info->descriptor, n + ndim, true,
-			  ar->as->type == AS_DEFERRED);
+			  ar->as->type == AS_DEFERRED, true);
 	  loop.from[n + loop.dimen] = info->start[n + ndim];
 	}
       else
@@ -13588,7 +13590,6 @@ gfc_alloc_allocatable_for_assignment (gfc_loopinfo *loop,
   stmtblock_t realloc_block;
   stmtblock_t alloc_block;
   stmtblock_t fblock;
-  stmtblock_t loop_pre_block;
   gfc_ref *ref;
   gfc_ss *rss;
   gfc_ss *lss;
@@ -13798,35 +13799,6 @@ gfc_alloc_allocatable_for_assignment (gfc_loopinfo *loop,
   for (ref = expr1->ref; ref; ref = ref->next)
     if (ref->type == REF_COMPONENT)
       break;
-
-  if (!expr1->symtree->n.sym->allocated_in_scope && !ref)
-    {
-      gfc_start_block (&loop_pre_block);
-      for (n = 0; n < expr1->rank; n++)
-	{
-	  gfc_conv_descriptor_lbound_set (&loop_pre_block, desc,
-					  gfc_rank_cst[n],
-					  gfc_index_one_node);
-	  gfc_conv_descriptor_ubound_set (&loop_pre_block, desc,
-					  gfc_rank_cst[n],
-					  gfc_index_zero_node);
-	  gfc_conv_descriptor_stride_set (&loop_pre_block, desc,
-					  gfc_rank_cst[n],
-					  gfc_index_zero_node);
-	}
-
-      gfc_conv_descriptor_offset_set (&loop_pre_block, desc, gfc_index_zero_node);
-
-      tmp = fold_build2_loc (input_location, EQ_EXPR,
-			     logical_type_node, array1,
-			     build_int_cst (TREE_TYPE (array1), 0));
-      tmp = build3_v (COND_EXPR, tmp,
-		      gfc_finish_block (&loop_pre_block),
-		      build_empty_stmt (input_location));
-      gfc_prepend_expr_to_block (&loop->pre, tmp);
-
-      expr1->symtree->n.sym->allocated_in_scope = 1;
-    }
 
   tmp = build3_v (COND_EXPR, cond_null,
 		  build1_v (GOTO_EXPR, jump_label1),
