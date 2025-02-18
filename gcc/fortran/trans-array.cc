@@ -13726,7 +13726,7 @@ gfc_alloc_allocatable_for_assignment (gfc_loopinfo *loop,
       && !expr2->value.function.isym)
     expr2->ts.u.cl->backend_decl = rss->info->string_length;
 
-  gfc_init_block (&fblock);
+  gfc_start_block (&fblock);
 
   /* Since the lhs is allocatable, this must be a descriptor type.
      Get the data and array size.  */
@@ -14231,9 +14231,14 @@ gfc_alloc_allocatable_for_assignment (gfc_loopinfo *loop,
   tmp = build1_v (LABEL_EXPR, jump_label2);
   gfc_add_expr_to_block (&fblock, tmp);
 
-  update_reallocated_descriptor (&fblock, loop);
+  tree realloc_code = gfc_finish_block (&fblock);
 
-  return gfc_finish_block (&fblock);
+  stmtblock_t result_block;
+  gfc_init_block (&result_block);
+  gfc_add_expr_to_block (&result_block, realloc_code);
+  update_reallocated_descriptor (&result_block, loop);
+
+  return gfc_finish_block (&result_block);
 }
 
 
