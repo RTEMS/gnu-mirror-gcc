@@ -13459,6 +13459,9 @@ gfc_is_reallocatable_lhs (gfc_expr *expr)
   gfc_ref * ref;
   gfc_symbol *sym;
 
+  if (!flag_realloc_lhs)
+    return false;
+
   if (!expr->ref)
     return false;
 
