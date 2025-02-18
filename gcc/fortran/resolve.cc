@@ -11310,6 +11310,8 @@ resolve_select_type (gfc_code *code, gfc_namespace *old_ns)
 	ref = gfc_copy_ref (ref);
     }
 
+  gfc_expr *orig_expr1 = code->expr1;
+
   /* Add EXEC_SELECT to switch on type.  */
   new_st = gfc_get_code (code->op);
   new_st->expr1 = code->expr1;
@@ -11378,13 +11380,14 @@ resolve_select_type (gfc_code *code, gfc_namespace *old_ns)
 	 that does precisely this here (instead of using the
 	 'global' one).  */
       const char * var_name = "";
-      if (code->expr1->symtree)
-	var_name = code->expr1->symtree->name;
-      if (code->expr1->ref)
+      if (orig_expr1->symtree)
+	var_name = orig_expr1->symtree->name;
+      if (orig_expr1->ref)
 	{
-	  for (gfc_ref *r = code->expr1->ref; r; r = r->next)
+	  for (gfc_ref *r = orig_expr1->ref; r; r = r->next)
 	    if (r->type == REF_COMPONENT
-		&& strcmp (r->u.c.component->name, "_data") != 0)
+		&& !(strcmp (r->u.c.component->name, "_data") == 0
+		     || strcmp (r->u.c.component->name, "_vptr") == 0))
 	      var_name = r->u.c.component->name;
 	}
 

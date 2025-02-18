@@ -6860,7 +6860,7 @@ select_type_push (gfc_symbol *sel)
 /* Set the temporary for the current intrinsic SELECT TYPE selector.  */
 
 static gfc_symtree *
-select_intrinsic_set_tmp (gfc_typespec *ts)
+select_intrinsic_set_tmp (gfc_typespec *ts, const char *var_name)
 {
   char name[GFC_MAX_SYMBOL_LEN];
   gfc_symtree *tmp;
@@ -6881,12 +6881,12 @@ select_intrinsic_set_tmp (gfc_typespec *ts)
     charlen = gfc_mpz_get_hwi (ts->u.cl->length->value.integer);
 
   if (ts->type != BT_CHARACTER)
-    sprintf (name, "__tmp_%s_%d", gfc_basic_typename (ts->type),
-	     ts->kind);
+    sprintf (name, "__tmp_%s_%d_%s", gfc_basic_typename (ts->type),
+	     ts->kind, var_name);
   else
     snprintf (name, sizeof (name),
-	      "__tmp_%s_" HOST_WIDE_INT_PRINT_DEC "_%d",
-	      gfc_basic_typename (ts->type), charlen, ts->kind);
+	      "__tmp_%s_" HOST_WIDE_INT_PRINT_DEC "_%d_%s",
+	      gfc_basic_typename (ts->type), charlen, ts->kind, var_name);
 
   gfc_get_sym_tree (name, gfc_current_ns, &tmp, false);
   sym = tmp->n.sym;
@@ -6911,6 +6911,22 @@ select_intrinsic_set_tmp (gfc_typespec *ts)
 }
 
 
+static const char *
+get_select_type_var_name ()
+{
+  const char *name = "";
+  gfc_expr *e = gfc_state_stack->construct->expr1;
+  if (e->symtree)
+    name = e->symtree->name;
+  for (gfc_ref *r = e->ref; r; r = r->next)
+    if (r->type == REF_COMPONENT
+	&& strcmp (r->u.c.component->name, "_data") != 0)
+      name = r->u.c.component->name;
+
+  return name;
+}
+
+
 /* Set up a temporary for the current TYPE IS / CLASS IS branch .  */
 
 static void
@@ -6928,7 +6944,10 @@ select_type_set_tmp (gfc_typespec *ts)
       return;
     }
 
-  tmp = select_intrinsic_set_tmp (ts);
+
+  const char *var_name = get_select_type_var_name ();
+
+  tmp = select_intrinsic_set_tmp (ts, var_name);
 
   if (tmp == NULL)
     {
@@ -6936,9 +6955,9 @@ select_type_set_tmp (gfc_typespec *ts)
 	return;
 
       if (ts->type == BT_CLASS)
-	sprintf (name, "__tmp_class_%s", ts->u.derived->name);
+	sprintf (name, "__tmp_class_%s_%s", ts->u.derived->name, var_name);
       else
-	sprintf (name, "__tmp_type_%s", ts->u.derived->name);
+	sprintf (name, "__tmp_type_%s_%s", ts->u.derived->name, var_name);
 
       gfc_get_sym_tree (name, gfc_current_ns, &tmp, false);
       sym = tmp->n.sym;
