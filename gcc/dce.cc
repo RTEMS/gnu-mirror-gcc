@@ -17,6 +17,7 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+#include <cassert>
 #define INCLUDE_ALGORITHM
 #define INCLUDE_FUNCTIONAL
 #include "config.h"
@@ -39,6 +40,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-pass.h"
 #include "dbgcnt.h"
 #include "rtl-iter.h"
+#include <unordered_set>
 
 using namespace rtl_ssa;
 
@@ -1237,30 +1239,81 @@ namespace
 
 } // namespace
 
-bool is_inherently_live(insn_info *insn)
+bool sets_global_register(rtx_insn* insn) {
+  rtx set = single_set(insn);
+  if (!set)
+    return false;
+
+  rtx dest = SET_DEST(set);
+  if (REG_P(dest) && HARD_REGISTER_NUM_P(REGNO(dest)) && global_regs[REGNO(dest)]) {
+    return true;
+  }
+
+  return false;
+}
+
+bool is_prelive(insn_info *insn)
 {
-  return insn->num_uses() > 0;
+  if (insn->is_artificial()) // phis are never prelive
+    return false;
+
+  /*
+   * There are a few functions we can use to detect if an instruction is
+   * inherently live:
+   * rtlanal.cc:
+   *  bool side_effects_p (const_rtx x);
+   *  bool volatile_insn_p (const_rtx x);
+   *
+   * rtlanal.h
+   *  bool has_side_effects (); inside class rtx_properties
+   *
+   * dce.cc:
+   *  static bool deletable_insn_p_1(rtx body); uses bool volatile_insn_p (const_rtx x);
+   *  static bool deletable_insn_p(rtx_insn *insn, bool fast, bitmap arg_stores);
+   * 
+   * Possibly the most accurate way would be to rewrite `static bool
+   * deletable_insn_p(rtx_insn *insn, bool fast, bitmap arg_stores);`
+   * 
+  */
+
+  // Now, we only have to handle rtx insns
+  assert(insn->is_real());
+  auto rtl = insn->rtl();
+
+  if (!INSN_P(rtl)) // This might be useless
+    return false;
+
+  rtx pat = PATTERN(rtl); // if we use this instead of rtl, then rtl notes wont be checked
+  
+  // TODO : join if statements
+
+  if (JUMP_P(rtl))
+    return true;
+
+  // We need to describe all possible prelive instructions, a list of all the instructions is inside `rtl.def`
+
+  // Mark set of a global register
+  if (sets_global_register(rtl))
+    return true;
+
+  // Call is inside side_effects_p
+  if (side_effects_p(rtl) || volatile_refs_p(rtl) || can_throw_internal(rtl))
+    return true;
+
+  return false;
 }
 
 static void
-rtl_ssa_dce_init(sbitmap &marked_rtx)
+rtl_ssa_dce_init()
 {
   calculate_dominance_info(CDI_DOMINATORS);
+  // here we create ssa form for function
   crtl->ssa = new rtl_ssa::function_info(cfun);
-
-  marked_rtx = sbitmap_alloc(get_max_uid() + 1);
-  bitmap_clear(marked_rtx);
-  if (dump_file)
-    fprintf(dump_file, "Allocated `marked_rtx` with size: %d\n", get_max_uid() + 1);
 }
 
 static void
-rtl_ssa_dce_done(sbitmap marked_rtx)
+rtl_ssa_dce_done()
 {
-  sbitmap_free(marked_rtx);
-  if (dump_file)
-    fprintf(dump_file, "Freed `marked_rtx`\n");
-
   free_dominance_info(CDI_DOMINATORS);
   if (crtl->ssa->perform_pending_updates())
     cleanup_cfg(0);
@@ -1273,24 +1326,20 @@ rtl_ssa_dce_done(sbitmap marked_rtx)
 }
 
 static void
-rtl_ssa_dce_mark_live(insn_info *info, vec<insn_info *> &worklist, sbitmap marked_rtx)
+rtl_ssa_dce_mark_live(insn_info *info, vec<insn_info *> &worklist, std::unordered_set<insn_info *> marked)
 {
   int info_uid = info->uid();
   if (dump_file)
   {
     fprintf(dump_file, "  Adding insn %d to worklist\n", info_uid);
   }
-  if (info_uid < 0)
-  {
-      return;
-  }
-  bitmap_set_bit(marked_rtx, info_uid);
 
+  marked.emplace(info);
   worklist.safe_push(info);
 }
 
-static void
-rtl_ssa_dce_mark(sbitmap marked_rtx)
+static auto_vec<insn_info *>
+rtl_ssa_dce_prelive(std::unordered_set<insn_info *> marked)
 {
   insn_info *next;
   auto_vec<insn_info *> worklist;
@@ -1316,9 +1365,9 @@ rtl_ssa_dce_mark(sbitmap marked_rtx)
     * Is seems, that insn->uid() is uniq enough
     */
 
-    if (is_inherently_live(insn))
+    if (is_prelive(insn))
     {
-      rtl_ssa_dce_mark_live(insn, worklist, marked_rtx);
+      rtl_ssa_dce_mark_live(insn, worklist, marked);
     }
 
     // if (insn->can_be_optimized () || insn->is_debug_insn ())
@@ -1326,12 +1375,18 @@ rtl_ssa_dce_mark(sbitmap marked_rtx)
     //  worklist.safe_push (insn);
   }
 
+  return worklist;
+}
+
+static void
+rtl_ssa_dce_mark(std::unordered_set<insn_info *> marked)
+{
+  auto worklist = rtl_ssa_dce_prelive(marked);
+
   if (dump_file)
     fprintf(dump_file, "Finished inherently live, marking parents\n");
   while (!worklist.is_empty())
   {
-    if (dump_file)
-      fprintf(dump_file, "Brruuh; ");
     insn_info *insn = worklist.pop();
     def_array defs = insn->defs(); // array - because of phi?
     if (dump_file)
@@ -1340,29 +1395,34 @@ rtl_ssa_dce_mark(sbitmap marked_rtx)
     {
       insn_info *parent_insn = defs[i]->insn();
       int parent_insn_uid = parent_insn->uid();
-      if (parent_insn_uid < 0)
-      {
-        continue;
-      }
+      // propage that some instruction in chain is live from bottom to top
       if (dump_file)
         fprintf(dump_file, "Trying to add: %d\n", parent_insn_uid);
-      if (!bitmap_bit_p(marked_rtx, parent_insn_uid))
+      // not yet marked
+      if (!(marked.count(parent_insn) > 0))
       {
         if (dump_file)
           fprintf(dump_file, "  Adding insn %d to worklist - mark\n", parent_insn_uid);
         worklist.safe_push(parent_insn);
-        if (parent_insn_uid >= 0)
-          bitmap_set_bit(marked_rtx, parent_insn_uid);
+        marked.emplace(parent_insn);
       }
     }
+
+    auto bb = insn->bb();
   }
+
+  // TODO : control dependence
 }
 
 static void
-rtl_ssa_dce_sweep(sbitmap marked_rtx)
+rtl_ssa_dce_sweep(std::unordered_set<insn_info *> marked)
 {
   insn_info *next;
-  auto_vec<insn_change const*> to_delete;
+  auto_vec<insn_change> to_delete;
+  // try to rewrite it with iterator?
+  // it might be better to iterate over `marked`
+  // we can get the number of items in the set and create an array of changes
+  // which will hopefully have constructor for array_slice<insn_info *>
   for (insn_info *insn = crtl->ssa->first_insn(); insn; insn = next)
   {
     if (dump_file)
@@ -1370,14 +1430,12 @@ rtl_ssa_dce_sweep(sbitmap marked_rtx)
       fprintf(dump_file, "Insn: %d\n", insn->uid());
     }
     next = insn->next_any_insn();
-    if (dump_file)
+    if (!(marked.count(insn) > 0))
     {
-      fprintf(dump_file, "  Sweeping insn %d\n", insn->uid());
-    }
-    if (insn->uid() < 0)
-      continue;
-    if (!bitmap_bit_p(marked_rtx, insn->uid()))
-    {
+      if (dump_file)
+      {
+        fprintf(dump_file, "  Sweeping insn %d\n", insn->uid());
+      }
       // rtx_insn* rtl = insn->rtl();
       // How to delete phis?
       // if (rtl != nullptr) {
@@ -1393,21 +1451,27 @@ rtl_ssa_dce_sweep(sbitmap marked_rtx)
       // insn->rtl()->set_deleted();
     }
   }
-  // array_slice<insn_change&> d(to_delete);
+  
+  auto_vec<insn_change*> changes{to_delete.length()};
+  for (auto i = 0; i != to_delete.length(); ++i) {
+    changes[i] = &to_delete[i];
+  }
 
-  // crtl->ssa->change_insns();
+  // if (verify_insn_changes())
+  crtl->ssa->change_insns(changes);
 }
 
 static unsigned int
 rtl_ssa_dce()
 {
   // I can do something like invert phi uid and shift it
-  sbitmap marked_rtx;
-  rtl_ssa_dce_init(marked_rtx);
-  rtl_ssa_dce_mark(marked_rtx);
-  rtl_ssa_dce_sweep(marked_rtx);
+  // unordered_set seems to be the easiest option
+  std::unordered_set<insn_info *> marked;
+  rtl_ssa_dce_init();
+  rtl_ssa_dce_mark(marked);
+  rtl_ssa_dce_sweep(marked);
+  rtl_ssa_dce_done();
 
-  rtl_ssa_dce_done(marked_rtx);
   return 0;
 }
 
