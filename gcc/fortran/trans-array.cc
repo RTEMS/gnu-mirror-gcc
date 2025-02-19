@@ -13613,7 +13613,6 @@ update_reallocated_descriptor (stmtblock_t *block, gfc_loopinfo *loop)
 		} \
 	      while (0)
 
-      UPDATE_VALUE (info->data, gfc_conv_descriptor_data_get (desc));
       UPDATE_VALUE (info->offset, gfc_conv_descriptor_offset_get (desc));
       info->saved_offset = info->offset;
       for (int i = 0; i < s->dimen; i++)
