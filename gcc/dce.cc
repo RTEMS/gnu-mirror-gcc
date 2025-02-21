@@ -17,8 +17,10 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+#include <cassert>
 #define INCLUDE_ALGORITHM
 #define INCLUDE_FUNCTIONAL
+#define INCLUDE_ARRAY
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -30,7 +32,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "rtl-ssa.h"
 #include "memmodel.h"
 #include "tm_p.h"
-#include "emit-rtl.h"  /* FIXME: Can go away once crtl is moved to rtl.h.  */
+#include "emit-rtl.h" /* FIXME: Can go away once crtl is moved to rtl.h.  */
 #include "cfgrtl.h"
 #include "cfgbuild.h"
 #include "cfgcleanup.h"
@@ -39,6 +41,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-pass.h"
 #include "dbgcnt.h"
 #include "rtl-iter.h"
+#include <unordered_set>
 
 using namespace rtl_ssa;
 
@@ -1300,128 +1303,282 @@ public:
 } // namespace
 
 
-bool is_inherently_live(insn_info *insn) {
+bool sets_global_register(rtx_insn* insn) {
+  rtx set = single_set(insn);
+  if (!set)
+    return false;
 
+  rtx dest = SET_DEST(set);
+  if (REG_P(dest) && HARD_REGISTER_NUM_P(REGNO(dest)) && global_regs[REGNO(dest)]) {
+    return true;
+  }
+
+  return false;
 }
 
-static void rti_ssa_dce_() {
+bool is_prelive(insn_info *insn)
+{
+  if (insn->is_artificial()) // phis are never prelive
+    return false;
+
+  /*
+   * There are a few functions we can use to detect if an instruction is
+   * inherently live:
+   * rtlanal.cc:
+   *  bool side_effects_p (const_rtx x);
+   *  bool volatile_insn_p (const_rtx x);
+   *
+   * rtlanal.h
+   *  bool has_side_effects (); inside class rtx_properties
+   *
+   * dce.cc:
+   *  static bool deletable_insn_p_1(rtx body); uses bool volatile_insn_p (const_rtx x);
+   *  static bool deletable_insn_p(rtx_insn *insn, bool fast, bitmap arg_stores);
+   * 
+   * Possibly the most accurate way would be to rewrite `static bool
+   * deletable_insn_p(rtx_insn *insn, bool fast, bitmap arg_stores);`
+   * 
+  */
+
+  // Now, we only have to handle rtx insns
+  assert(insn->is_real());
+  auto rtl = insn->rtl();
+
+  if (!INSN_P(rtl)) // This might be useless
+    return false;
+
+  rtx pat = PATTERN(rtl); // if we use this instead of rtl, then rtl notes wont be checked
   
+  // TODO : join if statements
+
+  if (JUMP_P(rtl))
+    return true;
+
+  // We need to describe all possible prelive instructions, a list of all the instructions is inside `rtl.def`
+
+  // Mark set of a global register
+  if (sets_global_register(rtl))
+    return true;
+
+  // Call is inside side_effects_p
+  if (side_effects_p(rtl) || volatile_refs_p(rtl) || can_throw_internal(rtl))
+    return true;
+
+  return false;
 }
 
 static void
-rtl_ssa_dce_init ()
+rtl_ssa_dce_init()
 {
-    calculate_dominance_info (CDI_DOMINATORS);
-    crtl->ssa = new rtl_ssa::function_info (cfun);
+  calculate_dominance_info(CDI_DOMINATORS);
+  // here we create ssa form for function
+  crtl->ssa = new rtl_ssa::function_info(cfun);
 }
 
 static void
-rtl_ssa_dce_done ()
+rtl_ssa_dce_done()
 {
-    free_dominance_info (CDI_DOMINATORS);
-    if (crtl->ssa->perform_pending_updates ())
-      cleanup_cfg (0);
+  free_dominance_info(CDI_DOMINATORS);
+  if (crtl->ssa->perform_pending_updates())
+    cleanup_cfg(0);
 
-    delete crtl->ssa;
-    crtl->ssa = nullptr;
+  delete crtl->ssa;
+  crtl->ssa = nullptr;
 
+  if (dump_file)
+    fprintf(dump_file, "\nFinished running rtl_ssa_dce\n\n");
+}
+
+static void
+rtl_ssa_dce_mark_live(insn_info *info, vec<insn_info *> &worklist, std::unordered_set<insn_info *> marked)
+{
+  int info_uid = info->uid();
+  if (dump_file)
+  {
+    fprintf(dump_file, "  Adding insn %d to worklist\n", info_uid);
+  }
+
+  marked.emplace(info);
+  worklist.safe_push(info);
+}
+
+static auto_vec<insn_info *>
+rtl_ssa_dce_prelive(std::unordered_set<insn_info *> marked)
+{
+  insn_info *next;
+  auto_vec<insn_info *> worklist;
+  for (insn_info *insn = crtl->ssa->first_insn(); insn; insn = next)
+  {
     if (dump_file)
-      fprintf (dump_file, "\nFinished running rtl_ssa_dce\n\n");
+    {
+      fprintf(dump_file, "Insn: %d\n", insn->uid());
+    }
+    next = insn->next_any_insn();
+    /*
+    I would like to mark visited instruction with something like plf (Pass local flags) as in gimple
+
+    This file contains some useful functions: e.g. marked_insn_p, mark_insn
+    mark_insn does much more than I want now...
+    It does quite a useful job. If rtl_insn is a call and it is obsolete, it will find call arguments.
+
+    insn.defs() // UD chain - this is what I want - reach the ancestors\
+    insn.uses() // DU chain
+
+
+    * For marking phi nodes, which don't have uid (insn->rtl() is null) by definition, use a dictionary and store their addresses
+    * Is seems, that insn->uid() is uniq enough
+    */
+
+    if (is_prelive(insn))
+    {
+      rtl_ssa_dce_mark_live(insn, worklist, marked);
+    }
+
+    // if (insn->can_be_optimized () || insn->is_debug_insn ())
+    //  if (fwprop_insn (insn, fwprop_addr_p))
+    //  worklist.safe_push (insn);
+  }
+
+  return worklist;
+}
+
+static void
+rtl_ssa_dce_mark(std::unordered_set<insn_info *> marked)
+{
+  auto worklist = rtl_ssa_dce_prelive(marked);
+
+  if (dump_file)
+    fprintf(dump_file, "Finished inherently live, marking parents\n");
+  while (!worklist.is_empty())
+  {
+    insn_info *insn = worklist.pop();
+    def_array defs = insn->defs(); // array - because of phi?
+    if (dump_file)
+      fprintf(dump_file, "Looking at: %d, defs: %d\n", insn->uid(), defs.size());
+    for (size_t i = 0; i < defs.size(); i++)
+    {
+      insn_info *parent_insn = defs[i]->insn();
+      int parent_insn_uid = parent_insn->uid();
+      // propage that some instruction in chain is live from bottom to top
+      if (dump_file)
+        fprintf(dump_file, "Trying to add: %d\n", parent_insn_uid);
+      // not yet marked
+      if (!(marked.count(parent_insn) > 0))
+      {
+        if (dump_file)
+          fprintf(dump_file, "  Adding insn %d to worklist - mark\n", parent_insn_uid);
+        worklist.safe_push(parent_insn);
+        marked.emplace(parent_insn);
+      }
+    }
+
+    auto bb = insn->bb();
+  }
+
+  // TODO : control dependence
+}
+
+static void
+rtl_ssa_dce_sweep(std::unordered_set<insn_info *> marked)
+{
+  insn_info *next;
+  auto_vec<insn_change> to_delete;
+  // try to rewrite it with iterator?
+  // it might be better to iterate over `marked`
+  // we can get the number of items in the set and create an array of changes
+  // which will hopefully have constructor for array_slice<insn_info *>
+  for (insn_info *insn = crtl->ssa->first_insn(); insn; insn = next)
+  {
+    if (dump_file)
+    {
+      fprintf(dump_file, "Insn: %d\n", insn->uid());
+    }
+    next = insn->next_any_insn();
+    if (!(marked.count(insn) > 0))
+    {
+      if (dump_file)
+      {
+        fprintf(dump_file, "  Sweeping insn %d\n", insn->uid());
+      }
+      // rtx_insn* rtl = insn->rtl();
+      // How to delete phis?
+      // if (rtl != nullptr) {
+      //   delete_insn(rtl);
+      // }
+      if (insn->rtl())
+      {
+        auto change = insn_change::delete_insn(insn);
+        // crtl->ssa->possibly_queue_changes(change);
+        to_delete.safe_push(change);
+        // crtl->ssa->change_insn(change);
+      }
+      // insn->rtl()->set_deleted();
+    }
+  }
+  
+  auto_vec<insn_change*> changes{to_delete.length()};
+  for (auto i = 0; i != to_delete.length(); ++i) {
+    changes[i] = &to_delete[i];
+  }
+
+  // if (verify_insn_changes())
+  crtl->ssa->change_insns(changes);
 }
 
 static unsigned int
-rtl_ssa_dce ()
+rtl_ssa_dce()
 {
-    rtl_ssa_dce_init ();
+  // I can do something like invert phi uid and shift it
+  // unordered_set seems to be the easiest option
+  std::unordered_set<insn_info *> marked;
+  rtl_ssa_dce_init();
+  rtl_ssa_dce_mark(marked);
+  rtl_ssa_dce_sweep(marked);
+  rtl_ssa_dce_done();
 
-    insn_info *next;
-    sbitmap marked;
-    auto_vec<insn_info *> worklist;
-    for (insn_info *insn = crtl->ssa->first_insn (); insn; insn = next)
-    {
-      next = insn->next_any_insn ();
-      auto *rtl = insn->rtl();
-      /*
-      I would like to mark visited instruction with something like plf (Pass local flags) as in gimple
-
-      This file contains some useful functions: e.g. marked_insn_p, mark_insn
-      mark_insn does much more than I want now...
-      It does quite a useful job. If rtl_insn is a call and it is obsolete, it will find call arguments.
-      */
-     // insn.defs() // UD chain - this is what I want - reach the ancestors\
-     // insn.uses() // DU chain
-      if (is_inherently_live(insn)) {
-        if (dump_file)
-	          fprintf (dump_file, "  Adding insn %d to worklist\n", INSN_UID (insn));
-        worklist.safe_push (insn);
-        bitmap_set_bit(marked, INSN_UID (insn)); 
-      }
-
-      //if (insn->can_be_optimized () || insn->is_debug_insn ())
-	    // if (fwprop_insn (insn, fwprop_addr_p))
-	    // worklist.safe_push (insn);
-    }
-
-    while (!worklist.is_empty())
-    {
-      insn_info *insn = worklist.pop();
-      def_array defs = insn->defs(); // array - because of phi?
-      for (size_t i = 0; i < defs.size(); i++)
-      {
-
-        insn_info* parent_insn = defs[i]->insn();
-
-        if (!bitmap_bit_p(INSN_UID (parent_insn))) {
-          if (dump_file)
-	          fprintf (dump_file, "  Adding insn %d to worklist\n", INSN_UID (parent_insn));
-          worklist.safe_push(parent_insn);
-          bitmap_set_bit(marked, INSN_UID (parent_insn)); 
-        }
-      }
-    }
-    
-    rtl_ssa_dce_done ();
-    return 0;
+  return 0;
 }
 
 rtl_opt_pass *
-make_pass_fast_rtl_dce (gcc::context *ctxt)
+make_pass_fast_rtl_dce(gcc::context *ctxt)
 {
-  return new pass_fast_rtl_dce (ctxt);
+  return new pass_fast_rtl_dce(ctxt);
 }
 
-namespace {
-
-const pass_data pass_data_rtl_ssa_dce = {
-  RTL_PASS,	  /* type */
-  "rtl_ssa_dce",  /* name */
-  OPTGROUP_NONE,  /* optinfo_flags */
-  TV_DCE,	  /* tv_id */
-  0,		  /* properties_required */
-  0,		  /* properties_provided */
-  0,		  /* properties_destroyed */
-  0,		  /* todo_flags_start */
-  TODO_df_finish, /* todo_flags_finish */
-};
-
-class pass_rtl_ssa_dce : public rtl_opt_pass
+namespace
 {
-public:
-  pass_rtl_ssa_dce (gcc::context *ctxt)
-    : rtl_opt_pass (pass_data_rtl_ssa_dce, ctxt)
-  {}
 
-  /* opt_pass methods: */
-  bool gate (function *) final override { return flag_dce; }
+  const pass_data pass_data_rtl_ssa_dce = {
+      RTL_PASS,       /* type */
+      "rtl_ssa_dce",  /* name */
+      OPTGROUP_NONE,  /* optinfo_flags */
+      TV_DCE,         /* tv_id */
+      0,              /* properties_required */
+      0,              /* properties_provided */
+      0,              /* properties_destroyed */
+      0,              /* todo_flags_start */
+      TODO_df_finish, /* todo_flags_finish */
+  };
 
-  unsigned int execute (function *) final override { return rtl_ssa_dce (); }
+  class pass_rtl_ssa_dce : public rtl_opt_pass
+  {
+  public:
+    pass_rtl_ssa_dce(gcc::context *ctxt)
+        : rtl_opt_pass(pass_data_rtl_ssa_dce, ctxt)
+    {
+    }
 
-}; // class pass_fast_rtl_dce
+    /* opt_pass methods: */
+    bool gate(function *) final override { return flag_dce; }
+
+    unsigned int execute(function *) final override { return rtl_ssa_dce(); }
+
+  }; // class pass_fast_rtl_dce
 
 } // namespace
 
 rtl_opt_pass *
-make_pass_rtl_ssa_dce (gcc::context *ctxt)
+make_pass_rtl_ssa_dce(gcc::context *ctxt)
 {
-  return new pass_rtl_ssa_dce (ctxt);
+  return new pass_rtl_ssa_dce(ctxt);
 }
