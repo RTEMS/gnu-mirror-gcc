@@ -17,7 +17,6 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-#include <cassert>
 #define INCLUDE_ALGORITHM
 #define INCLUDE_FUNCTIONAL
 #define INCLUDE_ARRAY
@@ -1316,6 +1315,28 @@ bool sets_global_register(rtx_insn* insn) {
   return false;
 }
 
+bool is_control_flow(rtx_code code) {
+  // What about BARRIERs?
+  switch (code) {
+    case JUMP_INSN:
+    case JUMP_TABLE_DATA: // Be careful with Table jump addresses - ADDR_VEC, ADDR_DIFF_VEC, PREFETCH 
+    case TRAP_IF:
+    case IF_THEN_ELSE: // Also COMPARE?
+    case COND_EXEC: // We might want to check the operation that is under this?
+    case RETURN:
+    case SIMPLE_RETURN:
+    case EH_RETURN:
+      return true;
+
+    default:
+      return false;
+  }
+}
+
+bool handle_rtl_previle(rtx_insn *insn) {
+  // TODO : handle everything except parallel
+}
+
 bool is_prelive(insn_info *insn)
 {
   if (insn->is_artificial()) // phis are never prelive
@@ -1341,7 +1362,7 @@ bool is_prelive(insn_info *insn)
   */
 
   // Now, we only have to handle rtx insns
-  assert(insn->is_real());
+  gcc_assert (insn->is_real());
   auto rtl = insn->rtl();
 
   if (!INSN_P(rtl)) // This might be useless
@@ -1350,19 +1371,22 @@ bool is_prelive(insn_info *insn)
   rtx pat = PATTERN(rtl); // if we use this instead of rtl, then rtl notes wont be checked
   
   // TODO : join if statements
-
-  if (JUMP_P(rtl))
-    return true;
-
   // We need to describe all possible prelive instructions, a list of all the instructions is inside `rtl.def`
+
+  // Control flow
+  auto rtl_code = GET_CODE(rtl);
+  if (is_control_flow(rtl_code))
+    return true;
 
   // Mark set of a global register
   if (sets_global_register(rtl))
     return true;
 
   // Call is inside side_effects_p
-  if (side_effects_p(rtl) || volatile_refs_p(rtl) || can_throw_internal(rtl))
+  if (volatile_refs_p(rtl) || can_throw_internal(rtl) || BARRIER_P(rtl) || rtl_code == PREFETCH)
     return true;
+
+  // TODO : handle parallel, {pre,post}_{int,dec}, {pre,post}_modify
 
   return false;
 }
@@ -1521,8 +1545,8 @@ rtl_ssa_dce_sweep(std::unordered_set<insn_info *> marked)
     changes[i] = &to_delete[i];
   }
 
-  // if (verify_insn_changes())
   crtl->ssa->change_insns(changes);
+  // if (verify_insn_changes())
 }
 
 static unsigned int
