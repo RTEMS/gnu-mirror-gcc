@@ -1466,8 +1466,16 @@
 ;; Return 1 if OP is a comparison operator suitable for vector/scalar
 ;; comparisons that generate a 0/-1 mask (i.e. the inverse of
 ;; fpmask_comparison_operator).
+;;
+;; invert_fpmask_comparison_operator is used to form floating point conditional
+;; moves on power9.  The instructions that would be generated (xscmpeqdp,
+;; xscmpgtdp, or xscmpgedp) will raise an error if one of the arguments is a
+;; signalling NaN.  Don't allow the test to be inverted if NaNs are supported
+;; and the comparison is an ordered comparison.
 (define_predicate "invert_fpmask_comparison_operator"
-  (match_code "ne,unlt,unle"))
+  (ior (match_code "ne")
+       (and (match_code "unlt,unle")
+	    (match_test "flag_finite_math_only"))))
 
 ;; Return 1 if OP is a comparison operation suitable for integer vector/scalar
 ;; comparisons that generate a -1/0 mask.

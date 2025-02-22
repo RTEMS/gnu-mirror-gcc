@@ -15360,17 +15360,38 @@ rs6000_print_patchable_function_entry (FILE *file,
 }
 
 enum rtx_code
-rs6000_reverse_condition (machine_mode mode, enum rtx_code code)
+rs6000_reverse_condition (machine_mode mode,
+			  enum rtx_code code,
+			  enum reverse_cond_t ordered_cmp_ok)
 {
   /* Reversal of FP compares takes care -- an ordered compare
-     becomes an unordered compare and vice versa.  */
-  if (mode == CCFPmode
-      && (!flag_finite_math_only
-	  || code == UNLT || code == UNLE || code == UNGT || code == UNGE
-	  || code == UNEQ || code == LTGT))
-    return reverse_condition_maybe_unordered (code);
-  else
-    return reverse_condition (code);
+     becomes an unordered compare and vice versa.
+
+     However, this is not safe for ordered comparisons (i.e. for isgreater,
+     etc.)  starting with the power9 because ifcvt.cc will want to create a fp
+     cmove, and the x{s,v}cmp{eq,gt,ge}{dp,qp} instructions will trap if one of
+     the arguments is a signalling NaN.  */
+
+  if (mode == CCFPmode)
+    {
+      /* If NaNs are allowed, don't allow the reversal of floating point
+	 comparisons when the comparison is used in the context of a floating
+	 point conditional move when REVERSE_COND_NO_ORDERED is passed.  We do
+	 allow the comparsion to be reversed for explicit jumps when
+	 REVERSE_COND_ORDERED_OK is passed.  */
+      if (!flag_finite_math_only)
+	return (ordered_cmp_ok == REVERSE_COND_NO_ORDERED
+		? UNKNOWN
+		: reverse_condition_maybe_unordered (code));
+
+      /* Explicit ordered comparisions can be reversed if NaNs are not
+	 allowed.  */
+      else if (code == UNLT || code == UNLE || code == UNGT || code == UNGE
+	       || code == UNEQ || code == LTGT)
+	return reverse_condition_maybe_unordered (code);
+    }
+
+  return reverse_condition (code);
 }
 
 /* Check if C (as 64bit integer) can be rotated to a constant which constains
@@ -15980,11 +16001,14 @@ rs6000_emit_sCOND (machine_mode mode, rtx operands[])
       rtx not_result = gen_reg_rtx (CCEQmode);
       rtx not_op, rev_cond_rtx;
       machine_mode cc_mode;
+      enum rtx_code rev;
 
       cc_mode = GET_MODE (XEXP (condition_rtx, 0));
 
-      rev_cond_rtx = gen_rtx_fmt_ee (rs6000_reverse_condition (cc_mode, cond_code),
-				     SImode, XEXP (condition_rtx, 0), const0_rtx);
+      rev = rs6000_reverse_condition (cc_mode, cond_code,
+				      REVERSE_COND_ORDERED_OK);
+      rev_cond_rtx = gen_rtx_fmt_ee (rev, SImode, XEXP (condition_rtx, 0),
+				     const0_rtx);
       not_op = gen_rtx_COMPARE (CCEQmode, rev_cond_rtx, const0_rtx);
       emit_insn (gen_rtx_SET (not_result, not_op));
       condition_rtx = gen_rtx_EQ (VOIDmode, not_result, const0_rtx);
