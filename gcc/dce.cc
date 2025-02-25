@@ -17,6 +17,8 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+#include <iostream>
+#include <ostream>
 #define INCLUDE_ALGORITHM
 #define INCLUDE_FUNCTIONAL
 #define INCLUDE_ARRAY
@@ -1302,13 +1304,29 @@ public:
 } // namespace
 
 
+bool sets_global_register(const_rtx rtx) {
+  auto code = GET_CODE(rtx);
+  if (GET_RTX_CLASS(code) != RTX_INSN)
+    return false;
+
+  return sets_global_register(static_cast<const rtx_insn*>(rtx));
+}
+
+// We should mark stack registers
 bool sets_global_register(rtx_insn* insn) {
   rtx set = single_set(insn);
   if (!set)
     return false;
 
   rtx dest = SET_DEST(set);
-  if (REG_P(dest) && HARD_REGISTER_NUM_P(REGNO(dest)) && global_regs[REGNO(dest)]) {
+
+  // TODO : rewrite to simple return
+  std::cerr << "first pseudo: " << FIRST_PSEUDO_REGISTER << '\n';
+  std::cerr << "register: " << REGNO(dest) << "\n";
+  debug(insn);
+  // If I understand correctly, global_regs[i] is 1 iff reg i is used
+  if (REG_P(dest) && HARD_REGISTER_NUM_P(REGNO(dest))) { // && global_regs[REGNO(dest)]
+    std::cerr << "sets_global_register: true\n";
     return true;
   }
 
@@ -1326,6 +1344,7 @@ bool is_control_flow(rtx_code code) {
     case RETURN:
     case SIMPLE_RETURN:
     case EH_RETURN:
+    case LABEL_REF:
       return true;
 
     default:
@@ -1333,13 +1352,66 @@ bool is_control_flow(rtx_code code) {
   }
 }
 
-bool handle_rtl_previle(rtx_insn *insn) {
-  // TODO : handle everything except parallel
+bool is_unary_mem_modification(rtx_code code) {
+  switch (code) {
+    case PRE_DEC:
+    case PRE_INC:
+    case POST_DEC:
+    case POST_INC:
+    case PRE_MODIFY:
+    case POST_MODIFY:
+      return true;
+
+    default:
+      return false;
+  }
+}
+
+bool is_rtx_insn_prelive(const_rtx rtx) {
+  if (rtx == nullptr) {
+    return false;
+  }
+
+  auto code = GET_CODE(rtx);
+  if (is_control_flow(code))
+    return true;
+
+  // Mark set of a global register
+  if (sets_global_register(rtx)) // check rtx_class with GET_RTX_CLASS if RTX_ISNS and convert if needed
+    return true;
+
+  // Call is inside side_effects_p - how to mark parameter registers?
+  if (volatile_refs_p(rtx) || can_throw_internal(rtx) || BARRIER_P(rtx) || code == PREFETCH)
+    return true;
+
+  if (is_unary_mem_modification(code))
+    return true;
+
+  // TODO : parallel, {pre,post}_{int,dec}, {pre,post}_modify, may_trap_or_fault_p
+  // Parallel is handled by volatile_refs_p
+
+  switch (code) {
+    
+  }
+
+  const char *const fmt = GET_RTX_FORMAT (code);
+  for (size_t i = 0; i < GET_RTX_LENGTH(code); ++i) {
+    if (fmt[i] == 'e' && is_rtx_insn_prelive(XEXP(rtx, i))) {
+      return true;
+    } else if (fmt[i] == 'E') {
+      for (size_t j = 0; j < XVECLEN(rtx, i); ++j) {
+        if (is_rtx_insn_prelive(XVECEXP(rtx, i, j)))
+          return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 bool is_prelive(insn_info *insn)
 {
-  if (insn->is_artificial()) // phis are never prelive
+  if (insn->is_artificial()) // phis are never prelive, bb head + end are artificial
     return false;
 
   /*
@@ -1374,8 +1446,8 @@ bool is_prelive(insn_info *insn)
   // We need to describe all possible prelive instructions, a list of all the instructions is inside `rtl.def`
 
   // Control flow
-  auto rtl_code = GET_CODE(rtl);
-  if (is_control_flow(rtl_code))
+  auto code = GET_CODE(rtl);
+  if (is_control_flow(code))
     return true;
 
   // Mark set of a global register
@@ -1383,8 +1455,15 @@ bool is_prelive(insn_info *insn)
     return true;
 
   // Call is inside side_effects_p
-  if (volatile_refs_p(rtl) || can_throw_internal(rtl) || BARRIER_P(rtl) || rtl_code == PREFETCH)
+  std::cerr << "Prelive: " << GET_RTX_NAME(code) << '\n';
+  // debug(insn);
+  debug(rtl);
+  if (volatile_refs_p(rtl) || can_throw_internal(rtl) || BARRIER_P(rtl) || code == PREFETCH)
     return true;
+
+  if (code == PARALLEL) {
+
+  }
 
   // TODO : handle parallel, {pre,post}_{int,dec}, {pre,post}_modify
 
@@ -1418,9 +1497,7 @@ rtl_ssa_dce_mark_live(insn_info *info, vec<insn_info *> &worklist, std::unordere
 {
   int info_uid = info->uid();
   if (dump_file)
-  {
     fprintf(dump_file, "  Adding insn %d to worklist\n", info_uid);
-  }
 
   marked.emplace(info);
   worklist.safe_push(info);
@@ -1433,10 +1510,6 @@ rtl_ssa_dce_prelive(std::unordered_set<insn_info *> marked)
   auto_vec<insn_info *> worklist;
   for (insn_info *insn = crtl->ssa->first_insn(); insn; insn = next)
   {
-    if (dump_file)
-    {
-      fprintf(dump_file, "Insn: %d\n", insn->uid());
-    }
     next = insn->next_any_insn();
     /*
     I would like to mark visited instruction with something like plf (Pass local flags) as in gimple
@@ -1479,6 +1552,7 @@ rtl_ssa_dce_mark(std::unordered_set<insn_info *> marked)
     def_array defs = insn->defs(); // array - because of phi?
     if (dump_file)
       fprintf(dump_file, "Looking at: %d, defs: %d\n", insn->uid(), defs.size());
+    // I hope that the ssa form uses defs and we don't have to scan inner content
     for (size_t i = 0; i < defs.size(); i++)
     {
       insn_info *parent_insn = defs[i]->insn();
@@ -1496,7 +1570,7 @@ rtl_ssa_dce_mark(std::unordered_set<insn_info *> marked)
       }
     }
 
-    auto bb = insn->bb();
+    // auto bb = insn->bb();
   }
 
   // TODO : control dependence
@@ -1524,11 +1598,7 @@ rtl_ssa_dce_sweep(std::unordered_set<insn_info *> marked)
       {
         fprintf(dump_file, "  Sweeping insn %d\n", insn->uid());
       }
-      // rtx_insn* rtl = insn->rtl();
-      // How to delete phis?
-      // if (rtl != nullptr) {
-      //   delete_insn(rtl);
-      // }
+
       if (insn->rtl())
       {
         auto change = insn_change::delete_insn(insn);
@@ -1536,17 +1606,20 @@ rtl_ssa_dce_sweep(std::unordered_set<insn_info *> marked)
         to_delete.safe_push(change);
         // crtl->ssa->change_insn(change);
       }
-      // insn->rtl()->set_deleted();
     }
   }
   
-  auto_vec<insn_change*> changes{to_delete.length()};
-  for (auto i = 0; i != to_delete.length(); ++i) {
-    changes[i] = &to_delete[i];
+  auto_vec<insn_change*> changes(to_delete.length());
+  for (size_t i = 0; i != to_delete.length(); ++i) {
+    changes.safe_push(&to_delete[i]);
   }
 
-  crtl->ssa->change_insns(changes);
-  // if (verify_insn_changes())
+  if (crtl->ssa->verify_insn_changes(changes)) {
+    std::cerr << "Changes are correct\n";
+    // crtl->ssa->change_insns(changes);
+  } else {
+    std::cerr << "Changes are not correct\n";
+  }
 }
 
 static unsigned int
@@ -1556,6 +1629,8 @@ rtl_ssa_dce()
   // unordered_set seems to be the easiest option
   std::unordered_set<insn_info *> marked;
   rtl_ssa_dce_init();
+  debug(crtl->ssa);
+  std::cerr << "Next phase: prelive + mark: \n";
   rtl_ssa_dce_mark(marked);
   rtl_ssa_dce_sweep(marked);
   rtl_ssa_dce_done();
