@@ -1640,6 +1640,13 @@
   DONE;
 })
 
+(define_expand "exception_receiver"
+  [(const_int 0)]
+  ""
+{
+  sorry ("exception handling not supported");
+})
+
 (define_expand "nonlocal_goto"
   [(match_operand 0 "" "")
    (match_operand 1 "" "")
@@ -1670,7 +1677,7 @@
     emit_insn (gen_nvptx_alloca (Pmode, operands[0], operands[1]));
   else if (!TARGET_SOFT_STACK)
     {
-      sorry ("target cannot support alloca");
+      sorry ("dynamic stack allocation not supported");
       emit_insn (gen_nop ());
     }
   else if (TARGET_SOFT_STACK)

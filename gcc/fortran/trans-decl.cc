@@ -135,21 +135,12 @@ tree gfor_fndecl_caf_this_image;
 tree gfor_fndecl_caf_num_images;
 tree gfor_fndecl_caf_register;
 tree gfor_fndecl_caf_deregister;
-
-// Deprecate start
-tree gfor_fndecl_caf_get;
-tree gfor_fndecl_caf_send;
-tree gfor_fndecl_caf_sendget;
-tree gfor_fndecl_caf_get_by_ref;
-tree gfor_fndecl_caf_send_by_ref;
-tree gfor_fndecl_caf_sendget_by_ref;
-// Deprecate end
-
 tree gfor_fndecl_caf_register_accessor;
 tree gfor_fndecl_caf_register_accessors_finish;
 tree gfor_fndecl_caf_get_remote_function_index;
-tree gfor_fndecl_caf_get_by_ct;
-
+tree gfor_fndecl_caf_get_from_remote;
+tree gfor_fndecl_caf_send_to_remote;
+tree gfor_fndecl_caf_transfer_between_remotes;
 tree gfor_fndecl_caf_sync_all;
 tree gfor_fndecl_caf_sync_memory;
 tree gfor_fndecl_caf_sync_images;
@@ -181,7 +172,7 @@ tree gfor_fndecl_co_max;
 tree gfor_fndecl_co_min;
 tree gfor_fndecl_co_reduce;
 tree gfor_fndecl_co_sum;
-tree gfor_fndecl_caf_is_present;
+tree gfor_fndecl_caf_is_present_on_remote;
 tree gfor_fndecl_caf_random_init;
 
 
@@ -2775,8 +2766,7 @@ create_function_arglist (gfc_symbol * sym)
   for (f = gfc_sym_get_dummy_args (sym); f; f = f->next)
     if (f->sym != NULL
 	&& f->sym->attr.optional && f->sym->attr.value
-	&& !f->sym->attr.dimension && f->sym->ts.type != BT_CLASS
-	&& !gfc_bt_struct (f->sym->ts.type))
+	&& !f->sym->attr.dimension && f->sym->ts.type != BT_CLASS)
       hidden_typelist = TREE_CHAIN (hidden_typelist);
 
   for (f = gfc_sym_get_dummy_args (sym); f; f = f->next)
@@ -2858,12 +2848,11 @@ create_function_arglist (gfc_symbol * sym)
 		type = gfc_sym_type (f->sym);
 	    }
 	}
-      /* For scalar intrinsic types, VALUE passes the value,
+      /* For scalar intrinsic types or derived types, VALUE passes the value,
 	 hence, the optional status cannot be transferred via a NULL pointer.
 	 Thus, we will use a hidden argument in that case.  */
       if (f->sym->attr.optional && f->sym->attr.value
-	  && !f->sym->attr.dimension && f->sym->ts.type != BT_CLASS
-	  && !gfc_bt_struct (f->sym->ts.type))
+	  && !f->sym->attr.dimension && f->sym->ts.type != BT_CLASS)
 	{
           tree tmp;
           strcpy (&name[1], f->sym->name);
@@ -4074,52 +4063,6 @@ gfc_build_builtin_function_decls (void)
 	ppvoid_type_node, integer_type_node, pint_type, pchar_type_node,
 	size_type_node);
 
-      // Deprecate start
-      gfor_fndecl_caf_get = gfc_build_library_function_decl_with_spec (
-	get_identifier (PREFIX("caf_get")), ". r . . r r w . . . w ",
-	void_type_node, 10,
-	pvoid_type_node, size_type_node, integer_type_node, pvoid_type_node,
-	pvoid_type_node, pvoid_type_node, integer_type_node, integer_type_node,
-	boolean_type_node, pint_type);
-
-      gfor_fndecl_caf_send = gfc_build_library_function_decl_with_spec (
-	get_identifier (PREFIX("caf_send")), ". r . . w r r . . . w ",
-	void_type_node, 11,
-	pvoid_type_node, size_type_node, integer_type_node, pvoid_type_node,
-	pvoid_type_node, pvoid_type_node, integer_type_node, integer_type_node,
-	boolean_type_node, pint_type, pvoid_type_node);
-
-      gfor_fndecl_caf_sendget = gfc_build_library_function_decl_with_spec (
-	get_identifier (PREFIX("caf_sendget")), ". r . . w r r . . r r . . . w ",
-	void_type_node,	14, pvoid_type_node, size_type_node, integer_type_node,
-	pvoid_type_node, pvoid_type_node, pvoid_type_node, size_type_node,
-	integer_type_node, pvoid_type_node, pvoid_type_node, integer_type_node,
-	integer_type_node, boolean_type_node, integer_type_node);
-
-      gfor_fndecl_caf_get_by_ref = gfc_build_library_function_decl_with_spec (
-	get_identifier (PREFIX("caf_get_by_ref")), ". r . w r . . . . w . ",
-	void_type_node,
-	10, pvoid_type_node, integer_type_node, pvoid_type_node,
-	pvoid_type_node, integer_type_node, integer_type_node,
-	boolean_type_node, boolean_type_node, pint_type, integer_type_node);
-
-      gfor_fndecl_caf_send_by_ref = gfc_build_library_function_decl_with_spec (
-	get_identifier (PREFIX("caf_send_by_ref")), ". r . r r . . . . w . ",
-	void_type_node,	10, pvoid_type_node, integer_type_node, pvoid_type_node,
-	pvoid_type_node, integer_type_node, integer_type_node,
-	boolean_type_node, boolean_type_node, pint_type, integer_type_node);
-
-      gfor_fndecl_caf_sendget_by_ref
-	  = gfc_build_library_function_decl_with_spec (
-	    get_identifier (PREFIX("caf_sendget_by_ref")),
-	    ". r . r r . r . . . w w . . ",
-	    void_type_node, 13, pvoid_type_node, integer_type_node,
-	    pvoid_type_node, pvoid_type_node, integer_type_node,
-	    pvoid_type_node, integer_type_node, integer_type_node,
-	    boolean_type_node, pint_type, pint_type, integer_type_node,
-	    integer_type_node);
-      // Deprecate end
-
       gfor_fndecl_caf_register_accessor
 	= gfc_build_library_function_decl_with_spec (
 	  get_identifier (PREFIX ("caf_register_accessor")), ". r r ",
@@ -4135,17 +4078,37 @@ gfc_build_builtin_function_decls (void)
 	  get_identifier (PREFIX ("caf_get_remote_function_index")), ". r ",
 	  integer_type_node, 1, integer_type_node);
 
-      gfor_fndecl_caf_get_by_ct = gfc_build_library_function_decl_with_spec (
-	get_identifier (PREFIX ("caf_get_by_ct")),
-	". r r r r r w w w r r w r w r r ", void_type_node, 15, pvoid_type_node,
-	pvoid_type_node, psize_type, integer_type_node, size_type_node,
-	ppvoid_type_node, psize_type, pvoid_type_node, boolean_type_node,
-	integer_type_node, pvoid_type_node, size_type_node, pint_type,
-	pvoid_type_node, pint_type);
+      gfor_fndecl_caf_get_from_remote
+	= gfc_build_library_function_decl_with_spec (
+	  get_identifier (PREFIX ("caf_get_from_remote")),
+	  ". r r r r r w w w r r w r w r r ", void_type_node, 15,
+	  pvoid_type_node, pvoid_type_node, psize_type, integer_type_node,
+	  size_type_node, ppvoid_type_node, psize_type, pvoid_type_node,
+	  boolean_type_node, integer_type_node, pvoid_type_node, size_type_node,
+	  pint_type, pvoid_type_node, pint_type);
+
+      gfor_fndecl_caf_send_to_remote
+	= gfc_build_library_function_decl_with_spec (
+	  get_identifier (PREFIX ("caf_send_to_remote")),
+	  ". r r r r r r r r r w r w r r ", void_type_node, 14, pvoid_type_node,
+	  pvoid_type_node, psize_type, integer_type_node, size_type_node,
+	  ppvoid_type_node, psize_type, pvoid_type_node, integer_type_node,
+	  pvoid_type_node, size_type_node, pint_type, pvoid_type_node,
+	  pint_type);
+
+      gfor_fndecl_caf_transfer_between_remotes
+	= gfc_build_library_function_decl_with_spec (
+	  get_identifier (PREFIX ("caf_transfer_between_remotes")),
+	  ". r r r r r r r r r r r r r r r r w w r r ", void_type_node, 20,
+	  pvoid_type_node, pvoid_type_node, psize_type, integer_type_node,
+	  integer_type_node, pvoid_type_node, size_type_node, pvoid_type_node,
+	  pvoid_type_node, psize_type, integer_type_node, integer_type_node,
+	  pvoid_type_node, size_type_node, size_type_node, boolean_type_node,
+	  pint_type, pint_type, pvoid_type_node, pint_type);
 
       gfor_fndecl_caf_sync_all = gfc_build_library_function_decl_with_spec (
-	get_identifier (PREFIX("caf_sync_all")), ". w w . ", void_type_node,
-	3, pint_type, pchar_type_node, size_type_node);
+	get_identifier (PREFIX ("caf_sync_all")), ". w w . ", void_type_node, 3,
+	pint_type, pchar_type_node, size_type_node);
 
       gfor_fndecl_caf_sync_memory = gfc_build_library_function_decl_with_spec (
 	get_identifier (PREFIX("caf_sync_memory")), ". w w . ", void_type_node,
@@ -4309,10 +4272,11 @@ gfc_build_builtin_function_decls (void)
 	void_type_node, 5, pvoid_type_node, integer_type_node,
 	pint_type, pchar_type_node, size_type_node);
 
-      gfor_fndecl_caf_is_present = gfc_build_library_function_decl_with_spec (
-	get_identifier (PREFIX("caf_is_present")), ". r . r ",
-	integer_type_node, 3, pvoid_type_node, integer_type_node,
-	pvoid_type_node);
+      gfor_fndecl_caf_is_present_on_remote
+	= gfc_build_library_function_decl_with_spec (
+	  get_identifier (PREFIX ("caf_is_present_on_remote")), ". r r r r r ",
+	  integer_type_node, 5, pvoid_type_node, integer_type_node,
+	  integer_type_node, pvoid_type_node, size_type_node);
 
       gfor_fndecl_caf_random_init = gfc_build_library_function_decl (
 	    get_identifier (PREFIX("caf_random_init")),
@@ -4551,7 +4515,6 @@ init_intent_out_dt (gfc_symbol * proc_sym, gfc_wrapped_block * block)
   tree tmp;
   tree present;
   gfc_symbol *s;
-  bool dealloc_with_value = false;
 
   gfc_init_block (&init);
   for (f = gfc_sym_get_dummy_args (proc_sym); f; f = f->next)
@@ -4582,12 +4545,9 @@ init_intent_out_dt (gfc_symbol * proc_sym, gfc_wrapped_block * block)
 	   by the caller.  */
 	if (tmp == NULL_TREE && !s->attr.allocatable
 	    && s->ts.u.derived->attr.alloc_comp)
-	  {
-	    tmp = gfc_deallocate_alloc_comp (s->ts.u.derived,
-					     s->backend_decl,
-					     s->as ? s->as->rank : 0);
-	    dealloc_with_value = s->value;
-	  }
+	  tmp = gfc_deallocate_alloc_comp (s->ts.u.derived,
+					   s->backend_decl,
+					   s->as ? s->as->rank : 0);
 
 	if (tmp != NULL_TREE && (s->attr.optional
 				 || s->ns->proc_name->attr.entry_master))
@@ -4597,14 +4557,9 @@ init_intent_out_dt (gfc_symbol * proc_sym, gfc_wrapped_block * block)
 			      present, tmp, build_empty_stmt (input_location));
 	  }
 
-	if (tmp != NULL_TREE && !dealloc_with_value)
-	  gfc_add_expr_to_block (&init, tmp);
-	else if (s->value && !s->attr.allocatable)
-	  {
-	    gfc_add_expr_to_block (&init, tmp);
-	    gfc_init_default_dt (s, &init, false);
-	    dealloc_with_value = false;
-	  }
+	gfc_add_expr_to_block (&init, tmp);
+	if (s->value && !s->attr.allocatable)
+	  gfc_init_default_dt (s, &init, false);
       }
     else if (f->sym && f->sym->attr.intent == INTENT_OUT
 	     && f->sym->ts.type == BT_CLASS
@@ -6142,6 +6097,19 @@ create_module_nml_decl (gfc_symbol *sym)
     }
 }
 
+static void
+gfc_handle_omp_declare_variant (gfc_symbol * sym)
+{
+  if (sym->attr.external
+      && sym->formal_ns
+      && sym->formal_ns->omp_declare_variant)
+    {
+      gfc_namespace *ns = gfc_current_ns;
+      gfc_current_ns = sym->ns;
+      gfc_get_symbol_decl (sym);
+      gfc_current_ns = ns;
+    }
+}
 
 /* Generate all the required code for module variables.  */
 
@@ -6165,6 +6133,11 @@ gfc_generate_module_vars (gfc_namespace * ns)
 
   if (flag_coarray == GFC_FCOARRAY_LIB && has_coarray_vars_or_accessors)
     generate_coarray_init (ns);
+
+  /* For OpenMP, ensure that declare variant in INTERFACE is is processed
+     especially as some late diagnostic is only done on tree level.  */
+  if (flag_openmp)
+    gfc_traverse_ns (ns, gfc_handle_omp_declare_variant);
 
   cur_module = NULL;
 
@@ -8015,6 +7988,11 @@ gfc_generate_function_code (gfc_namespace * ns)
 	fsym->backend_decl = desc_p;
 	gfc_conv_cfi_to_gfc (&init, &cleanup, tmp, desc, fsym);
       }
+
+  /* For OpenMP, ensure that declare variant in INTERFACE is is processed
+     especially as some late diagnostic is only done on tree level.  */
+  if (flag_openmp)
+    gfc_traverse_ns (ns, gfc_handle_omp_declare_variant);
 
   gfc_generate_contained_functions (ns);
 

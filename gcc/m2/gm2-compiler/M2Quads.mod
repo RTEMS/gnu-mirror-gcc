@@ -300,6 +300,7 @@ TYPE
                              Dimension : CARDINAL ;
                              ReadWrite : CARDINAL ;
                              name      : CARDINAL ;
+                             RangeDep  : CARDINAL ;
                              Annotation: String ;
                              tokenno   : CARDINAL ;
                           END ;
@@ -5623,6 +5624,7 @@ VAR
    proctok,
    paramtok    : CARDINAL ;
    n1, n2      : Name ;
+   ParamCheckId,   
    Dim,
    Actual,
    FormalI,
@@ -5686,8 +5688,11 @@ BEGIN
             s := InitString ('actual') ;
             WarnStringAt (s, paramtok)
          END ;
-
-         BuildRange (InitTypesParameterCheck (paramtok, Proc, i, FormalI, Actual)) ;
+         ParamCheckId := InitTypesParameterCheck (paramtok, Proc, i, FormalI, Actual, 0) ;
+         BuildRange (ParamCheckId) ;
+         (* Store the ParamCheckId on the quad stack so that any dependant checks
+            can be cancelled if the type check above detects an error.  *)
+         PutRangeDep (pi, ParamCheckId) ;
          IF IsConst(Actual)
          THEN
             IF IsVarParamAny (Proc, i)
@@ -5706,7 +5711,7 @@ BEGIN
                   (* Allow string literals to be passed to ARRAY [0..n] OF CHAR.  *)
                ELSIF (GetStringLength(paramtok, Actual) = 1)   (* If = 1 then it maybe treated as a char.  *)
                THEN
-                  CheckParameter (paramtok, Actual, Dim, FormalI, Proc, i, NIL)
+                  CheckParameter (paramtok, Actual, Dim, FormalI, Proc, i, NIL, ParamCheckId)
                ELSIF NOT IsUnboundedParamAny (Proc, i)
                THEN
                   IF IsForC AND (GetSType(FormalI)=Address)
@@ -5722,7 +5727,7 @@ BEGIN
                END
             END
          ELSE
-            CheckParameter (paramtok, Actual, Dim, FormalI, Proc, i, NIL)
+            CheckParameter (paramtok, Actual, Dim, FormalI, Proc, i, NIL, ParamCheckId)
          END
       ELSE
          IF IsForC AND UsesVarArgs(Proc)
@@ -5752,7 +5757,8 @@ END CheckProcedureParameters ;
    CheckProcTypeAndProcedure - checks the ProcType with the call.
 *)
 
-PROCEDURE CheckProcTypeAndProcedure (tokno: CARDINAL; ProcType: CARDINAL; call: CARDINAL) ;
+PROCEDURE CheckProcTypeAndProcedure (tokno: CARDINAL; ProcType: CARDINAL;
+                                     call: CARDINAL; ParamCheckId: CARDINAL) ;
 VAR
    n1, n2          : Name ;
    i, n, t         : CARDINAL ;
@@ -5793,8 +5799,7 @@ BEGIN
          END ;
          BuildRange (InitTypesParameterCheck (tokno, CheckedProcedure, i,
                                               GetParam (CheckedProcedure, i),
-                                              GetParam (ProcType, i))) ;
-         (* CheckParameter(tokpos, GetParam(CheckedProcedure, i), 0, GetParam(ProcType, i), call, i, TypeList) ; *)
+                                              GetParam (ProcType, i), ParamCheckId)) ;
          INC(i)
       END
    END
@@ -5911,7 +5916,7 @@ END LegalUnboundedParam ;
 
 PROCEDURE CheckParameter (tokpos: CARDINAL;
                           Actual, Dimension, Formal, ProcSym: CARDINAL;
-                          i: CARDINAL; TypeList: List) ;
+                          i: CARDINAL; TypeList: List; ParamCheckId: CARDINAL) ;
 VAR
    NewList            : BOOLEAN ;
    ActualType, FormalType: CARDINAL ;
@@ -5991,7 +5996,7 @@ BEGIN
          END
       END ;
       (* now to check each parameter of the proc type *)
-      CheckProcTypeAndProcedure (tokpos, FormalType, Actual)
+      CheckProcTypeAndProcedure (tokpos, FormalType, Actual, ParamCheckId)
    ELSIF (ActualType#FormalType) AND (ActualType#NulSym)
    THEN
       IF IsUnknown(FormalType)
@@ -6657,9 +6662,10 @@ BEGIN
          THEN
             IF NOT IsSet (GetDType (FormalI))
             THEN
-               (* tell code generator to test runtime values of assignment so ensure we
-                  catch overflow and underflow *)
-               BuildRange (InitParameterRangeCheck (tokno, Proc, i, FormalI, Actual))
+               (* Tell the code generator to test the runtime values of the assignment
+                  so ensure we catch overflow and underflow.  *)
+               BuildRange (InitParameterRangeCheck (tokno, Proc, i, FormalI, Actual,
+                                                    OperandRangeDep (pi)))
             END
          END
       END ;
@@ -7021,19 +7027,19 @@ BEGIN
       BuildDisposeProcedure (tokno)
    ELSIF ProcSym = Inc
    THEN
-      BuildIncProcedure
+      BuildIncProcedure (tokno)
    ELSIF ProcSym = Dec
    THEN
-      BuildDecProcedure
+      BuildDecProcedure (tokno)
    ELSIF ProcSym = Incl
    THEN
-      BuildInclProcedure
+      BuildInclProcedure (tokno)
    ELSIF ProcSym = Excl
    THEN
-      BuildExclProcedure
+      BuildExclProcedure (tokno)
    ELSIF ProcSym = Throw
    THEN
-      BuildThrowProcedure
+      BuildThrowProcedure (tokno)
    ELSE
       InternalError  ('pseudo procedure not implemented yet')
    END
@@ -7084,14 +7090,12 @@ END GetItemPointedTo ;
                          |----------------|
 *)
 
-PROCEDURE BuildThrowProcedure ;
+PROCEDURE BuildThrowProcedure (functok: CARDINAL) ;
 VAR
-   functok  : CARDINAL ;
    op       : CARDINAL ;
    NoOfParam: CARDINAL ;
 BEGIN
    PopT (NoOfParam) ;
-   functok  := OperandTtok (NoOfParam + 1) ;
    IF NoOfParam = 1
    THEN
       op := OperandT (NoOfParam) ;
@@ -7328,19 +7332,19 @@ BEGIN
    IF IsExpressionCompatible (dtype, etype)
    THEN
       (* the easy case simulate a straightforward macro *)
-      PushTF (des, dtype) ;
+      PushTFtok (des, dtype, tokenpos) ;
       PushT (tok) ;
-      PushTF (expr, etype) ;
+      PushTFtok (expr, etype, tokenpos) ;
       doBuildBinaryOp (FALSE, TRUE)
    ELSE
       IF (IsOrdinalType (dtype) OR (dtype = Address) OR IsPointer (dtype)) AND
          (IsOrdinalType (etype) OR (etype = Address) OR IsPointer (etype))
       THEN
-         PushTF (des, dtype) ;
+         PushTFtok (des, dtype, tokenpos) ;
          PushT (tok) ;
-         PushTF (Convert, NulSym) ;
-         PushT (dtype) ;
-         PushT (expr) ;
+         PushTFtok (Convert, NulSym, tokenpos) ;
+         PushTtok (dtype, tokenpos) ;
+         PushTtok (expr, tokenpos) ;
          PushT (2) ;          (* Two parameters *)
          BuildConvertFunction (Convert, FALSE) ;
          doBuildBinaryOp (FALSE, TRUE)
@@ -7387,9 +7391,8 @@ END CheckRangeIncDec ;
                        |----------------|
 *)
 
-PROCEDURE BuildIncProcedure ;
+PROCEDURE BuildIncProcedure (proctok: CARDINAL) ;
 VAR
-   proctok   : CARDINAL ;
    NoOfParam,
    dtype,
    OperandSym,
@@ -7397,26 +7400,25 @@ VAR
    TempSym   : CARDINAL ;
 BEGIN
    PopT (NoOfParam) ;
-   proctok := OperandTtok (NoOfParam + 1) ;
    IF (NoOfParam = 1) OR (NoOfParam = 2)
    THEN
-      VarSym := OperandT (NoOfParam) ;  (* bottom/first parameter *)
+      VarSym := OperandT (NoOfParam) ;  (* Bottom/first parameter.  *)
       IF IsVar (VarSym)
       THEN
          dtype := GetDType (VarSym) ;
          IF NoOfParam = 2
          THEN
-            OperandSym := DereferenceLValue (OperandTok (1), OperandT (1))
+            OperandSym := DereferenceLValue (proctok, OperandT (1))
          ELSE
             PushOne (proctok, dtype,
                      'the {%EkINC} will cause an overflow {%1ad}') ;
 	    PopT (OperandSym)
          END ;
 
-         PushT (VarSym) ;
-         TempSym := DereferenceLValue (OperandTok (NoOfParam), VarSym) ;
-         CheckRangeIncDec (proctok, TempSym, OperandSym, PlusTok) ;  (* TempSym + OperandSym *)
-         BuildAssignmentWithoutBounds (proctok, FALSE, TRUE)   (* VarSym := TempSym + OperandSym *)
+         PushTtok (VarSym, proctok) ;
+         TempSym := DereferenceLValue (proctok, VarSym) ;
+         CheckRangeIncDec (proctok, TempSym, OperandSym, PlusTok) ;  (* TempSym + OperandSym.  *)
+         BuildAssignmentWithoutBounds (proctok, FALSE, TRUE)   (* VarSym := TempSym + OperandSym.  *)
       ELSE
          MetaErrorT1 (proctok,
                       'base procedure {%EkINC} expects a variable as a parameter but was given {%1Ed}',
@@ -7460,9 +7462,8 @@ END BuildIncProcedure ;
                        |----------------|
 *)
 
-PROCEDURE BuildDecProcedure ;
+PROCEDURE BuildDecProcedure (proctok: CARDINAL) ;
 VAR
-   proctok,
    NoOfParam,
    dtype,
    OperandSym,
@@ -7470,26 +7471,25 @@ VAR
    TempSym   : CARDINAL ;
 BEGIN
    PopT (NoOfParam) ;
-   proctok := OperandTtok (NoOfParam + 1) ;
    IF (NoOfParam = 1) OR (NoOfParam = 2)
    THEN
-      VarSym := OperandT (NoOfParam) ;  (* bottom/first parameter *)
+      VarSym := OperandT (NoOfParam) ;  (* Bottom/first parameter.  *)
       IF IsVar (VarSym)
       THEN
          dtype := GetDType (VarSym) ;
          IF NoOfParam = 2
          THEN
-            OperandSym := DereferenceLValue (OperandTok (1), OperandT (1))
+            OperandSym := DereferenceLValue (proctok, OperandT (1))
          ELSE
             PushOne (proctok, dtype,
                      'the {%EkDEC} will cause an overflow {%1ad}') ;
 	    PopT (OperandSym)
          END ;
 
-         PushT (VarSym) ;
+         PushTtok (VarSym, proctok) ;
          TempSym := DereferenceLValue (OperandTok (NoOfParam), VarSym) ;
-         CheckRangeIncDec (proctok, TempSym, OperandSym, MinusTok) ;  (* TempSym - OperandSym *)
-         BuildAssignmentWithoutBounds (proctok, FALSE, TRUE)   (* VarSym := TempSym - OperandSym *)
+         CheckRangeIncDec (proctok, TempSym, OperandSym, MinusTok) ;  (* TempSym - OperandSym.  *)
+         BuildAssignmentWithoutBounds (proctok, FALSE, TRUE)   (* VarSym := TempSym - OperandSym.  *)
       ELSE
          MetaErrorT1 (proctok,
                       'base procedure {%EkDEC} expects a variable as a parameter but was given {%1Ed}',
@@ -7553,9 +7553,8 @@ END DereferenceLValue ;
                         |----------------|
 *)
 
-PROCEDURE BuildInclProcedure ;
+PROCEDURE BuildInclProcedure (proctok: CARDINAL) ;
 VAR
-   proctok,
    optok     : CARDINAL ;
    NoOfParam,
    DerefSym,
@@ -7563,7 +7562,6 @@ VAR
    VarSym    : CARDINAL ;
 BEGIN
    PopT (NoOfParam) ;
-   proctok := OperandTtok (NoOfParam + 1) ;
    IF NoOfParam = 2
    THEN
       VarSym := OperandT (2) ;
@@ -7619,9 +7617,8 @@ END BuildInclProcedure ;
                         |----------------|
 *)
 
-PROCEDURE BuildExclProcedure ;
+PROCEDURE BuildExclProcedure (proctok: CARDINAL) ;
 VAR
-   proctok,
    optok     : CARDINAL ;
    NoOfParam,
    DerefSym,
@@ -7629,7 +7626,6 @@ VAR
    VarSym    : CARDINAL ;
 BEGIN
    PopT (NoOfParam) ;
-   proctok := OperandTtok (NoOfParam + 1) ;
    IF NoOfParam=2
    THEN
       VarSym := OperandT (2) ;
@@ -13118,7 +13114,8 @@ BEGIN
       ReadWrite := NulSym ;
       tokenno := tok ;
       Annotation := KillString (Annotation) ;
-      Annotation := InitString ('%1s(%1d)|%2s(%2d)||boolean var|type')
+      Annotation := InitString ('%1s(%1d)|%2s(%2d)||boolean var|type') ;
+      RangeDep := 0
    END
 END ConvertBooleanToVariable ;
 
@@ -14453,7 +14450,8 @@ BEGIN
       FalseExit := False ;
       BooleanOp := TRUE ;
       tokenno := tokno ;
-      Annotation := NIL
+      Annotation := NIL ;
+      RangeDep := 0
    END ;
    PushAddress (BoolStack, f) ;
    Annotate ('<q%1d>|<q%2d>||true quad|false quad')
@@ -14593,6 +14591,34 @@ BEGIN
    Assert (NOT IsBoolean (pos)) ;
    RETURN OperandTtok (pos)
 END OperandTok ;
+
+
+(*
+   OperandRangeDep - return the range dependant associated with the quad stack.
+*)
+
+PROCEDURE OperandRangeDep (pos: CARDINAL) : CARDINAL ;
+VAR
+   f: BoolFrame ;
+BEGIN
+   Assert (NOT IsBoolean (pos)) ;
+   f := PeepAddress (BoolStack, pos) ;
+   RETURN f^.RangeDep
+END OperandRangeDep ;
+
+
+(*
+   PutRangeDep - assigns the quad stack pos RangeDep to dep.
+*)
+
+PROCEDURE PutRangeDep (pos: CARDINAL; dep: CARDINAL) ;
+VAR
+   f: BoolFrame ;
+BEGIN
+   Assert (NOT IsBoolean (pos)) ;
+   f := PeepAddress (BoolStack, pos) ;
+   f^.RangeDep := dep
+END PutRangeDep ;
 
 
 (*

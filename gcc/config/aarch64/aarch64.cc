@@ -3407,6 +3407,9 @@ aarch64_split_move (rtx dst, rtx src, machine_mode single_mode)
 			    GET_MODE_SIZE (single_mode)).to_constant ();
   auto_vec<rtx, 4> dst_pieces, src_pieces;
 
+  /* There should be at least one piece. */
+  gcc_assert (npieces > 0);
+
   for (unsigned int i = 0; i < npieces; ++i)
     {
       auto off = i * GET_MODE_SIZE (single_mode);
@@ -15889,7 +15892,24 @@ aarch64_insn_cost (rtx_insn *insn, bool speed)
 {
   if (rtx set = single_set (insn))
     return set_rtx_cost (set, speed);
-  return pattern_cost (PATTERN (insn), speed);
+
+  /* If the instruction does multiple sets in parallel, use the cost
+     of the most expensive set.  This copes with instructions that set
+     the flags to a useful value as a side effect.  */
+  rtx pat = PATTERN (insn);
+  if (GET_CODE (pat) == PARALLEL)
+    {
+      int max_cost = 0;
+      for (int i = 0; i < XVECLEN (pat, 0); ++i)
+	{
+	  rtx x = XVECEXP (pat, 0, i);
+	  if (GET_CODE (x) == SET)
+	    max_cost = std::max (max_cost, set_rtx_cost (x, speed));
+	}
+      return max_cost;
+    }
+
+  return pattern_cost (pat, speed);
 }
 
 /* Implement TARGET_INIT_BUILTINS.  */
@@ -26857,14 +26877,10 @@ aarch64_emit_sve_invert_fp_cond (rtx target, rtx_code code, rtx pred,
 
 /* Expand an SVE floating-point comparison using the SVE equivalent of:
 
-     (set TARGET (CODE OP0 OP1))
+     (set TARGET (CODE OP0 OP1)).  */
 
-   If CAN_INVERT_P is true, the caller can also handle inverted results;
-   return true if the result is in fact inverted.  */
-
-bool
-aarch64_expand_sve_vec_cmp_float (rtx target, rtx_code code,
-				  rtx op0, rtx op1, bool can_invert_p)
+void
+aarch64_expand_sve_vec_cmp_float (rtx target, rtx_code code, rtx op0, rtx op1)
 {
   machine_mode pred_mode = GET_MODE (target);
   machine_mode data_mode = GET_MODE (op0);
@@ -26882,16 +26898,14 @@ aarch64_expand_sve_vec_cmp_float (rtx target, rtx_code code,
     case GE:
     case EQ:
     case NE:
-      {
-	/* There is native support for the comparison.  */
-	aarch64_emit_sve_fp_cond (target, code, ptrue, true, op0, op1);
-	return false;
-      }
+      /* There is native support for the comparison.  */
+      aarch64_emit_sve_fp_cond (target, code, ptrue, true, op0, op1);
+      return;
 
     case LTGT:
       /* This is a trapping operation (LT or GT).  */
       aarch64_emit_sve_or_fp_conds (target, LT, GT, ptrue, true, op0, op1);
-      return false;
+      return;
 
     case UNEQ:
       if (!flag_trapping_math)
@@ -26900,7 +26914,7 @@ aarch64_expand_sve_vec_cmp_float (rtx target, rtx_code code,
 	  op1 = force_reg (data_mode, op1);
 	  aarch64_emit_sve_or_fp_conds (target, UNORDERED, EQ,
 					ptrue, true, op0, op1);
-	  return false;
+	  return;
 	}
       /* fall through */
     case UNLT:
@@ -26921,15 +26935,9 @@ aarch64_expand_sve_vec_cmp_float (rtx target, rtx_code code,
 	    code = NE;
 	  else
 	    code = reverse_condition_maybe_unordered (code);
-	  if (can_invert_p)
-	    {
-	      aarch64_emit_sve_fp_cond (target, code,
-					ordered, false, op0, op1);
-	      return true;
-	    }
 	  aarch64_emit_sve_invert_fp_cond (target, code,
 					   ordered, false, op0, op1);
-	  return false;
+	  return;
 	}
       break;
 
@@ -26944,13 +26952,7 @@ aarch64_expand_sve_vec_cmp_float (rtx target, rtx_code code,
 
   /* There is native support for the inverse comparison.  */
   code = reverse_condition_maybe_unordered (code);
-  if (can_invert_p)
-    {
-      aarch64_emit_sve_fp_cond (target, code, ptrue, true, op0, op1);
-      return true;
-    }
   aarch64_emit_sve_invert_fp_cond (target, code, ptrue, true, op0, op1);
-  return false;
 }
 
 /* Return true if:

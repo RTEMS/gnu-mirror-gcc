@@ -728,6 +728,12 @@ static const unsigned gpr_save_reg_order[] = {
   S10_REGNUM, S11_REGNUM
 };
 
+/* Order for the (ra, s0-sx) of zcmp_save.  */
+static const unsigned zcmp_save_reg_order[]
+  = {RETURN_ADDR_REGNUM, S0_REGNUM,  S1_REGNUM,	 S2_REGNUM,	S3_REGNUM,
+     S4_REGNUM,		 S5_REGNUM,  S6_REGNUM,	 S7_REGNUM,	S8_REGNUM,
+     S9_REGNUM,		 S10_REGNUM, S11_REGNUM, INVALID_REGNUM};
+
 /* A table describing all the processors GCC knows about.  */
 static const struct riscv_tune_info riscv_tune_info_table[] = {
 #define RISCV_TUNE(TUNE_NAME, PIPELINE_MODEL, TUNE_INFO)	\
@@ -3587,6 +3593,9 @@ riscv_legitimize_move (machine_mode mode, rtx dest, rtx src)
 	  nunits = nunits * 2;
 	}
 
+      /* This test can fail if (for example) we want a HF and Z[v]fh is
+	 not enabled.  In that case we just want to let the standard
+	 expansion path run.  */
       if (riscv_vector::get_vector_mode (smode, nunits).exists (&vmode))
 	{
 	  rtx v = gen_lowpart (vmode, SUBREG_REG (src));
@@ -3636,12 +3645,10 @@ riscv_legitimize_move (machine_mode mode, rtx dest, rtx src)
 	    emit_move_insn (dest, gen_lowpart (GET_MODE (dest), int_reg));
 	  else
 	    emit_move_insn (dest, int_reg);
+	  return true;
 	}
-      else
-	gcc_unreachable ();
-
-      return true;
     }
+
   /* Expand
        (set (reg:QI target) (mem:QI (address)))
      to
@@ -6478,9 +6485,13 @@ riscv_fntype_abi (const_tree fntype)
   /* Implement the vector calling convention.  For more details please
      reference the below link.
      https://github.com/riscv-non-isa/riscv-elf-psabi-doc/pull/389  */
-  if (riscv_return_value_is_vector_type_p (fntype)
-	  || riscv_arguments_is_vector_type_p (fntype)
-	  || riscv_vector_cc_function_p (fntype))
+  bool validate_v_abi_p = false;
+
+  validate_v_abi_p |= riscv_return_value_is_vector_type_p (fntype);
+  validate_v_abi_p |= riscv_arguments_is_vector_type_p (fntype);
+  validate_v_abi_p |= riscv_vector_cc_function_p (fntype);
+
+  if (validate_v_abi_p)
     return riscv_v_abi ();
 
   return default_function_abi;
@@ -8359,8 +8370,11 @@ riscv_adjust_multi_push_cfi_prologue (int saved_size)
   int offset;
   int saved_cnt = 0;
 
-  if (mask & S10_MASK)
-    mask |= S11_MASK;
+  unsigned int num_multi_push = riscv_multi_push_regs_count (mask);
+  for (unsigned int i = 0; i < num_multi_push; i++) {
+    gcc_assert(zcmp_save_reg_order[i] != INVALID_REGNUM);
+    mask |= 1 << (zcmp_save_reg_order[i] - GP_REG_FIRST);
+  }
 
   for (int regno = GP_REG_LAST; regno >= GP_REG_FIRST; regno--)
     if (BITSET_P (mask & MULTI_PUSH_GPR_MASK, regno - GP_REG_FIRST))
@@ -10900,7 +10914,9 @@ riscv_conditional_register_usage (void)
 	call_used_regs[regno] = 1;
     }
 
-  if (!TARGET_VECTOR)
+  if (TARGET_VECTOR)
+    global_regs[VXRM_REGNUM] = 1;
+  else
     {
       for (int regno = V_REG_FIRST; regno <= V_REG_LAST; regno++)
 	fixed_regs[regno] = call_used_regs[regno] = 1;
