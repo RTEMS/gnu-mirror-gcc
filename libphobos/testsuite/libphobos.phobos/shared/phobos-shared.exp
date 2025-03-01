@@ -24,6 +24,11 @@ if { ![is-effective-target d_runtime_has_std_library] } {
     return
 }
 
+# Skip running test if not doing expensive tests.
+if { ![is-effective-target run_expensive_tests] } {
+    return
+}
+
 # Gather a list of all tests.
 set tests [lsort [filter_libphobos_unittests [find $srcdir/../src "*.d"]]]
 
@@ -35,10 +40,10 @@ if { [is-effective-target linux_pre_2639] } {
 
 set libphobos_skip_tests {
     # Skip curl tests if library is not available
-    { libphobos.phobos_shared/etc/c/curl.d { ! libcurl_available } }
-    { libphobos.phobos_shared/std/net/curl.d { ! libcurl_available } }
+    { libphobos.phobos/shared/etc/c/curl.d { ! libcurl_available } }
+    { libphobos.phobos/shared/std/net/curl.d { ! libcurl_available } }
     # Skip concurrency.d test: SEGVs or hangs on macOS 13+ (PR d/111628).
-    { libphobos.phobos_shared/std/concurrency.d { x86_64-apple-darwin2[2-9]* } }
+    { libphobos.phobos/shared/std/concurrency.d { x86_64-apple-darwin2[2-9]* } }
 }
 
 # Initialize dg.

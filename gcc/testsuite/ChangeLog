@@ -1,3 +1,183 @@
+2025-02-27  Pan Li  <pan2.li@intel.com>
+
+	PR target/118931
+	* gcc.target/riscv/rvv/base/pr118931-run-1.c: New test.
+
+2025-02-27  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/119030
+	* gcc.c-torture/execute/pr119030.c: New test.
+
+2025-02-27  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/118860
+	* gcc.dg/pr118860.c: New test.
+
+2025-02-27  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* gcc.target/nvptx/stack_frame-1.c: Adjust.
+
+2025-02-27  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* gcc.target/nvptx/stack_frame-1.c: New.
+
+2025-02-27  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* gcc.target/nvptx/alloca-1-O0_-mfake-ptx-alloca.c: New.
+	* gcc.target/nvptx/alloca-2-O0_-mfake-ptx-alloca.c: Likewise.
+	* gcc.target/nvptx/alloca-4-O3_-mfake-ptx-alloca.c: Likewise.
+	* gcc.target/nvptx/vla-1-O0_-mfake-ptx-alloca.c: Likewise.
+	* gcc.target/nvptx/alloca-4-O3.c:
+	'dg-additional-options -mfake-ptx-alloca'.
+
+2025-02-27  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* gcc.target/nvptx/alloca-1-unused-O0-sm_30.c: Adjust.
+
+2025-02-27  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* gcc.target/nvptx/alloca-1-dead-O0-sm_30.c: New.
+	* gcc.target/nvptx/alloca-1-dead-O0.c: Likewise.
+	* gcc.target/nvptx/alloca-1-dead-O1-sm_30.c: Likewise.
+	* gcc.target/nvptx/alloca-1-dead-O1.c: Likewise.
+	* gcc.target/nvptx/alloca-1-unused-O0-sm_30.c: Likewise.
+	* gcc.target/nvptx/alloca-1-unused-O0.c: Likewise.
+	* gcc.target/nvptx/alloca-1-unused-O1-sm_30.c: Likewise.
+	* gcc.target/nvptx/alloca-1-unused-O1.c: Likewise.
+	* gcc.target/nvptx/vla-1-dead-O0-sm_30.c: Likewise.
+	* gcc.target/nvptx/vla-1-dead-O0.c: Likewise.
+	* gcc.target/nvptx/vla-1-dead-O1-sm_30.c: Likewise.
+	* gcc.target/nvptx/vla-1-dead-O1.c: Likewise.
+	* gcc.target/nvptx/vla-1-unused-O0-sm_30.c: Likewise.
+	* gcc.target/nvptx/vla-1-unused-O0.c: Likewise.
+	* gcc.target/nvptx/vla-1-unused-O1-sm_30.c: Likewise.
+	* gcc.target/nvptx/vla-1-unused-O1.c: Likewise.
+
+2025-02-27  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/118928
+	* g++.dg/cpp0x/constexpr-prvalue5.C: New test.
+
+2025-02-27  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	PR target/118940
+	* gcc.target/i386/pr118940.c: New test.
+
+2025-02-27  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	PR rtl-optimization/116336
+	* gcc.dg/pr116336.c: New test.
+
+2025-02-27  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/118516
+	* g++.dg/cpp2a/fn-template11.C:
+	* g++.dg/template/fn-template1.C: New test.
+	* g++.dg/template/fn-template2.C: New test.
+
+2025-02-27  Richard Earnshaw  <rearnsha@arm.com>
+
+	* gcc.target/arm/lto/pr61123-enum-size_0.c: (dg-lto-options) Move
+	linker related options to ...
+	(dg-extra-ld-options): ... here.  Add -flinker-output=nolto-rel.
+
+2025-02-27  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	PR fortran/118789
+	* gfortran.dg/associate_73.f90: New test.
+
+2025-02-26  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/119001
+	* gcc.dg/pr119001-1.c: New test.
+	* gcc.dg/pr119001-2.c: New test.
+
+2025-02-26  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/114870
+	* gcc.dg/c23-stddef-2.c: New test.
+
+2025-02-26  Alexandre Oliva  <oliva@adacore.com>
+
+	* lib/target-supports.exp (check_effective_target_x86): New.
+	Replace all uses of i?86-*-* and x86_64-*-* in this file.
+
+2025-02-26  Alexandre Oliva  <oliva@adacore.com>
+
+	* lib/target-supports-dg.exp (dg-do-if): New.
+	* gcc.dg/vect/vect-simd-clone-16f.c: Use -msse4 on x86, and
+	skip in case execution is enabled but the runtime isn't.
+	* gcc.dg/vect/vect-simd-clone-17f.c: Likewise.
+	* gcc.dg/vect/vect-simd-clone-18f.c: Likewise.
+	* gcc.dg/vect/vect-simd-clone-20.c: Likewise, but only skip
+	the scan test.
+
+2025-02-26  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	PR fortran/108233
+	* gfortran.dg/coarray/complex_1.f90: New test.
+
+2025-02-26  Tamar Christina  <tamar.christina@arm.com>
+
+	PR tree-optimization/118464
+	PR tree-optimization/116855
+	* g++.dg/ext/pragma-unroll-lambda-lto.C: Add pragma novector.
+	* gcc.dg/tree-ssa/gen-vect-2.c: Likewise.
+	* gcc.dg/tree-ssa/gen-vect-25.c: Likewise.
+	* gcc.dg/tree-ssa/gen-vect-32.c: Likewise.
+	* gcc.dg/tree-ssa/ivopt_mult_2g.c: Likewise.
+	* gcc.dg/tree-ssa/ivopts-5.c: Likewise.
+	* gcc.dg/tree-ssa/ivopts-6.c: Likewise.
+	* gcc.dg/tree-ssa/ivopts-7.c: Likewise.
+	* gcc.dg/tree-ssa/ivopts-8.c: Likewise.
+	* gcc.dg/tree-ssa/ivopts-9.c: Likewise.
+	* gcc.dg/tree-ssa/predcom-dse-1.c: Likewise.
+	* gcc.dg/tree-ssa/predcom-dse-10.c: Likewise.
+	* gcc.dg/tree-ssa/predcom-dse-11.c: Likewise.
+	* gcc.dg/tree-ssa/predcom-dse-12.c: Likewise.
+	* gcc.dg/tree-ssa/predcom-dse-2.c: Likewise.
+	* gcc.dg/tree-ssa/predcom-dse-3.c: Likewise.
+	* gcc.dg/tree-ssa/predcom-dse-4.c: Likewise.
+	* gcc.dg/tree-ssa/predcom-dse-5.c: Likewise.
+	* gcc.dg/tree-ssa/predcom-dse-6.c: Likewise.
+	* gcc.dg/tree-ssa/predcom-dse-7.c: Likewise.
+	* gcc.dg/tree-ssa/predcom-dse-8.c: Likewise.
+	* gcc.dg/tree-ssa/predcom-dse-9.c: Likewise.
+	* gcc.target/i386/pr90178.c: Likewise.
+
+2025-02-25  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	PR testsuite/115028
+	* gcc.target/i386/pr101950-2.c: Use a pointer argument instead
+	of the argument directly.
+
+2025-02-25  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	PR target/115458
+	* g++.target/riscv/pr115458.C: New.
+
+2025-02-25  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/118654
+	* gdc.dg/target/i386/i386.exp: New test.
+	* gdc.dg/target/i386/targetinfo_CET.d: New test.
+
+2025-02-25  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/119000
+	* c-c++-common/gomp/pr119000.c: New test.
+
+2025-02-25  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/118876
+	* g++.dg/gomp/pr118876.C: New test.
+
+2025-02-25  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/118923
+	* g++.dg/cpp0x/pr118923.C: New test.
+	* g++.dg/cpp1y/pr118923.C: New test.
+
 2025-02-24  Robin Dapp  <rdapp@ventanamicro.com>
 
 	PR target/114516
