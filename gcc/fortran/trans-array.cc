@@ -5702,6 +5702,24 @@ gfc_conv_ss_descriptor (stmtblock_t * block, gfc_ss * ss, int base)
   gfc_conv_expr_lhs (&se, ss_info->expr);
   gfc_add_block_to_block (block, &se.pre);
   info->descriptor = se.expr;
+  if (TREE_CODE (info->descriptor) == INDIRECT_REF)
+    {
+      tree ptr = TREE_OPERAND (info->descriptor, 0);
+      ptr = gfc_evaluate_now (ptr, block);
+      TREE_OPERAND (info->descriptor, 0) = ptr;
+    }
+  else if (TREE_CODE (info->descriptor) == COMPONENT_REF)
+    {
+      tree parent_ref = TREE_OPERAND (info->descriptor, 0);
+      tree parent_ptr_type = build_pointer_type (TREE_TYPE (parent_ref));
+      tree ptr = fold_build1_loc (input_location, ADDR_EXPR,
+				  parent_ptr_type, parent_ref);
+      ptr = gfc_evaluate_now (ptr, block);
+      tree deref = fold_build1_loc (input_location, INDIRECT_REF,
+				    TREE_TYPE (parent_ref),
+				    ptr);
+      TREE_OPERAND (info->descriptor, 0) = deref;
+    }
   ss_info->string_length = se.string_length;
   ss_info->class_container = se.class_container;
 
