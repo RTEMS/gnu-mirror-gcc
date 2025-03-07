@@ -5681,6 +5681,35 @@ gfc_add_loop_ss_code (gfc_loopinfo * loop, gfc_ss * ss, bool subscript,
 }
 
 
+/* A simple reference can be accessed with a pointer and
+   a constant offset.  */
+bool
+simple_reference_p (tree data_ref)
+{
+  bool seen_dereference = false;
+  while (true)
+    {
+      if (DECL_P (data_ref))
+	return true;
+
+      if (TREE_CODE (data_ref) == INDIRECT_REF)
+	{
+	  if (seen_dereference)
+	    return false;
+
+	  seen_dereference = true;
+	  data_ref = TREE_OPERAND (data_ref, 0);
+	}
+      else if (TREE_CODE (data_ref) == COMPONENT_REF)
+	data_ref = TREE_OPERAND (data_ref, 0);
+      else if (TREE_CODE (data_ref) == NOP_EXPR)
+	data_ref = TREE_OPERAND (data_ref, 0);
+      else
+	return false;
+    }
+}
+
+
 /* Translate expressions for the descriptor and data pointer of a SS.  */
 /*GCC ARRAYS*/
 
@@ -5701,24 +5730,34 @@ gfc_conv_ss_descriptor (stmtblock_t * block, gfc_ss * ss, int base)
   se.descriptor_only = 1;
   gfc_conv_expr_lhs (&se, ss_info->expr);
   gfc_add_block_to_block (block, &se.pre);
-  info->descriptor = se.expr;
-  if (TREE_CODE (info->descriptor) == INDIRECT_REF)
+  if (simple_reference_p (se.expr))
+    info->descriptor = se.expr;
+  else
     {
-      tree ptr = TREE_OPERAND (info->descriptor, 0);
-      ptr = gfc_evaluate_now (ptr, block);
-      TREE_OPERAND (info->descriptor, 0) = ptr;
-    }
-  else if (TREE_CODE (info->descriptor) == COMPONENT_REF)
-    {
-      tree parent_ref = TREE_OPERAND (info->descriptor, 0);
-      tree parent_ptr_type = build_pointer_type (TREE_TYPE (parent_ref));
-      tree ptr = fold_build1_loc (input_location, ADDR_EXPR,
-				  parent_ptr_type, parent_ref);
-      ptr = gfc_evaluate_now (ptr, block);
-      tree deref = fold_build1_loc (input_location, INDIRECT_REF,
-				    TREE_TYPE (parent_ref),
-				    ptr);
-      TREE_OPERAND (info->descriptor, 0) = deref;
+      tree desc = se.expr;
+      STRIP_NOPS (desc);
+      if (TREE_CODE (desc) == INDIRECT_REF)
+	{
+	  tree ptr = TREE_OPERAND (desc, 0);
+	  ptr = gfc_evaluate_now (ptr, block);
+	  TREE_OPERAND (desc, 0) = ptr;
+	  info->descriptor = se.expr;
+	}
+      else if (TREE_CODE (desc) == COMPONENT_REF)
+	{
+	  tree parent_ref = TREE_OPERAND (desc, 0);
+	  tree parent_ptr_type = build_pointer_type (TREE_TYPE (parent_ref));
+	  tree ptr = fold_build1_loc (input_location, ADDR_EXPR,
+				      parent_ptr_type, parent_ref);
+	  ptr = gfc_evaluate_now (ptr, block);
+	  tree deref = fold_build1_loc (input_location, INDIRECT_REF,
+					TREE_TYPE (parent_ref),
+					ptr);
+	  TREE_OPERAND (desc, 0) = deref;
+	  info->descriptor = se.expr;
+	}
+      else
+	info->descriptor = gfc_evaluate_now (se.expr, block);
     }
   ss_info->string_length = se.string_length;
   ss_info->class_container = se.class_container;
