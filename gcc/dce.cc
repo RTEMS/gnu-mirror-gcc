@@ -1313,6 +1313,7 @@ bool sets_global_register(const_rtx rtx) {
 }
 
 // We should mark stack registers
+// use HARD_FRAME_POINTER_REGNUM, REGNO_PTR_FRAME_P
 bool sets_global_register(rtx_insn* insn) {
   rtx set = single_set(insn);
   if (!set)
@@ -1367,21 +1368,55 @@ bool is_unary_mem_modification(rtx_code code) {
   }
 }
 
-bool is_rtx_insn_prelive(const_rtx rtx) {
-  if (rtx == nullptr) {
-    return false;
+bool is_rtx_insn_prelive(rtx_insn *insn) {
+  gcc_assert(insn != nullptr);
+
+  // TODO : handle calls correctly
+  if (CALL_P (insn)
+      /* We cannot delete pure or const sibling calls because it is
+	 hard to see the result.  */
+      && (!SIBLING_CALL_P (insn))
+      /* We can delete dead const or pure calls as long as they do not
+         infinite loop.  */
+      && (RTL_CONST_OR_PURE_CALL_P (insn) && !RTL_LOOPING_CONST_OR_PURE_CALL_P (insn))
+      /* Don't delete calls that may throw if we cannot do so.  */
+      && can_delete_call (insn))
+    return true;
+    // return !find_call_stack_args (as_a <rtx_call_insn *> (insn), false, fast, arg_stores);
+
+  // Jumps, notes, barriers should not be deleted
+    // According to the docs, rtl ssa does not contain noteS and barrierS 
+  if (!NONJUMP_INSN_P (insn))
+  {
+    std::cerr << "found jump instruction\n";
+    debug(insn);
+    return true;
   }
 
-  auto code = GET_CODE(rtx);
-  if (is_control_flow(code))
+  // Only rtx_insn should be handled here
+  auto code = GET_CODE(insn);
+  gcc_assert(code == INSN);
+
+  /* Don't delete insns that may throw if we cannot do so.  */
+  if (!(cfun->can_delete_dead_exceptions && can_alter_cfg) && !insn_nothrow_p (insn))
     return true;
+
+  /* TODO : What about call argumets? Accoring to the docs, for function prologue the RTX_FRAME_RELATED_P
+     should return true.
+  */  
+  /* Callee-save restores are needed.  */
+  if (RTX_FRAME_RELATED_P (insn) && crtl->shrink_wrapped_separate && find_reg_note (insn, REG_CFA_RESTORE, NULL))
+    return true;
+
+  // if (is_control_flow(code))
+  //   return true;
 
   // Mark set of a global register
-  if (sets_global_register(rtx)) // check rtx_class with GET_RTX_CLASS if RTX_ISNS and convert if needed
+  if (sets_global_register(insn)) // check rtx_class with GET_RTX_CLASS if RTX_ISNS and convert if needed
     return true;
 
-  // Call is inside side_effects_p - how to mark parameter registers?
-  if (volatile_refs_p(rtx) || can_throw_internal(rtx) || BARRIER_P(rtx) || code == PREFETCH)
+  rtx body = PATTERN(insn);
+  if (side_effects_p(body) || can_throw_internal(body))
     return true;
 
   if (is_unary_mem_modification(code))
@@ -1391,20 +1426,33 @@ bool is_rtx_insn_prelive(const_rtx rtx) {
   // Parallel is handled by volatile_refs_p
 
   switch (code) {
-    
+    case MEM:
+    case ASM_INPUT:
+    case ASM_OPERANDS:
+      return true;
+
+    case PARALLEL:
+      for (int i = XVECLEN (body, 0) - 1; i >= 0; i--)
+	      if (!deletable_insn_p_1 (XVECEXP (body, 0, i)))
+	        return true;
+      return false;
+      break;
+
+    default:
+      break;
   }
 
-  const char *const fmt = GET_RTX_FORMAT (code);
-  for (size_t i = 0; i < GET_RTX_LENGTH(code); ++i) {
-    if (fmt[i] == 'e' && is_rtx_insn_prelive(XEXP(rtx, i))) {
-      return true;
-    } else if (fmt[i] == 'E') {
-      for (size_t j = 0; j < XVECLEN(rtx, i); ++j) {
-        if (is_rtx_insn_prelive(XVECEXP(rtx, i, j)))
-          return true;
-      }
-    }
-  }
+  // const char *const fmt = GET_RTX_FORMAT (code);
+  // for (size_t i = 0; i < GET_RTX_LENGTH(code); ++i) {
+  //   if (fmt[i] == 'e' && is_rtx_insn_prelive(XEXP(rtx, i))) {
+  //     return true;
+  //   } else if (fmt[i] == 'E') {
+  //     for (size_t j = 0; j < XVECLEN(rtx, i); ++j) {
+  //       if (is_rtx_insn_prelive(XVECEXP(rtx, i, j)))
+  //         return true;
+  //     }
+  //   }
+  // }
 
   return false;
 }
@@ -1440,7 +1488,7 @@ bool is_prelive(insn_info *insn)
   if (!INSN_P(rtl)) // This might be useless
     return false;
 
-  rtx pat = PATTERN(rtl); // if we use this instead of rtl, then rtl notes wont be checked
+  return is_rtx_insn_prelive(rtl);
   
   // TODO : join if statements
   // We need to describe all possible prelive instructions, a list of all the instructions is inside `rtl.def`
@@ -1458,7 +1506,7 @@ bool is_prelive(insn_info *insn)
   std::cerr << "Prelive: " << GET_RTX_NAME(code) << '\n';
   // debug(insn);
   debug(rtl);
-  if (volatile_refs_p(rtl) || can_throw_internal(rtl) || BARRIER_P(rtl) || code == PREFETCH)
+  if (side_effects_p(rtl) || can_throw_internal(rtl) || BARRIER_P(rtl) || code == PREFETCH)
     return true;
 
   if (code == PARALLEL) {
@@ -1493,7 +1541,7 @@ rtl_ssa_dce_done()
 }
 
 static void
-rtl_ssa_dce_mark_live(insn_info *info, vec<insn_info *> &worklist, std::unordered_set<insn_info *> marked)
+rtl_ssa_dce_mark_live(insn_info *info, vec<insn_info *> &worklist, std::unordered_set<insn_info *> &marked)
 {
   int info_uid = info->uid();
   if (dump_file)
@@ -1504,7 +1552,7 @@ rtl_ssa_dce_mark_live(insn_info *info, vec<insn_info *> &worklist, std::unordere
 }
 
 static auto_vec<insn_info *>
-rtl_ssa_dce_prelive(std::unordered_set<insn_info *> marked)
+rtl_ssa_dce_prelive(std::unordered_set<insn_info *> &marked)
 {
   insn_info *next;
   auto_vec<insn_info *> worklist;
@@ -1539,9 +1587,10 @@ rtl_ssa_dce_prelive(std::unordered_set<insn_info *> marked)
   return worklist;
 }
 
-static void
-rtl_ssa_dce_mark(std::unordered_set<insn_info *> marked)
+static std::unordered_set<insn_info *>
+rtl_ssa_dce_mark()
 {
+  std::unordered_set<insn_info *> marked{};
   auto worklist = rtl_ssa_dce_prelive(marked);
 
   if (dump_file)
@@ -1574,6 +1623,7 @@ rtl_ssa_dce_mark(std::unordered_set<insn_info *> marked)
   }
 
   // TODO : control dependence
+  return marked;
 }
 
 static void
@@ -1585,6 +1635,7 @@ rtl_ssa_dce_sweep(std::unordered_set<insn_info *> marked)
   // it might be better to iterate over `marked`
   // we can get the number of items in the set and create an array of changes
   // which will hopefully have constructor for array_slice<insn_info *>
+  auto attempt = crtl->ssa->new_change_attempt ();
   for (insn_info *insn = crtl->ssa->first_insn(); insn; insn = next)
   {
     if (dump_file)
@@ -1616,7 +1667,7 @@ rtl_ssa_dce_sweep(std::unordered_set<insn_info *> marked)
 
   if (crtl->ssa->verify_insn_changes(changes)) {
     std::cerr << "Changes are correct\n";
-    // crtl->ssa->change_insns(changes);
+    crtl->ssa->change_insns(changes);
   } else {
     std::cerr << "Changes are not correct\n";
   }
@@ -1627,11 +1678,46 @@ rtl_ssa_dce()
 {
   // I can do something like invert phi uid and shift it
   // unordered_set seems to be the easiest option
-  std::unordered_set<insn_info *> marked;
   rtl_ssa_dce_init();
-  debug(crtl->ssa);
+
+  for (rtl_ssa::bb_info* bb : crtl->ssa->bbs()) {
+    // debug(bb);
+    std::cerr << "BASIC BLOCK: " << bb->index() << '\n';
+    std::cerr << "PRINTING INSNS:\n";
+    for (rtl_ssa::insn_info* insn : bb->all_insns()) {
+      std::cerr << "PRINTING INSN\n";
+      debug(insn);
+      if (insn->is_real()) {
+        std::cerr << "RTL PART\n";
+        debug(insn->rtl());
+      } else {
+        std::cerr << "NON REAL INSN\n";
+      }
+
+      rtl_ssa::use_array ua = insn->uses();
+      std::cerr << "USES\n";
+      for (size_t i = 0; i < ua.size(); i++)
+      {
+        std::cerr << "USE: " << i << '\n';
+        ua[i]->def();
+        debug(ua[i]->insn());
+      }
+
+      // rtl_ssa::def_array df = insn->defs();
+      // std::cerr << "DEFS\n";
+      // for (size_t i = 0; i < df.size(); i++)
+      // {
+      //   std::cerr << "DEF: " << i << '\n';
+      //   debug(df[i]->insn());
+      // }
+    }
+
+    std::cerr << "\n\n\n";
+  }
+
+  // debug(crtl->ssa);
   std::cerr << "Next phase: prelive + mark: \n";
-  rtl_ssa_dce_mark(marked);
+  std::unordered_set<insn_info *> marked = rtl_ssa_dce_mark();
   rtl_ssa_dce_sweep(marked);
   rtl_ssa_dce_done();
 
