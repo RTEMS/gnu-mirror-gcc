@@ -1430,8 +1430,8 @@ bool is_rtx_insn_prelive(rtx_insn *insn) {
   // According to the docs, rtl ssa does not contain noteS and barrierS 
   if (!NONJUMP_INSN_P (insn))
   {
-    std::cerr << "found jump instruction\n";
-    debug(insn);
+    //std::cerr << "found jump instruction\n";
+    //debug(insn);
     return true;
   }
 
@@ -1510,7 +1510,7 @@ bool is_prelive(insn_info *insn)
     return false;
 
   auto res = is_rtx_insn_prelive(rtl);
-  std::cerr << "Trying to mark insn: " << insn->uid() << " as prelive: " << res << '\n';
+  //std::cerr << "Trying to mark insn: " << insn->uid() << " as prelive: " << res << '\n';
 
   return is_rtx_insn_prelive(rtl);
 }
@@ -1589,11 +1589,25 @@ rtl_ssa_dce_mark()
   {
     insn_info *insn = worklist.pop();
     use_array uses = insn->uses();
+    if (insn->is_phi()) {
+      std::cerr << "Phi : "<< insn->uid() << " - uses: " << insn->num_uses() << ", defs:" << insn->num_defs() << '\n';
+      for (auto&& use : uses) {
+        debug(use);
+        std::cerr << '\n';
+      }
+    } else if (insn->is_artificial()) {
+      std::cerr << "Artificial " << insn->uid() << " - uses: " << insn->num_uses() << ", defs:" << insn->num_defs() << '\n';
+      for (auto&& use : uses) {
+        debug(use);
+        std::cerr << '\n';
+      }
+    }
 
     if (dump_file)
       fprintf(dump_file, "Looking at: %d, uses: %d\n", insn->uid(), uses.size());
 
-    std::cerr << "Insn: " << insn->uid() << ", uses: " << uses.size() << '\n';
+    //std::cerr << "Insn: " << insn->uid() << ", uses: " << uses.size() << '\n';
+      std::cerr << "Current: " << insn->uid() << '\n';
     for (size_t i = 0; i < uses.size(); i++)
     {
       // debug(uses[i]);
@@ -1605,7 +1619,18 @@ rtl_ssa_dce_mark()
       // std::cerr << '\n';
       // debug(use);
       // std::cerr << '\n';
+      
+      
       insn_info *parent_insn = use->def()->insn();
+      if (parent_insn->is_phi()) { // this is weird...
+        // debug(use->def());
+        phi_info * pi = as_a<phi_info *> (use->def());
+        // std::cerr << "phi inputs: " << pi->num_inputs() << '\n';
+        for (auto&& input: pi->inputs()) {
+          use_info* phi_use = input;
+          std::cerr << "Via phi insn: " << phi_use->def()->insn()->uid() << '\n';
+        }
+      }
       int parent_insn_uid = parent_insn->uid();
       // propage that some instruction in chain is live from bottom to top
       if (dump_file)
@@ -1613,9 +1638,11 @@ rtl_ssa_dce_mark()
       // not yet marked
       if (!(marked.count(parent_insn) > 0))
       {
-        std::cerr << "Adding: " << parent_insn_uid << " to worklist";
+        //std::cerr << "Adding: " << parent_insn_uid << " to worklist";
         if (dump_file)
           fprintf(dump_file, "  Adding insn %d to worklist - mark\n", parent_insn_uid);
+
+        
         worklist.safe_push(parent_insn);
         marked.emplace(parent_insn);
       }
@@ -1625,7 +1652,8 @@ rtl_ssa_dce_mark()
   }
 
   for (auto&& insn : marked) {
-    std::cerr << "Marked insn: " << insn->uid() << '\n';
+    if (dump_file)
+      fprintf(dump_file, "  Marked insn: %d\n", insn->uid());
   }
 
   // TODO : control dependence
@@ -1672,7 +1700,7 @@ rtl_ssa_dce_sweep(std::unordered_set<insn_info *> marked)
   }
 
   if (crtl->ssa->verify_insn_changes(changes)) {
-    std::cerr << "Changes are correct\n";
+    //std::cerr << "Changes are correct\n";
     crtl->ssa->change_insns(changes);
   } else {
     std::cerr << "Changes are not correct\n";
@@ -1685,7 +1713,7 @@ rtl_ssa_dce()
   rtl_ssa_dce_init();
   debug(crtl->ssa);
 
-  std::cerr << "Next phase: prelive + mark: \n";
+  //std::cerr << "Next phase: prelive + mark: \n";
   std::unordered_set<insn_info *> marked = rtl_ssa_dce_mark();
   rtl_ssa_dce_sweep(marked);
   rtl_ssa_dce_done();
@@ -1723,7 +1751,7 @@ namespace
     }
 
     /* opt_pass methods: */
-    bool gate(function *) final override { return flag_dce; }
+    bool gate(function *) final override { return optimize > 0 && flag_dce; }
 
     unsigned int execute(function *) final override { return rtl_ssa_dce(); }
 
