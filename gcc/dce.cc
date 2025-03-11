@@ -1582,6 +1582,57 @@ rtl_ssa_dce_mark()
 {
   std::unordered_set<insn_info *> marked{};
   auto worklist = rtl_ssa_dce_prelive(marked);
+  auto_vec<set_info *> worklist_new{};
+  for (auto && item : worklist) {
+    insn_info * insn = item;
+    for (auto&& use : insn->uses()) {
+      set_info* set = use->def();
+      if (set) {
+        worklist_new.safe_push(set);
+      }
+    }
+  }
+
+  while (!worklist_new.is_empty()) {
+    set_info* set = worklist_new.pop();
+    insn_info* insn = set->insn();
+    if (!insn) {
+      continue;
+    }
+
+    if (!(marked.count(insn) > 0))
+    {
+      marked.emplace(insn);
+    }
+
+    // use_array uses = insn->uses();
+    if (insn->is_phi()) {
+      phi_info* pi = as_a<phi_info *> (set);
+      
+      for (auto && input : pi->inputs()) {
+        use_info* use = input;
+        set_info* parent_set = use->def();
+        if (!parent_set) { // Clobber...
+          continue;
+        }
+
+        worklist_new.safe_push(parent_set);
+      }
+    } else {
+      if (dump_file)
+        fprintf(dump_file, "  Adding insn %d to worklist - mark\n", insn->uid());
+      
+      for (auto && use__ : insn->uses()) {
+        use_info * use = use__;
+        set_info* parent_set = use->def();
+        if (!parent_set) {
+          continue;
+        }
+
+        worklist_new.safe_push(parent_set);
+      }
+    }
+  }
 
   if (dump_file)
     fprintf(dump_file, "Finished inherently live, marking parents\n");
@@ -1620,17 +1671,23 @@ rtl_ssa_dce_mark()
       // debug(use);
       // std::cerr << '\n';
       
-      
-      insn_info *parent_insn = use->def()->insn();
-      if (parent_insn->is_phi()) { // this is weird...
-        // debug(use->def());
-        phi_info * pi = as_a<phi_info *> (use->def());
-        // std::cerr << "phi inputs: " << pi->num_inputs() << '\n';
-        for (auto&& input: pi->inputs()) {
-          use_info* phi_use = input;
-          std::cerr << "Via phi insn: " << phi_use->def()->insn()->uid() << '\n';
-        }
+      set_info* set = use->def();
+      if (!set) {
+        continue;
       }
+      insn_info *parent_insn = set->insn();
+      if (!parent_insn) {
+        continue;
+      }
+      // if (parent_insn->is_phi()) { // this is weird...
+      //   // debug(use->def());
+      //   phi_info * pi = as_a<phi_info *> (use->def());
+      //   // std::cerr << "phi inputs: " << pi->num_inputs() << '\n';
+      //   for (auto&& input: pi->inputs()) {
+      //     use_info* phi_use = input;
+      //     std::cerr << "Via phi insn: " << phi_use->def()->insn()->uid() << '\n';
+      //   }
+      // }
       int parent_insn_uid = parent_insn->uid();
       // propage that some instruction in chain is live from bottom to top
       if (dump_file)
