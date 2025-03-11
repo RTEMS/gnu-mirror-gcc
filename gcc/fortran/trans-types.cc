@@ -2865,6 +2865,8 @@ get_class_canonical_type (gfc_symbol *derived, int rank, int corank)
   gfc_build_class_symbol (&ts, &attr, &pas);
 
   gfc_find_symbol (class_name, ns, 0, &canonical_class);
+  if (canonical_class)
+    gfc_resolve_symbol (canonical_class);
 
   return canonical_class;
 }
