@@ -2959,7 +2959,7 @@ gfc_conv_component_ref (gfc_se * se, gfc_ref * ref)
       field = f2;
     }
 
-  if (ref->u.c.sym && ref->u.c.sym->ts.type == BT_CLASS
+  if (ref->u.c.sym && ref->u.c.sym->attr.is_class
       && strcmp ("_data", c->name) == 0)
     {
       /* Found a ref to the _data component.  Store the associated ref to
