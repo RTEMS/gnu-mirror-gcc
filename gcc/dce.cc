@@ -1387,10 +1387,12 @@ bool side_effects_with_mem (const_rtx x)
       return true;
 
     case MEM: // We might want tu return true iff volatile or mem is a destination
+      // write or possible null read
     case ASM_INPUT:
     case ASM_OPERANDS:
 	    return true;
 
+    // This should rather by RTX_BODY in is_rtx_insn_prelive - like global clobber
     case USE:
       return true;
 
@@ -1468,6 +1470,9 @@ bool is_rtx_insn_prelive(rtx_insn *insn) {
     return true;
 
   rtx body = PATTERN(insn);
+  if (GET_CODE(body) == CLOBBER) // ~/Documents/gcc/gcc/testsuite/gcc.c-torture/compile/20000605-1.c
+    return true;
+
   if (side_effects_with_mem(body) || can_throw_internal(body))
     return true;
 
@@ -1585,6 +1590,7 @@ rtl_ssa_dce_mark()
   auto_vec<set_info *> worklist_new{};
   for (auto && item : worklist) {
     insn_info * insn = item;
+    std::cerr << "cp Current: " << insn->uid() << '\n';
     for (auto&& use : insn->uses()) {
       set_info* set = use->def();
       if (set) {
@@ -1600,118 +1606,119 @@ rtl_ssa_dce_mark()
       continue;
     }
 
-    if (!(marked.count(insn) > 0))
-    {
-      marked.emplace(insn);
+    /*
+     * TODO : a phi insn might be visited more times due to having more phi nodes
+     * Either we have to mark phi nodes or do not mark phi insn
+    */
+    std::cerr << "Current: " << insn->uid() << '\n';
+    // if (insn->uid() == -21) {
+      // std::cerr << "Insn -21 phi? " << insn->is_phi() << '\n';
+    // }
+
+    if ((marked.count(insn) > 0)) {
+      continue;
     }
 
-    // use_array uses = insn->uses();
-    if (insn->is_phi()) {
-      phi_info* pi = as_a<phi_info *> (set);
-      
-      for (auto && input : pi->inputs()) {
-        use_info* use = input;
-        set_info* parent_set = use->def();
-        if (!parent_set) { // Clobber...
-          continue;
-        }
+    marked.emplace(insn);
 
-        worklist_new.safe_push(parent_set);
-      }
-    } else {
-      if (dump_file)
-        fprintf(dump_file, "  Adding insn %d to worklist - mark\n", insn->uid());
-      
-      for (auto && use__ : insn->uses()) {
-        use_info * use = use__;
-        set_info* parent_set = use->def();
-        if (!parent_set) {
-          continue;
-        }
-
-        worklist_new.safe_push(parent_set);
-      }
-    }
-  }
-
-  if (dump_file)
-    fprintf(dump_file, "Finished inherently live, marking parents\n");
-  while (!worklist.is_empty())
-  {
-    insn_info *insn = worklist.pop();
     use_array uses = insn->uses();
     if (insn->is_phi()) {
-      std::cerr << "Phi : "<< insn->uid() << " - uses: " << insn->num_uses() << ", defs:" << insn->num_defs() << '\n';
-      for (auto&& use : uses) {
-        debug(use);
-        std::cerr << '\n';
-      }
-    } else if (insn->is_artificial()) {
-      std::cerr << "Artificial " << insn->uid() << " - uses: " << insn->num_uses() << ", defs:" << insn->num_defs() << '\n';
-      for (auto&& use : uses) {
-        debug(use);
-        std::cerr << '\n';
-      }
+      phi_info* pi = as_a<phi_info *> (set);
+      uses = pi->inputs();
     }
 
     if (dump_file)
-      fprintf(dump_file, "Looking at: %d, uses: %d\n", insn->uid(), uses.size());
+      fprintf(dump_file, "  Adding insn %d to worklist - mark\n", insn->uid());
+    
+    for (auto && use__ : uses) {
+      use_info * use = use__;
+      set_info* parent_set = use->def();
+      if (!parent_set) {
+        continue;
+      }
 
-    //std::cerr << "Insn: " << insn->uid() << ", uses: " << uses.size() << '\n';
-      std::cerr << "Current: " << insn->uid() << '\n';
-    for (size_t i = 0; i < uses.size(); i++)
-    {
-      // debug(uses[i]);
-      use_info* use = uses[i];
-      // debug(use->def());
-      // if (use->def() != nullptr) {
-      //   std::cerr << use->def()->insn()->uid() << '\n';
-      // }
-      // std::cerr << '\n';
-      // debug(use);
-      // std::cerr << '\n';
+      worklist_new.safe_push(parent_set);
+    }
+  }
+
+  // if (dump_file)
+  //   fprintf(dump_file, "Finished inherently live, marking parents\n");
+  // while (!worklist.is_empty())
+  // {
+  //   insn_info *insn = worklist.pop();
+  //   use_array uses = insn->uses();
+  //   if (insn->is_phi()) {
+  //     std::cerr << "Phi : "<< insn->uid() << " - uses: " << insn->num_uses() << ", defs:" << insn->num_defs() << '\n';
+  //     for (auto&& use : uses) {
+  //       debug(use);
+  //       std::cerr << '\n';
+  //     }
+  //   } else if (insn->is_artificial()) {
+  //     std::cerr << "Artificial " << insn->uid() << " - uses: " << insn->num_uses() << ", defs:" << insn->num_defs() << '\n';
+  //     for (auto&& use : uses) {
+  //       debug(use);
+  //       std::cerr << '\n';
+  //     }
+  //   }
+
+  //   if (dump_file)
+  //     fprintf(dump_file, "Looking at: %d, uses: %d\n", insn->uid(), uses.size());
+
+  //   //std::cerr << "Insn: " << insn->uid() << ", uses: " << uses.size() << '\n';
+  //     std::cerr << "Current: " << insn->uid() << '\n';
+  //   for (size_t i = 0; i < uses.size(); i++)
+  //   {
+  //     // debug(uses[i]);
+  //     use_info* use = uses[i];
+  //     // debug(use->def());
+  //     // if (use->def() != nullptr) {
+  //     //   std::cerr << use->def()->insn()->uid() << '\n';
+  //     // }
+  //     // std::cerr << '\n';
+  //     // debug(use);
+  //     // std::cerr << '\n';
       
-      set_info* set = use->def();
-      if (!set) {
-        continue;
-      }
-      insn_info *parent_insn = set->insn();
-      if (!parent_insn) {
-        continue;
-      }
-      // if (parent_insn->is_phi()) { // this is weird...
-      //   // debug(use->def());
-      //   phi_info * pi = as_a<phi_info *> (use->def());
-      //   // std::cerr << "phi inputs: " << pi->num_inputs() << '\n';
-      //   for (auto&& input: pi->inputs()) {
-      //     use_info* phi_use = input;
-      //     std::cerr << "Via phi insn: " << phi_use->def()->insn()->uid() << '\n';
-      //   }
-      // }
-      int parent_insn_uid = parent_insn->uid();
-      // propage that some instruction in chain is live from bottom to top
-      if (dump_file)
-        fprintf(dump_file, "Trying to add: %d\n", parent_insn_uid);
-      // not yet marked
-      if (!(marked.count(parent_insn) > 0))
-      {
-        //std::cerr << "Adding: " << parent_insn_uid << " to worklist";
-        if (dump_file)
-          fprintf(dump_file, "  Adding insn %d to worklist - mark\n", parent_insn_uid);
+  //     set_info* set = use->def();
+  //     if (!set) {
+  //       continue;
+  //     }
+  //     insn_info *parent_insn = set->insn();
+  //     if (!parent_insn) {
+  //       continue;
+  //     }
+  //     // if (parent_insn->is_phi()) { // this is weird...
+  //     //   // debug(use->def());
+  //     //   phi_info * pi = as_a<phi_info *> (use->def());
+  //     //   // std::cerr << "phi inputs: " << pi->num_inputs() << '\n';
+  //     //   for (auto&& input: pi->inputs()) {
+  //     //     use_info* phi_use = input;
+  //     //     std::cerr << "Via phi insn: " << phi_use->def()->insn()->uid() << '\n';
+  //     //   }
+  //     // }
+  //     int parent_insn_uid = parent_insn->uid();
+  //     // propage that some instruction in chain is live from bottom to top
+  //     if (dump_file)
+  //       fprintf(dump_file, "Trying to add: %d\n", parent_insn_uid);
+  //     // not yet marked
+  //     if (!(marked.count(parent_insn) > 0))
+  //     {
+  //       //std::cerr << "Adding: " << parent_insn_uid << " to worklist";
+  //       if (dump_file)
+  //         fprintf(dump_file, "  Adding insn %d to worklist - mark\n", parent_insn_uid);
 
         
-        worklist.safe_push(parent_insn);
-        marked.emplace(parent_insn);
-      }
-    }
+  //       worklist.safe_push(parent_insn);
+  //       marked.emplace(parent_insn);
+  //     }
+  //   }
 
     // auto bb = insn->bb();
-  }
+  // }
 
-  for (auto&& insn : marked) {
-    if (dump_file)
-      fprintf(dump_file, "  Marked insn: %d\n", insn->uid());
-  }
+  // for (auto&& insn : marked) {
+  //   if (dump_file)
+  //     fprintf(dump_file, "  Marked insn: %d\n", insn->uid());
+  // }
 
   // TODO : control dependence
   return marked;
@@ -1726,6 +1733,7 @@ rtl_ssa_dce_sweep(std::unordered_set<insn_info *> marked)
   // we can get the number of items in the set and create an array of changes
   // which will hopefully have constructor for array_slice<insn_info *>
   auto attempt = crtl->ssa->new_change_attempt ();
+  std::cerr << "Change attempt created successfully" << std::endl;
   for (insn_info *insn = crtl->ssa->first_insn(); insn; insn = next)
   {
     if (dump_file)
@@ -1743,6 +1751,7 @@ rtl_ssa_dce_sweep(std::unordered_set<insn_info *> marked)
       // Skip artificial insns (or uid() < 0)
       if (insn->is_real())
       {
+        std::cerr << "Insn: " << insn->uid() << " will be deleted\n";
         auto change = insn_change::delete_insn(insn);
         // crtl->ssa->possibly_queue_changes(change);
         to_delete.safe_push(change);
@@ -1750,14 +1759,18 @@ rtl_ssa_dce_sweep(std::unordered_set<insn_info *> marked)
       }
     }
   }
+
+  std::cerr << "Selected unmarked insns" << std::endl;
   
   auto_vec<insn_change*> changes(to_delete.length());
   for (size_t i = 0; i != to_delete.length(); ++i) {
     changes.safe_push(&to_delete[i]);
   }
 
+  std::cerr << "Verification" << std::endl;
   if (crtl->ssa->verify_insn_changes(changes)) {
-    //std::cerr << "Changes are correct\n";
+    std::cerr << "Changes are correct" << std::endl;
+    // segfault: gcc.c-torture/execute/20000224-1.c
     crtl->ssa->change_insns(changes);
   } else {
     std::cerr << "Changes are not correct\n";
@@ -1772,7 +1785,9 @@ rtl_ssa_dce()
 
   //std::cerr << "Next phase: prelive + mark: \n";
   std::unordered_set<insn_info *> marked = rtl_ssa_dce_mark();
+  std::cerr << "Marking done\n";
   rtl_ssa_dce_sweep(marked);
+  std::cerr << "Sweeping done\n";
   rtl_ssa_dce_done();
 
   return 0;
